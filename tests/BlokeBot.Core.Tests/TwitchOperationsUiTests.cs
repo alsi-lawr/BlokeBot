@@ -86,6 +86,16 @@ public sealed class TwitchOperationsUiTests
         var selectorEnd = styles.IndexOf('}', selectorStart);
         styles[selectorStart..selectorEnd].ShouldContain("gap: 0.75rem");
 
+        styles
+            .TrimEnd()
+            .ShouldEndWith(
+                """
+                .dashboard-page[data-native-route] .phone-card-list {
+                    display: grid;
+                }
+                """
+            );
+
         var sharedStyles = ReadRepositoryFile(
             "src",
             "BlokeBot.Core",
@@ -107,8 +117,15 @@ public sealed class TwitchOperationsUiTests
             }
         )
         {
-            ReadRepositoryFile(["src", "BlokeBot.Core", "Features", "TwitchOperations", .. path])
-                .ShouldContain("data-native-route=");
+            var page = ReadRepositoryFile([
+                "src",
+                "BlokeBot.Core",
+                "Features",
+                "TwitchOperations",
+                .. path,
+            ]);
+            page.ShouldContain("data-native-route=");
+            page.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
         }
     }
 
@@ -242,7 +259,7 @@ public sealed class TwitchOperationsUiTests
         {
             page.Find("[data-native-route='shoutouts']");
             page.Find("[data-native-route='shoutouts']")
-                .ClassList.ShouldContain("dashboard-page--readable");
+                .ClassList.ShouldContain("dashboard-page--wide");
             page.Find("#shoutout-target");
             var sections = page.FindAll(".disclosure-title")
                 .Select(element => element.TextContent.Trim())

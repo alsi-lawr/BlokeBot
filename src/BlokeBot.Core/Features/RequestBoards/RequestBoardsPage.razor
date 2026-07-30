@@ -12,7 +12,10 @@
                Description="Configure viewer submissions and moderate the queue."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        <a class="btn-secondary" href="@_publicBoardUrl">Open public board</a>
+        @if (!_isCreating && Host is not null)
+        {
+            <a class="btn-secondary" href="@_publicBoardUrl">Open public board</a>
+        }
         <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
     </Actions>
 
@@ -27,15 +30,23 @@
             <aside class="card p-4">
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold text-slate-950">Boards</h2>
-                    <button class="btn-secondary" type="button" @onclick="NewBoard">New</button>
+                    <button class="btn-secondary"
+                            type="button"
+                            disabled="@_isCreating"
+                            aria-describedby="@(_isCreating ? "request-board-create-guidance" : null)"
+                            @onclick="NewBoard">New board</button>
                 </div>
+                @if (_boardList.Count == 0)
+                {
+                    <p class="mt-3 text-sm text-muted-foreground">No saved boards yet.</p>
+                }
                 <div class="mt-3 grid gap-2">
                     @foreach (var board in _boardList)
                     {
                         <button @key="board.Id"
                                 type="button"
                                 class="control-surface min-h-11 rounded-lg px-3 text-left text-sm font-semibold"
-                                aria-current="@(board.Slug == _draft.Slug ? "true" : null)"
+                                aria-current="@(!_isCreating && board.Slug == _draft.Slug ? "true" : null)"
                                 @onclick="() => SelectBoardAsync(board.Slug)">
                             @board.Title
                             <span class="block text-xs font-normal text-muted-foreground">/@board.Slug · @(board.IsOpen ? "Open" : "Closed")</span>
@@ -46,9 +57,18 @@
 
             <div class="space-y-6">
                 <section class="card p-5" aria-labelledby="request-board-configuration">
-                    <h2 id="request-board-configuration" class="text-lg font-semibold text-slate-950">Board configuration</h2>
+                    <h2 id="request-board-configuration" class="text-lg font-semibold text-slate-950">@(_isCreating ? "New board — not saved" : "Edit board")</h2>
+                    @if (_isCreating)
+                    {
+                        <p id="request-board-create-guidance" class="mt-2 text-sm text-muted-foreground">
+                            Complete the board details, then select Save board to create it. The public board link is available after Save.
+                        </p>
+                    }
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <Field Id="request-board-slug" Label="Command and URL name" @bind-Value="_draft.Slug" />
+                        <Field Id="request-board-slug"
+                               Label="Command and URL name"
+                               FocusRequest="@_primaryFocusRequest"
+                               @bind-Value="_draft.Slug" />
                         <Field Id="request-board-name" Label="Title" @bind-Value="_draft.Title" />
                         <div class="md:col-span-2">
                             <TextAreaField Id="request-board-description" Label="Description" @bind-Value="_draft.Description" />
@@ -73,40 +93,99 @@
                             <input type="checkbox" @bind="_draft.VotingEnabled" /> Enable voting
                         </label>
                     </div>
-                    <h3 class="mt-6 text-base font-semibold text-slate-950">Submission fields</h3>
-                    <div class="mt-3 grid gap-3">
-                        @for (var index = 0; index < _draft.Fields.Count; index++)
-                        {
-                            var field = _draft.Fields[index];
-                            <div @key="field.Identity" class="surface-muted grid gap-3 rounded-lg p-4 md:grid-cols-2">
-                                <Field Id="@($"request-field-key-{index}")" Label="Key" @bind-Value="field.Key" />
-                                <Field Id="@($"request-field-label-{index}")" Label="Label" @bind-Value="field.Label" />
-                                <div>
-                                    <label class="mb-1 block text-sm font-semibold text-slate-950" for="@($"request-field-kind-{index}")">Type</label>
-                                    <select id="@($"request-field-kind-{index}")" class="input" @bind="field.Kind">
-                                        @foreach (var kind in Enum.GetValues<RequestBoardFieldKind>())
-                                        {
-                                            <option value="@kind">@kind</option>
-                                        }
-                                    </select>
+                    <div class="mt-6 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-950">Submission fields</h3>
+                            <p id="request-field-limit" class="mt-1 text-sm text-muted-foreground">
+                                @_draft.Fields.Count of @RequestBoardLimits.MaximumFields fields.
+                                @if (_draft.Fields.Count >= RequestBoardLimits.MaximumFields)
+                                {
+                                    <span>Maximum of @RequestBoardLimits.MaximumFields fields reached.</span>
+                                }
+                            </p>
+                        </div>
+                        <button class="btn-secondary"
+                                type="button"
+                                disabled="@(_draft.Fields.Count >= RequestBoardLimits.MaximumFields)"
+                                aria-describedby="request-field-limit"
+                                @onclick="AddField">Add field</button>
+                    </div>
+                    <div class="management-field-workspace-container mt-3">
+                        <div class="management-field-workspace">
+                            <div class="management-field-inventory" aria-label="Submission fields">
+                            @foreach (var field in _draft.Fields)
+                            {
+                                var selected = IsFieldSelected(field);
+                                <div @key="field.Identity"
+                                     class="management-field-inventory-row surface-row"
+                                     data-current="@(selected ? "true" : "false")"
+                                     aria-current="@(selected ? "true" : null)">
+                                    <div class="min-w-0">
+                                        <p id="@FieldInventoryLabelId(field)" class="text-sm font-semibold text-slate-900">@FieldDisplayName(field)</p>
+                                        <p class="mt-1 break-words text-xs text-muted-foreground">@BoardFieldSummary(field)</p>
+                                    </div>
+                                    <button class="btn-secondary"
+                                            type="button"
+                                            aria-pressed="@(selected ? "true" : "false")"
+                                            aria-controls="@(selected ? FieldEditorRegionId(field) : null)"
+                                            @onclick="() => SelectField(field)">
+                                        @(selected ? "Editing" : "Edit field")
+                                    </button>
                                 </div>
-                                <Field Id="@($"request-field-limit-{index}")" Label="Maximum length" @bind-Value="field.MaximumLength" />
-                                @if (field.Kind == RequestBoardFieldKind.Choice)
-                                {
-                                    <Field Id="@($"request-field-choices-{index}")" Label="Choices (comma-separated)" @bind-Value="field.Choices" />
-                                }
-                                @if (field.Kind == RequestBoardFieldKind.Number)
-                                {
-                                    <Field Id="@($"request-field-min-{index}")" Label="Minimum (optional)" @bind-Value="field.MinimumNumber" />
-                                    <Field Id="@($"request-field-max-{index}")" Label="Maximum (optional)" @bind-Value="field.MaximumNumber" />
-                                }
-                                <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
-                                    <input type="checkbox" @bind="field.IsRequired" /> Required
-                                </label>
-                                <button class="btn-secondary justify-self-start" type="button" @onclick="() => RemoveField(field)">Remove field</button>
+                            }
                             </div>
-                        }
-                        <button class="btn-secondary justify-self-start" type="button" disabled="@(_draft.Fields.Count >= RequestBoardLimits.MaximumFields)" @onclick="AddField">Add field</button>
+                            @foreach (var field in _draft.Fields.Where(IsFieldSelected))
+                            {
+                                var index = _draft.Fields.IndexOf(field);
+                                <section @key="field.Identity"
+                                         id="@FieldEditorRegionId(field)"
+                                         class="management-field-editor surface-muted"
+                                         role="region"
+                                         aria-labelledby="@FieldInventoryLabelId(field)"
+                                         data-selected-field-editor>
+                                    <div class="grid gap-3 md:grid-cols-2">
+                                        <Field Id="@($"request-field-key-{index}")"
+                                               Label="Key"
+                                               FocusRequest="@FieldFocusRequest(field)"
+                                               @bind-Value="field.Key" />
+                                        <Field Id="@($"request-field-label-{index}")" Label="Label" @bind-Value="field.Label" />
+                                        <div>
+                                            <label class="mb-1 block text-sm font-semibold text-slate-950" for="@($"request-field-kind-{index}")">Type</label>
+                                            <select id="@($"request-field-kind-{index}")" class="input" @bind="field.Kind">
+                                                @foreach (var kind in Enum.GetValues<RequestBoardFieldKind>())
+                                                {
+                                                    <option value="@kind">@kind</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <Field Id="@($"request-field-limit-{index}")" Label="Maximum length" @bind-Value="field.MaximumLength" />
+                                        @if (field.Kind == RequestBoardFieldKind.Choice)
+                                        {
+                                            <Field Id="@($"request-field-choices-{index}")" Label="Choices (comma-separated)" @bind-Value="field.Choices" />
+                                        }
+                                        @if (field.Kind == RequestBoardFieldKind.Number)
+                                        {
+                                            <Field Id="@($"request-field-min-{index}")" Label="Minimum (optional)" @bind-Value="field.MinimumNumber" />
+                                            <Field Id="@($"request-field-max-{index}")" Label="Maximum (optional)" @bind-Value="field.MaximumNumber" />
+                                        }
+                                        <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
+                                            <input type="checkbox" @bind="field.IsRequired" /> Required
+                                        </label>
+                                    </div>
+                                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                                        <button class="btn-secondary"
+                                                type="button"
+                                                disabled="@(_draft.Fields.Count == 1)"
+                                                aria-describedby="@(_draft.Fields.Count == 1 ? "request-field-minimum" : null)"
+                                                @onclick="() => RemoveField(field)">Remove field</button>
+                                        @if (_draft.Fields.Count == 1)
+                                        {
+                                            <p id="request-field-minimum" class="text-sm text-muted-foreground">A request board needs at least one field.</p>
+                                        }
+                                    </div>
+                                </section>
+                            }
+                        </div>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(_feedback))
                     {

@@ -96,6 +96,9 @@ public partial class PageHelpButton
             "/points/settings" => _pointsSettingsHelp,
             "/custom-commands/settings" => _customCommandsHelp,
             "/host" => _hostConfigHelp,
+            "/requests" => _requestBoardsHelp,
+            "/queues" => _playQueuesHelp,
+            "/moments" => _momentsHelp,
             "/twitch-operations/shoutouts" => _shoutoutsHelp,
             "/twitch-operations/polls" => _pollsHelp,
             "/twitch-operations/clips-markers" => _clipsMarkersHelp,
@@ -103,6 +106,20 @@ public partial class PageHelpButton
             "/twitch-operations/predictions" => _predictionsHelp,
             _ => null,
         };
+    }
+
+    internal static bool HasUsefulHelpForPath(string path)
+    {
+        return HelpForPath(path) is { } help
+            && !string.IsNullOrWhiteSpace(help.Title)
+            && help.Sections.Count > 0
+            && help.Sections.All(section =>
+                !string.IsNullOrWhiteSpace(section.Title)
+                && (
+                    !string.IsNullOrWhiteSpace(section.Body)
+                    || section.Items.Any(item => !string.IsNullOrWhiteSpace(item))
+                )
+            );
     }
 
     private static readonly string[] _templateVariableItems =
@@ -145,6 +162,67 @@ public partial class PageHelpButton
                 "Moderator access",
                 "You can let all of your Twitch mods help by default, limit access to named mods, or block specific mods from changing this channel.",
                 []
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _requestBoardsHelp = new(
+        "Request boards",
+        [
+            new(
+                "Create or edit a board",
+                "Choose a saved board to edit it, or select New board to start a draft. A new board is not created until you complete its details and select Save board.",
+                [
+                    "The public board link becomes available after the new board has been saved.",
+                    "Add up to 12 submission fields. Choose a field in the inventory to edit it.",
+                ]
+            ),
+            new(
+                "Moderate requests",
+                "Open a saved board to approve, queue, accept, complete, reject, or merge viewer submissions.",
+                [
+                    "Public notes are visible to viewers. Private moderator notes and rejection reasons stay private.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _playQueuesHelp = new(
+        "Play with viewers",
+        [
+            new(
+                "Create or edit a queue",
+                "Choose a saved queue to edit it, or select New queue to start a draft. A new queue is not created until you complete its details and select Save queue.",
+                [
+                    "The viewer-page link becomes available after the new queue has been saved.",
+                    "Entry fields are private to moderators. Choose a field in the inventory to edit it.",
+                ]
+            ),
+            new(
+                "Run the queue",
+                "Use fair selection and ready checks to form a party, then send lobby details privately to the selected viewers.",
+                [
+                    "Queue settings control capacity, readiness expiry, history, and skip or no-show exclusions.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _momentsHelp = new(
+        "Moments",
+        [
+            new(
+                "Capture and moderate moments",
+                "Choose how nearby captures are merged, whether a stream marker is used as a fallback, and how point rewards work.",
+                [
+                    "Capture now saves the current live moment for moderation.",
+                    "Public titles and categories appear in the recap. Private moderator text never does.",
+                ]
+            ),
+            new(
+                "Preview the weekly recap",
+                "Open weekly recap launches the existing public, shareable recap in a new tab so this moderator workspace and any unsaved inputs remain available.",
+                ["Finalize previous week when the winning moment is ready to be recorded."]
             ),
         ]
     );

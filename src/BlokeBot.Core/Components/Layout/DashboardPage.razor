@@ -1,13 +1,17 @@
 @using System.Diagnostics
 
 <div class="@PageClass" @attributes="AdditionalAttributes">
-    <PageHeader Kicker="@Kicker"
-                Title="@Title"
-                Description="@Description" />
-
-    @if (Actions is not null || SaveFeedback is not null)
+    @if (Actions is null && SaveFeedback is null)
     {
-        <div class="dashboard-page__action-bar" data-persistent-page-actions>
+        <PageHeader Kicker="@Kicker"
+                    Title="@Title"
+                    Description="@Description" />
+    }
+    else
+    {
+        <PageHeader Kicker="@Kicker"
+                    Title="@Title"
+                    Description="@Description">
             @if (SaveFeedback is not null)
             {
                 <p class="dashboard-page__save-feedback"
@@ -18,11 +22,11 @@
             }
             @if (Actions is not null)
             {
-                <div class="dashboard-page__actions">
+                <div class="dashboard-page__actions" data-persistent-page-actions>
                     @Actions
                 </div>
             }
-        </div>
+        </PageHeader>
     }
 
     @switch (LoadState)

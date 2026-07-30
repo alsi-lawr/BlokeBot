@@ -13,7 +13,10 @@
                Description="Build fair parties, run ready checks, and deliver lobby details privately."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        <a class="btn-secondary" href="@_publicUrl">Open viewer page</a>
+        @if (!_isCreating && Host is not null)
+        {
+            <a class="btn-secondary" href="@_publicUrl">Open viewer page</a>
+        }
         <button class="btn-primary" type="button" @onclick="SaveAsync">Save queue</button>
     </Actions>
     <ChildContent>
@@ -27,14 +30,22 @@
                 <aside class="card p-4">
                     <div class="flex items-center justify-between gap-2">
                         <h2 class="text-lg font-semibold">Queues</h2>
-                        <button class="btn-secondary" type="button" @onclick="NewQueue">New</button>
+                        <button class="btn-secondary"
+                                type="button"
+                                disabled="@_isCreating"
+                                aria-describedby="@(_isCreating ? "queue-create-guidance" : null)"
+                                @onclick="NewQueue">New queue</button>
                     </div>
+                    @if (_queueList.Count == 0)
+                    {
+                        <p class="mt-3 text-sm text-muted-foreground">No saved queues yet.</p>
+                    }
                     <div class="mt-3 grid gap-2">
                         @foreach (var queue in _queueList)
                         {
                             <button class="control-surface min-h-11 rounded-lg px-3 text-left text-sm font-semibold"
                                     type="button"
-                                    aria-current="@(queue.Slug == _draft.Slug ? "true" : null)"
+                                    aria-current="@(!_isCreating && queue.Slug == _draft.Slug ? "true" : null)"
                                     @onclick="() => SelectQueueAsync(queue.Slug)">
                                 @queue.Name
                                 <span class="block text-xs font-normal text-muted-foreground">/@queue.Slug · @(queue.IsOpen ? "Open" : "Closed")</span>
@@ -45,9 +56,18 @@
 
                 <div class="space-y-5">
                     <section class="card p-5" aria-labelledby="queue-config-heading">
-                        <h2 id="queue-config-heading" class="text-lg font-semibold">Queue configuration</h2>
+                        <h2 id="queue-config-heading" class="text-lg font-semibold">@(_isCreating ? "New queue — not saved" : "Edit queue")</h2>
+                        @if (_isCreating)
+                        {
+                            <p id="queue-create-guidance" class="mt-2 text-sm text-muted-foreground">
+                                Complete the queue details, then select Save queue to create it. The viewer-page link is available after Save.
+                            </p>
+                        }
                         <div class="mt-4 grid gap-4 md:grid-cols-2">
-                            <Field Id="queue-slug" Label="Command and URL name" @bind-Value="_draft.Slug" />
+                            <Field Id="queue-slug"
+                                   Label="Command and URL name"
+                                   FocusRequest="@_primaryFocusRequest"
+                                   @bind-Value="_draft.Slug" />
                             <Field Id="queue-name" Label="Queue name" @bind-Value="_draft.Name" />
                             <Field Id="queue-activity" Label="Game or activity" @bind-Value="_draft.Activity" />
                             <Field Id="queue-capacity" Label="Party size" @bind-Value="_draft.Capacity" />
@@ -67,24 +87,78 @@
                             <label class="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" @bind="_draft.ShowNames" /> Show participant names publicly</label>
                         </div>
 
-                        <div class="mt-6 flex items-center justify-between gap-3">
-                            <h3 class="font-semibold">Entry fields</h3>
-                            <button class="btn-secondary" type="button" disabled="@(_draft.Fields.Count >= PlayQueueLimits.MaximumFields)" @onclick="AddField">Add field</button>
+                        <div class="mt-6 flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h3 class="font-semibold">Entry fields</h3>
+                                <p id="queue-field-limit" class="mt-1 text-sm text-muted-foreground">
+                                    @_draft.Fields.Count of @PlayQueueLimits.MaximumFields fields.
+                                    @if (_draft.Fields.Count >= PlayQueueLimits.MaximumFields)
+                                    {
+                                        <span>Maximum of @PlayQueueLimits.MaximumFields fields reached.</span>
+                                    }
+                                </p>
+                            </div>
+                            <button class="btn-secondary"
+                                    type="button"
+                                    disabled="@(_draft.Fields.Count >= PlayQueueLimits.MaximumFields)"
+                                    aria-describedby="queue-field-limit"
+                                    @onclick="AddField">Add field</button>
                         </div>
                         <p class="mt-1 text-sm text-muted-foreground">Platform, region, rank, preferred-role, and custom fields are private to moderators.</p>
-                        <div class="mt-3 grid gap-3">
-                            @foreach (var field in _draft.Fields)
-                            {
-                                <div class="surface-muted grid gap-3 rounded-lg p-4 md:grid-cols-2" @key="field.Identity">
-                                    <Field Id="@($"queue-field-key-{field.Identity}")" Label="Key" @bind-Value="field.Key" />
-                                    <Field Id="@($"queue-field-label-{field.Identity}")" Label="Label" @bind-Value="field.Label" />
-                                    <Field Id="@($"queue-field-choices-{field.Identity}")" Label="Choices (comma separated)" @bind-Value="field.Choices" />
-                                    <div class="flex items-end justify-between gap-3">
-                                        <label class="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" @bind="field.Required" /> Required</label>
-                                        <button class="btn-secondary" type="button" @onclick="() => RemoveField(field)">Remove</button>
-                                    </div>
+                        <div class="management-field-workspace-container mt-3">
+                            <div class="management-field-workspace">
+                                <div class="management-field-inventory" aria-label="Entry fields">
+                                    @if (_draft.Fields.Count == 0)
+                                    {
+                                        <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No entry fields. Viewers can join without additional details.</p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var field in _draft.Fields)
+                                        {
+                                            var selected = IsFieldSelected(field);
+                                            <div @key="field.Identity"
+                                                 class="management-field-inventory-row surface-row"
+                                                 data-current="@(selected ? "true" : "false")"
+                                                 aria-current="@(selected ? "true" : null)">
+                                                <div class="min-w-0">
+                                                    <p id="@FieldInventoryLabelId(field)" class="text-sm font-semibold text-slate-900">@FieldDisplayName(field)</p>
+                                                    <p class="mt-1 break-words text-xs text-muted-foreground">@QueueFieldSummary(field)</p>
+                                                </div>
+                                                <button class="btn-secondary"
+                                                        type="button"
+                                                        aria-pressed="@(selected ? "true" : "false")"
+                                                        aria-controls="@(selected ? FieldEditorRegionId(field) : null)"
+                                                        @onclick="() => SelectField(field)">
+                                                    @(selected ? "Editing" : "Edit field")
+                                                </button>
+                                            </div>
+                                        }
+                                    }
                                 </div>
-                            }
+                                @foreach (var field in _draft.Fields.Where(IsFieldSelected))
+                                {
+                                    <section @key="field.Identity"
+                                             id="@FieldEditorRegionId(field)"
+                                             class="management-field-editor surface-muted"
+                                             role="region"
+                                             aria-labelledby="@FieldInventoryLabelId(field)"
+                                             data-selected-field-editor>
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <Field Id="@($"queue-field-key-{field.Identity:N}")"
+                                                   Label="Key"
+                                                   FocusRequest="@FieldFocusRequest(field)"
+                                                   @bind-Value="field.Key" />
+                                            <Field Id="@($"queue-field-label-{field.Identity:N}")" Label="Label" @bind-Value="field.Label" />
+                                            <Field Id="@($"queue-field-choices-{field.Identity:N}")" Label="Choices (comma separated)" @bind-Value="field.Choices" />
+                                            <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
+                                                <input type="checkbox" @bind="field.Required" /> Required
+                                            </label>
+                                        </div>
+                                        <button class="btn-secondary mt-4" type="button" @onclick="() => RemoveField(field)">Remove field</button>
+                                    </section>
+                                }
+                            </div>
                         </div>
                         <Field Id="queue-roles" Label="Required roles (role=count, comma separated)" @bind-Value="_draft.RoleRequirements" />
                     </section>
@@ -150,7 +224,7 @@
                     }
                     @if (!string.IsNullOrWhiteSpace(_feedback))
                     {
-                        <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_operationFailed.ToString().ToLowerInvariant()">@_feedback</p>
+                        <p class="rounded-lg border p-3 text-sm" role="@(_operationFailed ? "alert" : "status")" data-error="@_operationFailed.ToString().ToLowerInvariant()">@_feedback</p>
                     }
                 </div>
             </div>

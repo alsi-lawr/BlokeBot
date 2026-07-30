@@ -9,14 +9,17 @@ public partial class PlayQueuesPage
     private ModeratorPlayQueuePage? _moderatorPage;
     private readonly Dictionary<long, EntryDraft> _entryDrafts = [];
     private QueueDraft _draft = QueueDraft.New();
+    private Guid? _selectedFieldIdentity;
+    private Guid? _fieldFocusIdentity;
     private string _feedback = string.Empty;
     private string _lobbyCode = string.Empty;
+    private long _fieldFocusRequest;
+    private long _primaryFocusRequest;
+    private bool _isCreating = true;
     private bool _operationFailed;
 
     private string _publicUrl =>
-        string.IsNullOrWhiteSpace(HostLogin) || string.IsNullOrWhiteSpace(_draft.Slug)
-            ? "#"
-            : $"/queues/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
+        $"/queues/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -35,12 +38,24 @@ public partial class PlayQueuesPage
         if (_queueList.Count > 0 && string.IsNullOrWhiteSpace(_draft.Slug))
         {
             await SelectQueueAsync(_queueList[0].Slug);
+            return;
+        }
+
+        if (_queueList.Count == 0 && _isCreating)
+        {
+            EnsureFieldSelection();
+            SetCreateGuidance();
+            _primaryFocusRequest++;
         }
     }
 
     private async Task SelectQueueAsync(string slug)
     {
         _draft = QueueDraft.From(_queueList.Single(value => value.Slug == slug));
+        _isCreating = false;
+        _operationFailed = false;
+        _feedback = string.Empty;
+        SelectFirstField();
         await RefreshPageAsync();
     }
 
@@ -61,19 +76,51 @@ public partial class PlayQueuesPage
 
     private void NewQueue()
     {
+        if (_isCreating)
+        {
+            return;
+        }
+
         _draft = QueueDraft.New();
+        _isCreating = true;
         _moderatorPage = null;
-        _feedback = string.Empty;
+        _entryDrafts.Clear();
+        _operationFailed = false;
+        SelectFirstField();
+        SetCreateGuidance();
+        _primaryFocusRequest++;
     }
 
     private void AddField()
     {
-        _draft.Fields.Add(FieldDraft.New());
+        if (_draft.Fields.Count >= PlayQueueLimits.MaximumFields)
+        {
+            return;
+        }
+
+        var field = FieldDraft.New();
+        _draft.Fields.Add(field);
+        SelectField(field);
     }
 
     private void RemoveField(FieldDraft field)
     {
-        _draft.Fields.Remove(field);
+        var removedIndex = _draft.Fields.IndexOf(field);
+        if (removedIndex < 0)
+        {
+            return;
+        }
+
+        _draft.Fields.RemoveAt(removedIndex);
+        if (_draft.Fields.Count == 0)
+        {
+            _selectedFieldIdentity = null;
+            _fieldFocusIdentity = null;
+            return;
+        }
+
+        var neighbour = _draft.Fields[Math.Min(removedIndex, _draft.Fields.Count - 1)];
+        SelectField(neighbour);
     }
 
     private Task SaveAsync()
@@ -82,6 +129,7 @@ public partial class PlayQueuesPage
             HostId,
             async () =>
             {
+                var wasCreating = _isCreating;
                 var command = _draft.ToCommand();
                 if (command is null)
                 {
@@ -92,19 +140,90 @@ public partial class PlayQueuesPage
                 }
 
                 var result = await _queues.ConfigureAsync(HostId, command, CancellationToken.None);
-                _feedback = result.Match(
-                    succeeded =>
-                    {
+                switch (result)
+                {
+                    case PlayQueueResult<PlayQueueSummary>.Succeeded succeeded:
                         _draft = QueueDraft.From(succeeded.Value);
-                        return "Queue saved.";
-                    },
-                    rejected => rejected.Reason.Message
-                );
-                _operationFailed = result is PlayQueueResult<PlayQueueSummary>.Rejected;
-                await LoadAsync();
-                await RefreshPageAsync();
+                        _isCreating = false;
+                        _operationFailed = false;
+                        _feedback = wasCreating ? "Queue created." : "Queue saved.";
+                        SelectFirstField();
+                        await LoadAsync();
+                        await RefreshPageAsync();
+                        break;
+                    case PlayQueueResult<PlayQueueSummary>.Rejected rejected:
+                        _operationFailed = true;
+                        _feedback = rejected.Reason.Message;
+                        break;
+                }
             }
         );
+    }
+
+    private void SetCreateGuidance()
+    {
+        _feedback = "New queue ready. Complete its details, then Save queue to create it.";
+    }
+
+    private void SelectFirstField()
+    {
+        _selectedFieldIdentity = _draft.Fields.FirstOrDefault()?.Identity;
+        _fieldFocusIdentity = null;
+    }
+
+    private void EnsureFieldSelection()
+    {
+        if (
+            _selectedFieldIdentity is null
+            || _draft.Fields.All(field => field.Identity != _selectedFieldIdentity)
+        )
+        {
+            SelectFirstField();
+        }
+    }
+
+    private void SelectField(FieldDraft field)
+    {
+        _selectedFieldIdentity = field.Identity;
+        _fieldFocusIdentity = field.Identity;
+        _fieldFocusRequest++;
+    }
+
+    private bool IsFieldSelected(FieldDraft field)
+    {
+        return field.Identity == _selectedFieldIdentity;
+    }
+
+    private long FieldFocusRequest(FieldDraft field)
+    {
+        return field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
+    }
+
+    private static string FieldInventoryLabelId(FieldDraft field)
+    {
+        return $"queue-field-{field.Identity:N}-inventory-label";
+    }
+
+    private static string FieldEditorRegionId(FieldDraft field)
+    {
+        return $"queue-field-{field.Identity:N}-editor";
+    }
+
+    private static string FieldDisplayName(FieldDraft field)
+    {
+        return string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
+    }
+
+    private static string QueueFieldSummary(FieldDraft field)
+    {
+        var key = string.IsNullOrWhiteSpace(field.Key) ? "No key" : field.Key;
+        var requirement = field.Required ? "Required" : "Optional";
+        var choices = field.Choices.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+        var detail = choices.Length == 0 ? "Free text" : $"{choices.Length} choices";
+        return $"{key} · {requirement} · {detail}";
     }
 
     private Task ToggleOpenAsync()

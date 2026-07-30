@@ -1,5 +1,6 @@
 using BlokeBot.Core.Components.Layout;
 using Bunit;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -19,7 +20,10 @@ public sealed class PageHelpButtonTests
         "return the viewer’s Channel Points"
     )]
     [Arguments("/twitch-operations/predictions", "Predictions", "winning outcome")]
-    public void NativeRoute_RendersOneButtonAndOpensRouteSpecificHelp(
+    [Arguments("/requests", "Request boards", "public board link becomes available")]
+    [Arguments("/queues", "Play with viewers", "viewer-page link becomes available")]
+    [Arguments("/moments", "Moments", "shareable recap in a new tab")]
+    public void FeatureRoute_RendersOneButtonAndOpensRouteSpecificHelp(
         string path,
         string title,
         string distinctiveContent
@@ -40,6 +44,44 @@ public sealed class PageHelpButtonTests
         cut.Find("button[aria-label='Close help']").ShouldNotBeNull();
         cut.Find("h2").TextContent.ShouldBe(title);
         cut.Markup.ShouldContain(distinctiveContent);
+    }
+
+    [Test]
+    public void EveryConcreteHostSelectedFeatureRoute_HasUsefulRouteSpecificHelp()
+    {
+        const string RedirectOnlyRoute = "/twitch-operations";
+        var routes = typeof(PageHelpButton)
+            .Assembly.GetTypes()
+            .Where(type =>
+                type.GetCustomAttributes(typeof(AuthorizeAttribute), true)
+                    .Cast<AuthorizeAttribute>()
+                    .Any(attribute => attribute.Policy == "HostSelected")
+            )
+            .SelectMany(type =>
+                type.GetCustomAttributes(typeof(RouteAttribute), true)
+                    .Cast<RouteAttribute>()
+                    .Select(route => route.Template)
+            )
+            .Where(route => route != RedirectOnlyRoute)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        routes.ShouldBe([
+            "/custom-commands/settings",
+            "/guessing",
+            "/guessing/settings",
+            "/moments",
+            "/points",
+            "/points/settings",
+            "/queues",
+            "/requests",
+            "/twitch-operations/channel-points",
+            "/twitch-operations/clips-markers",
+            "/twitch-operations/polls",
+            "/twitch-operations/predictions",
+            "/twitch-operations/shoutouts",
+        ]);
+        routes.ShouldAllBe(route => PageHelpButton.HasUsefulHelpForPath(route));
     }
 
     [Test]

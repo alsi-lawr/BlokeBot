@@ -76,3 +76,7 @@
         }
     }
 }
+
+.dashboard-page[data-native-route] .phone-card-list {
+    display: grid;
+}
