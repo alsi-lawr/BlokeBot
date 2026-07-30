@@ -10,14 +10,19 @@
     <div class="mx-auto max-w-5xl space-y-6">
         @if (_loading)
         {
-            <div class="card p-8">Loading queue…</div>
+            <ApplicationCardCollection Owner="public-queue-page-cards">
+                <div class="card p-8">Loading queue…</div>
+            </ApplicationCardCollection>
         }
         else if (_page is null)
         {
-            <div class="card p-8"><h1 class="text-2xl font-semibold">Queue not found</h1></div>
+            <ApplicationCardCollection Owner="public-queue-page-cards">
+                <div class="card p-8"><h1 class="text-2xl font-semibold">Queue not found</h1></div>
+            </ApplicationCardCollection>
         }
         else
         {
+            <ApplicationCardCollection Owner="public-queue-page-cards">
             <header class="card p-6">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Play with viewers</p>
                 <h1 class="mt-2 text-3xl font-bold">@_page.Queue.Name</h1>
@@ -91,7 +96,7 @@
                 }
             </section>
 
-            <section class="grid gap-6 lg:grid-cols-2">
+            <section class="application-card-collection lg:grid-cols-2" data-card-owner="public-queue-summary-cards">
                 <div class="card p-6">
                     <h2 class="text-xl font-semibold">Waiting</h2>
                     <ol class="mt-4 grid gap-2">
@@ -118,6 +123,7 @@
                     </ul>
                 </div>
             </section>
+            </ApplicationCardCollection>
         }
     </div>
 </main>

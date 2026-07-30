@@ -11,14 +11,19 @@
     <div class="mx-auto max-w-5xl space-y-6">
         @if (_loading)
         {
-            <div class="card p-8">Loading moments…</div>
+            <ApplicationCardCollection Owner="public-moment-page-cards">
+                <div class="card p-8">Loading moments…</div>
+            </ApplicationCardCollection>
         }
         else if (_page is null)
         {
-            <div class="card p-8"><h1 class="text-2xl font-semibold">Moment recap not found</h1></div>
+            <ApplicationCardCollection Owner="public-moment-page-cards">
+                <div class="card p-8"><h1 class="text-2xl font-semibold">Moment recap not found</h1></div>
+            </ApplicationCardCollection>
         }
         else
         {
+            <ApplicationCardCollection Owner="public-moment-page-cards">
             <header class="card p-6">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Community moments</p>
                 <h1 class="mt-2 text-3xl font-bold">@(_page.StreamIdentity is null ? "Weekly recap" : "Stream recap")</h1>
@@ -45,13 +50,14 @@
                     </div>
                 }
             </header>
+            </ApplicationCardCollection>
 
             @if (!string.IsNullOrWhiteSpace(_feedback))
             {
                 <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
             }
 
-            <section class="grid gap-4 sm:grid-cols-2">
+            <section class="application-card-collection sm:grid-cols-2" data-card-owner="public-moment-card-grid">
                 @foreach (var moment in _page.Moments)
                 {
                     <article class="card flex min-w-0 flex-col p-5" @key="moment.PublicId">
@@ -74,7 +80,9 @@
             </section>
             @if (_page.Moments.Count == 0)
             {
-                <div class="card p-6 text-sm text-muted-foreground">No approved moments in this recap yet.</div>
+                <ApplicationCardCollection Owner="public-moment-page-cards">
+                    <div class="card p-6 text-sm text-muted-foreground">No approved moments in this recap yet.</div>
+                </ApplicationCardCollection>
             }
         }
     </div>

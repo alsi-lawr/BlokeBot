@@ -22,11 +22,13 @@
     <ChildContent>
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="dashboard-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else
     {
-        <div class="grid gap-6 xl:grid-cols-[minmax(16rem,0.7fr)_minmax(0,1.8fr)]">
+        <div class="application-card-collection xl:grid-cols-[minmax(16rem,0.7fr)_minmax(0,1.8fr)]" data-card-owner="request-board-workspace-columns">
             <aside class="card p-4">
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold text-slate-950">Boards</h2>
@@ -55,7 +57,7 @@
                 </div>
             </aside>
 
-            <div class="space-y-6">
+            <div class="application-card-collection" data-card-owner="request-board-editor-cards">
                 <section class="card p-5" aria-labelledby="request-board-configuration">
                     <h2 id="request-board-configuration" class="text-lg font-semibold text-slate-950">@(_isCreating ? "New board — not saved" : "Edit board")</h2>
                     @if (_isCreating)
@@ -195,7 +197,7 @@
 
                 @if (_moderatorPage is not null)
                 {
-                    <section class="space-y-3" aria-labelledby="request-moderation-list">
+                    <section class="application-card-collection" data-card-owner="request-board-moderation-cards" aria-labelledby="request-moderation-list">
                         <div>
                             <h2 id="request-moderation-list" class="text-xl font-semibold text-slate-950">Moderation</h2>
                             <p class="mt-1 text-sm text-muted-foreground">@_moderatorPage.Board.OrderingDescription</p>

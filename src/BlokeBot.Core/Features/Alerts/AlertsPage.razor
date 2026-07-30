@@ -31,14 +31,19 @@
     }
     else if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="alerts-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
+        <ApplicationCardCollection Owner="alerts-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
+        </ApplicationCardCollection>
     }
     else
     {
+        <ApplicationCardCollection Owner="alerts-page-cards">
         @if (_state.Active.Count == 0)
         {
             <section class="card p-6" aria-labelledby="active-alerts-title">
@@ -53,7 +58,7 @@
                     <h2 id="active-alerts-title" class="text-lg font-semibold text-slate-950">Active alerts</h2>
                     <p class="mt-1 text-sm text-muted-foreground">@_activeSummary</p>
                 </div>
-                <div class="grid gap-3">
+                <div class="application-card-collection" data-card-owner="active-alert-cards">
                     @foreach (var alert in _state.Active)
                     {
                         <article @key="alert.Id" class="card p-5">
@@ -128,5 +133,6 @@
                 </div>
             }
         </section>
+        </ApplicationCardCollection>
     }
 </div>

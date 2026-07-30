@@ -1,0 +1,12 @@
+<div class="application-card-collection"
+     data-card-owner="@Owner">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Owner { get; set; } = string.Empty;
+}
