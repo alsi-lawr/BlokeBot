@@ -99,6 +99,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<MomentMerge> MomentMerges => Set<MomentMerge>();
     public DbSet<MomentWeeklyFinalization> MomentWeeklyFinalizations =>
         Set<MomentWeeklyFinalization>();
+    public DbSet<OverlayInstance> OverlayInstances => Set<OverlayInstance>();
+    public DbSet<OverlayInstanceDomainEvent> OverlayInstanceEvents =>
+        Set<OverlayInstanceDomainEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -118,6 +121,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureRequestBoards(modelBuilder);
         ConfigurePlayWithViewers(modelBuilder);
         ConfigureMoments(modelBuilder);
+        ConfigureOverlays(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

@@ -12,4 +12,5 @@ public enum AppEventKind
     RequestBoardsChanged,
     PlayQueuesChanged,
     MomentsChanged,
+    OverlaysChanged,
 }

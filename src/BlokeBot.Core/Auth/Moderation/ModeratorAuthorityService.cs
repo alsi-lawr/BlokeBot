@@ -13,7 +13,7 @@ public sealed class ModeratorAuthorityService(
     BotSettings settings,
     HostModAccessService moderatorAccess,
     TimeProvider timeProvider
-)
+) : IModeratorAuthorityService
 {
     private static readonly TimeSpan _definitiveCacheLifetime = TimeSpan.FromMinutes(15);
     private readonly ConcurrentDictionary<AuthorityCacheKey, CachedAuthority> _cache = new();
