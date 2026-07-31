@@ -148,7 +148,7 @@ public sealed class GuessingRoundService(
         {
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            await changes.NotifyChangedAsync(hostId, ct);
             if (mutations.Count > 0)
             {
                 await pointsChanges.NotifyChangedAsync(ct);
@@ -264,7 +264,7 @@ public sealed class GuessingRoundService(
                     && policy.ReplyKey == GuessingReplyKeys.RoundStarted,
                 ct
             );
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return new GuessingOperationOutcome.Succeeded(
             FormatRoundStarted(
                 settings.RoundStartedReply,
@@ -409,7 +409,7 @@ public sealed class GuessingRoundService(
         }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return new GuessingOperationOutcome.Succeeded(settings.GuessingStoppedReply);
     }
 

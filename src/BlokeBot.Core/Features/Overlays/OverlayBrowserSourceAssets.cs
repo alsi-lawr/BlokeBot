@@ -37,6 +37,101 @@ internal static class OverlayBrowserSourceAssets
           box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0);
         }
 
+        .guessing-card {
+          fill: rgba(15, 23, 42, 0.94);
+          stroke: rgba(148, 163, 184, 0.72);
+          stroke-width: 2;
+        }
+
+        .guessing-accent {
+          fill: #60a5fa;
+        }
+
+        .guessing-kicker,
+        .guessing-title,
+        .guessing-detail,
+        .guessing-result {
+          fill: #f8fafc;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+
+        .guessing-kicker {
+          fill: #93c5fd;
+          font-size: 30px;
+          font-weight: 800;
+          letter-spacing: 4px;
+        }
+
+        .guessing-title {
+          font-size: 58px;
+          font-weight: 800;
+        }
+
+        .guessing-detail {
+          fill: #cbd5e1;
+          font-size: 30px;
+          font-weight: 600;
+        }
+
+        .guessing-result {
+          fill: #fef08a;
+          font-size: 40px;
+          font-weight: 800;
+        }
+
+        #overlay-root[data-animation="entrance"] .guessing-presentation {
+          animation: guessing-overlay-entrance 480ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        #overlay-root[data-animation="statusChange"] .guessing-presentation {
+          animation: guessing-overlay-status 360ms ease-out;
+        }
+
+        #overlay-root[data-animation="result"] .guessing-presentation {
+          animation: guessing-overlay-result 640ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes guessing-overlay-entrance {
+          from {
+            opacity: 0;
+            transform: translateY(48px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes guessing-overlay-status {
+          from {
+            opacity: 0.45;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes guessing-overlay-result {
+          0% {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          70% {
+            opacity: 1;
+            transform: scale(1.02);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          #overlay-root[data-animation] .guessing-presentation,
+          #overlay-root[data-test-pulse="active"] #overlay-canvas {
+            animation: none;
+          }
+        }
+
         @keyframes blokebot-overlay-test-pulse {
           0% {
             box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0.95);
@@ -66,6 +161,8 @@ internal static class OverlayBrowserSourceAssets
             root.dataset.credentials === "same-origin" ? "same-origin" : "omit";
           const liveEnabled = root.dataset.liveEnabled !== "false";
           let testPulseTimer = null;
+          let presentationAnimationTimer = null;
+          const svgNamespace = canvas.namespaceURI;
 
           const showTestPulse = () => {
             root.dataset.testPulse = "active";
@@ -113,13 +210,185 @@ internal static class OverlayBrowserSourceAssets
             );
           };
 
-          const applyPresentation = (projection, sequence, epoch, occurredAtUtc) => {
+          const svgElement = (name, attributes, text) => {
+            const element = document.createElementNS(svgNamespace, name);
+            for (const [attribute, value] of Object.entries(attributes)) {
+              element.setAttribute(attribute, value);
+            }
+            if (typeof text === "string") {
+              element.textContent = text;
+            }
+            return element;
+          };
+
+          const appendText = (group, className, x, y, text) => {
+            group.append(
+              svgElement(
+                "text",
+                { class: className, x: String(x), y: String(y) },
+                text,
+              ),
+            );
+          };
+
+          const validGuessingState = (state) => {
+            if (typeof state !== "object" || state === null) {
+              return false;
+            }
+            if (state.phase === "noRound") {
+              return true;
+            }
             if (
-              projection?.overlayType !== "empty" ||
-              projection?.schemaVersion !== 1 ||
-              typeof projection?.state !== "object" ||
-              projection.state === null
+              (state.phase !== "open" &&
+                state.phase !== "closed" &&
+                state.phase !== "completed") ||
+              typeof state.roundName !== "string" ||
+              (state.guessCount !== null &&
+                (!Number.isSafeInteger(state.guessCount) || state.guessCount < 0))
             ) {
+              return false;
+            }
+            if (state.phase !== "completed") {
+              return true;
+            }
+            return (
+              typeof state.winningAnswer === "string" &&
+              Array.isArray(state.winners) &&
+              state.winners.every((winner) => typeof winner === "string") &&
+              (state.awardedPointsPerWinner === null ||
+                typeof state.awardedPointsPerWinner === "string") &&
+              (state.pointLabel === null || typeof state.pointLabel === "string")
+            );
+          };
+
+          const resultDetail = (state) => {
+            const winners =
+              state.winners.length === 0
+                ? "No winning guesses"
+                : state.winners.join(", ");
+            if (
+              state.winners.length === 0 ||
+              state.awardedPointsPerWinner === null ||
+              state.pointLabel === null
+            ) {
+              return winners;
+            }
+            return `${winners} · ${state.awardedPointsPerWinner} ${state.pointLabel} each`;
+          };
+
+          const renderGuessing = (state) => {
+            canvas.replaceChildren();
+            root.dataset.phase = state.phase;
+            if (state.phase === "noRound") {
+              return;
+            }
+
+            const group = svgElement("g", {
+              class: "guessing-presentation",
+              transform: "translate(160 690)",
+            });
+            group.append(
+              svgElement("rect", {
+                class: "guessing-card",
+                x: "0",
+                y: "0",
+                width: "1600",
+                height: "270",
+                rx: "30",
+              }),
+              svgElement("rect", {
+                class: "guessing-accent",
+                x: "0",
+                y: "0",
+                width: "16",
+                height: "270",
+                rx: "8",
+              }),
+            );
+
+            const status =
+              state.phase === "open"
+                ? "GUESSING OPEN"
+                : state.phase === "closed"
+                  ? "ENTRIES CLOSED"
+                  : "RESULT";
+            appendText(group, "guessing-kicker", 56, 62, status);
+            appendText(group, "guessing-title", 56, 135, state.roundName);
+            if (state.phase === "completed") {
+              appendText(
+                group,
+                "guessing-result",
+                56,
+                202,
+                `Winner: ${state.winningAnswer}`,
+              );
+              appendText(group, "guessing-detail", 760, 202, resultDetail(state));
+            } else {
+              const detail =
+                state.guessCount === null
+                  ? state.phase === "open"
+                    ? "Send your guess in chat"
+                    : "Waiting for the result"
+                  : `${state.guessCount} ${state.guessCount === 1 ? "guess" : "guesses"}`;
+              appendText(group, "guessing-detail", 56, 205, detail);
+            }
+            canvas.append(group);
+          };
+
+          const applyAnimation = (animation, durationMilliseconds) => {
+            if (presentationAnimationTimer !== null) {
+              window.clearTimeout(presentationAnimationTimer);
+              presentationAnimationTimer = null;
+            }
+            if (
+              animation !== "entrance" &&
+              animation !== "statusChange" &&
+              animation !== "result"
+            ) {
+              delete root.dataset.animation;
+              return;
+            }
+
+            root.dataset.animation = animation;
+            const animationDuration =
+              animation === "result" ? durationMilliseconds : 700;
+            presentationAnimationTimer = window.setTimeout(() => {
+              delete root.dataset.animation;
+              presentationAnimationTimer = null;
+            }, animationDuration);
+          };
+
+          const applyPresentation = (projection, sequence, epoch, occurredAtUtc) => {
+            if (projection?.schemaVersion !== 1) {
+              return false;
+            }
+            if (projection.overlayType === "empty") {
+              if (
+                typeof projection.state !== "object" ||
+                projection.state === null
+              ) {
+                return false;
+              }
+              canvas.replaceChildren();
+              delete root.dataset.phase;
+              applyAnimation("none", 0);
+            } else if (projection.overlayType === "guessing") {
+              if (
+                !Number.isSafeInteger(projection.resultDurationMilliseconds) ||
+                projection.resultDurationMilliseconds < 1000 ||
+                projection.resultDurationMilliseconds > 30000 ||
+                !validGuessingState(projection.state)
+              ) {
+                return false;
+              }
+              renderGuessing(projection.state);
+              applyAnimation(
+                typeof projection.animation === "string"
+                  ? projection.animation
+                  : "none",
+                projection.resultDurationMilliseconds,
+              );
+            } else {
               return false;
             }
 
@@ -322,6 +591,9 @@ internal static class OverlayBrowserSourceAssets
               pageLifetime.abort();
               if (testPulseTimer !== null) {
                 window.clearTimeout(testPulseTimer);
+              }
+              if (presentationAnimationTimer !== null) {
+                window.clearTimeout(presentationAnimationTimer);
               }
             },
             { once: true },

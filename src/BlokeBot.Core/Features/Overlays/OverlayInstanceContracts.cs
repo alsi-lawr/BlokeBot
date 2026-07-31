@@ -140,6 +140,12 @@ public abstract record OverlayInstanceRejection
         public override string Message =>
             "Moderator access could not be confirmed. Try again later.";
     }
+
+    public sealed record FeatureDisabled : OverlayInstanceRejection
+    {
+        public override string Message =>
+            "This overlay type is off for the selected channel. Turn its required tools on in Channel setup.";
+    }
 }
 
 public sealed record ResolvedOverlayInstance(

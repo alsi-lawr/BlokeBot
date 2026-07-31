@@ -94,8 +94,27 @@ public sealed class OverlayInstanceService(
             return Rejected<OverlayInstanceCreation>(rejected.Reason);
         }
         var actor = ((AuthorizationDecision.Granted)authorization).Actor;
-        var accessKey = GenerateAccessKey();
         var now = Now();
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var enabledFeatures = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == actor.HostId)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(ct);
+        if (enabledFeatures is null)
+        {
+            return Rejected<OverlayInstanceCreation>(new OverlayInstanceRejection.NotFound());
+        }
+        if (!RequiredFeaturesEnabled(command.Type, enabledFeatures.Value))
+        {
+            return Rejected<OverlayInstanceCreation>(
+                new OverlayInstanceRejection.FeatureDisabled()
+            );
+        }
+
+        var accessKey = GenerateAccessKey();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.NewGuid(),
@@ -110,14 +129,6 @@ public sealed class OverlayInstanceService(
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (!await db.Hosts.AnyAsync(host => host.Id == actor.HostId, ct))
-        {
-            return Rejected<OverlayInstanceCreation>(new OverlayInstanceRejection.NotFound());
-        }
-
         db.OverlayInstances.Add(overlay);
         db.OverlayInstanceEvents.Add(
             DomainEvent(actor, overlay, OverlayInstanceEventKind.Created, now)
@@ -223,6 +234,12 @@ public sealed class OverlayInstanceService(
                 return Rejected<OverlayInstanceView>(targetRejected.Reason);
             }
             var overlay = ((MutationTarget.Found)existing).Overlay;
+            if (!await RequiredFeaturesEnabledAsync(db, actor.HostId, overlay.Type, ct))
+            {
+                return Rejected<OverlayInstanceView>(
+                    new OverlayInstanceRejection.FeatureDisabled()
+                );
+            }
             if (overlay.Type != command.Configuration.Type)
             {
                 return Rejected<OverlayInstanceView>(
@@ -336,6 +353,12 @@ public sealed class OverlayInstanceService(
                 return Rejected<OverlayInstanceKeyRotation>(targetRejected.Reason);
             }
             var overlay = ((MutationTarget.Found)existing).Overlay;
+            if (!await RequiredFeaturesEnabledAsync(db, actor.HostId, overlay.Type, ct))
+            {
+                return Rejected<OverlayInstanceKeyRotation>(
+                    new OverlayInstanceRejection.FeatureDisabled()
+                );
+            }
             var accessKey = GenerateAccessKey();
             var digest = OverlayAccessKeyDigest.Compute(accessKey);
             var now = Now();
@@ -426,6 +449,10 @@ public sealed class OverlayInstanceService(
                 return Rejected<Guid>(targetRejected.Reason);
             }
             var overlay = ((MutationTarget.Found)existing).Overlay;
+            if (!await RequiredFeaturesEnabledAsync(db, actor.HostId, overlay.Type, ct))
+            {
+                return Rejected<Guid>(new OverlayInstanceRejection.FeatureDisabled());
+            }
             var now = Now();
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             var deleted = await db
@@ -528,6 +555,12 @@ public sealed class OverlayInstanceService(
                 return Rejected<OverlayInstanceView>(targetRejected.Reason);
             }
             var overlay = ((MutationTarget.Found)existing).Overlay;
+            if (!await RequiredFeaturesEnabledAsync(db, actor.HostId, overlay.Type, ct))
+            {
+                return Rejected<OverlayInstanceView>(
+                    new OverlayInstanceRejection.FeatureDisabled()
+                );
+            }
             var now = Now();
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
             var query = db.OverlayInstances.Where(value =>
@@ -767,6 +800,30 @@ public sealed class OverlayInstanceService(
     private static bool ValidOverlayIdAndRevision(Guid overlayId, OverlayRevision expectedRevision)
     {
         return overlayId != Guid.Empty && expectedRevision.Value > 0;
+    }
+
+    private static async Task<bool> RequiredFeaturesEnabledAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        OverlayType type,
+        CancellationToken ct
+    )
+    {
+        var enabledFeatures = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == hostId)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(ct);
+        return enabledFeatures is { } value && RequiredFeaturesEnabled(type, value);
+    }
+
+    private static bool RequiredFeaturesEnabled(OverlayType type, HostFeatureFlags enabledFeatures)
+    {
+        var required =
+            type is OverlayType.Guessing
+                ? HostFeatureFlags.Overlays | HostFeatureFlags.Guessing
+                : HostFeatureFlags.Overlays;
+        return (enabledFeatures & required) == required;
     }
 
     private static SemaphoreSlim MutationGate(Guid overlayId)

@@ -1,20 +1,31 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using BlokeBot.Core.Auth.Moderation;
+using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
+using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Simulation;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -29,7 +40,8 @@ public sealed class OverlayBrowserSourceTests
             new DateTimeOffset(2026, 7, 30, 14, 15, 0, TimeSpan.Zero)
         );
         var epoch = new OverlayServerEpoch();
-        IOverlayStateProvider provider = new OverlayStateProvider(epoch, time);
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        IOverlayStateProvider provider = new OverlayStateProvider(database, epoch, time);
         var instance = new ResolvedOverlayInstance(
             91,
             Guid.NewGuid(),
@@ -236,7 +248,10 @@ public sealed class OverlayBrowserSourceTests
         (await document.Content.ReadAsStringAsync()).ShouldContain("id=\"overlay-canvas\"");
         state.StatusCode.ShouldBe(HttpStatusCode.OK);
         var json = await state.Content.ReadAsStringAsync();
-        json.ShouldContain("\"overlayType\":\"empty\"");
+        json.ShouldContain("\"overlayType\":\"guessing\"");
+        json.ShouldContain("\"phase\":\"open\"");
+        json.ShouldContain("\"roundName\":\"Default\"");
+        json.ShouldContain("\"guessCount\":4");
         json.ShouldContain("\"sequence\":1");
     }
 
@@ -399,6 +414,56 @@ public sealed class OverlayBrowserSourceTests
         await AssertDelayLifecycleAsync(javascript);
     }
 
+    [Test]
+    public async Task GuessingPreview_AllSamplesRequireBothParentsAndNeverExposeSuppressedState()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var seed = await host.SeedGuessingAsync("preview");
+
+        foreach (var sample in new[] { "no-round", "open", "closed", "completed" })
+        {
+            using var response = await host.Client.GetAsync(
+                $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample={sample}"
+            );
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            document.RootElement.GetProperty("overlayType").GetString().ShouldBe("guessing");
+        }
+
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Overlays);
+        foreach (
+            var path in new[]
+            {
+                $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample=completed",
+                $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample=completed",
+                $"/overlays/preview/{seed.OverlayId:D}/events",
+            }
+        )
+        {
+            using var response = await host.Client.GetAsync(path);
+            response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+            (await response.Content.ReadAsStringAsync()).ShouldBe("Overlay unavailable.");
+        }
+
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Guessing);
+        using var overlaysOff = await host.Client.GetAsync(
+            $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample=completed"
+        );
+        overlaysOff.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        await host.SetFeaturesAsync(
+            seed.HostId,
+            HostFeatureFlags.Overlays | HostFeatureFlags.Guessing
+        );
+        using var restored = await host.Client.GetAsync(
+            $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample=completed"
+        );
+        restored.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var restoredJson = await restored.Content.ReadAsStringAsync();
+        restoredJson.ShouldContain("\"phase\":\"completed\"");
+        restoredJson.ShouldNotContain("\"animation\"");
+    }
+
     private static async Task AssertDelayLifecycleAsync(string javascript)
     {
         const string DelayStart = "const delay =";
@@ -557,6 +622,9 @@ public sealed class OverlayBrowserSourceTests
         internal EventBus<AppEventKind> Events =>
             app.Services.GetRequiredService<EventBus<AppEventKind>>();
 
+        private PreviewAuthenticationSettings _authentication =>
+            app.Services.GetRequiredService<PreviewAuthenticationSettings>();
+
         internal static async Task<BrowserSourceHost> StartAsync(string? pathBase = null)
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -568,6 +636,32 @@ public sealed class OverlayBrowserSourceTests
             builder.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
             builder.Services.AddSingleton<TimeProvider>(time);
             builder.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+            builder.Services.AddSingleton<HostedChannelChangeNotifier>();
+            builder.Services.AddSingleton<HostFeatureService>();
+            builder.Services.AddSingleton<IModeratorAuthorityService>(
+                new GrantedModeratorAuthority()
+            );
+            builder.Services.AddSingleton(new PreviewAuthenticationSettings());
+            builder
+                .Services.AddAuthentication(PreviewAuthenticationHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, PreviewAuthenticationHandler>(
+                    PreviewAuthenticationHandler.SchemeName,
+                    static _ => { }
+                );
+            builder.Services.AddAuthorization(options =>
+                options.AddPolicy(
+                    "HostSelected",
+                    policy =>
+                        policy
+                            .RequireAuthenticatedUser()
+                            .AddRequirements(
+                                new AuthSessionCapabilityRequirement(
+                                    AuthSessionCapability.HostSelected
+                                )
+                            )
+                )
+            );
+            builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
             builder.Services.AddBlokeBotOverlays();
 
             var app = builder.Build();
@@ -576,6 +670,8 @@ public sealed class OverlayBrowserSourceTests
             {
                 app.UsePathBase(pathBase);
             }
+            app.UseAuthentication();
+            app.UseAuthorization();
             var observedCompletedPaths = new ConcurrentQueue<string>();
             app.Use(
                 async (context, next) =>
@@ -639,7 +735,53 @@ public sealed class OverlayBrowserSourceTests
             };
             db.OverlayInstances.Add(overlay);
             await db.SaveChangesAsync();
+            _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal async Task<OverlaySeed> SeedGuessingAsync(string login)
+        {
+            var accessKey = AccessKey(login);
+            await using var db = await database.CreateDbContextAsync();
+            var host = new BotHost
+            {
+                EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Guessing,
+                TwitchUserId = $"{login}-id",
+                Login = login,
+                DisplayName = login,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            var overlay = new OverlayInstance
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = host.Id,
+                Name = login,
+                Type = OverlayType.Guessing,
+                IsEnabled = true,
+                ConfigurationJson =
+                    """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+                UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.OverlayInstances.Add(overlay);
+            await db.SaveChangesAsync();
+            _authentication.SelectedHostId = host.Id;
+            return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal async Task SetFeaturesAsync(int hostId, HostFeatureFlags features)
+        {
+            await using var db = await database.CreateDbContextAsync();
+            await db
+                .Hosts.Where(host => host.Id == hostId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(host => host.EnabledFeatures, features)
+                );
         }
 
         internal async Task<LiveStream> OpenLiveAsync(string accessKey, string query = "")
@@ -796,6 +938,56 @@ public sealed class OverlayBrowserSourceTests
         internal void Advance(TimeSpan duration)
         {
             _now += duration;
+        }
+    }
+
+    private sealed class PreviewAuthenticationSettings
+    {
+        internal int SelectedHostId { get; set; }
+    }
+
+    private sealed class PreviewAuthenticationHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        PreviewAuthenticationSettings settings
+    ) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        internal const string SchemeName = "OverlayPreviewTest";
+
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var host = new BotHostChoice(
+                settings.SelectedHostId,
+                "preview",
+                "Preview",
+                AuthRole.Streamer
+            );
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, "preview-id"),
+                new Claim(ClaimTypes.Name, "preview"),
+                new Claim(AuthClaims.Login, "preview"),
+                new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(host)),
+                new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(host)),
+            };
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
+            var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name);
+            return Task.FromResult(AuthenticateResult.Success(ticket));
+        }
+    }
+
+    private sealed class GrantedModeratorAuthority : IModeratorAuthorityService
+    {
+        public Task<ModeratorAuthorityOutcome> AuthorizeAsync(
+            AuthenticatedSession session,
+            int requestedHostId,
+            CancellationToken ct
+        )
+        {
+            return Task.FromResult<ModeratorAuthorityOutcome>(
+                new ModeratorAuthorityOutcome.Granted()
+            );
         }
     }
 }

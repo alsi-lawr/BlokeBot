@@ -88,7 +88,7 @@ public sealed class GuessingConfigurationService(
         db.Profiles.Add(profile);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingProfileCreated, GuessingProfileCreateFailure>.Success(
             new(profile.Id, $"Created {profile.Name}.")
         );
@@ -173,7 +173,7 @@ public sealed class GuessingConfigurationService(
         db.Profiles.Remove(profile);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Success(
             new($"Deleted {profile.Name}.")
         );
@@ -405,7 +405,7 @@ public sealed class GuessingConfigurationService(
 
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Success(new());
     }
 
