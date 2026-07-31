@@ -107,7 +107,7 @@ public sealed class OverlayInstanceService(
         {
             return Rejected<OverlayInstanceCreation>(new OverlayInstanceRejection.NotFound());
         }
-        if (!RequiredFeaturesEnabled(command.Type, enabledFeatures.Value))
+        if (!OverlayRequiredFeatures.AreEnabled(command.Type, enabledFeatures.Value))
         {
             return Rejected<OverlayInstanceCreation>(
                 new OverlayInstanceRejection.FeatureDisabled()
@@ -834,16 +834,7 @@ public sealed class OverlayInstanceService(
             .Where(host => host.Id == hostId)
             .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
             .SingleOrDefaultAsync(ct);
-        return enabledFeatures is { } value && RequiredFeaturesEnabled(type, value);
-    }
-
-    private static bool RequiredFeaturesEnabled(OverlayType type, HostFeatureFlags enabledFeatures)
-    {
-        var required =
-            type is OverlayType.Guessing
-                ? HostFeatureFlags.Overlays | HostFeatureFlags.Guessing
-                : HostFeatureFlags.Overlays;
-        return (enabledFeatures & required) == required;
+        return enabledFeatures is { } value && OverlayRequiredFeatures.AreEnabled(type, value);
     }
 
     private static SemaphoreSlim MutationGate(Guid overlayId)

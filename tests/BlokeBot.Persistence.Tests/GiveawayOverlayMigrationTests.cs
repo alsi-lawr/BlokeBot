@@ -9,13 +9,13 @@ using TUnit.Core;
 
 namespace BlokeBot.Persistence.Tests;
 
-public sealed class GuessingOverlayMigrationTests
+public sealed class GiveawayOverlayMigrationTests
 {
-    private const string _previousMigration = "20260730202307_v0.5.0_IndependentChatTools";
+    private const string _previousMigration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
     private const string _latestMigration = "20260731083003_v0.6.0_GiveawayOverlay";
 
     [Test]
-    public async Task Upgrade_PreservesEmptyOverlaysAndAllowsTypedGuessingRows()
+    public async Task Upgrade_PreservesExistingOverlayTypesAndAllowsGiveawayRows()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using (var before = await factory.CreateDbContextAsync())
@@ -27,13 +27,13 @@ public sealed class GuessingOverlayMigrationTests
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
                      CommandsAliasesConfigured, CreatedAtUtc)
                 VALUES
-                    (1, 'host-id', 'host', 'Host', 0, 17, 0, '2026-07-31T00:00:00Z');
+                    (1, 'host-id', 'host', 'Host', 0, 511, 0, '2026-07-31T00:00:00Z');
 
                 INSERT INTO overlay_instances
                     (PublicId, HostId, Name, Type, IsEnabled, ConfigurationJson,
                      AccessKeyDigest, KeyVersion, Revision, CreatedAtUtc, UpdatedAtUtc)
                 VALUES
-                    ('41ea1646-0cdf-4f22-a68c-d51afdd3d850', 1, 'Existing empty', 'empty', 1,
+                    ('41ea1646-0cdf-4f22-a68c-d51afdd3d850', 1, 'Existing cue', 'cue-player', 1,
                      '{{"schemaVersion":1}}', zeroblob(32), 1, 1,
                      '2026-07-31T00:00:00Z', '2026-07-31T00:00:00Z');
                 """
@@ -45,18 +45,18 @@ public sealed class GuessingOverlayMigrationTests
         upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(18);
         (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
-        (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.Empty);
+        (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);
 
         upgraded.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("805f4686-d192-4b9d-8481-790fef956a98"),
                 HostId = 1,
-                Name = "Guessing",
-                Type = OverlayType.Guessing,
+                Name = "Giveaway",
+                Type = OverlayType.Giveaway,
                 IsEnabled = true,
                 ConfigurationJson =
-                    """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+                    """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
                 AccessKeyDigest = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
                 KeyVersion = 1,
                 Revision = 1,
@@ -71,7 +71,7 @@ public sealed class GuessingOverlayMigrationTests
                 .OverlayInstances.OrderBy(value => value.Id)
                 .Select(value => value.Type)
                 .ToArrayAsync()
-        ).ShouldBe([OverlayType.Empty, OverlayType.Guessing]);
+        ).ShouldBe([OverlayType.CuePlayer, OverlayType.Giveaway]);
         (await ReadOverlayTableSqlAsync(upgraded.Database.GetDbConnection())).ShouldContain(
             "Type IN ('cue-player', 'empty', 'giveaway', 'guessing')"
         );

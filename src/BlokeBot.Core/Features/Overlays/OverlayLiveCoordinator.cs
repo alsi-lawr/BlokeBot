@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using BlokeBot.Core.Features.Guessing.Game;
+using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Eventing;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -17,7 +18,8 @@ internal sealed class OverlayLiveCoordinator(
         IOverlayLivePresence,
         IOverlayCueTransport,
         IAsyncDisposable,
-        IGuessingChangeObserver
+        IGuessingChangeObserver,
+        IPointsGiveawayChangeObserver
 {
     private const int _connectionQueueCapacity = 16;
     private readonly CancellationTokenSource _stopping = new();
@@ -27,6 +29,7 @@ internal sealed class OverlayLiveCoordinator(
     private readonly Dictionary<OverlayIdentity, PresenceState> _presence = [];
     private readonly Dictionary<Guid, long> _sequences = [];
     private readonly Dictionary<OverlayIdentity, GuessingOverlayPhase> _guessingPhases = [];
+    private readonly Dictionary<OverlayIdentity, GiveawayOverlayPhase> _giveawayPhases = [];
     private IDisposable? _overlayChangesSubscription;
     private long _generation;
     private int _disposeState;
@@ -141,6 +144,31 @@ internal sealed class OverlayLiveCoordinator(
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask GiveawayChangedAsync(int hostId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ResolvedOverlayInstance[] instances;
+        lock (_connectionsGate)
+        {
+            instances = _connections
+                .Values.Where(connection =>
+                    connection.IsActive
+                    && connection.Instance.HostId == hostId
+                    && connection.Instance.Type == BlokeBot.Persistence.Models.OverlayType.Giveaway
+                )
+                .Select(connection => connection.Instance)
+                .DistinctBy(instance => instance.OverlayId)
+                .ToArray();
+        }
+
+        foreach (var instance in instances)
+        {
+            QueuePublication(instance, OverlayLivePublicationKind.State);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     internal async Task<OverlayLiveOpenResult> OpenAsync(
         ResolvedOverlayInstance instance,
         long resolvedGeneration,
@@ -154,6 +182,7 @@ internal sealed class OverlayLiveCoordinator(
                 OverlaySnapshotProjection.EmptyV1
                 or OverlaySnapshotProjection.GuessingV1
                 or OverlaySnapshotProjection.CuePlayerV1
+                or OverlaySnapshotProjection.GiveawayV1
             )
         )
         {
@@ -248,6 +277,7 @@ internal sealed class OverlayLiveCoordinator(
                     OverlaySnapshotProjection.EmptyV1
                     or OverlaySnapshotProjection.GuessingV1
                     or OverlaySnapshotProjection.CuePlayerV1
+                    or OverlaySnapshotProjection.GiveawayV1
                 )
             )
             {
@@ -359,10 +389,37 @@ internal sealed class OverlayLiveCoordinator(
                         OccurredAtUtc = occurredAtUtc,
                     }
                 ),
+            OverlaySnapshotProjection.GiveawayV1 giveaway => GiveawayBaseline(
+                instance,
+                giveaway.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required to open a live overlay."
             ),
         };
+    }
+
+    private OverlayLiveTransportMessage GiveawayBaseline(
+        ResolvedOverlayInstance instance,
+        GiveawayV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        _giveawayPhases[new OverlayIdentity(instance.HostId, instance.OverlayId)] = snapshot
+            .State
+            .Phase;
+        return new OverlayLiveTransportMessage.GiveawayBaseline(
+            new GiveawayV1OverlayLiveBaselineEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                OccurredAtUtc = occurredAtUtc,
+                Payload = GiveawayPayload(snapshot, "none"),
+            }
+        );
     }
 
     private OverlayLiveTransportMessage GuessingBaseline(
@@ -415,9 +472,56 @@ internal sealed class OverlayLiveCoordinator(
             OverlaySnapshotProjection.CuePlayerV1 => throw new InvalidOperationException(
                 "Cue players publish only typed cue transport messages."
             ),
+            OverlaySnapshotProjection.GiveawayV1 giveaway => GiveawayEvent(
+                publication.Kind,
+                identity,
+                giveaway.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required for live publication."
             ),
+        };
+    }
+
+    private OverlayLiveTransportMessage GiveawayEvent(
+        OverlayLivePublicationKind kind,
+        OverlayIdentity identity,
+        GiveawayV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        var animation =
+            kind is OverlayLivePublicationKind.Test ? "none"
+            : snapshot.State.Phase is GiveawayOverlayPhase.Completed
+            && _giveawayPhases.GetValueOrDefault(identity) is not GiveawayOverlayPhase.Completed
+                ? "winner"
+            : "none";
+        _giveawayPhases[identity] = snapshot.State.Phase;
+        return new OverlayLiveTransportMessage.GiveawayEvent(
+            new GiveawayV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                Kind = kind,
+                OccurredAtUtc = occurredAtUtc,
+                Payload = GiveawayPayload(snapshot, animation),
+            }
+        );
+    }
+
+    private static GiveawayV1OverlayLivePayload GiveawayPayload(
+        GiveawayV1OverlaySnapshot snapshot,
+        string animation
+    )
+    {
+        return new GiveawayV1OverlayLivePayload
+        {
+            WinnerAnimationDurationMilliseconds = snapshot.WinnerAnimationDurationMilliseconds,
+            Animation = animation,
+            State = snapshot.State,
         };
     }
 
@@ -572,6 +676,7 @@ internal sealed class OverlayLiveCoordinator(
                 );
             }
             _guessingPhases.Clear();
+            _giveawayPhases.Clear();
         }
     }
 
@@ -812,6 +917,12 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record CuePlayerBaseline(CuePlayerV1OverlayLiveBaselineEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record GiveawayBaseline(GiveawayV1OverlayLiveBaselineEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record GiveawayEvent(GiveawayV1OverlayLiveEnvelope Envelope)
         : OverlayLiveTransportMessage;
 
     internal sealed record Cue(CuePlaybackLiveEnvelope Envelope) : OverlayLiveTransportMessage;

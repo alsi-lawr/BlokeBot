@@ -55,13 +55,15 @@ internal static class OverlayBrowserSourceAssets
           box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0);
         }
 
-        .guessing-card {
+        .guessing-card,
+        .giveaway-card {
           fill: rgba(15, 23, 42, 0.94);
           stroke: rgba(148, 163, 184, 0.72);
           stroke-width: 2;
         }
 
-        .guessing-accent {
+        .guessing-accent,
+        .giveaway-accent {
           fill: #60a5fa;
         }
 
@@ -71,6 +73,42 @@ internal static class OverlayBrowserSourceAssets
         .guessing-result {
           fill: #f8fafc;
           font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+
+        .giveaway-kicker,
+        .giveaway-title,
+        .giveaway-detail,
+        .giveaway-result {
+          fill: #f8fafc;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+
+        .giveaway-kicker {
+          fill: #93c5fd;
+          font-size: 30px;
+          font-weight: 800;
+          letter-spacing: 4px;
+        }
+
+        .giveaway-title {
+          font-size: 58px;
+          font-weight: 800;
+        }
+
+        .giveaway-detail {
+          fill: #cbd5e1;
+          font-size: 30px;
+          font-weight: 600;
+        }
+
+        .giveaway-result {
+          fill: #fef08a;
+          font-size: 40px;
+          font-weight: 800;
+        }
+
+        #overlay-root[data-animation="winner"] .giveaway-presentation {
+          animation: guessing-overlay-result 640ms cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .guessing-kicker {
@@ -145,6 +183,7 @@ internal static class OverlayBrowserSourceAssets
 
         @media (prefers-reduced-motion: reduce) {
           #overlay-root[data-animation] .guessing-presentation,
+          #overlay-root[data-animation] .giveaway-presentation,
           #overlay-root[data-test-pulse="active"] #overlay-canvas {
             animation: none;
           }
@@ -185,6 +224,7 @@ internal static class OverlayBrowserSourceAssets
           const liveEnabled = root.dataset.liveEnabled !== "false";
           let testPulseTimer = null;
           let presentationAnimationTimer = null;
+          let giveawayCountdownTimer = null;
           const cueTimers = new Map();
           const svgNamespace = canvas.namespaceURI;
 
@@ -359,6 +399,162 @@ internal static class OverlayBrowserSourceAssets
             canvas.append(group);
           };
 
+          const validGiveawayState = (state) => {
+            if (
+              typeof state !== "object" ||
+              state === null ||
+              typeof state.title !== "string" ||
+              state.title.length < 1 ||
+              state.title.length > 80
+            ) {
+              return false;
+            }
+            if (state.phase === "idle") {
+              return true;
+            }
+            if (state.phase === "open") {
+              return (
+                (state.entrantCount === null ||
+                  (Number.isSafeInteger(state.entrantCount) &&
+                    state.entrantCount >= 0)) &&
+                (state.closesAtUtc === null ||
+                  !Number.isNaN(Date.parse(state.closesAtUtc))) &&
+                (state.joinCommand === null ||
+                  typeof state.joinCommand === "string")
+              );
+            }
+            if (state.phase === "ending") {
+              return (
+                state.entrantCount === null ||
+                (Number.isSafeInteger(state.entrantCount) &&
+                  state.entrantCount >= 0)
+              );
+            }
+            if (state.phase === "completed") {
+              return (
+                Array.isArray(state.winners) &&
+                state.winners.every(
+                  (winner) =>
+                    typeof winner?.login === "string" &&
+                    typeof winner?.awardedPoints === "string",
+                ) &&
+                typeof state.completedAtUtc === "string"
+              );
+            }
+            return (
+              state.phase === "cancelled" &&
+              typeof state.message === "string" &&
+              typeof state.completedAtUtc === "string"
+            );
+          };
+
+          const giveawayDetail = (state) => {
+            if (state.phase === "idle") {
+              return "No giveaway is running";
+            }
+            if (state.phase === "ending") {
+              return "Entries closed · choosing winners";
+            }
+            if (state.phase === "cancelled") {
+              return state.message;
+            }
+            if (state.phase === "completed") {
+              return state.winners.length === 0
+                ? "Giveaway closed without a winner"
+                : state.winners
+                    .map(
+                      (winner) =>
+                        `${winner.login} · ${winner.awardedPoints} ${state.pointLabel ?? "points"}`,
+                    )
+                    .join("  •  ");
+            }
+
+            const details = [];
+            if (state.entrantCount !== null) {
+              details.push(
+                `${state.entrantCount} ${
+                  state.entrantCount === 1 ? "entrant" : "entrants"
+                }`,
+              );
+            }
+            if (state.closesAtUtc !== null) {
+              const remaining = Math.max(
+                0,
+                Math.ceil((Date.parse(state.closesAtUtc) - Date.now()) / 1000),
+              );
+              details.push(
+                remaining === 0
+                  ? "Closing now"
+                  : `${Math.floor(remaining / 60)}:${String(
+                      remaining % 60,
+                    ).padStart(2, "0")} remaining`,
+              );
+            }
+            if (state.joinCommand !== null) {
+              details.push(`Type ${state.joinCommand} to enter`);
+            }
+            return details.join("  •  ");
+          };
+
+          const renderGiveaway = (state) => {
+            if (giveawayCountdownTimer !== null) {
+              window.clearTimeout(giveawayCountdownTimer);
+              giveawayCountdownTimer = null;
+            }
+            canvas.replaceChildren();
+            root.dataset.phase = state.phase;
+            const group = svgElement("g", {
+              class: "giveaway-presentation",
+              transform: "translate(160 690)",
+            });
+            group.append(
+              svgElement("rect", {
+                class: "giveaway-card",
+                x: "0",
+                y: "0",
+                width: "1600",
+                height: "270",
+                rx: "30",
+              }),
+              svgElement("rect", {
+                class: "giveaway-accent",
+                x: "0",
+                y: "0",
+                width: "16",
+                height: "270",
+                rx: "8",
+              }),
+            );
+            const status =
+              state.phase === "open"
+                ? "GIVEAWAY OPEN"
+                : state.phase === "completed"
+                  ? "WINNERS"
+                  : state.phase === "ending"
+                    ? "GIVEAWAY ENDING"
+                    : state.phase === "cancelled"
+                      ? "GIVEAWAY CLOSED"
+                      : "GIVEAWAY";
+            appendText(group, "giveaway-kicker", 56, 62, status);
+            appendText(group, "giveaway-title", 56, 135, state.title);
+            appendText(
+              group,
+              state.phase === "completed"
+                ? "giveaway-result"
+                : "giveaway-detail",
+              56,
+              205,
+              giveawayDetail(state),
+            );
+            canvas.append(group);
+            if (state.phase === "open" && state.closesAtUtc !== null) {
+              giveawayCountdownTimer = window.setTimeout(
+                () => renderGiveaway(state),
+                1000,
+              );
+            }
+          };
+
           const applyAnimation = (animation, durationMilliseconds) => {
             if (presentationAnimationTimer !== null) {
               window.clearTimeout(presentationAnimationTimer);
@@ -367,7 +563,8 @@ internal static class OverlayBrowserSourceAssets
             if (
               animation !== "entrance" &&
               animation !== "statusChange" &&
-              animation !== "result"
+              animation !== "result" &&
+              animation !== "winner"
             ) {
               delete root.dataset.animation;
               return;
@@ -375,7 +572,9 @@ internal static class OverlayBrowserSourceAssets
 
             root.dataset.animation = animation;
             const animationDuration =
-              animation === "result" ? durationMilliseconds : 700;
+              animation === "result" || animation === "winner"
+                ? durationMilliseconds
+                : 700;
             presentationAnimationTimer = window.setTimeout(() => {
               delete root.dataset.animation;
               presentationAnimationTimer = null;
@@ -423,6 +622,24 @@ internal static class OverlayBrowserSourceAssets
               clearCues();
               delete root.dataset.phase;
               applyAnimation("none", 0);
+            } else if (projection.overlayType === "giveaway") {
+              if (
+                !Number.isSafeInteger(
+                  projection.winnerAnimationDurationMilliseconds,
+                ) ||
+                projection.winnerAnimationDurationMilliseconds < 1000 ||
+                projection.winnerAnimationDurationMilliseconds > 10000 ||
+                !validGiveawayState(projection.state)
+              ) {
+                return false;
+              }
+              renderGiveaway(projection.state);
+              applyAnimation(
+                typeof projection.animation === "string"
+                  ? projection.animation
+                  : "none",
+                projection.winnerAnimationDurationMilliseconds,
+              );
             } else {
               return false;
             }
@@ -804,6 +1021,9 @@ internal static class OverlayBrowserSourceAssets
               }
               if (presentationAnimationTimer !== null) {
                 window.clearTimeout(presentationAnimationTimer);
+              }
+              if (giveawayCountdownTimer !== null) {
+                window.clearTimeout(giveawayCountdownTimer);
               }
               clearCues();
             },

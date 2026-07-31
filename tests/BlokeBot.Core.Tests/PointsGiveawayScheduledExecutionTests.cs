@@ -101,6 +101,7 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
 
         operations.ExpirationAttempts.ShouldBe(1);
         operations.ChangeNotificationAttempts.ShouldBe(1);
+        operations.NotifiedHostIds.ShouldBe([7]);
         var failure = logger.Entries.Single(entry => entry.Level == LogLevel.Error);
         failure.Exception.ShouldBeNull();
         failure.Message.ShouldContain("StateChanged notification failed");

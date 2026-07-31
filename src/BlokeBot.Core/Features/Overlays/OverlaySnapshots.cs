@@ -24,6 +24,17 @@ public interface IOverlayStateProvider
             new OverlaySnapshotProjection.Unavailable()
         );
     }
+
+    Task<OverlaySnapshotProjection> ProjectSampleAsync(
+        ResolvedOverlayInstance instance,
+        GiveawayOverlaySampleState sample,
+        CancellationToken cancellationToken
+    )
+    {
+        return Task.FromResult<OverlaySnapshotProjection>(
+            new OverlaySnapshotProjection.Unavailable()
+        );
+    }
 }
 
 public enum GuessingOverlaySampleState
@@ -32,6 +43,15 @@ public enum GuessingOverlaySampleState
     Open,
     Closed,
     Completed,
+}
+
+public enum GiveawayOverlaySampleState
+{
+    Idle,
+    Open,
+    Ending,
+    Completed,
+    Cancelled,
 }
 
 public abstract record OverlaySnapshotProjection
@@ -44,6 +64,8 @@ public abstract record OverlaySnapshotProjection
 
     public sealed record CuePlayerV1(CuePlayerV1OverlaySnapshot Snapshot)
         : OverlaySnapshotProjection;
+
+    public sealed record GiveawayV1(GiveawayV1OverlaySnapshot Snapshot) : OverlaySnapshotProjection;
 
     public sealed record Unavailable : OverlaySnapshotProjection;
 }
@@ -97,6 +119,88 @@ public sealed record GuessingV1OverlaySnapshot
     public required int ResultDurationMilliseconds { get; init; }
 
     public required GuessingV1OverlayPresentationState State { get; init; }
+}
+
+public sealed record GiveawayV1OverlaySnapshot
+{
+    public string OverlayType => "giveaway";
+
+    public int SchemaVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+
+    public int WinnerAnimationDurationMilliseconds => 5000;
+
+    public required GiveawayV1OverlayPresentationState State { get; init; }
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
+[JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Idle), "idle")]
+[JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Open), "open")]
+[JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Ending), "ending")]
+[JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Completed), "completed")]
+[JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Cancelled), "cancelled")]
+public abstract record GiveawayV1OverlayPresentationState
+{
+    private GiveawayV1OverlayPresentationState() { }
+
+    public required string Title { get; init; }
+
+    internal abstract GiveawayOverlayPhase Phase { get; }
+
+    public sealed record Idle : GiveawayV1OverlayPresentationState
+    {
+        internal override GiveawayOverlayPhase Phase => GiveawayOverlayPhase.Idle;
+    }
+
+    public sealed record Open : GiveawayV1OverlayPresentationState
+    {
+        public int? EntrantCount { get; init; }
+
+        public DateTimeOffset? ClosesAtUtc { get; init; }
+
+        public string? JoinCommand { get; init; }
+
+        internal override GiveawayOverlayPhase Phase => GiveawayOverlayPhase.Open;
+    }
+
+    public sealed record Ending : GiveawayV1OverlayPresentationState
+    {
+        public int? EntrantCount { get; init; }
+
+        internal override GiveawayOverlayPhase Phase => GiveawayOverlayPhase.Ending;
+    }
+
+    public sealed record Completed : GiveawayV1OverlayPresentationState
+    {
+        public ImmutableArray<GiveawayWinnerPresentation> Winners { get; init; } = [];
+
+        public string? PointLabel { get; init; }
+
+        public required DateTimeOffset CompletedAtUtc { get; init; }
+
+        internal override GiveawayOverlayPhase Phase => GiveawayOverlayPhase.Completed;
+    }
+
+    public sealed record Cancelled : GiveawayV1OverlayPresentationState
+    {
+        public required string Message { get; init; }
+
+        public required DateTimeOffset CompletedAtUtc { get; init; }
+
+        internal override GiveawayOverlayPhase Phase => GiveawayOverlayPhase.Cancelled;
+    }
+}
+
+public sealed record GiveawayWinnerPresentation
+{
+    public required string Login { get; init; }
+
+    public required string AwardedPoints { get; init; }
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
@@ -165,6 +269,15 @@ internal enum GuessingOverlayPhase
     Completed,
 }
 
+internal enum GiveawayOverlayPhase
+{
+    Idle,
+    Open,
+    Ending,
+    Completed,
+    Cancelled,
+}
+
 internal sealed class OverlayServerEpoch
 {
     internal Guid Value { get; } = Guid.NewGuid();
@@ -206,11 +319,31 @@ internal sealed class OverlayStateProvider(
 
         if (
             instance
+                is {
+                    Type: OverlayType.Giveaway,
+                    Configuration: OverlayConfiguration.GiveawayV1 giveawayConfiguration,
+                }
+            && await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.Giveaway,
+                cancellationToken
+            )
+        )
+        {
+            return await GiveawayAsync(instance, giveawayConfiguration, cancellationToken);
+        }
+
+        if (
+            instance
                 is not {
                     Type: OverlayType.Guessing,
                     Configuration: OverlayConfiguration.GuessingV1 configuration,
                 }
-            || !await RequiredFeaturesEnabledAsync(instance.HostId, cancellationToken)
+            || !await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.Guessing,
+                cancellationToken
+            )
         )
         {
             return new OverlaySnapshotProjection.Unavailable();
@@ -289,7 +422,11 @@ internal sealed class OverlayStateProvider(
                     Type: OverlayType.Guessing,
                     Configuration: OverlayConfiguration.GuessingV1 configuration,
                 }
-            || !await RequiredFeaturesEnabledAsync(instance.HostId, cancellationToken)
+            || !await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.Guessing,
+                cancellationToken
+            )
         )
         {
             return new OverlaySnapshotProjection.Unavailable();
@@ -326,6 +463,69 @@ internal sealed class OverlayStateProvider(
         return Guessing(instance, configuration, state);
     }
 
+    public async Task<OverlaySnapshotProjection> ProjectSampleAsync(
+        ResolvedOverlayInstance instance,
+        GiveawayOverlaySampleState sample,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            instance
+                is not {
+                    Type: OverlayType.Giveaway,
+                    Configuration: OverlayConfiguration.GiveawayV1 configuration,
+                }
+            || !await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.Giveaway,
+                cancellationToken
+            )
+        )
+        {
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+
+        var now = timeProvider.GetUtcNow();
+        GiveawayV1OverlayPresentationState state = sample switch
+        {
+            GiveawayOverlaySampleState.Idle => new GiveawayV1OverlayPresentationState.Idle
+            {
+                Title = configuration.Title,
+            },
+            GiveawayOverlaySampleState.Open => new GiveawayV1OverlayPresentationState.Open
+            {
+                Title = configuration.Title,
+                EntrantCount = configuration.ShowEntrantCount ? 42 : null,
+                ClosesAtUtc = configuration.ShowCountdown ? now.AddMinutes(3) : null,
+                JoinCommand = configuration.ShowJoinCommand ? "!join" : null,
+            },
+            GiveawayOverlaySampleState.Ending => new GiveawayV1OverlayPresentationState.Ending
+            {
+                Title = configuration.Title,
+                EntrantCount = configuration.ShowEntrantCount ? 42 : null,
+            },
+            GiveawayOverlaySampleState.Completed => new GiveawayV1OverlayPresentationState.Completed
+            {
+                Title = configuration.Title,
+                Winners =
+                [
+                    new GiveawayWinnerPresentation { Login = "nightowl", AwardedPoints = "500" },
+                    new GiveawayWinnerPresentation { Login = "newviewer", AwardedPoints = "250" },
+                ],
+                PointLabel = "points",
+                CompletedAtUtc = now,
+            },
+            GiveawayOverlaySampleState.Cancelled => new GiveawayV1OverlayPresentationState.Cancelled
+            {
+                Title = configuration.Title,
+                Message = "Giveaway closed without a winner",
+                CompletedAtUtc = now,
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+        return Giveaway(instance, state);
+    }
+
     private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance)
     {
         return new OverlaySnapshotProjection.EmptyV1(
@@ -358,16 +558,131 @@ internal sealed class OverlayStateProvider(
 
     private async Task<bool> RequiredFeaturesEnabledAsync(
         int hostId,
+        OverlayType type,
         CancellationToken cancellationToken
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        const HostFeatureFlags Required = HostFeatureFlags.Overlays | HostFeatureFlags.Guessing;
         return await db
             .Hosts.AsNoTracking()
             .Where(value => value.Id == hostId)
-            .Select(value => (value.EnabledFeatures & Required) == Required)
+            .Select(value =>
+                (value.EnabledFeatures & OverlayRequiredFeatures.For(type))
+                == OverlayRequiredFeatures.For(type)
+            )
             .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<OverlaySnapshotProjection> GiveawayAsync(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.GiveawayV1 configuration,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var row = await db
+            .PointsGiveaways.AsNoTracking()
+            .Where(value => value.HostId == instance.HostId)
+            .OrderBy(value => value.Status == PointsGiveawayStatus.Active ? 0 : 1)
+            .ThenByDescending(value => value.StartedAtUtc)
+            .Select(value => new GiveawayProjectionRow(
+                value.Status,
+                value.EndsAtUtc,
+                value.CompletedAtUtc,
+                value.Entrants.Count,
+                value
+                    .Winners.OrderBy(winner => winner.Id)
+                    .Select(winner => new GiveawayWinnerPresentation
+                    {
+                        Login = winner.Login,
+                        AwardedPoints = winner.Payout,
+                    })
+                    .ToArray()
+            ))
+            .FirstOrDefaultAsync(cancellationToken);
+        var joinAlias = configuration.ShowJoinCommand
+            ? (
+                await db
+                    .CommandAliases.AsNoTracking()
+                    .Where(value =>
+                        value.HostId == instance.HostId
+                        && value.Kind == AppCommandKind.Join
+                        && value.GuessRoundProfileId == null
+                    )
+                    .Select(value => value.Alias)
+                    .ToArrayAsync(cancellationToken)
+            )
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(value => value, StringComparer.Ordinal)
+                .FirstOrDefault()
+            : null;
+        var pointLabel =
+            await db
+                .PointsSettings.AsNoTracking()
+                .Where(value => value.HostId == instance.HostId)
+                .Select(value => value.PointLabel)
+                .SingleOrDefaultAsync(cancellationToken)
+            ?? "points";
+
+        var now = timeProvider.GetUtcNow();
+        GiveawayV1OverlayPresentationState state = row switch
+        {
+            null => new GiveawayV1OverlayPresentationState.Idle { Title = configuration.Title },
+            { Status: PointsGiveawayStatus.Active } when Utc(row.EndsAtUtc) > now =>
+                new GiveawayV1OverlayPresentationState.Open
+                {
+                    Title = configuration.Title,
+                    EntrantCount = configuration.ShowEntrantCount ? row.EntrantCount : null,
+                    ClosesAtUtc = configuration.ShowCountdown ? Utc(row.EndsAtUtc) : null,
+                    JoinCommand =
+                        configuration.ShowJoinCommand && !string.IsNullOrWhiteSpace(joinAlias)
+                            ? $"!{joinAlias}"
+                            : null,
+                },
+            { Status: PointsGiveawayStatus.Active } => new GiveawayV1OverlayPresentationState.Ending
+            {
+                Title = configuration.Title,
+                EntrantCount = configuration.ShowEntrantCount ? row.EntrantCount : null,
+            },
+            { Status: PointsGiveawayStatus.Completed, CompletedAtUtc: { } completedAtUtc } =>
+                new GiveawayV1OverlayPresentationState.Completed
+                {
+                    Title = configuration.Title,
+                    Winners = row.Winners.ToImmutableArray(),
+                    PointLabel = pointLabel,
+                    CompletedAtUtc = Utc(completedAtUtc),
+                },
+            {
+                Status: PointsGiveawayStatus.Cancelled or PointsGiveawayStatus.Expired,
+                CompletedAtUtc: { } completedAtUtc,
+            } => new GiveawayV1OverlayPresentationState.Cancelled
+            {
+                Title = configuration.Title,
+                Message =
+                    row.Status is PointsGiveawayStatus.Cancelled
+                        ? "Giveaway cancelled"
+                        : "Giveaway closed without a winner",
+                CompletedAtUtc = Utc(completedAtUtc),
+            },
+            _ => throw new PersistenceDataIntegrityException(typeof(PointsGiveaway)),
+        };
+        return Giveaway(instance, state);
+    }
+
+    private OverlaySnapshotProjection Giveaway(
+        ResolvedOverlayInstance instance,
+        GiveawayV1OverlayPresentationState state
+    )
+    {
+        return new OverlaySnapshotProjection.GiveawayV1(
+            new GiveawayV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                State = state,
+            }
+        );
     }
 
     private static GuessingV1OverlayPresentationState ToPresentation(
@@ -441,5 +756,13 @@ internal sealed class OverlayStateProvider(
         string WinningGuessPointReward,
         int GuessCount,
         string[] Winners
+    );
+
+    private sealed record GiveawayProjectionRow(
+        PointsGiveawayStatus Status,
+        DateTime EndsAtUtc,
+        DateTime? CompletedAtUtc,
+        int EntrantCount,
+        GiveawayWinnerPresentation[] Winners
     );
 }

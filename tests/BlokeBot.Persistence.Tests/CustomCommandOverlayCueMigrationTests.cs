@@ -90,8 +90,10 @@ public sealed class CustomCommandOverlayCueMigrationTests
                 """
             )
         );
-        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(17);
+        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(18);
         (await db.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_migration);
-        (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
+        (await db.Database.GetPendingMigrationsAsync()).ShouldBe([
+            "20260731083003_v0.6.0_GiveawayOverlay",
+        ]);
     }
 }

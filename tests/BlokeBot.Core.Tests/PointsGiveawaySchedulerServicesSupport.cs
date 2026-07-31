@@ -33,7 +33,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     {
         public int Attempts { get; private set; }
 
-        public ValueTask NotifyAsync(CancellationToken cancellationToken)
+        public ValueTask NotifyAsync(int hostId, CancellationToken cancellationToken)
         {
             Attempts++;
             return ValueTask.FromException(new IOException(failureMessage));

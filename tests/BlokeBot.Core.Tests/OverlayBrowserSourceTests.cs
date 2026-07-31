@@ -549,6 +549,53 @@ public sealed class OverlayBrowserSourceTests
         restoredJson.ShouldNotContain("\"animation\"");
     }
 
+    [Test]
+    public async Task GiveawayPreview_AllSamplesRequireBothParentsAndExposeNoPrivateEntrants()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var seed = await host.SeedGiveawayAsync("giveaway-preview");
+
+        foreach (var sample in new[] { "idle", "open", "ending", "completed", "cancelled" })
+        {
+            using var documentResponse = await host.Client.GetAsync(
+                $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample={sample}"
+            );
+            documentResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+            (await documentResponse.Content.ReadAsStringAsync()).ShouldContain(
+                $"data-state-url=\"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&amp;sample={sample}\""
+            );
+
+            using var response = await host.Client.GetAsync(
+                $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample={sample}"
+            );
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var json = await response.Content.ReadAsStringAsync();
+            json.ShouldContain("\"overlayType\":\"giveaway\"");
+            json.ShouldNotContain("eligibility", Case.Insensitive);
+            json.ShouldNotContain("private-entrant", Case.Insensitive);
+        }
+
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Overlays);
+        using var pointsOff = await host.Client.GetAsync(
+            $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample=completed"
+        );
+        pointsOff.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Points);
+        using var overlaysOff = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state");
+        overlaysOff.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        await host.SetFeaturesAsync(
+            seed.HostId,
+            HostFeatureFlags.Overlays | HostFeatureFlags.Points
+        );
+        using var restored = await host.Client.GetAsync(
+            $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample=completed"
+        );
+        restored.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await restored.Content.ReadAsStringAsync()).ShouldNotContain("\"animation\"");
+    }
+
     private static async Task AssertDelayLifecycleAsync(string javascript)
     {
         const string DelayStart = "const delay =";
@@ -863,6 +910,50 @@ public sealed class OverlayBrowserSourceTests
                 IsEnabled = true,
                 ConfigurationJson =
                     """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+                UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.OverlayInstances.Add(overlay);
+            await db.SaveChangesAsync();
+            _authentication.SelectedHostId = host.Id;
+            return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal async Task<OverlaySeed> SeedGiveawayAsync(string login)
+        {
+            var accessKey = AccessKey(login);
+            await using var db = await database.CreateDbContextAsync();
+            var host = new BotHost
+            {
+                EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Points,
+                TwitchUserId = $"{login}-id",
+                Login = login,
+                DisplayName = login,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "points" });
+            db.CommandAliases.Add(
+                new CommandAlias
+                {
+                    HostId = host.Id,
+                    Kind = AppCommandKind.Join,
+                    Alias = "enter",
+                }
+            );
+            var overlay = new OverlayInstance
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = host.Id,
+                Name = login,
+                Type = OverlayType.Giveaway,
+                IsEnabled = true,
+                ConfigurationJson =
+                    """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
                 KeyVersion = 1,
                 Revision = 1,

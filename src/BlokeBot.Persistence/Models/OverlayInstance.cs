@@ -10,6 +10,9 @@ public enum OverlayType
 
     [PersistedToken("cue-player")]
     CuePlayer,
+
+    [PersistedToken("giveaway")]
+    Giveaway,
 }
 
 public enum OverlayInstanceEventKind

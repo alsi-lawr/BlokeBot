@@ -53,6 +53,7 @@ public abstract record OverlayConfiguration
                 OverlayType.Empty => ParseEmpty(document.RootElement),
                 OverlayType.Guessing => ParseGuessing(document.RootElement),
                 OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
+                OverlayType.Giveaway => ParseGiveaway(document.RootElement),
                 _ => new OverlayConfigurationParseResult.Invalid(
                     "The overlay type is not supported."
                 ),
@@ -143,6 +144,34 @@ public abstract record OverlayConfiguration
             );
     }
 
+    private static OverlayConfigurationParseResult ParseGiveaway(JsonElement root)
+    {
+        var properties = root.EnumerateObject().ToArray();
+        if (
+            properties.Length != 5
+            || !TryReadProperty(properties, "schemaVersion", out var schemaVersion)
+            || schemaVersion.Value.ValueKind != JsonValueKind.Number
+            || !schemaVersion.Value.TryGetInt32(out var version)
+            || version != 1
+            || !TryReadProperty(properties, "title", out var title)
+            || title.Value.ValueKind != JsonValueKind.String
+            || title.Value.GetString() is not { } titleValue
+            || titleValue.Trim().Length is < 1 or > GiveawayV1.MaximumTitleLength
+            || !TryReadBoolean(properties, "showEntrantCount", out var showEntrantCount)
+            || !TryReadBoolean(properties, "showCountdown", out var showCountdown)
+            || !TryReadBoolean(properties, "showJoinCommand", out var showJoinCommand)
+        )
+        {
+            return new OverlayConfigurationParseResult.Invalid(
+                "A giveaway overlay configuration must contain schemaVersion 1, a title from 1 to 80 characters, and showEntrantCount, showCountdown, and showJoinCommand booleans."
+            );
+        }
+
+        return new OverlayConfigurationParseResult.Valid(
+            new GiveawayV1(titleValue, showEntrantCount, showCountdown, showJoinCommand)
+        );
+    }
+
     private static bool TryReadProperty(
         IEnumerable<JsonProperty> properties,
         string name,
@@ -159,6 +188,25 @@ public abstract record OverlayConfiguration
         }
 
         property = default;
+        return false;
+    }
+
+    private static bool TryReadBoolean(
+        IEnumerable<JsonProperty> properties,
+        string name,
+        out bool value
+    )
+    {
+        if (
+            TryReadProperty(properties, name, out var property)
+            && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+        )
+        {
+            value = property.Value.GetBoolean();
+            return true;
+        }
+
+        value = false;
         return false;
     }
 
@@ -221,6 +269,60 @@ public abstract record OverlayConfiguration
         internal override string ToPersistenceJson()
         {
             return """{"schemaVersion":1}""";
+        }
+    }
+
+    public sealed record GiveawayV1 : OverlayConfiguration
+    {
+        public const int MaximumTitleLength = 80;
+        public const string DefaultTitle = "Points giveaway";
+
+        public GiveawayV1(
+            string title,
+            bool showEntrantCount,
+            bool showCountdown,
+            bool showJoinCommand
+        )
+        {
+            var normalizedTitle = title.Trim();
+            if (normalizedTitle.Length is < 1 or > MaximumTitleLength)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(title),
+                    "The title must contain from 1 to 80 characters."
+                );
+            }
+
+            Title = normalizedTitle;
+            ShowEntrantCount = showEntrantCount;
+            ShowCountdown = showCountdown;
+            ShowJoinCommand = showJoinCommand;
+        }
+
+        public override OverlayType Type => OverlayType.Giveaway;
+
+        public override int SchemaVersion => 1;
+
+        public string Title { get; }
+
+        public bool ShowEntrantCount { get; }
+
+        public bool ShowCountdown { get; }
+
+        public bool ShowJoinCommand { get; }
+
+        internal override string ToPersistenceJson()
+        {
+            return JsonSerializer.Serialize(
+                new
+                {
+                    schemaVersion = SchemaVersion,
+                    title = Title,
+                    showEntrantCount = ShowEntrantCount,
+                    showCountdown = ShowCountdown,
+                    showJoinCommand = ShowJoinCommand,
+                }
+            );
         }
     }
 }

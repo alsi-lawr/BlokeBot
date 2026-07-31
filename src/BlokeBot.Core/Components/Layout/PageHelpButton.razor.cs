@@ -287,6 +287,15 @@ public partial class PageHelpButton
                 ]
             ),
             new(
+                "Giveaway overlay availability",
+                "Giveaway overlays require both Overlays and Points to be on in Channel setup.",
+                [
+                    "The overlay presents authoritative Points giveaway state, entrant count, countdown, configured winners and prizes, and the current canonical join command. It never exposes entrant identities or private eligibility details.",
+                    "Turning either tool off blocks preview, Browser Source data, publication, tests, and winner animation while retaining saved setup and giveaway history.",
+                    "Turning both tools back on resumes from stable current state without replaying suppressed updates, queued work, or winner animations.",
+                ]
+            ),
+            new(
                 "Reusable media and web cues",
                 "Create an enabled Cue player Browser Source, upload validated MP4 or MP3 media, then compose reusable Cue-V1 layers in the cue editor.",
                 [

@@ -75,6 +75,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
 
         public int ChangeNotificationAttempts { get; private set; }
 
+        public List<int> NotifiedHostIds { get; } = [];
+
         public IO<
             IReadOnlyList<PointsGiveawaySchedule>,
             PointsGiveawaySchedulerTransientFailure
@@ -158,7 +160,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         public IO<
             PointsGiveawayChangeNotificationCompleted,
             PointsGiveawaySchedulerNotificationFailure
-        > NotifyChanged()
+        > NotifyChanged(int hostId)
         {
             return IO<
                 PointsGiveawayChangeNotificationCompleted,
@@ -166,6 +168,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             >.Create(_ =>
             {
                 ChangeNotificationAttempts++;
+                NotifiedHostIds.Add(hostId);
                 return ValueTask.FromResult(
                     Next(
                         ChangeNotificationOutcomes,

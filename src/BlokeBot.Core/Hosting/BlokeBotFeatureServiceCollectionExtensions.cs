@@ -111,6 +111,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
+        services.AddSingleton<IPointsGiveawayChangeObserver>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
         services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
@@ -300,6 +303,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IPointTargetUserLookup, HelixPointTargetUserLookup>();
         services.AddSingleton<PointsConfigurationService>();
         services.AddSingleton<PointsDashboardService>();
+        services.AddSingleton<PointsGiveawayChangeNotifier>();
         services.AddSingleton<
             IPointsGiveawayChangeNotification,
             PointsGiveawayChangeNotification

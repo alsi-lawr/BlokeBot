@@ -17,6 +17,8 @@ internal sealed class SimulationFixtureSeeder(
 {
     internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
     internal const string CuePlayerAccessKey = "simulation-cue-player-access-key-000000000000";
+    internal const string GiveawayOverlayAccessKey =
+        "simulation-giveaway-overlay-key-0000000000000";
 
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
@@ -65,6 +67,32 @@ internal sealed class SimulationFixtureSeeder(
         CancellationToken cancellationToken
     )
     {
+        if (
+            !await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("0a8b9ee0-500f-4b20-b706-455ff9ef4288"),
+                cancellationToken
+            )
+        )
+        {
+            db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    PublicId = Guid.Parse("0a8b9ee0-500f-4b20-b706-455ff9ef4288"),
+                    HostId = hostId,
+                    Name = "Points giveaway",
+                    Type = OverlayType.Giveaway,
+                    IsEnabled = true,
+                    ConfigurationJson =
+                        """{"schemaVersion":1,"title":"Community points giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
+                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(GiveawayOverlayAccessKey),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                }
+            );
+        }
+
         if (
             await db.OverlayInstances.AnyAsync(
                 value => value.PublicId == Guid.Parse("82bd3021-fc60-47fc-8fa7-ed828083e70a"),

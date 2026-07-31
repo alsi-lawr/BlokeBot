@@ -280,6 +280,71 @@ public sealed class OverlayDashboardUiTests
         });
     }
 
+    [Test]
+    public async Task GiveawayEditor_OffersAllSamplesAndRecoversWhenPointsIsOff()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedGiveawayAsync(database);
+        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
+        {
+            context.Services.AddSingleton<IModeratorAuthorityService>(
+                new GrantedModeratorAuthority()
+            );
+            context.Services.AddBlokeBotOverlays();
+            var page = context.Render<OverlaysPage>();
+
+            page.WaitForAssertion(() =>
+            {
+                page.FindAll("[aria-label='Giveaway overlay sample state'] button")
+                    .Select(button => button.TextContent.Trim())
+                    .ShouldBe(["Idle", "Open", "Ending", "Winners", "Cancelled"]);
+                page.Markup.ShouldContain("Show entrant count");
+                page.Markup.ShouldContain("Show close-time countdown");
+                page.Markup.ShouldContain("Show current join command");
+            });
+            FindButton(page, "Giveaway overlay sample state", "Winners").Click();
+            page.WaitForAssertion(() =>
+                page.Find("iframe")
+                    .GetAttribute("src")
+                    .ShouldBe(
+                        $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample=completed"
+                    )
+            );
+        }
+
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            await db
+                .Hosts.Where(host => host.Id == seed.HostId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
+                );
+        }
+        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
+        {
+            context.Services.AddSingleton<IModeratorAuthorityService>(
+                new GrantedModeratorAuthority()
+            );
+            context.Services.AddBlokeBotOverlays();
+            var page = context.Render<OverlaysPage>();
+
+            page.WaitForAssertion(() =>
+            {
+                var type = (IHtmlSelectElement)page.Find("#overlay-type");
+                type.Value.ShouldBe(OverlayType.Giveaway.ToString());
+                type.TextContent.ShouldContain("Points giveaway");
+                type.IsDisabled.ShouldBeTrue();
+                page.Find("[data-overlay-disabled-recovery]")
+                    .TextContent.ShouldContain("Turn Points on in Channel setup");
+                page.FindAll("iframe").ShouldBeEmpty();
+                page.FindAll("button")
+                    .Single(button => button.TextContent.Trim() == "Save overlay")
+                    .HasAttribute("disabled")
+                    .ShouldBeTrue();
+            });
+        }
+    }
+
     private static string? PressedValue(
         IRenderedComponent<OverlaysPage> page,
         string groupLabel,
@@ -374,6 +439,40 @@ public sealed class OverlayDashboardUiTests
             IsEnabled = true,
             ConfigurationJson =
                 """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
+            KeyVersion = 1,
+            Revision = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        db.OverlayInstances.Add(overlay);
+        await db.SaveChangesAsync();
+        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
+    }
+
+    private static async Task<OverlaySeed> SeedGiveawayAsync(SqliteBlokeBotDbFactory database)
+    {
+        const string PrivateAccessKey = "giveaway-component-test-key-0000000000000";
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            TwitchUserId = "giveaway-streamer-id",
+            Login = "giveaway-streamer",
+            DisplayName = "Giveaway Streamer",
+            EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Points,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        var overlay = new OverlayInstance
+        {
+            PublicId = Guid.Parse("45949b52-282f-4133-b423-18d511690e70"),
+            HostId = host.Id,
+            Name = "Points giveaway",
+            Type = OverlayType.Giveaway,
+            IsEnabled = true,
+            ConfigurationJson =
+                """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
             KeyVersion = 1,
             Revision = 1,

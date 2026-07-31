@@ -177,12 +177,12 @@ public sealed class GuessingOverlayTests
         await ReadAsync(otherConnection);
 
         provider.SetPhase(owner.HostId, GuessingOverlayPhase.Closed);
-        provider.BlockNextProjection();
+        var blockedProjection = provider.BlockNextProjection();
         await coordinator.GuessingChangedAsync(owner.HostId, CancellationToken.None);
-        await provider.BlockedProjectionEntered;
+        await blockedProjection.Entered;
         await coordinator.GuessingChangedAsync(owner.HostId, CancellationToken.None);
         await coordinator.GuessingChangedAsync(owner.HostId, CancellationToken.None);
-        provider.ReleaseBlockedProjection();
+        blockedProjection.Release();
 
         var closed = (
             await ReadAsync(ownerConnection)
@@ -393,24 +393,22 @@ public sealed class GuessingOverlayTests
         private TaskCompletionSource? _blockedProjectionEntered;
         private TaskCompletionSource? _blockedProjectionRelease;
 
-        internal Task BlockedProjectionEntered =>
-            _blockedProjectionEntered?.Task
-            ?? throw new InvalidOperationException("No projection is blocked.");
-
         internal void SetPhase(int hostId, GuessingOverlayPhase phase)
         {
             _phases[hostId] = phase;
         }
 
-        internal void BlockNextProjection()
+        internal (Task Entered, Action Release) BlockNextProjection()
         {
-            _blockedProjectionEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            _blockedProjectionRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        }
-
-        internal void ReleaseBlockedProjection()
-        {
-            _blockedProjectionRelease?.TrySetResult();
+            var entered = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            var release = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            _blockedProjectionEntered = entered;
+            _blockedProjectionRelease = release;
+            return (entered.Task, () => release.TrySetResult());
         }
 
         public async Task<OverlaySnapshotProjection> ProjectAsync(

@@ -504,6 +504,67 @@ public sealed class OverlayInstanceServiceTests
         (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(1);
     }
 
+    [Test]
+    public async Task GiveawayParents_BlockCreationMutationAndResolutionWhileRetainingSetup()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(AuthRole.Streamer, fixture.HostId);
+        var configuration = new OverlayConfiguration.GiveawayV1(
+            "Community giveaway",
+            true,
+            true,
+            true
+        );
+        var command = new CreateOverlayInstanceCommand(
+            "Giveaway",
+            OverlayType.Giveaway,
+            configuration
+        );
+        var created = (
+            await fixture.Service.CreateAsync(session, command, CancellationToken.None)
+        ).SucceededValue();
+
+        foreach (var incomplete in new[] { HostFeatureFlags.Overlays, HostFeatureFlags.Points })
+        {
+            await fixture.SetFeaturesAsync(incomplete);
+            (
+                await fixture.Resolver.ResolveAsync(
+                    created.PrivateAccess.AccessKey,
+                    CancellationToken.None
+                )
+            ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
+            (
+                await fixture.Service.ConfigureAsync(
+                    session,
+                    new(created.Instance.Id, created.Instance.Revision, configuration),
+                    CancellationToken.None
+                )
+            )
+                .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
+                .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+            (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
+                .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
+                .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+        }
+
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays | HostFeatureFlags.Points);
+        var restored = (
+            await fixture.Service.GetAsync(session, created.Instance.Id, CancellationToken.None)
+        ).SucceededValue();
+        restored.Name.ShouldBe("Giveaway");
+        restored.Revision.ShouldBe(created.Instance.Revision);
+        restored.Configuration.ShouldBe(configuration);
+        (
+            await fixture.Resolver.ResolveAsync(
+                created.PrivateAccess.AccessKey,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayResolutionResult.Resolved>();
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        (await db.OverlayInstances.CountAsync()).ShouldBe(1);
+        (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(1);
+    }
+
     private static CreateOverlayInstanceCommand Create(string name)
     {
         return new(name, OverlayType.Empty, new OverlayConfiguration.EmptyV1());
