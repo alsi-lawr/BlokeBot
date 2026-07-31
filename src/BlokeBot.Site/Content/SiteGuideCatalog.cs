@@ -467,10 +467,10 @@ internal static class SiteGuideCatalog
             Summary =
                 "Collect consistent viewer suggestions, moderate their lifecycle and keep point charges and public status understandable.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/community/request-boards-participant-mobile.png",
-                LightPhoneSource: "media/community/request-boards-participant-mobile.png",
-                DarkLaptopSource: "media/community/request-boards-moderator-desktop.png",
-                LightLaptopSource: "media/community/request-boards-moderator-desktop.png",
+                DarkPhoneSource: "media/community/phone-dark-request-boards.png",
+                LightPhoneSource: "media/community/phone-light-request-boards.png",
+                DarkLaptopSource: "media/community/laptop-dark-request-boards.png",
+                LightLaptopSource: "media/community/laptop-light-request-boards.png",
                 PhoneAlt: "The Sample Channel public request board on a narrow screen, showing open rules and the start of the submission form.",
                 LaptopAlt: "The Sample Channel Request boards moderator page, showing a saved Game night requests board and its configuration.",
                 "Moderators configure the board at /requests; viewers use its public channel-and-board address."
@@ -556,10 +556,10 @@ internal static class SiteGuideCatalog
             Summary =
                 "Open a queue, collect private entry details, run ready checks and deliver lobby information without posting it publicly.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/community/play-with-viewers-participant-mobile.png",
-                LightPhoneSource: "media/community/play-with-viewers-participant-mobile.png",
-                DarkLaptopSource: "media/community/play-with-viewers-moderator-desktop.png",
-                LightLaptopSource: "media/community/play-with-viewers-moderator-desktop.png",
+                DarkPhoneSource: "media/community/phone-dark-play-with-viewers.png",
+                LightPhoneSource: "media/community/phone-light-play-with-viewers.png",
+                DarkLaptopSource: "media/community/laptop-dark-play-with-viewers.png",
+                LightLaptopSource: "media/community/laptop-light-play-with-viewers.png",
                 PhoneAlt: "The Sample Channel Community night party viewer page on a narrow screen, showing the public queue rule and private entry form.",
                 LaptopAlt: "The Sample Channel Play with viewers moderator page, showing a saved queue, party size and fair-selection configuration.",
                 "The moderator route /queues and viewer route /queues/{channel}/{queue-name} share one live queue."
@@ -641,10 +641,10 @@ internal static class SiteGuideCatalog
             Summary =
                 "Turn live viewer calls into one moderated Twitch clip or marker, then publish safe stream and weekly recaps.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/community/moments-participant-mobile.png",
-                LightPhoneSource: "media/community/moments-participant-mobile.png",
-                DarkLaptopSource: "media/community/moments-moderator-desktop.png",
-                LightLaptopSource: "media/community/moments-moderator-desktop.png",
+                DarkPhoneSource: "media/community/phone-dark-moments.png",
+                LightPhoneSource: "media/community/phone-light-moments.png",
+                DarkLaptopSource: "media/community/laptop-dark-moments.png",
+                LightLaptopSource: "media/community/laptop-light-moments.png",
                 PhoneAlt: "The Sample Channel stream recap on a narrow screen, showing an approved Community clutch save and a recorded vote.",
                 LaptopAlt: "The Sample Channel Moments moderator page, showing live capture settings and an approved Community clutch save.",
                 "Moderators work at /moments; approved entries appear in channel, stream and weekly recaps."

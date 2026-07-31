@@ -127,7 +127,10 @@ local readiness = {
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
-  local expected = assert(readiness[view], "No capture readiness is registered for " .. view)
+  local expected = readiness[view]
+  if expected == nil then
+    error("No capture readiness is registered for " .. view)
+  end
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
   local ready_expression = ([=[

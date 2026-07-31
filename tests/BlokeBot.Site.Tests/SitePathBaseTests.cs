@@ -77,7 +77,7 @@ public sealed class SitePathBaseTests
 
             var requestBoards = await client.GetStringAsync("/blokebot/community/request-boards");
             requestBoards.ShouldContain(
-                "data-theme-light-source=\"media/community/request-boards-moderator-desktop.png\""
+                "data-theme-light-source=\"media/community/laptop-light-request-boards.png\""
             );
             requestBoards.ShouldContain("Current topic: <strong>Request boards</strong>");
 
@@ -133,7 +133,7 @@ public sealed class SitePathBaseTests
             commandCatalogShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var communityShowcase = await client.GetAsync(
-                "/blokebot/media/community/request-boards-moderator-desktop.png"
+                "/blokebot/media/community/laptop-light-request-boards.png"
             );
             communityShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 

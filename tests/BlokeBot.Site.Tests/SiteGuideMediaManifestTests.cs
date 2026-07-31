@@ -30,15 +30,17 @@ public sealed class SiteGuideMediaManifestTests
     {
         var manifest = LoadManifest();
         manifest.Version.ShouldBe(1);
-        manifest.Assets.Count.ShouldBe(68);
-        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(60);
+        manifest.Assets.Count.ShouldBe(80);
+        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(72);
         manifest.Assets.Count(asset => asset.Format == "webp").ShouldBe(8);
         manifest.Assets.Select(asset => asset.File).ShouldBeUnique();
 
         var mediaInventory = Directory
-            .EnumerateFiles(_mediaRoot)
+            .EnumerateFiles(_mediaRoot, "*", SearchOption.AllDirectories)
             .Where(path => Path.GetExtension(path) is ".png" or ".webp")
-            .Select(Path.GetFileName)
+            .Select(path =>
+                Path.GetRelativePath(_mediaRoot, path).Replace(Path.DirectorySeparatorChar, '/')
+            )
             .Order(StringComparer.Ordinal)
             .ToArray();
         manifest
@@ -55,7 +57,6 @@ public sealed class SiteGuideMediaManifestTests
             .Append("media/phone-dark-home-scroll.webp")
             .Append("media/laptop-light-home-scroll.webp")
             .Append("media/laptop-dark-home-scroll.webp")
-            .Where(source => !source.StartsWith("media/community/", StringComparison.Ordinal))
             .Select(source => source["media/".Length..])
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
@@ -72,38 +73,12 @@ public sealed class SiteGuideMediaManifestTests
             asset.Theme.ShouldBeOneOf("light", "dark");
             asset.Device.ShouldBeOneOf("laptop", "phone");
             asset.SemanticReadiness.ShouldNotBeNullOrWhiteSpace();
+            var expectedDimensions = asset.Device == "laptop" ? (1308, 840) : (462, 956);
+            (asset.Width, asset.Height).ShouldBe(expectedDimensions, asset.File);
 
             var dimensions = ReadDimensions(Path.Combine(_mediaRoot, asset.File));
             dimensions.Width.ShouldBe(asset.Width, asset.File);
             dimensions.Height.ShouldBe(asset.Height, asset.File);
-        }
-    }
-
-    [Test]
-    public void CommunityGuideMedia_UsesBoundedFinalUiCaptures()
-    {
-        var expected = new Dictionary<string, (int Width, int Height)>(StringComparer.Ordinal)
-        {
-            ["media/community/request-boards-moderator-desktop.png"] = (1440, 757),
-            ["media/community/request-boards-participant-mobile.png"] = (390, 844),
-            ["media/community/play-with-viewers-moderator-desktop.png"] = (1440, 900),
-            ["media/community/play-with-viewers-participant-mobile.png"] = (390, 844),
-            ["media/community/moments-moderator-desktop.png"] = (1440, 900),
-            ["media/community/moments-participant-mobile.png"] = (390, 844),
-        };
-        var referenced = SiteGuideCatalog
-            .All.Where(page => page.Route.StartsWith("/community/", StringComparison.Ordinal))
-            .SelectMany(page => Sources(page.Media!))
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        referenced.ShouldBe(expected.Keys.Order(StringComparer.Ordinal).ToArray());
-        foreach (var source in referenced)
-        {
-            var path = Path.Combine(_repositoryRoot, "src", "BlokeBot.Site", "wwwroot", source);
-            File.Exists(path).ShouldBeTrue(source);
-            ReadDimensions(path).ShouldBe(expected[source], source);
         }
     }
 
@@ -165,16 +140,14 @@ public sealed class SiteGuideMediaManifestTests
                 "!request &lt;board&gt; &lt;title&gt; | field=value | category=value | tags=a,b"
             );
             requestBoards.ShouldContain("Private moderator note");
-            requestBoards.ShouldContain("media/community/request-boards-moderator-desktop.png");
+            requestBoards.ShouldContain("media/community/laptop-dark-request-boards.png");
 
             var playWithViewers = await client.GetStringAsync("/community/play-with-viewers");
             playWithViewers.ShouldContain("Current topic: <strong>Play with viewers</strong>");
             playWithViewers.ShouldContain("/queues/{channel}/{queue-name}");
             playWithViewers.ShouldContain("!ready [queue]");
             playWithViewers.ShouldContain("Private lobby message");
-            playWithViewers.ShouldContain(
-                "media/community/play-with-viewers-participant-mobile.png"
-            );
+            playWithViewers.ShouldContain("media/community/phone-light-play-with-viewers.png");
 
             var moments = await client.GetStringAsync("/community/moments");
             moments.ShouldContain("Current topic: <strong>Moments</strong>");
@@ -182,7 +155,7 @@ public sealed class SiteGuideMediaManifestTests
             moments.ShouldContain("!moment &lt;suggested title&gt;");
             moments.ShouldContain("Provider pending");
             moments.ShouldContain("does not copy or host the clip or VOD");
-            moments.ShouldContain("media/community/moments-participant-mobile.png");
+            moments.ShouldContain("media/community/phone-light-moments.png");
 
             foreach (
                 var source in SiteGuideCatalog
