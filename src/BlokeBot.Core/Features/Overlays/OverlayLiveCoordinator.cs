@@ -15,6 +15,7 @@ internal sealed class OverlayLiveCoordinator(
     : IHostedService,
         IOverlayLivePublisher,
         IOverlayLivePresence,
+        IOverlayCueTransport,
         IAsyncDisposable,
         IGuessingChangeObserver
 {
@@ -66,6 +67,45 @@ internal sealed class OverlayLiveCoordinator(
         QueuePublication(instance, OverlayLivePublicationKind.Test);
     }
 
+    void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan)
+    {
+        PublishCueMessage(
+            target,
+            (sequence, occurredAtUtc) =>
+                new OverlayLiveTransportMessage.Cue(
+                    new CuePlaybackLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        OccurredAtUtc = occurredAtUtc,
+                        Payload = new CuePlaybackLivePayload
+                        {
+                            RunId = plan.RunId,
+                            DurationMilliseconds = plan.DurationMilliseconds,
+                            Layers = plan.Layers.Select(ToPayload).ToArray(),
+                        },
+                    }
+                )
+        );
+    }
+
+    void IOverlayCueTransport.Stop(ResolvedOverlayInstance target, Guid runId)
+    {
+        PublishCueMessage(
+            target,
+            (sequence, occurredAtUtc) =>
+                new OverlayLiveTransportMessage.CueStop(
+                    new CuePlaybackStopLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        OccurredAtUtc = occurredAtUtc,
+                        RunId = runId,
+                    }
+                )
+        );
+    }
+
     public OverlayConnectionPresence Read(int hostId, Guid overlayId)
     {
         lock (_connectionsGate)
@@ -110,7 +150,11 @@ internal sealed class OverlayLiveCoordinator(
         var projection = await stateProvider.ProjectAsync(instance, cancellationToken);
         if (
             projection
-            is not (OverlaySnapshotProjection.EmptyV1 or OverlaySnapshotProjection.GuessingV1)
+            is not (
+                OverlaySnapshotProjection.EmptyV1
+                or OverlaySnapshotProjection.GuessingV1
+                or OverlaySnapshotProjection.CuePlayerV1
+            )
         )
         {
             return new OverlayLiveOpenResult.Unavailable();
@@ -200,7 +244,11 @@ internal sealed class OverlayLiveCoordinator(
             );
             if (
                 projection
-                is not (OverlaySnapshotProjection.EmptyV1 or OverlaySnapshotProjection.GuessingV1)
+                is not (
+                    OverlaySnapshotProjection.EmptyV1
+                    or OverlaySnapshotProjection.GuessingV1
+                    or OverlaySnapshotProjection.CuePlayerV1
+                )
             )
             {
                 logger.LogWarning(
@@ -302,6 +350,15 @@ internal sealed class OverlayLiveCoordinator(
                 sequence,
                 occurredAtUtc
             ),
+            OverlaySnapshotProjection.CuePlayerV1 =>
+                new OverlayLiveTransportMessage.CuePlayerBaseline(
+                    new CuePlayerV1OverlayLiveBaselineEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        OccurredAtUtc = occurredAtUtc,
+                    }
+                ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required to open a live overlay."
             ),
@@ -354,6 +411,9 @@ internal sealed class OverlayLiveCoordinator(
                 guessing.Snapshot,
                 sequence,
                 occurredAtUtc
+            ),
+            OverlaySnapshotProjection.CuePlayerV1 => throw new InvalidOperationException(
+                "Cue players publish only typed cue transport messages."
             ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required for live publication."
@@ -413,6 +473,82 @@ internal sealed class OverlayLiveCoordinator(
             return "entrance";
         }
         return current == previous ? "none" : "statusChange";
+    }
+
+    private void PublishCueMessage(
+        ResolvedOverlayInstance target,
+        Func<long, DateTimeOffset, OverlayLiveTransportMessage> message
+    )
+    {
+        lock (_connectionsGate)
+        {
+            var identity = new OverlayIdentity(target.HostId, target.OverlayId);
+            var connections = _connections
+                .Values.Where(value =>
+                    value.IsActive
+                    && value.Generation == _generation
+                    && value.Identity == identity
+                    && value.Instance.Type == BlokeBot.Persistence.Models.OverlayType.CuePlayer
+                )
+                .ToArray();
+            if (connections.Length == 0)
+            {
+                return;
+            }
+            var sequence = CurrentSequence(target.OverlayId) + 1;
+            _sequences[target.OverlayId] = sequence;
+            var publication = message(sequence, timeProvider.GetUtcNow());
+            foreach (var connection in connections)
+            {
+                if (!connection.TryWrite(publication))
+                {
+                    RemoveConnection(connection, timeProvider.GetUtcNow(), complete: false);
+                }
+            }
+        }
+    }
+
+    private static CuePlaybackLayerPayload ToPayload(OverlayCuePlaybackLayer layer)
+    {
+        return layer switch
+        {
+            OverlayCuePlaybackLayer.UploadedMedia value => new CuePlaybackLayerPayload
+            {
+                Kind = "uploadedMedia",
+                AssetId = value.AssetId,
+                ContentRevision = value.ContentRevision,
+                ContentType = value.ContentType,
+                MediaKind = value.ContentType == "video/mp4" ? "video" : "audio",
+                Volume = value.Volume,
+                Fit = value.Fit.ToString().ToLowerInvariant(),
+                StartOffsetMilliseconds = value.StartOffsetMilliseconds,
+                DurationMilliseconds = value.DurationMilliseconds,
+                ZIndex = value.ZIndex,
+                Rectangle = value.Rectangle,
+            },
+            OverlayCuePlaybackLayer.RemoteMedia value => new CuePlaybackLayerPayload
+            {
+                Kind = "remoteMedia",
+                Url = value.Url.AbsoluteUri,
+                MediaKind = value.MediaKind.ToString().ToLowerInvariant(),
+                Volume = value.Volume,
+                Fit = value.Fit.ToString().ToLowerInvariant(),
+                StartOffsetMilliseconds = value.StartOffsetMilliseconds,
+                DurationMilliseconds = value.DurationMilliseconds,
+                ZIndex = value.ZIndex,
+                Rectangle = value.Rectangle,
+            },
+            OverlayCuePlaybackLayer.ExternalWeb value => new CuePlaybackLayerPayload
+            {
+                Kind = "externalWeb",
+                Url = value.Url.AbsoluteUri,
+                StartOffsetMilliseconds = value.StartOffsetMilliseconds,
+                DurationMilliseconds = value.DurationMilliseconds,
+                ZIndex = value.ZIndex,
+                Rectangle = value.Rectangle,
+            },
+            _ => throw new InvalidOperationException("Unsupported cue playback layer."),
+        };
     }
 
     private void InvalidateAllConnections()
@@ -673,6 +809,14 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record GuessingEvent(GuessingV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record CuePlayerBaseline(CuePlayerV1OverlayLiveBaselineEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record Cue(CuePlaybackLiveEnvelope Envelope) : OverlayLiveTransportMessage;
+
+    internal sealed record CueStop(CuePlaybackStopLiveEnvelope Envelope)
         : OverlayLiveTransportMessage;
 }
 

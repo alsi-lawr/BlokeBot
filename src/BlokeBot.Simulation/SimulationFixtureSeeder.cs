@@ -16,6 +16,7 @@ internal sealed class SimulationFixtureSeeder(
 )
 {
     internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
+    internal const string CuePlayerAccessKey = "simulation-cue-player-access-key-000000000000";
 
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
@@ -85,6 +86,38 @@ internal sealed class SimulationFixtureSeeder(
                     """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(OverlayAccessKey),
                 KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+        db.OverlayInstances.Add(
+            new OverlayInstance
+            {
+                PublicId = Guid.Parse("a24ea34e-47f7-41f7-bdf7-5de18d90389c"),
+                HostId = hostId,
+                Name = "Celebration cue player",
+                Type = OverlayType.CuePlayer,
+                IsEnabled = true,
+                ConfigurationJson = """{"schemaVersion":1}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(CuePlayerAccessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+        db.OverlayCues.Add(
+            new OverlayCue
+            {
+                PublicId = Guid.Parse("f9c437a7-4df5-45de-bb87-450ca6a40f9b"),
+                HostId = hostId,
+                Name = "Raid celebration",
+                IsEnabled = true,
+                DurationMilliseconds = 8000,
+                QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                ConfigurationJson =
+                    """{"schemaVersion":1,"layers":[{"type":"externalWeb","url":"https://example.com/","startOffsetMilliseconds":0,"durationMilliseconds":8000,"zIndex":0,"rectangle":{"xPercent":10,"yPercent":10,"widthPercent":80,"heightPercent":80}}]}""",
                 Revision = 1,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,

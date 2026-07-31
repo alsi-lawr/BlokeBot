@@ -52,6 +52,7 @@ public abstract record OverlayConfiguration
             {
                 OverlayType.Empty => ParseEmpty(document.RootElement),
                 OverlayType.Guessing => ParseGuessing(document.RootElement),
+                OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
                 _ => new OverlayConfigurationParseResult.Invalid(
                     "The overlay type is not supported."
                 ),
@@ -127,6 +128,21 @@ public abstract record OverlayConfiguration
         );
     }
 
+    private static OverlayConfigurationParseResult ParseCuePlayer(JsonElement root)
+    {
+        var properties = root.EnumerateObject().ToArray();
+        return
+            properties.Length == 1
+            && string.Equals(properties[0].Name, "schemaVersion", StringComparison.Ordinal)
+            && properties[0].Value.ValueKind == JsonValueKind.Number
+            && properties[0].Value.TryGetInt32(out var schemaVersion)
+            && schemaVersion == 1
+            ? new OverlayConfigurationParseResult.Valid(new CuePlayerV1())
+            : new OverlayConfigurationParseResult.Invalid(
+                "A cue player configuration must contain only schemaVersion 1."
+            );
+    }
+
     private static bool TryReadProperty(
         IEnumerable<JsonProperty> properties,
         string name,
@@ -193,6 +209,18 @@ public abstract record OverlayConfiguration
         internal override string ToPersistenceJson()
         {
             return $$"""{"schemaVersion":1,"showGuessCount":{{ShowGuessCount.ToString().ToLowerInvariant()}},"resultDurationSeconds":{{ResultDurationSeconds}}}""";
+        }
+    }
+
+    public sealed record CuePlayerV1 : OverlayConfiguration
+    {
+        public override OverlayType Type => OverlayType.CuePlayer;
+
+        public override int SchemaVersion => 1;
+
+        internal override string ToPersistenceJson()
+        {
+            return """{"schemaVersion":1}""";
         }
     }
 }

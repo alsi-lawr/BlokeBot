@@ -13,11 +13,11 @@ internal static class OverlayBrowserSourceEndpoints
 {
     private const string _contentSecurityPolicy =
         "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-        + "img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; "
+        + "img-src 'self' data: https:; media-src 'self' https:; frame-src https:; font-src 'self'; base-uri 'none'; form-action 'none'; "
         + "frame-ancestors 'none'";
     private const string _previewContentSecurityPolicy =
         "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-        + "img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; "
+        + "img-src 'self' data: https:; media-src 'self' https:; frame-src https:; font-src 'self'; base-uri 'none'; form-action 'none'; "
         + "frame-ancestors 'self'";
     private const string _unavailableMessage = "Overlay unavailable.";
 
@@ -80,6 +80,8 @@ internal static class OverlayBrowserSourceEndpoints
                                 context.Request.PathBase,
                                 $"/overlay/{Uri.EscapeDataString(accessKey)}/state",
                                 $"/overlay/{Uri.EscapeDataString(accessKey)}/events",
+                                $"/overlay/{Uri.EscapeDataString(accessKey)}/media",
+                                $"/overlay/{Uri.EscapeDataString(accessKey)}/cue-complete",
                                 OverlayBrowserSourceCredentials.Omit,
                                 liveEnabled: true
                             ),
@@ -159,10 +161,78 @@ internal static class OverlayBrowserSourceEndpoints
                         OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
                             guessing.Snapshot
                         ),
+                        OverlaySnapshotProjection.CuePlayerV1 player => Results.Json(
+                            player.Snapshot
+                        ),
                         _ => Unavailable(),
                     };
                 }
             )
+            .AllowAnonymous();
+        app.MapGet(
+                "/overlay/{accessKey}/media/{assetId:guid}/{contentRevision:int}",
+                async (
+                    HttpContext context,
+                    string accessKey,
+                    Guid assetId,
+                    int contentRevision,
+                    OverlayInstanceResolver resolver,
+                    OverlayCueService cues,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    var resolution = await ResolveSafelyAsync(
+                        resolver,
+                        accessKey,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayResolutionResult.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+                    var content = await cues.ResolveContentAsync(
+                        resolved.Instance.HostId,
+                        assetId,
+                        contentRevision,
+                        cancellationToken
+                    );
+                    return content is null ? Unavailable() : MediaFile(context, content);
+                }
+            )
+            .AllowAnonymous();
+        app.MapPost(
+                "/overlay/{accessKey}/cue-complete/{runId:guid}",
+                async (
+                    HttpContext context,
+                    string accessKey,
+                    Guid runId,
+                    OverlayInstanceResolver resolver,
+                    OverlayCuePlaybackService playback,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPrivateBrowserSourceHeaders(context.Response);
+                    var resolution = await ResolveSafelyAsync(
+                        resolver,
+                        accessKey,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayResolutionResult.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+                    await playback.CompleteAsync(
+                        resolved.Instance.HostId,
+                        resolved.Instance.OverlayId,
+                        runId,
+                        cancellationToken
+                    );
+                    return Results.NoContent();
+                }
+            )
+            .DisableAntiforgery()
             .AllowAnonymous();
 
         app.MapGet(
@@ -208,6 +278,8 @@ internal static class OverlayBrowserSourceEndpoints
                             context.Request.PathBase,
                             $"/overlays/preview/{encodedId}/state{suffix}",
                             $"/overlays/preview/{encodedId}/events",
+                            $"/overlays/preview/{encodedId}/media",
+                            $"/overlays/preview/{encodedId}/cue-complete",
                             OverlayBrowserSourceCredentials.SameOrigin,
                             liveEnabled: !representative
                         ),
@@ -266,10 +338,82 @@ internal static class OverlayBrowserSourceEndpoints
                         OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
                             guessing.Snapshot
                         ),
+                        OverlaySnapshotProjection.CuePlayerV1 player => Results.Json(
+                            player.Snapshot
+                        ),
                         _ => Unavailable(),
                     };
                 }
             )
+            .RequireAuthorization("HostSelected");
+        app.MapGet(
+                "/overlays/preview/{overlayId:guid}/media/{assetId:guid}/{contentRevision:int}",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    Guid assetId,
+                    int contentRevision,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    OverlayCueService cues,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+                    var content = await cues.ResolveContentAsync(
+                        resolved.Instance.HostId,
+                        assetId,
+                        contentRevision,
+                        cancellationToken
+                    );
+                    return content is null ? Unavailable() : MediaFile(context, content);
+                }
+            )
+            .RequireAuthorization("HostSelected");
+        app.MapPost(
+                "/overlays/preview/{overlayId:guid}/cue-complete/{runId:guid}",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    Guid runId,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    OverlayCuePlaybackService playback,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPreviewHeaders(context.Response);
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+                    await playback.CompleteAsync(
+                        resolved.Instance.HostId,
+                        resolved.Instance.OverlayId,
+                        runId,
+                        cancellationToken
+                    );
+                    return Results.NoContent();
+                }
+            )
+            .DisableAntiforgery()
             .RequireAuthorization("HostSelected");
         app.MapGet(
                 "/overlays/preview/{overlayId:guid}/events",
@@ -511,6 +655,22 @@ internal static class OverlayBrowserSourceEndpoints
         );
     }
 
+    private static IResult MediaFile(HttpContext context, OverlayMediaContent content)
+    {
+        context.Response.Headers[HeaderNames.CacheControl] = "private, max-age=31536000, immutable";
+        context.Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        return Results.File(
+            content.Path,
+            content.ContentType,
+            lastModified: File.GetLastWriteTimeUtc(content.Path),
+            entityTag: new Microsoft.Net.Http.Headers.EntityTagHeaderValue(
+                $"\"{content.AssetId:N}-{content.ContentRevision}\""
+            ),
+            enableRangeProcessing: true
+        );
+    }
+
     private static void ApplyPrivateBrowserSourceHeaders(HttpResponse response)
     {
         response.Headers[HeaderNames.CacheControl] = "no-store, private";
@@ -539,12 +699,9 @@ internal static class OverlayBrowserSourceEndpoints
 
         var segments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (
-            segments.Length is not (2 or 3)
+            segments.Length is < 2
             || !string.Equals(segments[0], "overlay", StringComparison.OrdinalIgnoreCase)
             || string.Equals(segments[1], "assets", StringComparison.OrdinalIgnoreCase)
-            || segments.Length == 3
-                && !string.Equals(segments[2], "state", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(segments[2], "events", StringComparison.OrdinalIgnoreCase)
         )
         {
             return path;
@@ -552,7 +709,9 @@ internal static class OverlayBrowserSourceEndpoints
 
         return segments.Length == 2
             ? new PathString("/overlay/[redacted]")
-            : new PathString($"/overlay/[redacted]/{segments[2].ToLowerInvariant()}");
+            : new PathString(
+                $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(value => value.ToLowerInvariant()))}"
+            );
     }
 
     private sealed class OverlayLiveStreamResult(
@@ -626,6 +785,9 @@ internal static class OverlayBrowserSourceEndpoints
                                     or OverlayLiveTransportMessage.Event
                                     or OverlayLiveTransportMessage.GuessingBaseline
                                     or OverlayLiveTransportMessage.GuessingEvent
+                                    or OverlayLiveTransportMessage.CuePlayerBaseline
+                                    or OverlayLiveTransportMessage.Cue
+                                    or OverlayLiveTransportMessage.CueStop
                             && !live.MaySend(connection)
                         )
                         {
@@ -641,6 +803,14 @@ internal static class OverlayBrowserSourceEndpoints
                             OverlayLiveTransportMessage.GuessingBaseline baseline =>
                                 JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.GuessingEvent publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.CuePlayerBaseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.Cue publication => JsonSerializer.Serialize(
+                                publication.Envelope,
+                                _jsonOptions
+                            ),
+                            OverlayLiveTransportMessage.CueStop publication =>
                                 JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
                             _ => string.Empty,
                         };

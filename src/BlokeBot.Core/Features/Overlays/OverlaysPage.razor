@@ -5,6 +5,8 @@
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject OverlayInstanceService _overlays
+@inject OverlayCueService _cues
+@inject OverlayCuePlaybackService _cuePlayback
 @inject HostFeatureService _features
 @inject IOverlayLivePublisher _publisher
 @inject IOverlayLivePresence _presence
@@ -131,6 +133,7 @@
                                         disabled="@(!_isCreating)"
                                         @bind="_draftType">
                                     <option value="@OverlayType.Empty">Empty</option>
+                                    <option value="@OverlayType.CuePlayer">Cue player</option>
                                     @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
                                     {
                                         <option value="@OverlayType.Guessing">Guessing round</option>
@@ -180,7 +183,9 @@
                             else
                             {
                                 <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                                    Empty V1 has no visual fields or custom CSS or JavaScript.
+                                    @(_draftType is OverlayType.CuePlayer
+                                        ? "Cue players receive reusable media and web cues through the live overlay transport."
+                                        : "Empty V1 has no visual fields or custom CSS or JavaScript.")
                                 </p>
                             }
                         </div>
@@ -302,6 +307,185 @@
                             </ol>
                         </section>
                     }
+                </div>
+            </div>
+
+            <div class="application-card-collection xl:grid-cols-[minmax(17rem,0.68fr)_minmax(0,1.82fr)]"
+                 data-card-owner="overlay-cue-workspace">
+                <aside class="card p-4" aria-labelledby="cue-inventory-title">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 id="cue-inventory-title" class="text-lg font-semibold text-slate-950">Reusable cues</h2>
+                            <p class="mt-1 text-xs text-muted-foreground">@CueCountLabel(_cuesList.Count)</p>
+                        </div>
+                        <button class="btn-secondary" type="button" @onclick="NewCue">New</button>
+                    </div>
+                    <div class="mt-4 grid gap-2" aria-label="Saved cues">
+                        @foreach (var cue in _cuesList)
+                        {
+                            <button class="control-surface min-h-14 rounded-lg px-3 py-2 text-left"
+                                    type="button"
+                                    aria-current="@(_selectedCueId == cue.Id ? "true" : null)"
+                                    @onclick="() => SelectCue(cue)">
+                                <span class="block truncate text-sm font-semibold text-slate-950">@cue.Name</span>
+                                <span class="mt-1 block text-xs text-muted-foreground">
+                                    @(cue.IsEnabled ? "Enabled" : "Disabled") · @cue.QueuePolicy · @(cue.DurationMilliseconds / 1000m)s
+                                </span>
+                            </button>
+                        }
+                    </div>
+                </aside>
+
+                <div class="application-card-collection min-w-0" data-card-owner="overlay-cue-editor-cards">
+                    <section class="card p-5" aria-labelledby="cue-editor-title" data-cue-editor>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 id="cue-editor-title" class="text-lg font-semibold text-slate-950">
+                                    @(_selectedCue is null ? "New cue — not saved" : "Edit cue")
+                                </h2>
+                                <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                                    Build Cue-V1 layers once, then preview them on an enabled Cue player Browser Source.
+                                </p>
+                            </div>
+                            <button class="btn-primary" type="button" disabled="@_isBusy" @onclick="SaveCueAsync">
+                                @(_selectedCue is null ? "Create cue" : "Save cue")
+                            </button>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <Field Id="cue-name" Label="Cue name" @bind-Value="_cueDraftName" />
+                            <div class="space-y-2">
+                                <label class="label" for="cue-duration">Duration (milliseconds)</label>
+                                <input id="cue-duration"
+                                       class="input"
+                                       type="number"
+                                       min="100"
+                                       max="300000"
+                                       @bind="_cueDraftDuration" />
+                            </div>
+                            <div class="space-y-2">
+                                <label class="label" for="cue-policy">Queue policy</label>
+                                <select id="cue-policy" class="input" @bind="_cueDraftPolicy">
+                                    @foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>())
+                                    {
+                                        <option value="@policy">@QueuePolicyLabel(policy)</option>
+                                    }
+                                </select>
+                            </div>
+                            <label class="control-surface mt-7 flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold">
+                                <input type="checkbox" @bind="_cueDraftEnabled" />
+                                Cue enabled
+                            </label>
+                        </div>
+                        <div class="mt-4">
+                            <label class="label" for="cue-layers-json">Cue-V1 layer configuration</label>
+                            <textarea id="cue-layers-json"
+                                      class="input mt-2 min-h-72 font-mono text-xs leading-5"
+                                      spellcheck="false"
+                                      @bind="_cueDraftJson"></textarea>
+                            <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                                Strict JSON supports uploadedMedia, remoteMedia, and externalWeb layers. Remote content loads directly in the Browser Source; BlokeBot never fetches or proxies it.
+                            </p>
+                        </div>
+                        @if (_selectedCue is not null)
+                        {
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button class="btn-secondary" type="button" @onclick="DeleteCueAsync">Delete cue</button>
+                            </div>
+                        }
+                    </section>
+
+                    <section class="card p-5" aria-labelledby="cue-test-title">
+                        <h2 id="cue-test-title" class="text-lg font-semibold text-slate-950">Production test playback</h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            Choose an authorised Cue player target. The test uses the same queue, live transport, asset routes, iframe sandbox, and timeout completion as later command triggers.
+                        </p>
+                        <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                            <div class="space-y-2">
+                                <label class="label" for="cue-target">Cue player target</label>
+                                <select id="cue-target" class="input" @bind="_cueTargetId">
+                                    <option value="">Choose a Cue player</option>
+                                    @foreach (var target in _cueCatalog.Targets)
+                                    {
+                                        <option value="@target.Id">@target.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn-primary"
+                                    type="button"
+                                    disabled="@(_selectedCue is null || _cueTargetId is null || _isBusy)"
+                                    @onclick="PlayCueTestAsync">Play test cue</button>
+                        </div>
+                        @if (_cueTargetId is { } targetId)
+                        {
+                            <div class="mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-slate-950">
+                                <iframe class="h-full w-full"
+                                        src="@($"/overlays/preview/{targetId:D}")"
+                                        title="Cue player production preview"
+                                        sandbox="allow-scripts allow-same-origin"
+                                        referrerpolicy="no-referrer"></iframe>
+                            </div>
+                        }
+                        <p class="mt-3 text-xs leading-5 text-muted-foreground">
+                            External pages may refuse framing. BlokeBot reports a bounded refusal or timeout and advances the queue instead of weakening the sandbox.
+                        </p>
+                    </section>
+
+                    <section class="card p-5" aria-labelledby="media-library-title">
+                        <h2 id="media-library-title" class="text-lg font-semibold text-slate-950">Media library</h2>
+                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                            Upload validated MP4 video or MP3 audio. Files stay in private channel storage outside the web root.
+                        </p>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+                            <Field Id="media-name" Label="Media name" @bind-Value="_mediaDraftName" />
+                            <div class="space-y-2">
+                                <label class="label" for="media-upload">MP4 or MP3 file</label>
+                                <InputFile id="media-upload" class="input" OnChange="UploadAssetAsync" accept="video/mp4,audio/mpeg" />
+                            </div>
+                        </div>
+                        <div class="mt-4 grid gap-3">
+                            @foreach (var asset in _assets)
+                            {
+                                <article class="control-surface rounded-lg p-3" @key="asset.Id">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-semibold text-slate-950">@asset.Name</p>
+                                            <p class="mt-1 text-xs text-muted-foreground">
+                                                @asset.ContentType · @ByteLabel(asset.ByteLength) · asset @asset.Id
+                                            </p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <InputFile class="input max-w-56"
+                                                       OnChange="@(args => ReplaceAssetAsync(asset, args))"
+                                                       accept="@(asset.ContentType)" />
+                                            <button class="btn-secondary"
+                                                    type="button"
+                                                    @onclick="() => DeleteAssetAsync(asset)">Delete</button>
+                                        </div>
+                                    </div>
+                                    @if (_cueTargetId is { } mediaTarget)
+                                    {
+                                        var mediaUrl = $"/overlays/preview/{mediaTarget:D}/media/{asset.Id:D}/{asset.ContentRevision}";
+                                        <div class="mt-3 rounded-lg bg-slate-950 p-2">
+                                            @if (asset.ContentType == "video/mp4")
+                                            {
+                                                <video class="max-h-64 w-full"
+                                                       controls
+                                                       preload="metadata"
+                                                       src="@mediaUrl"></video>
+                                            }
+                                            else
+                                            {
+                                                <audio class="w-full"
+                                                       controls
+                                                       preload="metadata"
+                                                       src="@mediaUrl"></audio>
+                                            }
+                                        </div>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    </section>
                 </div>
             </div>
             </ApplicationCardCollection>

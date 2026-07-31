@@ -56,7 +56,7 @@ public sealed class OverlayDashboardUiTests
         });
 
         page.Find("button").TextContent.ShouldNotBeNull();
-        page.FindAll("button").Single(value => value.TextContent.Trim() == "New").Click();
+        page.Find("aside[aria-labelledby='overlay-inventory-title'] button.btn-secondary").Click();
 
         page.WaitForAssertion(() =>
         {

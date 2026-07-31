@@ -223,6 +223,91 @@ public sealed class OverlayBrowserSourceTests
     }
 
     [Test]
+    public async Task UploadedMedia_PrivateRouteSupportsRangesCacheAndHostIsolation()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var owner = await host.SeedCuePlayerAsync("media-owner");
+        var other = await host.SeedAsync("media-other");
+        var asset = await host.UploadMp4Async(owner, "Range sample");
+        using var rangeRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/overlay/{owner.AccessKey}/media/{asset.Id:D}/{asset.ContentRevision}"
+        );
+        rangeRequest.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(4, 7);
+
+        using var response = await host.Client.SendAsync(rangeRequest);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        using var crossHost = await host.Client.GetAsync(
+            $"/overlay/{other.AccessKey}/media/{asset.Id:D}/{asset.ContentRevision}"
+        );
+        await host.SetFeaturesAsync(owner.HostId, HostFeatureFlags.None);
+        using var disabled = await host.Client.GetAsync(
+            $"/overlay/{owner.AccessKey}/media/{asset.Id:D}/{asset.ContentRevision}"
+        );
+
+        response.StatusCode.ShouldBe(HttpStatusCode.PartialContent);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("video/mp4");
+        response.Content.Headers.ContentRange?.From.ShouldBe(4);
+        response.Content.Headers.ContentRange?.To.ShouldBe(7);
+        bytes.ShouldBe("ftyp"u8.ToArray());
+        response.Headers.CacheControl?.Private.ShouldBeTrue();
+        response.Headers.CacheControl?.MaxAge.ShouldBe(TimeSpan.FromDays(365));
+        response.Headers.CacheControl?.Extensions.ShouldContain(value => value.Name == "immutable");
+        response.Headers.GetValues("X-Content-Type-Options").Single().ShouldBe("nosniff");
+        crossHost.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        disabled.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task CuePlayer_AdmissionPublishesTypedPlanAndCompletionThroughRealTransport()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var target = await host.SeedCuePlayerAsync("cue-live");
+        var cueId = await host.SeedExternalCueAsync(target.HostId);
+        await using var live = await host.OpenLiveAsync(target.AccessKey);
+        var baseline = await live.ReadEnvelopeAsync();
+        var outcome = await host.Playback.AdmitAsync(
+            new(
+                target.HostId,
+                target.OverlayId,
+                cueId,
+                OverlayCueQueuePolicy.Enqueue,
+                OverlayCueAdmissionOrigin.Command,
+                new("viewer", "Viewer")
+            ),
+            CancellationToken.None
+        );
+        var cue = await live.ReadEnvelopeAsync();
+        var runId = cue.GetProperty("payload").GetProperty("runId").GetGuid();
+        using var completion = await host.Client.PostAsync(
+            $"/overlay/{target.AccessKey}/cue-complete/{runId:D}",
+            content: null
+        );
+        var stopped = await live.ReadEnvelopeAsync();
+
+        baseline.GetProperty("eventType").GetString().ShouldBe("baseline");
+        baseline
+            .GetProperty("payload")
+            .GetProperty("overlayType")
+            .GetString()
+            .ShouldBe("cuePlayer");
+        outcome.ShouldBeOfType<OverlayCueAdmissionOutcome.Running>().RunId.ShouldBe(runId);
+        cue.GetProperty("eventType").GetString().ShouldBe("cue");
+        cue.GetProperty("payload").GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+        cue.GetProperty("payload")
+            .GetProperty("layers")[0]
+            .GetProperty("kind")
+            .GetString()
+            .ShouldBe("externalWeb");
+        cue.ToString().ShouldNotContain("viewer", Case.Insensitive);
+        cue.ToString().ShouldNotContain(target.OverlayId.ToString(), Case.Insensitive);
+        cue.ToString().ShouldNotContain(cueId.ToString(), Case.Insensitive);
+        completion.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        stopped.GetProperty("eventType").GetString().ShouldBe("cueStop");
+        stopped.GetProperty("runId").GetGuid().ShouldBe(runId);
+    }
+
+    [Test]
     public async Task Simulator_SeedsAReproducibleAnonymousBrowserSourceRoute()
     {
         await using var simulation = await SimulationApplication.BuildAsync(
@@ -604,7 +689,8 @@ public sealed class OverlayBrowserSourceTests
         HttpClient client,
         SqliteBlokeBotDbFactory database,
         MutableTimeProvider time,
-        ConcurrentQueue<string> observedCompletedPaths
+        ConcurrentQueue<string> observedCompletedPaths,
+        string mediaRoot
     ) : IAsyncDisposable
     {
         public HttpClient Client { get; } = client;
@@ -621,6 +707,9 @@ public sealed class OverlayBrowserSourceTests
 
         internal EventBus<AppEventKind> Events =>
             app.Services.GetRequiredService<EventBus<AppEventKind>>();
+
+        internal OverlayCuePlaybackService Playback =>
+            app.Services.GetRequiredService<OverlayCuePlaybackService>();
 
         private PreviewAuthenticationSettings _authentication =>
             app.Services.GetRequiredService<PreviewAuthenticationSettings>();
@@ -642,6 +731,16 @@ public sealed class OverlayBrowserSourceTests
                 new GrantedModeratorAuthority()
             );
             builder.Services.AddSingleton(new PreviewAuthenticationSettings());
+            var mediaRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"blokebot-browser-source-media-{Guid.NewGuid():N}"
+            );
+            Directory.CreateDirectory(mediaRoot);
+            builder.Services.AddSingleton<IOptions<BlokeBotOptions>>(
+                Options.Create(
+                    new BlokeBotOptions { DatabasePath = Path.Combine(mediaRoot, "state.db") }
+                )
+            );
             builder
                 .Services.AddAuthentication(PreviewAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, PreviewAuthenticationHandler>(
@@ -663,6 +762,7 @@ public sealed class OverlayBrowserSourceTests
             );
             builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
             builder.Services.AddBlokeBotOverlays();
+            builder.Services.AddSingleton<IOverlayDnsResolver>(new PublicOverlayDnsResolver());
 
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");
@@ -697,7 +797,8 @@ public sealed class OverlayBrowserSourceTests
                 },
                 database,
                 time,
-                observedCompletedPaths
+                observedCompletedPaths,
+                mediaRoot
             );
         }
 
@@ -772,6 +873,100 @@ public sealed class OverlayBrowserSourceTests
             await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal async Task<OverlaySeed> SeedCuePlayerAsync(string login)
+        {
+            var accessKey = AccessKey(login);
+            await using var db = await database.CreateDbContextAsync();
+            var host = new BotHost
+            {
+                EnabledFeatures = HostFeatureFlags.Overlays,
+                TwitchUserId = $"{login}-id",
+                Login = login,
+                DisplayName = login,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            var overlay = new OverlayInstance
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = host.Id,
+                Name = login,
+                Type = OverlayType.CuePlayer,
+                IsEnabled = true,
+                ConfigurationJson = """{"schemaVersion":1}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+                UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.OverlayInstances.Add(overlay);
+            await db.SaveChangesAsync();
+            _authentication.SelectedHostId = host.Id;
+            return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal async Task<OverlayMediaAssetView> UploadMp4Async(OverlaySeed seed, string name)
+        {
+            var host = new BotHostChoice(
+                seed.HostId,
+                "media-owner",
+                "Media owner",
+                AuthRole.Streamer
+            );
+            var session = new AuthenticatedSession
+            {
+                IsAuthenticated = true,
+                UserId = "media-owner-id",
+                Login = "media-owner",
+                State = new AuthSessionState.Selected(new BotHostSelection(host, [host])),
+            };
+            await using var content = new MemoryStream([
+                0,
+                0,
+                0,
+                12,
+                (byte)'f',
+                (byte)'t',
+                (byte)'y',
+                (byte)'p',
+                (byte)'i',
+                (byte)'s',
+                (byte)'o',
+                (byte)'m',
+            ]);
+            return (
+                await app
+                    .Services.GetRequiredService<OverlayCueService>()
+                    .UploadAssetAsync(session, name, "video/mp4", content, CancellationToken.None)
+            )
+                .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+                .Value;
+        }
+
+        internal async Task<Guid> SeedExternalCueAsync(int hostId)
+        {
+            await using var db = await database.CreateDbContextAsync();
+            var cue = new OverlayCue
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                Name = "External widget",
+                IsEnabled = true,
+                DurationMilliseconds = 1000,
+                QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                ConfigurationJson =
+                    """{"schemaVersion":1,"layers":[{"type":"externalWeb","url":"https://widget.example.test/","startOffsetMilliseconds":0,"durationMilliseconds":1000,"zIndex":0,"rectangle":{"xPercent":0,"yPercent":0,"widthPercent":100,"heightPercent":100}}]}""",
+                Revision = 1,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+                UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.OverlayCues.Add(cue);
+            await db.SaveChangesAsync();
+            return cue.PublicId;
         }
 
         internal async Task SetFeaturesAsync(int hostId, HostFeatureFlags features)
@@ -878,6 +1073,7 @@ public sealed class OverlayBrowserSourceTests
             Client.Dispose();
             await app.DisposeAsync();
             await database.DisposeAsync();
+            Directory.Delete(mediaRoot, recursive: true);
         }
     }
 
@@ -988,6 +1184,17 @@ public sealed class OverlayBrowserSourceTests
             return Task.FromResult<ModeratorAuthorityOutcome>(
                 new ModeratorAuthorityOutcome.Granted()
             );
+        }
+    }
+
+    private sealed class PublicOverlayDnsResolver : IOverlayDnsResolver
+    {
+        public Task<IReadOnlyList<IPAddress>> ResolveAsync(
+            string host,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
         }
     }
 }

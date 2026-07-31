@@ -32,6 +32,24 @@ internal static class OverlayBrowserSourceAssets
           background: transparent;
         }
 
+        #cue-canvas {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+
+        .cue-run,
+        .cue-layer {
+          position: absolute;
+          inset: 0;
+        }
+
+        .cue-layer {
+          border: 0;
+          background: transparent;
+        }
+
         #overlay-root[data-test-pulse="active"] #overlay-canvas {
           animation: blokebot-overlay-test-pulse 1.5s ease-out;
           box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0);
@@ -148,7 +166,12 @@ internal static class OverlayBrowserSourceAssets
 
           const root = document.getElementById("overlay-root");
           const canvas = document.getElementById("overlay-canvas");
-          if (!(root instanceof HTMLElement) || !(canvas instanceof SVGSVGElement)) {
+          const cueCanvas = document.getElementById("cue-canvas");
+          if (
+            !(root instanceof HTMLElement) ||
+            !(canvas instanceof SVGSVGElement) ||
+            !(cueCanvas instanceof HTMLElement)
+          ) {
             return;
           }
 
@@ -162,6 +185,7 @@ internal static class OverlayBrowserSourceAssets
           const liveEnabled = root.dataset.liveEnabled !== "false";
           let testPulseTimer = null;
           let presentationAnimationTimer = null;
+          const cueTimers = new Map();
           const svgNamespace = canvas.namespaceURI;
 
           const showTestPulse = () => {
@@ -388,6 +412,17 @@ internal static class OverlayBrowserSourceAssets
                   : "none",
                 projection.resultDurationMilliseconds,
               );
+            } else if (projection.overlayType === "cuePlayer") {
+              if (
+                typeof projection.state !== "object" ||
+                projection.state === null
+              ) {
+                return false;
+              }
+              canvas.replaceChildren();
+              clearCues();
+              delete root.dataset.phase;
+              applyAnimation("none", 0);
             } else {
               return false;
             }
@@ -400,9 +435,169 @@ internal static class OverlayBrowserSourceAssets
             return true;
           };
 
+          const clearCues = () => {
+            cueCanvas.replaceChildren();
+            for (const timers of cueTimers.values()) {
+              for (const timer of timers) {
+                window.clearTimeout(timer);
+              }
+            }
+            cueTimers.clear();
+          };
+
+          const validRectangle = (rectangle) =>
+            typeof rectangle === "object" &&
+            rectangle !== null &&
+            ["xPercent", "yPercent", "widthPercent", "heightPercent"].every(
+              (name) =>
+                typeof rectangle[name] === "number" &&
+                Number.isFinite(rectangle[name]),
+            );
+
+          const layerElement = (layer) => {
+            let element;
+            if (layer.kind === "externalWeb" && typeof layer.url === "string") {
+              element = document.createElement("iframe");
+              element.src = layer.url;
+              element.setAttribute("sandbox", "allow-scripts");
+              element.referrerPolicy = "no-referrer";
+              element.title = "External cue content";
+            } else if (
+              (layer.kind === "uploadedMedia" ||
+                layer.kind === "remoteMedia") &&
+              (layer.mediaKind === "video" || layer.mediaKind === "audio")
+            ) {
+              element = document.createElement(layer.mediaKind);
+              element.autoplay = true;
+              element.preload = "auto";
+              element.controls = false;
+              element.volume =
+                typeof layer.volume === "number"
+                  ? Math.min(1, Math.max(0, layer.volume))
+                  : 1;
+              if (layer.kind === "remoteMedia" && typeof layer.url === "string") {
+                element.src = layer.url;
+              } else if (
+                typeof layer.assetId === "string" &&
+                Number.isSafeInteger(layer.contentRevision)
+              ) {
+                element.src = `${root.dataset.mediaUrl}/${encodeURIComponent(
+                  layer.assetId,
+                )}/${layer.contentRevision}`;
+              } else {
+                return null;
+              }
+              element.style.objectFit =
+                layer.fit === "cover" || layer.fit === "fill"
+                  ? layer.fit
+                  : "contain";
+            } else {
+              return null;
+            }
+
+            if (!validRectangle(layer.rectangle)) {
+              return null;
+            }
+            element.className = "cue-layer";
+            element.style.left = `${layer.rectangle.xPercent}%`;
+            element.style.top = `${layer.rectangle.yPercent}%`;
+            element.style.width = `${layer.rectangle.widthPercent}%`;
+            element.style.height = `${layer.rectangle.heightPercent}%`;
+            element.style.zIndex = String(layer.zIndex);
+            return element;
+          };
+
+          const completeCue = async (runId) => {
+            const run = cueCanvas.querySelector(`[data-cue-run="${CSS.escape(runId)}"]`);
+            run?.remove();
+            const timers = cueTimers.get(runId) ?? [];
+            for (const timer of timers) {
+              window.clearTimeout(timer);
+            }
+            cueTimers.delete(runId);
+            try {
+              await fetch(
+                `${root.dataset.completionUrl}/${encodeURIComponent(runId)}`,
+                {
+                  method: "POST",
+                  credentials,
+                  cache: "no-store",
+                },
+              );
+            } catch {
+              // Server-side expiry still advances the transient queue.
+            }
+          };
+
+          const renderCue = (payload) => {
+            if (
+              payload?.overlayType !== "cuePlayer" ||
+              payload.schemaVersion !== 1 ||
+              typeof payload.runId !== "string" ||
+              !Number.isSafeInteger(payload.durationMilliseconds) ||
+              payload.durationMilliseconds < 100 ||
+              payload.durationMilliseconds > 300000 ||
+              !Array.isArray(payload.layers)
+            ) {
+              return false;
+            }
+            const run = document.createElement("div");
+            run.className = "cue-run";
+            run.dataset.cueRun = payload.runId;
+            cueCanvas.append(run);
+            const timers = [];
+            for (const layer of payload.layers) {
+              if (
+                !Number.isSafeInteger(layer.startOffsetMilliseconds) ||
+                !Number.isSafeInteger(layer.durationMilliseconds) ||
+                !Number.isSafeInteger(layer.zIndex)
+              ) {
+                continue;
+              }
+              timers.push(
+                window.setTimeout(() => {
+                  const element = layerElement(layer);
+                  if (element === null) {
+                    return;
+                  }
+                  run.append(element);
+                  timers.push(
+                    window.setTimeout(
+                      () => element.remove(),
+                      layer.durationMilliseconds,
+                    ),
+                  );
+                }, layer.startOffsetMilliseconds),
+              );
+            }
+            timers.push(
+              window.setTimeout(
+                () => void completeCue(payload.runId),
+                payload.durationMilliseconds,
+              ),
+            );
+            cueTimers.set(payload.runId, timers);
+            return true;
+          };
+
+          const stopCue = (runId) => {
+            if (typeof runId !== "string") {
+              return false;
+            }
+            const run = cueCanvas.querySelector(`[data-cue-run="${CSS.escape(runId)}"]`);
+            run?.remove();
+            const timers = cueTimers.get(runId) ?? [];
+            for (const timer of timers) {
+              window.clearTimeout(timer);
+            }
+            cueTimers.delete(runId);
+            return true;
+          };
+
           const loadCurrentState = async (signal) => {
             root.dataset.status = "loading";
             canvas.replaceChildren();
+            clearCues();
             const response = await fetch(root.dataset.stateUrl, {
               cache: "no-store",
               credentials,
@@ -451,6 +646,7 @@ internal static class OverlayBrowserSourceAssets
                 return "resync";
               }
               if (envelope.eventType === "reauthenticate" || envelope.eventType === "resync") {
+                clearCues();
                 return "resync";
               }
               if (envelope.eventType === "baseline") {
@@ -489,6 +685,20 @@ internal static class OverlayBrowserSourceAssets
               }
               if (envelope.sequence !== liveSequence + 1) {
                 return "resync";
+              }
+              if (envelope.eventType === "cue") {
+                if (!renderCue(envelope.payload)) {
+                  return "resync";
+                }
+                liveSequence = envelope.sequence;
+                return "continue";
+              }
+              if (envelope.eventType === "cueStop") {
+                if (!stopCue(envelope.runId)) {
+                  return "resync";
+                }
+                liveSequence = envelope.sequence;
+                return "continue";
               }
               if (envelope.eventType !== "state" && envelope.eventType !== "test") {
                 return "resync";
@@ -595,6 +805,7 @@ internal static class OverlayBrowserSourceAssets
               if (presentationAnimationTimer !== null) {
                 window.clearTimeout(presentationAnimationTimer);
               }
+              clearCues();
             },
             { once: true },
           );

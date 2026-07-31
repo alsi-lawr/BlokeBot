@@ -12,7 +12,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class GuessingOverlayMigrationTests
 {
     private const string _previousMigration = "20260730202307_v0.5.0_IndependentChatTools";
-    private const string _guessingOverlayMigration = "20260731015218_v0.6.0_GuessingOverlay";
+    private const string _latestMigration = "20260731043353_v0.6.0_OverlayCues";
 
     [Test]
     public async Task Upgrade_PreservesEmptyOverlaysAndAllowsTypedGuessingRows()
@@ -42,10 +42,8 @@ public sealed class GuessingOverlayMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(15);
-        (await upgraded.Database.GetAppliedMigrationsAsync())
-            .Last()
-            .ShouldBe(_guessingOverlayMigration);
+        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(16);
+        (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.Empty);
 
@@ -75,7 +73,7 @@ public sealed class GuessingOverlayMigrationTests
                 .ToArrayAsync()
         ).ShouldBe([OverlayType.Empty, OverlayType.Guessing]);
         (await ReadOverlayTableSqlAsync(upgraded.Database.GetDbConnection())).ShouldContain(
-            "Type IN ('empty', 'guessing')"
+            "Type IN ('cue-player', 'empty', 'guessing')"
         );
     }
 

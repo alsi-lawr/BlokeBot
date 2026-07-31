@@ -18,10 +18,36 @@ internal static class OverlayBrowserSourceDocument
         bool liveEnabled
     )
     {
+        var root = statePath.EndsWith("/state", StringComparison.Ordinal)
+            ? statePath[..^"/state".Length]
+            : statePath;
+        return Render(
+            pathBase,
+            statePath,
+            livePath,
+            $"{root}/media",
+            $"{root}/cue-complete",
+            credentials,
+            liveEnabled
+        );
+    }
+
+    internal static string Render(
+        PathString pathBase,
+        string statePath,
+        string livePath,
+        string mediaPath,
+        string completionPath,
+        OverlayBrowserSourceCredentials credentials,
+        bool liveEnabled
+    )
+    {
         var prefix = pathBase.HasValue ? pathBase.Value : string.Empty;
         var encodedPrefix = WebUtility.HtmlEncode(prefix);
         var encodedStateUrl = WebUtility.HtmlEncode($"{prefix}{statePath}");
         var encodedLiveUrl = WebUtility.HtmlEncode($"{prefix}{livePath}");
+        var encodedMediaUrl = WebUtility.HtmlEncode($"{prefix}{mediaPath}");
+        var encodedCompletionUrl = WebUtility.HtmlEncode($"{prefix}{completionPath}");
         var credentialsValue =
             credentials is OverlayBrowserSourceCredentials.SameOrigin ? "same-origin" : "omit";
         return $$"""
@@ -35,8 +61,9 @@ internal static class OverlayBrowserSourceDocument
               <link rel="stylesheet" href="{{encodedPrefix}}/overlay/assets/blokebot-overlay.css">
             </head>
             <body>
-              <main id="overlay-root" data-state-url="{{encodedStateUrl}}" data-live-url="{{encodedLiveUrl}}" data-credentials="{{credentialsValue}}" data-live-enabled="{{liveEnabled.ToString().ToLowerInvariant()}}" data-status="loading" aria-live="off">
+              <main id="overlay-root" data-state-url="{{encodedStateUrl}}" data-live-url="{{encodedLiveUrl}}" data-media-url="{{encodedMediaUrl}}" data-completion-url="{{encodedCompletionUrl}}" data-credentials="{{credentialsValue}}" data-live-enabled="{{liveEnabled.ToString().ToLowerInvariant()}}" data-status="loading" aria-live="off">
                 <svg id="overlay-canvas" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="cue-canvas" aria-hidden="true"></div>
               </main>
               <script src="{{encodedPrefix}}/overlay/assets/blokebot-overlay.js" defer></script>
             </body>

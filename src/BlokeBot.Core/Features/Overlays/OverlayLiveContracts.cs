@@ -105,6 +105,100 @@ internal sealed record OverlayLiveControlEnvelope
     public required DateTimeOffset OccurredAtUtc { get; init; }
 }
 
+internal sealed record CuePlayerV1OverlayLivePayload
+{
+    public string OverlayType => "cuePlayer";
+
+    public int SchemaVersion => 1;
+
+    public CuePlayerV1OverlayPresentationState State { get; } = new();
+}
+
+internal sealed record CuePlayerV1OverlayLiveBaselineEnvelope
+{
+    public int ProtocolVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public string EventType => "baseline";
+
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+
+    public CuePlayerV1OverlayLivePayload Payload { get; } = new();
+}
+
+internal sealed record CuePlaybackLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public string EventType => "cue";
+
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+
+    public required CuePlaybackLivePayload Payload { get; init; }
+}
+
+internal sealed record CuePlaybackStopLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public string EventType => "cueStop";
+
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+
+    public required Guid RunId { get; init; }
+}
+
+internal sealed record CuePlaybackLivePayload
+{
+    public string OverlayType => "cuePlayer";
+
+    public int SchemaVersion => 1;
+
+    public required Guid RunId { get; init; }
+
+    public required int DurationMilliseconds { get; init; }
+
+    public required IReadOnlyList<CuePlaybackLayerPayload> Layers { get; init; }
+}
+
+internal sealed record CuePlaybackLayerPayload
+{
+    public required string Kind { get; init; }
+
+    public string? Url { get; init; }
+
+    public Guid? AssetId { get; init; }
+
+    public int? ContentRevision { get; init; }
+
+    public string? ContentType { get; init; }
+
+    public string? MediaKind { get; init; }
+
+    public decimal? Volume { get; init; }
+
+    public string? Fit { get; init; }
+
+    public required int StartOffsetMilliseconds { get; init; }
+
+    public required int DurationMilliseconds { get; init; }
+
+    public required int ZIndex { get; init; }
+
+    public required OverlayCueRectangle Rectangle { get; init; }
+}
+
 public sealed record OverlayConnectionPresence
 {
     public required int ActiveConnectionCount { get; init; }
