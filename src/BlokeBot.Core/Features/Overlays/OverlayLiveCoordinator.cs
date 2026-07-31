@@ -175,6 +175,7 @@ internal sealed class OverlayLiveCoordinator(
                 or OverlaySnapshotProjection.GuessingV1
                 or OverlaySnapshotProjection.CuePlayerV1
                 or OverlaySnapshotProjection.GiveawayV1
+                or OverlaySnapshotProjection.EventFeedV1
             )
         )
         {
@@ -270,6 +271,7 @@ internal sealed class OverlayLiveCoordinator(
                     or OverlaySnapshotProjection.GuessingV1
                     or OverlaySnapshotProjection.CuePlayerV1
                     or OverlaySnapshotProjection.GiveawayV1
+                    or OverlaySnapshotProjection.EventFeedV1
                 )
             )
             {
@@ -387,6 +389,21 @@ internal sealed class OverlayLiveCoordinator(
                 sequence,
                 occurredAtUtc
             ),
+            OverlaySnapshotProjection.EventFeedV1 feed =>
+                new OverlayLiveTransportMessage.EventFeedBaseline(
+                    new EventFeedV1OverlayLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        EventType = "baseline",
+                        OccurredAtUtc = occurredAtUtc,
+                        Payload = new EventFeedV1OverlayLivePayload
+                        {
+                            Animation = "none",
+                            State = feed.Snapshot.State,
+                        },
+                    }
+                ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required to open a live overlay."
             ),
@@ -471,6 +488,25 @@ internal sealed class OverlayLiveCoordinator(
                 sequence,
                 occurredAtUtc
             ),
+            OverlaySnapshotProjection.EventFeedV1 feed =>
+                new OverlayLiveTransportMessage.EventFeedEvent(
+                    new EventFeedV1OverlayLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        EventType =
+                            publication.Kind is OverlayLivePublicationKind.Test ? "test" : "state",
+                        OccurredAtUtc = occurredAtUtc,
+                        Payload = new EventFeedV1OverlayLivePayload
+                        {
+                            Animation =
+                                publication.Kind is OverlayLivePublicationKind.Test
+                                    ? "sample"
+                                    : "card",
+                            State = feed.Snapshot.State,
+                        },
+                    }
+                ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required for live publication."
             ),
@@ -890,6 +926,12 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record GiveawayEvent(GiveawayV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record EventFeedBaseline(EventFeedV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record EventFeedEvent(EventFeedV1OverlayLiveEnvelope Envelope)
         : OverlayLiveTransportMessage;
 
     internal sealed record Cue(CuePlaybackLiveEnvelope Envelope) : OverlayLiveTransportMessage;

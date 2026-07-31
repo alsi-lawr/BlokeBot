@@ -1,7 +1,9 @@
+using System.Collections.Immutable;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Replies;
@@ -17,9 +19,18 @@ public sealed class GuessingRoundService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     GuessingChangeNotifier changes,
     PointBalanceService balances,
-    PointsChangeNotifier pointsChanges
+    PointsChangeNotifier pointsChanges,
+    IEnumerable<IOverlayEventPresenter> eventPresenters
 )
 {
+    public GuessingRoundService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        GuessingChangeNotifier changes,
+        PointBalanceService balances,
+        PointsChangeNotifier pointsChanges
+    )
+        : this(dbFactory, changes, balances, pointsChanges, []) { }
+
     public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(int hostId, string name) =>
         IO<GuessingWinnerDeclarationOutcome, Never>.Create(async ct =>
             Result<GuessingWinnerDeclarationOutcome, Never>.Success(
@@ -96,6 +107,11 @@ public sealed class GuessingRoundService(
                 .Select(x => x.PointLabel)
                 .SingleOrDefaultAsync(ct)
             ?? "points";
+        var roundName = await db
+            .Profiles.AsNoTracking()
+            .Where(x => x.Id == round.GuessRoundProfileId)
+            .Select(x => x.Name)
+            .SingleAsync(ct);
         var now = DateTime.UtcNow;
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -150,6 +166,27 @@ public sealed class GuessingRoundService(
             if (mutations.Count > 0)
             {
                 await pointsChanges.NotifyChangedAsync(ct);
+            }
+            if (winners.Count > 0)
+            {
+                foreach (var presenter in eventPresenters)
+                {
+                    await presenter.PresentAsync(
+                        new OverlayEventPresentation.GuessingWinner
+                        {
+                            HostId = hostId,
+                            SourceKey = round.Id.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture
+                            ),
+                            RoundName = roundName,
+                            WinningAnswer = canonicalName,
+                            Winners = winners.ToImmutableArray(),
+                            Amount = rewardAmount.ToDisplayString(),
+                            PointLabel = pointLabel,
+                        },
+                        ct
+                    );
+                }
             }
 
             var message = MessageTemplateFormatter.Format(

@@ -34,6 +34,20 @@ public partial class OverlaysPage
     private bool _draftShowEntrantCount = true;
     private bool _draftShowCountdown = true;
     private bool _draftShowJoinCommand = true;
+    private int _eventFeedCapacity = OverlayConfiguration.EventFeedV1.DefaultCapacity;
+    private EventFeedOverflowPolicy _eventFeedOverflow = EventFeedOverflowPolicy.DropNewest;
+    private bool _pointEventEnabled = true;
+    private string _pointEventTemplate = "{recipient} received {amount} {pointLabel}";
+    private OverlayEventFeedPriority _pointEventPriority = OverlayEventFeedPriority.Normal;
+    private int _pointEventDuration = 6;
+    private bool _guessEventEnabled = true;
+    private string _guessEventTemplate = "{winners} won {roundName}: {winningAnswer}";
+    private OverlayEventFeedPriority _guessEventPriority = OverlayEventFeedPriority.High;
+    private int _guessEventDuration = 8;
+    private bool _giveawayEventEnabled = true;
+    private string _giveawayEventTemplate = "{winners} won {prizes}";
+    private OverlayEventFeedPriority _giveawayEventPriority = OverlayEventFeedPriority.High;
+    private int _giveawayEventDuration = 8;
     private string? _revealedBrowserSourceUrl;
     private string _feedback = string.Empty;
     private bool _operationFailed;
@@ -74,6 +88,13 @@ public partial class OverlaysPage
             {
                 mode = $"?mode=representative&sample={SampleToken(_giveawayPreviewSample)}";
             }
+            if (
+                _previewMode is OverlayPreviewMode.Representative
+                && _selected.Type is OverlayType.EventFeed
+            )
+            {
+                mode = $"?mode=representative&sample={SampleToken(_eventFeedPreviewSample)}";
+            }
             return $"/overlays/preview/{_selected.Id:D}{mode}";
         }
     }
@@ -88,6 +109,7 @@ public partial class OverlaysPage
 
     private GuessingOverlaySampleState _previewSample = GuessingOverlaySampleState.Open;
     private GiveawayOverlaySampleState _giveawayPreviewSample = GiveawayOverlaySampleState.Open;
+    private OverlayEventFeedKind _eventFeedPreviewSample = OverlayEventFeedKind.PointAward;
 
     private string _presenceLabel
     {
@@ -501,6 +523,32 @@ public partial class OverlaysPage
             _draftShowCountdown = giveaway.ShowCountdown;
             _draftShowJoinCommand = giveaway.ShowJoinCommand;
         }
+        if (overlay.Configuration is OverlayConfiguration.EventFeedV1 feed)
+        {
+            _eventFeedCapacity = feed.Capacity;
+            _eventFeedOverflow = feed.OverflowPolicy;
+            LoadEventKind(
+                feed.Kinds[OverlayEventFeedKind.PointAward],
+                ref _pointEventEnabled,
+                ref _pointEventTemplate,
+                ref _pointEventPriority,
+                ref _pointEventDuration
+            );
+            LoadEventKind(
+                feed.Kinds[OverlayEventFeedKind.GuessingWinner],
+                ref _guessEventEnabled,
+                ref _guessEventTemplate,
+                ref _guessEventPriority,
+                ref _guessEventDuration
+            );
+            LoadEventKind(
+                feed.Kinds[OverlayEventFeedKind.GiveawayWinner],
+                ref _giveawayEventEnabled,
+                ref _giveawayEventTemplate,
+                ref _giveawayEventPriority,
+                ref _giveawayEventDuration
+            );
+        }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
         _previewKey++;
@@ -879,6 +927,14 @@ public partial class OverlaysPage
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
+    private void SetPreviewSample(OverlayEventFeedKind sample)
+    {
+        _eventFeedPreviewSample = sample;
+        _previewMode = OverlayPreviewMode.Representative;
+        _previewKey++;
+        SetSuccess($"{EventKindLabel(sample)} sample selected.");
+    }
+
     private OverlayConfiguration DraftConfiguration() =>
         _draftType switch
         {
@@ -893,6 +949,31 @@ public partial class OverlaysPage
                 _draftShowEntrantCount,
                 _draftShowCountdown,
                 _draftShowJoinCommand
+            ),
+            OverlayType.EventFeed => new OverlayConfiguration.EventFeedV1(
+                _eventFeedCapacity,
+                _eventFeedOverflow,
+                new Dictionary<OverlayEventFeedKind, EventFeedKindConfiguration>
+                {
+                    [OverlayEventFeedKind.PointAward] = new(
+                        _pointEventEnabled,
+                        _pointEventTemplate,
+                        _pointEventPriority,
+                        _pointEventDuration
+                    ),
+                    [OverlayEventFeedKind.GuessingWinner] = new(
+                        _guessEventEnabled,
+                        _guessEventTemplate,
+                        _guessEventPriority,
+                        _guessEventDuration
+                    ),
+                    [OverlayEventFeedKind.GiveawayWinner] = new(
+                        _giveawayEventEnabled,
+                        _giveawayEventTemplate,
+                        _giveawayEventPriority,
+                        _giveawayEventDuration
+                    ),
+                }
             ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
@@ -928,8 +1009,23 @@ public partial class OverlaysPage
             OverlayType.Guessing => "Guessing",
             OverlayType.CuePlayer => "Cue player",
             OverlayType.Giveaway => "Giveaway",
+            OverlayType.EventFeed => "Event feed",
             _ => "Unsupported",
         };
+
+    private static void LoadEventKind(
+        EventFeedKindConfiguration source,
+        ref bool enabled,
+        ref string template,
+        ref OverlayEventFeedPriority priority,
+        ref int duration
+    )
+    {
+        enabled = source.Enabled;
+        template = source.Template;
+        priority = source.Priority;
+        duration = source.DurationSeconds;
+    }
 
     private static string SampleLabel(GuessingOverlaySampleState sample) =>
         sample switch
@@ -939,6 +1035,24 @@ public partial class OverlaysPage
             GuessingOverlaySampleState.Closed => "Closed",
             GuessingOverlaySampleState.Completed => "Result",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+
+    private static string SampleToken(OverlayEventFeedKind kind) =>
+        kind switch
+        {
+            OverlayEventFeedKind.PointAward => "point-award",
+            OverlayEventFeedKind.GuessingWinner => "guessing-winner",
+            OverlayEventFeedKind.GiveawayWinner => "giveaway-winner",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+    private static string EventKindLabel(OverlayEventFeedKind kind) =>
+        kind switch
+        {
+            OverlayEventFeedKind.PointAward => "Point award",
+            OverlayEventFeedKind.GuessingWinner => "Guessing winner",
+            OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
     private static string SampleToken(GuessingOverlaySampleState sample) =>

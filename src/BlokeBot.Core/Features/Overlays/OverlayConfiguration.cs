@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -54,6 +55,7 @@ public abstract record OverlayConfiguration
                 OverlayType.Guessing => ParseGuessing(document.RootElement),
                 OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
                 OverlayType.Giveaway => ParseGiveaway(document.RootElement),
+                OverlayType.EventFeed => ParseEventFeed(document.RootElement),
                 _ => new OverlayConfigurationParseResult.Invalid(
                     "The overlay type is not supported."
                 ),
@@ -168,6 +170,67 @@ public abstract record OverlayConfiguration
         return new OverlayConfigurationParseResult.Valid(
             new GiveawayV1(titleValue, showEntrantCount, showCountdown, showJoinCommand)
         );
+    }
+
+    private static OverlayConfigurationParseResult ParseEventFeed(JsonElement root)
+    {
+        try
+        {
+            var dto = root.Deserialize<EventFeedConfigurationDto>(
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    PropertyNameCaseInsensitive = false,
+                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+                }
+            );
+            if (
+                dto is null
+                || dto.SchemaVersion != 1
+                || dto.OverflowPolicy is null
+                || dto.Kinds is null
+                || dto.Kinds.Count != 3
+                || dto.Kinds.Any(pair =>
+                    pair.Value is null || pair.Value.Template is null || pair.Value.Priority is null
+                )
+            )
+            {
+                throw new ArgumentException();
+            }
+            var expected = new[] { "pointAward", "guessingWinner", "giveawayWinner" };
+            if (
+                !dto
+                    .Kinds.Keys.Order(StringComparer.Ordinal)
+                    .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            )
+            {
+                throw new ArgumentException();
+            }
+            return new OverlayConfigurationParseResult.Valid(
+                new EventFeedV1(
+                    dto.Capacity,
+                    PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
+                    dto.Kinds.ToDictionary(
+                        pair => PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
+                        pair => new EventFeedKindConfiguration(
+                            pair.Value!.Enabled,
+                            pair.Value.Template!,
+                            PersistedEnumTokens<OverlayEventFeedPriority>.Parse(
+                                pair.Value.Priority!
+                            ),
+                            pair.Value.DurationSeconds
+                        )
+                    )
+                )
+            );
+        }
+        catch (Exception exception)
+            when (exception is JsonException or ArgumentException or FormatException)
+        {
+            return new OverlayConfigurationParseResult.Invalid(
+                "An event feed configuration must use EventFeedV1 with capacity 1 to 25, dropNewest or replaceNewestSameKind overflow, and exact pointAward, guessingWinner, and giveawayWinner settings."
+            );
+        }
     }
 
     private static bool TryReadProperty(
@@ -313,7 +376,199 @@ public abstract record OverlayConfiguration
                 }
             );
     }
+
+    public sealed record EventFeedV1 : OverlayConfiguration
+    {
+        public const int MinimumCapacity = 1;
+        public const int MaximumCapacity = 25;
+        public const int DefaultCapacity = 10;
+
+        public EventFeedV1(
+            int capacity,
+            EventFeedOverflowPolicy overflowPolicy,
+            IReadOnlyDictionary<OverlayEventFeedKind, EventFeedKindConfiguration> kinds
+        )
+        {
+            if (
+                capacity is < MinimumCapacity or > MaximumCapacity
+                || !Enum.IsDefined(overflowPolicy)
+            )
+            {
+                throw new ArgumentOutOfRangeException(nameof(capacity));
+            }
+            if (
+                kinds.Count != 3
+                || Enum.GetValues<OverlayEventFeedKind>().Any(kind => !kinds.ContainsKey(kind))
+            )
+            {
+                throw new ArgumentException(
+                    "Every event kind requires configuration.",
+                    nameof(kinds)
+                );
+            }
+            Capacity = capacity;
+            OverflowPolicy = overflowPolicy;
+            Kinds = kinds.ToDictionary(pair => pair.Key, pair => pair.Value);
+            foreach (var pair in Kinds)
+            {
+                ValidateTemplate(pair.Key, pair.Value.Template);
+            }
+        }
+
+        public override OverlayType Type => OverlayType.EventFeed;
+        public override int SchemaVersion => 1;
+        public int Capacity { get; }
+        public EventFeedOverflowPolicy OverflowPolicy { get; }
+        public IReadOnlyDictionary<OverlayEventFeedKind, EventFeedKindConfiguration> Kinds { get; }
+
+        internal override string ToPersistenceJson() =>
+            JsonSerializer.Serialize(
+                new EventFeedConfigurationDto(
+                    SchemaVersion,
+                    Capacity,
+                    PersistedEnumTokens<EventFeedOverflowPolicy>.Format(OverflowPolicy),
+                    Kinds.ToDictionary(
+                        pair => PersistedEnumTokens<OverlayEventFeedKind>.Format(pair.Key),
+                        pair =>
+                            (EventFeedKindConfigurationDto?)
+                                new EventFeedKindConfigurationDto(
+                                    pair.Value.Enabled,
+                                    pair.Value.Template,
+                                    PersistedEnumTokens<OverlayEventFeedPriority>.Format(
+                                        pair.Value.Priority
+                                    ),
+                                    pair.Value.DurationSeconds
+                                )
+                    )
+                ),
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+            );
+
+        public static EventFeedV1 Default =>
+            new(
+                DefaultCapacity,
+                EventFeedOverflowPolicy.DropNewest,
+                new Dictionary<OverlayEventFeedKind, EventFeedKindConfiguration>
+                {
+                    [OverlayEventFeedKind.PointAward] = new(
+                        true,
+                        "{recipient} received {amount} {pointLabel}",
+                        OverlayEventFeedPriority.Normal,
+                        6
+                    ),
+                    [OverlayEventFeedKind.GuessingWinner] = new(
+                        true,
+                        "{winners} won {roundName}: {winningAnswer}",
+                        OverlayEventFeedPriority.High,
+                        8
+                    ),
+                    [OverlayEventFeedKind.GiveawayWinner] = new(
+                        true,
+                        "{winners} won {prizes}",
+                        OverlayEventFeedPriority.High,
+                        8
+                    ),
+                }
+            );
+
+        private static void ValidateTemplate(OverlayEventFeedKind kind, string template)
+        {
+            var allowed = kind switch
+            {
+                OverlayEventFeedKind.PointAward => new[] { "recipient", "amount", "pointLabel" },
+                OverlayEventFeedKind.GuessingWinner => new[]
+                {
+                    "roundName",
+                    "winningAnswer",
+                    "winners",
+                    "winnerCount",
+                    "amount",
+                    "pointLabel",
+                },
+                OverlayEventFeedKind.GiveawayWinner => new[]
+                {
+                    "winners",
+                    "winnerCount",
+                    "prizes",
+                    "pointLabel",
+                },
+                _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+            };
+            var remaining = template;
+            foreach (var placeholder in allowed)
+            {
+                remaining = remaining.Replace(
+                    $"{{{placeholder}}}",
+                    string.Empty,
+                    StringComparison.Ordinal
+                );
+            }
+            if (
+                remaining.Contains('{', StringComparison.Ordinal)
+                || remaining.Contains('}', StringComparison.Ordinal)
+            )
+            {
+                throw new ArgumentException(
+                    "Templates may contain only placeholders supported by their event kind.",
+                    nameof(template)
+                );
+            }
+        }
+    }
 }
+
+public enum EventFeedOverflowPolicy
+{
+    [PersistedToken("dropNewest")]
+    DropNewest,
+
+    [PersistedToken("replaceNewestSameKind")]
+    ReplaceNewestSameKind,
+}
+
+public sealed record EventFeedKindConfiguration
+{
+    public EventFeedKindConfiguration(
+        bool enabled,
+        string template,
+        OverlayEventFeedPriority priority,
+        int durationSeconds
+    )
+    {
+        var normalized = template.Trim();
+        if (
+            normalized.Length is < 1 or > 500
+            || durationSeconds is < 1 or > 30
+            || !Enum.IsDefined(priority)
+        )
+        {
+            throw new ArgumentOutOfRangeException(nameof(template));
+        }
+        Enabled = enabled;
+        Template = normalized;
+        Priority = priority;
+        DurationSeconds = durationSeconds;
+    }
+
+    public bool Enabled { get; }
+    public string Template { get; }
+    public OverlayEventFeedPriority Priority { get; }
+    public int DurationSeconds { get; }
+}
+
+internal sealed record EventFeedConfigurationDto(
+    int SchemaVersion,
+    int Capacity,
+    string? OverflowPolicy,
+    Dictionary<string, EventFeedKindConfigurationDto?>? Kinds
+);
+
+internal sealed record EventFeedKindConfigurationDto(
+    bool Enabled,
+    string? Template,
+    string? Priority,
+    int DurationSeconds
+);
 
 public abstract record OverlayConfigurationParseResult
 {

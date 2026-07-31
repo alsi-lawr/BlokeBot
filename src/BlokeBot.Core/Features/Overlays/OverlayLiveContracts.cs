@@ -150,6 +150,24 @@ internal sealed record OverlayLiveControlEnvelope
     public required DateTimeOffset OccurredAtUtc { get; init; }
 }
 
+internal sealed record EventFeedV1OverlayLivePayload
+{
+    public string OverlayType => "eventFeed";
+    public int SchemaVersion => 1;
+    public required string Animation { get; init; }
+    public required EventFeedStatePresentation State { get; init; }
+}
+
+internal sealed record EventFeedV1OverlayLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required string EventType { get; init; }
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+    public required EventFeedV1OverlayLivePayload Payload { get; init; }
+}
+
 internal sealed record CuePlayerV1OverlayLivePayload
 {
     public string OverlayType => "cuePlayer";

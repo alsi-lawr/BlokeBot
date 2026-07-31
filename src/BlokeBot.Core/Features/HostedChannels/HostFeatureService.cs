@@ -7,12 +7,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.HostedChannels;
 
+public interface IHostFeatureChangeObserver
+{
+    ValueTask FeatureChangedAsync(
+        int hostId,
+        HostFeatureFlags feature,
+        bool enabled,
+        CancellationToken cancellationToken
+    );
+}
+
 public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
-    IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
+    IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
+    IEnumerable<IHostFeatureChangeObserver> featureObservers
 )
 {
+    public HostFeatureService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        HostedChannelChangeNotifier changes,
+        IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
+    )
+        : this(dbFactory, changes, nativeTwitchObservers, []) { }
+
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
         CancellationToken ct
     )
@@ -89,6 +107,10 @@ public sealed class HostFeatureService(
         host.EnabledFeatures = updated;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
+        foreach (var observer in featureObservers)
+        {
+            await observer.FeatureChangedAsync(hostId, feature, updated.Contains(feature), ct);
+        }
         if (!HostFeatureFlags.NativeTwitchFeatures.Contains(feature))
         {
             return;

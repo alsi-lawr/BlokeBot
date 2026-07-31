@@ -134,6 +134,7 @@
                                         @bind="_draftType">
                                     <option value="@OverlayType.Empty">Empty</option>
                                     <option value="@OverlayType.CuePlayer">Cue player</option>
+                                    <option value="@OverlayType.EventFeed">Event feed</option>
                                     @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
                                     {
                                         <option value="@OverlayType.Guessing">Guessing round</option>
@@ -224,6 +225,19 @@
                                         Giveaway state, entrant count, winners, prizes, and the canonical Points join alias come from Points. Entrant identities and private eligibility data are never published.
                                     </p>
                                 }
+                            }
+                            else if (_draftType is OverlayType.EventFeed)
+                            {
+                                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                                    <div class="space-y-2"><label class="label" for="event-feed-capacity">Queue capacity</label><input id="event-feed-capacity" class="input" type="number" min="1" max="25" @bind="_eventFeedCapacity" /></div>
+                                    <div class="space-y-2"><label class="label" for="event-feed-overflow">When full</label><select id="event-feed-overflow" class="input" @bind="_eventFeedOverflow"><option value="@EventFeedOverflowPolicy.DropNewest">Drop newest</option><option value="@EventFeedOverflowPolicy.ReplaceNewestSameKind">Replace newest of same kind</option></select></div>
+                                </div>
+                                <div class="application-card-collection mt-4 lg:grid-cols-3" data-event-feed-kind-settings>
+                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_pointEventEnabled" /> Point awards</label><label class="label mt-3" for="point-event-template">Template</label><textarea id="point-event-template" class="input min-h-24" @bind="_pointEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Point award priority" @bind="_pointEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Point award seconds" type="number" min="1" max="30" @bind="_pointEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{recipient} {amount} {pointLabel}")</p></section>
+                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_guessEventEnabled" /> Guessing winners</label><label class="label mt-3" for="guess-event-template">Template</label><textarea id="guess-event-template" class="input min-h-24" @bind="_guessEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Guessing winner priority" @bind="_guessEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Guessing winner seconds" type="number" min="1" max="30" @bind="_guessEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{roundName} {winningAnswer} {winners} {winnerCount} {amount} {pointLabel}")</p></section>
+                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_giveawayEventEnabled" /> Giveaway winners</label><label class="label mt-3" for="giveaway-event-template">Template</label><textarea id="giveaway-event-template" class="input min-h-24" @bind="_giveawayEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Giveaway winner priority" @bind="_giveawayEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Giveaway winner seconds" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{winners} {winnerCount} {prizes} {pointLabel}")</p></section>
+                                </div>
+                                <p class="mt-3 text-sm leading-6 text-muted-foreground">Cards are plain text, queued durably, deduplicated for 24 hours, and scheduled with high-priority fairness. Disabled Points or Guessing sources are suppressed without replay.</p>
                             }
                             else
                             {
@@ -329,6 +343,15 @@
                                                 type="button"
                                                 aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _giveawayPreviewSample == sample ? "true" : "false")"
                                                 @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
+                                    }
+                                </div>
+                            }
+                            else if (_selected.Type is OverlayType.EventFeed)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Event feed sample event">
+                                    @foreach (var sample in Enum.GetValues<OverlayEventFeedKind>())
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "btn-primary" : "btn-secondary")" type="button" aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "true" : "false")" @onclick="() => SetPreviewSample(sample)">@EventKindLabel(sample)</button>
                                     }
                                 </div>
                             }

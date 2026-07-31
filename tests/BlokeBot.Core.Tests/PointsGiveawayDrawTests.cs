@@ -6,6 +6,7 @@ using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Configuration;
@@ -109,13 +110,26 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
             "entrant"
         );
         await SeedSettingsAsync(dbFactory, hostId);
-        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+        var presenter = new RecordingEventPresenter();
+        var service = new PointsGiveawayDrawService(
+            dbFactory,
+            new PointBalanceService(dbFactory),
+            new FixedPointsRandom(),
+            [presenter]
+        );
 
         var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
         var winners = outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>().Payouts;
         winners.Single().Login.ShouldBe("entrant");
         winners.Single().Payout.ShouldBe(PointAmount.ParseAbsolute("10"));
+        var presentation = presenter
+            .Presentations.ShouldHaveSingleItem()
+            .ShouldBeOfType<OverlayEventPresentation.GiveawayWinner>();
+        presentation.HostId.ShouldBe(hostId);
+        presentation.SourceKey.ShouldBe(giveawayId.ToString());
+        presentation.Winners.ShouldBe(["entrant"]);
+        presentation.Prizes.ShouldBe(["10 points"]);
     }
 
     [Test]
@@ -200,5 +214,20 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         var balance = await db.PointBalances.SingleAsync(x => x.HostId == hostId);
         balance.Login.ShouldBe("entrant");
         balance.Amount.ShouldBe("10");
+    }
+
+    private sealed class RecordingEventPresenter : IOverlayEventPresenter
+    {
+        internal List<OverlayEventPresentation> Presentations { get; } = [];
+
+        public Task PresentAsync(
+            OverlayEventPresentation presentation,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Presentations.Add(presentation);
+            return Task.CompletedTask;
+        }
     }
 }

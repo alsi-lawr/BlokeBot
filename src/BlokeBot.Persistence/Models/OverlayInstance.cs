@@ -13,6 +13,63 @@ public enum OverlayType
 
     [PersistedToken("giveaway")]
     Giveaway,
+
+    [PersistedToken("event-feed")]
+    EventFeed,
+}
+
+public enum OverlayEventFeedKind
+{
+    [PersistedToken("pointAward")]
+    PointAward,
+
+    [PersistedToken("guessingWinner")]
+    GuessingWinner,
+
+    [PersistedToken("giveawayWinner")]
+    GiveawayWinner,
+}
+
+public enum OverlayEventFeedPriority
+{
+    [PersistedToken("normal")]
+    Normal,
+
+    [PersistedToken("high")]
+    High,
+}
+
+public enum OverlayEventFeedLifecycle
+{
+    [PersistedToken("queued")]
+    Queued,
+
+    [PersistedToken("active")]
+    Active,
+
+    [PersistedToken("consumed")]
+    Consumed,
+
+    [PersistedToken("suppressed")]
+    Suppressed,
+}
+
+public sealed class OverlayEventFeedItem
+{
+    public long Id { get; set; }
+    public long OverlayInstanceId { get; set; }
+    public int HostId { get; set; }
+    public OverlayEventFeedKind Kind { get; set; }
+    public string SourceKey { get; set; } = string.Empty;
+    public OverlayEventFeedPriority Priority { get; set; }
+    public OverlayEventFeedLifecycle Lifecycle { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public int DurationSeconds { get; set; }
+    public DateTime EnqueuedAtUtc { get; set; }
+    public DateTime? DisplayDeadlineUtc { get; set; }
+    public DateTime? TombstoneExpiresAtUtc { get; set; }
+    public OverlayInstance OverlayInstance { get; set; } = null!;
 }
 
 public enum OverlayInstanceEventKind

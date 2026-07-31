@@ -93,6 +93,16 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
         services.AddSingleton<OverlayCueService>();
         services.AddSingleton<OverlayServerEpoch>();
+        services.AddSingleton<OverlayEventFeedService>();
+        services.AddSingleton<IOverlayEventPresenter>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayEventFeedService>()
+        );
+        services.AddSingleton<IHostFeatureChangeObserver>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayEventFeedService>()
+        );
+        services.AddHostedService(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayEventFeedService>()
+        );
         services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
         services.AddSingleton<OverlayLiveCoordinator>();
         services.AddSingleton<IOverlayLivePublisher>(serviceProvider =>

@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -32,6 +33,33 @@ public sealed class PointBalanceIOTests
         result.Match(static _ => true, static _ => false).ShouldBeTrue();
         await using var after = await dbFactory.CreateDbContextAsync();
         (await after.PointBalances.SingleAsync()).Amount.ShouldBe("10");
+    }
+
+    [Test]
+    public async Task Add_CommittingPublishesTypedPointAwardWithStableLedgerKey()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            seed.PointsSettings.Add(new PointsSettings { HostId = hostId, PointLabel = "beans" });
+            await seed.SaveChangesAsync();
+        }
+        var presenter = new RecordingEventPresenter();
+
+        var result = await new PointBalanceService(dbFactory, [presenter])
+            .Add(hostId, "viewer", PointAmount.ParseAbsolute("10"), "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
+
+        result.Match(static _ => true, static _ => false).ShouldBeTrue();
+        var presentation = presenter
+            .Presentations.ShouldHaveSingleItem()
+            .ShouldBeOfType<OverlayEventPresentation.PointAward>();
+        presentation.HostId.ShouldBe(hostId);
+        presentation.Recipient.ShouldBe("viewer");
+        presentation.Amount.ShouldBe("10");
+        presentation.PointLabel.ShouldBe("beans");
+        long.Parse(presentation.SourceKey).ShouldBeGreaterThan(0);
     }
 
     [Test]
@@ -154,5 +182,20 @@ public sealed class PointBalanceIOTests
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
         ) => Task.FromException<BlokeBotDbContext>(exception);
+    }
+
+    private sealed class RecordingEventPresenter : IOverlayEventPresenter
+    {
+        internal List<OverlayEventPresentation> Presentations { get; } = [];
+
+        public Task PresentAsync(
+            OverlayEventPresentation presentation,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Presentations.Add(presentation);
+            return Task.CompletedTask;
+        }
     }
 }

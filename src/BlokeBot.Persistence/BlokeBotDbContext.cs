@@ -106,6 +106,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<OverlayMediaAsset> OverlayMediaAssets => Set<OverlayMediaAsset>();
     public DbSet<OverlayCueMediaAssetReference> OverlayCueMediaAssetReferences =>
         Set<OverlayCueMediaAssetReference>();
+    public DbSet<OverlayEventFeedItem> OverlayEventFeedItems => Set<OverlayEventFeedItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
