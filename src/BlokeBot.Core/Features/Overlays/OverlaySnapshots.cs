@@ -42,6 +42,9 @@ public abstract record OverlaySnapshotProjection
 
     public sealed record GuessingV1(GuessingV1OverlaySnapshot Snapshot) : OverlaySnapshotProjection;
 
+    public sealed record CuePlayerV1(CuePlayerV1OverlaySnapshot Snapshot)
+        : OverlaySnapshotProjection;
+
     public sealed record Unavailable : OverlaySnapshotProjection;
 }
 
@@ -61,6 +64,23 @@ public sealed record EmptyV1OverlaySnapshot
 }
 
 public sealed record EmptyV1OverlayPresentationState;
+
+public sealed record CuePlayerV1OverlaySnapshot
+{
+    public string OverlayType => "cuePlayer";
+
+    public int SchemaVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+
+    public CuePlayerV1OverlayPresentationState State { get; } = new();
+}
+
+public sealed record CuePlayerV1OverlayPresentationState;
 
 public sealed record GuessingV1OverlaySnapshot
 {
@@ -170,6 +190,22 @@ internal sealed class OverlayStateProvider(
 
         if (
             instance
+                is { Type: OverlayType.CuePlayer, Configuration: OverlayConfiguration.CuePlayerV1 }
+            && await OverlayParentEnabledAsync(instance.HostId, cancellationToken)
+        )
+        {
+            return new OverlaySnapshotProjection.CuePlayerV1(
+                new CuePlayerV1OverlaySnapshot
+                {
+                    ServerEpoch = serverEpoch.Value,
+                    Sequence = instance.Revision.Value,
+                    GeneratedAtUtc = timeProvider.GetUtcNow(),
+                }
+            );
+        }
+
+        if (
+            instance
                 is not {
                     Type: OverlayType.Guessing,
                     Configuration: OverlayConfiguration.GuessingV1 configuration,
@@ -222,6 +258,23 @@ internal sealed class OverlayStateProvider(
                 ? new GuessingV1OverlayPresentationState.NoRound()
                 : ToPresentation(round, configuration, pointLabel)
         );
+    }
+
+    private async Task<bool> OverlayParentEnabledAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db
+            .Hosts.AsNoTracking()
+            .AnyAsync(
+                value =>
+                    value.Id == hostId
+                    && (value.EnabledFeatures & HostFeatureFlags.Overlays)
+                        == HostFeatureFlags.Overlays,
+                cancellationToken
+            );
     }
 
     public async Task<OverlaySnapshotProjection> ProjectSampleAsync(

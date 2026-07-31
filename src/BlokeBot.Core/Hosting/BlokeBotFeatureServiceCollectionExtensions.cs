@@ -87,6 +87,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IOverlayAccessKeyGenerator, CryptographicOverlayAccessKeyGenerator>();
         services.AddSingleton<OverlayInstanceService>();
         services.AddSingleton<OverlayInstanceResolver>();
+        services.AddSingleton<OverlayManagementAuthority>();
+        services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
+        services.AddSingleton<OverlayRemoteUrlPolicy>();
+        services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
+        services.AddSingleton<OverlayCueService>();
         services.AddSingleton<OverlayServerEpoch>();
         services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
         services.AddSingleton<OverlayLiveCoordinator>();
@@ -96,11 +101,18 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IOverlayLivePresence>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
+        services.AddSingleton<IOverlayCueTransport>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
+        services.AddSingleton<OverlayCuePlaybackService>();
         services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
         services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
+        services.AddHostedService(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayCuePlaybackService>()
         );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;

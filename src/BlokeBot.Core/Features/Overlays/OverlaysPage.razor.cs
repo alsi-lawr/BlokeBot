@@ -1,6 +1,7 @@
 using System.Globalization;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -9,6 +10,18 @@ public partial class OverlaysPage
 {
     private readonly CancellationTokenSource _lifetime = new();
     private IReadOnlyList<OverlayInstanceView> _instances = [];
+    private IReadOnlyList<OverlayCueView> _cuesList = [];
+    private IReadOnlyList<OverlayMediaAssetView> _assets = [];
+    private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
+    private OverlayCueView? _selectedCue;
+    private Guid? _selectedCueId;
+    private Guid? _cueTargetId;
+    private string _cueDraftName = "Raid celebration";
+    private int _cueDraftDuration = 8000;
+    private bool _cueDraftEnabled = true;
+    private OverlayCueQueuePolicy _cueDraftPolicy = OverlayCueQueuePolicy.Enqueue;
+    private string _cueDraftJson = DefaultCueJson();
+    private string _mediaDraftName = "Stream media";
     private OverlayInstanceView? _selected;
     private Guid? _selectedId;
     private string _draftName = "Main stream overlay";
@@ -157,6 +170,7 @@ public partial class OverlaysPage
                     return false;
                 }
             );
+            await LoadCueDataAsync();
         }
         catch (Exception exception)
         {
@@ -167,6 +181,276 @@ public partial class OverlaysPage
         {
             _isLoading = false;
         }
+    }
+
+    private async Task LoadCueDataAsync()
+    {
+        if (Host is null || !_featureEnabled)
+        {
+            _cuesList = [];
+            _assets = [];
+            _cueCatalog = new([], []);
+            return;
+        }
+        var cues = await _cues.ListCuesAsync(PageContext.Session, CancellationToken.None);
+        if (cues is OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded cueValues)
+        {
+            _cuesList = cueValues.Value;
+            if (_selectedCueId is { } cueId)
+            {
+                var selected = _cuesList.FirstOrDefault(value => value.Id == cueId);
+                if (selected is not null)
+                {
+                    SelectCue(selected);
+                }
+                else
+                {
+                    NewCue();
+                }
+            }
+        }
+        var assets = await _cues.ListAssetsAsync(PageContext.Session, CancellationToken.None);
+        if (assets is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded assetValues)
+        {
+            _assets = assetValues.Value;
+        }
+        _cueCatalog = await _cuePlayback.QueryCatalogAsync(HostId, CancellationToken.None);
+        if (_cueTargetId is null || !_cueCatalog.Targets.Any(value => value.Id == _cueTargetId))
+        {
+            _cueTargetId = _cueCatalog.Targets.FirstOrDefault()?.Id;
+        }
+    }
+
+    private void NewCue()
+    {
+        _selectedCue = null;
+        _selectedCueId = null;
+        _cueDraftName = "Raid celebration";
+        _cueDraftDuration = 8000;
+        _cueDraftEnabled = true;
+        _cueDraftPolicy = OverlayCueQueuePolicy.Enqueue;
+        _cueDraftJson = DefaultCueJson();
+    }
+
+    private void SelectCue(OverlayCueView cue)
+    {
+        _selectedCue = cue;
+        _selectedCueId = cue.Id;
+        _cueDraftName = cue.Name;
+        _cueDraftDuration = cue.DurationMilliseconds;
+        _cueDraftEnabled = cue.IsEnabled;
+        _cueDraftPolicy = cue.QueuePolicy;
+        _cueDraftJson = cue.Configuration.ToPersistenceJson();
+    }
+
+    private Task SaveCueAsync()
+    {
+        return RunOperationAsync(async () =>
+        {
+            var result = await _cues.SaveCueAsync(
+                PageContext.Session,
+                new SaveOverlayCueCommand(
+                    _selectedCue?.Id,
+                    _selectedCue?.Revision ?? new OverlayCueRevision(0),
+                    _cueDraftName,
+                    _cueDraftEnabled,
+                    _cueDraftDuration,
+                    _cueDraftPolicy,
+                    _cueDraftJson
+                ),
+                CancellationToken.None
+            );
+            if (result is OverlayCueResult<OverlayCueView>.Rejected rejected)
+            {
+                SetFailure(rejected.Reason.Message);
+                return;
+            }
+            var saved = ((OverlayCueResult<OverlayCueView>.Succeeded)result).Value;
+            _selectedCueId = saved.Id;
+            SetSuccess("Cue saved.");
+            await LoadCueDataAsync();
+        });
+    }
+
+    private Task DeleteCueAsync()
+    {
+        return RunOperationAsync(async () =>
+        {
+            if (_selectedCue is null)
+            {
+                return;
+            }
+            var result = await _cues.DeleteCueAsync(
+                PageContext.Session,
+                _selectedCue.Id,
+                _selectedCue.Revision,
+                CancellationToken.None
+            );
+            if (result is OverlayCueResult<Guid>.Rejected rejected)
+            {
+                SetFailure(rejected.Reason.Message);
+                return;
+            }
+            NewCue();
+            SetSuccess("Cue deleted. Any transient playback was cancelled.");
+            await LoadCueDataAsync();
+        });
+    }
+
+    private Task PlayCueTestAsync()
+    {
+        return RunOperationAsync(async () =>
+        {
+            if (Host is null || _selectedCue is null || _cueTargetId is null)
+            {
+                SetFailure("Choose a saved cue and Cue player target.");
+                return;
+            }
+            var outcome = await _cuePlayback.AdmitAsync(
+                new OverlayCueAdmissionRequest(
+                    HostId,
+                    _cueTargetId.Value,
+                    _selectedCue.Id,
+                    _selectedCue.QueuePolicy,
+                    OverlayCueAdmissionOrigin.OwnerPreview,
+                    OverlayCueSafeContext.Empty
+                ),
+                CancellationToken.None
+            );
+            switch (outcome)
+            {
+                case OverlayCueAdmissionOutcome.Running:
+                    SetSuccess("Test cue is playing through the live overlay transport.");
+                    break;
+                case OverlayCueAdmissionOutcome.Queued:
+                case OverlayCueAdmissionOutcome.Disconnected:
+                    SetSuccess(
+                        "Test cue is queued briefly while the target is busy or disconnected."
+                    );
+                    break;
+                case OverlayCueAdmissionOutcome.QueueRejected:
+                    SetFailure("The cue queue policy rejected this test while the target is busy.");
+                    break;
+                case OverlayCueAdmissionOutcome.ParentDisabledOrCancelled:
+                    SetFailure("Overlays were turned off before the cue could play.");
+                    break;
+                default:
+                    SetFailure("The cue or target is unavailable or disabled.");
+                    break;
+            }
+        });
+    }
+
+    private Task UploadAssetAsync(InputFileChangeEventArgs args)
+    {
+        return RunOperationAsync(async () =>
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream(file.Size);
+            var result = await _cues.UploadAssetAsync(
+                PageContext.Session,
+                _mediaDraftName,
+                file.ContentType,
+                stream,
+                CancellationToken.None
+            );
+            if (result is OverlayCueResult<OverlayMediaAssetView>.Rejected rejected)
+            {
+                SetFailure(rejected.Reason.Message);
+                return;
+            }
+            SetSuccess("Media uploaded and validated.");
+            await LoadCueDataAsync();
+        });
+    }
+
+    private Task ReplaceAssetAsync(OverlayMediaAssetView asset, InputFileChangeEventArgs args)
+    {
+        return RunOperationAsync(async () =>
+        {
+            var file = args.File;
+            await using var stream = file.OpenReadStream(file.Size);
+            var result = await _cues.ReplaceAssetAsync(
+                PageContext.Session,
+                new ReplaceOverlayMediaAssetCommand(
+                    asset.Id,
+                    asset.ContentRevision,
+                    file.ContentType,
+                    stream
+                ),
+                CancellationToken.None
+            );
+            if (result is OverlayCueResult<OverlayMediaAssetView>.Rejected rejected)
+            {
+                SetFailure(rejected.Reason.Message);
+                return;
+            }
+            SetSuccess("Media replaced. New playback uses the new content revision.");
+            await LoadCueDataAsync();
+        });
+    }
+
+    private Task DeleteAssetAsync(OverlayMediaAssetView asset)
+    {
+        return RunOperationAsync(async () =>
+        {
+            var result = await _cues.DeleteAssetAsync(
+                PageContext.Session,
+                asset.Id,
+                asset.ContentRevision,
+                CancellationToken.None
+            );
+            if (result is OverlayCueResult<Guid>.Rejected rejected)
+            {
+                SetFailure(rejected.Reason.Message);
+                return;
+            }
+            SetSuccess("Media deleted.");
+            await LoadCueDataAsync();
+        });
+    }
+
+    private static string DefaultCueJson()
+    {
+        return """
+            {
+              "schemaVersion": 1,
+              "layers": [
+                {
+                  "type": "externalWeb",
+                  "url": "https://example.com/",
+                  "startOffsetMilliseconds": 0,
+                  "durationMilliseconds": 8000,
+                  "zIndex": 0,
+                  "rectangle": {
+                    "xPercent": 10,
+                    "yPercent": 10,
+                    "widthPercent": 80,
+                    "heightPercent": 80
+                  }
+                }
+              ]
+            }
+            """;
+    }
+
+    private static string QueuePolicyLabel(OverlayCueQueuePolicy policy)
+    {
+        return policy switch
+        {
+            OverlayCueQueuePolicy.Enqueue => "Enqueue",
+            OverlayCueQueuePolicy.Replace => "Replace current",
+            OverlayCueQueuePolicy.Ignore => "Ignore while busy",
+            OverlayCueQueuePolicy.Concurrent => "Allow concurrent",
+            _ => policy.ToString(),
+        };
+    }
+
+    private static string ByteLabel(long value)
+    {
+        return value >= 1024 * 1024
+            ? $"{value / (1024m * 1024m):0.##} MB"
+            : $"{value / 1024m:0.##} KB";
     }
 
     private void NewOverlay()
@@ -589,6 +873,7 @@ public partial class OverlaysPage
                 _draftShowGuessCount,
                 _draftResultDurationSeconds
             ),
+            OverlayType.CuePlayer => new OverlayConfiguration.CuePlayerV1(),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
     }
@@ -615,6 +900,11 @@ public partial class OverlaysPage
         return count == 1 ? "1 saved overlay" : $"{count} saved overlays";
     }
 
+    private static string CueCountLabel(int count)
+    {
+        return count == 1 ? "1 saved cue" : $"{count} saved cues";
+    }
+
     private static string UpdatedLabel(OverlayInstanceView overlay)
     {
         return $"updated {overlay.UpdatedAtUtc:yyyy-MM-dd HH:mm} UTC";
@@ -626,6 +916,7 @@ public partial class OverlaysPage
         {
             OverlayType.Empty => "Empty",
             OverlayType.Guessing => "Guessing",
+            OverlayType.CuePlayer => "Cue player",
             _ => "Unsupported",
         };
     }

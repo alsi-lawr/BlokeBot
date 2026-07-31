@@ -7,6 +7,9 @@ public enum OverlayType
 
     [PersistedToken("guessing")]
     Guessing,
+
+    [PersistedToken("cue-player")]
+    CuePlayer,
 }
 
 public enum OverlayInstanceEventKind
@@ -81,4 +84,80 @@ public sealed class OverlayInstanceDomainEvent
     public int KeyVersion { get; set; }
 
     public DateTime OccurredAtUtc { get; set; }
+}
+
+public enum OverlayCueQueuePolicy
+{
+    [PersistedToken("enqueue")]
+    Enqueue,
+
+    [PersistedToken("replace")]
+    Replace,
+
+    [PersistedToken("ignore")]
+    Ignore,
+
+    [PersistedToken("concurrent")]
+    Concurrent,
+}
+
+public sealed class OverlayCue
+{
+    public long Id { get; set; }
+
+    public Guid PublicId { get; set; }
+
+    public int HostId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public bool IsEnabled { get; set; }
+
+    public int DurationMilliseconds { get; set; }
+
+    public OverlayCueQueuePolicy QueuePolicy { get; set; }
+
+    public string ConfigurationJson { get; set; } = string.Empty;
+
+    public long Revision { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
+public sealed class OverlayMediaAsset
+{
+    public long Id { get; set; }
+
+    public Guid PublicId { get; set; }
+
+    public int HostId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public long ByteLength { get; set; }
+
+    public int ContentRevision { get; set; }
+
+    public string StorageKey { get; set; } = string.Empty;
+
+    public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
+public sealed class OverlayCueMediaAssetReference
+{
+    public long CueId { get; set; }
+
+    public long AssetId { get; set; }
+
+    public int HostId { get; set; }
+
+    public OverlayCue Cue { get; set; } = null!;
+
+    public OverlayMediaAsset Asset { get; set; } = null!;
 }

@@ -9,6 +9,8 @@ public sealed partial class BlokeBotDbContext
         PersistedEnumTokens<OverlayType>.Values.ToArray();
     private static readonly string[] _overlayInstanceEventKinds =
         PersistedEnumTokens<OverlayInstanceEventKind>.Values.ToArray();
+    private static readonly string[] _overlayCueQueuePolicies =
+        PersistedEnumTokens<OverlayCueQueuePolicy>.Values.ToArray();
 
     private static void ConfigureOverlays(ModelBuilder modelBuilder)
     {
@@ -99,6 +101,117 @@ public sealed partial class BlokeBotDbContext
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OverlayCue>(b =>
+        {
+            b.ToTable(
+                "overlay_cues",
+                t =>
+                {
+                    t.HasCheckConstraint("CK_overlay_cues_Name", "length(Name) BETWEEN 1 AND 128");
+                    t.HasCheckConstraint(
+                        "CK_overlay_cues_Duration",
+                        "DurationMilliseconds BETWEEN 100 AND 300000"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_cues_QueuePolicy",
+                        KindIn("QueuePolicy", _overlayCueQueuePolicies)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_cues_ConfigurationJson",
+                        "length(ConfigurationJson) BETWEEN 1 AND 32768 "
+                            + "AND json_valid(ConfigurationJson) "
+                            + "AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' "
+                            + "AND json_extract(ConfigurationJson, '$.schemaVersion') = 1"
+                    );
+                    t.HasCheckConstraint("CK_overlay_cues_Revision", "Revision > 0");
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.Id, x.HostId });
+            b.Property(x => x.PublicId).HasConversion<string>();
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.QueuePolicy)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Format(value),
+                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.ConfigurationJson).HasMaxLength(32768);
+            b.Property(x => x.Revision).IsConcurrencyToken();
+            b.HasIndex(x => x.PublicId).IsUnique();
+            b.HasIndex(x => new
+            {
+                x.HostId,
+                x.Name,
+                x.PublicId,
+            });
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OverlayMediaAsset>(b =>
+        {
+            b.ToTable(
+                "overlay_media_assets",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_overlay_media_assets_Name",
+                        "length(Name) BETWEEN 1 AND 128"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_media_assets_ContentType",
+                        "ContentType IN ('video/mp4', 'audio/mpeg')"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_media_assets_Length",
+                        "ByteLength > 0 AND ContentRevision > 0"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_media_assets_StorageKey",
+                        "length(StorageKey) = 32"
+                    );
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.Id, x.HostId });
+            b.Property(x => x.PublicId).HasConversion<string>();
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.ContentType).HasMaxLength(32);
+            b.Property(x => x.StorageKey).HasMaxLength(32);
+            b.HasIndex(x => x.PublicId).IsUnique();
+            b.HasIndex(x => x.StorageKey).IsUnique();
+            b.HasIndex(x => new
+            {
+                x.HostId,
+                x.Name,
+                x.PublicId,
+            });
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OverlayCueMediaAssetReference>(b =>
+        {
+            b.ToTable("overlay_cue_media_asset_references");
+            b.HasKey(x => new { x.CueId, x.AssetId });
+            b.HasIndex(x => new { x.HostId, x.AssetId });
+            b.HasOne(x => x.Cue)
+                .WithMany()
+                .HasForeignKey(x => new { x.CueId, x.HostId })
+                .HasPrincipalKey(x => new { x.Id, x.HostId })
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.Asset)
+                .WithMany()
+                .HasForeignKey(x => new { x.AssetId, x.HostId })
+                .HasPrincipalKey(x => new { x.Id, x.HostId })
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

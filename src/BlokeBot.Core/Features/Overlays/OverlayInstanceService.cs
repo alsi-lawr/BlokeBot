@@ -614,7 +614,7 @@ public sealed class OverlayInstanceService(
         var actor = new AuthorizedActor(selectedHost.Id, session.UserId, session.Login.Trim());
         if (selectedHost.Role is AuthRole.Streamer or AuthRole.Admin)
         {
-            return new AuthorizationDecision.Granted(actor);
+            return await GrantIfParentEnabledAsync(actor, ct);
         }
         if (selectedHost.Role != AuthRole.Moderator)
         {
@@ -623,7 +623,7 @@ public sealed class OverlayInstanceService(
         }
 
         var authority = await moderatorAuthority.AuthorizeAsync(session, selectedHost.Id, ct);
-        return authority.Match<AuthorizationDecision>(
+        var decision = authority.Match<AuthorizationDecision>(
             _ => new AuthorizationDecision.Granted(actor),
             _ =>
             {
@@ -647,6 +647,26 @@ public sealed class OverlayInstanceService(
                 );
             }
         );
+        return decision is AuthorizationDecision.Granted
+            ? await GrantIfParentEnabledAsync(actor, ct)
+            : decision;
+    }
+
+    private async Task<AuthorizationDecision> GrantIfParentEnabledAsync(
+        AuthorizedActor actor,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var enabled = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == actor.HostId)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(cancellationToken);
+        return
+            enabled is { } value && (value & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays
+            ? new AuthorizationDecision.Granted(actor)
+            : new AuthorizationDecision.Rejected(new OverlayInstanceRejection.FeatureDisabled());
     }
 
     private async Task<MutationTarget> LoadForMutationAsync(

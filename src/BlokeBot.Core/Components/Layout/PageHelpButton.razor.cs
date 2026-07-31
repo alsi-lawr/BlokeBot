@@ -286,6 +286,17 @@ public partial class PageHelpButton
                     "Turning both tools back on resumes from the stable current round without replaying suppressed updates or winner animations.",
                 ]
             ),
+            new(
+                "Reusable media and web cues",
+                "Create an enabled Cue player Browser Source, upload validated MP4 or MP3 media, then compose reusable Cue-V1 layers in the cue editor.",
+                [
+                    "Uploaded files remain in private channel storage. A cue cannot use another channel’s asset, and an in-use asset cannot be deleted.",
+                    "Remote HTTPS media loads directly in the Browser Source. BlokeBot does not fetch or proxy it, and private-network destinations are rejected unless the server owner opts in.",
+                    "External pages run in a restrictive iframe sandbox. A site may refuse framing; a bounded failure or timeout advances the queue without weakening the sandbox.",
+                    "Test playback uses the same Cue player target, queue policy, live transport, and media routes used by later triggers.",
+                    "Turning Overlays off blocks cue management, uploads, private media, playback, queues, and external loads. Saved cues and assets remain, but suppressed or queued runs never replay after re-enable or restart.",
+                ]
+            ),
         ]
     );
 
