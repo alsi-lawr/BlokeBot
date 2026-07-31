@@ -156,6 +156,9 @@ internal static class OverlayBrowserSourceEndpoints
                     return projection switch
                     {
                         OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
+                        OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
+                            guessing.Snapshot
+                        ),
                         _ => Unavailable(),
                     };
                 }
@@ -192,6 +195,14 @@ internal static class OverlayBrowserSourceEndpoints
                         StringComparison.Ordinal
                     );
                     var suffix = representative ? "?mode=representative" : string.Empty;
+                    if (
+                        representative
+                        && TryParseSample(context.Request.Query["sample"], out var sample)
+                    )
+                    {
+                        suffix =
+                            $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(sample))}";
+                    }
                     return Results.Text(
                         OverlayBrowserSourceDocument.Render(
                             context.Request.PathBase,
@@ -229,15 +240,32 @@ internal static class OverlayBrowserSourceEndpoints
                         return Unavailable();
                     }
 
-                    var projection = await ProjectSafelyAsync(
-                        stateProvider,
-                        resolved.Instance,
-                        context.RequestServices,
-                        cancellationToken
-                    );
+                    var projection =
+                        TryParseSample(context.Request.Query["sample"], out var sample)
+                        && string.Equals(
+                            context.Request.Query["mode"],
+                            "representative",
+                            StringComparison.Ordinal
+                        )
+                            ? await ProjectSampleSafelyAsync(
+                                stateProvider,
+                                resolved.Instance,
+                                sample,
+                                context.RequestServices,
+                                cancellationToken
+                            )
+                            : await ProjectSafelyAsync(
+                                stateProvider,
+                                resolved.Instance,
+                                context.RequestServices,
+                                cancellationToken
+                            );
                     return projection switch
                     {
                         OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
+                        OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
+                            guessing.Snapshot
+                        ),
                         _ => Unavailable(),
                     };
                 }
@@ -312,17 +340,30 @@ internal static class OverlayBrowserSourceEndpoints
             }
 
             var result = await overlays.GetAsync(session, overlayId, cancellationToken);
-            return result.Match<OverlayPreviewResolution>(
-                succeeded => new OverlayPreviewResolution.Resolved(
-                    new ResolvedOverlayInstance(
-                        selectedHost.Id,
-                        succeeded.Value.Id,
-                        succeeded.Value.Type,
-                        succeeded.Value.Configuration,
-                        succeeded.Value.Revision
-                    )
-                ),
-                _ => new OverlayPreviewResolution.Unavailable()
+            if (result is not OverlayInstanceResult<OverlayInstanceView>.Succeeded succeeded)
+            {
+                return new OverlayPreviewResolution.Unavailable();
+            }
+            if (
+                succeeded.Value.Type is OverlayType.Guessing
+                && !await features.IsEnabledAsync(
+                    selectedHost.Id,
+                    HostFeatureFlags.Guessing,
+                    cancellationToken
+                )
+            )
+            {
+                return new OverlayPreviewResolution.Unavailable();
+            }
+
+            return new OverlayPreviewResolution.Resolved(
+                new ResolvedOverlayInstance(
+                    selectedHost.Id,
+                    succeeded.Value.Id,
+                    succeeded.Value.Type,
+                    succeeded.Value.Configuration,
+                    succeeded.Value.Revision
+                )
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -409,6 +450,56 @@ internal static class OverlayBrowserSourceEndpoints
                 .LogWarning(exception, "An overlay Browser Source state could not be projected.");
             return new OverlaySnapshotProjection.Unavailable();
         }
+    }
+
+    private static async Task<OverlaySnapshotProjection> ProjectSampleSafelyAsync(
+        IOverlayStateProvider stateProvider,
+        ResolvedOverlayInstance instance,
+        GuessingOverlaySampleState sample,
+        IServiceProvider services,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            return await stateProvider.ProjectSampleAsync(instance, sample, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            services
+                .GetRequiredService<ILogger<OverlayBrowserSourceLog>>()
+                .LogWarning(exception, "An overlay preview sample could not be projected.");
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+    }
+
+    private static bool TryParseSample(string? value, out GuessingOverlaySampleState sample)
+    {
+        sample = value switch
+        {
+            "no-round" => GuessingOverlaySampleState.NoRound,
+            "open" => GuessingOverlaySampleState.Open,
+            "closed" => GuessingOverlaySampleState.Closed,
+            "completed" => GuessingOverlaySampleState.Completed,
+            _ => default,
+        };
+        return value is "no-round" or "open" or "closed" or "completed";
+    }
+
+    private static string SampleToken(GuessingOverlaySampleState sample)
+    {
+        return sample switch
+        {
+            GuessingOverlaySampleState.NoRound => "no-round",
+            GuessingOverlaySampleState.Open => "open",
+            GuessingOverlaySampleState.Closed => "closed",
+            GuessingOverlaySampleState.Completed => "completed",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
     }
 
     private static IResult Unavailable()
@@ -533,6 +624,8 @@ internal static class OverlayBrowserSourceEndpoints
                             message
                                 is OverlayLiveTransportMessage.Baseline
                                     or OverlayLiveTransportMessage.Event
+                                    or OverlayLiveTransportMessage.GuessingBaseline
+                                    or OverlayLiveTransportMessage.GuessingEvent
                             && !live.MaySend(connection)
                         )
                         {
@@ -544,6 +637,10 @@ internal static class OverlayBrowserSourceEndpoints
                             OverlayLiveTransportMessage.Baseline baseline =>
                                 JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.Event publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.GuessingBaseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.GuessingEvent publication =>
                                 JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
                             _ => string.Empty,
                         };

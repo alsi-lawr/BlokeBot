@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Eventing;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -10,7 +11,12 @@ internal sealed class OverlayLiveCoordinator(
     TimeProvider timeProvider,
     EventBus<AppEventKind> events,
     ILogger<OverlayLiveCoordinator> logger
-) : IHostedService, IOverlayLivePublisher, IOverlayLivePresence, IAsyncDisposable
+)
+    : IHostedService,
+        IOverlayLivePublisher,
+        IOverlayLivePresence,
+        IAsyncDisposable,
+        IGuessingChangeObserver
 {
     private const int _connectionQueueCapacity = 16;
     private readonly CancellationTokenSource _stopping = new();
@@ -19,6 +25,7 @@ internal sealed class OverlayLiveCoordinator(
     private readonly Dictionary<Guid, OverlayLiveConnection> _connections = [];
     private readonly Dictionary<OverlayIdentity, PresenceState> _presence = [];
     private readonly Dictionary<Guid, long> _sequences = [];
+    private readonly Dictionary<OverlayIdentity, GuessingOverlayPhase> _guessingPhases = [];
     private IDisposable? _overlayChangesSubscription;
     private long _generation;
     private int _disposeState;
@@ -29,7 +36,7 @@ internal sealed class OverlayLiveCoordinator(
     {
         cancellationToken.ThrowIfCancellationRequested();
         _overlayChangesSubscription = events.Subscribe(
-            AppEventKind.OverlaysChanged,
+            [AppEventKind.OverlaysChanged, AppEventKind.HostedChannelsChanged],
             ObserverIdentity.For(typeof(OverlayLiveCoordinator)),
             (_, _) =>
             {
@@ -69,6 +76,31 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
+    public ValueTask GuessingChangedAsync(int hostId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ResolvedOverlayInstance[] instances;
+        lock (_connectionsGate)
+        {
+            instances = _connections
+                .Values.Where(connection =>
+                    connection.IsActive
+                    && connection.Instance.HostId == hostId
+                    && connection.Instance.Type == BlokeBot.Persistence.Models.OverlayType.Guessing
+                )
+                .Select(connection => connection.Instance)
+                .DistinctBy(instance => instance.OverlayId)
+                .ToArray();
+        }
+
+        foreach (var instance in instances)
+        {
+            QueuePublication(instance, OverlayLivePublicationKind.State);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     internal async Task<OverlayLiveOpenResult> OpenAsync(
         ResolvedOverlayInstance instance,
         long resolvedGeneration,
@@ -76,7 +108,10 @@ internal sealed class OverlayLiveCoordinator(
     )
     {
         var projection = await stateProvider.ProjectAsync(instance, cancellationToken);
-        if (projection is not OverlaySnapshotProjection.EmptyV1)
+        if (
+            projection
+            is not (OverlaySnapshotProjection.EmptyV1 or OverlaySnapshotProjection.GuessingV1)
+        )
         {
             return new OverlayLiveOpenResult.Unavailable();
         }
@@ -90,20 +125,14 @@ internal sealed class OverlayLiveCoordinator(
 
             var connection = new OverlayLiveConnection(
                 Guid.NewGuid(),
-                new OverlayIdentity(instance.HostId, instance.OverlayId),
+                instance,
                 resolvedGeneration,
                 _connectionQueueCapacity
             );
             _connections.Add(connection.Id, connection);
             var presence = GetOrCreatePresence(connection.Identity);
             presence.Connected(timeProvider.GetUtcNow());
-            var baseline = new EmptyV1OverlayLiveBaselineEnvelope
-            {
-                ServerEpoch = serverEpoch.Value,
-                Sequence = CurrentSequence(instance.OverlayId),
-                OccurredAtUtc = timeProvider.GetUtcNow(),
-            };
-            connection.TryWrite(new OverlayLiveTransportMessage.Baseline(baseline));
+            connection.TryWrite(Baseline(instance, projection));
             return new OverlayLiveOpenResult.Opened(connection);
         }
     }
@@ -169,7 +198,10 @@ internal sealed class OverlayLiveCoordinator(
                 publication.Instance,
                 cancellationToken
             );
-            if (projection is not OverlaySnapshotProjection.EmptyV1)
+            if (
+                projection
+                is not (OverlaySnapshotProjection.EmptyV1 or OverlaySnapshotProjection.GuessingV1)
+            )
             {
                 logger.LogWarning(
                     "An overlay live publication had no supported projection for overlay {OverlayId}.",
@@ -178,7 +210,7 @@ internal sealed class OverlayLiveCoordinator(
                 return;
             }
 
-            PublishProjection(publication);
+            PublishProjection(publication, projection);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
@@ -202,7 +234,10 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    private void PublishProjection(OverlayPublication publication)
+    private void PublishProjection(
+        OverlayPublication publication,
+        OverlaySnapshotProjection projection
+    )
     {
         lock (_connectionsGate)
         {
@@ -224,14 +259,7 @@ internal sealed class OverlayLiveCoordinator(
 
             var nextSequence = CurrentSequence(publication.Instance.OverlayId) + 1;
             _sequences[publication.Instance.OverlayId] = nextSequence;
-            var envelope = new EmptyV1OverlayLiveEnvelope
-            {
-                ServerEpoch = serverEpoch.Value,
-                Sequence = nextSequence,
-                Kind = publication.Kind,
-                OccurredAtUtc = timeProvider.GetUtcNow(),
-            };
-            var message = new OverlayLiveTransportMessage.Event(envelope);
+            var message = Event(publication, projection, identity, nextSequence);
             foreach (var connection in targets)
             {
                 if (!connection.TryWrite(message))
@@ -249,6 +277,142 @@ internal sealed class OverlayLiveCoordinator(
                 }
             }
         }
+    }
+
+    private OverlayLiveTransportMessage Baseline(
+        ResolvedOverlayInstance instance,
+        OverlaySnapshotProjection projection
+    )
+    {
+        var sequence = CurrentSequence(instance.OverlayId);
+        var occurredAtUtc = timeProvider.GetUtcNow();
+        return projection switch
+        {
+            OverlaySnapshotProjection.EmptyV1 => new OverlayLiveTransportMessage.Baseline(
+                new EmptyV1OverlayLiveBaselineEnvelope
+                {
+                    ServerEpoch = serverEpoch.Value,
+                    Sequence = sequence,
+                    OccurredAtUtc = occurredAtUtc,
+                }
+            ),
+            OverlaySnapshotProjection.GuessingV1 guessing => GuessingBaseline(
+                instance,
+                guessing.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
+            _ => throw new InvalidOperationException(
+                "A supported projection is required to open a live overlay."
+            ),
+        };
+    }
+
+    private OverlayLiveTransportMessage GuessingBaseline(
+        ResolvedOverlayInstance instance,
+        GuessingV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        _guessingPhases[new OverlayIdentity(instance.HostId, instance.OverlayId)] = snapshot
+            .State
+            .Phase;
+        return new OverlayLiveTransportMessage.GuessingBaseline(
+            new GuessingV1OverlayLiveBaselineEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                OccurredAtUtc = occurredAtUtc,
+                Payload = GuessingPayload(snapshot, "none"),
+            }
+        );
+    }
+
+    private OverlayLiveTransportMessage Event(
+        OverlayPublication publication,
+        OverlaySnapshotProjection projection,
+        OverlayIdentity identity,
+        long sequence
+    )
+    {
+        var occurredAtUtc = timeProvider.GetUtcNow();
+        return projection switch
+        {
+            OverlaySnapshotProjection.EmptyV1 => new OverlayLiveTransportMessage.Event(
+                new EmptyV1OverlayLiveEnvelope
+                {
+                    ServerEpoch = serverEpoch.Value,
+                    Sequence = sequence,
+                    Kind = publication.Kind,
+                    OccurredAtUtc = occurredAtUtc,
+                }
+            ),
+            OverlaySnapshotProjection.GuessingV1 guessing => GuessingEvent(
+                publication.Kind,
+                identity,
+                guessing.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
+            _ => throw new InvalidOperationException(
+                "A supported projection is required for live publication."
+            ),
+        };
+    }
+
+    private OverlayLiveTransportMessage GuessingEvent(
+        OverlayLivePublicationKind kind,
+        OverlayIdentity identity,
+        GuessingV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        var animation =
+            kind is OverlayLivePublicationKind.Test
+                ? "none"
+                : AnimationFor(_guessingPhases.GetValueOrDefault(identity), snapshot.State.Phase);
+        _guessingPhases[identity] = snapshot.State.Phase;
+        return new OverlayLiveTransportMessage.GuessingEvent(
+            new GuessingV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                Kind = kind,
+                OccurredAtUtc = occurredAtUtc,
+                Payload = GuessingPayload(snapshot, animation),
+            }
+        );
+    }
+
+    private static GuessingV1OverlayLivePayload GuessingPayload(
+        GuessingV1OverlaySnapshot snapshot,
+        string animation
+    )
+    {
+        return new GuessingV1OverlayLivePayload
+        {
+            ResultDurationMilliseconds = snapshot.ResultDurationMilliseconds,
+            Animation = animation,
+            State = snapshot.State,
+        };
+    }
+
+    private static string AnimationFor(GuessingOverlayPhase previous, GuessingOverlayPhase current)
+    {
+        if (
+            current is GuessingOverlayPhase.Completed
+            && previous is not GuessingOverlayPhase.Completed
+        )
+        {
+            return "result";
+        }
+        if (current is GuessingOverlayPhase.Open && previous is GuessingOverlayPhase.NoRound)
+        {
+            return "entrance";
+        }
+        return current == previous ? "none" : "statusChange";
     }
 
     private void InvalidateAllConnections()
@@ -271,6 +435,7 @@ internal sealed class OverlayLiveCoordinator(
                     }
                 );
             }
+            _guessingPhases.Clear();
         }
     }
 
@@ -416,13 +581,14 @@ internal sealed class OverlayLiveCoordinator(
 
         internal OverlayLiveConnection(
             Guid id,
-            OverlayIdentity identity,
+            ResolvedOverlayInstance instance,
             long generation,
             int queueCapacity
         )
         {
             Id = id;
-            Identity = identity;
+            Instance = instance;
+            Identity = new OverlayIdentity(instance.HostId, instance.OverlayId);
             Generation = generation;
             _messages = Channel.CreateBounded<OverlayLiveTransportMessage>(
                 new BoundedChannelOptions(queueCapacity)
@@ -437,6 +603,8 @@ internal sealed class OverlayLiveCoordinator(
         internal Guid Id { get; }
 
         internal OverlayIdentity Identity { get; }
+
+        internal ResolvedOverlayInstance Instance { get; }
 
         internal long Generation { get; }
 
@@ -500,6 +668,12 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record Event(EmptyV1OverlayLiveEnvelope Envelope) : OverlayLiveTransportMessage;
+
+    internal sealed record GuessingBaseline(GuessingV1OverlayLiveBaselineEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record GuessingEvent(GuessingV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
 }
 
 internal sealed record OverlayIdentity(int HostId, Guid OverlayId);

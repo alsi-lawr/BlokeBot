@@ -36,6 +36,27 @@ public sealed class OverlayInstanceServiceTests
         OverlayConfiguration
             .Parse((OverlayType)999, """{"schemaVersion":1}""")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
+        var guessing = OverlayConfiguration
+            .Parse(
+                OverlayType.Guessing,
+                """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}"""
+            )
+            .ShouldBeOfType<OverlayConfigurationParseResult.Valid>()
+            .Value.ShouldBeOfType<OverlayConfiguration.GuessingV1>();
+        guessing.ShowGuessCount.ShouldBeTrue();
+        guessing.ResultDurationSeconds.ShouldBe(8);
+        OverlayConfiguration
+            .Parse(
+                OverlayType.Guessing,
+                """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":31}"""
+            )
+            .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
+        OverlayConfiguration
+            .Parse(
+                OverlayType.Guessing,
+                """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8,"extra":1}"""
+            )
+            .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
     }
 
     [Test]
@@ -415,6 +436,74 @@ public sealed class OverlayInstanceServiceTests
         }
     }
 
+    [Test]
+    public async Task GuessingParents_BlockCreationMutationAndResolutionWhileRetainingSetup()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(AuthRole.Streamer, fixture.HostId);
+        var command = new CreateOverlayInstanceCommand(
+            "Guessing",
+            OverlayType.Guessing,
+            new OverlayConfiguration.GuessingV1(true, 9)
+        );
+        var created = (
+            await fixture.Service.CreateAsync(session, command, CancellationToken.None)
+        ).SucceededValue();
+
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays);
+
+        (
+            await fixture.Resolver.ResolveAsync(
+                created.PrivateAccess.AccessKey,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
+        (
+            await fixture.Service.RenameAsync(
+                session,
+                new(created.Instance.Id, created.Instance.Revision, "Suppressed rename"),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
+            .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+        (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
+            .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
+            .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Guessing);
+        (
+            await fixture.Service.ConfigureAsync(
+                session,
+                new(
+                    created.Instance.Id,
+                    created.Instance.Revision,
+                    new OverlayConfiguration.GuessingV1(false, 5)
+                ),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
+            .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays | HostFeatureFlags.Guessing);
+        var restored = (
+            await fixture.Service.GetAsync(session, created.Instance.Id, CancellationToken.None)
+        ).SucceededValue();
+        restored.Name.ShouldBe("Guessing");
+        restored.Revision.ShouldBe(created.Instance.Revision);
+        restored.Configuration.ShouldBe(new OverlayConfiguration.GuessingV1(true, 9));
+        (
+            await fixture.Resolver.ResolveAsync(
+                created.PrivateAccess.AccessKey,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayResolutionResult.Resolved>();
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        (await db.OverlayInstances.CountAsync()).ShouldBe(1);
+        (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(1);
+    }
+
     private static CreateOverlayInstanceCommand Create(string name)
     {
         return new(name, OverlayType.Empty, new OverlayConfiguration.EmptyV1());
@@ -461,6 +550,16 @@ public sealed class OverlayInstanceServiceTests
         internal OverlayInstanceService Service { get; }
         internal OverlayInstanceResolver Resolver { get; }
 
+        internal async Task SetFeaturesAsync(HostFeatureFlags features)
+        {
+            await using var db = await Database.CreateDbContextAsync();
+            await db
+                .Hosts.Where(host => host.Id == HostId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(host => host.EnabledFeatures, features)
+                );
+        }
+
         internal static async Task<Fixture> CreateAsync()
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -504,6 +603,7 @@ public sealed class OverlayInstanceServiceTests
                 TwitchUserId = $"{login}-id",
                 Login = login,
                 DisplayName = login,
+                EnabledFeatures = HostFeatureFlags.All,
                 CreatedAtUtc = DateTime.UtcNow,
             };
         }

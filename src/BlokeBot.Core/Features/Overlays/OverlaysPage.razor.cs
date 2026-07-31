@@ -12,10 +12,16 @@ public partial class OverlaysPage
     private OverlayInstanceView? _selected;
     private Guid? _selectedId;
     private string _draftName = "Main stream overlay";
+    private OverlayType _draftType = OverlayType.Guessing;
+    private bool _draftShowGuessCount = true;
+    private int _draftResultDurationSeconds = OverlayConfiguration
+        .GuessingV1
+        .DefaultResultDurationSeconds;
     private string? _revealedBrowserSourceUrl;
     private string _feedback = string.Empty;
     private bool _operationFailed;
     private bool _featureEnabled;
+    private bool _guessingFeatureEnabled;
     private bool _isCreating = true;
     private bool _isLoading = true;
     private bool _isBusy;
@@ -36,9 +42,21 @@ public partial class OverlaysPage
                 _previewMode is OverlayPreviewMode.Representative
                     ? "?mode=representative"
                     : string.Empty;
+            if (
+                _previewMode is OverlayPreviewMode.Representative
+                && _selected.Type is OverlayType.Guessing
+            )
+            {
+                mode = $"?mode=representative&sample={SampleToken(_previewSample)}";
+            }
             return $"/overlays/preview/{_selected.Id:D}{mode}";
         }
     }
+
+    private bool _selectedFeatureEnabled =>
+        _selected?.Type is not OverlayType.Guessing || _guessingFeatureEnabled;
+
+    private GuessingOverlaySampleState _previewSample = GuessingOverlaySampleState.Open;
 
     private string _presenceLabel
     {
@@ -108,6 +126,11 @@ public partial class OverlaysPage
             {
                 return;
             }
+            _guessingFeatureEnabled = await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Guessing,
+                CancellationToken.None
+            );
 
             var result = await _overlays.ListAsync(PageContext.Session, CancellationToken.None);
             result.Match(
@@ -157,6 +180,9 @@ public partial class OverlaysPage
         _selected = null;
         _selectedId = null;
         _draftName = "Main stream overlay";
+        _draftType = _guessingFeatureEnabled ? OverlayType.Guessing : OverlayType.Empty;
+        _draftShowGuessCount = true;
+        _draftResultDurationSeconds = OverlayConfiguration.GuessingV1.DefaultResultDurationSeconds;
         _revealedBrowserSourceUrl = null;
         if (setFeedback)
         {
@@ -176,6 +202,12 @@ public partial class OverlaysPage
         _selected = overlay;
         _selectedId = overlay.Id;
         _draftName = overlay.Name;
+        _draftType = overlay.Type;
+        if (overlay.Configuration is OverlayConfiguration.GuessingV1 guessing)
+        {
+            _draftShowGuessCount = guessing.ShowGuessCount;
+            _draftResultDurationSeconds = guessing.ResultDurationSeconds;
+        }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
         _previewKey++;
@@ -194,11 +226,7 @@ public partial class OverlaysPage
             {
                 var creationResult = await _overlays.CreateAsync(
                     PageContext.Session,
-                    new CreateOverlayInstanceCommand(
-                        _draftName,
-                        OverlayType.Empty,
-                        new OverlayConfiguration.EmptyV1()
-                    ),
+                    new CreateOverlayInstanceCommand(_draftName, _draftType, DraftConfiguration()),
                     CancellationToken.None
                 );
                 await creationResult.Match(
@@ -224,23 +252,52 @@ public partial class OverlaysPage
                 return;
             }
 
-            var result = await _overlays.RenameAsync(
-                PageContext.Session,
-                new RenameOverlayInstanceCommand(_selected.Id, _selected.Revision, _draftName),
-                CancellationToken.None
-            );
-            await result.Match(
-                async succeeded =>
-                {
-                    SetSuccess("Overlay saved.");
-                    await LoadAsync(succeeded.Value.Id);
-                },
-                rejected =>
+            if (!_selectedFeatureEnabled)
+            {
+                SetFailure(
+                    "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it."
+                );
+                return;
+            }
+
+            var current = _selected;
+            if (!string.Equals(current.Name, _draftName.Trim(), StringComparison.Ordinal))
+            {
+                var renamed = await _overlays.RenameAsync(
+                    PageContext.Session,
+                    new RenameOverlayInstanceCommand(current.Id, current.Revision, _draftName),
+                    CancellationToken.None
+                );
+                if (renamed is OverlayInstanceResult<OverlayInstanceView>.Rejected rejected)
                 {
                     SetFailure(rejected.Reason.Message);
-                    return Task.CompletedTask;
+                    return;
                 }
-            );
+                current = ((OverlayInstanceResult<OverlayInstanceView>.Succeeded)renamed).Value;
+            }
+
+            var configuration = DraftConfiguration();
+            if (configuration != current.Configuration)
+            {
+                var configured = await _overlays.ConfigureAsync(
+                    PageContext.Session,
+                    new ConfigureOverlayInstanceCommand(
+                        current.Id,
+                        current.Revision,
+                        configuration
+                    ),
+                    CancellationToken.None
+                );
+                if (configured is OverlayInstanceResult<OverlayInstanceView>.Rejected rejected)
+                {
+                    SetFailure(rejected.Reason.Message);
+                    return;
+                }
+                current = ((OverlayInstanceResult<OverlayInstanceView>.Succeeded)configured).Value;
+            }
+
+            SetSuccess("Overlay saved.");
+            await LoadAsync(current.Id);
         });
     }
 
@@ -395,7 +452,7 @@ public partial class OverlaysPage
     {
         return RunOperationAsync(async () =>
         {
-            if (_selected is null)
+            if (_selected is null || !_selectedFeatureEnabled)
             {
                 return;
             }
@@ -511,8 +568,29 @@ public partial class OverlaysPage
         SetSuccess(
             mode is OverlayPreviewMode.Live
                 ? "Live preview selected."
-                : "Representative Empty V1 state selected. This mode does not open a live connection."
+                : "Representative sample selected. This mode does not open a live connection."
         );
+    }
+
+    private void SetPreviewSample(GuessingOverlaySampleState sample)
+    {
+        _previewSample = sample;
+        _previewMode = OverlayPreviewMode.Representative;
+        _previewKey++;
+        SetSuccess($"{SampleLabel(sample)} sample selected.");
+    }
+
+    private OverlayConfiguration DraftConfiguration()
+    {
+        return _draftType switch
+        {
+            OverlayType.Empty => new OverlayConfiguration.EmptyV1(),
+            OverlayType.Guessing => new OverlayConfiguration.GuessingV1(
+                _draftShowGuessCount,
+                _draftResultDurationSeconds
+            ),
+            _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
+        };
     }
 
     private string AbsoluteUrl(string relativeUrl)
@@ -540,6 +618,40 @@ public partial class OverlaysPage
     private static string UpdatedLabel(OverlayInstanceView overlay)
     {
         return $"updated {overlay.UpdatedAtUtc:yyyy-MM-dd HH:mm} UTC";
+    }
+
+    private static string TypeLabel(OverlayType type)
+    {
+        return type switch
+        {
+            OverlayType.Empty => "Empty",
+            OverlayType.Guessing => "Guessing",
+            _ => "Unsupported",
+        };
+    }
+
+    private static string SampleLabel(GuessingOverlaySampleState sample)
+    {
+        return sample switch
+        {
+            GuessingOverlaySampleState.NoRound => "No round",
+            GuessingOverlaySampleState.Open => "Open",
+            GuessingOverlaySampleState.Closed => "Closed",
+            GuessingOverlaySampleState.Completed => "Result",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+    }
+
+    private static string SampleToken(GuessingOverlaySampleState sample)
+    {
+        return sample switch
+        {
+            GuessingOverlaySampleState.NoRound => "no-round",
+            GuessingOverlaySampleState.Open => "open",
+            GuessingOverlaySampleState.Closed => "closed",
+            GuessingOverlaySampleState.Completed => "completed",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
     }
 
     private string InventoryPresenceLabel(OverlayInstanceView overlay)

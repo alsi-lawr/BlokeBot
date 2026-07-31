@@ -272,9 +272,18 @@ public partial class PageHelpButton
                 "Preview and test",
                 "Live preview uses the same renderer as OBS without putting the private URL in this page.",
                 [
-                    "Representative mode shows the supported Empty overlay state without connecting to live updates.",
+                    "Guessing overlays show open, closed, and completed rounds from the existing Guessing game. Sample buttons preview each supported state without changing a round.",
+                    "Guess count display and winner-result duration are saved per guessing overlay.",
                     "Connection status is approximate diagnostic information, not proof that an OBS scene is visible.",
                     "Send test pulse publishes temporary presentation data only to the selected overlay.",
+                ]
+            ),
+            new(
+                "Guessing overlay availability",
+                "Guessing overlays require both Overlays and Guessing game to be on in Channel setup.",
+                [
+                    "Turning either tool off blocks preview, Browser Source data, live delivery, and changes while retaining saved overlay setup and round history.",
+                    "Turning both tools back on resumes from the stable current round without replaying suppressed updates or winner animations.",
                 ]
             ),
         ]

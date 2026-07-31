@@ -1,3 +1,4 @@
+using AngleSharp.Html.Dom;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components.Layout;
@@ -162,6 +163,142 @@ public sealed class OverlayDashboardUiTests
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("setInterval");
     }
 
+    [Test]
+    public async Task GuessingEditor_OffersEverySampleAndRecoversWhenParentIsOff()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedGuessingAsync(database);
+        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
+        {
+            context.Services.AddSingleton<IModeratorAuthorityService>(
+                new GrantedModeratorAuthority()
+            );
+            context.Services.AddBlokeBotOverlays();
+
+            var page = context.Render<OverlaysPage>();
+
+            page.WaitForAssertion(() =>
+            {
+                page.Find("iframe")
+                    .GetAttribute("src")
+                    .ShouldBe($"/overlays/preview/{seed.OverlayId:D}");
+                page.FindAll("[aria-label='Guessing overlay sample state'] button")
+                    .Select(button => button.TextContent.Trim())
+                    .ShouldBe(["No round", "Open", "Closed", "Result"]);
+                page.Markup.ShouldContain("Show the number of guesses");
+                page.Markup.ShouldContain("Result animation duration");
+            });
+
+            page.FindAll("[aria-label='Guessing overlay sample state'] button")
+                .Single(button => button.TextContent.Trim() == "Result")
+                .Click();
+            page.WaitForAssertion(() =>
+                page.Find("iframe")
+                    .GetAttribute("src")
+                    .ShouldBe(
+                        $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample=completed"
+                    )
+            );
+        }
+
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            await db
+                .Hosts.Where(host => host.Id == seed.HostId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
+                );
+        }
+        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
+        {
+            context.Services.AddSingleton<IModeratorAuthorityService>(
+                new GrantedModeratorAuthority()
+            );
+            context.Services.AddBlokeBotOverlays();
+
+            var page = context.Render<OverlaysPage>();
+
+            page.WaitForAssertion(() =>
+            {
+                var type = (IHtmlSelectElement)page.Find("#overlay-type");
+                type.Value.ShouldBe(OverlayType.Guessing.ToString());
+                type.TextContent.ShouldContain("Guessing round");
+                type.IsDisabled.ShouldBeTrue();
+                page.Find("[data-overlay-disabled-recovery]")
+                    .TextContent.ShouldContain("Turn Guessing game on in Channel setup");
+                page.FindAll("iframe").ShouldBeEmpty();
+                page.FindAll("button")
+                    .Single(button => button.TextContent.Trim() == "Save overlay")
+                    .HasAttribute("disabled")
+                    .ShouldBeTrue();
+            });
+        }
+    }
+
+    [Test]
+    public async Task GuessingPreviewControls_RenderExplicitPressedValuesAcrossSelectionChanges()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedGuessingAsync(database);
+        await using var context = UiTestContextFactory.Create(database, seed.HostId);
+        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
+        context.Services.AddBlokeBotOverlays();
+
+        var page = context.Render<OverlaysPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            PressedValue(page, "Preview state", "Live").ShouldBe("true");
+            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
+            page.FindAll("[aria-label='Guessing overlay sample state'] button")
+                .Select(button => button.GetAttribute("aria-pressed"))
+                .ShouldAllBe(value => value == "false");
+        });
+
+        FindButton(page, "Guessing overlay sample state", "Result").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            PressedValue(page, "Preview state", "Live").ShouldBe("false");
+            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
+            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
+            page.FindAll("[aria-label='Guessing overlay sample state'] button")
+                .Where(button => button.TextContent.Trim() != "Result")
+                .Select(button => button.GetAttribute("aria-pressed"))
+                .ShouldAllBe(value => value == "false");
+        });
+
+        FindButton(page, "Preview state", "Live").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            PressedValue(page, "Preview state", "Live").ShouldBe("true");
+            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
+            page.FindAll("[aria-label='Guessing overlay sample state'] button")
+                .Select(button => button.GetAttribute("aria-pressed"))
+                .ShouldAllBe(value => value == "false");
+        });
+    }
+
+    private static string? PressedValue(
+        IRenderedComponent<OverlaysPage> page,
+        string groupLabel,
+        string buttonLabel
+    )
+    {
+        return FindButton(page, groupLabel, buttonLabel).GetAttribute("aria-pressed");
+    }
+
+    private static AngleSharp.Dom.IElement FindButton(
+        IRenderedComponent<OverlaysPage> page,
+        string groupLabel,
+        string buttonLabel
+    )
+    {
+        return page.FindAll($"[aria-label='{groupLabel}'] button")
+            .Single(button => button.TextContent.Trim() == buttonLabel);
+    }
+
     private static string SourcePath(string fileName)
     {
         return Path.GetFullPath(
@@ -203,6 +340,40 @@ public sealed class OverlayDashboardUiTests
             Type = OverlayType.Empty,
             IsEnabled = true,
             ConfigurationJson = """{"schemaVersion":1}""",
+            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
+            KeyVersion = 1,
+            Revision = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        db.OverlayInstances.Add(overlay);
+        await db.SaveChangesAsync();
+        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
+    }
+
+    private static async Task<OverlaySeed> SeedGuessingAsync(SqliteBlokeBotDbFactory database)
+    {
+        const string PrivateAccessKey = "guessing-component-test-key-00000000000000";
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            TwitchUserId = "guessing-streamer-id",
+            Login = "guessing-streamer",
+            DisplayName = "Guessing Streamer",
+            EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Guessing,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        var overlay = new OverlayInstance
+        {
+            PublicId = Guid.Parse("93a5d74f-470e-4df3-920c-3f4932425a0d"),
+            HostId = host.Id,
+            Name = "Guessing round",
+            Type = OverlayType.Guessing,
+            IsEnabled = true,
+            ConfigurationJson =
+                """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
             KeyVersion = 1,
             Revision = 1,

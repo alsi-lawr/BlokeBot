@@ -78,10 +78,11 @@ internal sealed class SimulationFixtureSeeder(
             {
                 PublicId = Guid.Parse("82bd3021-fc60-47fc-8fa7-ed828083e70a"),
                 HostId = hostId,
-                Name = "Transparent browser source",
-                Type = OverlayType.Empty,
+                Name = "Guessing round",
+                Type = OverlayType.Guessing,
                 IsEnabled = true,
-                ConfigurationJson = """{"schemaVersion":1}""",
+                ConfigurationJson =
+                    """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(OverlayAccessKey),
                 KeyVersion = 1,
                 Revision = 1,

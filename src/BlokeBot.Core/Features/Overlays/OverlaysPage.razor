@@ -20,7 +20,7 @@
     <Actions>
         <button class="btn-primary"
                 type="button"
-                disabled="@(!_featureEnabled || _isBusy)"
+                disabled="@(!_featureEnabled || !_selectedFeatureEnabled || _isBusy)"
                 @onclick="SaveAsync">@(_isCreating ? "Create overlay" : "Save overlay")</button>
     </Actions>
 
@@ -41,7 +41,8 @@
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Overlays are off for this channel. Turn them on in Channel setup.
+                    Overlays are off for this channel.
+                    <a class="font-semibold text-blue-700 underline" href="host">Turn them on in Channel setup.</a>
                 </div>
             </ApplicationCardCollection>
         }
@@ -89,7 +90,7 @@
                                     @onclick="() => SelectOverlay(overlay)">
                                 <span class="block truncate text-sm font-semibold text-slate-950">@overlay.Name</span>
                                 <span class="mt-1 block text-xs text-muted-foreground">
-                                    Empty · @(overlay.IsEnabled ? "Enabled" : "Disabled") · @UpdatedLabel(overlay) · @InventoryPresenceLabel(overlay)
+                                    @TypeLabel(overlay.Type) · @(overlay.IsEnabled ? "Enabled" : "Disabled") · @UpdatedLabel(overlay) · @InventoryPresenceLabel(overlay)
                                 </span>
                             </button>
                         }
@@ -125,17 +126,63 @@
                                    Placeholder="Main stream overlay" />
                             <div class="space-y-2">
                                 <label class="label" for="overlay-type">Overlay type</label>
-                                <select id="overlay-type" class="input" disabled>
-                                    <option>Empty</option>
+                                <select id="overlay-type"
+                                        class="input"
+                                        disabled="@(!_isCreating)"
+                                        @bind="_draftType">
+                                    <option value="@OverlayType.Empty">Empty</option>
+                                    @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
+                                    {
+                                        <option value="@OverlayType.Guessing">Guessing round</option>
+                                    }
                                 </select>
                             </div>
                         </div>
 
                         <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                             <h3 class="text-sm font-semibold text-slate-950">Visual configuration</h3>
-                            <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                                Empty V1 is the only supported overlay type. It has no visual fields or custom CSS or JavaScript.
-                            </p>
+                            @if (_draftType is OverlayType.Guessing)
+                            {
+                                @if (!_guessingFeatureEnabled)
+                                {
+                                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4"
+                                         data-overlay-disabled-recovery>
+                                        <p class="text-sm font-semibold text-slate-950">This guessing overlay is paused.</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-700">
+                                            Guessing game is off. Its saved setup is retained, but preview, live delivery, tests, and changes remain blocked.
+                                            <a class="font-semibold text-blue-700 underline" href="host">Turn Guessing game on in Channel setup</a>
+                                            to resume from the current round without replaying suppressed events or winner animations.
+                                        </p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                                        <label class="control-surface flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-950">
+                                            <input type="checkbox" @bind="_draftShowGuessCount" />
+                                            Show the number of guesses
+                                        </label>
+                                        <div class="space-y-2">
+                                            <label class="label" for="overlay-result-duration">Result animation duration (seconds)</label>
+                                            <input id="overlay-result-duration"
+                                                   class="input"
+                                                   type="number"
+                                                   min="@OverlayConfiguration.GuessingV1.MinimumResultDurationSeconds"
+                                                   max="@OverlayConfiguration.GuessingV1.MaximumResultDurationSeconds"
+                                                   @bind="_draftResultDurationSeconds" />
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                                        Round names, status, answers, winners, and awarded points come from the existing Guessing game. Custom HTML is not supported.
+                                    </p>
+                                }
+                            }
+                            else
+                            {
+                                <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                                    Empty V1 has no visual fields or custom CSS or JavaScript.
+                                </p>
+                            }
                         </div>
 
                         @if (_revealedBrowserSourceUrl is not null)
@@ -166,23 +213,23 @@
                             <div class="mt-5 flex flex-wrap gap-2">
                                 <button class="btn-secondary"
                                         type="button"
-                                        disabled="@_isBusy"
+                                        disabled="@(_isBusy || !_selectedFeatureEnabled)"
                                         @onclick="ToggleAvailabilityAsync">
                                     @(_selected.IsEnabled ? "Disable" : "Enable")
                                 </button>
                                 <button class="btn-secondary"
                                         type="button"
-                                        disabled="@_isBusy"
+                                        disabled="@(_isBusy || !_selectedFeatureEnabled)"
                                         @onclick="RotateUrlAsync">Rotate private URL</button>
                                 <button class="btn-secondary"
                                         type="button"
-                                        disabled="@_isBusy"
+                                        disabled="@(_isBusy || !_selectedFeatureEnabled)"
                                         @onclick="DeleteAsync">Delete</button>
                             </div>
                         }
                     </section>
 
-                    @if (_selected is not null)
+                    @if (_selected is not null && _selectedFeatureEnabled)
                     {
                         <section class="card p-5" aria-labelledby="overlay-preview-title">
                             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -198,14 +245,29 @@
                                     <span class="segmented-motion__indicator" aria-hidden="true"></span>
                                     <button class="@PreviewButtonClass(OverlayPreviewMode.Live)"
                                             type="button"
-                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Live)"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Live ? "true" : "false")"
                                             @onclick="() => SetPreviewMode(OverlayPreviewMode.Live)">Live</button>
                                     <button class="@PreviewButtonClass(OverlayPreviewMode.Representative)"
                                             type="button"
-                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Representative)"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Representative ? "true" : "false")"
                                             @onclick="() => SetPreviewMode(OverlayPreviewMode.Representative)">Representative</button>
                                 </div>
                             </div>
+
+                            @if (_selected.Type is OverlayType.Guessing)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2"
+                                     role="group"
+                                     aria-label="Guessing overlay sample state">
+                                    @foreach (var sample in Enum.GetValues<GuessingOverlaySampleState>())
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "btn-primary" : "btn-secondary")"
+                                                type="button"
+                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "true" : "false")"
+                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
+                                    }
+                                </div>
+                            }
 
                             <div class="mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]">
                                 <iframe @key="_previewKey"

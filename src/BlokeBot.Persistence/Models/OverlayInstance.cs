@@ -4,6 +4,9 @@ public enum OverlayType
 {
     [PersistedToken("empty")]
     Empty,
+
+    [PersistedToken("guessing")]
+    Guessing,
 }
 
 public enum OverlayInstanceEventKind

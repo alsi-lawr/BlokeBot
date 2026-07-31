@@ -96,6 +96,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IOverlayLivePresence>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
+        services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
         services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );

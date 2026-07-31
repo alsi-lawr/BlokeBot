@@ -1,4 +1,5 @@
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -17,14 +18,25 @@ public sealed class OverlayInstanceResolver(IDbContextFactory<BlokeBotDbContext>
 
         var digest = OverlayAccessKeyDigest.Compute(accessKey);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var overlay = await db
+        var resolved = await db
             .OverlayInstances.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.IsEnabled && value.AccessKeyDigest == digest, ct);
-        if (overlay is null)
+            .Where(value => value.IsEnabled && value.AccessKeyDigest == digest)
+            .Join(
+                db.Hosts.AsNoTracking(),
+                overlay => overlay.HostId,
+                host => host.Id,
+                (overlay, host) => new { Overlay = overlay, host.EnabledFeatures }
+            )
+            .SingleOrDefaultAsync(ct);
+        if (
+            resolved is null
+            || !RequiredFeaturesEnabled(resolved.Overlay.Type, resolved.EnabledFeatures)
+        )
         {
             return new OverlayResolutionResult.NotFound();
         }
 
+        var overlay = resolved.Overlay;
         return new OverlayResolutionResult.Resolved(
             new ResolvedOverlayInstance(
                 overlay.HostId,
@@ -34,5 +46,14 @@ public sealed class OverlayInstanceResolver(IDbContextFactory<BlokeBotDbContext>
                 new OverlayRevision(overlay.Revision)
             )
         );
+    }
+
+    private static bool RequiredFeaturesEnabled(OverlayType type, HostFeatureFlags enabledFeatures)
+    {
+        var required =
+            type is OverlayType.Guessing
+                ? HostFeatureFlags.Overlays | HostFeatureFlags.Guessing
+                : HostFeatureFlags.Overlays;
+        return (enabledFeatures & required) == required;
     }
 }

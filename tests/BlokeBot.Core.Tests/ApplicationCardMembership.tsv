@@ -39,11 +39,11 @@ card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|84|included|
 card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|31|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|37|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|43|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|53|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|61|included|overlay-workspace-columns
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|100|included|overlay-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|187|included|overlay-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|233|included|overlay-editor-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|54|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|62|included|overlay-workspace-columns
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|101|included|overlay-editor-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|234|included|overlay-editor-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|295|included|overlay-editor-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|30|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|36|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|44|included|play-queue-workspace-columns
