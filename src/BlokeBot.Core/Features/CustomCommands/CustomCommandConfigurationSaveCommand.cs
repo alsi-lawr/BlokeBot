@@ -56,12 +56,17 @@ public abstract record CustomCommandActionValue
 
     public abstract CustomCommandReplyRoutes ReplyRoutes { get; }
 
-    public TResult Match<TResult>(Func<Message, TResult> message, Func<Counter, TResult> counter)
+    public TResult Match<TResult>(
+        Func<Message, TResult> message,
+        Func<Counter, TResult> counter,
+        Func<OverlayCue, TResult> overlayCue
+    )
     {
         return this switch
         {
             Message value => message(value),
             Counter value => counter(value),
+            OverlayCue value => overlayCue(value),
             _ => throw new UnreachableException("Unknown custom command action value."),
         };
     }
@@ -73,6 +78,17 @@ public abstract record CustomCommandActionValue
 
     public sealed record Counter(CustomCommandReplyRoutes Routes, int CounterId)
         : CustomCommandActionValue
+    {
+        public override CustomCommandReplyRoutes ReplyRoutes => Routes;
+    }
+
+    public sealed record OverlayCue(
+        CustomCommandReplyRoutes Routes,
+        Guid TargetOverlayPublicId,
+        Guid CuePublicId,
+        OverlayCueQueuePolicy QueuePolicy,
+        OverlayCueReplyOrder ReplyOrder
+    ) : CustomCommandActionValue
     {
         public override CustomCommandReplyRoutes ReplyRoutes => Routes;
     }
@@ -202,7 +218,8 @@ public abstract record CustomCommandConfigurationSaveFailure
     public TResult Match<TResult>(
         Func<BuiltInAliasCollision, TResult> builtInAliasCollision,
         Func<CustomAliasCollision, TResult> customAliasCollision,
-        Func<StaleEntity, TResult> staleEntity
+        Func<StaleEntity, TResult> staleEntity,
+        Func<OverlayCueReference, TResult> overlayCueReference
     )
     {
         return this switch
@@ -210,6 +227,7 @@ public abstract record CustomCommandConfigurationSaveFailure
             BuiltInAliasCollision value => builtInAliasCollision(value),
             CustomAliasCollision value => customAliasCollision(value),
             StaleEntity value => staleEntity(value),
+            OverlayCueReference value => overlayCueReference(value),
             _ => throw new UnreachableException("Unknown custom command save failure."),
         };
     }
@@ -228,5 +246,14 @@ public abstract record CustomCommandConfigurationSaveFailure
     {
         public override string Message =>
             $"A {EntityName} you edited is no longer available. Reload the page and try again.";
+    }
+
+    public sealed record OverlayCueReference(
+        int CommandId,
+        CustomCommandValidationFieldKind Field,
+        string Detail
+    ) : CustomCommandConfigurationSaveFailure
+    {
+        public override string Message => Detail;
     }
 }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using BlokeBot.Commands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -28,7 +29,8 @@ public sealed record ViewerCommandCatalogSnapshot(
 
 public sealed class ViewerCommandCatalogService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IHostStreamLivenessProvider streams
+    IHostStreamLivenessProvider streams,
+    IOverlayCueAdmissionService overlayCues
 )
 {
     public async Task<ViewerCommandCatalogSnapshot> LoadForHostAsync(
@@ -133,10 +135,12 @@ public sealed class ViewerCommandCatalogService(
         var customCommands = enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ? await db
                 .CustomCommands.AsNoTracking()
+                .Include(value => value.Action)
                 .Include(value => value.Aliases)
                 .Where(value => value.HostId == hostId)
                 .ToArrayAsync(ct)
             : [];
+        var availableCueActions = await AvailableCueActionsAsync(hostId, customCommands, ct);
 
         HostStreamLivenessOutcome liveness = new HostStreamLivenessOutcome.Offline();
         if (enabledFeatures.Contains(HostFeatureFlags.Moments))
@@ -227,7 +231,11 @@ public sealed class ViewerCommandCatalogService(
         if (enabledFeatures.Contains(HostFeatureFlags.CustomCommands))
         {
             foreach (
-                var command in customCommands.Where(value => value.Enabled && !value.ModeratorOnly)
+                var command in customCommands.Where(value =>
+                    value.Enabled
+                    && !value.ModeratorOnly
+                    && IsCustomActionAvailable(value.Action, availableCueActions)
+                )
             )
             {
                 var canonical = command
@@ -244,8 +252,13 @@ public sealed class ViewerCommandCatalogService(
 
         var entries = candidates
             .Where(candidate =>
-                IsActuallyDispatchedTo(candidate, appAliases, customCommands, enabledFeatures)
-                || AddConflict(conflicts, candidate)
+                IsActuallyDispatchedTo(
+                    candidate,
+                    appAliases,
+                    customCommands,
+                    enabledFeatures,
+                    availableCueActions
+                ) || AddConflict(conflicts, candidate)
             )
             .DistinctBy(candidate => candidate.LogicalIdentity)
             .Select(candidate => new ViewerCommandCatalogEntry(
@@ -289,7 +302,8 @@ public sealed class ViewerCommandCatalogService(
         Candidate candidate,
         IReadOnlyList<AppAlias> appAliases,
         IReadOnlyList<CustomCommand> customCommands,
-        HostFeatureFlags enabledFeatures
+        HostFeatureFlags enabledFeatures,
+        IReadOnlySet<CueActionIdentity> availableCueActions
     )
     {
         if (candidate.FixedRoute)
@@ -326,7 +340,55 @@ public sealed class ViewerCommandCatalogService(
                     StringComparison.OrdinalIgnoreCase
                 )
             );
-        return customOwner is not null && candidate.CustomCommandId == customOwner.Command.Id;
+        return customOwner is not null
+            && IsCustomActionAvailable(customOwner.Command.Action, availableCueActions)
+            && candidate.CustomCommandId == customOwner.Command.Id;
+    }
+
+    private static bool IsCustomActionAvailable(
+        CustomCommandAction action,
+        IReadOnlySet<CueActionIdentity> availableCueActions
+    )
+    {
+        return action is not OverlayCueCustomCommandAction cue
+            || availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId));
+    }
+
+    private async Task<IReadOnlySet<CueActionIdentity>> AvailableCueActionsAsync(
+        int hostId,
+        IReadOnlyList<CustomCommand> commands,
+        CancellationToken ct
+    )
+    {
+        var identities = commands
+            .Select(command => command.Action)
+            .OfType<OverlayCueCustomCommandAction>()
+            .Select(action => new CueActionIdentity(
+                action.TargetOverlayPublicId,
+                action.CuePublicId
+            ))
+            .Distinct()
+            .ToArray();
+        if (identities.Length == 0)
+        {
+            return new HashSet<CueActionIdentity>();
+        }
+
+        var resolutions = await Task.WhenAll(
+            identities.Select(async identity =>
+                (
+                    Identity: identity,
+                    Outcome: await overlayCues.ResolveReferencesAsync(
+                        new(hostId, identity.TargetOverlayId, identity.CueId),
+                        ct
+                    )
+                )
+            )
+        );
+        return resolutions
+            .Where(value => value.Outcome is OverlayCueReferenceOutcome.Available)
+            .Select(value => value.Identity)
+            .ToHashSet();
     }
 
     private static bool IsAppRouteEnabled(AppCommandKind kind, HostFeatureFlags enabledFeatures)
@@ -344,6 +406,8 @@ public sealed class ViewerCommandCatalogService(
     }
 
     private sealed record AppAlias(AppCommandKind Kind, int? ProfileId, string Alias);
+
+    private readonly record struct CueActionIdentity(Guid TargetOverlayId, Guid CueId);
 
     private sealed record Candidate(
         string Alias,

@@ -16,7 +16,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
-        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(16);
+        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(17);
         (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         var hostId = await SeedHostAsync(db, "host");
 

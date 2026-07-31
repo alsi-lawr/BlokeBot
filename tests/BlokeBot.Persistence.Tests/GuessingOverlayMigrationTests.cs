@@ -12,7 +12,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class GuessingOverlayMigrationTests
 {
     private const string _previousMigration = "20260730202307_v0.5.0_IndependentChatTools";
-    private const string _latestMigration = "20260731043353_v0.6.0_OverlayCues";
+    private const string _latestMigration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
 
     [Test]
     public async Task Upgrade_PreservesEmptyOverlaysAndAllowsTypedGuessingRows()
@@ -42,7 +42,7 @@ public sealed class GuessingOverlayMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(16);
+        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(17);
         (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.Empty);

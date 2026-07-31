@@ -17,13 +17,32 @@ internal sealed class OverlayCuePlaybackService(
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
     ILogger<OverlayCuePlaybackService> logger
-) : IHostedService, IAsyncDisposable
+) : IOverlayCueAdmissionService, IHostedService, IAsyncDisposable
 {
     private const int _maximumPendingPerTarget = 64;
     private readonly ConcurrentDictionary<OverlayTargetIdentity, TargetState> _targets = new();
     private readonly CancellationTokenSource _stopping = new();
     private Task? _monitor;
     private IDisposable? _changesSubscription;
+
+    public async Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
+        OverlayCueReferenceRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await ResolveReferencesAsync(db, request, cancellationToken) switch
+        {
+            ReferenceResolution.Available => new OverlayCueReferenceOutcome.Available(),
+            ReferenceResolution.Missing missing => new OverlayCueReferenceOutcome.Missing(
+                missing.Part
+            ),
+            ReferenceResolution.Disabled disabled => new OverlayCueReferenceOutcome.Disabled(
+                disabled.Part
+            ),
+            _ => throw new InvalidOperationException("Unknown overlay cue reference outcome."),
+        };
+    }
 
     public async Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
         int hostId,
@@ -238,42 +257,24 @@ internal sealed class OverlayCuePlaybackService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var parentEnabled = await db
-            .Hosts.AsNoTracking()
-            .Where(host => host.Id == request.HostId)
-            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (
-            parentEnabled is null
-            || (parentEnabled.Value & HostFeatureFlags.Overlays) != HostFeatureFlags.Overlays
-        )
+        var references = await ResolveReferencesAsync(
+            db,
+            new(request.HostId, request.TargetOverlayId, request.CueId),
+            cancellationToken
+        );
+        if (references is not ReferenceResolution.Available available)
         {
-            return new PlanResolution.ParentDisabled();
+            return references switch
+            {
+                ReferenceResolution.Disabled { Part: OverlayCueReferencePart.Parent }
+                or ReferenceResolution.Missing { Part: OverlayCueReferencePart.Parent } =>
+                    new PlanResolution.ParentDisabled(),
+                ReferenceResolution.Disabled => new PlanResolution.Disabled(),
+                _ => new PlanResolution.Missing(),
+            };
         }
-
-        var target = await db
-            .OverlayInstances.AsNoTracking()
-            .SingleOrDefaultAsync(
-                value =>
-                    value.HostId == request.HostId
-                    && value.PublicId == request.TargetOverlayId
-                    && value.Type == OverlayType.CuePlayer,
-                cancellationToken
-            );
-        var cue = await db
-            .OverlayCues.AsNoTracking()
-            .SingleOrDefaultAsync(
-                value => value.HostId == request.HostId && value.PublicId == request.CueId,
-                cancellationToken
-            );
-        if (target is null || cue is null)
-        {
-            return new PlanResolution.Missing();
-        }
-        if (!target.IsEnabled || !cue.IsEnabled)
-        {
-            return new PlanResolution.Disabled();
-        }
+        var target = available.Target;
+        var cue = available.Cue;
 
         var parsed = OverlayCueConfiguration.Parse(cue.ConfigurationJson);
         if (parsed is not OverlayCueConfigurationResult.Valid valid)
@@ -341,6 +342,72 @@ internal sealed class OverlayCuePlaybackService(
             ),
             plan
         );
+    }
+
+    private static async Task<ReferenceResolution> ResolveReferencesAsync(
+        BlokeBotDbContext db,
+        OverlayCueReferenceRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        if (request.HostId <= 0)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Parent);
+        }
+        if (request.TargetOverlayId == Guid.Empty)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Target);
+        }
+        if (request.CueId == Guid.Empty)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Cue);
+        }
+
+        var features = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == request.HostId)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (features is null)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Parent);
+        }
+        if ((features.Value & HostFeatureFlags.Overlays) != HostFeatureFlags.Overlays)
+        {
+            return new ReferenceResolution.Disabled(OverlayCueReferencePart.Parent);
+        }
+
+        var target = await db
+            .OverlayInstances.AsNoTracking()
+            .SingleOrDefaultAsync(
+                value =>
+                    value.HostId == request.HostId
+                    && value.PublicId == request.TargetOverlayId
+                    && value.Type == OverlayType.CuePlayer,
+                cancellationToken
+            );
+        if (target is null)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Target);
+        }
+        if (!target.IsEnabled)
+        {
+            return new ReferenceResolution.Disabled(OverlayCueReferencePart.Target);
+        }
+
+        var cue = await db
+            .OverlayCues.AsNoTracking()
+            .SingleOrDefaultAsync(
+                value => value.HostId == request.HostId && value.PublicId == request.CueId,
+                cancellationToken
+            );
+        if (cue is null)
+        {
+            return new ReferenceResolution.Missing(OverlayCueReferencePart.Cue);
+        }
+        return cue.IsEnabled
+            ? new ReferenceResolution.Available(target, cue)
+            : new ReferenceResolution.Disabled(OverlayCueReferencePart.Cue);
     }
 
     private static OverlayCuePlaybackLayer ResolveLayer(
@@ -662,5 +729,17 @@ internal sealed class OverlayCuePlaybackService(
         internal sealed record Disabled : PlanResolution;
 
         internal sealed record ParentDisabled : PlanResolution;
+    }
+
+    private abstract record ReferenceResolution
+    {
+        private ReferenceResolution() { }
+
+        internal sealed record Available(OverlayInstance Target, OverlayCue Cue)
+            : ReferenceResolution;
+
+        internal sealed record Missing(OverlayCueReferencePart Part) : ReferenceResolution;
+
+        internal sealed record Disabled(OverlayCueReferencePart Part) : ReferenceResolution;
     }
 }

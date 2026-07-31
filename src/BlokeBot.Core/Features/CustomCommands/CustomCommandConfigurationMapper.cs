@@ -58,6 +58,14 @@ internal static class CustomCommandConfigurationMapper
                     ReplyRoutes = ToReplyRoutesEditor(action),
                     CounterId = action.CounterId,
                 },
+                OverlayCueCustomCommandAction action => new OverlayCueCustomCommandActionEditor
+                {
+                    ReplyRoutes = ToReplyRoutesEditor(action),
+                    TargetOverlayPublicId = action.TargetOverlayPublicId,
+                    CuePublicId = action.CuePublicId,
+                    QueuePolicy = action.QueuePolicy,
+                    ReplyOrder = action.ReplyOrder,
+                },
                 _ => throw new InvalidOperationException("Unsupported custom command action."),
             },
         };
@@ -148,6 +156,14 @@ internal static class CustomCommandConfigurationMapper
                 HostId = hostId,
                 CounterId = counters[counter.CounterId].Id,
             },
+            CustomCommandActionValue.OverlayCue cue => new OverlayCueCustomCommandAction
+            {
+                HostId = hostId,
+                TargetOverlayPublicId = cue.TargetOverlayPublicId,
+                CuePublicId = cue.CuePublicId,
+                QueuePolicy = cue.QueuePolicy,
+                ReplyOrder = cue.ReplyOrder,
+            },
             _ => throw new InvalidOperationException("Unsupported custom command action."),
         };
         ApplyReplyRoutes(created, action.ReplyRoutes, messageEntries);
@@ -168,6 +184,16 @@ internal static class CustomCommandConfigurationMapper
         )
         {
             counterAction.CounterId = counters[counterValue.CounterId].Id;
+        }
+        else if (
+            action is OverlayCueCustomCommandAction cueAction
+            && value is CustomCommandActionValue.OverlayCue cueValue
+        )
+        {
+            cueAction.TargetOverlayPublicId = cueValue.TargetOverlayPublicId;
+            cueAction.CuePublicId = cueValue.CuePublicId;
+            cueAction.QueuePolicy = cueValue.QueuePolicy;
+            cueAction.ReplyOrder = cueValue.ReplyOrder;
         }
     }
 
@@ -270,7 +296,9 @@ internal static class CustomCommandConfigurationMapper
             is
                 (MessageCustomCommandAction, CustomCommandActionValue.Message)
                 or
-                (CounterCustomCommandAction, CustomCommandActionValue.Counter);
+                (CounterCustomCommandAction, CustomCommandActionValue.Counter)
+                or
+                (OverlayCueCustomCommandAction, CustomCommandActionValue.OverlayCue);
     }
 
     public static bool ScheduleMatches(

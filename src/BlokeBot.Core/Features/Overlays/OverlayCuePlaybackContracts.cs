@@ -6,6 +6,7 @@ namespace BlokeBot.Core.Features.Overlays;
 public enum OverlayCueAdmissionOrigin
 {
     OwnerPreview,
+    OwnerTest,
     Command,
     Automation,
 }
@@ -23,6 +24,26 @@ public sealed record OverlayCueAdmissionRequest(
     OverlayCueAdmissionOrigin Origin,
     OverlayCueSafeContext Context
 );
+
+public sealed record OverlayCueReferenceRequest(int HostId, Guid TargetOverlayId, Guid CueId);
+
+public enum OverlayCueReferencePart
+{
+    Parent,
+    Target,
+    Cue,
+}
+
+public abstract record OverlayCueReferenceOutcome
+{
+    private OverlayCueReferenceOutcome() { }
+
+    public sealed record Available : OverlayCueReferenceOutcome;
+
+    public sealed record Missing(OverlayCueReferencePart Part) : OverlayCueReferenceOutcome;
+
+    public sealed record Disabled(OverlayCueReferencePart Part) : OverlayCueReferenceOutcome;
+}
 
 public abstract record OverlayCueAdmissionOutcome
 {
@@ -58,6 +79,24 @@ public sealed record OverlayCueChoice(
     string Name,
     OverlayCueQueuePolicy DefaultQueuePolicy
 );
+
+public interface IOverlayCueAdmissionService
+{
+    Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
+        OverlayCueReferenceRequest request,
+        CancellationToken cancellationToken
+    );
+
+    Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    );
+
+    Task<OverlayCueAdmissionOutcome> AdmitAsync(
+        OverlayCueAdmissionRequest request,
+        CancellationToken cancellationToken
+    );
+}
 
 internal sealed record OverlayCuePlaybackPlan(
     Guid RunId,

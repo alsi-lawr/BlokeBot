@@ -12,6 +12,7 @@ public sealed partial class BlokeBotDbContext
     [
         CounterCustomCommandAction.Discriminator,
         MessageCustomCommandAction.Discriminator,
+        OverlayCueCustomCommandAction.Discriminator,
     ];
 
     private static readonly string[] _customCommandCooldownScopes =
@@ -22,6 +23,9 @@ public sealed partial class BlokeBotDbContext
 
     private static readonly string[] _customCommandInvocationResetScopes =
         PersistedEnumTokens<CustomCommandInvocationResetScope>.Values.ToArray();
+
+    private static readonly string[] _overlayCueReplyOrders =
+        PersistedEnumTokens<OverlayCueReplyOrder>.Values.ToArray();
 
     private static readonly string[] _customMessageSelectionModes =
         PersistedEnumTokens<CustomMessageSelectionMode>.Values.ToArray();
@@ -175,9 +179,24 @@ public sealed partial class BlokeBotDbContext
                         KindIn("ActionType", _customCommandActionTypes)
                     );
                     t.HasCheckConstraint(
+                        "CK_custom_command_actions_QueuePolicy",
+                        KindInOrNull("QueuePolicy", _overlayCueQueuePolicies)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_command_actions_ReplyOrder",
+                        KindInOrNull("ReplyOrder", _overlayCueReplyOrders)
+                    );
+                    t.HasCheckConstraint(
                         "CK_custom_command_actions_Payload",
-                        "(ActionType = 'Message' AND CounterId IS NULL) OR "
-                            + "(ActionType = 'Counter' AND CounterId IS NOT NULL)"
+                        "(ActionType = 'Message' AND CounterId IS NULL "
+                            + "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL "
+                            + "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR "
+                            + "(ActionType = 'Counter' AND CounterId IS NOT NULL "
+                            + "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL "
+                            + "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR "
+                            + "(ActionType = 'OverlayCue' AND CounterId IS NULL "
+                            + "AND TargetOverlayPublicId IS NOT NULL AND CuePublicId IS NOT NULL "
+                            + "AND QueuePolicy IS NOT NULL AND ReplyOrder IS NOT NULL)"
                     );
                 }
             );
@@ -185,7 +204,10 @@ public sealed partial class BlokeBotDbContext
             b.Property<string>("ActionType").HasMaxLength(32);
             b.HasDiscriminator<string>("ActionType")
                 .HasValue<MessageCustomCommandAction>(MessageCustomCommandAction.Discriminator)
-                .HasValue<CounterCustomCommandAction>(CounterCustomCommandAction.Discriminator);
+                .HasValue<CounterCustomCommandAction>(CounterCustomCommandAction.Discriminator)
+                .HasValue<OverlayCueCustomCommandAction>(
+                    OverlayCueCustomCommandAction.Discriminator
+                );
             b.HasOne(x => x.ZeroArgumentMessageLibraryEntry)
                 .WithMany()
                 .HasForeignKey(x => new { x.HostId, x.ZeroArgumentMessageLibraryEntryId })
@@ -210,6 +232,24 @@ public sealed partial class BlokeBotDbContext
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict)
         );
+
+        modelBuilder.Entity<OverlayCueCustomCommandAction>(b =>
+        {
+            b.Property(x => x.TargetOverlayPublicId).HasConversion<string>();
+            b.Property(x => x.CuePublicId).HasConversion<string>();
+            b.Property(x => x.QueuePolicy)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Format(value),
+                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.ReplyOrder)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayCueReplyOrder>.Format(value),
+                    value => PersistedEnumTokens<OverlayCueReplyOrder>.Parse(value)
+                )
+                .HasMaxLength(16);
+        });
 
         modelBuilder.Entity<CustomCommandAlias>(b =>
         {

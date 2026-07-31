@@ -54,6 +54,29 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
+    public async Task ActionKind_ChangingToOverlayCue_ShowsBoundedEditorAndOptionalReplyGuidance()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-action-kind")
+            .Change(CustomCommandActionKind.OverlayCue.ToString());
+
+        var editor = cut.Find("[data-overlay-cue-command]");
+        editor.ClassList.ShouldContain("p-3");
+        cut.Find($"#command-{seeded.CommandId}-overlay-target").ShouldNotBeNull();
+        cut.Find($"#command-{seeded.CommandId}-overlay-cue").ShouldNotBeNull();
+        cut.Find($"#command-{seeded.CommandId}-queue-policy").ShouldNotBeNull();
+        cut.Find($"#command-{seeded.CommandId}-reply-order").ShouldNotBeNull();
+        cut.Find("button[data-action='test-overlay-cue-command']")
+            .HasAttribute("disabled")
+            .ShouldBeTrue();
+        cut.Markup.ShouldContain("Replies are optional for overlay cues.");
+    }
+
+    [Test]
     public async Task NewAnnouncement_Adding_SavesWithoutValidation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

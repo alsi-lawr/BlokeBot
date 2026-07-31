@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
@@ -30,6 +31,10 @@ public partial class CustomCommandSettingsPage
         Enum.GetValues<CustomCommandInvocationLimit>();
     private static readonly IReadOnlyList<CustomCommandActionKind> _actionKinds =
         Enum.GetValues<CustomCommandActionKind>();
+    private static readonly IReadOnlyList<OverlayCueQueuePolicy> _cueQueuePolicies =
+        Enum.GetValues<OverlayCueQueuePolicy>();
+    private static readonly IReadOnlyList<OverlayCueReplyOrder> _cueReplyOrders =
+        Enum.GetValues<OverlayCueReplyOrder>();
     private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> _announcementScheduleKinds =
         Enum.GetValues<CustomAnnouncementScheduleKind>();
     private static readonly IReadOnlyList<CustomAnnouncementDeliveryType> _announcementDeliveryTypes =
@@ -44,6 +49,9 @@ public partial class CustomCommandSettingsPage
     private string? _loadedConfigurationFingerprint;
     private string? _loadFailureMessage;
     private bool _featureEnabled;
+    private bool _overlaysEnabled;
+    private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
+    private string? _cueTestOutcome;
     private bool _isLoading = true;
     private int _nextTemporaryId = -1;
     private IReadOnlyList<CustomCommandConfigurationValidationError> _validationErrors = [];
@@ -113,6 +121,17 @@ public partial class CustomCommandSettingsPage
                 HostFeatureFlags.CustomCommands,
                 CancellationToken.None
             );
+        _overlaysEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Overlays,
+                CancellationToken.None
+            );
+        _cueCatalog =
+            _featureEnabled && _overlaysEnabled
+                ? await _overlayCues.QueryCatalogAsync(HostId, CancellationToken.None)
+                : new([], []);
         _config = _featureEnabled
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
@@ -121,6 +140,7 @@ public partial class CustomCommandSettingsPage
         _activeTab = CustomCommandSettingsTab.Commands;
         _focusTarget = null;
         _pendingResetAllCommandId = null;
+        _cueTestOutcome = null;
         _commandAdvancedEntityId = null;
         _commandAdvancedOpenRequest = 0;
         _announcementAdvancedEntityId = null;
@@ -452,6 +472,13 @@ public partial class CustomCommandSettingsPage
             {
                 Append(result, counterAction.CounterId);
             }
+            else if (command.Action is OverlayCueCustomCommandActionEditor cueAction)
+            {
+                Append(result, cueAction.TargetOverlayPublicId);
+                Append(result, cueAction.CuePublicId);
+                Append(result, cueAction.QueuePolicy);
+                Append(result, cueAction.ReplyOrder);
+            }
         }
 
         foreach (var counter in config.Counters)
@@ -569,7 +596,8 @@ public partial class CustomCommandSettingsPage
         return failure.Match<CustomCommandConfigurationValidationTarget?>(
             builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
             customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
-            _ => null
+            _ => null,
+            cueReference => CommandTarget(cueReference.CommandId, cueReference.Field)
         );
     }
 
@@ -749,6 +777,26 @@ public partial class CustomCommandSettingsPage
     private static string CommandCounterFieldId(CustomCommandEditor command)
     {
         return $"command-{command.Id}-counter-id";
+    }
+
+    private static string CommandOverlayTargetFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-overlay-target";
+    }
+
+    private static string CommandOverlayCueFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-overlay-cue";
+    }
+
+    private static string CommandQueuePolicyFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-queue-policy";
+    }
+
+    private static string CommandReplyOrderFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-reply-order";
     }
 
     private static string CounterNameFieldId(CustomCounterEditor counter)
@@ -1107,6 +1155,40 @@ public partial class CustomCommandSettingsPage
         EnsureEditorSelection();
     }
 
+    private Task TestCueAsync(OverlayCueCustomCommandActionEditor action)
+    {
+        return ObserveUiOperationAsync(
+            nameof(TestCueAsync),
+            async () =>
+            {
+                if (HostId == 0)
+                {
+                    return;
+                }
+                var outcome = await _execution.TestCueAsync(HostId, action, CancellationToken.None);
+                _cueTestOutcome = CueAdmissionMessage(outcome);
+            }
+        );
+    }
+
+    private static string CueAdmissionMessage(OverlayCueAdmissionOutcome outcome)
+    {
+        return outcome switch
+        {
+            OverlayCueAdmissionOutcome.Running => "Cue test started.",
+            OverlayCueAdmissionOutcome.Queued => "Cue test queued.",
+            OverlayCueAdmissionOutcome.Disconnected disconnected =>
+                $"The overlay is disconnected. The cue is queued until {disconnected.ExpiresAtUtc.LocalDateTime:t}.",
+            OverlayCueAdmissionOutcome.QueueRejected => "The overlay queue rejected this cue test.",
+            OverlayCueAdmissionOutcome.Disabled =>
+                "The selected overlay player or cue is disabled.",
+            OverlayCueAdmissionOutcome.ParentDisabledOrCancelled =>
+                "Custom commands or overlays are off. Turn both on in Channel setup.",
+            OverlayCueAdmissionOutcome.Expired => "The cue test expired before it could play.",
+            _ => "The selected overlay player or cue is no longer available.",
+        };
+    }
+
     private Task ResetViewerAsync(CustomCommandEditor command)
     {
         return ObserveUiOperationAsync(
@@ -1317,6 +1399,10 @@ public partial class CustomCommandSettingsPage
         {
             summaries.Add($"Counter {counter.CounterId}");
         }
+        if (command.Action is OverlayCueCustomCommandActionEditor)
+        {
+            summaries.Add("Overlay cue");
+        }
         return summaries.Count == 0 ? "Default settings" : string.Join(" · ", summaries);
     }
 
@@ -1364,7 +1450,30 @@ public partial class CustomCommandSettingsPage
         {
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
+            CustomCommandActionKind.OverlayCue => "Play an overlay cue",
             _ => "Choose what happens",
+        };
+    }
+
+    private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy)
+    {
+        return policy switch
+        {
+            OverlayCueQueuePolicy.Enqueue => "Wait for earlier cues",
+            OverlayCueQueuePolicy.Replace => "Replace the current cue",
+            OverlayCueQueuePolicy.Ignore => "Ignore while the player is busy",
+            OverlayCueQueuePolicy.Concurrent => "Play at the same time",
+            _ => "Choose a playback policy",
+        };
+    }
+
+    private static string CueReplyOrderLabel(OverlayCueReplyOrder order)
+    {
+        return order switch
+        {
+            OverlayCueReplyOrder.Before => "Before requesting the cue",
+            OverlayCueReplyOrder.After => "After the cue is accepted",
+            _ => "Choose when to reply",
         };
     }
 
