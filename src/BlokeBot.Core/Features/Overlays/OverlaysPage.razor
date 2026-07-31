@@ -1,12 +1,10 @@
-@page "/overlays"
+@page "/overlays/sources"
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject OverlayInstanceService _overlays
-@inject OverlayCueService _cues
-@inject OverlayCuePlaybackService _cuePlayback
 @inject HostFeatureService _features
 @inject IOverlayLivePublisher _publisher
 @inject IOverlayLivePresence _presence
@@ -17,7 +15,7 @@
 
 <DashboardPage Kicker="Stream presentation"
                Title="Overlays"
-               Description="Create Browser Sources, preview their production rendering, and check live delivery."
+               Description="Create Browser Sources, choose how they look in OBS, and check delivery."
                Width="DashboardPageWidth.Wide">
     <Actions>
         <button class="btn-primary"
@@ -27,6 +25,7 @@
     </Actions>
 
     <ChildContent>
+        <OverlaySectionTabs />
         @if (_isLoading)
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
@@ -100,6 +99,157 @@
                 </aside>
 
                 <div class="application-card-collection min-w-0" data-card-owner="overlay-editor-cards">
+                    @if (_selected is not null && _selectedFeatureEnabled)
+                    {
+                        <section class="card p-5" aria-labelledby="overlay-preview-title">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 id="overlay-preview-title" class="text-lg font-semibold text-slate-950">Preview</h2>
+                                    <p class="mt-1 text-sm text-muted-foreground">
+                                        This 1920 × 1080 canvas shows how it will look in OBS.
+                                    </p>
+                                </div>
+                                <div class="segmented-motion @(_previewMode is OverlayPreviewMode.Representative ? "segmented-motion--second" : string.Empty)"
+                                     role="group"
+                                     aria-label="Preview state">
+                                    <span class="segmented-motion__indicator" aria-hidden="true"></span>
+                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Live)"
+                                            type="button"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Live ? "true" : "false")"
+                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Live)">Live</button>
+                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Representative)"
+                                            type="button"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Representative ? "true" : "false")"
+                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Representative)">Representative</button>
+                                </div>
+                            </div>
+
+                            @if (_selected.Type is OverlayType.Guessing)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2"
+                                     role="group"
+                                     aria-label="Guessing overlay sample state">
+                                    @foreach (var sample in Enum.GetValues<GuessingOverlaySampleState>())
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "btn-primary" : "btn-secondary")"
+                                                type="button"
+                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "true" : "false")"
+                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
+                                    }
+                                </div>
+                            }
+                            else if (_selected.Type is OverlayType.Giveaway)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2"
+                                     role="group"
+                                     aria-label="Giveaway overlay sample state">
+                                    @foreach (var sample in Enum.GetValues<GiveawayOverlaySampleState>().Where(value => value is not GiveawayOverlaySampleState.Idle))
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _giveawayPreviewSample == sample ? "btn-primary" : "btn-secondary")"
+                                                type="button"
+                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _giveawayPreviewSample == sample ? "true" : "false")"
+                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
+                                    }
+                                </div>
+                            }
+                            else if (_selected.Type is OverlayType.EventFeed)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Event feed sample event">
+                                    @foreach (var sample in Enum.GetValues<OverlayEventFeedKind>())
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "btn-primary" : "btn-secondary")" type="button" aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "true" : "false")" @onclick="() => SetPreviewSample(sample)">@EventKindLabel(sample)</button>
+                                    }
+                                </div>
+                            }
+
+                            <div class="relative mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]"
+                                 data-appearance-canvas>
+                                <iframe @key="_previewUrl"
+                                        class="@(_selected.Type is OverlayType.Empty or OverlayType.CuePlayer ? "overlay-preview-frame overlay-preview-frame--ready h-full w-full" : "overlay-preview-frame h-full w-full")"
+                                        data-appearance-preview
+                                        data-overlay-id="@_selected.Id"
+                                        data-draft-type="@_selected.Type.ToString().ToLowerInvariant()"
+                                        data-show-guess-count="@_draftShowGuessCount.ToString().ToLowerInvariant()"
+                                        data-giveaway-title="@_draftGiveawayTitle"
+                                        data-show-entrant-count="@_draftShowEntrantCount.ToString().ToLowerInvariant()"
+                                        data-show-countdown="@_draftShowCountdown.ToString().ToLowerInvariant()"
+                                        data-show-join-command="@_draftShowJoinCommand.ToString().ToLowerInvariant()"
+                                        src="@_previewUrl"
+                                        title="@($"{_selected.Name} overlay preview")"
+                                        referrerpolicy="no-referrer"></iframe>
+                                @if (_selected.Type is not (OverlayType.Empty or OverlayType.CuePlayer))
+                                {
+                                    <svg class="absolute inset-0 size-full touch-none"
+                                         viewBox="0 0 1920 1080"
+                                         role="group"
+                                         aria-label="Overlay position and size"
+                                         data-appearance-editor
+                                         data-x="@_appearanceX" data-y="@_appearanceY"
+                                         data-width="@_appearanceWidth" data-height="@_appearanceHeight"
+                                         data-rendered-css="@_appearanceCss">
+                                        <style>
+                                            [data-selection-line] { fill: none; stroke: #2563eb; stroke-width: 5; stroke-dasharray: 22 14; pointer-events: none; animation: overlay-selection-dashes 1s linear infinite; }
+                                            [data-appearance-action] { fill: transparent; stroke: transparent; }
+                                            [data-appearance-action="move"] { cursor: move; }
+                                            [data-appearance-action="w"], [data-appearance-action="e"] { cursor: ew-resize; }
+                                            [data-appearance-action="n"], [data-appearance-action="s"] { cursor: ns-resize; }
+                                            [data-appearance-action="nw"], [data-appearance-action="se"] { cursor: nwse-resize; }
+                                            [data-appearance-action="ne"], [data-appearance-action="sw"] { cursor: nesw-resize; }
+                                            @@keyframes overlay-selection-dashes { to { stroke-dashoffset: -36; } }
+                                            @@media (prefers-reduced-motion: reduce) { [data-selection-line] { animation: none; } }
+                                        </style>
+                                        <rect x="@_appearanceX" y="@_appearanceY" width="@_appearanceWidth" height="@_appearanceHeight" data-selection-line />
+                                        <rect x="@_appearanceX" y="@_appearanceY" width="@_appearanceWidth" height="@_appearanceHeight" tabindex="0" role="button" aria-label="Move overlay. Use arrow keys for one pixel, or Shift plus arrow for ten pixels." data-appearance-action="move" />
+                                        <rect x="@(_appearanceX - 14)" y="@(_appearanceY + 28)" width="28" height="@(_appearanceHeight - 56)" tabindex="0" role="slider" aria-label="Resize from left edge" data-appearance-action="w" />
+                                        <rect x="@(_appearanceX + _appearanceWidth - 14)" y="@(_appearanceY + 28)" width="28" height="@(_appearanceHeight - 56)" tabindex="0" role="slider" aria-label="Resize from right edge" data-appearance-action="e" />
+                                        <rect x="@(_appearanceX + 28)" y="@(_appearanceY - 14)" width="@(_appearanceWidth - 56)" height="28" tabindex="0" role="slider" aria-label="Resize from top edge" data-appearance-action="n" />
+                                        <rect x="@(_appearanceX + 28)" y="@(_appearanceY + _appearanceHeight - 14)" width="@(_appearanceWidth - 56)" height="28" tabindex="0" role="slider" aria-label="Resize from bottom edge" data-appearance-action="s" />
+                                        <rect x="@(_appearanceX - 20)" y="@(_appearanceY - 20)" width="40" height="40" tabindex="0" role="slider" aria-label="Resize from top left corner" data-appearance-action="nw" />
+                                        <rect x="@(_appearanceX + _appearanceWidth - 20)" y="@(_appearanceY - 20)" width="40" height="40" tabindex="0" role="slider" aria-label="Resize from top right corner" data-appearance-action="ne" />
+                                        <rect x="@(_appearanceX - 20)" y="@(_appearanceY + _appearanceHeight - 20)" width="40" height="40" tabindex="0" role="slider" aria-label="Resize from bottom left corner" data-appearance-action="sw" />
+                                        <rect x="@(_appearanceX + _appearanceWidth - 20)" y="@(_appearanceY + _appearanceHeight - 20)" width="40" height="40" tabindex="0" role="slider" aria-label="Resize from bottom right corner" data-appearance-action="se" />
+                                    </svg>
+                                }
+                            </div>
+
+                            @if (_selected.Type is not (OverlayType.Empty or OverlayType.CuePlayer))
+                            {
+                                <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5" data-appearance-fields>
+                                    <div><label class="label" for="appearance-x">X</label><input id="appearance-x" class="input mt-1" type="number" min="0" max="1760" @bind="_appearanceX" @bind:event="oninput" /></div>
+                                    <div><label class="label" for="appearance-y">Y</label><input id="appearance-y" class="input mt-1" type="number" min="0" max="990" @bind="_appearanceY" @bind:event="oninput" /></div>
+                                    <div><label class="label" for="appearance-width">Width</label><input id="appearance-width" class="input mt-1" type="number" min="160" max="1920" @bind="_appearanceWidth" @bind:event="oninput" /></div>
+                                    <div><label class="label" for="appearance-height">Height</label><input id="appearance-height" class="input mt-1" type="number" min="90" max="1080" @bind="_appearanceHeight" @bind:event="oninput" /></div>
+                                    <button class="btn-secondary self-end" type="button" @onclick="ResetAppearance">Reset</button>
+                                </div>
+                                <details class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <summary class="cursor-pointer text-sm font-semibold text-slate-950">Advanced styling</summary>
+                                    <label class="label mt-4" for="appearance-css">Overlay-local CSS</label>
+                                    <textarea id="appearance-css"
+                                              class="input mt-2 min-h-32 font-mono text-xs"
+                                              maxlength="@OverlayAppearance.MaximumCssBytes"
+                                              spellcheck="false"
+                                              @bind="_appearanceCss" @bind:event="oninput" data-appearance-css></textarea>
+                                    <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                                        Available selectors: .overlay, .&#99;ard, .accent, .kicker, .title, .detail, and .result.
+                                        Imports, external URLs, markup, scripts, at-rules, and selectors outside this Browser Source are rejected.
+                                    </p>
+                                </details>
+                            }
+
+                            <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-950">@_presenceLabel</p>
+                                    <p class="mt-1 text-xs leading-5 text-muted-foreground">Open OBS Browser Sources appear here when connected.</p>
+                                </div>
+                                <button class="btn-primary"
+                                        type="button"
+                                        disabled="@(_isBusy || !_selected.IsEnabled)"
+                                        @onclick="PublishTestAsync">Send test pulse</button>
+                            </div>
+                        </section>
+
+                    }
+
                     <section class="card p-5" aria-labelledby="overlay-editor-title" data-overlay-editor>
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -166,10 +316,7 @@
                                 else
                                 {
                                     <div class="mt-4 grid gap-4 md:grid-cols-2">
-                                        <label class="control-surface flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-950">
-                                            <input type="checkbox" @bind="_draftShowGuessCount" />
-                                            Show the number of guesses
-                                        </label>
+                                        <OverlayStateToggle Label="Show the number of guesses" @bind-Value="_draftShowGuessCount" />
                                         <div class="space-y-2">
                                             <label class="label" for="overlay-result-duration">Result animation duration (seconds)</label>
                                             <input id="overlay-result-duration"
@@ -206,19 +353,10 @@
                                                Label="Giveaway title"
                                                @bind-Value="_draftGiveawayTitle"
                                                Placeholder="Points giveaway" />
-                                        <div class="grid gap-3">
-                                            <label class="control-surface flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-950">
-                                                <input type="checkbox" @bind="_draftShowEntrantCount" />
-                                                Show entrant count
-                                            </label>
-                                            <label class="control-surface flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-950">
-                                                <input type="checkbox" @bind="_draftShowCountdown" />
-                                                Show close-time countdown
-                                            </label>
-                                            <label class="control-surface flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-950">
-                                                <input type="checkbox" @bind="_draftShowJoinCommand" />
-                                                Show current join command
-                                            </label>
+                                        <div class="flex flex-wrap gap-2">
+                                            <OverlayStateToggle Label="Entrant count" @bind-Value="_draftShowEntrantCount" />
+                                            <OverlayStateToggle Label="Close-time countdown" @bind-Value="_draftShowCountdown" />
+                                            <OverlayStateToggle Label="Current join command" @bind-Value="_draftShowJoinCommand" />
                                         </div>
                                     </div>
                                     <p class="mt-3 text-sm leading-6 text-muted-foreground">
@@ -229,22 +367,21 @@
                             else if (_draftType is OverlayType.EventFeed)
                             {
                                 <div class="mt-4 grid gap-4 md:grid-cols-2">
-                                    <div class="space-y-2"><label class="label" for="event-feed-capacity">Queue capacity</label><input id="event-feed-capacity" class="input" type="number" min="1" max="25" @bind="_eventFeedCapacity" /></div>
-                                    <div class="space-y-2"><label class="label" for="event-feed-overflow">When full</label><select id="event-feed-overflow" class="input" @bind="_eventFeedOverflow"><option value="@EventFeedOverflowPolicy.DropNewest">Drop newest</option><option value="@EventFeedOverflowPolicy.ReplaceNewestSameKind">Replace newest of same kind</option></select></div>
+                                    <div class="space-y-2"><label class="label" for="event-feed-capacity">Maximum waiting cards</label><input id="event-feed-capacity" class="input" type="number" min="1" max="25" @bind="_eventFeedCapacity" /></div>
+                                    <div class="space-y-2"><label class="label" for="event-feed-overflow">When full</label><select id="event-feed-overflow" class="input" @bind="_eventFeedOverflow"><option value="@EventFeedOverflowPolicy.DropNewest">Keep current cards</option><option value="@EventFeedOverflowPolicy.ReplaceNewestSameKind">Replace the newest matching item</option></select></div>
                                 </div>
                                 <div class="application-card-collection mt-4 lg:grid-cols-3" data-event-feed-kind-settings>
-                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_pointEventEnabled" /> Point awards</label><label class="label mt-3" for="point-event-template">Template</label><textarea id="point-event-template" class="input min-h-24" @bind="_pointEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Point award priority" @bind="_pointEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Point award seconds" type="number" min="1" max="30" @bind="_pointEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{recipient} {amount} {pointLabel}")</p></section>
-                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_guessEventEnabled" /> Guessing winners</label><label class="label mt-3" for="guess-event-template">Template</label><textarea id="guess-event-template" class="input min-h-24" @bind="_guessEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Guessing winner priority" @bind="_guessEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Guessing winner seconds" type="number" min="1" max="30" @bind="_guessEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{roundName} {winningAnswer} {winners} {winnerCount} {amount} {pointLabel}")</p></section>
-                                    <section class="control-surface rounded-lg p-3"><label class="flex gap-2 text-sm font-semibold"><input type="checkbox" @bind="_giveawayEventEnabled" /> Giveaway winners</label><label class="label mt-3" for="giveaway-event-template">Template</label><textarea id="giveaway-event-template" class="input min-h-24" @bind="_giveawayEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Giveaway winner priority" @bind="_giveawayEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Giveaway winner seconds" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{winners} {winnerCount} {prizes} {pointLabel}")</p></section>
+                                    <section class="control-surface rounded-lg p-3"><OverlayStateToggle Label="Point awards" @bind-Value="_pointEventEnabled" />@if (_pointEventEnabled) { <div data-event-feed-details><label class="label mt-3" for="point-event-template">Template</label><textarea id="point-event-template" class="input min-h-24" @bind="_pointEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Point award priority" @bind="_pointEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Point award seconds" type="number" min="1" max="30" @bind="_pointEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{recipient} {amount} {pointLabel}")</p></div> }</section>
+                                    <section class="control-surface rounded-lg p-3"><OverlayStateToggle Label="Guessing winners" @bind-Value="_guessEventEnabled" />@if (_guessEventEnabled) { <div data-event-feed-details><label class="label mt-3" for="guess-event-template">Template</label><textarea id="guess-event-template" class="input min-h-24" @bind="_guessEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Guessing winner priority" @bind="_guessEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Guessing winner seconds" type="number" min="1" max="30" @bind="_guessEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{roundName} {winningAnswer} {winners} {winnerCount} {amount} {pointLabel}")</p></div> }</section>
+                                    <section class="control-surface rounded-lg p-3"><OverlayStateToggle Label="Giveaway winners" @bind-Value="_giveawayEventEnabled" />@if (_giveawayEventEnabled) { <div data-event-feed-details><label class="label mt-3" for="giveaway-event-template">Template</label><textarea id="giveaway-event-template" class="input min-h-24" @bind="_giveawayEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Giveaway winner priority" @bind="_giveawayEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Giveaway winner seconds" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{winners} {winnerCount} {prizes} {pointLabel}")</p></div> }</section>
                                 </div>
-                                <p class="mt-3 text-sm leading-6 text-muted-foreground">Cards are plain text, queued durably, deduplicated for 24 hours, and scheduled with high-priority fairness. Disabled Points or Guessing sources are suppressed without replay.</p>
                             }
                             else
                             {
                                 <p class="mt-1 text-sm leading-6 text-muted-foreground">
                                     @(_draftType is OverlayType.CuePlayer
-                                        ? "Cue players receive reusable media and web cues through the live overlay transport."
-                                        : "Empty V1 has no visual fields or custom CSS or JavaScript.")
+                                        ? "Cue players receive reusable cue layers. Compose and test them on the Cues tab."
+                                        : "Empty overlays have no visual settings.")
                                 </p>
                             }
                         </div>
@@ -295,90 +432,6 @@
 
                     @if (_selected is not null && _selectedFeatureEnabled)
                     {
-                        <section class="card p-5" aria-labelledby="overlay-preview-title">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <h2 id="overlay-preview-title" class="text-lg font-semibold text-slate-950">Production preview</h2>
-                                    <p class="mt-1 text-sm text-muted-foreground">
-                                        This preview uses the same document, client, CSS, and 1920 × 1080 canvas as the OBS Browser Source.
-                                    </p>
-                                </div>
-                                <div class="segmented-motion @(_previewMode is OverlayPreviewMode.Representative ? "segmented-motion--second" : string.Empty)"
-                                     role="group"
-                                     aria-label="Preview state">
-                                    <span class="segmented-motion__indicator" aria-hidden="true"></span>
-                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Live)"
-                                            type="button"
-                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Live ? "true" : "false")"
-                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Live)">Live</button>
-                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Representative)"
-                                            type="button"
-                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Representative ? "true" : "false")"
-                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Representative)">Representative</button>
-                                </div>
-                            </div>
-
-                            @if (_selected.Type is OverlayType.Guessing)
-                            {
-                                <div class="mt-4 flex flex-wrap gap-2"
-                                     role="group"
-                                     aria-label="Guessing overlay sample state">
-                                    @foreach (var sample in Enum.GetValues<GuessingOverlaySampleState>())
-                                    {
-                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "btn-primary" : "btn-secondary")"
-                                                type="button"
-                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _previewSample == sample ? "true" : "false")"
-                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
-                                    }
-                                </div>
-                            }
-                            else if (_selected.Type is OverlayType.Giveaway)
-                            {
-                                <div class="mt-4 flex flex-wrap gap-2"
-                                     role="group"
-                                     aria-label="Giveaway overlay sample state">
-                                    @foreach (var sample in Enum.GetValues<GiveawayOverlaySampleState>())
-                                    {
-                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _giveawayPreviewSample == sample ? "btn-primary" : "btn-secondary")"
-                                                type="button"
-                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _giveawayPreviewSample == sample ? "true" : "false")"
-                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
-                                    }
-                                </div>
-                            }
-                            else if (_selected.Type is OverlayType.EventFeed)
-                            {
-                                <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Event feed sample event">
-                                    @foreach (var sample in Enum.GetValues<OverlayEventFeedKind>())
-                                    {
-                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "btn-primary" : "btn-secondary")" type="button" aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _eventFeedPreviewSample == sample ? "true" : "false")" @onclick="() => SetPreviewSample(sample)">@EventKindLabel(sample)</button>
-                                    }
-                                </div>
-                            }
-
-                            <div class="mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]">
-                                <iframe @key="_previewKey"
-                                        class="overlay-preview-frame h-full w-full"
-                                        src="@_previewUrl"
-                                        title="@($"{_selected.Name} production overlay preview")"
-                                        sandbox="allow-scripts allow-same-origin"
-                                        referrerpolicy="no-referrer"></iframe>
-                            </div>
-
-                            <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-950">@_presenceLabel</p>
-                                    <p class="mt-1 text-xs leading-5 text-muted-foreground">
-                                        Approximate diagnostic presence excludes this page's live preview. It does not prove that an OBS scene is currently visible.
-                                    </p>
-                                </div>
-                                <button class="btn-primary"
-                                        type="button"
-                                        disabled="@(_isBusy || !_selected.IsEnabled)"
-                                        @onclick="PublishTestAsync">Send test pulse</button>
-                            </div>
-                        </section>
-
                         <section class="card p-5" aria-labelledby="overlay-obs-title">
                             <h2 id="overlay-obs-title" class="text-lg font-semibold text-slate-950">OBS setup</h2>
                             <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
@@ -392,184 +445,6 @@
                 </div>
             </div>
 
-            <div class="application-card-collection xl:grid-cols-[minmax(17rem,0.68fr)_minmax(0,1.82fr)]"
-                 data-card-owner="overlay-cue-workspace">
-                <aside class="card p-4" aria-labelledby="cue-inventory-title">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <h2 id="cue-inventory-title" class="text-lg font-semibold text-slate-950">Reusable cues</h2>
-                            <p class="mt-1 text-xs text-muted-foreground">@CueCountLabel(_cuesList.Count)</p>
-                        </div>
-                        <button class="btn-secondary" type="button" @onclick="NewCue">New</button>
-                    </div>
-                    <div class="mt-4 grid gap-2" aria-label="Saved cues">
-                        @foreach (var cue in _cuesList)
-                        {
-                            <button class="control-surface min-h-14 rounded-lg px-3 py-2 text-left"
-                                    type="button"
-                                    aria-current="@(_selectedCueId == cue.Id ? "true" : null)"
-                                    @onclick="() => SelectCue(cue)">
-                                <span class="block truncate text-sm font-semibold text-slate-950">@cue.Name</span>
-                                <span class="mt-1 block text-xs text-muted-foreground">
-                                    @(cue.IsEnabled ? "Enabled" : "Disabled") · @cue.QueuePolicy · @(cue.DurationMilliseconds / 1000m)s
-                                </span>
-                            </button>
-                        }
-                    </div>
-                </aside>
-
-                <div class="application-card-collection min-w-0" data-card-owner="overlay-cue-editor-cards">
-                    <section class="card p-5" aria-labelledby="cue-editor-title" data-cue-editor>
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <h2 id="cue-editor-title" class="text-lg font-semibold text-slate-950">
-                                    @(_selectedCue is null ? "New cue — not saved" : "Edit cue")
-                                </h2>
-                                <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                                    Build Cue-V1 layers once, then preview them on an enabled Cue player Browser Source.
-                                </p>
-                            </div>
-                            <button class="btn-primary" type="button" disabled="@_isBusy" @onclick="SaveCueAsync">
-                                @(_selectedCue is null ? "Create cue" : "Save cue")
-                            </button>
-                        </div>
-                        <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <Field Id="cue-name" Label="Cue name" @bind-Value="_cueDraftName" />
-                            <div class="space-y-2">
-                                <label class="label" for="cue-duration">Duration (milliseconds)</label>
-                                <input id="cue-duration"
-                                       class="input"
-                                       type="number"
-                                       min="100"
-                                       max="300000"
-                                       @bind="_cueDraftDuration" />
-                            </div>
-                            <div class="space-y-2">
-                                <label class="label" for="cue-policy">Queue policy</label>
-                                <select id="cue-policy" class="input" @bind="_cueDraftPolicy">
-                                    @foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>())
-                                    {
-                                        <option value="@policy">@QueuePolicyLabel(policy)</option>
-                                    }
-                                </select>
-                            </div>
-                            <label class="control-surface mt-7 flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold">
-                                <input type="checkbox" @bind="_cueDraftEnabled" />
-                                Cue enabled
-                            </label>
-                        </div>
-                        <div class="mt-4">
-                            <label class="label" for="cue-layers-json">Cue-V1 layer configuration</label>
-                            <textarea id="cue-layers-json"
-                                      class="input mt-2 min-h-72 font-mono text-xs leading-5"
-                                      spellcheck="false"
-                                      @bind="_cueDraftJson"></textarea>
-                            <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                                Strict JSON supports uploadedMedia, remoteMedia, and externalWeb layers. Remote content loads directly in the Browser Source; BlokeBot never fetches or proxies it.
-                            </p>
-                        </div>
-                        @if (_selectedCue is not null)
-                        {
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <button class="btn-secondary" type="button" @onclick="DeleteCueAsync">Delete cue</button>
-                            </div>
-                        }
-                    </section>
-
-                    <section class="card p-5" aria-labelledby="cue-test-title">
-                        <h2 id="cue-test-title" class="text-lg font-semibold text-slate-950">Production test playback</h2>
-                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                            Choose an authorised Cue player target. The test uses the same queue, live transport, asset routes, iframe sandbox, and timeout completion as later command triggers.
-                        </p>
-                        <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                            <div class="space-y-2">
-                                <label class="label" for="cue-target">Cue player target</label>
-                                <select id="cue-target" class="input" @bind="_cueTargetId">
-                                    <option value="">Choose a Cue player</option>
-                                    @foreach (var target in _cueCatalog.Targets)
-                                    {
-                                        <option value="@target.Id">@target.Name</option>
-                                    }
-                                </select>
-                            </div>
-                            <button class="btn-primary"
-                                    type="button"
-                                    disabled="@(_selectedCue is null || _cueTargetId is null || _isBusy)"
-                                    @onclick="PlayCueTestAsync">Play test cue</button>
-                        </div>
-                        @if (_cueTargetId is { } targetId)
-                        {
-                            <div class="mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-slate-950">
-                                <iframe class="h-full w-full"
-                                        src="@($"/overlays/preview/{targetId:D}")"
-                                        title="Cue player production preview"
-                                        sandbox="allow-scripts allow-same-origin"
-                                        referrerpolicy="no-referrer"></iframe>
-                            </div>
-                        }
-                        <p class="mt-3 text-xs leading-5 text-muted-foreground">
-                            External pages may refuse framing. BlokeBot reports a bounded refusal or timeout and advances the queue instead of weakening the sandbox.
-                        </p>
-                    </section>
-
-                    <section class="card p-5" aria-labelledby="media-library-title">
-                        <h2 id="media-library-title" class="text-lg font-semibold text-slate-950">Media library</h2>
-                        <p class="mt-1 text-sm leading-6 text-muted-foreground">
-                            Upload validated MP4 video or MP3 audio. Files stay in private channel storage outside the web root.
-                        </p>
-                        <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-                            <Field Id="media-name" Label="Media name" @bind-Value="_mediaDraftName" />
-                            <div class="space-y-2">
-                                <label class="label" for="media-upload">MP4 or MP3 file</label>
-                                <InputFile id="media-upload" class="input" OnChange="UploadAssetAsync" accept="video/mp4,audio/mpeg" />
-                            </div>
-                        </div>
-                        <div class="mt-4 grid gap-3">
-                            @foreach (var asset in _assets)
-                            {
-                                <article class="control-surface rounded-lg p-3" @key="asset.Id">
-                                    <div class="flex flex-wrap items-center justify-between gap-3">
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-semibold text-slate-950">@asset.Name</p>
-                                            <p class="mt-1 text-xs text-muted-foreground">
-                                                @asset.ContentType · @ByteLabel(asset.ByteLength) · asset @asset.Id
-                                            </p>
-                                        </div>
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <InputFile class="input max-w-56"
-                                                       OnChange="@(args => ReplaceAssetAsync(asset, args))"
-                                                       accept="@(asset.ContentType)" />
-                                            <button class="btn-secondary"
-                                                    type="button"
-                                                    @onclick="() => DeleteAssetAsync(asset)">Delete</button>
-                                        </div>
-                                    </div>
-                                    @if (_cueTargetId is { } mediaTarget)
-                                    {
-                                        var mediaUrl = $"/overlays/preview/{mediaTarget:D}/media/{asset.Id:D}/{asset.ContentRevision}";
-                                        <div class="mt-3 rounded-lg bg-slate-950 p-2">
-                                            @if (asset.ContentType == "video/mp4")
-                                            {
-                                                <video class="max-h-64 w-full"
-                                                       controls
-                                                       preload="metadata"
-                                                       src="@mediaUrl"></video>
-                                            }
-                                            else
-                                            {
-                                                <audio class="w-full"
-                                                       controls
-                                                       preload="metadata"
-                                                       src="@mediaUrl"></audio>
-                                            }
-                                        </div>
-                                    }
-                                </article>
-                            }
-                        </div>
-                    </section>
-                </div>
-            </div>
             </ApplicationCardCollection>
         }
     </ChildContent>

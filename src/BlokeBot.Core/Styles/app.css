@@ -16,6 +16,7 @@
 @import "./utilities/motion-components.css";
 @import "./components/scroll-panels.css";
 @import "./components/controls.css";
+@import "./components/file-drop-input.css";
 @import "./themeing/palettes.css";
 @import "./layout/mobile-drawer.css";
 @import "./themeing/component-colours.css";

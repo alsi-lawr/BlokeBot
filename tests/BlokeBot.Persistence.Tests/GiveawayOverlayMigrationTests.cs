@@ -12,7 +12,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class GiveawayOverlayMigrationTests
 {
     private const string _previousMigration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
-    private const string _latestMigration = "20260731110140_v0.6.0_EventFeedOverlay";
+    private const string _latestMigration = "20260731141254_v0.6.0_OverlayAppearance";
 
     [Test]
     public async Task Upgrade_PreservesExistingOverlayTypesAndAllowsGiveawayRows()
@@ -42,7 +42,7 @@ public sealed class GiveawayOverlayMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(19);
+        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
         (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);

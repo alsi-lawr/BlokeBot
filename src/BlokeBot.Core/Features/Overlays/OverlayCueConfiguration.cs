@@ -8,6 +8,7 @@ public enum OverlayCueMediaKind
 {
     Video,
     Audio,
+    Image,
 }
 
 public enum OverlayCueFitMode
@@ -150,6 +151,13 @@ public sealed record OverlayCueConfiguration
         {
             return Invalid("Layer URLs must be absolute HTTPS URLs.");
         }
+    }
+
+    public static OverlayCueConfigurationResult Create(IReadOnlyList<OverlayCueLayer> layers)
+    {
+        ArgumentNullException.ThrowIfNull(layers);
+        var candidate = new OverlayCueConfiguration(layers.ToImmutableArray());
+        return Parse(candidate.ToPersistenceJson());
     }
 
     public string ToPersistenceJson()

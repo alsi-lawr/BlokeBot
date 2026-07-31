@@ -15,7 +15,7 @@ internal static class SimulationViewCatalog
         ["points"] = "/points",
         ["points-settings"] = "/points/settings",
         ["custom-commands"] = "/custom-commands/settings",
-        ["overlays"] = "/overlays",
+        ["overlays"] = "/overlays/sources",
         ["admin"] = "/admin",
         ["native-shoutouts"] = "/twitch-operations/shoutouts",
         ["native-polls"] = "/twitch-operations/polls",

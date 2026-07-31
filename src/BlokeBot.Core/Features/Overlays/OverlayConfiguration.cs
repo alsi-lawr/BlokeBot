@@ -7,7 +7,11 @@ namespace BlokeBot.Core.Features.Overlays;
 
 public abstract record OverlayConfiguration
 {
-    private const int _maximumJsonBytes = 4096;
+    private const int _maximumJsonBytes = 8192;
+    private static readonly JsonSerializerOptions _persistenceJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     private OverlayConfiguration() { }
 
@@ -27,7 +31,7 @@ public abstract record OverlayConfiguration
         if (string.IsNullOrWhiteSpace(json) || Encoding.UTF8.GetByteCount(json) > _maximumJsonBytes)
         {
             return new OverlayConfigurationParseResult.Invalid(
-                "The overlay configuration must be from 1 to 4096 UTF-8 bytes."
+                "The overlay configuration must be from 1 to 8192 UTF-8 bytes."
             );
         }
 
@@ -104,7 +108,8 @@ public abstract record OverlayConfiguration
     {
         var properties = root.EnumerateObject().ToArray();
         if (
-            properties.Length != 3
+            properties.Length is not (3 or 4)
+            || (properties.Length == 4 && !TryReadProperty(properties, "appearance", out _))
             || !TryReadProperty(properties, "schemaVersion", out var schemaVersion)
             || schemaVersion.Value.ValueKind != JsonValueKind.Number
             || !schemaVersion.Value.TryGetInt32(out var version)
@@ -117,6 +122,7 @@ public abstract record OverlayConfiguration
             || resultDurationSeconds
                 is < GuessingV1.MinimumResultDurationSeconds
                     or > GuessingV1.MaximumResultDurationSeconds
+            || !TryReadAppearance(properties, GuessingV1.Default.Appearance, out var appearance)
         )
         {
             return new OverlayConfigurationParseResult.Invalid(
@@ -125,7 +131,7 @@ public abstract record OverlayConfiguration
         }
 
         return new OverlayConfigurationParseResult.Valid(
-            new GuessingV1(showGuessCount.Value.GetBoolean(), resultDurationSeconds)
+            new GuessingV1(showGuessCount.Value.GetBoolean(), resultDurationSeconds, appearance)
         );
     }
 
@@ -148,7 +154,8 @@ public abstract record OverlayConfiguration
     {
         var properties = root.EnumerateObject().ToArray();
         if (
-            properties.Length != 5
+            properties.Length is not (5 or 6)
+            || (properties.Length == 6 && !TryReadProperty(properties, "appearance", out _))
             || !TryReadProperty(properties, "schemaVersion", out var schemaVersion)
             || schemaVersion.Value.ValueKind != JsonValueKind.Number
             || !schemaVersion.Value.TryGetInt32(out var version)
@@ -160,6 +167,7 @@ public abstract record OverlayConfiguration
             || !TryReadBoolean(properties, "showEntrantCount", out var showEntrantCount)
             || !TryReadBoolean(properties, "showCountdown", out var showCountdown)
             || !TryReadBoolean(properties, "showJoinCommand", out var showJoinCommand)
+            || !TryReadAppearance(properties, GiveawayV1.Default.Appearance, out var appearance)
         )
         {
             return new OverlayConfigurationParseResult.Invalid(
@@ -168,7 +176,7 @@ public abstract record OverlayConfiguration
         }
 
         return new OverlayConfigurationParseResult.Valid(
-            new GiveawayV1(titleValue, showEntrantCount, showCountdown, showJoinCommand)
+            new GiveawayV1(titleValue, showEntrantCount, showCountdown, showJoinCommand, appearance)
         );
     }
 
@@ -220,7 +228,10 @@ public abstract record OverlayConfiguration
                             ),
                             pair.Value.DurationSeconds
                         )
-                    )
+                    ),
+                    dto.Appearance is null
+                        ? OverlayAppearance.EventFeedDefault
+                        : ParseAppearance(dto.Appearance)
                 )
             );
         }
@@ -271,6 +282,40 @@ public abstract record OverlayConfiguration
         return false;
     }
 
+    private static bool TryReadAppearance(
+        IEnumerable<JsonProperty> properties,
+        OverlayAppearance defaultAppearance,
+        out OverlayAppearance appearance
+    )
+    {
+        if (!TryReadProperty(properties, "appearance", out var property))
+        {
+            appearance = defaultAppearance;
+            return true;
+        }
+        try
+        {
+            var dto = property.Value.Deserialize<OverlayAppearanceDto>(
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    PropertyNameCaseInsensitive = false,
+                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+                }
+            );
+            appearance = dto is null ? throw new ArgumentException() : ParseAppearance(dto);
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            appearance = defaultAppearance;
+            return false;
+        }
+    }
+
+    private static OverlayAppearance ParseAppearance(OverlayAppearanceDto dto) =>
+        new OverlayAppearance(dto.X, dto.Y, dto.Width, dto.Height, dto.Css ?? string.Empty);
+
     public sealed record EmptyV1 : OverlayConfiguration
     {
         public override OverlayType Type => OverlayType.Empty;
@@ -286,7 +331,11 @@ public abstract record OverlayConfiguration
         public const int MaximumResultDurationSeconds = 30;
         public const int DefaultResultDurationSeconds = 8;
 
-        public GuessingV1(bool showGuessCount, int resultDurationSeconds)
+        public GuessingV1(
+            bool showGuessCount,
+            int resultDurationSeconds,
+            OverlayAppearance? appearance = null
+        )
         {
             if (
                 resultDurationSeconds
@@ -302,6 +351,7 @@ public abstract record OverlayConfiguration
 
             ShowGuessCount = showGuessCount;
             ResultDurationSeconds = resultDurationSeconds;
+            Appearance = appearance ?? OverlayAppearance.GuessingDefault;
         }
 
         public override OverlayType Type => OverlayType.Guessing;
@@ -312,8 +362,22 @@ public abstract record OverlayConfiguration
 
         public int ResultDurationSeconds { get; }
 
+        public OverlayAppearance Appearance { get; }
+
+        public static GuessingV1 Default =>
+            new(true, DefaultResultDurationSeconds, OverlayAppearance.GuessingDefault);
+
         internal override string ToPersistenceJson() =>
-            $$"""{"schemaVersion":1,"showGuessCount":{{ShowGuessCount.ToString().ToLowerInvariant()}},"resultDurationSeconds":{{ResultDurationSeconds}}}""";
+            JsonSerializer.Serialize(
+                new
+                {
+                    schemaVersion = SchemaVersion,
+                    showGuessCount = ShowGuessCount,
+                    resultDurationSeconds = ResultDurationSeconds,
+                    appearance = Appearance,
+                },
+                _persistenceJsonOptions
+            );
     }
 
     public sealed record CuePlayerV1 : OverlayConfiguration
@@ -334,7 +398,8 @@ public abstract record OverlayConfiguration
             string title,
             bool showEntrantCount,
             bool showCountdown,
-            bool showJoinCommand
+            bool showJoinCommand,
+            OverlayAppearance? appearance = null
         )
         {
             var normalizedTitle = title.Trim();
@@ -350,6 +415,7 @@ public abstract record OverlayConfiguration
             ShowEntrantCount = showEntrantCount;
             ShowCountdown = showCountdown;
             ShowJoinCommand = showJoinCommand;
+            Appearance = appearance ?? OverlayAppearance.GiveawayDefault;
         }
 
         public override OverlayType Type => OverlayType.Giveaway;
@@ -364,6 +430,11 @@ public abstract record OverlayConfiguration
 
         public bool ShowJoinCommand { get; }
 
+        public OverlayAppearance Appearance { get; }
+
+        public static GiveawayV1 Default =>
+            new(DefaultTitle, true, true, true, OverlayAppearance.GiveawayDefault);
+
         internal override string ToPersistenceJson() =>
             JsonSerializer.Serialize(
                 new
@@ -373,7 +444,9 @@ public abstract record OverlayConfiguration
                     showEntrantCount = ShowEntrantCount,
                     showCountdown = ShowCountdown,
                     showJoinCommand = ShowJoinCommand,
-                }
+                    appearance = Appearance,
+                },
+                _persistenceJsonOptions
             );
     }
 
@@ -386,7 +459,8 @@ public abstract record OverlayConfiguration
         public EventFeedV1(
             int capacity,
             EventFeedOverflowPolicy overflowPolicy,
-            IReadOnlyDictionary<OverlayEventFeedKind, EventFeedKindConfiguration> kinds
+            IReadOnlyDictionary<OverlayEventFeedKind, EventFeedKindConfiguration> kinds,
+            OverlayAppearance? appearance = null
         )
         {
             if (
@@ -409,6 +483,7 @@ public abstract record OverlayConfiguration
             Capacity = capacity;
             OverflowPolicy = overflowPolicy;
             Kinds = kinds.ToDictionary(pair => pair.Key, pair => pair.Value);
+            Appearance = appearance ?? OverlayAppearance.EventFeedDefault;
             foreach (var pair in Kinds)
             {
                 ValidateTemplate(pair.Key, pair.Value.Template);
@@ -420,6 +495,7 @@ public abstract record OverlayConfiguration
         public int Capacity { get; }
         public EventFeedOverflowPolicy OverflowPolicy { get; }
         public IReadOnlyDictionary<OverlayEventFeedKind, EventFeedKindConfiguration> Kinds { get; }
+        public OverlayAppearance Appearance { get; }
 
         internal override string ToPersistenceJson() =>
             JsonSerializer.Serialize(
@@ -439,6 +515,13 @@ public abstract record OverlayConfiguration
                                     ),
                                     pair.Value.DurationSeconds
                                 )
+                    ),
+                    new OverlayAppearanceDto(
+                        Appearance.X,
+                        Appearance.Y,
+                        Appearance.Width,
+                        Appearance.Height,
+                        Appearance.Css
                     )
                 ),
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
@@ -468,7 +551,8 @@ public abstract record OverlayConfiguration
                         OverlayEventFeedPriority.High,
                         8
                     ),
-                }
+                },
+                OverlayAppearance.EventFeedDefault
             );
 
         private static void ValidateTemplate(OverlayEventFeedKind kind, string template)
@@ -560,8 +644,11 @@ internal sealed record EventFeedConfigurationDto(
     int SchemaVersion,
     int Capacity,
     string? OverflowPolicy,
-    Dictionary<string, EventFeedKindConfigurationDto?>? Kinds
+    Dictionary<string, EventFeedKindConfigurationDto?>? Kinds,
+    OverlayAppearanceDto? Appearance
 );
+
+internal sealed record OverlayAppearanceDto(int X, int Y, int Width, int Height, string? Css);
 
 internal sealed record EventFeedKindConfigurationDto(
     bool Enabled,

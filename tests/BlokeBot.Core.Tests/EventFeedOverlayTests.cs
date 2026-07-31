@@ -514,8 +514,9 @@ public sealed class EventFeedOverlayTests
         javascript.ShouldContain("document.createElement(\"div\")");
         javascript.ShouldContain("body.textContent = text");
         javascript.ShouldContain("eventFeedBody.body.scrollHeight");
-        javascript.ShouldContain("Math.min(1, maximumCardHeight / naturalHeight)");
-        javascript.ShouldContain("translate(160 960)");
+        javascript.ShouldContain("const scaleY = appearance.height / naturalHeight");
+        javascript.ShouldNotContain("maximumCardHeight");
+        javascript.ShouldContain("translate(${appearance.x} ${appearance.y + appearance.height})");
         javascript.ShouldContain("\"data-source-card-id\": String(card.id)");
         javascript.ShouldNotContain("Intl.Segmenter");
         javascript.ShouldNotContain("eventFeedGraphemes");
@@ -534,7 +535,7 @@ public sealed class EventFeedOverlayTests
         dashboard.ShouldContain("Guessing winner");
         dashboard.ShouldContain("Giveaway winner");
         dashboard.ShouldContain("When full");
-        dashboard.ShouldContain("Queue capacity");
+        dashboard.ShouldContain("Maximum waiting cards");
         var help = File.ReadAllText(
             Path.GetFullPath(
                 Path.Combine(
@@ -553,7 +554,7 @@ public sealed class EventFeedOverlayTests
             )
         );
         help.ShouldContain("Event Feed");
-        help.ShouldContain("never replay");
+        help.ShouldContain("Saved settings remain");
     }
 
     private static async Task<OverlayLiveTransportMessage> ReadLiveAsync(

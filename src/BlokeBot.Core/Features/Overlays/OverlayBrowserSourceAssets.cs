@@ -233,10 +233,14 @@ internal static class OverlayBrowserSourceAssets
           const root = document.getElementById("overlay-root");
           const canvas = document.getElementById("overlay-canvas");
           const cueCanvas = document.getElementById("cue-canvas");
+          const appearanceStylesheet = document.getElementById(
+            "overlay-appearance-style",
+          );
           if (
             !(root instanceof HTMLElement) ||
             !(canvas instanceof SVGSVGElement) ||
-            !(cueCanvas instanceof HTMLElement)
+            !(cueCanvas instanceof HTMLElement) ||
+            !(appearanceStylesheet instanceof HTMLLinkElement)
           ) {
             return;
           }
@@ -252,8 +256,22 @@ internal static class OverlayBrowserSourceAssets
           let testPulseTimer = null;
           let presentationAnimationTimer = null;
           let giveawayCountdownTimer = null;
+          let loadedSnapshotSequence = null;
           const cueTimers = new Map();
           const svgNamespace = canvas.namespaceURI;
+
+          const refreshAppearanceStylesheet = (sequence) => {
+            if (!Number.isSafeInteger(sequence) || sequence < 1) {
+              return false;
+            }
+            const url = new URL(appearanceStylesheet.href, window.location.href);
+            if (url.origin !== window.location.origin) {
+              return false;
+            }
+            url.searchParams.set("revision", String(sequence));
+            appearanceStylesheet.href = url.href;
+            return true;
+          };
 
           const showTestPulse = () => {
             root.dataset.testPulse = "active";
@@ -313,10 +331,17 @@ internal static class OverlayBrowserSourceAssets
           };
 
           const appendText = (group, className, x, y, text) => {
+            const stableClass = className.endsWith("-kicker")
+              ? " kicker"
+              : className.endsWith("-title")
+                ? " title"
+                : className.endsWith("-result")
+                  ? " result"
+                  : " detail";
             group.append(
               svgElement(
                 "text",
-                { class: className, x: String(x), y: String(y) },
+                { class: className + stableClass, x: String(x), y: String(y) },
                 text,
               ),
             );
@@ -383,20 +408,37 @@ internal static class OverlayBrowserSourceAssets
             return `${winners} · ${state.awardedPointsPerWinner} ${state.pointLabel} each`;
           };
 
-          const renderGuessing = (state) => {
+          const validAppearance = (appearance) =>
+            typeof appearance === "object" &&
+            appearance !== null &&
+            Number.isSafeInteger(appearance.x) &&
+            Number.isSafeInteger(appearance.y) &&
+            Number.isSafeInteger(appearance.width) &&
+            Number.isSafeInteger(appearance.height) &&
+            appearance.x >= 0 &&
+            appearance.y >= 0 &&
+            appearance.width >= 160 &&
+            appearance.height >= 90 &&
+            appearance.x + appearance.width <= 1920 &&
+            appearance.y + appearance.height <= 1080;
+
+          const renderGuessing = (state, appearance) => {
             canvas.replaceChildren();
             root.dataset.phase = state.phase;
             if (state.phase === "noRound") {
               return;
             }
 
-            const group = svgElement("g", {
-              class: "guessing-presentation",
-              transform: "translate(160 690)",
+            const geometryGroup = svgElement("g", {
+              class: "overlay",
+              transform: `translate(${appearance.x} ${appearance.y}) scale(${appearance.width / 1600} ${appearance.height / 270})`,
             });
-            group.append(
+            const presentationGroup = svgElement("g", {
+              class: "guessing-presentation",
+            });
+            presentationGroup.append(
               svgElement("rect", {
-                class: "guessing-card",
+                class: "guessing-card card",
                 x: "0",
                 y: "0",
                 width: "1600",
@@ -404,7 +446,7 @@ internal static class OverlayBrowserSourceAssets
                 rx: "30",
               }),
               svgElement("rect", {
-                class: "guessing-accent",
+                class: "guessing-accent accent",
                 x: "0",
                 y: "0",
                 width: "16",
@@ -419,17 +461,23 @@ internal static class OverlayBrowserSourceAssets
                 : state.phase === "closed"
                   ? "ENTRIES CLOSED"
                   : "RESULT";
-            appendText(group, "guessing-kicker", 56, 62, status);
-            appendText(group, "guessing-title", 56, 135, state.roundName);
+            appendText(presentationGroup, "guessing-kicker", 56, 62, status);
+            appendText(presentationGroup, "guessing-title", 56, 135, state.roundName);
             if (state.phase === "completed") {
               appendText(
-                group,
+                presentationGroup,
                 "guessing-result",
                 56,
                 202,
                 `Winner: ${state.winningAnswer}`,
               );
-              appendText(group, "guessing-detail", 760, 202, resultDetail(state));
+              appendText(
+                presentationGroup,
+                "guessing-detail",
+                760,
+                202,
+                resultDetail(state),
+              );
             } else {
               const detail =
                 state.guessCount === null
@@ -437,9 +485,10 @@ internal static class OverlayBrowserSourceAssets
                     ? "Send your guess in chat"
                     : "Waiting for the result"
                   : `${state.guessCount} ${state.guessCount === 1 ? "guess" : "guesses"}`;
-              appendText(group, "guessing-detail", 56, 205, detail);
+              appendText(presentationGroup, "guessing-detail", 56, 205, detail);
             }
-            canvas.append(group);
+            geometryGroup.append(presentationGroup);
+            canvas.append(geometryGroup);
           };
 
           const validGiveawayState = (state) => {
@@ -539,20 +588,26 @@ internal static class OverlayBrowserSourceAssets
             return details.join("  •  ");
           };
 
-          const renderGiveaway = (state) => {
+          const renderGiveaway = (state, appearance) => {
             if (giveawayCountdownTimer !== null) {
               window.clearTimeout(giveawayCountdownTimer);
               giveawayCountdownTimer = null;
             }
             canvas.replaceChildren();
             root.dataset.phase = state.phase;
-            const group = svgElement("g", {
-              class: "giveaway-presentation",
-              transform: "translate(160 690)",
+            if (state.phase === "idle") {
+              return;
+            }
+            const geometryGroup = svgElement("g", {
+              class: "overlay",
+              transform: `translate(${appearance.x} ${appearance.y}) scale(${appearance.width / 1600} ${appearance.height / 270})`,
             });
-            group.append(
+            const presentationGroup = svgElement("g", {
+              class: "giveaway-presentation",
+            });
+            presentationGroup.append(
               svgElement("rect", {
-                class: "giveaway-card",
+                class: "giveaway-card card",
                 x: "0",
                 y: "0",
                 width: "1600",
@@ -560,7 +615,7 @@ internal static class OverlayBrowserSourceAssets
                 rx: "30",
               }),
               svgElement("rect", {
-                class: "giveaway-accent",
+                class: "giveaway-accent accent",
                 x: "0",
                 y: "0",
                 width: "16",
@@ -578,10 +633,10 @@ internal static class OverlayBrowserSourceAssets
                     : state.phase === "cancelled"
                       ? "GIVEAWAY CLOSED"
                       : "GIVEAWAY";
-            appendText(group, "giveaway-kicker", 56, 62, status);
-            appendText(group, "giveaway-title", 56, 135, state.title);
+            appendText(presentationGroup, "giveaway-kicker", 56, 62, status);
+            appendText(presentationGroup, "giveaway-title", 56, 135, state.title);
             appendText(
-              group,
+              presentationGroup,
               state.phase === "completed"
                 ? "giveaway-result"
                 : "giveaway-detail",
@@ -589,10 +644,11 @@ internal static class OverlayBrowserSourceAssets
               205,
               giveawayDetail(state),
             );
-            canvas.append(group);
+            geometryGroup.append(presentationGroup);
+            canvas.append(geometryGroup);
             if (state.phase === "open" && state.closesAtUtc !== null) {
               giveawayCountdownTimer = window.setTimeout(
-                () => renderGiveaway(state),
+                () => renderGiveaway(state, appearance),
                 1000,
               );
             }
@@ -620,7 +676,7 @@ internal static class OverlayBrowserSourceAssets
             );
           };
 
-          const renderEventFeed = (state) => {
+          const renderEventFeed = (state, appearance) => {
             canvas.replaceChildren();
             const card = state.active;
             if (card === null) return;
@@ -632,28 +688,37 @@ internal static class OverlayBrowserSourceAssets
             eventFeedBody.host.setAttribute("height", String(bodyHeight));
             eventFeedBody.host.removeAttribute("visibility");
             const naturalHeight = Math.max(270, 206 + bodyHeight);
-            const maximumCardHeight = 900;
-            const scale = Math.min(1, maximumCardHeight / naturalHeight);
-            const group = svgElement("g", {
-              class: "event-feed-presentation",
-              transform: `translate(160 960) scale(${scale}) translate(0 ${-naturalHeight})`,
+            const scaleX = appearance.width / 1600;
+            const scaleY = appearance.height / naturalHeight;
+            const geometryGroup = svgElement("g", {
+              class: "overlay",
+              transform: `translate(${appearance.x} ${appearance.y + appearance.height}) scale(${scaleX} ${scaleY}) translate(0 ${-naturalHeight})`,
               "data-source-card-id": String(card.id),
             });
-            group.append(
-              svgElement("rect", { class: "event-feed-card", x: "0", y: "0", width: "1600", height: String(naturalHeight), rx: "30" }),
-              svgElement("rect", { class: "event-feed-accent", x: "0", y: "0", width: "16", height: String(naturalHeight), rx: "8" }),
+            const presentationGroup = svgElement("g", {
+              class: "event-feed-presentation",
+            });
+            presentationGroup.append(
+              svgElement("rect", { class: "event-feed-card card", x: "0", y: "0", width: "1600", height: String(naturalHeight), rx: "30" }),
+              svgElement("rect", { class: "event-feed-accent accent", x: "0", y: "0", width: "16", height: String(naturalHeight), rx: "8" }),
             );
-            appendText(group, "event-feed-kicker", 56, 58, card.kind.replace(/([A-Z])/g, " $1").toUpperCase());
-            appendText(group, "event-feed-title", 56, 128, card.title);
-            group.append(eventFeedBody.host);
-            canvas.append(group);
+            appendText(presentationGroup, "event-feed-kicker", 56, 58, card.kind.replace(/([A-Z])/g, " $1").toUpperCase());
+            appendText(presentationGroup, "event-feed-title", 56, 128, card.title);
+            presentationGroup.append(eventFeedBody.host);
+            geometryGroup.append(presentationGroup);
+            canvas.append(geometryGroup);
           };
 
-          const applyAnimation = (animation, durationMilliseconds) => {
+          const clearPresentationAnimation = () => {
             if (presentationAnimationTimer !== null) {
               window.clearTimeout(presentationAnimationTimer);
               presentationAnimationTimer = null;
             }
+            delete root.dataset.animation;
+          };
+
+          const applyAnimation = (animation, durationMilliseconds) => {
+            clearPresentationAnimation();
             if (
               animation !== "entrance" &&
               animation !== "statusChange" &&
@@ -662,7 +727,6 @@ internal static class OverlayBrowserSourceAssets
               && animation !== "card"
               && animation !== "sample"
             ) {
-              delete root.dataset.animation;
               return;
             }
 
@@ -677,9 +741,83 @@ internal static class OverlayBrowserSourceAssets
             }, animationDuration);
           };
 
-          const applyPresentation = (projection, sequence, epoch, occurredAtUtc) => {
+          const applyPresentationAnimation = (
+            animation,
+            durationMilliseconds,
+            fromDraft,
+          ) => {
+            if (!fromDraft) {
+              applyAnimation(animation, durationMilliseconds);
+            }
+          };
+
+          let dashboardDraft = null;
+          let savedPresentation = null;
+          let draftSheet = null;
+          let draftBaseRuleCount = 0;
+
+          const clearDraftCss = () => {
+            const sheet = appearanceStylesheet.sheet;
+            if (!(sheet instanceof CSSStyleSheet)) return null;
+            if (sheet !== draftSheet) {
+              draftSheet = sheet;
+              draftBaseRuleCount = sheet.cssRules.length;
+            }
+            while (sheet.cssRules.length > draftBaseRuleCount) {
+              sheet.deleteRule(sheet.cssRules.length - 1);
+            }
+            return sheet;
+          };
+
+          const applyDraftCss = (css) => {
+            const sheet = clearDraftCss();
+            if (sheet === null || typeof css !== "string" || css.length === 0) return;
+            for (const rule of css.matchAll(/([^{}]+)\{([^{}]+)\}/g)) {
+              try {
+                sheet.insertRule(`${rule[1]} { ${rule[2]} }`, sheet.cssRules.length);
+              } catch (error) {
+                if (!(error instanceof DOMException)) throw error;
+              }
+            }
+          };
+
+          const acknowledgeDashboardDraft = () => {
+            if (
+              dashboardDraft === null ||
+              typeof dashboardDraft.requestId !== "string" ||
+              typeof dashboardDraft.overlayId !== "string"
+            ) return;
+            window.parent.postMessage(
+              {
+                kind: "blokebot-dashboard-draft-ready",
+                requestId: dashboardDraft.requestId,
+                overlayId: dashboardDraft.overlayId,
+              },
+              window.location.origin,
+            );
+          };
+
+          const withDashboardDraft = (projection) => {
+            if (dashboardDraft === null || !validAppearance(dashboardDraft.appearance)) return projection;
+            const state = { ...projection.state };
+            if (projection.overlayType === "guessing" && dashboardDraft.choices?.showGuessCount === false && state.phase !== "completed") state.guessCount = null;
+            if (projection.overlayType === "giveaway") {
+              state.title = dashboardDraft.choices?.giveawayTitle ?? state.title;
+              if (dashboardDraft.choices?.showEntrantCount === false) state.entrantCount = null;
+              if (dashboardDraft.choices?.showCountdown === false) state.closesAtUtc = null;
+              if (dashboardDraft.choices?.showJoinCommand === false) state.joinCommand = null;
+            }
+            return { ...projection, state, appearance: dashboardDraft.appearance };
+          };
+
+          const applyPresentation = (projection, sequence, epoch, occurredAtUtc, fromDraft = false) => {
+            if (!fromDraft) savedPresentation = { projection, sequence, epoch, occurredAtUtc };
+            projection = withDashboardDraft(projection);
             if (projection?.schemaVersion !== 1) {
               return false;
+            }
+            if (fromDraft) {
+              clearPresentationAnimation();
             }
             if (projection.overlayType === "empty") {
               if (
@@ -690,22 +828,24 @@ internal static class OverlayBrowserSourceAssets
               }
               canvas.replaceChildren();
               delete root.dataset.phase;
-              applyAnimation("none", 0);
+              applyPresentationAnimation("none", 0, fromDraft);
             } else if (projection.overlayType === "guessing") {
               if (
                 !Number.isSafeInteger(projection.resultDurationMilliseconds) ||
                 projection.resultDurationMilliseconds < 1000 ||
                 projection.resultDurationMilliseconds > 30000 ||
-                !validGuessingState(projection.state)
+                !validGuessingState(projection.state) ||
+                !validAppearance(projection.appearance)
               ) {
                 return false;
               }
-              renderGuessing(projection.state);
-              applyAnimation(
+              renderGuessing(projection.state, projection.appearance);
+              applyPresentationAnimation(
                 typeof projection.animation === "string"
                   ? projection.animation
                   : "none",
                 projection.resultDurationMilliseconds,
+                fromDraft,
               );
             } else if (projection.overlayType === "cuePlayer") {
               if (
@@ -717,7 +857,7 @@ internal static class OverlayBrowserSourceAssets
               canvas.replaceChildren();
               clearCues();
               delete root.dataset.phase;
-              applyAnimation("none", 0);
+              applyPresentationAnimation("none", 0, fromDraft);
             } else if (projection.overlayType === "giveaway") {
               if (
                 !Number.isSafeInteger(
@@ -725,21 +865,29 @@ internal static class OverlayBrowserSourceAssets
                 ) ||
                 projection.winnerAnimationDurationMilliseconds < 1000 ||
                 projection.winnerAnimationDurationMilliseconds > 10000 ||
-                !validGiveawayState(projection.state)
+                !validGiveawayState(projection.state) ||
+                !validAppearance(projection.appearance)
               ) {
                 return false;
               }
-              renderGiveaway(projection.state);
-              applyAnimation(
+              renderGiveaway(projection.state, projection.appearance);
+              applyPresentationAnimation(
                 typeof projection.animation === "string"
                   ? projection.animation
                   : "none",
                 projection.winnerAnimationDurationMilliseconds,
+                fromDraft,
               );
             } else if (projection.overlayType === "eventFeed") {
-              if (!validEventFeedState(projection.state)) return false;
-              renderEventFeed(projection.state);
-              applyAnimation(typeof projection.animation === "string" ? projection.animation : "none", 700);
+              if (!validEventFeedState(projection.state) || !validAppearance(projection.appearance)) return false;
+              renderEventFeed(projection.state, projection.appearance);
+              applyPresentationAnimation(
+                typeof projection.animation === "string"
+                  ? projection.animation
+                  : "none",
+                700,
+                fromDraft,
+              );
             } else {
               return false;
             }
@@ -749,8 +897,26 @@ internal static class OverlayBrowserSourceAssets
             root.dataset.serverEpoch = epoch;
             root.dataset.sequence = String(sequence);
             root.dataset.generatedAtUtc = occurredAtUtc;
+            window.requestAnimationFrame(() => {
+              applyDraftCss(dashboardDraft?.css ?? "");
+              acknowledgeDashboardDraft();
+            });
             return true;
           };
+
+          if (credentials === "same-origin" && window.parent !== window) {
+            window.addEventListener("message", (event) => {
+              if (event.origin !== window.location.origin || event.source !== window.parent) return;
+              const value = event.data;
+              if (typeof value !== "object" || value === null || value.kind !== "blokebot-dashboard-draft" || typeof value.overlayId !== "string") return;
+              const expectedPath = `${window.location.pathname.replace(/\/$/, "")}`;
+              if (!expectedPath.endsWith(`/overlays/preview/${value.overlayId}`)) return;
+              if (!validAppearance(value.appearance) || typeof value.css !== "string" || value.css.length > 16384) return;
+              if (typeof value.requestId !== "string") return;
+              dashboardDraft = { requestId: value.requestId, overlayId: value.overlayId, appearance: value.appearance, css: value.css, choices: value.choices };
+              if (savedPresentation !== null) applyPresentation(savedPresentation.projection, savedPresentation.sequence, savedPresentation.epoch, savedPresentation.occurredAtUtc, true);
+            });
+          }
 
           const clearCues = () => {
             cueCanvas.replaceChildren();
@@ -782,16 +948,25 @@ internal static class OverlayBrowserSourceAssets
             } else if (
               (layer.kind === "uploadedMedia" ||
                 layer.kind === "remoteMedia") &&
-              (layer.mediaKind === "video" || layer.mediaKind === "audio")
+              (layer.mediaKind === "video" ||
+                layer.mediaKind === "audio" ||
+                (layer.kind === "uploadedMedia" && layer.mediaKind === "image"))
             ) {
-              element = document.createElement(layer.mediaKind);
-              element.autoplay = true;
-              element.preload = "auto";
-              element.controls = false;
-              element.volume =
-                typeof layer.volume === "number"
-                  ? Math.min(1, Math.max(0, layer.volume))
-                  : 1;
+              element = document.createElement(
+                layer.mediaKind === "image" ? "img" : layer.mediaKind,
+              );
+              if (layer.mediaKind === "image") {
+                element.alt = "";
+                element.decoding = "async";
+              } else {
+                element.autoplay = true;
+                element.preload = "auto";
+                element.controls = false;
+                element.volume =
+                  typeof layer.volume === "number"
+                    ? Math.min(1, Math.max(0, layer.volume))
+                    : 1;
+              }
               if (layer.kind === "remoteMedia" && typeof layer.url === "string") {
                 element.src = layer.url;
               } else if (
@@ -937,6 +1112,14 @@ internal static class OverlayBrowserSourceAssets
               throw new Error("Overlay state is invalid.");
             }
 
+            if (
+              loadedSnapshotSequence !== null &&
+              snapshot.sequence !== loadedSnapshotSequence &&
+              !refreshAppearanceStylesheet(snapshot.sequence)
+            ) {
+              throw new Error("Overlay appearance is invalid.");
+            }
+            loadedSnapshotSequence = snapshot.sequence;
             root.dataset.snapshotSequence = String(snapshot.sequence);
             root.dataset.status = "ready";
           };

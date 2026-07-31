@@ -84,7 +84,9 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
-            "/overlays" => _overlaysHelp,
+            "/overlays/sources" => _overlaysHelp,
+            "/overlays/cues" => _cuesHelp,
+            "/overlays/media" => _mediaLibraryHelp,
             "/twitch-operations/shoutouts" => _shoutoutsHelp,
             "/twitch-operations/polls" => _pollsHelp,
             "/twitch-operations/clips-markers" => _clipsMarkersHelp,
@@ -252,11 +254,11 @@ public partial class PageHelpButton
             ),
             new(
                 "Preview and test",
-                "Live preview uses the same renderer as OBS without putting the private URL in this page.",
+                "Live preview shows how the selected Browser Source will look in OBS without revealing its private URL.",
                 [
                     "Guessing overlays show open, closed, and completed rounds from the existing Guessing game. Sample buttons preview each supported state without changing a round.",
                     "Guess count display and winner-result duration are saved per guessing overlay.",
-                    "Connection status is approximate diagnostic information, not proof that an OBS scene is visible.",
+                    "Connection status is approximate and is not proof that an OBS scene is visible.",
                     "Send test pulse publishes temporary presentation data only to the selected overlay.",
                 ]
             ),
@@ -279,22 +281,42 @@ public partial class PageHelpButton
             ),
             new(
                 "Unified event feed",
-                "One Event Feed Browser Source presents safe point awards, Guessing winners, and Giveaway winners in a bounded durable queue.",
+                "One Event Feed Browser Source presents point awards, Guessing winners, and Giveaway winners.",
                 [
-                    "Each kind can be filtered, templated with its listed plain-text placeholders, prioritised, and shown for 1 to 30 seconds.",
-                    "The queue uses fixed 3-high-to-1-normal fairness, 24-hour duplicate protection, and an explicit drop or same-kind replacement policy.",
-                    "Overlays off blocks configuration, preview, admission, publication, and rendering. Points or Guessing off suppresses only its source cards. Saved setup and dedup history remain, and suppressed or consumed cards never replay after re-enable or reconnect.",
+                    "Choose which events appear, what each item says, its importance, and how long it stays visible.",
+                    "If Points or Guessing is off, its cards stay hidden. Saved settings remain when you turn a feature back on.",
                 ]
             ),
+        ]
+    );
+
+    private static readonly HelpPage _cuesHelp = new(
+        "Cues",
+        [
+            _featureSwitchHelp,
             new(
-                "Reusable media and web cues",
-                "Create an enabled Cue player Browser Source, upload validated MP4 or MP3 media, then compose reusable Cue-V1 layers in the cue editor.",
+                "Compose and test cues",
+                "Build reusable layers, choose a Cue player Browser Source, and try the cue exactly as it will appear in OBS.",
                 [
-                    "Uploaded files remain in private channel storage. A cue cannot use another channel’s asset, and an in-use asset cannot be deleted.",
-                    "Remote HTTPS media loads directly in the Browser Source. BlokeBot does not fetch or proxy it, and private-network destinations are rejected unless the server owner opts in.",
-                    "External pages run in a restrictive iframe sandbox. A site may refuse framing; a bounded failure or timeout advances the queue without weakening the sandbox.",
-                    "Test playback uses the same Cue player target, queue policy, live transport, and media routes used by later triggers.",
-                    "Turning Overlays off blocks cue management, uploads, private media, playback, queues, and external loads. Saved cues and assets remain, but suppressed or queued runs never replay after re-enable or restart.",
+                    "Use Media library to upload or replace cue media.",
+                    "A web page may refuse framing; BlokeBot keeps the Browser Source sandbox in place and moves on after a bounded failure.",
+                    "Turning Overlays off pauses editing and playback. Saved cues remain and paused cues do not play later.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _mediaLibraryHelp = new(
+        "Media library",
+        [
+            _featureSwitchHelp,
+            new(
+                "Manage cue media",
+                "Upload, preview, replace, and delete media used by cues.",
+                [
+                    "Files stay in private channel storage and cannot be used by another channel.",
+                    "Media that is still used by a cue cannot be deleted; edit the cue first.",
+                    "Turning Overlays off pauses file access while retaining saved media.",
                 ]
             ),
         ]

@@ -58,7 +58,7 @@ public sealed class ViewerCommandCatalogMigrationTests
 
         await using var migrated = await factory.CreateDbContextAsync();
         (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_catalogMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(19);
+        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
         (
             await migrated
                 .CustomCommandAliases.OrderBy(value => value.SortOrder)
@@ -98,6 +98,7 @@ public sealed class ViewerCommandCatalogMigrationTests
             "20260731064005_v0.6.0_CustomCommandOverlayCues",
             "20260731083003_v0.6.0_GiveawayOverlay",
             "20260731110140_v0.6.0_EventFeedOverlay",
+            "20260731141254_v0.6.0_OverlayAppearance",
         ]);
     }
 }

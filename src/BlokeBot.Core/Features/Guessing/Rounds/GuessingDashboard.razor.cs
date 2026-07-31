@@ -52,6 +52,13 @@ namespace BlokeBot.Core.Features.Guessing.Rounds;
 
 public partial class GuessingDashboard
 {
+    private static readonly IReadOnlyList<SegmentedTabItem> _dashboardTabs =
+    [
+        new("live", "Live"),
+        new("history", "History"),
+        new("leaderboard", "Leaderboard"),
+    ];
+
     private enum DashboardTab
     {
         Live,
@@ -90,16 +97,6 @@ public partial class GuessingDashboard
             static _ => "Waiting for a winner",
             static _ => "Finished"
         );
-
-    private string _segmentedControlClass =>
-        _activeTab switch
-        {
-            DashboardTab.History =>
-                "segmented-motion segmented-motion--three segmented-motion--second",
-            DashboardTab.Leaderboard =>
-                "segmented-motion segmented-motion--three segmented-motion--third",
-            _ => "segmented-motion segmented-motion--three",
-        };
 
     protected override async Task OnInitializedAsync()
     {
@@ -323,10 +320,25 @@ public partial class GuessingDashboard
 
     private Task StopGuessingAsync() => RunAsync(() => _rounds.StopGuessing(HostId));
 
-    private string TabClass(DashboardTab tab) =>
-        _activeTab == tab
-            ? "segmented-motion__tab segmented-motion__tab--active"
-            : "segmented-motion__tab";
+    private static string DashboardTabKey(DashboardTab tab) =>
+        tab switch
+        {
+            DashboardTab.Live => "live",
+            DashboardTab.History => "history",
+            DashboardTab.Leaderboard => "leaderboard",
+            _ => throw new ArgumentOutOfRangeException(nameof(tab), tab, null),
+        };
+
+    private Task ActivateTabAsync(string tab) =>
+        ActivateTabAsync(
+            tab switch
+            {
+                "live" => DashboardTab.Live,
+                "history" => DashboardTab.History,
+                "leaderboard" => DashboardTab.Leaderboard,
+                _ => throw new ArgumentOutOfRangeException(nameof(tab), tab, null),
+            }
+        );
 
     private async Task RunAsync(Func<IO<GuessingOperationOutcome, Never>> operation)
     {

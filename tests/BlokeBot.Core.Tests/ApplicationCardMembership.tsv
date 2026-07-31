@@ -1,5 +1,5 @@
 # kind|source path|line|membership|owning collection
-# Baseline: 84 exact card authoring sites (83 Razor + one conditional Razor C# path).
+# Baseline: 98 exact card authoring sites.
 card|src/BlokeBot.Core/Components/Pages/Error.razor|7|included|error-page-cards
 card|src/BlokeBot.Core/Components/Pages/NotFound.razor|5|included|not-found-page-cards
 card|src/BlokeBot.Core/Features/Admin/AdminPage.razor|37|included|admin-page-cards
@@ -20,9 +20,9 @@ card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|36
 card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|67|included|guessing-settings-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|34|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|40|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|57|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|79|included|guessing-dashboard-cards
-card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|101|included|guessing-dashboard-cards
-card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|150|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|128|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|44|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|50|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|56|included|channel-setup-cards
@@ -36,18 +36,6 @@ card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|21|included|
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|27|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|63|included|public-moment-card-grid
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|84|included|public-moment-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|33|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|39|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|45|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|56|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|64|included|overlay-workspace-columns
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|103|included|overlay-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|298|included|overlay-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|382|included|overlay-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|397|included|overlay-cue-workspace
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|422|included|overlay-cue-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|479|included|overlay-cue-editor-cards
-card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|515|included|overlay-cue-editor-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|30|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|36|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|44|included|play-queue-workspace-columns
@@ -60,6 +48,25 @@ card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|26|inc
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|37|included|public-queue-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|100|included|public-queue-summary-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|116|included|public-queue-summary-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|19|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|23|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|33|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|36|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|50|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/CuesPage.razor|118|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/MediaLibraryPage.razor|22|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/MediaLibraryPage.razor|26|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/MediaLibraryPage.razor|36|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/MediaLibraryPage.razor|39|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/MediaLibraryPage.razor|43|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|32|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|38|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|44|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|55|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|63|included|overlay-workspace-columns
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|104|included|overlay-editor-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|253|included|overlay-editor-cards
+card|src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor|435|included|overlay-editor-cards
 card|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|24|included|points-settings-cards
 card|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|30|included|points-settings-cards
 card|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|36|included|points-settings-cards

@@ -1,4 +1,11 @@
 .overlay-preview-frame {
     background: transparent;
     color-scheme: only light;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.overlay-preview-frame--ready {
+    opacity: 1;
+    visibility: visible;
 }

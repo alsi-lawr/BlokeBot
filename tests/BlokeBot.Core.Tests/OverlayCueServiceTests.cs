@@ -19,7 +19,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class OverlayCueServiceTests
 {
     [Test]
-    public async Task AssetLifecycle_ValidatesSignatureRetainsDataAndPreventsReferencedDelete()
+    public async Task AssetLifecycle_IsHostBoundRetainsDataAndPreventsReferencedDelete()
     {
         await using var fixture = await Fixture.CreateAsync();
         var session = Session(fixture.HostId);
@@ -98,18 +98,156 @@ public sealed class OverlayCueServiceTests
     }
 
     [Test]
-    public async Task Upload_TruncatedOversizedAndQuotaRacesLeaveOnlyCommittedAssets()
+    public async Task ReferencedSameFamilyReplacement_PublishesNewRevisionAndRetainsCueKind()
     {
         await using var fixture = await Fixture.CreateAsync();
         var session = Session(fixture.HostId);
-        await using (var truncated = new MemoryStream([0, 0, 0, 12, (byte)'f', (byte)'t']))
+        await using var original = new MemoryStream(Mp4Bytes());
+        var uploaded = (
+            await fixture.Cues.UploadAssetAsync(
+                session,
+                "Video",
+                "video/mp4",
+                original,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+            .Value;
+        var cue = await SaveUploadedCueAsync(fixture, session, uploaded, OverlayCueMediaKind.Video);
+        var originalPath = fixture.ContentPath(uploaded.Id);
+        var replacementBytes = WebMBytes();
+        await using var replacement = new MemoryStream(replacementBytes);
+
+        var replaced = (
+            await fixture.Cues.ReplaceAssetAsync(
+                session,
+                new(uploaded.Id, uploaded.ContentRevision, "video/webm", replacement),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+            .Value;
+
+        replaced.ContentType.ShouldBe("video/webm");
+        replaced.ContentRevision.ShouldBe(uploaded.ContentRevision + 1);
+        File.Exists(originalPath).ShouldBeFalse();
+        var published = await fixture.Cues.ResolveContentAsync(
+            fixture.HostId,
+            uploaded.Id,
+            replaced.ContentRevision,
+            CancellationToken.None
+        );
+        published.ShouldNotBeNull();
+        published.ContentType.ShouldBe("video/webm");
+        (await File.ReadAllBytesAsync(published.Path)).ShouldBe(replacementBytes);
+        (
+            await fixture.Cues.ResolveContentAsync(
+                fixture.HostId,
+                uploaded.Id,
+                uploaded.ContentRevision,
+                CancellationToken.None
+            )
+        ).ShouldBeNull();
+        var retainedCue = (await fixture.Cues.ListCuesAsync(session, CancellationToken.None))
+            .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded>()
+            .Value.Single(value => value.Id == cue.Id);
+        retainedCue
+            .Configuration.Layers.ShouldHaveSingleItem()
+            .ShouldBeOfType<OverlayCueLayer.UploadedMedia>()
+            .MediaKind.ShouldBe(OverlayCueMediaKind.Video);
+    }
+
+    [Test]
+    public async Task ReferencedCrossFamilyReplacement_RejectsWithoutChangingAssetOrCue()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(fixture.HostId);
+        var originalBytes = PngBytes();
+        await using var original = new MemoryStream(originalBytes);
+        var uploaded = (
+            await fixture.Cues.UploadAssetAsync(
+                session,
+                "Image",
+                "image/png",
+                original,
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+            .Value;
+        var cue = await SaveUploadedCueAsync(fixture, session, uploaded, OverlayCueMediaKind.Image);
+        var originalPath = fixture.ContentPath(uploaded.Id);
+        await using var replacement = new MemoryStream([1, 2, 3, 4]);
+
+        (
+            await fixture.Cues.ReplaceAssetAsync(
+                session,
+                new(uploaded.Id, uploaded.ContentRevision, "audio/wav", replacement),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
+            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>();
+
+        var retainedAsset = (await fixture.Cues.ListAssetsAsync(session, CancellationToken.None))
+            .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded>()
+            .Value.ShouldHaveSingleItem();
+        retainedAsset.ShouldBe(uploaded);
+        File.Exists(originalPath).ShouldBeTrue();
+        (await File.ReadAllBytesAsync(originalPath)).ShouldBe(originalBytes);
+        (
+            await fixture.Cues.ResolveContentAsync(
+                fixture.HostId,
+                uploaded.Id,
+                uploaded.ContentRevision + 1,
+                CancellationToken.None
+            )
+        ).ShouldBeNull();
+        var retainedContent = await fixture.Cues.ResolveContentAsync(
+            fixture.HostId,
+            uploaded.Id,
+            uploaded.ContentRevision,
+            CancellationToken.None
+        );
+        retainedContent.ShouldNotBeNull();
+        retainedContent.Path.ShouldBe(originalPath);
+        var retainedCue = (await fixture.Cues.ListCuesAsync(session, CancellationToken.None))
+            .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded>()
+            .Value.Single(value => value.Id == cue.Id);
+        retainedCue
+            .Configuration.Layers.ShouldHaveSingleItem()
+            .ShouldBeOfType<OverlayCueLayer.UploadedMedia>()
+            .MediaKind.ShouldBe(OverlayCueMediaKind.Image);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var reference = await db.OverlayCueMediaAssetReferences.SingleAsync();
+        reference.CueId.ShouldBe(
+            await db
+                .OverlayCues.Where(value => value.PublicId == cue.Id)
+                .Select(value => value.Id)
+                .SingleAsync()
+        );
+        reference.AssetId.ShouldBe(
+            await db
+                .OverlayMediaAssets.Where(value => value.PublicId == uploaded.Id)
+                .Select(value => value.Id)
+                .SingleAsync()
+        );
+    }
+
+    [Test]
+    public async Task Upload_EmptyOversizedAndQuotaRacesLeaveOnlyCommittedAssets()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(fixture.HostId);
+        await using (var empty = new MemoryStream())
         {
             (
                 await fixture.Cues.UploadAssetAsync(
                     session,
-                    "Truncated",
+                    "Empty",
                     "video/mp4",
-                    truncated,
+                    empty,
                     CancellationToken.None
                 )
             ).ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>();
@@ -158,9 +296,13 @@ public sealed class OverlayCueServiceTests
     }
 
     [Test]
+    [Arguments("")]
+    [Arguments("not a type")]
     [Arguments("application/octet-stream")]
-    [Arguments("audio/mpeg")]
-    public async Task Upload_RejectsMismatchedMimeWithoutPublishingMetadata(string claimedMime)
+    [Arguments("image/*")]
+    public async Task Upload_RejectsInvalidOrNonMediaDeclarationWithoutPublishingMetadata(
+        string claimedType
+    )
     {
         await using var fixture = await Fixture.CreateAsync();
         await using var content = new MemoryStream(Mp4Bytes());
@@ -169,18 +311,92 @@ public sealed class OverlayCueServiceTests
             await fixture.Cues.UploadAssetAsync(
                 Session(fixture.HostId),
                 "Bad",
-                claimedMime,
+                claimedType,
                 content,
                 CancellationToken.None
             )
         )
             .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Rejected>()
-            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>();
+            .Reason.ShouldBeOfType<OverlayCueRejection.Invalid>()
+            .Message.ShouldBe("Unsupported file type");
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.OverlayMediaAssets.CountAsync()).ShouldBe(0);
         Directory
             .EnumerateFiles(fixture.MediaRoot, "*", SearchOption.AllDirectories)
             .ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task Upload_BrowserMediaFamiliesPersistAndBackTypedCueLayers()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(fixture.HostId);
+        var samples = new[]
+        {
+            new MediaSample("Still image", "image/png", PngBytes(), OverlayCueMediaKind.Image),
+            new MediaSample("Web video", "video/webm", WebMBytes(), OverlayCueMediaKind.Video),
+            new MediaSample("Sound", "audio/mpeg", Mp3Bytes(), OverlayCueMediaKind.Audio),
+            new MediaSample("Video", "video/mp4", Mp4Bytes(), OverlayCueMediaKind.Video),
+            new MediaSample(
+                "AVIF",
+                "IMAGE/AVIF; codecs=av01",
+                [1, 2, 3],
+                OverlayCueMediaKind.Image,
+                "image/avif"
+            ),
+            new MediaSample("Wave", "audio/wav", [4, 5, 6], OverlayCueMediaKind.Audio),
+            new MediaSample("Ogg", "video/ogg", [7, 8, 9], OverlayCueMediaKind.Video),
+        };
+
+        foreach (var sample in samples)
+        {
+            await using var content = new MemoryStream(sample.Bytes);
+            var uploaded = (
+                await fixture.Cues.UploadAssetAsync(
+                    session,
+                    sample.Name,
+                    sample.ContentType,
+                    content,
+                    CancellationToken.None
+                )
+            )
+                .ShouldBeOfType<OverlayCueResult<OverlayMediaAssetView>.Succeeded>()
+                .Value;
+            uploaded.ContentType.ShouldBe(sample.ExpectedContentType ?? sample.ContentType);
+
+            var configuration = OverlayCueConfiguration
+                .Create([
+                    new OverlayCueLayer.UploadedMedia
+                    {
+                        AssetId = uploaded.Id,
+                        MediaKind = sample.Kind,
+                        StartOffsetMilliseconds = 0,
+                        DurationMilliseconds = 1000,
+                        ZIndex = 0,
+                        Volume = 1,
+                        Fit = OverlayCueFitMode.Contain,
+                        Rectangle = new(0, 0, 100, 100),
+                    },
+                ])
+                .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
+                .Value;
+
+            (
+                await fixture.Cues.SaveCueAsync(
+                    session,
+                    new(
+                        null,
+                        new(0),
+                        sample.Name,
+                        true,
+                        1000,
+                        OverlayCueQueuePolicy.Enqueue,
+                        configuration.ToPersistenceJson()
+                    ),
+                    CancellationToken.None
+                )
+            ).ShouldBeOfType<OverlayCueResult<OverlayCueView>.Succeeded>();
+        }
     }
 
     [Test]
@@ -303,16 +519,17 @@ public sealed class OverlayCueServiceTests
         var deletion = new ControlledMediaFileDeletion { TemporaryFilesUnavailable = true };
         await using var fixture = await Fixture.CreateAsync(
             maximumHostStorageBytes: 1024,
-            deletion
+            deletion,
+            maximumUploadBytes: 2048
         );
         var session = Session(fixture.HostId);
-        await using (var rejected = new MemoryStream(Mp4Bytes(1024)))
+        await using (var rejected = new MemoryStream(new byte[1025]))
         {
             (
                 await fixture.Cues.UploadAssetAsync(
                     session,
                     "Rejected",
-                    "audio/mpeg",
+                    "video/mp4",
                     rejected,
                     CancellationToken.None
                 )
@@ -321,7 +538,7 @@ public sealed class OverlayCueServiceTests
         var staleUpload = Directory
             .EnumerateFiles(fixture.MediaRoot, ".upload-*", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
-        new FileInfo(staleUpload).Length.ShouldBe(1024);
+        new FileInfo(staleUpload).Length.ShouldBe(1025);
         deletion.TemporaryFilesUnavailable = false;
         await using var additional = new MemoryStream(Mp4Bytes());
 
@@ -486,6 +703,48 @@ public sealed class OverlayCueServiceTests
             new("viewer", "Viewer")
         );
 
+    private static async Task<OverlayCueView> SaveUploadedCueAsync(
+        Fixture fixture,
+        AuthenticatedSession session,
+        OverlayMediaAssetView asset,
+        OverlayCueMediaKind mediaKind
+    )
+    {
+        var configuration = OverlayCueConfiguration
+            .Create([
+                new OverlayCueLayer.UploadedMedia
+                {
+                    AssetId = asset.Id,
+                    MediaKind = mediaKind,
+                    StartOffsetMilliseconds = 0,
+                    DurationMilliseconds = 1000,
+                    ZIndex = 0,
+                    Volume = 1,
+                    Fit = OverlayCueFitMode.Contain,
+                    Rectangle = new(0, 0, 100, 100),
+                },
+            ])
+            .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
+            .Value;
+        return (
+            await fixture.Cues.SaveCueAsync(
+                session,
+                new(
+                    null,
+                    new(0),
+                    $"{mediaKind} cue",
+                    true,
+                    1000,
+                    OverlayCueQueuePolicy.Enqueue,
+                    configuration.ToPersistenceJson()
+                ),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueResult<OverlayCueView>.Succeeded>()
+            .Value;
+    }
+
     private static byte[] Mp4Bytes(int length = 12)
     {
         var bytes = new byte[length];
@@ -493,6 +752,22 @@ public sealed class OverlayCueServiceTests
         "ftypisom"u8.CopyTo(bytes.AsSpan(4));
         return bytes;
     }
+
+    private static byte[] PngBytes() =>
+        [(byte)0x89, (byte)'P', (byte)'N', (byte)'G', 0x0d, 0x0a, 0x1a, 0x0a];
+
+    private static byte[] WebMBytes() =>
+        [(byte)0x1a, (byte)0x45, (byte)0xdf, (byte)0xa3, 0x42, 0x82, 0x84, .. "webm"u8];
+
+    private static byte[] Mp3Bytes() => [(byte)'I', (byte)'D', (byte)'3', 0, 0, 0, 0, 0, 0, 0];
+
+    private sealed record MediaSample(
+        string Name,
+        string ContentType,
+        byte[] Bytes,
+        OverlayCueMediaKind Kind,
+        string? ExpectedContentType = null
+    );
 
     private static AuthenticatedSession Session(int hostId)
     {
@@ -546,7 +821,8 @@ public sealed class OverlayCueServiceTests
 
         internal static async Task<Fixture> CreateAsync(
             long maximumHostStorageBytes = 2048,
-            IOverlayMediaFileDeletion? fileDeletion = null
+            IOverlayMediaFileDeletion? fileDeletion = null,
+            long maximumUploadBytes = 1024
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -574,7 +850,7 @@ public sealed class OverlayCueServiceTests
                     {
                         Media = new()
                         {
-                            MaximumUploadBytes = 1024,
+                            MaximumUploadBytes = maximumUploadBytes,
                             MaximumHostStorageBytes = maximumHostStorageBytes,
                             DisconnectedQueueExpirySeconds = 5,
                         },

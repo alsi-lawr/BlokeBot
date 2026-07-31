@@ -232,7 +232,10 @@ public sealed class GuessingOverlayTests
         OverlayBrowserSourceAssets.JavaScript.ShouldContain(
             "typeof projection.animation === \"string\""
         );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("applyAnimation(\"none\", 0)");
+        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
+            "applyPresentationAnimation(\"none\", 0, fromDraft)"
+        );
+        OverlayBrowserSourceAssets.JavaScript.ShouldContain("if (!fromDraft)");
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("style.setProperty");
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("api.twitch.tv");
 

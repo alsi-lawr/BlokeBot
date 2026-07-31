@@ -27,6 +27,7 @@ internal static class OverlayBrowserSourceDocument
             livePath,
             $"{root}/media",
             $"{root}/cue-complete",
+            $"{root}/appearance.css",
             credentials,
             liveEnabled
         );
@@ -38,6 +39,7 @@ internal static class OverlayBrowserSourceDocument
         string livePath,
         string mediaPath,
         string completionPath,
+        string appearanceStylePath,
         OverlayBrowserSourceCredentials credentials,
         bool liveEnabled
     )
@@ -48,6 +50,7 @@ internal static class OverlayBrowserSourceDocument
         var encodedLiveUrl = WebUtility.HtmlEncode($"{prefix}{livePath}");
         var encodedMediaUrl = WebUtility.HtmlEncode($"{prefix}{mediaPath}");
         var encodedCompletionUrl = WebUtility.HtmlEncode($"{prefix}{completionPath}");
+        var encodedAppearanceStyleUrl = WebUtility.HtmlEncode($"{prefix}{appearanceStylePath}");
         var credentialsValue =
             credentials is OverlayBrowserSourceCredentials.SameOrigin ? "same-origin" : "omit";
         return $$"""
@@ -59,6 +62,7 @@ internal static class OverlayBrowserSourceDocument
               <meta name="robots" content="noindex,nofollow,noarchive">
               <title>BlokeBot overlay</title>
               <link rel="stylesheet" href="{{encodedPrefix}}/overlay/assets/blokebot-overlay.css">
+              <link id="overlay-appearance-style" rel="stylesheet" href="{{encodedAppearanceStyleUrl}}">
             </head>
             <body>
               <main id="overlay-root" data-state-url="{{encodedStateUrl}}" data-live-url="{{encodedLiveUrl}}" data-media-url="{{encodedMediaUrl}}" data-completion-url="{{encodedCompletionUrl}}" data-credentials="{{credentialsValue}}" data-live-enabled="{{liveEnabled.ToString().ToLowerInvariant()}}" data-status="loading" aria-live="off">

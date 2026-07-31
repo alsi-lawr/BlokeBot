@@ -636,7 +636,7 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    private static CuePlaybackLayerPayload ToPayload(OverlayCuePlaybackLayer layer) =>
+    internal static CuePlaybackLayerPayload ToPayload(OverlayCuePlaybackLayer layer) =>
         layer switch
         {
             OverlayCuePlaybackLayer.UploadedMedia value => new CuePlaybackLayerPayload
@@ -645,7 +645,12 @@ internal sealed class OverlayLiveCoordinator(
                 AssetId = value.AssetId,
                 ContentRevision = value.ContentRevision,
                 ContentType = value.ContentType,
-                MediaKind = value.ContentType == "video/mp4" ? "video" : "audio",
+                MediaKind = (
+                    OverlayMediaTypes.Kind(value.ContentType)
+                    ?? throw new InvalidOperationException("Unsupported stored media type.")
+                )
+                    .ToString()
+                    .ToLowerInvariant(),
                 Volume = value.Volume,
                 Fit = value.Fit.ToString().ToLowerInvariant(),
                 StartOffsetMilliseconds = value.StartOffsetMilliseconds,
