@@ -396,6 +396,53 @@ public sealed class OverlayCueServiceTests
     }
 
     [Test]
+    public async Task CueReferenceResolution_IsHostBoundAndDistinguishesMissingAndDisabledParts()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var (target, cue) = await fixture.SeedPlaybackAsync();
+
+        (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlayCueReferenceOutcome.Available>();
+        (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.OtherHostId, target, cue),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueReferenceOutcome.Missing>()
+            .Part.ShouldBe(OverlayCueReferencePart.Target);
+
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var storedCue = await db.OverlayCues.SingleAsync(value => value.PublicId == cue);
+            storedCue.IsEnabled = false;
+            await db.SaveChangesAsync();
+        }
+        (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueReferenceOutcome.Disabled>()
+            .Part.ShouldBe(OverlayCueReferencePart.Cue);
+
+        await fixture.SetFeaturesAsync(HostFeatureFlags.None);
+        (
+            await fixture.Playback.ResolveReferencesAsync(
+                new(fixture.HostId, target, cue),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<OverlayCueReferenceOutcome.Disabled>()
+            .Part.ShouldBe(OverlayCueReferencePart.Parent);
+    }
+
+    [Test]
     public async Task PlaybackTimeout_CompletesFailedRunAndAdvancesQueuedCue()
     {
         await using var fixture = await Fixture.CreateAsync();

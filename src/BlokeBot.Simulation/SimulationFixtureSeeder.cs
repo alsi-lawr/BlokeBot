@@ -427,6 +427,32 @@ internal sealed class SimulationFixtureSeeder(
                 ],
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
+            },
+            new CustomCommand
+            {
+                HostId = hostId,
+                Name = "Raid celebration cue",
+                CooldownSeconds = 15,
+                Action = new OverlayCueCustomCommandAction
+                {
+                    HostId = hostId,
+                    ZeroArgumentMessageLibraryEntryId = welcome.Id,
+                    TargetOverlayPublicId = Guid.Parse("a24ea34e-47f7-41f7-bdf7-5de18d90389c"),
+                    CuePublicId = Guid.Parse("f9c437a7-4df5-45de-bb87-450ca6a40f9b"),
+                    QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                    ReplyOrder = OverlayCueReplyOrder.After,
+                },
+                Aliases =
+                [
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "celebrate",
+                        SortOrder = 0,
+                    },
+                ],
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
             }
         );
         db.CustomCommands.Add(

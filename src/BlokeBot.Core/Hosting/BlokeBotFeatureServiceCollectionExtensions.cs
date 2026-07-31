@@ -105,6 +105,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
         services.AddSingleton<OverlayCuePlaybackService>();
+        services.AddSingleton<IOverlayCueAdmissionService>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayCuePlaybackService>()
+        );
         services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
@@ -128,6 +131,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandAliasRegistry>();
         services.AddSingleton<CustomCommandCooldownStore>();
         services.AddSingleton<CustomCommandExecutionService>();
+        services.TryAddSingleton<
+            IOverlayCueAdmissionService,
+            UnavailableOverlayCueAdmissionService
+        >();
         services.AddSingleton<CustomCommandInvocationClaimStore>();
         services.AddSingleton<CustomCommandInvocationResetService>();
         services.TryAddSingleton<

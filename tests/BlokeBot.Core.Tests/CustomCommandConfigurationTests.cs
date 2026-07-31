@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.CustomCommands;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -140,6 +141,49 @@ public sealed class CustomCommandConfigurationTests
             announcement.Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
         schedule.Day.ShouldBe(DayOfWeek.Friday);
         schedule.Time.ShouldBe(new TimeOnly(19, 30));
+    }
+
+    [Test]
+    public async Task OverlayCueCommand_SavingAndLoading_RoundTripsAndRejectsCrossHostOrDisabledReferences()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var otherHostId = await SeedHostAsync(dbFactory, "other");
+        var owned = await SeedCueChoicesAsync(dbFactory, hostId, "owned");
+        var other = await SeedCueChoicesAsync(dbFactory, otherHostId, "other");
+        var references = new RecordingCueAdmissions();
+        var service = CreateService(dbFactory, overlayCues: references);
+        var draft = ConfigurationWithCommands(("Cue", "cue"));
+        draft.Commands.Single().Action = new OverlayCueCustomCommandActionEditor
+        {
+            TargetOverlayPublicId = owned.TargetId,
+            CuePublicId = owned.CueId,
+            QueuePolicy = OverlayCueQueuePolicy.Replace,
+            ReplyOrder = OverlayCueReplyOrder.Before,
+        };
+
+        await SaveValidAsync(service, hostId, draft);
+        var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        var action = loaded
+            .Commands.Single()
+            .Action.ShouldBeOfType<OverlayCueCustomCommandActionEditor>();
+        action.TargetOverlayPublicId.ShouldBe(owned.TargetId);
+        action.CuePublicId.ShouldBe(owned.CueId);
+        action.QueuePolicy.ShouldBe(OverlayCueQueuePolicy.Replace);
+        action.ReplyOrder.ShouldBe(OverlayCueReplyOrder.Before);
+        action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId.ShouldBeNull();
+
+        action.TargetOverlayPublicId = other.TargetId;
+        references.Outcome = new OverlayCueReferenceOutcome.Missing(OverlayCueReferencePart.Target);
+        (
+            await SaveFailureAsync(service, hostId, loaded)
+        ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
+        action.TargetOverlayPublicId = owned.TargetId;
+        references.Outcome = new OverlayCueReferenceOutcome.Disabled(OverlayCueReferencePart.Cue);
+        (
+            await SaveFailureAsync(service, hostId, loaded)
+        ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
+        references.Requests.Count.ShouldBe(3);
     }
 
     [Test]
@@ -709,18 +753,58 @@ public sealed class CustomCommandConfigurationTests
 
     private static CustomCommandConfigurationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
-        TwitchAnnouncementAvailability availability = TwitchAnnouncementAvailability.Available
+        TwitchAnnouncementAvailability availability = TwitchAnnouncementAvailability.Available,
+        IOverlayCueAdmissionService? overlayCues = null
     )
     {
         var events = TestEventBus.Create<AppEventKind>();
         return new CustomCommandConfigurationService(
             dbFactory,
             new CustomCommandAliasRegistry(),
-            new CustomCommandConfigurationGraphWriter(dbFactory, TimeProvider.System),
+            new CustomCommandConfigurationGraphWriter(
+                dbFactory,
+                overlayCues ?? new RecordingCueAdmissions(),
+                TimeProvider.System
+            ),
             new HostCustomCommandSettingsService(dbFactory, events),
             new AvailableTwitchAnnouncementReadinessProvider(availability),
             events
         );
+    }
+
+    private sealed class RecordingCueAdmissions : IOverlayCueAdmissionService
+    {
+        public OverlayCueReferenceOutcome Outcome { get; set; } =
+            new OverlayCueReferenceOutcome.Available();
+
+        public List<OverlayCueReferenceRequest> Requests { get; } = [];
+
+        public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
+            OverlayCueReferenceRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            Requests.Add(request);
+            return Task.FromResult(Outcome);
+        }
+
+        public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(new OverlayCueAdmissionCatalog([], []));
+        }
+
+        public Task<OverlayCueAdmissionOutcome> AdmitAsync(
+            OverlayCueAdmissionRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<OverlayCueAdmissionOutcome>(
+                new OverlayCueAdmissionOutcome.Missing()
+            );
+        }
     }
 
     private sealed class AvailableTwitchAnnouncementReadinessProvider(
@@ -841,5 +925,51 @@ public sealed class CustomCommandConfigurationTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
+    }
+
+    private static async Task<(Guid TargetId, Guid CueId)> SeedCueChoicesAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        string name
+    )
+    {
+        var targetId = Guid.NewGuid();
+        var cueId = Guid.NewGuid();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.OverlayInstances.Add(
+            new OverlayInstance
+            {
+                HostId = hostId,
+                PublicId = targetId,
+                Name = $"{name} target",
+                Type = OverlayType.CuePlayer,
+                IsEnabled = true,
+                ConfigurationJson = """{"schemaVersion":1}""",
+                AccessKeyDigest = System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(name)
+                ),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        db.OverlayCues.Add(
+            new OverlayCue
+            {
+                HostId = hostId,
+                PublicId = cueId,
+                Name = $"{name} cue",
+                IsEnabled = true,
+                DurationMilliseconds = 1000,
+                QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                ConfigurationJson = """{"schemaVersion":1,"layers":[]}""",
+                Revision = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        await db.SaveChangesAsync();
+        return (targetId, cueId);
     }
 }

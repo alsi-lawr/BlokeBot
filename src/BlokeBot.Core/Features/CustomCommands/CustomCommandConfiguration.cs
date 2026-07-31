@@ -89,6 +89,10 @@ public sealed class CustomCommandEditor
                 {
                     ReplyRoutes = Action.ReplyRoutes,
                 },
+                CustomCommandActionKind.OverlayCue => new OverlayCueCustomCommandActionEditor
+                {
+                    ReplyRoutes = Action.ReplyRoutes,
+                },
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
             };
         }
@@ -99,6 +103,7 @@ public enum CustomCommandActionKind
 {
     Message,
     Counter,
+    OverlayCue,
 }
 
 public interface ICustomCommandActionEditor
@@ -139,6 +144,25 @@ public sealed class CounterCustomCommandActionEditor : ICustomCommandActionEdito
     } = new();
 
     public int CounterId { get; set; }
+}
+
+public sealed class OverlayCueCustomCommandActionEditor : ICustomCommandActionEditor
+{
+    public CustomCommandActionKind Kind => CustomCommandActionKind.OverlayCue;
+
+    public CustomCommandReplyRoutesEditor ReplyRoutes
+    {
+        get;
+        set => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = new();
+
+    public Guid TargetOverlayPublicId { get; set; }
+
+    public Guid CuePublicId { get; set; }
+
+    public OverlayCueQueuePolicy QueuePolicy { get; set; } = OverlayCueQueuePolicy.Enqueue;
+
+    public OverlayCueReplyOrder ReplyOrder { get; set; } = OverlayCueReplyOrder.After;
 }
 
 public sealed class CustomCounterEditor

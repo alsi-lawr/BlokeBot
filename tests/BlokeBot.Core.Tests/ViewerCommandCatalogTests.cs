@@ -1,6 +1,7 @@
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
@@ -20,13 +21,115 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerCommandCatalogTests
 {
     [Test]
+    public async Task OverlayCueCustomCommand_LoadingCatalog_InheritsOverlaysWithoutHidingMessageCommands()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        var targetId = Guid.NewGuid();
+        var cueId = Guid.NewGuid();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.CustomCommands,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            hostId = host.Id;
+            db.CustomCommands.AddRange(
+                CatalogCommand(
+                    hostId,
+                    "message",
+                    new MessageCustomCommandAction { HostId = hostId }
+                ),
+                CatalogCommand(
+                    hostId,
+                    "cue",
+                    new OverlayCueCustomCommandAction
+                    {
+                        HostId = hostId,
+                        TargetOverlayPublicId = targetId,
+                        CuePublicId = cueId,
+                        QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                        ReplyOrder = OverlayCueReplyOrder.After,
+                    }
+                )
+            );
+            db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    HostId = hostId,
+                    PublicId = targetId,
+                    Name = "Player",
+                    Type = OverlayType.CuePlayer,
+                    IsEnabled = true,
+                    ConfigurationJson = """{"schemaVersion":1}""",
+                    AccessKeyDigest = System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes("catalog-player")
+                    ),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            db.OverlayCues.Add(
+                new OverlayCue
+                {
+                    HostId = hostId,
+                    PublicId = cueId,
+                    Name = "Cue",
+                    IsEnabled = true,
+                    DurationMilliseconds = 1000,
+                    QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                    ConfigurationJson = """{"schemaVersion":1,"layers":[]}""",
+                    Revision = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var references = new RecordingCueAdmissions
+        {
+            Outcome = new OverlayCueReferenceOutcome.Disabled(OverlayCueReferencePart.Parent),
+        };
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            references
+        );
+
+        (await catalog.LoadForHostAsync(hostId, CancellationToken.None)).Names.ShouldBe([
+            "!message",
+        ]);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures |= HostFeatureFlags.Overlays;
+            await db.SaveChangesAsync();
+        }
+        references.Outcome = new OverlayCueReferenceOutcome.Available();
+
+        (await catalog.LoadForHostAsync(hostId, CancellationToken.None)).Names.ShouldBe([
+            "!cue",
+            "!message",
+        ]);
+        references.Requests.Count.ShouldBe(2);
+    }
+
+    [Test]
     public async Task ChannelState_LoadingCatalog_ListsViewerCanonicalRoutesOnceInStableOrder()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var fixture = await SeedCatalogFixtureAsync(dbFactory);
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
-            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream"))
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
+            new RecordingCueAdmissions()
         );
 
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
@@ -60,6 +163,24 @@ public sealed class ViewerCommandCatalogTests
         snapshot.Conflicts.ShouldBeEmpty();
     }
 
+    private static CustomCommand CatalogCommand(
+        int hostId,
+        string alias,
+        CustomCommandAction action
+    )
+    {
+        return new()
+        {
+            HostId = hostId,
+            Name = alias,
+            Enabled = true,
+            Action = action,
+            Aliases = [new CustomCommandAlias { HostId = hostId, Alias = alias }],
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+    }
+
     [Test]
     public async Task ClosedRoundAndOffline_LoadingCatalog_UsesChannelWideAvailabilityOnly()
     {
@@ -83,7 +204,8 @@ public sealed class ViewerCommandCatalogTests
 
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
-            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline())
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions()
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
@@ -126,7 +248,8 @@ public sealed class ViewerCommandCatalogTests
 
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
-            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream"))
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
+            new RecordingCueAdmissions()
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
@@ -145,6 +268,7 @@ public sealed class ViewerCommandCatalogTests
         var services = new ServiceCollection();
         services.AddSingleton<IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>>(dbFactory);
         services.AddSingleton<IHostStreamLivenessProvider>(liveness);
+        services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
         services.AddSingleton<ViewerCommandCatalogService>();
         services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
@@ -212,6 +336,7 @@ public sealed class ViewerCommandCatalogTests
         services.AddSingleton<IHostStreamLivenessProvider>(
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline())
         );
+        services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
         services.AddSingleton<ViewerCommandCatalogService>();
         services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
@@ -474,6 +599,41 @@ public sealed class ViewerCommandCatalogTests
         {
             return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
                 ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
+            );
+        }
+    }
+
+    private sealed class RecordingCueAdmissions : IOverlayCueAdmissionService
+    {
+        public OverlayCueReferenceOutcome Outcome { get; set; } =
+            new OverlayCueReferenceOutcome.Available();
+
+        public List<OverlayCueReferenceRequest> Requests { get; } = [];
+
+        public Task<OverlayCueReferenceOutcome> ResolveReferencesAsync(
+            OverlayCueReferenceRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            Requests.Add(request);
+            return Task.FromResult(Outcome);
+        }
+
+        public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(new OverlayCueAdmissionCatalog([], []));
+        }
+
+        public Task<OverlayCueAdmissionOutcome> AdmitAsync(
+            OverlayCueAdmissionRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<OverlayCueAdmissionOutcome>(
+                new OverlayCueAdmissionOutcome.Missing()
             );
         }
     }

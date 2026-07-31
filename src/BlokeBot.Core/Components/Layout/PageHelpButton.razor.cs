@@ -542,6 +542,9 @@ public partial class PageHelpButton
                     "Use <code>{user}</code> for the viewer's name and <code>{channel}</code> for the channel name.",
                     "Use <code>{args}</code> for everything typed after the command, or <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
                     "Counter commands can use <code>{count}</code> for the new number.",
+                    "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, playback, testing, replies, cooldowns, use claims, and viewer-catalog disclosure are paused.",
+                    "Turning either switch back on restores the saved cue setup without replaying commands that were suppressed while it was off.",
+                    "Test cue uses the same host-bound playback admission as a viewer command, but does not send chat, start a cooldown, or claim a viewer use.",
                 ]
             ),
             new(

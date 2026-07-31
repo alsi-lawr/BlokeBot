@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -18,6 +19,7 @@ public sealed class CustomCommandExecutionService(
     CustomCommandTemplateRenderer templates,
     CustomCommandInvocationClaimStore claims,
     IHostStreamLivenessProvider streams,
+    IOverlayCueAdmissionService overlayCues,
     TimeProvider clock
 )
 {
@@ -68,16 +70,37 @@ public sealed class CustomCommandExecutionService(
             return new CustomCommandExecutionOutcome.Handled();
         }
 
+        var cueAction = command.Action as OverlayCueCustomCommandAction;
+        if (cueAction is not null && !HasOverlays(host.EnabledFeatures))
+        {
+            return new CustomCommandExecutionOutcome.OverlayCue(
+                new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled()
+            );
+        }
+        if (cueAction is not null)
+        {
+            var references = await overlayCues.ResolveReferencesAsync(
+                ReferenceRequest(host.Id, cueAction),
+                ct
+            );
+            if (references is not OverlayCueReferenceOutcome.Available)
+            {
+                return new CustomCommandExecutionOutcome.OverlayCue(AdmissionOutcome(references));
+            }
+        }
+
         var replyId = command.Action.ReplyIdForArgumentCount(args.Count);
-        if (replyId is null)
+        if (replyId is null && cueAction is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
 
-        var messageEntry = await db
-            .CustomMessageLibraryEntries.Include(x => x.Variants)
-            .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == replyId.Value, ct);
-        if (messageEntry is null)
+        var messageEntry = replyId is null
+            ? null
+            : await db
+                .CustomMessageLibraryEntries.Include(x => x.Variants)
+                .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == replyId.Value, ct);
+        if (replyId is not null && messageEntry is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
@@ -131,7 +154,7 @@ public sealed class CustomCommandExecutionService(
         }
 
         var selectedMessage = SelectMessage(messageEntry);
-        if (selectedMessage is null)
+        if (selectedMessage is null && cueAction is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
@@ -139,9 +162,129 @@ public sealed class CustomCommandExecutionService(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        var reply = templates.Render(selectedMessage, context, args, count);
-        await context.ReplyAsync(reply, ct);
+        var reply = selectedMessage is null
+            ? null
+            : templates.Render(selectedMessage, context, args, count);
+        if (
+            cueAction is not null
+            && reply is not null
+            && cueAction.ReplyOrder == OverlayCueReplyOrder.Before
+        )
+        {
+            await context.ReplyAsync(reply, ct);
+        }
+
+        if (cueAction is not null)
+        {
+            var admission = await overlayCues.AdmitAsync(
+                Request(host.Id, cueAction, context.Message, OverlayCueAdmissionOrigin.Command),
+                ct
+            );
+            if (
+                reply is not null
+                && cueAction.ReplyOrder == OverlayCueReplyOrder.After
+                && AdmissionAccepted(admission)
+            )
+            {
+                await context.ReplyAsync(reply, ct);
+            }
+            return new CustomCommandExecutionOutcome.OverlayCue(admission);
+        }
+
+        await context.ReplyAsync(reply!, ct);
         return new CustomCommandExecutionOutcome.Handled();
+    }
+
+    public async Task<OverlayCueAdmissionOutcome> TestCueAsync(
+        int hostId,
+        OverlayCueCustomCommandActionEditor action,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var features = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == hostId)
+            .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
+            .SingleOrDefaultAsync(ct);
+        if (features is null || !HasCustomCommands(features.Value) || !HasOverlays(features.Value))
+        {
+            return new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled();
+        }
+
+        var storedShape = new OverlayCueCustomCommandAction
+        {
+            TargetOverlayPublicId = action.TargetOverlayPublicId,
+            CuePublicId = action.CuePublicId,
+            QueuePolicy = action.QueuePolicy,
+            ReplyOrder = action.ReplyOrder,
+        };
+        var references = await overlayCues.ResolveReferencesAsync(
+            ReferenceRequest(hostId, storedShape),
+            ct
+        );
+        if (references is not OverlayCueReferenceOutcome.Available)
+        {
+            return AdmissionOutcome(references);
+        }
+        return await overlayCues.AdmitAsync(
+            Request(hostId, storedShape, null, OverlayCueAdmissionOrigin.OwnerTest),
+            ct
+        );
+    }
+
+    private static OverlayCueAdmissionRequest Request(
+        int hostId,
+        OverlayCueCustomCommandAction action,
+        ChatMessage? message,
+        OverlayCueAdmissionOrigin origin
+    )
+    {
+        var displayName =
+            message is not null
+            && message.Tags.TryGetValue("display-name", out var taggedDisplayName)
+                ? taggedDisplayName
+                : message?.Login ?? string.Empty;
+        return new(
+            hostId,
+            action.TargetOverlayPublicId,
+            action.CuePublicId,
+            action.QueuePolicy,
+            origin,
+            new OverlayCueSafeContext(message?.Login ?? string.Empty, displayName)
+        );
+    }
+
+    private static bool AdmissionAccepted(OverlayCueAdmissionOutcome admission)
+    {
+        return admission
+            is OverlayCueAdmissionOutcome.Running
+                or OverlayCueAdmissionOutcome.Queued
+                or OverlayCueAdmissionOutcome.Disconnected;
+    }
+
+    private static OverlayCueReferenceRequest ReferenceRequest(
+        int hostId,
+        OverlayCueCustomCommandAction action
+    )
+    {
+        return new(hostId, action.TargetOverlayPublicId, action.CuePublicId);
+    }
+
+    private static OverlayCueAdmissionOutcome AdmissionOutcome(
+        OverlayCueReferenceOutcome references
+    )
+    {
+        return references switch
+        {
+            OverlayCueReferenceOutcome.Disabled { Part: OverlayCueReferencePart.Parent } =>
+                new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled(),
+            OverlayCueReferenceOutcome.Disabled => new OverlayCueAdmissionOutcome.Disabled(),
+            OverlayCueReferenceOutcome.Missing => new OverlayCueAdmissionOutcome.Missing(),
+            _ => throw new InvalidOperationException(
+                "An available cue reference does not map to a failed admission."
+            ),
+        };
     }
 
     private async Task<StreamIdentity> StreamIdAsync(
@@ -252,6 +395,11 @@ public sealed class CustomCommandExecutionService(
     private static bool HasCustomCommands(HostFeatureFlags features)
     {
         return (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+    }
+
+    private static bool HasOverlays(HostFeatureFlags features)
+    {
+        return (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays;
     }
 
     private abstract record StreamIdentity

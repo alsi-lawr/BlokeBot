@@ -45,3 +45,25 @@ public sealed class CounterCustomCommandAction : CustomCommandAction
 
     public CustomCounter? Counter { get; set; }
 }
+
+public enum OverlayCueReplyOrder
+{
+    [PersistedToken("before")]
+    Before,
+
+    [PersistedToken("after")]
+    After,
+}
+
+public sealed class OverlayCueCustomCommandAction : CustomCommandAction
+{
+    public const string Discriminator = "OverlayCue";
+
+    public Guid TargetOverlayPublicId { get; set; }
+
+    public Guid CuePublicId { get; set; }
+
+    public OverlayCueQueuePolicy QueuePolicy { get; set; }
+
+    public OverlayCueReplyOrder ReplyOrder { get; set; }
+}

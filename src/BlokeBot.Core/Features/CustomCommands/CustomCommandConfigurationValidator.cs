@@ -260,6 +260,7 @@ public static class CustomCommandConfigurationValidator
                 names[index],
                 editor.Action.ReplyRoutes,
                 messageIds,
+                editor.Action is not OverlayCueCustomCommandActionEditor,
                 errors
             );
 
@@ -302,6 +303,25 @@ public static class CustomCommandConfigurationValidator
                     editor.Id,
                     names[index],
                     counter,
+                    replyRoutes,
+                    errors
+                ),
+                OverlayCueCustomCommandActionEditor cue
+                    when cue.TargetOverlayPublicId != Guid.Empty
+                        && cue.CuePublicId != Guid.Empty
+                        && Enum.IsDefined(cue.QueuePolicy)
+                        && Enum.IsDefined(cue.ReplyOrder) =>
+                    new CustomCommandActionValue.OverlayCue(
+                        replyRoutes,
+                        cue.TargetOverlayPublicId,
+                        cue.CuePublicId,
+                        cue.QueuePolicy,
+                        cue.ReplyOrder
+                    ),
+                OverlayCueCustomCommandActionEditor cue => InvalidOverlayCueAction(
+                    editor.Id,
+                    names[index],
+                    cue,
                     replyRoutes,
                     errors
                 ),
@@ -385,11 +405,61 @@ public static class CustomCommandConfigurationValidator
         return new CustomCommandActionValue.Message(replyRoutes);
     }
 
+    private static CustomCommandActionValue InvalidOverlayCueAction(
+        int commandId,
+        string commandName,
+        OverlayCueCustomCommandActionEditor editor,
+        CustomCommandReplyRoutes replyRoutes,
+        ICollection<CustomCommandConfigurationValidationError> errors
+    )
+    {
+        if (editor.TargetOverlayPublicId == Guid.Empty)
+        {
+            AddError(
+                errors,
+                $"Choose an overlay player for command '{commandName}'.",
+                CommandTarget(commandId, CustomCommandValidationFieldKind.OverlayTarget)
+            );
+        }
+        if (editor.CuePublicId == Guid.Empty)
+        {
+            AddError(
+                errors,
+                $"Choose an overlay cue for command '{commandName}'.",
+                CommandTarget(commandId, CustomCommandValidationFieldKind.OverlayCue)
+            );
+        }
+        if (!Enum.IsDefined(editor.QueuePolicy))
+        {
+            AddError(
+                errors,
+                $"Choose a playback policy for command '{commandName}'.",
+                CommandTarget(commandId, CustomCommandValidationFieldKind.QueuePolicy)
+            );
+        }
+        if (!Enum.IsDefined(editor.ReplyOrder))
+        {
+            AddError(
+                errors,
+                $"Choose when command '{commandName}' sends its reply.",
+                CommandTarget(commandId, CustomCommandValidationFieldKind.ReplyOrder)
+            );
+        }
+        return new CustomCommandActionValue.OverlayCue(
+            replyRoutes,
+            editor.TargetOverlayPublicId,
+            editor.CuePublicId,
+            editor.QueuePolicy,
+            editor.ReplyOrder
+        );
+    }
+
     private static CustomCommandReplyRoutes SnapshotReplyRoutes(
         int commandId,
         string commandName,
         CustomCommandReplyRoutesEditor editor,
         IReadOnlySet<int> messageIds,
+        bool replyRequired,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
@@ -399,7 +469,7 @@ public static class CustomCommandConfigurationValidator
             (1, editor.OneArgumentMessageLibraryEntryId),
             (2, editor.TwoArgumentMessageLibraryEntryId),
         };
-        if (routes.All(route => route.MessageEntryId is null))
+        if (replyRequired && routes.All(route => route.MessageEntryId is null))
         {
             AddError(
                 errors,
