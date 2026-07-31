@@ -21,6 +21,7 @@ BLOKEBOT_SCREENSHOT_PORT=43217 viset capture screenshots.lua
 BLOKEBOT_HOME_SCROLL_PORT=43218 viset capture home-scroll.lua
 BLOKEBOT_GUESSING_CAPTURE_PORT=43219 viset capture guessing-workflow.lua
 BLOKEBOT_V05_GUIDES_PORT=5334 viset capture v0.5-guides.lua
+BLOKEBOT_COMMUNITY_GUIDES_PORT=5460 viset capture community-guides.lua
 ```
 
 Viset evaluates every theme/device/view matrix item independently. Each item starts a fresh Release
@@ -32,9 +33,11 @@ The Shoutouts still capture opens the real **Automatic raid shoutouts** disclosu
 snapshotting. Before every state-dependent capture, `v0.5-guides.lua` drives the deterministic
 round, giveaway, feature and stream-liveness endpoints. It captures both all-disabled and
 representative enabled Chat Tools states and opens the real **Available viewer commands**
-disclosure. Its Overlays capture asserts that the one-time private URL reveal and seeded access key
-are absent before capturing the saved dashboard state. The animated captures use real page
-controls and scrolling. Generated files go directly to
+disclosure. `community-guides.lua` captures the current
+moderator workspace on laptops and the matching participant view on phones for request boards,
+play-with-viewers queues and moments. The Simulation fixture provides the approved, voted moment
+shown in both moments captures. The animated captures use real page controls and scrolling.
+Generated files go directly to
 `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
 
 ## Editor support

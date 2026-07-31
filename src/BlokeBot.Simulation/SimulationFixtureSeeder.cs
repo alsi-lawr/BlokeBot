@@ -44,6 +44,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
+        await SeedMomentAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await SeedOverlayAsync(db, hostId, now, cancellationToken);
@@ -576,8 +577,8 @@ internal sealed class SimulationFixtureSeeder(
             {
                 HostId = hostId,
                 Slug = "requests",
-                Title = "Viewer requests",
-                Description = "Deterministic command-catalog fixture.",
+                Title = "Game night requests",
+                Description = "Share games you would like to see on the next community night.",
                 IsOpen = true,
                 VotingEnabled = true,
                 CreatedAtUtc = now,
@@ -603,11 +604,63 @@ internal sealed class SimulationFixtureSeeder(
             {
                 HostId = hostId,
                 Slug = "main",
-                Name = "Main queue",
-                ActivityName = "Fake Game",
+                Name = "Community night",
+                ActivityName = "BlokeQuest",
                 IsOpen = true,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
+            }
+        );
+    }
+
+    private static async Task SeedMomentAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.MomentCandidates.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+
+        var capturedAt = now.AddMinutes(-12);
+        db.MomentCandidates.Add(
+            new MomentCandidate
+            {
+                PublicId = Guid.Parse("75a75ee9-cfed-47da-ad88-762f67f8c0a5"),
+                HostId = hostId,
+                StreamIdentity = "stream-0001",
+                State = MomentCandidateState.Approved,
+                PublicTitle = "Community clutch save",
+                PublicCategory = "Community",
+                CapturedAtUtc = capturedAt,
+                LastCapturedAtUtc = capturedAt,
+                ApprovedAtUtc = now.AddMinutes(-10),
+                Contributors =
+                [
+                    new MomentContributor
+                    {
+                        IdentityKey = "id:viewer-1000",
+                        TwitchUserId = "viewer-1000",
+                        NormalizedLogin = "nightowl",
+                        DisplayName = "NightOwl",
+                        CaptureCount = 1,
+                        FirstCapturedAtUtc = capturedAt,
+                        LastCapturedAtUtc = capturedAt,
+                    },
+                ],
+                Votes =
+                [
+                    new MomentVote
+                    {
+                        IdentityKey = "id:viewer-1001",
+                        TwitchUserId = "viewer-1001",
+                        NormalizedLogin = "clipfan",
+                        CreatedAtUtc = now.AddMinutes(-8),
+                    },
+                ],
             }
         );
     }

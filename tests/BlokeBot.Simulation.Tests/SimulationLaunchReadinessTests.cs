@@ -98,9 +98,11 @@ public sealed class SimulationLaunchReadinessTests
         captured.State.ShouldBe(MomentCandidateState.ClipReady);
         captured.ProviderUrl.ShouldStartWith("https://clips.twitch.tv/fake-clip-");
         await using var verify = await database.CreateDbContextAsync();
-        (await verify.MomentCandidates.CountAsync()).ShouldBe(1);
+        (await verify.MomentCandidates.CountAsync()).ShouldBe(2);
         (await verify.TwitchClips.CountAsync()).ShouldBe(1);
-        (await verify.MomentCandidates.SingleAsync()).TwitchClipId.ShouldNotBeNull();
+        (
+            await verify.MomentCandidates.SingleAsync(value => value.PublicId == captured.PublicId)
+        ).TwitchClipId.ShouldNotBeNull();
         simulation.FakeTwitch.Authority.Transcript.ShouldContain(value =>
             value.Kind == "oauth.app-token"
         );
