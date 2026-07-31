@@ -104,8 +104,9 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task UnrelatedWriterContention_DoesNotSilentlySuppressDistinctRaid()
     {
         var deleteFailure = new ProcessedEventDeleteFailureObserver();
-        await using var factory = await ContentionObservingSqliteDbFactory.CreateAsync(
-            deleteFailure
+        await using var factory = await InterceptedSqliteDbFactory.CreateAsync(
+            deleteFailure,
+            new DeferredSqliteTransactionInterceptor()
         );
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using var writer = await factory.CreateDbContextAsync();
@@ -151,44 +152,22 @@ public sealed class AutomaticRaidShoutoutObserverTests
     [Test]
     public async Task PersistentWriterContention_SurfacesFailureInsteadOfLookingLikeDuplicate()
     {
-        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
-        await using var writer = await factory.CreateDbContextAsync();
-        await using var transaction = await writer.Database.BeginTransactionAsync();
-        writer.AutomaticRaidShoutoutOutcomes.Add(
-            Outcome(
-                hostId,
-                "held-writer",
-                AutomaticRaidShoutoutOutcomeStatus.Processing,
-                null,
-                null
+        var contention = new PersistentProcessedEventDeleteContention();
+        await using var factory = await InterceptedSqliteDbFactory.CreateAsync(contention);
+        await SeedAsync(factory, enabled: true, threshold: 1);
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
+        var observer = Observer(factory, delivery);
+
+        var exception = await Should.ThrowAsync<SqliteException>(() =>
+            observer.IncomingRaidReceivedAsync(
+                Raid("contention-exhausted", _now, 1),
+                CancellationToken.None
             )
         );
-        await writer.SaveChangesAsync();
-        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
 
-        var observation = Task.Run(() =>
-            Observer(factory, delivery)
-                .IncomingRaidReceivedAsync(
-                    Raid("contention-exhausted", _now, 1),
-                    CancellationToken.None
-                )
-        );
-        SqliteException exception;
-        try
-        {
-            exception = await Should.ThrowAsync<SqliteException>(async () =>
-                await observation.WaitAsync(TimeSpan.FromSeconds(6))
-            );
-        }
-        finally
-        {
-            await transaction.RollbackAsync();
-        }
-
-        exception.SqliteErrorCode.ShouldBeOneOf(
-            SQLitePCL.raw.SQLITE_BUSY,
-            SQLitePCL.raw.SQLITE_LOCKED
+        exception.SqliteErrorCode.ShouldBe(SQLitePCL.raw.SQLITE_BUSY);
+        contention.MatchedDispatches.ShouldBe(
+            AutomaticRaidShoutoutObserver.ClaimContentionMaximumAttempts
         );
         delivery.Requests.ShouldBeEmpty();
         await using var verification = await factory.CreateDbContextAsync();
@@ -690,6 +669,40 @@ public sealed class AutomaticRaidShoutoutObserverTests
         }
     }
 
+    private sealed class PersistentProcessedEventDeleteContention : DbCommandInterceptor
+    {
+        private const string _processedEventCleanupCommand =
+            "DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc < @p0;";
+        private int _matchedDispatches;
+
+        internal int MatchedDispatches => Volatile.Read(ref _matchedDispatches);
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                !string.Equals(
+                    command.CommandText,
+                    _processedEventCleanupCommand,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return ValueTask.FromResult(result);
+            }
+
+            Interlocked.Increment(ref _matchedDispatches);
+            throw new SqliteException(
+                "Injected persistent processed-event cleanup contention.",
+                SQLitePCL.raw.SQLITE_BUSY
+            );
+        }
+    }
+
     private sealed class DeferredSqliteTransactionInterceptor : DbTransactionInterceptor
     {
         public override ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
@@ -709,14 +722,14 @@ public sealed class AutomaticRaidShoutoutObserverTests
         }
     }
 
-    private sealed class ContentionObservingSqliteDbFactory
+    private sealed class InterceptedSqliteDbFactory
         : IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>,
             IAsyncDisposable
     {
         private readonly SqliteConnection _keeper;
         private readonly DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> _options;
 
-        private ContentionObservingSqliteDbFactory(
+        private InterceptedSqliteDbFactory(
             SqliteConnection keeper,
             DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> options
         )
@@ -725,8 +738,8 @@ public sealed class AutomaticRaidShoutoutObserverTests
             _options = options;
         }
 
-        internal static async Task<ContentionObservingSqliteDbFactory> CreateAsync(
-            ProcessedEventDeleteFailureObserver deleteFailure
+        internal static async Task<InterceptedSqliteDbFactory> CreateAsync(
+            params IInterceptor[] interceptors
         )
         {
             var connectionString = new SqliteConnectionStringBuilder
@@ -741,9 +754,9 @@ public sealed class AutomaticRaidShoutoutObserverTests
             await keeper.OpenAsync();
             var options = new DbContextOptionsBuilder<BlokeBot.Persistence.BlokeBotDbContext>()
                 .UseSqlite(connectionString)
-                .AddInterceptors(deleteFailure, new DeferredSqliteTransactionInterceptor())
+                .AddInterceptors(interceptors)
                 .Options;
-            var factory = new ContentionObservingSqliteDbFactory(keeper, options);
+            var factory = new InterceptedSqliteDbFactory(keeper, options);
             await using var db = await factory.CreateDbContextAsync();
             await db.Database.EnsureCreatedAsync();
             return factory;
