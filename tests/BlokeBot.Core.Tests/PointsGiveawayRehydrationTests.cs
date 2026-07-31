@@ -189,7 +189,7 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
                 flakyFactory,
                 CreateDrawService(flakyFactory),
                 new PointsGiveawayMessageFormatter(),
-                new PointsGiveawayChangeNotification(changes),
+                new PointsGiveawayChangeNotification(new PointsGiveawayChangeNotifier(changes)),
                 timeProvider
             ),
             new ReplyOnlyPointsGiveawaySchedulerNotification(),
@@ -234,7 +234,7 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
                 flakyFactory,
                 CreateDrawService(flakyFactory),
                 new PointsGiveawayMessageFormatter(),
-                new PointsGiveawayChangeNotification(changes),
+                new PointsGiveawayChangeNotification(new PointsGiveawayChangeNotifier(changes)),
                 timeProvider
             ),
             new ReplyOnlyPointsGiveawaySchedulerNotification(),

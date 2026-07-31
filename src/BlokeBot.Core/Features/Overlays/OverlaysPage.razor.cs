@@ -30,11 +30,16 @@ public partial class OverlaysPage
     private int _draftResultDurationSeconds = OverlayConfiguration
         .GuessingV1
         .DefaultResultDurationSeconds;
+    private string _draftGiveawayTitle = OverlayConfiguration.GiveawayV1.DefaultTitle;
+    private bool _draftShowEntrantCount = true;
+    private bool _draftShowCountdown = true;
+    private bool _draftShowJoinCommand = true;
     private string? _revealedBrowserSourceUrl;
     private string _feedback = string.Empty;
     private bool _operationFailed;
     private bool _featureEnabled;
     private bool _guessingFeatureEnabled;
+    private bool _pointsFeatureEnabled;
     private bool _isCreating = true;
     private bool _isLoading = true;
     private bool _isBusy;
@@ -62,14 +67,27 @@ public partial class OverlaysPage
             {
                 mode = $"?mode=representative&sample={SampleToken(_previewSample)}";
             }
+            if (
+                _previewMode is OverlayPreviewMode.Representative
+                && _selected.Type is OverlayType.Giveaway
+            )
+            {
+                mode = $"?mode=representative&sample={SampleToken(_giveawayPreviewSample)}";
+            }
             return $"/overlays/preview/{_selected.Id:D}{mode}";
         }
     }
 
     private bool _selectedFeatureEnabled =>
-        _selected?.Type is not OverlayType.Guessing || _guessingFeatureEnabled;
+        _selected?.Type switch
+        {
+            OverlayType.Guessing => _guessingFeatureEnabled,
+            OverlayType.Giveaway => _pointsFeatureEnabled,
+            _ => true,
+        };
 
     private GuessingOverlaySampleState _previewSample = GuessingOverlaySampleState.Open;
+    private GiveawayOverlaySampleState _giveawayPreviewSample = GiveawayOverlaySampleState.Open;
 
     private string _presenceLabel
     {
@@ -142,6 +160,11 @@ public partial class OverlaysPage
             _guessingFeatureEnabled = await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Guessing,
+                CancellationToken.None
+            );
+            _pointsFeatureEnabled = await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Points,
                 CancellationToken.None
             );
 
@@ -467,6 +490,10 @@ public partial class OverlaysPage
         _draftType = _guessingFeatureEnabled ? OverlayType.Guessing : OverlayType.Empty;
         _draftShowGuessCount = true;
         _draftResultDurationSeconds = OverlayConfiguration.GuessingV1.DefaultResultDurationSeconds;
+        _draftGiveawayTitle = OverlayConfiguration.GiveawayV1.DefaultTitle;
+        _draftShowEntrantCount = true;
+        _draftShowCountdown = true;
+        _draftShowJoinCommand = true;
         _revealedBrowserSourceUrl = null;
         if (setFeedback)
         {
@@ -491,6 +518,13 @@ public partial class OverlaysPage
         {
             _draftShowGuessCount = guessing.ShowGuessCount;
             _draftResultDurationSeconds = guessing.ResultDurationSeconds;
+        }
+        if (overlay.Configuration is OverlayConfiguration.GiveawayV1 giveaway)
+        {
+            _draftGiveawayTitle = giveaway.Title;
+            _draftShowEntrantCount = giveaway.ShowEntrantCount;
+            _draftShowCountdown = giveaway.ShowCountdown;
+            _draftShowJoinCommand = giveaway.ShowJoinCommand;
         }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
@@ -539,7 +573,9 @@ public partial class OverlaysPage
             if (!_selectedFeatureEnabled)
             {
                 SetFailure(
-                    "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it."
+                    _selected.Type is OverlayType.Giveaway
+                        ? "This giveaway overlay is paused. Turn Points on in Channel setup before changing it."
+                        : "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it."
                 );
                 return;
             }
@@ -864,6 +900,14 @@ public partial class OverlaysPage
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
+    private void SetPreviewSample(GiveawayOverlaySampleState sample)
+    {
+        _giveawayPreviewSample = sample;
+        _previewMode = OverlayPreviewMode.Representative;
+        _previewKey++;
+        SetSuccess($"{SampleLabel(sample)} sample selected.");
+    }
+
     private OverlayConfiguration DraftConfiguration()
     {
         return _draftType switch
@@ -874,6 +918,12 @@ public partial class OverlaysPage
                 _draftResultDurationSeconds
             ),
             OverlayType.CuePlayer => new OverlayConfiguration.CuePlayerV1(),
+            OverlayType.Giveaway => new OverlayConfiguration.GiveawayV1(
+                _draftGiveawayTitle,
+                _draftShowEntrantCount,
+                _draftShowCountdown,
+                _draftShowJoinCommand
+            ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
     }
@@ -917,6 +967,7 @@ public partial class OverlaysPage
             OverlayType.Empty => "Empty",
             OverlayType.Guessing => "Guessing",
             OverlayType.CuePlayer => "Cue player",
+            OverlayType.Giveaway => "Giveaway",
             _ => "Unsupported",
         };
     }
@@ -941,6 +992,32 @@ public partial class OverlaysPage
             GuessingOverlaySampleState.Open => "open",
             GuessingOverlaySampleState.Closed => "closed",
             GuessingOverlaySampleState.Completed => "completed",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+    }
+
+    private static string SampleLabel(GiveawayOverlaySampleState sample)
+    {
+        return sample switch
+        {
+            GiveawayOverlaySampleState.Idle => "Idle",
+            GiveawayOverlaySampleState.Open => "Open",
+            GiveawayOverlaySampleState.Ending => "Ending",
+            GiveawayOverlaySampleState.Completed => "Winners",
+            GiveawayOverlaySampleState.Cancelled => "Cancelled",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+    }
+
+    private static string SampleToken(GiveawayOverlaySampleState sample)
+    {
+        return sample switch
+        {
+            GiveawayOverlaySampleState.Idle => "idle",
+            GiveawayOverlaySampleState.Open => "open",
+            GiveawayOverlaySampleState.Ending => "ending",
+            GiveawayOverlaySampleState.Completed => "completed",
+            GiveawayOverlaySampleState.Cancelled => "cancelled",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
     }

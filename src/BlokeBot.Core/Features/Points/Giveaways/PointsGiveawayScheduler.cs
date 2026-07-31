@@ -174,9 +174,9 @@ internal sealed class PointsGiveawayScheduler(
         await drawOutcome.Match(
             static _ => Task.CompletedTask,
             static _ => Task.CompletedTask,
-            _ => NotifyChangedAsync(schedule.GiveawayId, ct),
+            _ => NotifyChangedAsync(schedule.GiveawayId, schedule.HostId, ct),
             static _ => Task.CompletedTask,
-            _ => NotifyChangedAsync(schedule.GiveawayId, ct)
+            _ => NotifyChangedAsync(schedule.GiveawayId, schedule.HostId, ct)
         );
 
         var drawMessage = await BuildDrawNotificationAsync(schedule, drawOutcome, ct);
@@ -391,9 +391,9 @@ internal sealed class PointsGiveawayScheduler(
         }
     }
 
-    private async Task NotifyChangedAsync(int giveawayId, CancellationToken ct)
+    private async Task NotifyChangedAsync(int giveawayId, int hostId, CancellationToken ct)
     {
-        var result = ToAttempt(await operations.NotifyChanged().ExecuteAsync(ct));
+        var result = ToAttempt(await operations.NotifyChanged(hostId).ExecuteAsync(ct));
         switch (result)
         {
             case OperationAttempt<
@@ -430,7 +430,7 @@ internal sealed class PointsGiveawayScheduler(
         switch (outcome)
         {
             case PointsGiveawayExpirationOutcome.Expired:
-                await NotifyChangedAsync(schedule.GiveawayId, ct);
+                await NotifyChangedAsync(schedule.GiveawayId, schedule.HostId, ct);
                 log.LogInformation(
                     "Expired overdue points giveaway {GiveawayId} for host {HostId}.",
                     schedule.GiveawayId,

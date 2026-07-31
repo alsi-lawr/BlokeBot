@@ -2,15 +2,38 @@ namespace BlokeBot.Core.Features.Points.Giveaways;
 
 internal interface IPointsGiveawayChangeNotification
 {
-    ValueTask NotifyAsync(CancellationToken cancellationToken);
+    ValueTask NotifyAsync(int hostId, CancellationToken cancellationToken);
 }
 
-internal sealed class PointsGiveawayChangeNotification(PointsChangeNotifier changes)
-    : IPointsGiveawayChangeNotification
+public interface IPointsGiveawayChangeObserver
 {
-    public async ValueTask NotifyAsync(CancellationToken cancellationToken)
+    ValueTask GiveawayChangedAsync(int hostId, CancellationToken cancellationToken);
+}
+
+public sealed class PointsGiveawayChangeNotifier(
+    PointsChangeNotifier changes,
+    IEnumerable<IPointsGiveawayChangeObserver> observers
+)
+{
+    public PointsGiveawayChangeNotifier(PointsChangeNotifier changes)
+        : this(changes, []) { }
+
+    public async ValueTask NotifyChangedAsync(int hostId, CancellationToken cancellationToken)
     {
         await changes.NotifyChangedAsync(cancellationToken);
+        foreach (var observer in observers)
+        {
+            await observer.GiveawayChangedAsync(hostId, cancellationToken);
+        }
+    }
+}
+
+internal sealed class PointsGiveawayChangeNotification(PointsGiveawayChangeNotifier changes)
+    : IPointsGiveawayChangeNotification
+{
+    public async ValueTask NotifyAsync(int hostId, CancellationToken cancellationToken)
+    {
+        await changes.NotifyChangedAsync(hostId, cancellationToken);
     }
 }
 

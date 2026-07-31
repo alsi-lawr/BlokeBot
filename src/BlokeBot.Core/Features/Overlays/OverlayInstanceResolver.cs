@@ -30,7 +30,7 @@ public sealed class OverlayInstanceResolver(IDbContextFactory<BlokeBotDbContext>
             .SingleOrDefaultAsync(ct);
         if (
             resolved is null
-            || !RequiredFeaturesEnabled(resolved.Overlay.Type, resolved.EnabledFeatures)
+            || !OverlayRequiredFeatures.AreEnabled(resolved.Overlay.Type, resolved.EnabledFeatures)
         )
         {
             return new OverlayResolutionResult.NotFound();
@@ -46,14 +46,5 @@ public sealed class OverlayInstanceResolver(IDbContextFactory<BlokeBotDbContext>
                 new OverlayRevision(overlay.Revision)
             )
         );
-    }
-
-    private static bool RequiredFeaturesEnabled(OverlayType type, HostFeatureFlags enabledFeatures)
-    {
-        var required =
-            type is OverlayType.Guessing
-                ? HostFeatureFlags.Overlays | HostFeatureFlags.Guessing
-                : HostFeatureFlags.Overlays;
-        return (enabledFeatures & required) == required;
     }
 }

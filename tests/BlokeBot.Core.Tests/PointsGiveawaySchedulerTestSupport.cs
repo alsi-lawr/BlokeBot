@@ -40,7 +40,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                 dbFactory,
                 CreateDrawService(dbFactory),
                 formatter,
-                new PointsGiveawayChangeNotification(changes),
+                new PointsGiveawayChangeNotification(new PointsGiveawayChangeNotifier(changes)),
                 timeProvider
             ),
             new ReplyOnlyPointsGiveawaySchedulerNotification(),
@@ -112,7 +112,9 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             ),
             new PointsGiveawayMessageFormatter(),
             scheduler,
-            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
+            new PointsGiveawayChangeNotifier(
+                new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
+            )
         );
     }
 

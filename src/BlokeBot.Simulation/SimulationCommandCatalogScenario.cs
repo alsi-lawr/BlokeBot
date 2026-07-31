@@ -2,6 +2,7 @@ using BlokeBot.Commands;
 using BlokeBot.Core;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -21,7 +22,8 @@ internal enum SimulationStreamLiveness
 internal sealed class SimulationCommandCatalogScenario(
     HostBotStatusService productionStreams,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    EventBus<AppEventKind> events
+    EventBus<AppEventKind> events,
+    PointsGiveawayChangeNotifier giveawayChanges
 ) : IHostStreamLivenessProvider
 {
     private SimulationStreamLiveness _liveness = SimulationStreamLiveness.Production;
@@ -116,11 +118,27 @@ internal sealed class SimulationCommandCatalogScenario(
         switch (state.ToLowerInvariant())
         {
             case "active":
+            case "open":
                 giveaway.Status = PointsGiveawayStatus.Active;
+                giveaway.EndsAtUtc = SimulationMode.Now.UtcDateTime.AddMinutes(5);
+                giveaway.CompletedAtUtc = null;
+                break;
+            case "ending":
+                giveaway.Status = PointsGiveawayStatus.Active;
+                giveaway.EndsAtUtc = SimulationMode.Now.UtcDateTime.AddSeconds(-1);
                 giveaway.CompletedAtUtc = null;
                 break;
             case "inactive":
+            case "completed":
                 giveaway.Status = PointsGiveawayStatus.Completed;
+                giveaway.CompletedAtUtc = SimulationMode.Now.UtcDateTime;
+                break;
+            case "cancelled":
+                giveaway.Status = PointsGiveawayStatus.Cancelled;
+                giveaway.CompletedAtUtc = SimulationMode.Now.UtcDateTime;
+                break;
+            case "expired":
+                giveaway.Status = PointsGiveawayStatus.Expired;
                 giveaway.CompletedAtUtc = SimulationMode.Now.UtcDateTime;
                 break;
             default:
@@ -131,8 +149,32 @@ internal sealed class SimulationCommandCatalogScenario(
                 );
         }
 
+        if (
+            giveaway.Status is PointsGiveawayStatus.Completed
+            && !await db.PointsGiveawayWinners.AnyAsync(
+                value => value.GiveawayId == giveaway.Id,
+                ct
+            )
+        )
+        {
+            db.PointsGiveawayWinners.AddRange(
+                new PointsGiveawayWinner
+                {
+                    GiveawayId = giveaway.Id,
+                    Login = "nightowl",
+                    Payout = "500",
+                },
+                new PointsGiveawayWinner
+                {
+                    GiveawayId = giveaway.Id,
+                    Login = "newviewer",
+                    Payout = "250",
+                }
+            );
+        }
+
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.PointsChanged, ct);
+        await giveawayChanges.NotifyChangedAsync(hostId, ct);
     }
 
     public async Task SetFeatureAvailabilityAsync(string state, CancellationToken ct)

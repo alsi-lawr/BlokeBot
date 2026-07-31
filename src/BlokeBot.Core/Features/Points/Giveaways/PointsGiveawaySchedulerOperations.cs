@@ -29,7 +29,7 @@ internal interface IPointsGiveawaySchedulerOperations
     IO<
         PointsGiveawayChangeNotificationCompleted,
         PointsGiveawaySchedulerNotificationFailure
-    > NotifyChanged();
+    > NotifyChanged(int hostId);
 }
 
 internal sealed class PointsGiveawaySchedulerOperations(
@@ -80,9 +80,9 @@ internal sealed class PointsGiveawaySchedulerOperations(
     public IO<
         PointsGiveawayChangeNotificationCompleted,
         PointsGiveawaySchedulerNotificationFailure
-    > NotifyChanged()
+    > NotifyChanged(int hostId)
     {
-        return CaptureNotification(NotifyChangedAsync);
+        return CaptureNotification(ct => NotifyChangedAsync(hostId, ct));
     }
 
     private async ValueTask<IReadOnlyList<PointsGiveawaySchedule>> LoadActiveAsync(
@@ -226,10 +226,11 @@ internal sealed class PointsGiveawaySchedulerOperations(
     }
 
     private async ValueTask<PointsGiveawayChangeNotificationCompleted> NotifyChangedAsync(
+        int hostId,
         CancellationToken ct
     )
     {
-        await changeNotification.NotifyAsync(ct);
+        await changeNotification.NotifyAsync(hostId, ct);
         return new PointsGiveawayChangeNotificationCompleted();
     }
 

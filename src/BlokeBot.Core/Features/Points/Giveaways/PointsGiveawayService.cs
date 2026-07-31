@@ -17,7 +17,7 @@ public sealed class PointsGiveawayService(
     PointsGiveawayEligibilityPolicy eligibility,
     PointsGiveawayMessageFormatter formatter,
     IPointsGiveawayScheduler scheduler,
-    PointsChangeNotifier changes
+    PointsGiveawayChangeNotifier changes
 )
 {
     public IO<Option<PointsGiveawayView>, Never> GetActiveGiveaway(int hostId)
@@ -127,7 +127,7 @@ public sealed class PointsGiveawayService(
                 reply
             )
         );
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayStartOutcome.Started(settings);
     }
 
@@ -212,7 +212,7 @@ public sealed class PointsGiveawayService(
             }
         );
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayJoinOutcome.Joined(settings, normalized);
     }
 
@@ -254,7 +254,7 @@ public sealed class PointsGiveawayService(
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         scheduler.Cancel(giveaway.Id);
-        await changes.NotifyChangedAsync(ct);
+        await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayCancelOutcome.Cancelled(settings);
     }
 
@@ -291,7 +291,7 @@ public sealed class PointsGiveawayService(
         async Task CompleteAsync()
         {
             scheduler.Cancel(giveawayId.Value);
-            await changes.NotifyChangedAsync(ct);
+            await changes.NotifyChangedAsync(hostId, ct);
         }
     }
 
