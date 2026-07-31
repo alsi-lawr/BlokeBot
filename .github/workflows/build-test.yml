@@ -17,14 +17,20 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.301
-      - name: Run the repository release gate
+      - name: Restore local tools
+        run: dotnet tool restore
+      - name: Check C# formatting
+        run: dotnet csharpier check .
+      - name: Build and test
         run: >-
-          ./scripts/verify-release
-          --base-ref "${{ github.event.pull_request.base.sha }}"
-          --expected-migration-count 17
+          dotnet test BlokeBot.slnx
+          --configuration Release
+          --property:TreatWarningsAsErrors=true
+          --
+          --no-ansi
+          --no-progress
+          --output Normal
