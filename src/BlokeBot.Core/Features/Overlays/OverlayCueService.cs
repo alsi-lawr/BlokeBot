@@ -694,16 +694,14 @@ internal sealed class OverlayCueService(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken cancellationToken
-    )
-    {
-        return await db
+    ) =>
+        await db
             .Hosts.AsNoTracking()
             .Where(host =>
                 host.Id == hostId
                 && (host.EnabledFeatures & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays
             )
             .AnyAsync(cancellationToken);
-    }
 
     private string HostContentDirectory(int hostId)
     {
@@ -722,10 +720,8 @@ internal sealed class OverlayCueService(
         return directory;
     }
 
-    private string ContentPath(int hostId, string storageKey)
-    {
-        return Path.Combine(HostContentDirectory(hostId), storageKey);
-    }
+    private string ContentPath(int hostId, string storageKey) =>
+        Path.Combine(HostContentDirectory(hostId), storageKey);
 
     private static async Task<long> CopyBoundedAsync(
         Stream source,
@@ -824,9 +820,8 @@ internal sealed class OverlayCueService(
         );
     }
 
-    private static OverlayMediaAssetView ToView(OverlayMediaAsset value)
-    {
-        return new(
+    private static OverlayMediaAssetView ToView(OverlayMediaAsset value) =>
+        new(
             value.PublicId,
             value.Name,
             value.ContentType,
@@ -834,17 +829,11 @@ internal sealed class OverlayCueService(
             value.ContentRevision,
             AsOffset(value.UpdatedAtUtc)
         );
-    }
 
-    private static DateTimeOffset AsOffset(DateTime value)
-    {
-        return new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
-    }
+    private static DateTimeOffset AsOffset(DateTime value) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
-    private DateTime Now()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime Now() => timeProvider.GetUtcNow().UtcDateTime;
 
     private StoredByteMeasurement MeasureStoredBytes(string root, string currentUploadPath)
     {
@@ -866,20 +855,12 @@ internal sealed class OverlayCueService(
         }
     }
 
-    private void TryDelete(string path)
-    {
-        _ = fileDeletion.Delete(path);
-    }
+    private void TryDelete(string path) => _ = fileDeletion.Delete(path);
 
-    private static OverlayCueResult<T>.Succeeded Success<T>(T value)
-    {
-        return new(value);
-    }
+    private static OverlayCueResult<T>.Succeeded Success<T>(T value) => new(value);
 
-    private static OverlayCueResult<T>.Rejected Reject<T>(OverlayCueRejection reason)
-    {
-        return new(reason);
-    }
+    private static OverlayCueResult<T>.Rejected Reject<T>(OverlayCueRejection reason) =>
+        new(reason);
 
     private sealed class UploadTooLargeException : Exception;
 

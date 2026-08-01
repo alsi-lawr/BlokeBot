@@ -7,30 +7,23 @@ namespace BlokeBot.Core.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
-    private static string FeatureBadgeClass(HostFeatureCardState feature)
-    {
-        return feature.Enabled
+    private static string FeatureBadgeClass(HostFeatureCardState feature) =>
+        feature.Enabled
             ? "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 text-[0.68rem] font-bold text-emerald-700 ring-1 ring-emerald-200"
             : "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2 text-[0.68rem] font-bold text-slate-600 ring-1 ring-slate-200";
-    }
 
-    private static string FeatureCardClass(HostFeatureCardState feature)
-    {
-        return feature.Enabled
+    private static string FeatureCardClass(HostFeatureCardState feature) =>
+        feature.Enabled
             ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left"
             : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left";
-    }
 
-    private static string FeatureDotClass(HostFeatureCardState feature)
-    {
-        return feature.Enabled
+    private static string FeatureDotClass(HostFeatureCardState feature) =>
+        feature.Enabled
             ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
             : "h-1.5 w-1.5 rounded-full bg-slate-400";
-    }
 
-    private static string FeatureIconClass(HostFeatureCardState feature)
-    {
-        return feature.Enabled
+    private static string FeatureIconClass(HostFeatureCardState feature) =>
+        feature.Enabled
             ? feature.Feature switch
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
@@ -47,11 +40,9 @@ public partial class HostConfigPage
                 _ => "feature-toggle-card__icon text-blue-600",
             }
             : "feature-toggle-card__icon text-slate-500";
-    }
 
-    private static MarkupString FeatureIcon(HostFeatureFlags feature)
-    {
-        return new(
+    private static MarkupString FeatureIcon(HostFeatureFlags feature) =>
+        new(
             feature switch
             {
                 HostFeatureFlags.Guessing => """
@@ -112,11 +103,9 @@ public partial class HostConfigPage
                 _ => string.Empty,
             }
         );
-    }
 
-    private Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
-    {
-        return ObserveUiOperationAsync(
+    private Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled) =>
+        ObserveUiOperationAsync(
             nameof(SetFeatureEnabledAsync),
             () =>
                 RunSelectedHostMutationAsync(
@@ -124,7 +113,6 @@ public partial class HostConfigPage
                     () => SetFeatureEnabledCoreAsync(hostId, feature, enabled)
                 )
         );
-    }
 
     private async Task SetFeatureEnabledCoreAsync(
         int hostId,
@@ -191,9 +179,8 @@ public partial class HostConfigPage
             : "Its chat commands and pages are unavailable until you enable it again.";
     }
 
-    private static string FeatureName(HostFeatureFlags feature)
-    {
-        return feature switch
+    private static string FeatureName(HostFeatureFlags feature) =>
+        feature switch
         {
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
@@ -209,5 +196,4 @@ public partial class HostConfigPage
             HostFeatureFlags.Overlays => "Overlays",
             _ => "Feature",
         };
-    }
 }

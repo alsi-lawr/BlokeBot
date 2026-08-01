@@ -46,28 +46,22 @@ public sealed class HostBotAccountTokenProtectorTests
         failure.ShouldBe(new HostBotAccountTokenProtectionFailure());
     }
 
-    private static DataProtectionHostBotAccountTokenProtector CreateProtector()
-    {
-        return new(new EphemeralDataProtectionProvider());
-    }
+    private static DataProtectionHostBotAccountTokenProtector CreateProtector() =>
+        new(new EphemeralDataProtectionProvider());
 
     private static TValue Success<TValue>(
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             value => value,
             _ => throw new InvalidOperationException("Expected protection to succeed.")
         );
-    }
 
     private static HostBotAccountTokenProtectionFailure Error<TValue>(
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             _ => throw new InvalidOperationException("Expected protection to fail."),
             failure => failure
         );
-    }
 }

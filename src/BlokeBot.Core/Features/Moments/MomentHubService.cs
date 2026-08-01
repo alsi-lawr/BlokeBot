@@ -247,9 +247,8 @@ public sealed class MomentHubService(
         int hostId,
         ModerateMomentCommand command,
         CancellationToken ct
-    )
-    {
-        return await ModerateAsync(
+    ) =>
+        await ModerateAsync(
             hostId,
             command,
             async (db, candidate, now) =>
@@ -296,15 +295,13 @@ public sealed class MomentHubService(
             },
             ct
         );
-    }
 
     public Task<MomentResult<ModeratorMomentView>> EditAsync(
         int hostId,
         ModerateMomentCommand command,
         CancellationToken ct
-    )
-    {
-        return ModerateAsync(
+    ) =>
+        ModerateAsync(
             hostId,
             command,
             (db, candidate, now) =>
@@ -326,15 +323,13 @@ public sealed class MomentHubService(
             },
             ct
         );
-    }
 
     public Task<MomentResult<ModeratorMomentView>> RejectAsync(
         int hostId,
         ModerateMomentCommand command,
         CancellationToken ct
-    )
-    {
-        return ModerateAsync(
+    ) =>
+        ModerateAsync(
             hostId,
             command,
             (db, candidate, now) =>
@@ -355,7 +350,6 @@ public sealed class MomentHubService(
             },
             ct
         );
-    }
 
     public async Task<MomentResult<ModeratorMomentView>> MergeAsync(
         int hostId,
@@ -867,25 +861,11 @@ public sealed class MomentHubService(
             .ToArrayAsync(ct);
     }
 
-    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
-    {
-        return HostFeatureAvailability.IsEnabledAsync(
-            dbFactory,
-            hostId,
-            HostFeatureFlags.Moments,
-            ct
-        );
-    }
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(dbFactory, hostId, HostFeatureFlags.Moments, ct);
 
-    private Task<bool> FeatureIsEnabledAsync(string channel, CancellationToken ct)
-    {
-        return HostFeatureAvailability.IsEnabledAsync(
-            dbFactory,
-            channel,
-            HostFeatureFlags.Moments,
-            ct
-        );
-    }
+    private Task<bool> FeatureIsEnabledAsync(string channel, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(dbFactory, channel, HostFeatureFlags.Moments, ct);
 
     private async Task<MomentResult<ModeratorMomentView>> ModerateAsync(
         int hostId,
@@ -1198,8 +1178,7 @@ public sealed class MomentHubService(
         string actorLogin,
         string privateText,
         DateTime now
-    )
-    {
+    ) =>
         db.MomentModerationAudit.Add(
             new MomentModerationAudit
             {
@@ -1211,46 +1190,40 @@ public sealed class MomentHubService(
                 OccurredAtUtc = now,
             }
         );
-    }
 
     private static async Task<MomentHubSettings> LoadSettingsAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await db
-                .MomentHubSettings.AsNoTracking()
-                .SingleOrDefaultAsync(value => value.HostId == hostId, ct)
-            ?? new MomentHubSettings
-            {
-                HostId = hostId,
-                MergeWindowSeconds = MomentLimits.DefaultMergeWindowSeconds,
-                MarkerFallbackEnabled = true,
-                RewardPolicy = MomentRewardPolicy.None,
-                RewardAmount = "0",
-            };
-    }
+    ) =>
+        await db
+            .MomentHubSettings.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.HostId == hostId, ct)
+        ?? new MomentHubSettings
+        {
+            HostId = hostId,
+            MergeWindowSeconds = MomentLimits.DefaultMergeWindowSeconds,
+            MarkerFallbackEnabled = true,
+            RewardPolicy = MomentRewardPolicy.None,
+            RewardAmount = "0",
+        };
 
-    private static MomentHubSettingsView SettingsView(MomentHubSettings value)
-    {
-        return new(
+    private static MomentHubSettingsView SettingsView(MomentHubSettings value) =>
+        new(
             value.HostId,
             value.MergeWindowSeconds,
             value.MarkerFallbackEnabled,
             value.RewardPolicy,
             value.RewardAmount
         );
-    }
 
     private static async Task<MomentCandidate?> LoadPublicCandidateAsync(
         BlokeBotDbContext db,
         int hostId,
         Guid publicId,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .MomentCandidates.Include(value => value.Contributors)
             .Include(value => value.Votes)
             .Include(value => value.TwitchClip)
@@ -1259,16 +1232,14 @@ public sealed class MomentHubService(
                 value => value.HostId == hostId && value.PublicId == publicId,
                 ct
             );
-    }
 
     private static async Task<IReadOnlyList<MomentCandidate>> LoadApprovedAsync(
         BlokeBotDbContext db,
         int hostId,
         System.Linq.Expressions.Expression<Func<MomentCandidate, bool>> predicate,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .MomentCandidates.AsNoTracking()
             .Include(value => value.Contributors)
             .Include(value => value.Votes)
@@ -1280,11 +1251,9 @@ public sealed class MomentHubService(
             .ThenBy(value => value.ApprovedAtUtc)
             .ThenBy(value => value.PublicId)
             .ToArrayAsync(ct);
-    }
 
-    private static MomentView ToPublic(MomentCandidate candidate, string hostLogin)
-    {
-        return new(
+    private static MomentView ToPublic(MomentCandidate candidate, string hostLogin) =>
+        new(
             candidate.PublicId,
             candidate.HostId,
             hostLogin,
@@ -1308,7 +1277,6 @@ public sealed class MomentHubService(
                 ))
                 .ToArray()
         );
-    }
 
     private static async Task<ModeratorMomentView> ToModeratorAsync(
         BlokeBotDbContext db,
@@ -1360,38 +1328,20 @@ public sealed class MomentHubService(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return db
-            .Hosts.Where(value => value.Id == hostId)
-            .Select(value => value.Login)
-            .SingleAsync(ct);
-    }
+    ) => db.Hosts.Where(value => value.Id == hostId).Select(value => value.Login).SingleAsync(ct);
 
-    private DateTime Now()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime Now() => timeProvider.GetUtcNow().UtcDateTime;
 
-    private Task NotifyAsync(CancellationToken ct)
-    {
-        return events.PublishAsync(AppEventKind.MomentsChanged, ct).AsTask();
-    }
+    private Task NotifyAsync(CancellationToken ct) =>
+        events.PublishAsync(AppEventKind.MomentsChanged, ct).AsTask();
 
-    private static string Description(Guid publicId)
-    {
-        return $"Community moment {publicId:N}"[..Math.Min(49, 17 + 32)];
-    }
+    private static string Description(Guid publicId) =>
+        $"Community moment {publicId:N}"[..Math.Min(49, 17 + 32)];
 
-    private static string ApprovalEventKey(Guid publicId)
-    {
-        return $"moment:{publicId:N}:approval";
-    }
+    private static string ApprovalEventKey(Guid publicId) => $"moment:{publicId:N}:approval";
 
-    private static string WinnerEventKey(DateTime weekStart)
-    {
-        return $"moment:week:{weekStart:yyyyMMdd}:winner";
-    }
+    private static string WinnerEventKey(DateTime weekStart) =>
+        $"moment:week:{weekStart:yyyyMMdd}:winner";
 
     private static string CleanTitle(string requested, MomentCandidate candidate)
     {
@@ -1410,20 +1360,14 @@ public sealed class MomentHubService(
             : $"Moment {candidate.CapturedAtUtc:yyyy-MM-dd HH:mm:ss} UTC";
     }
 
-    private static string? CleanOptional(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
+    private static string? CleanOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static DateTime Earlier(DateTime first, DateTime second)
-    {
-        return first <= second ? first : second;
-    }
+    private static DateTime Earlier(DateTime first, DateTime second) =>
+        first <= second ? first : second;
 
-    private static DateTime Later(DateTime first, DateTime second)
-    {
-        return first >= second ? first : second;
-    }
+    private static DateTime Later(DateTime first, DateTime second) =>
+        first >= second ? first : second;
 
     private static bool ReconcileIdentity(
         MomentContributor contributor,
@@ -1488,8 +1432,7 @@ public sealed class MomentHubService(
         }
     }
 
-    private static async Task RetryPersistenceAsync(Func<Task> action, CancellationToken ct)
-    {
+    private static async Task RetryPersistenceAsync(Func<Task> action, CancellationToken ct) =>
         await RetryPersistenceAsync(
             async () =>
             {
@@ -1498,11 +1441,9 @@ public sealed class MomentHubService(
             },
             ct
         );
-    }
 
-    private static bool IsPersistenceCollision(Exception exception)
-    {
-        return exception switch
+    private static bool IsPersistenceCollision(Exception exception) =>
+        exception switch
         {
             SqliteException
             {
@@ -1516,17 +1457,11 @@ public sealed class MomentHubService(
             DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
             _ => false,
         };
-    }
 
-    private static MomentResult<T> Succeeded<T>(T value)
-    {
-        return new MomentResult<T>.Succeeded(value);
-    }
+    private static MomentResult<T> Succeeded<T>(T value) => new MomentResult<T>.Succeeded(value);
 
-    private static MomentResult<T> Rejected<T>(MomentRejection rejection)
-    {
-        return new MomentResult<T>.Rejected(rejection);
-    }
+    private static MomentResult<T> Rejected<T>(MomentRejection rejection) =>
+        new MomentResult<T>.Rejected(rejection);
 
     private sealed record CaptureDecision(
         Guid PublicId,
@@ -1584,10 +1519,7 @@ public sealed class MomentHubService(
             }
         }
 
-        public Task CommitAsync(CancellationToken ct)
-        {
-            return contextTransaction.CommitAsync(ct);
-        }
+        public Task CommitAsync(CancellationToken ct) => contextTransaction.CommitAsync(ct);
 
         public async ValueTask DisposeAsync()
         {

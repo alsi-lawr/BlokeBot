@@ -440,10 +440,8 @@ internal interface IObserverCorrelationIdProvider
 
 internal sealed class ObserverCorrelationIdProvider : IObserverCorrelationIdProvider
 {
-    public ObserverCorrelationId Next()
-    {
-        return ObserverCorrelationId.Named(Guid.NewGuid().ToString("N"));
-    }
+    public ObserverCorrelationId Next() =>
+        ObserverCorrelationId.Named(Guid.NewGuid().ToString("N"));
 }
 
 internal readonly record struct ObserverFailureDetails(
@@ -460,9 +458,8 @@ internal readonly record struct ObserverFailureHandlingDetails(
         ObserverFailureSummary observerFailure,
         ObserverFailureHandlingStage stage,
         Exception exception
-    )
-    {
-        return new(
+    ) =>
+        new(
             new ObserverFailureHandlingSummary
             {
                 ObserverFailure = observerFailure,
@@ -471,7 +468,6 @@ internal readonly record struct ObserverFailureHandlingDetails(
             },
             exception
         );
-    }
 }
 
 internal static class ObserverFailureClassifier
@@ -483,9 +479,8 @@ internal static class ObserverFailureClassifier
         ObserverCorrelationId correlationId,
         int attempt,
         Exception exception
-    )
-    {
-        return new(
+    ) =>
+        new(
             new ObserverFailureSummary
             {
                 Boundary = boundary,
@@ -498,11 +493,9 @@ internal static class ObserverFailureClassifier
             },
             exception
         );
-    }
 
-    private static ObserverFailureClassification Classify(Exception exception)
-    {
-        return exception switch
+    private static ObserverFailureClassification Classify(Exception exception) =>
+        exception switch
         {
             TimeoutException or IOException or SocketException =>
                 ObserverFailureClassification.Transient,
@@ -517,14 +510,11 @@ internal static class ObserverFailureClassifier
             or JsonException => ObserverFailureClassification.Terminal,
             _ => ObserverFailureClassification.Unexpected,
         };
-    }
 
-    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
-            || (int)statusCode >= 500;
-    }
+    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode) =>
+        statusCode is null
+        || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+        || (int)statusCode >= 500;
 }
 
 internal abstract record ObserverAttemptOutcome

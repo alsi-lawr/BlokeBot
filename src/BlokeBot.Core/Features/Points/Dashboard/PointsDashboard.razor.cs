@@ -63,9 +63,8 @@ public partial class PointsDashboard
             ? "No giveaway running."
             : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Length} people joined.";
 
-    internal static string LedgerChangeLabel(PointLedgerKind kind)
-    {
-        return kind switch
+    internal static string LedgerChangeLabel(PointLedgerKind kind) =>
+        kind switch
         {
             PointLedgerKind.Add => "Points added",
             PointLedgerKind.Remove => "Points removed",
@@ -80,7 +79,6 @@ public partial class PointsDashboard
             PointLedgerKind.RequestRefund => "Request refunded",
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -96,31 +94,21 @@ public partial class PointsDashboard
         await LoadAsync();
     }
 
-    private Task AddAsync()
-    {
-        return RunAsync(() =>
+    private Task AddAsync() =>
+        RunAsync(() =>
             _dashboard.AddAsync(HostId, _addLogin, _addAmount, ActorLogin, CancellationToken.None)
         );
-    }
 
-    private Task CancelGiveawayAsync()
-    {
-        return RunAsync(() => _dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
-    }
+    private Task CancelGiveawayAsync() =>
+        RunAsync(() => _dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
 
-    private Task EndGiveawayAsync()
-    {
-        return RunAsync(() =>
-            _dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None)
-        );
-    }
+    private Task EndGiveawayAsync() =>
+        RunAsync(() => _dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
 
-    private Task GiveAsync()
-    {
-        return RunAsync(() =>
+    private Task GiveAsync() =>
+        RunAsync(() =>
             _dashboard.GiveAsync(HostId, _giveFrom, _giveTo, _giveAmount, CancellationToken.None)
         );
-    }
 
     private async Task LoadAsync()
     {
@@ -145,14 +133,10 @@ public partial class PointsDashboard
         _lookupResult = await _dashboard.LookupAsync(HostId, _lookupLogin, CancellationToken.None);
     }
 
-    private async Task RefreshAsync()
-    {
-        await LoadAsync();
-    }
+    private async Task RefreshAsync() => await LoadAsync();
 
-    private Task RemoveAsync()
-    {
-        return RunAsync(() =>
+    private Task RemoveAsync() =>
+        RunAsync(() =>
             _dashboard.RemoveAsync(
                 HostId,
                 _removeLogin,
@@ -161,14 +145,11 @@ public partial class PointsDashboard
                 CancellationToken.None
             )
         );
-    }
 
-    private Task RemoveLeaderboardEntryAsync(string login)
-    {
-        return RunAsync(() =>
+    private Task RemoveLeaderboardEntryAsync(string login) =>
+        RunAsync(() =>
             _dashboard.RemoveBalanceAsync(HostId, login, ActorLogin, CancellationToken.None)
         );
-    }
 
     private async Task RunAsync(Func<Task<PointOperationOutcome>> operation)
     {
@@ -189,15 +170,10 @@ public partial class PointsDashboard
         );
     }
 
-    private Task StartGiveawayAsync()
-    {
-        return RunAsync(() =>
-            _dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None)
-        );
-    }
+    private Task StartGiveawayAsync() =>
+        RunAsync(() => _dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
 
-    private async Task LoadFeatureStateAsync()
-    {
+    private async Task LoadFeatureStateAsync() =>
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -205,10 +181,8 @@ public partial class PointsDashboard
                 HostFeatureFlags.Points,
                 CancellationToken.None
             );
-    }
 
-    private void PublishResult(PointOperationOutcome outcome)
-    {
+    private void PublishResult(PointOperationOutcome outcome) =>
         _ = outcome.Match(
             succeeded =>
             {
@@ -229,5 +203,4 @@ public partial class PointsDashboard
                 return true;
             }
         );
-    }
 }

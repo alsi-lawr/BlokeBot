@@ -26,9 +26,8 @@ public sealed class HostFeatureService(
         return hosts.ToDictionary(x => x.Id, x => x.EnabledFeatures);
     }
 
-    public IO<Option<HostFeatureFlags>, Never> Load(int hostId)
-    {
-        return IO<Option<HostFeatureFlags>, Never>.Create(async ct =>
+    public IO<Option<HostFeatureFlags>, Never> Load(int hostId) =>
+        IO<Option<HostFeatureFlags>, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var features = await db
@@ -42,7 +41,6 @@ public sealed class HostFeatureService(
                     : Option<HostFeatureFlags>.None
             );
         });
-    }
 
     public async Task<bool> IsEnabledAsync(
         int hostId,
@@ -57,15 +55,11 @@ public sealed class HostFeatureService(
         );
     }
 
-    public Task EnableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct)
-    {
-        return UpdateAsync(hostId, feature, static (current, selected) => current | selected, ct);
-    }
+    public Task EnableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct) =>
+        UpdateAsync(hostId, feature, static (current, selected) => current | selected, ct);
 
-    public Task DisableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct)
-    {
-        return UpdateAsync(hostId, feature, static (current, selected) => current & ~selected, ct);
-    }
+    public Task DisableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct) =>
+        UpdateAsync(hostId, feature, static (current, selected) => current & ~selected, ct);
 
     private async Task UpdateAsync(
         int hostId,

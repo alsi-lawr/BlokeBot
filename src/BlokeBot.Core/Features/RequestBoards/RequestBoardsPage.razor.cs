@@ -141,9 +141,8 @@ public partial class RequestBoardsPage
         SelectField(neighbour);
     }
 
-    private Task SaveBoardAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task SaveBoardAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -175,12 +174,9 @@ public partial class RequestBoardsPage
                 }
             }
         );
-    }
 
-    private void SetCreateGuidance()
-    {
+    private void SetCreateGuidance() =>
         _feedback = "New board ready. Complete its details, then Save board to create it.";
-    }
 
     private void SelectFirstField()
     {
@@ -206,30 +202,19 @@ public partial class RequestBoardsPage
         _fieldFocusRequest++;
     }
 
-    private bool IsFieldSelected(BoardFieldDraft field)
-    {
-        return field.Identity == _selectedFieldIdentity;
-    }
+    private bool IsFieldSelected(BoardFieldDraft field) => field.Identity == _selectedFieldIdentity;
 
-    private long FieldFocusRequest(BoardFieldDraft field)
-    {
-        return field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
-    }
+    private long FieldFocusRequest(BoardFieldDraft field) =>
+        field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
 
-    private static string FieldInventoryLabelId(BoardFieldDraft field)
-    {
-        return $"request-field-{field.Identity:N}-inventory-label";
-    }
+    private static string FieldInventoryLabelId(BoardFieldDraft field) =>
+        $"request-field-{field.Identity:N}-inventory-label";
 
-    private static string FieldEditorRegionId(BoardFieldDraft field)
-    {
-        return $"request-field-{field.Identity:N}-editor";
-    }
+    private static string FieldEditorRegionId(BoardFieldDraft field) =>
+        $"request-field-{field.Identity:N}-editor";
 
-    private static string FieldDisplayName(BoardFieldDraft field)
-    {
-        return string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
-    }
+    private static string FieldDisplayName(BoardFieldDraft field) =>
+        string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
 
     private static string BoardFieldSummary(BoardFieldDraft field)
     {
@@ -248,14 +233,11 @@ public partial class RequestBoardsPage
         return $"{key} · {field.Kind} · {requirement} · {detail}";
     }
 
-    private static string OptionalBoundary(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? "any" : value;
-    }
+    private static string OptionalBoundary(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "any" : value;
 
-    private Task TransitionAsync(long submissionId, RequestSubmissionStatus target)
-    {
-        return RunSelectedHostMutationAsync(
+    private Task TransitionAsync(long submissionId, RequestSubmissionStatus target) =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -278,11 +260,9 @@ public partial class RequestBoardsPage
                 await LoadModeratorPageAsync();
             }
         );
-    }
 
-    private Task MergeAsync(long submissionId)
-    {
-        return RunSelectedHostMutationAsync(
+    private Task MergeAsync(long submissionId) =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -318,13 +298,11 @@ public partial class RequestBoardsPage
                 await LoadModeratorPageAsync();
             }
         );
-    }
 
     private static IReadOnlyList<RequestSubmissionStatus> AvailableTransitions(
         RequestSubmissionStatus status
-    )
-    {
-        return status switch
+    ) =>
+        status switch
         {
             RequestSubmissionStatus.Pending =>
             [
@@ -350,7 +328,6 @@ public partial class RequestBoardsPage
             ],
             _ => [],
         };
-    }
 
     private sealed class BoardDraft
     {
@@ -494,14 +471,10 @@ public partial class RequestBoardsPage
             );
         }
 
-        public static BoardFieldDraft New()
-        {
-            return new() { Key = "details", Label = "Details" };
-        }
+        public static BoardFieldDraft New() => new() { Key = "details", Label = "Details" };
 
-        public static BoardFieldDraft From(RequestBoardFieldView field)
-        {
-            return new()
+        public static BoardFieldDraft From(RequestBoardFieldView field) =>
+            new()
             {
                 Key = field.Key,
                 Label = field.Label,
@@ -514,7 +487,6 @@ public partial class RequestBoardsPage
                     field.MaximumNumber?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                 Choices = string.Join(", ", field.Choices),
             };
-        }
 
         private static bool TryOptionalDecimal(string value, out decimal? parsed)
         {
@@ -545,9 +517,11 @@ public partial class RequestBoardsPage
         public string PrivateRejectionReason { get; set; } = string.Empty;
         public string MergeTarget { get; set; } = string.Empty;
 
-        public ModerateRequestCommand? ToCommand(long submissionId, RequestSubmissionStatus target)
-        {
-            return int.TryParse(
+        public ModerateRequestCommand? ToCommand(
+            long submissionId,
+            RequestSubmissionStatus target
+        ) =>
+            int.TryParse(
                 Priority,
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
@@ -564,11 +538,9 @@ public partial class RequestBoardsPage
                     RequestBoardInput.ParseTags(Tags)
                 )
                 : null;
-        }
 
-        public static ModerationDraft From(ModeratorRequestSubmissionView submission)
-        {
-            return new()
+        public static ModerationDraft From(ModeratorRequestSubmissionView submission) =>
+            new()
             {
                 Category = submission.Public.Category,
                 Tags = string.Join(", ", submission.Public.Tags),
@@ -577,6 +549,5 @@ public partial class RequestBoardsPage
                 PrivateNote = submission.PrivateModeratorNote,
                 PrivateRejectionReason = submission.PrivateRejectionReason,
             };
-        }
     }
 }

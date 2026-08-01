@@ -55,10 +55,8 @@ public abstract record CustomCommandViewerResolution
 
 internal sealed class UnavailableCustomCommandViewerResolver : ICustomCommandViewerResolver
 {
-    public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct)
-    {
-        return Task.FromResult<CustomCommandViewerResolution>(
+    public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct) =>
+        Task.FromResult<CustomCommandViewerResolution>(
             new CustomCommandViewerResolution.NotFound()
         );
-    }
 }

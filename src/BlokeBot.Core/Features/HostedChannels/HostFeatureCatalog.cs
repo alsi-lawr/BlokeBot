@@ -20,9 +20,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.CustomCommands,
     ];
 
-    public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures)
-    {
-        return
+    public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
         [
             new(
                 HostFeatureFlags.Shoutouts,
@@ -97,15 +95,9 @@ public static class HostFeatureCatalog
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
         ];
-    }
 
-    public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature)
-    {
-        return (enabledFeatures & feature) == feature;
-    }
+    public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature) =>
+        (enabledFeatures & feature) == feature;
 
-    public static bool IsSelectable(HostFeatureFlags feature)
-    {
-        return Features.Contains(feature);
-    }
+    public static bool IsSelectable(HostFeatureFlags feature) => Features.Contains(feature);
 }

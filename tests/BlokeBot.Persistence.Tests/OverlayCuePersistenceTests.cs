@@ -60,9 +60,8 @@ public sealed class OverlayCuePersistenceTests
         await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
-    private static BotHost Host(string login)
-    {
-        return new()
+    private static BotHost Host(string login) =>
+        new()
         {
             TwitchUserId = $"{login}-id",
             Login = login,
@@ -70,11 +69,9 @@ public sealed class OverlayCuePersistenceTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = DateTime.UtcNow,
         };
-    }
 
-    private static OverlayCue Cue(int hostId)
-    {
-        return new()
+    private static OverlayCue Cue(int hostId) =>
+        new()
         {
             PublicId = Guid.NewGuid(),
             HostId = hostId,
@@ -88,11 +85,9 @@ public sealed class OverlayCuePersistenceTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
-    private static OverlayMediaAsset Asset(int hostId)
-    {
-        return new()
+    private static OverlayMediaAsset Asset(int hostId) =>
+        new()
         {
             PublicId = Guid.Parse("7a90d36d-e77c-496b-9211-d0547759050f"),
             HostId = hostId,
@@ -104,5 +99,4 @@ public sealed class OverlayCuePersistenceTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 }

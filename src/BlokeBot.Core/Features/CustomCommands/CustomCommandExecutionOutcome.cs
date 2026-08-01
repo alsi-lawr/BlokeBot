@@ -16,9 +16,8 @@ public abstract record CustomCommandExecutionOutcome
         Func<StreamOffline, TResult> streamOffline,
         Func<StreamUnavailable, TResult> streamUnavailable,
         Func<OverlayCue, TResult> overlayCue
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Unhandled value => unhandled(value),
             Handled value => handled(value),
@@ -29,7 +28,6 @@ public abstract record CustomCommandExecutionOutcome
             OverlayCue value => overlayCue(value),
             _ => throw new UnreachableException("Unknown custom-command execution outcome."),
         };
-    }
 
     public sealed record Unhandled : CustomCommandExecutionOutcome;
 

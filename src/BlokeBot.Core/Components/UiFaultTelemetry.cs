@@ -11,8 +11,7 @@ public sealed class UiFaultTelemetry(ILogger<UiFaultTelemetry> log)
 {
     private static readonly EventId _unexpectedUiFault = new(7003, "UnexpectedUiFault");
 
-    public void Report(Exception exception, UiFaultContext context)
-    {
+    public void Report(Exception exception, UiFaultContext context) =>
         log.LogError(
             _unexpectedUiFault,
             "Unexpected UI fault in {UiComponent} during {UiOperation} for host {HostId} with load identity {LoadIdentityType}; failure type {FailureType}",
@@ -22,5 +21,4 @@ public sealed class UiFaultTelemetry(ILogger<UiFaultTelemetry> log)
             context.LoadIdentityType,
             exception.GetType().FullName ?? exception.GetType().Name
         );
-    }
 }

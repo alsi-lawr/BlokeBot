@@ -71,16 +71,14 @@ public sealed class PublicChatCommandResponseSenderTests
         entry.Properties["HostChannel"].ShouldBe("streamer");
     }
 
-    private static ChatMessage SourceMessage()
-    {
-        return new(
+    private static ChatMessage SourceMessage() =>
+        new(
             "viewer",
             "streamer",
             "!points",
             ":viewer!u@h PRIVMSG #streamer :!points",
             new Dictionary<string, string>()
         );
-    }
 
     private sealed class RecordingChatSender(PublicChatSendOutcome? outcome = null)
         : IPublicChatMessageSender
@@ -112,15 +110,9 @@ public sealed class PublicChatCommandResponseSenderTests
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

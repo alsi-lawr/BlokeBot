@@ -12,14 +12,12 @@ public sealed class FollowerOnlyChatReadinessService(
     TimeProvider timeProvider
 )
 {
-    public IO<FollowerOnlyChatReadiness, Never> GetReadiness(string channelLogin)
-    {
-        return IO<FollowerOnlyChatReadiness, Never>.Create(async ct =>
+    public IO<FollowerOnlyChatReadiness, Never> GetReadiness(string channelLogin) =>
+        IO<FollowerOnlyChatReadiness, Never>.Create(async ct =>
             Result<FollowerOnlyChatReadiness, Never>.Success(
                 await EvaluateReadinessAsync(channelLogin, ct)
             )
         );
-    }
 
     private async Task<FollowerOnlyChatReadiness> EvaluateReadinessAsync(
         string channelLogin,
@@ -246,15 +244,10 @@ public sealed class FollowerOnlyChatReadinessService(
         return channels.SingleOrDefault();
     }
 
-    private HelixRequestContext HelixContext(string accessToken)
-    {
-        return new(settings.Identity.ClientId, accessToken);
-    }
+    private HelixRequestContext HelixContext(string accessToken) =>
+        new(settings.Identity.ClientId, accessToken);
 
     private static FollowerOnlyChatReadiness.UnableToVerify UnableToVerify(
         FollowerOnlyChatVerificationFailure failure
-    )
-    {
-        return new(failure);
-    }
+    ) => new(failure);
 }

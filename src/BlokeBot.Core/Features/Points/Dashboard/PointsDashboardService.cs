@@ -26,10 +26,11 @@ public sealed class PointsDashboardService(
         );
     }
 
-    public async Task<PointBalanceEntry> LookupAsync(int hostId, string login, CancellationToken ct)
-    {
-        return await balances.GetBalanceAsync(hostId, login, ct);
-    }
+    public async Task<PointBalanceEntry> LookupAsync(
+        int hostId,
+        string login,
+        CancellationToken ct
+    ) => await balances.GetBalanceAsync(hostId, login, ct);
 
     public async Task<PointOperationOutcome> AddAsync(
         int hostId,
@@ -177,27 +178,17 @@ public sealed class PointsDashboardService(
         int hostId,
         string hostLogin,
         CancellationToken ct
-    )
-    {
-        return giveaways.StartAsync(hostId, hostLogin, null, ct);
-    }
+    ) => giveaways.StartAsync(hostId, hostLogin, null, ct);
 
     public Task<PointOperationOutcome> EndGiveawayAsync(
         int hostId,
         string hostLogin,
         CancellationToken ct
-    )
-    {
-        return giveaways.EndAsync(hostId, hostLogin, ct);
-    }
+    ) => giveaways.EndAsync(hostId, hostLogin, ct);
 
-    public Task<PointOperationOutcome> CancelGiveawayAsync(int hostId, CancellationToken ct)
-    {
-        return giveaways.CancelAsync(hostId, ct);
-    }
+    public Task<PointOperationOutcome> CancelGiveawayAsync(int hostId, CancellationToken ct) =>
+        giveaways.CancelAsync(hostId, ct);
 
-    private static PointOperationOutcome InvalidAmount()
-    {
-        return new PointOperationOutcome.Failed("Invalid amount.", CommandResponseTarget.Chat);
-    }
+    private static PointOperationOutcome InvalidAmount() =>
+        new PointOperationOutcome.Failed("Invalid amount.", CommandResponseTarget.Chat);
 }

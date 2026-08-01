@@ -40,20 +40,11 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
         return new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
     }
 
-    public BlokeBotDbContext CreateDbContext()
-    {
-        return new(_options);
-    }
+    public BlokeBotDbContext CreateDbContext() => new(_options);
 
     public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
         CancellationToken cancellationToken = default
-    )
-    {
-        return ValueTask.FromResult(CreateDbContext());
-    }
+    ) => ValueTask.FromResult(CreateDbContext());
 
-    public async ValueTask DisposeAsync()
-    {
-        await _keeperConnection.DisposeAsync();
-    }
+    public async ValueTask DisposeAsync() => await _keeperConnection.DisposeAsync();
 }

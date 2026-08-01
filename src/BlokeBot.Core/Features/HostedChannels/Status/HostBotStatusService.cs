@@ -15,19 +15,15 @@ public sealed class HostBotStatusService(
     IDbContextFactory<BlokeBotDbContext>? dbFactory = null
 ) : IHostStreamLivenessProvider
 {
-    public IO<HostBotChannelStatus, Never> GetStatus(string channelLogin)
-    {
-        return GetReadiness(channelLogin).Map(HostBotChannelStatus.FromReadiness);
-    }
+    public IO<HostBotChannelStatus, Never> GetStatus(string channelLogin) =>
+        GetReadiness(channelLogin).Map(HostBotChannelStatus.FromReadiness);
 
-    public IO<HostBotReadinessOutcome, Never> GetReadiness(string channelLogin)
-    {
-        return IO<HostBotReadinessOutcome, Never>.Create(async ct =>
+    public IO<HostBotReadinessOutcome, Never> GetReadiness(string channelLogin) =>
+        IO<HostBotReadinessOutcome, Never>.Create(async ct =>
             Result<HostBotReadinessOutcome, Never>.Success(
                 await EvaluateReadinessCoreAsync(channelLogin, ct)
             )
         );
-    }
 
     private async Task<HostBotReadinessOutcome> EvaluateReadinessCoreAsync(
         string channelLogin,
@@ -171,21 +167,17 @@ public sealed class HostBotStatusService(
 
     private static HostBotReadinessOutcome ChannelAuthorityReadyOutcome(
         HostBotReadinessCapabilities capabilities
-    )
-    {
-        return capabilities.FollowerReadGranted
+    ) =>
+        capabilities.FollowerReadGranted
             ? new HostBotReadinessOutcome.Ready()
             : new HostBotReadinessOutcome.MissingFollowerReadScope(capabilities);
-    }
 
-    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
-    {
-        return IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+        IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
             Result<HostStreamLivenessOutcome, Never>.Success(
                 await EvaluateStreamLivenessAsync(channelLogin, ct)
             )
         );
-    }
 
     private async Task<HostStreamLivenessOutcome> EvaluateStreamLivenessAsync(
         string channelLogin,
@@ -244,14 +236,12 @@ public sealed class HostBotStatusService(
         }
     }
 
-    public IO<FollowerCheckOutcome, Never> CheckFollower(string channelLogin, string viewerLogin)
-    {
-        return IO<FollowerCheckOutcome, Never>.Create(async ct =>
+    public IO<FollowerCheckOutcome, Never> CheckFollower(string channelLogin, string viewerLogin) =>
+        IO<FollowerCheckOutcome, Never>.Create(async ct =>
             Result<FollowerCheckOutcome, Never>.Success(
                 await CheckFollowerAsync(channelLogin, viewerLogin, ct)
             )
         );
-    }
 
     private async Task<FollowerCheckOutcome> CheckFollowerAsync(
         string channelLogin,
@@ -379,18 +369,13 @@ public sealed class HostBotStatusService(
         );
     }
 
-    private HelixRequestContext HelixContext(string token)
-    {
-        return new(settings.Identity.ClientId, token);
-    }
+    private HelixRequestContext HelixContext(string token) =>
+        new(settings.Identity.ClientId, token);
 
     private static HostStreamLivenessOutcome.Unavailable Unavailable(
         HostStreamLivenessUnavailableReason reason,
         Exception cause
-    )
-    {
-        return new(reason, cause);
-    }
+    ) => new(reason, cause);
 
     private sealed record ValidatedUserAccessToken(string AccessToken, TokenValidation Validation);
 }

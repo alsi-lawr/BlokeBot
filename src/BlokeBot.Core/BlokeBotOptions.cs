@@ -45,16 +45,14 @@ public sealed record BlokeBotOverlayMediaOptions
 
 public static class BlokeBotOptionsValidation
 {
-    public static bool IsValid(BlokeBotOptions options)
-    {
-        return options.BotStateChangeCooldownSeconds >= 0
-            && options.CustomCommands.MinimumCooldownSeconds >= 0
-            && options.CustomCommands.AnnouncementSchedulerTickSeconds > 0
-            && options.Points.MinimumGamblingCooldownSeconds >= 0
-            && options.Overlays.Media.MaximumUploadBytes is >= 1024 and <= 2L * 1024 * 1024 * 1024
-            && options.Overlays.Media.MaximumHostStorageBytes
-                >= options.Overlays.Media.MaximumUploadBytes
-            && options.Overlays.Media.MaximumHostStorageBytes <= 20L * 1024 * 1024 * 1024
-            && options.Overlays.Media.DisconnectedQueueExpirySeconds is >= 1 and <= 300;
-    }
+    public static bool IsValid(BlokeBotOptions options) =>
+        options.BotStateChangeCooldownSeconds >= 0
+        && options.CustomCommands.MinimumCooldownSeconds >= 0
+        && options.CustomCommands.AnnouncementSchedulerTickSeconds > 0
+        && options.Points.MinimumGamblingCooldownSeconds >= 0
+        && options.Overlays.Media.MaximumUploadBytes is >= 1024 and <= 2L * 1024 * 1024 * 1024
+        && options.Overlays.Media.MaximumHostStorageBytes
+            >= options.Overlays.Media.MaximumUploadBytes
+        && options.Overlays.Media.MaximumHostStorageBytes <= 20L * 1024 * 1024 * 1024
+        && options.Overlays.Media.DisconnectedQueueExpirySeconds is >= 1 and <= 300;
 }

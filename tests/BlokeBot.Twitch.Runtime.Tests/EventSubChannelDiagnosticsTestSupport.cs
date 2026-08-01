@@ -66,10 +66,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
             while (_transitions.Reader.TryRead(out _)) { }
         }
 
-        internal ValueTask<EventSubChannelStatus> NextAsync()
-        {
-            return _transitions.Reader.ReadAsync();
-        }
+        internal ValueTask<EventSubChannelStatus> NextAsync() => _transitions.Reader.ReadAsync();
     }
 
     private protected sealed class FixedTimeProvider(DateTimeOffset initialNow) : TimeProvider
@@ -87,10 +84,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
             }
         }
 
-        public override long GetTimestamp()
-        {
-            return GetUtcNow().UtcTicks;
-        }
+        public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
         public override ITimer CreateTimer(
             TimerCallback callback,
@@ -144,10 +138,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
             private DateTimeOffset _dueAt = DateTimeOffset.MaxValue;
             private bool _disposed;
 
-            internal bool IsDue(DateTimeOffset current)
-            {
-                return !_disposed && _dueAt <= current;
-            }
+            internal bool IsDue(DateTimeOffset current) => !_disposed && _dueAt <= current;
 
             public bool Change(TimeSpan dueTime, TimeSpan period)
             {

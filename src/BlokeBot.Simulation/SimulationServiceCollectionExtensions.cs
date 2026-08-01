@@ -64,39 +64,30 @@ internal static class SimulationServiceCollectionExtensions
         public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
             AutomaticRaidShoutoutDeliveryRequest request,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<AutomaticRaidShoutoutDeliveryResult>(
+        ) =>
+            Task.FromResult<AutomaticRaidShoutoutDeliveryResult>(
                 new AutomaticRaidShoutoutDeliveryResult.Delivered()
             );
-        }
     }
 
     private sealed class SimulationTimeProvider : TimeProvider
     {
         private readonly long _startedAtTimestamp = TimeProvider.System.GetTimestamp();
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return SimulationMode.Now + TimeProvider.System.GetElapsedTime(_startedAtTimestamp);
-        }
+        public override DateTimeOffset GetUtcNow() =>
+            SimulationMode.Now + TimeProvider.System.GetElapsedTime(_startedAtTimestamp);
 
         public override ITimer CreateTimer(
             TimerCallback callback,
             object? state,
             TimeSpan dueTime,
             TimeSpan period
-        )
-        {
-            return TimeProvider.System.CreateTimer(callback, state, dueTime, period);
-        }
+        ) => TimeProvider.System.CreateTimer(callback, state, dueTime, period);
     }
 
     private sealed class SimulationPointTargetUserLookup : IPointTargetUserLookup
     {
-        public Task<bool> ExistsAsync(string login, CancellationToken ct)
-        {
-            return Task.FromResult(!string.IsNullOrWhiteSpace(login));
-        }
+        public Task<bool> ExistsAsync(string login, CancellationToken ct) =>
+            Task.FromResult(!string.IsNullOrWhiteSpace(login));
     }
 }

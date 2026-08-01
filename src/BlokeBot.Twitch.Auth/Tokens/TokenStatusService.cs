@@ -176,16 +176,14 @@ public sealed class TokenStatusService(
         TokenStatusTransportFailureReason reason,
         Exception exception,
         ImmutableArray<string> requiredScopes
-    )
-    {
-        return Result<TokenStatus, TokenStatusError>.Error(
+    ) =>
+        Result<TokenStatus, TokenStatusError>.Error(
             new TokenStatusError.AcquisitionUnavailable(
                 reason,
                 FailureType(exception),
                 requiredScopes
             )
         );
-    }
 
     private static Result<TokenStatus, TokenStatusError> StatusFromValidation(
         string accessToken,
@@ -214,33 +212,25 @@ public sealed class TokenStatusService(
         TokenStatusTransportFailureReason reason,
         Exception exception,
         ImmutableArray<string> requiredScopes
-    )
-    {
-        return Result<TokenStatus, TokenStatusError>.Error(
+    ) =>
+        Result<TokenStatus, TokenStatusError>.Error(
             new TokenStatusError.ValidationUnavailable(
                 reason,
                 FailureType(exception),
                 requiredScopes
             )
         );
-    }
 
-    private static Result<TokenStatus, TokenStatusError> Success(TokenStatus status)
-    {
-        return Result<TokenStatus, TokenStatusError>.Success(status);
-    }
+    private static Result<TokenStatus, TokenStatusError> Success(TokenStatus status) =>
+        Result<TokenStatus, TokenStatusError>.Success(status);
 
-    private void LogUnexpectedFailure(string operation, Exception exception)
-    {
+    private void LogUnexpectedFailure(string operation, Exception exception) =>
         log.LogError(
             "Unexpected Twitch token status {Operation} failure of type {FailureType} was escalated.",
             operation,
             FailureType(exception)
         );
-    }
 
-    private static string FailureType(Exception exception)
-    {
-        return exception.GetType().FullName ?? exception.GetType().Name;
-    }
+    private static string FailureType(Exception exception) =>
+        exception.GetType().FullName ?? exception.GetType().Name;
 }

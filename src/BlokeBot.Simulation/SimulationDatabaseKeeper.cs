@@ -23,8 +23,5 @@ internal sealed class SimulationDatabaseKeeper : IDisposable
 
     internal bool IsOpen => _connection.State == System.Data.ConnectionState.Open;
 
-    public void Dispose()
-    {
-        _connection.Dispose();
-    }
+    public void Dispose() => _connection.Dispose();
 }

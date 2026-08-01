@@ -23,36 +23,31 @@ namespace BlokeBot.Core.Tests;
 
 public abstract class PointsTestBase
 {
-    private protected static string DescribeParse(Result<PointAmount, PointAmountParseError> result)
-    {
-        return result.Match(static amount => $"Amount:{amount}", static error => $"Error:{error}");
-    }
+    private protected static string DescribeParse(
+        Result<PointAmount, PointAmountParseError> result
+    ) => result.Match(static amount => $"Amount:{amount}", static error => $"Error:{error}");
 
-    private protected static PointOperationOutcome.Succeeded Success(PointOperationOutcome outcome)
-    {
-        return outcome.Match(
+    private protected static PointOperationOutcome.Succeeded Success(
+        PointOperationOutcome outcome
+    ) =>
+        outcome.Match(
             succeeded => succeeded,
             _ => throw new InvalidOperationException("Expected a successful point operation.")
         );
-    }
 
-    private protected static PointOperationOutcome.Failed Failure(PointOperationOutcome outcome)
-    {
-        return outcome.Match(
+    private protected static PointOperationOutcome.Failed Failure(PointOperationOutcome outcome) =>
+        outcome.Match(
             _ => throw new InvalidOperationException("Expected a failed point operation."),
             failed => failed
         );
-    }
 
     private protected static PointBalanceMutation Mutation(
         Result<PointBalanceMutation, PointBalanceMutationFailure> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             mutation => mutation,
             _ => throw new InvalidOperationException("Expected a successful balance mutation.")
         );
-    }
 
     private protected static CommandStrategyContext<
         PointsCommandKind,
@@ -91,9 +86,8 @@ public abstract class PointsTestBase
         SqliteBlokeBotDbFactory dbFactory,
         TimeProvider clock,
         int minimumGamblingCooldownSeconds = 0
-    )
-    {
-        return new(
+    ) =>
+        new(
             new PointsCommandService(dbFactory),
             new PointBalanceService(dbFactory),
             new FixedPointsRandom(),
@@ -108,7 +102,6 @@ public abstract class PointsTestBase
                 }
             )
         );
-    }
 
     private protected static PointsConfigurationService CreateConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
@@ -120,9 +113,8 @@ public abstract class PointsTestBase
 
     private protected static PointsConfigurationSaveCommand ValidConfiguration(
         PointsConfiguration draft
-    )
-    {
-        return PointsConfigurationValidator
+    ) =>
+        PointsConfigurationValidator
             .Validate(draft)
             .Match(
                 command => command,
@@ -131,7 +123,6 @@ public abstract class PointsTestBase
                         string.Join(" ", errors.Select(error => error.Message))
                     )
             );
-    }
 
     private protected static async Task AddBalanceAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -212,10 +203,7 @@ public abstract class PointsTestBase
 
     private protected sealed class FakeHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new();
-        }
+        public HttpClient CreateClient(string name) => new();
     }
 
     private protected sealed class FixedPointTargetUserLookup(IEnumerable<string> existingUsers)
@@ -225,37 +213,23 @@ public abstract class PointsTestBase
             .Select(Login.Normalize)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        public Task<bool> ExistsAsync(string login, CancellationToken ct)
-        {
-            return Task.FromResult(_users.Contains(Login.Normalize(login)));
-        }
+        public Task<bool> ExistsAsync(string login, CancellationToken ct) =>
+            Task.FromResult(_users.Contains(Login.Normalize(login)));
     }
 
     private protected sealed class FixedPointsRandom : IPointsRandom
     {
-        public double NextDouble()
-        {
-            return 0;
-        }
+        public double NextDouble() => 0;
 
-        public int Next(int minValue, int maxValue)
-        {
-            return minValue;
-        }
+        public int Next(int minValue, int maxValue) => minValue;
     }
 
     private protected sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
         private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _current;
-        }
+        public override DateTimeOffset GetUtcNow() => _current;
 
-        public void Advance(TimeSpan interval)
-        {
-            _current += interval;
-        }
+        public void Advance(TimeSpan interval) => _current += interval;
     }
 }

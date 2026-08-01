@@ -26,10 +26,7 @@ public sealed record HostBotAccountTokenPayload(
     [property: JsonIgnore] DateTimeOffset ExpiresAtUtc
 )
 {
-    public override string ToString()
-    {
-        return $"{nameof(HostBotAccountTokenPayload)} {{ [REDACTED] }}";
-    }
+    public override string ToString() => $"{nameof(HostBotAccountTokenPayload)} {{ [REDACTED] }}";
 }
 
 public sealed record HostBotAccountTokenProtectionFailure;
@@ -137,21 +134,17 @@ public sealed class DataProtectionHostBotAccountTokenProtector(
         }
     }
 
-    private IDataProtector Protector(int hostId)
-    {
-        return protectionProvider.CreateProtector(
+    private IDataProtector Protector(int hostId) =>
+        protectionProvider.CreateProtector(
             _purpose,
             _schemaPurpose,
             hostId.ToString(CultureInfo.InvariantCulture)
         );
-    }
 
-    private static Result<T, HostBotAccountTokenProtectionFailure> Failed<T>()
-    {
-        return Result<T, HostBotAccountTokenProtectionFailure>.Error(
+    private static Result<T, HostBotAccountTokenProtectionFailure> Failed<T>() =>
+        Result<T, HostBotAccountTokenProtectionFailure>.Error(
             new HostBotAccountTokenProtectionFailure()
         );
-    }
 
     private sealed record StoredPayload(
         int Version,

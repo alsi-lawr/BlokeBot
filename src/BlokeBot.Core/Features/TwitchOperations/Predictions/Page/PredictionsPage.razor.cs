@@ -77,47 +77,37 @@ public partial class PredictionsPage
         );
     }
 
-    private Task DeleteTemplateAsync(int templateId)
-    {
-        return MutateAsync(async hostId =>
+    private Task DeleteTemplateAsync(int templateId) =>
+        MutateAsync(async hostId =>
             Publish(
                 await _predictions.DeleteTemplateAsync(hostId, templateId, CancellationToken.None)
             )
         );
-    }
 
-    private Task StartPredictionAsync(int templateId)
-    {
-        return MutateAsync(async hostId =>
+    private Task StartPredictionAsync(int templateId) =>
+        MutateAsync(async hostId =>
             Publish(await _predictions.StartAsync(hostId, templateId, CancellationToken.None))
         );
-    }
 
-    private Task LockPredictionAsync()
-    {
-        return ConfirmedMutationAsync(
+    private Task LockPredictionAsync() =>
+        ConfirmedMutationAsync(
             "Lock this Twitch Prediction?",
             (hostId, confirmed) => _predictions.LockAsync(hostId, confirmed, CancellationToken.None)
         );
-    }
 
-    private Task CancelPredictionAsync()
-    {
-        return ConfirmedMutationAsync(
+    private Task CancelPredictionAsync() =>
+        ConfirmedMutationAsync(
             "Cancel this Twitch Prediction? Twitch refunds viewers.",
             (hostId, confirmed) =>
                 _predictions.CancelAsync(hostId, confirmed, CancellationToken.None)
         );
-    }
 
-    private Task ResolvePredictionAsync(string outcomeId)
-    {
-        return ConfirmedMutationAsync(
+    private Task ResolvePredictionAsync(string outcomeId) =>
+        ConfirmedMutationAsync(
             "Resolve this Twitch Prediction and pay winners?",
             (hostId, confirmed) =>
                 _predictions.ResolveAsync(hostId, outcomeId, confirmed, CancellationToken.None)
         );
-    }
 
     private async Task ConfirmedMutationAsync(
         string prompt,
@@ -194,8 +184,6 @@ public partial class PredictionsPage
         }
     }
 
-    private void Warn(string message)
-    {
+    private void Warn(string message) =>
         _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
-    }
 }

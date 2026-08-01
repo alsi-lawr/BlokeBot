@@ -18,9 +18,8 @@ internal sealed record FollowerOnlyChatReadinessPresentation(
     DateTimeOffset? EligibleAtUtc
 )
 {
-    public static FollowerOnlyChatReadinessPresentation From(FollowerOnlyChatReadiness readiness)
-    {
-        return readiness.Match<FollowerOnlyChatReadinessPresentation>(
+    public static FollowerOnlyChatReadinessPresentation From(FollowerOnlyChatReadiness readiness) =>
+        readiness.Match<FollowerOnlyChatReadinessPresentation>(
             _ => new(FollowerOnlyChatSetupState.NotRequired, null),
             _ => new(FollowerOnlyChatSetupState.Exempt, null),
             _ => new(FollowerOnlyChatSetupState.Eligible, null),
@@ -35,5 +34,4 @@ internal sealed record FollowerOnlyChatReadinessPresentation(
                     null
                 )
         );
-    }
 }

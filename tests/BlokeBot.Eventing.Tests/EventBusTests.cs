@@ -185,9 +185,6 @@ public sealed class EventBusTests
     private sealed class FixedCorrelationIdProvider(string correlationId)
         : IObserverCorrelationIdProvider
     {
-        public ObserverCorrelationId Next()
-        {
-            return ObserverCorrelationId.Named(correlationId);
-        }
+        public ObserverCorrelationId Next() => ObserverCorrelationId.Named(correlationId);
     }
 }

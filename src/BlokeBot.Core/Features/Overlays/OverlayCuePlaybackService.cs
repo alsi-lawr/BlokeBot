@@ -413,9 +413,8 @@ internal sealed class OverlayCuePlaybackService(
     private static OverlayCuePlaybackLayer ResolveLayer(
         OverlayCueLayer layer,
         IReadOnlyDictionary<Guid, OverlayMediaAsset> assets
-    )
-    {
-        return layer switch
+    ) =>
+        layer switch
         {
             OverlayCueLayer.UploadedMedia uploaded => new OverlayCuePlaybackLayer.UploadedMedia
             {
@@ -450,7 +449,6 @@ internal sealed class OverlayCuePlaybackService(
             },
             _ => throw new InvalidOperationException("Unsupported Cue-V1 layer."),
         };
-    }
 
     private async Task MonitorAsync(CancellationToken cancellationToken)
     {

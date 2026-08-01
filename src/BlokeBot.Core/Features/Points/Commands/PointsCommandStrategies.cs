@@ -44,18 +44,10 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     protected async Task<PointsCommandResolution> LoadResolutionAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    )
-    {
-        return await Commands.CreateResolutionAsync(HostId(context.State), Kind, cancellationToken);
-    }
+    ) => await Commands.CreateResolutionAsync(HostId(context.State), Kind, cancellationToken);
 
-    private static int HostId(AppCommandRouteState state)
-    {
-        return state.Match(
-            static host => host.HostId,
-            static guessingProfile => guessingProfile.HostId
-        );
-    }
+    private static int HostId(AppCommandRouteState state) =>
+        state.Match(static host => host.HostId, static guessingProfile => guessingProfile.HostId);
 
     protected static async ValueTask ReplyAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -73,10 +65,8 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         }
     }
 
-    protected static CommandResponse Response(string message, CommandResponseTarget target)
-    {
-        return new(target, message);
-    }
+    protected static CommandResponse Response(string message, CommandResponseTarget target) =>
+        new(target, message);
 
     protected static string Format(
         string template,
@@ -86,9 +76,8 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         string? to = null,
         string? amount = null,
         string? balance = null
-    )
-    {
-        return MessageTemplateFormatter.Format(
+    ) =>
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -100,37 +89,30 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
                 ["balance"] = balance ?? string.Empty,
             }
         );
-    }
 
     protected static PointOperationOutcome Insufficient(
         PointsSettings settings,
         ReplyDeliveryMap delivery
-    )
-    {
-        return new PointOperationOutcome.Failed(
+    ) =>
+        new PointOperationOutcome.Failed(
             Format(settings.InsufficientBalanceReply, settings),
             delivery.TargetFor(PointsReplyKeys.InsufficientBalance)
         );
-    }
 
     protected static PointOperationOutcome Invalid(
         PointsSettings settings,
         ReplyDeliveryMap delivery
-    )
-    {
-        return new PointOperationOutcome.Failed(
+    ) =>
+        new PointOperationOutcome.Failed(
             Format(settings.InvalidAmountReply, settings),
             delivery.TargetFor(PointsReplyKeys.InvalidAmount)
         );
-    }
 
-    protected static PointOperationOutcome UnknownUser(string login)
-    {
-        return new PointOperationOutcome.Failed(
+    protected static PointOperationOutcome UnknownUser(string login) =>
+        new PointOperationOutcome.Failed(
             $"Twitch user @{login} was not found.",
             CommandResponseTarget.Chat
         );
-    }
 }
 
 public sealed class PointsBalanceCommandStrategy(

@@ -214,28 +214,25 @@ public sealed class AutomaticRaidShoutoutObserver(
             .ExecuteDeleteAsync(cancellationToken);
     }
 
-    private static bool HasUsableIdentity(EventSubIncomingRaidEvent incomingRaid)
-    {
-        return !string.IsNullOrWhiteSpace(incomingRaid.MessageId)
-            && incomingRaid.MessageId.Length <= 128
-            && incomingRaid.MessageTimestamp != default
-            && !string.IsNullOrWhiteSpace(incomingRaid.FromBroadcasterUserId)
-            && incomingRaid.FromBroadcasterUserId.Length <= 64
-            && !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.FromBroadcasterUserLogin))
-            && Login.Normalize(incomingRaid.FromBroadcasterUserLogin).Length <= 128
-            && incomingRaid.FromBroadcasterUserName.Length <= 128
-            && incomingRaid.ToBroadcasterUserId.Length <= 64
-            && Login.Normalize(incomingRaid.ToBroadcasterUserLogin).Length <= 128
-            && (
-                !string.IsNullOrWhiteSpace(incomingRaid.ToBroadcasterUserId)
-                || !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.ToBroadcasterUserLogin))
-            )
-            && incomingRaid.ViewerCount >= 0;
-    }
+    private static bool HasUsableIdentity(EventSubIncomingRaidEvent incomingRaid) =>
+        !string.IsNullOrWhiteSpace(incomingRaid.MessageId)
+        && incomingRaid.MessageId.Length <= 128
+        && incomingRaid.MessageTimestamp != default
+        && !string.IsNullOrWhiteSpace(incomingRaid.FromBroadcasterUserId)
+        && incomingRaid.FromBroadcasterUserId.Length <= 64
+        && !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.FromBroadcasterUserLogin))
+        && Login.Normalize(incomingRaid.FromBroadcasterUserLogin).Length <= 128
+        && incomingRaid.FromBroadcasterUserName.Length <= 128
+        && incomingRaid.ToBroadcasterUserId.Length <= 64
+        && Login.Normalize(incomingRaid.ToBroadcasterUserLogin).Length <= 128
+        && (
+            !string.IsNullOrWhiteSpace(incomingRaid.ToBroadcasterUserId)
+            || !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.ToBroadcasterUserLogin))
+        )
+        && incomingRaid.ViewerCount >= 0;
 
-    private static bool IsPersistenceContention(Exception exception)
-    {
-        return exception switch
+    private static bool IsPersistenceContention(Exception exception) =>
+        exception switch
         {
             SqliteException
             {
@@ -244,5 +241,4 @@ public sealed class AutomaticRaidShoutoutObserver(
             DbUpdateException { InnerException: { } inner } => IsPersistenceContention(inner),
             _ => false,
         };
-    }
 }

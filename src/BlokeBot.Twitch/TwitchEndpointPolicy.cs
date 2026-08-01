@@ -30,10 +30,7 @@ public sealed class TwitchEndpointPolicy
 
     public Uri OAuthValidationEndpoint => CreateHttpEndpoint(OAuthOrigin, "validate");
 
-    public Uri HelixEndpoint(string path)
-    {
-        return CreateHttpEndpoint(HelixOrigin, path);
-    }
+    public Uri HelixEndpoint(string path) => CreateHttpEndpoint(HelixOrigin, path);
 
     public void Validate()
     {

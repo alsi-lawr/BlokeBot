@@ -105,9 +105,8 @@ public static class PointsConfigurationValidator
         string value,
         bool minimum,
         ICollection<PointsConfigurationValidationError> errors
-    )
-    {
-        return PointAmount
+    ) =>
+        PointAmount
             .ParseNonNegativeAbsolute(value)
             .Match<PointAmount?>(
                 amount => amount,
@@ -117,14 +116,12 @@ public static class PointsConfigurationValidator
                     return null;
                 }
             );
-    }
 
     private static PointsConfigurationValidationError PayoutError(
         bool minimum,
         PointAmountParseError error
-    )
-    {
-        return (minimum, error) switch
+    ) =>
+        (minimum, error) switch
         {
             (true, PointAmountParseError.AmountOutOfRange) =>
                 new PointsConfigurationValidationError.MinimumPayoutOutOfRange(),
@@ -133,16 +130,12 @@ public static class PointsConfigurationValidator
             (true, _) => new PointsConfigurationValidationError.InvalidMinimumPayout(),
             (false, _) => new PointsConfigurationValidationError.InvalidMaximumPayout(),
         };
-    }
 
-    private static string NormalizePointLabel(string pointLabel)
-    {
-        return string.IsNullOrWhiteSpace(pointLabel) ? "points" : pointLabel.Trim();
-    }
+    private static string NormalizePointLabel(string pointLabel) =>
+        string.IsNullOrWhiteSpace(pointLabel) ? "points" : pointLabel.Trim();
 
-    private static PointsCommandAliases SnapshotAliases(PointsCommandAliasEditor aliases)
-    {
-        return new(
+    private static PointsCommandAliases SnapshotAliases(PointsCommandAliasEditor aliases) =>
+        new(
             NormalizeAliases(aliases.PointsAliases),
             NormalizeAliases(aliases.GivePointsAliases),
             NormalizeAliases(aliases.AddPointsAliases),
@@ -153,16 +146,12 @@ public static class PointsConfigurationValidator
             NormalizeAliases(aliases.EndGiveawayAliases),
             NormalizeAliases(aliases.CancelGiveawayAliases)
         );
-    }
 
-    private static string NormalizeAliases(string aliases)
-    {
-        return string.Join(", ", CommandAliasNormalizer.Split(aliases));
-    }
+    private static string NormalizeAliases(string aliases) =>
+        string.Join(", ", CommandAliasNormalizer.Split(aliases));
 
-    private static PointsReplySettings SnapshotReplies(PointsReplySettingsEditor replies)
-    {
-        return new(
+    private static PointsReplySettings SnapshotReplies(PointsReplySettingsEditor replies) =>
+        new(
             replies.BalanceReply.Trim(),
             replies.OtherBalanceReply.Trim(),
             replies.TransferReply.Trim(),
@@ -187,7 +176,6 @@ public static class PointsConfigurationValidator
             replies.NotEligibleReply.Trim(),
             replies.FollowerEligibilityUnavailableReply.Trim()
         );
-    }
 }
 
 public abstract record PointsConfigurationValidationError

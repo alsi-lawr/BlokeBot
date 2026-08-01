@@ -182,18 +182,13 @@ internal sealed class TwitchAnnouncementAccessService(
         };
     }
 
-    private HelixRequestContext HelixContext(string accessToken)
-    {
-        return new(settings.Identity.ClientId, accessToken);
-    }
+    private HelixRequestContext HelixContext(string accessToken) =>
+        new(settings.Identity.ClientId, accessToken);
 }
 
 internal abstract class TwitchAnnouncementAccess
 {
-    private TwitchAnnouncementAccess(string botLogin)
-    {
-        BotLogin = botLogin;
-    }
+    private TwitchAnnouncementAccess(string botLogin) => BotLogin = botLogin;
 
     public string BotLogin { get; }
 

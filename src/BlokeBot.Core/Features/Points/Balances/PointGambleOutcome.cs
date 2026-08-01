@@ -8,17 +8,13 @@ public abstract record PointGambleOutcome
 
     public sealed record Won : PointGambleOutcome
     {
-        public override TResult Match<TResult>(Func<Won, TResult> won, Func<Lost, TResult> lost)
-        {
-            return won(this);
-        }
+        public override TResult Match<TResult>(Func<Won, TResult> won, Func<Lost, TResult> lost) =>
+            won(this);
     }
 
     public sealed record Lost : PointGambleOutcome
     {
-        public override TResult Match<TResult>(Func<Won, TResult> won, Func<Lost, TResult> lost)
-        {
-            return lost(this);
-        }
+        public override TResult Match<TResult>(Func<Won, TResult> won, Func<Lost, TResult> lost) =>
+            lost(this);
     }
 }

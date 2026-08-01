@@ -560,9 +560,8 @@ public sealed class RequestBoardServiceTests
         int submissionLimit = 3,
         int cooldownSeconds = 0,
         int voteLimit = 10
-    )
-    {
-        return new ConfigureRequestBoardCommand(
+    ) =>
+        new ConfigureRequestBoardCommand(
             "games",
             "Game requests",
             "Suggest something to play.",
@@ -614,16 +613,14 @@ public sealed class RequestBoardServiceTests
                 ),
             ]
         );
-    }
 
     private static SubmitRequestCommand Submission(
         Guid operationId,
         string login,
         string title,
         IReadOnlyDictionary<string, string>? fields = null
-    )
-    {
-        return new SubmitRequestCommand(
+    ) =>
+        new SubmitRequestCommand(
             operationId,
             login,
             title,
@@ -635,7 +632,6 @@ public sealed class RequestBoardServiceTests
                     ["details"] = "Please consider this.",
                 }
         );
-    }
 
     private static ModerateRequestCommand Moderate(
         long submissionId,
@@ -644,9 +640,8 @@ public sealed class RequestBoardServiceTests
         string privateNote = "",
         string privateReason = "",
         int priority = 0
-    )
-    {
-        return new ModerateRequestCommand(
+    ) =>
+        new ModerateRequestCommand(
             submissionId,
             status,
             publicNote,
@@ -656,15 +651,13 @@ public sealed class RequestBoardServiceTests
             "Games",
             ["community"]
         );
-    }
 
     private static async Task ApproveAsync(
         RequestBoardService service,
         int hostId,
         long submissionId,
         int priority = 0
-    )
-    {
+    ) =>
         _ = Success(
             await service.ModerateAsync(
                 hostId,
@@ -672,38 +665,31 @@ public sealed class RequestBoardServiceTests
                 CancellationToken.None
             )
         );
-    }
 
     private static RequestBoardService CreateService(
         SqliteBlokeBotDbFactory database,
         TimeProvider? clock = null
-    )
-    {
-        return new RequestBoardService(
+    ) =>
+        new RequestBoardService(
             database,
             TestEventBus.Create<AppEventKind>(),
             clock ?? TimeProvider.System
         );
-    }
 
-    private static RequestBoardResult<T>.Succeeded Success<T>(RequestBoardResult<T> result)
-    {
-        return result.Match(
+    private static RequestBoardResult<T>.Succeeded Success<T>(RequestBoardResult<T> result) =>
+        result.Match(
             value => value,
             rejected =>
                 throw new InvalidOperationException(
                     $"Expected success but received: {rejected.Reason.Message}"
                 )
         );
-    }
 
-    private static RequestBoardRejection Rejection<T>(RequestBoardResult<T> result)
-    {
-        return result.Match(
+    private static RequestBoardRejection Rejection<T>(RequestBoardResult<T> result) =>
+        result.Match(
             _ => throw new InvalidOperationException("Expected rejection."),
             rejected => rejected.Reason
         );
-    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)
     {
@@ -744,14 +730,8 @@ public sealed class RequestBoardServiceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        public void Advance(TimeSpan duration)
-        {
-            _now = _now.Add(duration);
-        }
+        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
     }
 }

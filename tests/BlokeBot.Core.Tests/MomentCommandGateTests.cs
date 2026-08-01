@@ -63,8 +63,7 @@ public sealed class MomentCommandGateTests
         ChatCommandDispatcher dispatcher,
         string text,
         List<string> responses
-    )
-    {
+    ) =>
         await dispatcher.DispatchResponsesAsync(
             new ChatMessage(
                 "viewer",
@@ -80,7 +79,6 @@ public sealed class MomentCommandGateTests
             },
             CancellationToken.None
         );
-    }
 
     private sealed class RecordingLivenessProvider : IHostStreamLivenessProvider
     {

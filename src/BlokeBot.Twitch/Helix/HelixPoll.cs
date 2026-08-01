@@ -88,9 +88,8 @@ internal sealed record HelixPollWire
     [JsonPropertyName("ends_at")]
     public DateTimeOffset? EndsAt { get; init; }
 
-    public HelixPoll ToDomain()
-    {
-        return new(
+    public HelixPoll ToDomain() =>
+        new(
             Id,
             BroadcasterId,
             Title,
@@ -108,7 +107,6 @@ internal sealed record HelixPollWire
             StartedAt,
             EndsAt
         );
-    }
 }
 
 internal sealed record HelixPollChoiceWire

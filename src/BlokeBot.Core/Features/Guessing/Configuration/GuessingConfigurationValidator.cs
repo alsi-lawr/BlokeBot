@@ -162,9 +162,8 @@ public static class GuessingConfigurationValidator
     private static PointAmount? ParseReward(
         string value,
         ICollection<GuessingConfigurationValidationError> errors
-    )
-    {
-        return PointAmount
+    ) =>
+        PointAmount
             .ParseNonNegativeAbsolute(value)
             .Match<PointAmount?>(
                 amount => amount,
@@ -178,7 +177,6 @@ public static class GuessingConfigurationValidator
                     return null;
                 }
             );
-    }
 
     private static IReadOnlyList<GuessOptionValue> SnapshotOptions(
         GuessRoundProfileEditor profile,
@@ -249,25 +247,20 @@ public static class GuessingConfigurationValidator
         return normalized;
     }
 
-    private static GuessingCommandAliases SnapshotAliases(CommandAliasEditor aliases)
-    {
-        return new(
+    private static GuessingCommandAliases SnapshotAliases(CommandAliasEditor aliases) =>
+        new(
             NormalizeAliases(aliases.StartAliases),
             NormalizeAliases(aliases.StopAliases),
             NormalizeAliases(aliases.WinAliases),
             NormalizeAliases(aliases.GuessAliases),
             NormalizeAliases(aliases.GuessesAliases)
         );
-    }
 
-    private static string NormalizeAliases(string aliases)
-    {
-        return string.Join(", ", CommandAliasNormalizer.Split(aliases));
-    }
+    private static string NormalizeAliases(string aliases) =>
+        string.Join(", ", CommandAliasNormalizer.Split(aliases));
 
-    private static GuessingReplySettings SnapshotReplies(ReplySettingsEditor replies)
-    {
-        return new(
+    private static GuessingReplySettings SnapshotReplies(ReplySettingsEditor replies) =>
+        new(
             replies.RoundStartedReply.Trim(),
             replies.RoundAlreadyOpenReply.Trim(),
             replies.NoOpenRoundReply.Trim(),
@@ -282,7 +275,6 @@ public static class GuessingConfigurationValidator
             replies.WinnerReply.Trim(),
             replies.NoWinnersReply.Trim()
         );
-    }
 }
 
 public abstract record GuessingConfigurationValidationError

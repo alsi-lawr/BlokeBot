@@ -14,10 +14,7 @@ public abstract record CommandHandlingOutcome
         public override TResult Match<TResult>(
             Func<Unhandled, TResult> unhandled,
             Func<Handled, TResult> handled
-        )
-        {
-            return unhandled(this);
-        }
+        ) => unhandled(this);
     }
 
     public sealed record Handled : CommandHandlingOutcome
@@ -25,9 +22,6 @@ public abstract record CommandHandlingOutcome
         public override TResult Match<TResult>(
             Func<Unhandled, TResult> unhandled,
             Func<Handled, TResult> handled
-        )
-        {
-            return handled(this);
-        }
+        ) => handled(this);
     }
 }

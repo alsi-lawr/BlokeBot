@@ -13,10 +13,7 @@ internal sealed class SystemOverlayDnsResolver : IOverlayDnsResolver
     public async Task<IReadOnlyList<IPAddress>> ResolveAsync(
         string host,
         CancellationToken cancellationToken
-    )
-    {
-        return await Dns.GetHostAddressesAsync(host, cancellationToken);
-    }
+    ) => await Dns.GetHostAddressesAsync(host, cancellationToken);
 }
 
 public abstract record OverlayRemoteUrlDecision
@@ -118,8 +115,5 @@ public sealed class OverlayRemoteUrlPolicy(
             || ipv6[0] == 0xff;
     }
 
-    private static OverlayRemoteUrlDecision.Rejected Rejected(string message)
-    {
-        return new(message);
-    }
+    private static OverlayRemoteUrlDecision.Rejected Rejected(string message) => new(message);
 }

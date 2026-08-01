@@ -33,15 +33,9 @@ internal sealed class RecordingLogger<TCategory> : ILogger<TCategory>
     internal List<UiFaultLogEntry> Entries { get; } = [];
 
     public IDisposable? BeginScope<TState>(TState state)
-        where TState : notnull
-    {
-        return null;
-    }
+        where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel)
-    {
-        return true;
-    }
+    public bool IsEnabled(LogLevel logLevel) => true;
 
     public void Log<TState>(
         LogLevel logLevel,

@@ -35,34 +35,20 @@ internal static class GuessingReplySettingsQueries
         int hostId,
         int roundProfileId,
         CancellationToken ct
-    )
-    {
-        return LoadAsync(db, hostId, roundProfileId, ct);
-    }
+    ) => LoadAsync(db, hostId, roundProfileId, ct);
 
     public static Task<GuessingReplySettingsResolution> LoadForProfileAsync(
         BlokeBotDbContext db,
         int hostId,
         int profileId,
         CancellationToken ct
-    )
-    {
-        return LoadAsync(db, hostId, profileId, ct);
-    }
+    ) => LoadAsync(db, hostId, profileId, ct);
 
     public static async Task<GuessingReplySettingsResolution> LoadForDefaultAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await LoadAsync(
-            db,
-            hostId,
-            await db.Profiles.LoadDefaultProfileIdAsync(hostId, ct),
-            ct
-        );
-    }
+    ) => await LoadAsync(db, hostId, await db.Profiles.LoadDefaultProfileIdAsync(hostId, ct), ct);
 
     private static async Task<GuessingReplySettingsResolution> LoadAsync(
         BlokeBotDbContext db,

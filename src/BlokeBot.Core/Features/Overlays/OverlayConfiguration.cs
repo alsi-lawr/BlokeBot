@@ -67,9 +67,8 @@ public abstract record OverlayConfiguration
         }
     }
 
-    internal static OverlayConfiguration FromPersistence(OverlayType type, string json)
-    {
-        return Parse(type, json)
+    internal static OverlayConfiguration FromPersistence(OverlayType type, string json) =>
+        Parse(type, json)
             .Match(
                 valid => valid.Value,
                 invalid =>
@@ -77,7 +76,6 @@ public abstract record OverlayConfiguration
                         $"Persisted overlay configuration is invalid: {invalid.Message}"
                     )
             );
-    }
 
     internal abstract string ToPersistenceJson();
 
@@ -216,10 +214,7 @@ public abstract record OverlayConfiguration
 
         public override int SchemaVersion => 1;
 
-        internal override string ToPersistenceJson()
-        {
-            return """{"schemaVersion":1}""";
-        }
+        internal override string ToPersistenceJson() => """{"schemaVersion":1}""";
     }
 
     public sealed record GuessingV1 : OverlayConfiguration
@@ -254,10 +249,8 @@ public abstract record OverlayConfiguration
 
         public int ResultDurationSeconds { get; }
 
-        internal override string ToPersistenceJson()
-        {
-            return $$"""{"schemaVersion":1,"showGuessCount":{{ShowGuessCount.ToString().ToLowerInvariant()}},"resultDurationSeconds":{{ResultDurationSeconds}}}""";
-        }
+        internal override string ToPersistenceJson() =>
+            $$"""{"schemaVersion":1,"showGuessCount":{{ShowGuessCount.ToString().ToLowerInvariant()}},"resultDurationSeconds":{{ResultDurationSeconds}}}""";
     }
 
     public sealed record CuePlayerV1 : OverlayConfiguration
@@ -266,10 +259,7 @@ public abstract record OverlayConfiguration
 
         public override int SchemaVersion => 1;
 
-        internal override string ToPersistenceJson()
-        {
-            return """{"schemaVersion":1}""";
-        }
+        internal override string ToPersistenceJson() => """{"schemaVersion":1}""";
     }
 
     public sealed record GiveawayV1 : OverlayConfiguration
@@ -311,9 +301,8 @@ public abstract record OverlayConfiguration
 
         public bool ShowJoinCommand { get; }
 
-        internal override string ToPersistenceJson()
-        {
-            return JsonSerializer.Serialize(
+        internal override string ToPersistenceJson() =>
+            JsonSerializer.Serialize(
                 new
                 {
                     schemaVersion = SchemaVersion,
@@ -323,7 +312,6 @@ public abstract record OverlayConfiguration
                     showJoinCommand = ShowJoinCommand,
                 }
             );
-        }
     }
 }
 
@@ -341,10 +329,7 @@ public abstract record OverlayConfigurationParseResult
         public override TResult Match<TResult>(
             Func<Valid, TResult> valid,
             Func<Invalid, TResult> invalid
-        )
-        {
-            return valid(this);
-        }
+        ) => valid(this);
     }
 
     public sealed record Invalid(string Message) : OverlayConfigurationParseResult
@@ -352,9 +337,6 @@ public abstract record OverlayConfigurationParseResult
         public override TResult Match<TResult>(
             Func<Valid, TResult> valid,
             Func<Invalid, TResult> invalid
-        )
-        {
-            return invalid(this);
-        }
+        ) => invalid(this);
     }
 }

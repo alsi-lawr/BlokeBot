@@ -80,139 +80,94 @@ public abstract partial class EventSubChannelRecoveryTestBase
         internal void EnqueueAccount(
             string channel,
             Func<CancellationToken, ValueTask<BotAccount>> operation
-        )
-        {
+        ) =>
             GetQueue(_accountScripts, channel)
                 .Enqueue(async cancellationToken =>
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         await operation(cancellationToken)
                     )
                 );
-        }
 
-        internal void EnqueueAccountFailure(string channel, Exception exception)
-        {
+        internal void EnqueueAccountFailure(string channel, Exception exception) =>
             EnqueueAccount(channel, _ => ValueTask.FromException<BotAccount>(exception));
-        }
 
-        internal void EnqueueAccountResult(string channel, string botLogin)
-        {
+        internal void EnqueueAccountResult(string channel, string botLogin) =>
             EnqueueAccount(channel, _ => ValueTask.FromResult(new BotAccount(botLogin, "secret")));
-        }
 
-        internal void EnqueueBroadcasterAccountResult(string channel, string login)
-        {
+        internal void EnqueueBroadcasterAccountResult(string channel, string login) =>
             GetQueue(_broadcasterAccountScripts, channel)
                 .Enqueue(_ => ValueTask.FromResult(new BotAccount(login, "broadcaster-secret")));
-        }
 
-        internal void EnqueueAccountUnavailable(string channel, AccessTokenUnavailableReason reason)
-        {
+        internal void EnqueueAccountUnavailable(
+            string channel,
+            AccessTokenUnavailableReason reason
+        ) =>
             GetQueue(_accountScripts, channel)
                 .Enqueue(_ =>
                     ValueTask.FromResult(
                         Result<BotAccount, AccessTokenUnavailableReason>.Error(reason)
                     )
                 );
-        }
 
-        internal int AccountCount(string channel)
-        {
-            return _accountCounts.GetValueOrDefault(channel);
-        }
+        internal int AccountCount(string channel) => _accountCounts.GetValueOrDefault(channel);
 
-        internal IReadOnlyList<EventSubAuthorizationContext> Authorizations(string channel)
-        {
-            return _authorizations.TryGetValue(channel, out var values) ? values : [];
-        }
+        internal IReadOnlyList<EventSubAuthorizationContext> Authorizations(string channel) =>
+            _authorizations.TryGetValue(channel, out var values) ? values : [];
 
-        internal IReadOnlyList<EventSubOperationSubscriptionKind?> OperationKinds(string channel)
-        {
-            return _operationKinds.TryGetValue(channel, out var values) ? values : [];
-        }
+        internal IReadOnlyList<EventSubOperationSubscriptionKind?> OperationKinds(string channel) =>
+            _operationKinds.TryGetValue(channel, out var values) ? values : [];
 
-        internal void EnqueueCreateFailure(string channel, Exception exception)
-        {
+        internal void EnqueueCreateFailure(string channel, Exception exception) =>
             EnqueueCreate(
                 channel,
                 _ => ValueTask.FromException<EventSubSubscriptionSetupOutcome>(exception)
             );
-        }
 
-        internal void EnqueueCreateOutcome(string channel, EventSubSubscriptionSetupOutcome outcome)
-        {
-            EnqueueCreate(channel, _ => ValueTask.FromResult(outcome));
-        }
+        internal void EnqueueCreateOutcome(
+            string channel,
+            EventSubSubscriptionSetupOutcome outcome
+        ) => EnqueueCreate(channel, _ => ValueTask.FromResult(outcome));
 
-        internal int CreateCount(string channel)
-        {
-            return _createCounts.GetValueOrDefault(channel);
-        }
+        internal int CreateCount(string channel) => _createCounts.GetValueOrDefault(channel);
 
-        internal void EnqueueDeleteFailure(string channel, Exception exception)
-        {
+        internal void EnqueueDeleteFailure(string channel, Exception exception) =>
             GetQueue(_deleteOutcomes, channel).Enqueue(exception);
-        }
 
-        internal void EnqueueDeleteSuccess(string channel)
-        {
+        internal void EnqueueDeleteSuccess(string channel) =>
             GetQueue(_deleteOutcomes, channel).Enqueue(null);
-        }
 
-        internal void EnqueueBeforeDelete(string channel, Action action)
-        {
+        internal void EnqueueBeforeDelete(string channel, Action action) =>
             GetQueue(_beforeDelete, channel).Enqueue(action);
-        }
 
-        internal int DeleteCount(string channel)
-        {
-            return _deleteCounts.GetValueOrDefault(channel);
-        }
+        internal int DeleteCount(string channel) => _deleteCounts.GetValueOrDefault(channel);
 
-        internal IReadOnlyList<ActiveEventSubSubscription> DeleteAttempts(string channel)
-        {
-            return _deleteAttempts.TryGetValue(channel, out var attempts) ? attempts.ToArray() : [];
-        }
+        internal IReadOnlyList<ActiveEventSubSubscription> DeleteAttempts(string channel) =>
+            _deleteAttempts.TryGetValue(channel, out var attempts) ? attempts.ToArray() : [];
 
-        internal int StartupDeliveryCount(string channel)
-        {
-            return _startupDeliveryCounts.GetValueOrDefault(channel);
-        }
+        internal int StartupDeliveryCount(string channel) =>
+            _startupDeliveryCounts.GetValueOrDefault(channel);
 
         internal void EnqueueStartupDeliveryOutcome(
             string channel,
             EventSubStartupDeliveryOutcome outcome
-        )
-        {
-            GetQueue(_startupDeliveryOutcomes, channel).Enqueue(outcome);
-        }
+        ) => GetQueue(_startupDeliveryOutcomes, channel).Enqueue(outcome);
 
-        internal int ChannelStartedCount(string channel)
-        {
-            return _channelStartedCounts.GetValueOrDefault(channel);
-        }
+        internal int ChannelStartedCount(string channel) =>
+            _channelStartedCounts.GetValueOrDefault(channel);
 
-        internal void EnqueueChannelStartedFailure(string channel, Exception exception)
-        {
+        internal void EnqueueChannelStartedFailure(string channel, Exception exception) =>
             GetQueue(_channelStartedFailures, channel).Enqueue(exception);
-        }
 
-        internal int CompleteStopCount(string channel)
-        {
-            return _completeStopCounts.GetValueOrDefault(channel);
-        }
+        internal int CompleteStopCount(string channel) =>
+            _completeStopCounts.GetValueOrDefault(channel);
 
-        internal void EnqueueCompleteStopFailure(string channel, Exception exception)
-        {
+        internal void EnqueueCompleteStopFailure(string channel, Exception exception) =>
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
-        }
 
-        internal void SetNativeTwitchEnabled(string channel, bool enabled)
-        {
+        internal void SetNativeTwitchEnabled(string channel, bool enabled) =>
             _nativeTwitchFeatures[channel] = enabled
                 ? Enum.GetValues<EventSubOperationSubscriptionKind>().ToHashSet()
                 : [];
-        }
 
         internal void SetNativeTwitchFeatureEnabled(
             string channel,
@@ -239,9 +194,8 @@ public abstract partial class EventSubChannelRecoveryTestBase
         public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
             string channel,
             EventSubAuthorizationContext authorization
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 _accountCounts[channel] = AccountCount(channel) + 1;
                 if (!_authorizations.TryGetValue(channel, out var authorizations))
@@ -270,7 +224,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
                         )
                     );
             });
-        }
 
         public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
             string channel,
@@ -326,13 +279,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
             string channel,
             EventSubOperationSubscriptionKind kind,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult(
+        ) =>
+            ValueTask.FromResult(
                 _nativeTwitchFeatures.TryGetValue(channel, out var features)
                     && features.Contains(kind)
             );
-        }
 
         public ValueTask NotifyChannelStartedAsync(
             string channel,
@@ -417,12 +368,10 @@ public abstract partial class EventSubChannelRecoveryTestBase
         > GetBroadcasterAccountAsync(
             Func<CancellationToken, ValueTask<BotAccount>> operation,
             CancellationToken cancellationToken
-        )
-        {
-            return Result<BotAccount, AccessTokenUnavailableReason>.Success(
+        ) =>
+            Result<BotAccount, AccessTokenUnavailableReason>.Success(
                 await operation(cancellationToken)
             );
-        }
 
         private static Queue<TValue> GetQueue<TValue>(
             Dictionary<string, Queue<TValue>> queues,
@@ -441,9 +390,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private void EnqueueCreate(
             string channel,
             Func<CancellationToken, ValueTask<EventSubSubscriptionSetupOutcome>> operation
-        )
-        {
-            GetQueue(_createScripts, channel).Enqueue(operation);
-        }
+        ) => GetQueue(_createScripts, channel).Enqueue(operation);
     }
 }

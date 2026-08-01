@@ -22,15 +22,10 @@ public sealed record CommandResponse(
     PublicChatPinIntent? Pin = null
 )
 {
-    public static CommandResponse Chat(string message)
-    {
-        return new(CommandResponseTarget.Chat, message);
-    }
+    public static CommandResponse Chat(string message) => new(CommandResponseTarget.Chat, message);
 
-    public static CommandResponse Whisper(string message)
-    {
-        return new(CommandResponseTarget.Whisper, message);
-    }
+    public static CommandResponse Whisper(string message) =>
+        new(CommandResponseTarget.Whisper, message);
 }
 
 public sealed record PublicChatPinIntent(

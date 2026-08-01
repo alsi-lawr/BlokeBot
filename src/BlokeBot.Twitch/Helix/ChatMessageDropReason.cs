@@ -10,8 +10,6 @@ public sealed record ChatMessageDropReason
     [JsonPropertyName("message")]
     public string? Message { get; init; }
 
-    public override string ToString()
-    {
-        return $"{nameof(ChatMessageDropReason)} {{ Code = {Code}, Message = [redacted] }}";
-    }
+    public override string ToString() =>
+        $"{nameof(ChatMessageDropReason)} {{ Code = {Code}, Message = [redacted] }}";
 }

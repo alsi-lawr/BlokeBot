@@ -402,19 +402,12 @@ public sealed class WhisperCommandResponseSender(
             ?.Id;
     }
 
-    private static Result<PrivateDeliveryReceipt, PrivateDeliveryError> Success()
-    {
-        return Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Success(
-            new PrivateDeliveryReceipt()
-        );
-    }
+    private static Result<PrivateDeliveryReceipt, PrivateDeliveryError> Success() =>
+        Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Success(new PrivateDeliveryReceipt());
 
     private static Result<PrivateDeliveryReceipt, PrivateDeliveryError> Error(
         PrivateDeliveryError error
-    )
-    {
-        return Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Error(error);
-    }
+    ) => Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Error(error);
 
     private sealed record WhisperHost(int Id);
 

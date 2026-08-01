@@ -49,8 +49,6 @@ public partial class Error
     private string? _requestId { get; set; }
     private bool _showRequestId => !string.IsNullOrEmpty(_requestId);
 
-    protected override void OnInitialized()
-    {
+    protected override void OnInitialized() =>
         _requestId = Activity.Current?.Id ?? _httpContext?.TraceIdentifier;
-    }
 }

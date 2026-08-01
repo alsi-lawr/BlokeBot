@@ -176,9 +176,8 @@ public sealed class TwitchEndpointRoutingTests
         }
     }
 
-    private static EventSubConnectionSession CreateSession(TwitchEndpointPolicy policy)
-    {
-        return new EventSubConnectionSession(
+    private static EventSubConnectionSession CreateSession(TwitchEndpointPolicy policy) =>
+        new EventSubConnectionSession(
             null!,
             null!,
             null!,
@@ -191,11 +190,9 @@ public sealed class TwitchEndpointRoutingTests
             NullLogger<EventSubConnectionSession>.Instance,
             policy
         );
-    }
 
-    private static BotIdentity Identity()
-    {
-        return new BotIdentity
+    private static BotIdentity Identity() =>
+        new BotIdentity
         {
             BotUsername = "bot",
             ClientId = "client",
@@ -204,7 +201,6 @@ public sealed class TwitchEndpointRoutingTests
             Scopes = OAuthAuthorizationScopeSet.Create(["chat:read"]),
             TokenCachePath = "tokens.json",
         };
-    }
 
     private sealed record EndpointRoute(
         string Name,
@@ -215,10 +211,8 @@ public sealed class TwitchEndpointRoutingTests
 
     private sealed class RoutingHttpClientFactory(List<Uri> observedEndpoints) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new HttpClient(new Handler(observedEndpoints), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new HttpClient(new Handler(observedEndpoints), disposeHandler: false);
 
         private sealed class Handler(List<Uri> observedEndpoints) : HttpMessageHandler
         {
@@ -232,9 +226,8 @@ public sealed class TwitchEndpointRoutingTests
                 return Task.FromResult(ResponseFor(endpoint.AbsolutePath));
             }
 
-            private static HttpResponseMessage ResponseFor(string path)
-            {
-                return path switch
+            private static HttpResponseMessage ResponseFor(string path) =>
+                path switch
                 {
                     var value when value.EndsWith("/token", StringComparison.Ordinal) => Json(
                         """{"access_token":"access","refresh_token":"refresh","expires_in":3600}"""
@@ -252,15 +245,12 @@ public sealed class TwitchEndpointRoutingTests
                         Json("""{"data":[{"id":"id"}]}"""),
                     _ => new HttpResponseMessage(HttpStatusCode.NoContent),
                 };
-            }
 
-            private static HttpResponseMessage Json(string json)
-            {
-                return new HttpResponseMessage(HttpStatusCode.OK)
+            private static HttpResponseMessage Json(string json) =>
+                new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 }

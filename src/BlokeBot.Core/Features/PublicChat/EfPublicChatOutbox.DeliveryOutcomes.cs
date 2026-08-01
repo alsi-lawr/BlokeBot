@@ -453,9 +453,8 @@ internal sealed partial class EfPublicChatOutbox
         PublicChatFailureDiagnostic.Send diagnostic,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return ExecuteSendTerminalTransitionAsync(
+    ) =>
+        ExecuteSendTerminalTransitionAsync(
             message,
             (db, ct) =>
                 db
@@ -490,23 +489,20 @@ internal sealed partial class EfPublicChatOutbox
             AutomaticRaidShoutoutResultCode.Ambiguous,
             cancellationToken
         );
-    }
 
     private async ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Preparation diagnostic,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return await RecordUnexpectedAsync(
+    ) =>
+        await RecordUnexpectedAsync(
             message,
             diagnostic,
             AutomaticRaidShoutoutResultCode.Unexpected,
             recordedAt,
             cancellationToken
         );
-    }
 
     private async ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
         PublicChatClaimedMessage message,

@@ -20,42 +20,34 @@ public sealed class GuessingConfigurationService(
     public IO<GuessingProfileCreated, GuessingProfileCreateFailure> CreateProfile(
         int hostId,
         GuessingProfileCreateCommand command
-    )
-    {
-        return IO<GuessingProfileCreated, GuessingProfileCreateFailure>.Create(ct =>
+    ) =>
+        IO<GuessingProfileCreated, GuessingProfileCreateFailure>.Create(ct =>
             ExecuteCreateProfileAsync(hostId, command, ct)
         );
-    }
 
     public IO<GuessingProfileDeleted, GuessingProfileDeleteFailure> DeleteProfile(
         int hostId,
         GuessingProfileDeleteCommand command
-    )
-    {
-        return IO<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Create(ct =>
+    ) =>
+        IO<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Create(ct =>
             ExecuteDeleteProfileAsync(hostId, command, ct)
         );
-    }
 
     public IO<GuessingConfiguration, GuessingConfigurationLoadFailure> LoadConfiguration(
         int hostId,
         GuessingProfileSelection selection
-    )
-    {
-        return IO<GuessingConfiguration, GuessingConfigurationLoadFailure>.Create(ct =>
+    ) =>
+        IO<GuessingConfiguration, GuessingConfigurationLoadFailure>.Create(ct =>
             ExecuteLoadConfigurationAsync(hostId, selection, ct)
         );
-    }
 
     public IO<GuessingConfigurationSaved, GuessingConfigurationSaveFailure> SaveConfiguration(
         int hostId,
         GuessingConfigurationSaveCommand command
-    )
-    {
-        return IO<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Create(ct =>
+    ) =>
+        IO<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Create(ct =>
             ExecuteSaveConfigurationAsync(hostId, command, ct)
         );
-    }
 
     private async ValueTask<
         Result<GuessingProfileCreated, GuessingProfileCreateFailure>
@@ -506,14 +498,12 @@ public sealed class GuessingConfigurationService(
         List<CommandAlias> aliases,
         GuessCommandKind kind,
         int profileId
-    )
-    {
-        return CommandAliasRegistry.JoinAliases(
+    ) =>
+        CommandAliasRegistry.JoinAliases(
             aliases,
             GuessingAppCommandKindMap.ToAppKind(kind),
             new CommandAliasScope.Profile(profileId)
         );
-    }
 
     internal static async Task<GuessRoundProfileEditor?> LoadProfileEditorAsync(
         BlokeBotDbContext db,
@@ -569,14 +559,12 @@ public sealed class GuessingConfigurationService(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .HostBotAccountSettings.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
             .SingleOrDefaultAsync(ct);
-    }
 
     private static async Task<IReadOnlyList<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
         BlokeBotDbContext db,

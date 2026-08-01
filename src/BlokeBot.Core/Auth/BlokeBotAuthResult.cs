@@ -9,10 +9,8 @@ internal sealed record BlokeBotAuthResult(
     BlokeBotAuthContext? Context = null
 ) : IResult
 {
-    public Task ExecuteAsync(HttpContext httpContext)
-    {
-        return BlokeBotAuthResultPage.Render(this).ExecuteAsync(httpContext);
-    }
+    public Task ExecuteAsync(HttpContext httpContext) =>
+        BlokeBotAuthResultPage.Render(this).ExecuteAsync(httpContext);
 }
 
 internal enum BlokeBotAuthOutcome

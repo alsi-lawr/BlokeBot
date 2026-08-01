@@ -5,12 +5,10 @@ namespace BlokeBot.Testing;
 public static class TestEventBus
 {
     public static EventBus<TKey> Create<TKey>()
-        where TKey : notnull
-    {
-        return Create<TKey>(key =>
+        where TKey : notnull =>
+        Create<TKey>(key =>
             ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
         );
-    }
 
     public static EventBus<TKey> Create<TKey>(Func<TKey, ObserverEventIdentity> eventIdentity)
         where TKey : notnull
@@ -27,12 +25,10 @@ public static class TestEventBus
     }
 
     public static TestEventBusRecording<TKey> CreateContinueAndRecord<TKey>()
-        where TKey : notnull
-    {
-        return CreateContinueAndRecord<TKey>(key =>
+        where TKey : notnull =>
+        CreateContinueAndRecord<TKey>(key =>
             ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
         );
-    }
 
     public static TestEventBusRecording<TKey> CreateContinueAndRecord<TKey>(
         Func<TKey, ObserverEventIdentity> eventIdentity
@@ -69,9 +65,8 @@ public static class TestObserverFanOut
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary)
-        where TDeadLetter : IObserverDeadLetterPayload
-    {
-        return new(
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -79,7 +74,6 @@ public static class TestObserverFanOut
             new FailingObserverFailureReporter(),
             new TestObserverCorrelationIdProvider()
         );
-    }
 
     public static TestObserverFanOutRecording<TBoundary, TEvent, TDeadLetter> ContinueAndRecord<
         TBoundary,
@@ -107,12 +101,8 @@ public static class TestObserverFanOut
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromException(
-                new InvalidOperationException("A test event observer failed.")
-            );
-        }
+        ) =>
+            ValueTask.FromException(new InvalidOperationException("A test event observer failed."));
     }
 
     private sealed class RecordingObserverFailureReporter : IObserverFailureDiagnosticReporter
@@ -133,10 +123,8 @@ public static class TestObserverFanOut
     {
         private int _next;
 
-        public ObserverCorrelationId Next()
-        {
-            return ObserverCorrelationId.Named($"test-correlation-{++_next}");
-        }
+        public ObserverCorrelationId Next() =>
+            ObserverCorrelationId.Named($"test-correlation-{++_next}");
     }
 }
 

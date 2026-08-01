@@ -7,8 +7,5 @@ internal sealed class HostedChannelProvider(HostedChannelRuntimeStatusService ho
 {
     public async ValueTask<IReadOnlyList<string>> GetChannelsAsync(
         CancellationToken cancellationToken
-    )
-    {
-        return await hostedChannels.LoadConnectableChannelLoginsAsync(cancellationToken);
-    }
+    ) => await hostedChannels.LoadConnectableChannelLoginsAsync(cancellationToken);
 }

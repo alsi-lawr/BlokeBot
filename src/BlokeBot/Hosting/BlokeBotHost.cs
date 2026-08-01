@@ -210,10 +210,7 @@ internal sealed record BlokeBotHostComposition(
     BlokeBotStatePaths StatePaths
 ) : IAsyncDisposable
 {
-    public ValueTask DisposeAsync()
-    {
-        return App.DisposeAsync();
-    }
+    public ValueTask DisposeAsync() => App.DisposeAsync();
 }
 
 internal sealed class BlokeBotHostStartupException(string summary)

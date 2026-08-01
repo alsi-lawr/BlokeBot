@@ -11,8 +11,6 @@ public interface IChatCommandFilter
     /// <param name="context">The command context.</param>
     /// <param name="cancellationToken">A token that cancels filter evaluation.</param>
     /// <returns><see langword="true" /> when command handling may continue.</returns>
-    ValueTask<bool> AllowAsync(ChatCommandContext context, CancellationToken cancellationToken)
-    {
-        return ValueTask.FromResult(true);
-    }
+    ValueTask<bool> AllowAsync(ChatCommandContext context, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(true);
 }

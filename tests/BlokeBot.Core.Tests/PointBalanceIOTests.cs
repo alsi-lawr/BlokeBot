@@ -149,16 +149,10 @@ public sealed class PointBalanceIOTests
     private sealed class ThrowingDbContextFactory(Exception exception)
         : IDbContextFactory<BlokeBotDbContext>
     {
-        public BlokeBotDbContext CreateDbContext()
-        {
-            throw exception;
-        }
+        public BlokeBotDbContext CreateDbContext() => throw exception;
 
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            return Task.FromException<BlokeBotDbContext>(exception);
-        }
+        ) => Task.FromException<BlokeBotDbContext>(exception);
     }
 }

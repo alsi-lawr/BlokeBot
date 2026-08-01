@@ -190,9 +190,8 @@ public sealed class PublicChatDeliveryClassifierTests
         prepared.ToString().ShouldNotContain("secret chat payload");
     }
 
-    private static PublicChatPreparedSend Prepared(string accessToken, string message)
-    {
-        return new()
+    private static PublicChatPreparedSend Prepared(string accessToken, string message) =>
+        new()
         {
             Message = new PublicChatClaimedMessage
             {
@@ -210,5 +209,4 @@ public sealed class PublicChatDeliveryClassifierTests
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
-    }
 }

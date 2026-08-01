@@ -153,9 +153,8 @@ public sealed class NativeEventDispatchTests
     private static EventSubConnectionSession CreateSession(
         INativeTwitchFeatureStateProvider gate,
         IIncomingRaidEventObserver observer
-    )
-    {
-        return new(
+    ) =>
+        new(
             null!,
             null!,
             null!,
@@ -173,7 +172,6 @@ public sealed class NativeEventDispatchTests
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default,
             incomingRaidObservers: [observer]
         );
-    }
 
     private sealed class MutableNativeTwitchFeatureStateProvider : INativeTwitchFeatureStateProvider
     {

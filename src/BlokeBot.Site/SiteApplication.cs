@@ -8,13 +8,11 @@ internal static class SiteApplication
     internal const string ConsoleOutputTemplate =
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}";
 
-    internal static void ConfigureBootstrapLogging()
-    {
+    internal static void ConfigureBootstrapLogging() =>
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
             .CreateBootstrapLogger();
-    }
 
     public static WebApplication Build(
         string[] arguments,

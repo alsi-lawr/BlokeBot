@@ -126,24 +126,15 @@ public partial class NavMenu
         catch (TaskCanceledException) { }
     }
 
-    private string? CurrentRoute(string route, bool exact = false)
-    {
-        return RouteIsCurrent(route, exact) ? "page" : null;
-    }
+    private string? CurrentRoute(string route, bool exact = false) =>
+        RouteIsCurrent(route, exact) ? "page" : null;
 
-    private bool GroupIsCurrent(string route)
-    {
-        return RouteIsCurrent(route, exact: false);
-    }
+    private bool GroupIsCurrent(string route) => RouteIsCurrent(route, exact: false);
 
-    private string? CurrentGroup(string route)
-    {
-        return GroupIsCurrent(route) ? "page" : null;
-    }
+    private string? CurrentGroup(string route) => GroupIsCurrent(route) ? "page" : null;
 
-    private bool GroupIsOpen(NavigationGroup group)
-    {
-        return Presentation switch
+    private bool GroupIsOpen(NavigationGroup group) =>
+        Presentation switch
         {
             NavigationPresentation.Expanded => group switch
             {
@@ -156,26 +147,17 @@ public partial class NavMenu
             NavigationPresentation.IconRail => _iconRailOpenGroup == group,
             _ => throw new UnreachableException(),
         };
-    }
 
-    private string GroupBodyId(NavigationGroup group)
-    {
-        return $"{_rootId}-{group.ToString().ToLowerInvariant()}-destinations";
-    }
+    private string GroupBodyId(NavigationGroup group) =>
+        $"{_rootId}-{group.ToString().ToLowerInvariant()}-destinations";
 
-    private string? RouteHelpReference(string routeKey)
-    {
-        return Presentation is NavigationPresentation.IconRail ? RouteHelpId(routeKey) : null;
-    }
+    private string? RouteHelpReference(string routeKey) =>
+        Presentation is NavigationPresentation.IconRail ? RouteHelpId(routeKey) : null;
 
-    private string RouteHelpId(string routeKey)
-    {
-        return $"{_rootId}-{routeKey}-help";
-    }
+    private string RouteHelpId(string routeKey) => $"{_rootId}-{routeKey}-help";
 
-    private RenderFragment RouteHelp(string routeKey, string label)
-    {
-        return builder =>
+    private RenderFragment RouteHelp(string routeKey, string label) =>
+        builder =>
         {
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "id", RouteHelpId(routeKey));
@@ -184,7 +166,6 @@ public partial class NavMenu
             builder.AddContent(4, label);
             builder.CloseElement();
         };
-    }
 
     private async Task ToggleGroupAsync(NavigationGroup group)
     {

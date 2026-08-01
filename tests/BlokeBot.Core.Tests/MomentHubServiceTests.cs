@@ -640,9 +640,8 @@ public sealed class MomentHubServiceTests
         int hostId,
         string stream,
         DateTime now
-    )
-    {
-        return (
+    ) =>
+        (
             new MomentCandidate
             {
                 PublicId = Guid.NewGuid(),
@@ -662,11 +661,9 @@ public sealed class MomentHubServiceTests
                 LastCapturedAtUtc = now,
             }
         );
-    }
 
-    private static MomentContributor Contributor(string login, DateTime now)
-    {
-        return new()
+    private static MomentContributor Contributor(string login, DateTime now) =>
+        new()
         {
             IdentityKey = $"login:{login}",
             NormalizedLogin = login,
@@ -675,17 +672,14 @@ public sealed class MomentHubServiceTests
             FirstCapturedAtUtc = now,
             LastCapturedAtUtc = now,
         };
-    }
 
-    private static MomentSuggestion Suggestion(string title, DateTime now)
-    {
-        return new()
+    private static MomentSuggestion Suggestion(string title, DateTime now) =>
+        new()
         {
             IdentityKey = $"login:{title}",
             SuggestedTitle = title,
             CreatedAtUtc = now,
         };
-    }
 
     private static async Task<MomentView> CaptureAndApproveAsync(
         MomentHubService service,
@@ -719,32 +713,19 @@ public sealed class MomentHubServiceTests
         string login,
         string? userId = null,
         string title = ""
-    )
-    {
-        return new(stream, new MomentViewerIdentity(login, userId, login), title);
-    }
+    ) => new(stream, new MomentViewerIdentity(login, userId, login), title);
 
     private static MomentHubService CreateService(
         SqliteBlokeBotDbFactory database,
         IMomentProviderOperations provider,
         TimeProvider? clock = null
-    )
-    {
-        return new(
-            database,
-            provider,
-            TestEventBus.Create<AppEventKind>(),
-            clock ?? TimeProvider.System
-        );
-    }
+    ) => new(database, provider, TestEventBus.Create<AppEventKind>(), clock ?? TimeProvider.System);
 
-    private static MomentResult<T>.Succeeded Success<T>(MomentResult<T> result)
-    {
-        return result.Match(
+    private static MomentResult<T>.Succeeded Success<T>(MomentResult<T> result) =>
+        result.Match(
             value => value,
             rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
-    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)
     {
@@ -909,15 +890,9 @@ public sealed class MomentHubServiceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        public void Advance(TimeSpan value)
-        {
-            _now += value;
-        }
+        public void Advance(TimeSpan value) => _now += value;
     }
 
     private enum FakeProviderState

@@ -20,11 +20,9 @@ internal sealed class HostModAccessSaveSequence : IDisposable
         return new(++_currentVersion, command, previousAccess, cancellation);
     }
 
-    public bool IsCurrent(HostModAccessSaveSubmission submission)
-    {
-        return submission.Version == _currentVersion
-            && ReferenceEquals(_currentCancellation, submission.Cancellation);
-    }
+    public bool IsCurrent(HostModAccessSaveSubmission submission) =>
+        submission.Version == _currentVersion
+        && ReferenceEquals(_currentCancellation, submission.Cancellation);
 
     public void Complete(HostModAccessSaveSubmission submission)
     {
@@ -68,8 +66,5 @@ internal sealed class HostModAccessSaveSubmission : IDisposable
 
     internal CancellationTokenSource Cancellation { get; }
 
-    public void Dispose()
-    {
-        Cancellation.Dispose();
-    }
+    public void Dispose() => Cancellation.Dispose();
 }

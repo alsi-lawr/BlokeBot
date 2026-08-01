@@ -56,38 +56,23 @@ public partial class PageHelpButton
         }
     }
 
-    protected override void OnInitialized()
-    {
-        _navigation.LocationChanged += OnLocationChanged;
-    }
+    protected override void OnInitialized() => _navigation.LocationChanged += OnLocationChanged;
 
-    public void Dispose()
-    {
-        _navigation.LocationChanged -= OnLocationChanged;
-    }
+    public void Dispose() => _navigation.LocationChanged -= OnLocationChanged;
 
-    private void Close()
-    {
-        _isOpen = false;
-    }
+    private void Close() => _isOpen = false;
 
-    private void Toggle()
-    {
-        _isOpen = !_isOpen;
-    }
+    private void Toggle() => _isOpen = !_isOpen;
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
-    {
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) =>
         _ = InvokeAsync(() =>
         {
             _isOpen = false;
             StateHasChanged();
         });
-    }
 
-    private static HelpPage? HelpForPath(string path)
-    {
-        return path switch
+    private static HelpPage? HelpForPath(string path) =>
+        path switch
         {
             "/" => _homeHelp,
             "/guessing" => _guessingDashboardHelp,
@@ -107,21 +92,18 @@ public partial class PageHelpButton
             "/twitch-operations/predictions" => _predictionsHelp,
             _ => null,
         };
-    }
 
-    internal static bool HasUsefulHelpForPath(string path)
-    {
-        return HelpForPath(path) is { } help
-            && !string.IsNullOrWhiteSpace(help.Title)
-            && help.Sections.Count > 0
-            && help.Sections.All(section =>
-                !string.IsNullOrWhiteSpace(section.Title)
-                && (
-                    !string.IsNullOrWhiteSpace(section.Body)
-                    || section.Items.Any(item => !string.IsNullOrWhiteSpace(item))
-                )
-            );
-    }
+    internal static bool HasUsefulHelpForPath(string path) =>
+        HelpForPath(path) is { } help
+        && !string.IsNullOrWhiteSpace(help.Title)
+        && help.Sections.Count > 0
+        && help.Sections.All(section =>
+            !string.IsNullOrWhiteSpace(section.Title)
+            && (
+                !string.IsNullOrWhiteSpace(section.Body)
+                || section.Items.Any(item => !string.IsNullOrWhiteSpace(item))
+            )
+        );
 
     private static readonly string[] _templateVariableItems =
     [

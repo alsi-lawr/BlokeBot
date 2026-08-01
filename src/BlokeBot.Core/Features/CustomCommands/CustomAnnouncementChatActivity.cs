@@ -58,8 +58,6 @@ public sealed class CustomAnnouncementChatActivity(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static bool HasCustomCommands(HostFeatureFlags features)
-    {
-        return (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
-    }
+    private static bool HasCustomCommands(HostFeatureFlags features) =>
+        (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
 }

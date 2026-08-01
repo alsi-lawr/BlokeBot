@@ -7,33 +7,16 @@ public sealed class ReplyDeliveryEditor
     public ReplyDeliveryEditor()
         : this([]) { }
 
-    private ReplyDeliveryEditor(IEnumerable<string> whisperKeys)
-    {
+    private ReplyDeliveryEditor(IEnumerable<string> whisperKeys) =>
         _whisperKeys = whisperKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
 
-    public static ReplyDeliveryEditor From(ReplyDeliveryMap delivery)
-    {
-        return new(delivery.WhisperKeys);
-    }
+    public static ReplyDeliveryEditor From(ReplyDeliveryMap delivery) => new(delivery.WhisperKeys);
 
-    public bool IsWhisper(string replyKey)
-    {
-        return _whisperKeys.Contains(replyKey);
-    }
+    public bool IsWhisper(string replyKey) => _whisperKeys.Contains(replyKey);
 
-    public void DeliverAsWhisper(string replyKey)
-    {
-        _whisperKeys.Add(replyKey);
-    }
+    public void DeliverAsWhisper(string replyKey) => _whisperKeys.Add(replyKey);
 
-    public void DeliverInChat(string replyKey)
-    {
-        _whisperKeys.Remove(replyKey);
-    }
+    public void DeliverInChat(string replyKey) => _whisperKeys.Remove(replyKey);
 
-    public ReplyDeliveryMap ToMap()
-    {
-        return ReplyDeliveryMap.FromWhisperKeys(_whisperKeys);
-    }
+    public ReplyDeliveryMap ToMap() => ReplyDeliveryMap.FromWhisperKeys(_whisperKeys);
 }

@@ -111,26 +111,19 @@ internal static class GuessingRoundQueries
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return Unresolved(db, hostId).AnyAsync(ct);
-    }
+    ) => Unresolved(db, hostId).AnyAsync(ct);
 
-    private static IQueryable<GuessRound> Unresolved(BlokeBotDbContext db, int hostId)
-    {
-        return db
+    private static IQueryable<GuessRound> Unresolved(BlokeBotDbContext db, int hostId) =>
+        db
             .Rounds.Where(x => x.HostId == hostId)
             .Where(x => x.Status == GuessRoundStatus.Open || x.Status == GuessRoundStatus.Closed)
             .OrderByDescending(x => x.StartedAtUtc);
-    }
 
-    private static GuessRoundLifecycle ToLifecycle(GuessRound round)
-    {
-        return GuessRoundLifecycle.FromPersistence(
+    private static GuessRoundLifecycle ToLifecycle(GuessRound round) =>
+        GuessRoundLifecycle.FromPersistence(
             round.Status,
             round.StartedAtUtc,
             round.ClosedAtUtc,
             round.WinningName
         );
-    }
 }

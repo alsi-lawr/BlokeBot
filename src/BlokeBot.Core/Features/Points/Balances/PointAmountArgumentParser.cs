@@ -14,10 +14,8 @@ public enum PointAmountParseError
 
 public static class PointAmountArgumentParser
 {
-    public static Result<PointAmount, PointAmountParseError> ParseAbsolute(string? value)
-    {
-        return PointAmount.ParseNonNegativeAbsolute(value).Bind(RejectZero);
-    }
+    public static Result<PointAmount, PointAmountParseError> ParseAbsolute(string? value) =>
+        PointAmount.ParseNonNegativeAbsolute(value).Bind(RejectZero);
 
     public static Result<PointAmount, PointAmountParseError> ParseSpend(
         string? value,
@@ -61,10 +59,8 @@ public static class PointAmountArgumentParser
         return RejectZero(new PointAmount(scaled / 100000));
     }
 
-    private static Result<PointAmount, PointAmountParseError> RejectZero(PointAmount amount)
-    {
-        return amount.IsZero
+    private static Result<PointAmount, PointAmountParseError> RejectZero(PointAmount amount) =>
+        amount.IsZero
             ? Result<PointAmount, PointAmountParseError>.Error(PointAmountParseError.ZeroAmount)
             : Result<PointAmount, PointAmountParseError>.Success(amount);
-    }
 }

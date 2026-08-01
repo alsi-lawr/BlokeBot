@@ -153,10 +153,7 @@ public abstract record RequestBoardResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return succeeded(this);
-        }
+        ) => succeeded(this);
     }
 
     public sealed record Rejected(RequestBoardRejection Reason) : RequestBoardResult<T>
@@ -164,10 +161,7 @@ public abstract record RequestBoardResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }
 
@@ -197,28 +191,19 @@ public abstract record RequestBoardRejection(string Message)
 
 internal static class RequestBoardInput
 {
-    public static string NormalizeLogin(string value)
-    {
-        return value.Trim().TrimStart('@').ToLowerInvariant();
-    }
+    public static string NormalizeLogin(string value) =>
+        value.Trim().TrimStart('@').ToLowerInvariant();
 
-    public static bool IsValidLogin(string value)
-    {
-        return value.Length is >= 1 and <= 128
-            && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
-    }
+    public static bool IsValidLogin(string value) =>
+        value.Length is >= 1 and <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
-    public static string NormalizeSlug(string value)
-    {
-        return value.Trim().ToLowerInvariant();
-    }
+    public static string NormalizeSlug(string value) => value.Trim().ToLowerInvariant();
 
-    public static bool IsValidSlug(string value)
-    {
-        return value.Length is >= 1 and <= 48
-            && value[0] is >= 'a' and <= 'z'
-            && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
-    }
+    public static bool IsValidSlug(string value) =>
+        value.Length is >= 1 and <= 48
+        && value[0] is >= 'a' and <= 'z'
+        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
 
     public static string NormalizeTitle(string value)
     {
@@ -284,17 +269,12 @@ internal static class RequestBoardInput
             );
     }
 
-    public static IReadOnlyList<string> ParseTags(string value)
-    {
-        return value
+    public static IReadOnlyList<string> ParseTags(string value) =>
+        value
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(tag => tag.ToLowerInvariant())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-    }
 
-    public static string JoinTags(IEnumerable<string> tags)
-    {
-        return string.Join(",", tags);
-    }
+    public static string JoinTags(IEnumerable<string> tags) => string.Join(",", tags);
 }

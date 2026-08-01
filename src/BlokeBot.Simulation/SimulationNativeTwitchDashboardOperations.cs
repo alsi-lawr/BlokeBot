@@ -630,35 +630,20 @@ internal sealed class SimulationNativeTwitchDashboardOperations
         int hostId,
         bool confirmed,
         CancellationToken cancellationToken
-    )
-    {
-        return ChangePredictionAsync(hostId, confirmed, "Locked", null, cancellationToken);
-    }
+    ) => ChangePredictionAsync(hostId, confirmed, "Locked", null, cancellationToken);
 
     public Task<PredictionOperationOutcome> CancelAsync(
         int hostId,
         bool confirmed,
         CancellationToken cancellationToken
-    )
-    {
-        return ChangePredictionAsync(hostId, confirmed, "Canceled", null, cancellationToken);
-    }
+    ) => ChangePredictionAsync(hostId, confirmed, "Canceled", null, cancellationToken);
 
     public Task<PredictionOperationOutcome> ResolveAsync(
         int hostId,
         string winningOutcomeId,
         bool confirmed,
         CancellationToken cancellationToken
-    )
-    {
-        return ChangePredictionAsync(
-            hostId,
-            confirmed,
-            "Resolved",
-            winningOutcomeId,
-            cancellationToken
-        );
-    }
+    ) => ChangePredictionAsync(hostId, confirmed, "Resolved", winningOutcomeId, cancellationToken);
 
     private Task<PredictionOperationOutcome> ChangePredictionAsync(
         int hostId,
@@ -734,9 +719,8 @@ internal sealed class SimulationNativeTwitchDashboardOperations
         ChannelPointsRewardDraft draft,
         bool isEnabled,
         bool isPaused
-    )
-    {
-        return new(
+    ) =>
+        new(
             rewardId,
             draft.Title.Trim(),
             draft.Prompt?.Trim(),
@@ -754,7 +738,6 @@ internal sealed class SimulationNativeTwitchDashboardOperations
             draft.ShouldRedemptionsSkipRequestQueue,
             draft.BackgroundColor
         );
-    }
 
     private sealed class HostState
     {

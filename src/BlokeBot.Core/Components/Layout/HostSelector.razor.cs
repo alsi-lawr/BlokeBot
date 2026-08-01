@@ -64,30 +64,19 @@ public partial class HostSelector
 
     private string _currentReturnUrl => Uri.EscapeDataString(_currentPath);
 
-    private bool IsAdminEditing()
-    {
-        return Session.IsAdminEditing;
-    }
+    private bool IsAdminEditing() => Session.IsAdminEditing;
 
-    protected override void OnInitialized()
-    {
+    protected override void OnInitialized() =>
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             InvokeAsync,
             ReloadForEventAsync,
             StateHasChanged
         );
-    }
 
-    protected override async Task OnParametersSetAsync()
-    {
-        await LoadVisibleHostsIfChangedAsync();
-    }
+    protected override async Task OnParametersSetAsync() => await LoadVisibleHostsIfChangedAsync();
 
-    public void Dispose()
-    {
-        _hostedChannelSubscription?.Dispose();
-    }
+    public void Dispose() => _hostedChannelSubscription?.Dispose();
 
     private async Task LoadVisibleHostsIfChangedAsync()
     {
@@ -131,24 +120,18 @@ public partial class HostSelector
         return $"{_selection?.Current.Id}:{Session.Login}:{hosts}";
     }
 
-    private bool IsAlternateHost(BotHostChoice host)
-    {
-        return host.Role != AuthRole.Admin
-            && host.Role != AuthRole.Streamer
-            && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool IsAlternateHost(BotHostChoice host) =>
+        host.Role != AuthRole.Admin
+        && host.Role != AuthRole.Streamer
+        && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
 
-    private BotHostChoice? SelectedVisibleHost()
-    {
-        return _selectedHostId is { } hostId
+    private BotHostChoice? SelectedVisibleHost() =>
+        _selectedHostId is { } hostId
             ? _visibleHosts.FirstOrDefault(host => host.Id == hostId)
             : null;
-    }
 
-    private string SelectHostHref(int hostId)
-    {
-        return $"/auth/select-host?hostId={hostId}&returnUrl={_currentReturnUrl}";
-    }
+    private string SelectHostHref(int hostId) =>
+        $"/auth/select-host?hostId={hostId}&returnUrl={_currentReturnUrl}";
 
     private string _myChannelHref => $"/auth/select-own-host?returnUrl={_currentReturnUrl}";
 
@@ -163,11 +146,9 @@ public partial class HostSelector
             && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
     }
 
-    private bool IsOwnHost(BotHostChoice host)
-    {
-        return host.Role == AuthRole.Streamer
-            && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool IsOwnHost(BotHostChoice host) =>
+        host.Role == AuthRole.Streamer
+        && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
 
     private string HostItemClass(BotHostChoice host)
     {
@@ -184,9 +165,8 @@ public partial class HostSelector
         return string.IsNullOrWhiteSpace(text) ? "?" : text[..1].ToUpperInvariant();
     }
 
-    private RenderFragment ChannelImage(BotHostChoice host)
-    {
-        return builder =>
+    private RenderFragment ChannelImage(BotHostChoice host) =>
+        builder =>
         {
             if (!string.IsNullOrWhiteSpace(host.ProfileImageUrl))
             {
@@ -211,5 +191,4 @@ public partial class HostSelector
             builder.AddContent(6, ChannelInitial(host));
             builder.CloseElement();
         };
-    }
 }

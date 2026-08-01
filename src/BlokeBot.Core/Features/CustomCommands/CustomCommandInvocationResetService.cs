@@ -35,10 +35,7 @@ public sealed class CustomCommandInvocationResetService(
         int commandId,
         CustomCommandResetActor actor,
         CancellationToken ct
-    )
-    {
-        return ResetAsync(hostId, commandId, actor, new ResetTarget.AllViewers(), ct);
-    }
+    ) => ResetAsync(hostId, commandId, actor, new ResetTarget.AllViewers(), ct);
 
     private async Task<CustomCommandInvocationResetOutcome> ResetAsync(
         int hostId,

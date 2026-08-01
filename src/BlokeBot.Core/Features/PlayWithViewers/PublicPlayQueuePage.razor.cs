@@ -32,22 +32,14 @@ public partial class PublicPlayQueuePage
         _loading = false;
     }
 
-    private string Value(string key)
-    {
-        return _values.GetValueOrDefault(key, string.Empty);
-    }
+    private string Value(string key) => _values.GetValueOrDefault(key, string.Empty);
 
-    private void SetValue(string key, string value)
-    {
-        _values[key] = value;
-    }
+    private void SetValue(string key, string value) => _values[key] = value;
 
-    private PlayQueueViewerIdentity Identity()
-    {
-        return _session.IsAuthenticated
+    private PlayQueueViewerIdentity Identity() =>
+        _session.IsAuthenticated
             ? new(_session.Login, _session.UserId, _session.DisplayName)
             : new(PlayQueueInput.NormalizeLogin(_login));
-    }
 
     private async Task JoinAsync()
     {
@@ -69,27 +61,22 @@ public partial class PublicPlayQueuePage
         await ReloadAsync();
     }
 
-    private Task LeaveAsync()
-    {
-        return MutateAsync(
+    private Task LeaveAsync() =>
+        MutateAsync(
             (hostId, slug, viewer) =>
                 _queues.LeaveAsync(hostId, slug, viewer, CancellationToken.None),
             "You left the queue."
         );
-    }
 
-    private Task ReadyAsync()
-    {
-        return MutateAsync(
+    private Task ReadyAsync() =>
+        MutateAsync(
             (hostId, slug, viewer) =>
                 _queues.ReadyAsync(hostId, slug, viewer, CancellationToken.None),
             "You are ready."
         );
-    }
 
-    private Task PositionAsync()
-    {
-        return MutateAsync(
+    private Task PositionAsync() =>
+        MutateAsync(
             (hostId, slug, viewer) =>
                 _queues.GetPositionAsync(hostId, slug, viewer, CancellationToken.None),
             "Position checked.",
@@ -98,7 +85,6 @@ public partial class PublicPlayQueuePage
                     ? "You are in the current party."
                     : $"You are position {value.Position} ({value.Status})."
         );
-    }
 
     private async Task MutateAsync(
         Func<
@@ -124,8 +110,6 @@ public partial class PublicPlayQueuePage
         await ReloadAsync();
     }
 
-    private async Task ReloadAsync()
-    {
+    private async Task ReloadAsync() =>
         _page = await _queues.GetPublicPageAsync(Channel, QueueSlug, CancellationToken.None);
-    }
 }

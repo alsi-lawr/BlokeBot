@@ -22,14 +22,12 @@ internal static class GuessRoundProfileQueryExtensions
 {
     extension(IQueryable<GuessRoundProfile> profiles)
     {
-        public Task<int> LoadDefaultProfileIdAsync(int hostId, CancellationToken ct)
-        {
-            return profiles
+        public Task<int> LoadDefaultProfileIdAsync(int hostId, CancellationToken ct) =>
+            profiles
                 .AsNoTracking()
                 .Where(profile => profile.HostId == hostId && profile.IsDefault)
                 .Select(profile => profile.Id)
                 .FirstAsync(ct);
-        }
 
         public Task<int?> LoadProfileIdByNameAsync(
             int hostId,

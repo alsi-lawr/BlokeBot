@@ -332,9 +332,8 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
         IAutomaticRaidChannelInformationProvider information,
         IPublicChatMessageSender chat,
         IAutomaticRaidAnnouncementSender announcements
-    )
-    {
-        return new(
+    ) =>
+        new(
             native,
             information,
             chat,
@@ -346,13 +345,11 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
                 TestEventBus.Create<AppEventKind>()
             )
         );
-    }
 
     private static AutomaticRaidShoutoutDeliveryRequest Request(
         AutomaticRaidShoutoutConfiguration configuration
-    )
-    {
-        return new(
+    ) =>
+        new(
             1,
             "host",
             configuration,
@@ -363,24 +360,12 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             "Raider",
             42
         );
-    }
 
     private static AutomaticRaidShoutoutConfiguration Configuration(
         AutomaticRaidShoutoutMechanism mechanism,
         AutomaticRaidChatPresentation presentation = AutomaticRaidChatPresentation.Regular,
         string template = "Welcome {display_name}"
-    )
-    {
-        return new(
-            true,
-            1,
-            mechanism,
-            presentation,
-            template,
-            null,
-            PersistedAnnouncementColor.Primary
-        );
-    }
+    ) => new(true, 1, mechanism, presentation, template, null, PersistedAnnouncementColor.Primary);
 
     private static async Task SeedHostAsync(SqliteBlokeBotDbFactory database)
     {
@@ -397,9 +382,8 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
         await db.SaveChangesAsync();
     }
 
-    private static AutomaticRaidAnnouncementSendResult AnnouncementResult(string scenario)
-    {
-        return scenario switch
+    private static AutomaticRaidAnnouncementSendResult AnnouncementResult(string scenario) =>
+        scenario switch
         {
             "authority" => new AutomaticRaidAnnouncementSendResult.AuthorityRequired(),
             "not-ready" => new AutomaticRaidAnnouncementSendResult.NotReady(),
@@ -409,11 +393,9 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             "unexpected" => new AutomaticRaidAnnouncementSendResult.Unexpected(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
-    }
 
-    private static ShoutoutOperationOutcome NativeOutcome(string scenario)
-    {
-        return scenario switch
+    private static ShoutoutOperationOutcome NativeOutcome(string scenario) =>
+        scenario switch
         {
             "sent" => new ShoutoutOperationOutcome.Sent("raider"),
             "cooldown" => new ShoutoutOperationOutcome.CooldownUnknown(),
@@ -429,7 +411,6 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
-    }
 
     private static async Task SeedHostAndOutcomeAsync(SqliteBlokeBotDbFactory database)
     {
@@ -521,10 +502,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             string message,
             PublicChatDeliveryDeadline deadline,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("Automatic delivery must use correlation.");
-        }
+        ) => throw new InvalidOperationException("Automatic delivery must use correlation.");
 
         public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
             string channel,
@@ -532,10 +510,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             PublicChatDeliveryDeadline deadline,
             PublicChatDeliveryCorrelation correlation,
             CancellationToken cancellationToken
-        )
-        {
-            return Record(channel, message, deadline, correlation, null, cancellationToken);
-        }
+        ) => Record(channel, message, deadline, correlation, null, cancellationToken);
 
         public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
             string channel,
@@ -544,10 +519,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             PublicChatDeliveryCorrelation correlation,
             PublicChatPinIntent pinIntent,
             CancellationToken cancellationToken
-        )
-        {
-            return Record(channel, message, deadline, correlation, pinIntent, cancellationToken);
-        }
+        ) => Record(channel, message, deadline, correlation, pinIntent, cancellationToken);
 
         private ValueTask<PublicChatSendOutcome> Record(
             string channel,

@@ -20,9 +20,8 @@ public sealed class DurableAlertService(
         string title,
         string message,
         string? linkPath
-    )
-    {
-        return IO<DurableAlertCreateOutcome, Never>.Create(async ct =>
+    ) =>
+        IO<DurableAlertCreateOutcome, Never>.Create(async ct =>
         {
             var normalizedSource = NormalizeRequired(source, nameof(source));
             var normalizedSourceKey = NormalizeRequired(sourceKey, nameof(sourceKey));
@@ -61,15 +60,13 @@ public sealed class DurableAlertService(
                 new DurableAlertCreateOutcome.Created(alert)
             );
         });
-    }
 
     public IO<DurableAlertAcknowledgement, Never> Acknowledge(
         int hostId,
         int alertId,
         string actorLogin
-    )
-    {
-        return IO<DurableAlertAcknowledgement, Never>.Create(async ct =>
+    ) =>
+        IO<DurableAlertAcknowledgement, Never>.Create(async ct =>
         {
             var actor = NormalizeRequired(actorLogin, nameof(actorLogin));
             await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -99,7 +96,6 @@ public sealed class DurableAlertService(
                 new DurableAlertAcknowledgement.Acknowledged()
             );
         });
-    }
 
     public async Task<int> CountActiveAsync(int hostId, CancellationToken ct)
     {
@@ -137,10 +133,7 @@ public sealed class DurableAlertService(
         );
     }
 
-    private DateTime UtcNow()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
     private static string NormalizeRequired(string value, string parameterName)
     {

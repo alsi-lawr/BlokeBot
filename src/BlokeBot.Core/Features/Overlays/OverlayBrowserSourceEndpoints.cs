@@ -21,8 +21,7 @@ internal static class OverlayBrowserSourceEndpoints
         + "frame-ancestors 'self'";
     private const string _unavailableMessage = "Overlay unavailable.";
 
-    internal static void UseOverlayAccessLogRedaction(this WebApplication app)
-    {
+    internal static void UseOverlayAccessLogRedaction(this WebApplication app) =>
         app.Use(
             async (context, next) =>
             {
@@ -36,7 +35,6 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             }
         );
-    }
 
     internal static void MapOverlayBrowserSourceEndpoints(this WebApplication app)
     {
@@ -703,9 +701,8 @@ internal static class OverlayBrowserSourceEndpoints
         return value is "no-round" or "open" or "closed" or "completed";
     }
 
-    private static string SampleToken(GuessingOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleToken(GuessingOverlaySampleState sample) =>
+        sample switch
         {
             GuessingOverlaySampleState.NoRound => "no-round",
             GuessingOverlaySampleState.Open => "open",
@@ -713,7 +710,6 @@ internal static class OverlayBrowserSourceEndpoints
             GuessingOverlaySampleState.Completed => "completed",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
     private static bool TryParseGiveawaySample(string? value, out GiveawayOverlaySampleState sample)
     {
@@ -729,9 +725,8 @@ internal static class OverlayBrowserSourceEndpoints
         return value is "idle" or "open" or "ending" or "completed" or "cancelled";
     }
 
-    private static string SampleToken(GiveawayOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleToken(GiveawayOverlaySampleState sample) =>
+        sample switch
         {
             GiveawayOverlaySampleState.Idle => "idle",
             GiveawayOverlaySampleState.Open => "open",
@@ -740,16 +735,9 @@ internal static class OverlayBrowserSourceEndpoints
             GiveawayOverlaySampleState.Cancelled => "cancelled",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
-    private static IResult Unavailable()
-    {
-        return Results.Text(
-            _unavailableMessage,
-            "text/plain",
-            statusCode: StatusCodes.Status404NotFound
-        );
-    }
+    private static IResult Unavailable() =>
+        Results.Text(_unavailableMessage, "text/plain", statusCode: StatusCodes.Status404NotFound);
 
     private static IResult MediaFile(HttpContext context, OverlayMediaContent content)
     {

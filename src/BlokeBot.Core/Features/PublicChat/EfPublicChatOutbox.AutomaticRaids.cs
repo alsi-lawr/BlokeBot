@@ -10,20 +10,18 @@ internal sealed partial class EfPublicChatOutbox
 {
     private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(
         PublicChatHttpStatus httpStatus
-    )
-    {
-        return httpStatus.Match(
+    ) =>
+        httpStatus.Match(
             known => SafePreSendExhaustionResult(known.Value),
             () => AutomaticRaidShoutoutResultCode.Unexpected
         );
-    }
 
-    private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(int? httpStatusCode)
-    {
-        return httpStatusCode == (int)System.Net.HttpStatusCode.TooManyRequests
+    private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(
+        int? httpStatusCode
+    ) =>
+        httpStatusCode == (int)System.Net.HttpStatusCode.TooManyRequests
             ? AutomaticRaidShoutoutResultCode.RateLimited
             : AutomaticRaidShoutoutResultCode.Unexpected;
-    }
 
     private static async Task<bool> RecordAutomaticRaidTerminalAsync(
         BlokeBotDbContext db,
@@ -31,9 +29,8 @@ internal sealed partial class EfPublicChatOutbox
         AutomaticRaidShoutoutResultCode resultCode,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return await RecordAutomaticRaidTerminalAsync(
+    ) =>
+        await RecordAutomaticRaidTerminalAsync(
             db,
             message.DeduplicationKey.Value,
             message.Id,
@@ -41,7 +38,6 @@ internal sealed partial class EfPublicChatOutbox
             completedAt,
             cancellationToken
         );
-    }
 
     private static async Task<bool> RecordAutomaticRaidTerminalAsync(
         BlokeBotDbContext db,

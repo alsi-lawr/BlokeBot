@@ -195,10 +195,8 @@ public sealed class PointsGiveawayMessageFormatterTests
         );
     }
 
-    private static ReplyDeliveryMap WhisperDelivery(params string[] replyKeys)
-    {
-        return ReplyDeliveryMap.FromWhisperKeys(replyKeys);
-    }
+    private static ReplyDeliveryMap WhisperDelivery(params string[] replyKeys) =>
+        ReplyDeliveryMap.FromWhisperKeys(replyKeys);
 
     private static void AssertSucceeded(
         PointOperationOutcome outcome,

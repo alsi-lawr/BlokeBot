@@ -97,12 +97,10 @@ public partial class PollsPage
         });
     }
 
-    private Task StartPollAsync(int templateId)
-    {
-        return MutateAsync(async hostId =>
+    private Task StartPollAsync(int templateId) =>
+        MutateAsync(async hostId =>
             Publish(await _polls.StartAsync(hostId, templateId, CancellationToken.None))
         );
-    }
 
     private async Task EndPollAsync()
     {
@@ -164,8 +162,6 @@ public partial class PollsPage
         }
     }
 
-    private void Warn(string message)
-    {
+    private void Warn(string message) =>
         _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
-    }
 }

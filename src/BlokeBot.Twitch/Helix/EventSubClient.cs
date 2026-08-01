@@ -20,9 +20,8 @@ public sealed class EventSubClient(
         string botUserId,
         string sessionId,
         CancellationToken cancellationToken
-    )
-    {
-        return CreateSubscriptionAsync(
+    ) =>
+        CreateSubscriptionAsync(
             context,
             new(
                 "channel.chat.message",
@@ -36,7 +35,6 @@ public sealed class EventSubClient(
             ),
             cancellationToken
         );
-    }
 
     public Task<string> CreateShoutoutCreateSubscriptionAsync(
         HelixRequestContext context,
@@ -44,9 +42,8 @@ public sealed class EventSubClient(
         string moderatorId,
         string sessionId,
         CancellationToken cancellationToken
-    )
-    {
-        return CreateSubscriptionAsync(
+    ) =>
+        CreateSubscriptionAsync(
             context,
             new(
                 "channel.shoutout.create",
@@ -60,7 +57,6 @@ public sealed class EventSubClient(
             ),
             cancellationToken
         );
-    }
 
     public Task<string> CreateShoutoutReceiveSubscriptionAsync(
         HelixRequestContext context,
@@ -68,9 +64,8 @@ public sealed class EventSubClient(
         string moderatorId,
         string sessionId,
         CancellationToken cancellationToken
-    )
-    {
-        return CreateSubscriptionAsync(
+    ) =>
+        CreateSubscriptionAsync(
             context,
             new(
                 "channel.shoutout.receive",
@@ -84,16 +79,14 @@ public sealed class EventSubClient(
             ),
             cancellationToken
         );
-    }
 
     public Task<string> CreateIncomingRaidSubscriptionAsync(
         HelixRequestContext context,
         string broadcasterId,
         string sessionId,
         CancellationToken cancellationToken
-    )
-    {
-        return CreateSubscriptionAsync(
+    ) =>
+        CreateSubscriptionAsync(
             context,
             new(
                 "channel.raid",
@@ -103,7 +96,6 @@ public sealed class EventSubClient(
             ),
             cancellationToken
         );
-    }
 
     public Task<string> CreatePollSubscriptionAsync(
         HelixRequestContext context,
@@ -111,9 +103,8 @@ public sealed class EventSubClient(
         string broadcasterId,
         string sessionId,
         CancellationToken cancellationToken
-    )
-    {
-        return CreateSubscriptionAsync(
+    ) =>
+        CreateSubscriptionAsync(
             context,
             new(
                 type,
@@ -123,7 +114,6 @@ public sealed class EventSubClient(
             ),
             cancellationToken
         );
-    }
 
     public async Task<string> CreateSubscriptionAsync(
         HelixRequestContext context,

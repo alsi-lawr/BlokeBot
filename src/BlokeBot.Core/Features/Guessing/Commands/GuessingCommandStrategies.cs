@@ -21,14 +21,12 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     public async ValueTask<CommandResponse> ModeratorOnlyResponseAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    )
-    {
-        return await Commands.ModeratorOnlyResponseAsync(
+    ) =>
+        await Commands.ModeratorOnlyResponseAsync(
             context.Command.Message.Channel,
             context.State,
             cancellationToken
         );
-    }
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -137,8 +135,7 @@ public sealed class StopGuessingCommandStrategy(
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         await ReplyAsync(
             context,
             await ExecuteAsync(
@@ -147,7 +144,6 @@ public sealed class StopGuessingCommandStrategy(
             ),
             cancellationToken
         );
-    }
 }
 
 public sealed class WinGuessingCommandStrategy(

@@ -476,9 +476,8 @@ public sealed class OverlayCueServiceTests
         Guid target,
         Guid cue,
         OverlayCueQueuePolicy policy
-    )
-    {
-        return new(
+    ) =>
+        new(
             hostId,
             target,
             cue,
@@ -486,7 +485,6 @@ public sealed class OverlayCueServiceTests
             OverlayCueAdmissionOrigin.Command,
             new("viewer", "Viewer")
         );
-    }
 
     private static byte[] Mp4Bytes(int length = 12)
     {
@@ -695,9 +693,8 @@ public sealed class OverlayCueServiceTests
             Directory.Delete(MediaRoot, recursive: true);
         }
 
-        private static BotHost Host(string login)
-        {
-            return new()
+        private static BotHost Host(string login) =>
+            new()
             {
                 TwitchUserId = $"{login}-id",
                 Login = login,
@@ -705,7 +702,6 @@ public sealed class OverlayCueServiceTests
                 EnabledFeatures = HostFeatureFlags.Overlays,
                 CreatedAtUtc = DateTime.UtcNow,
             };
-        }
     }
 
     private sealed class GrantedModeratorAuthority : IModeratorAuthorityService
@@ -714,12 +710,7 @@ public sealed class OverlayCueServiceTests
             AuthenticatedSession session,
             int requestedHostId,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<ModeratorAuthorityOutcome>(
-                new ModeratorAuthorityOutcome.Granted()
-            );
-        }
+        ) => Task.FromResult<ModeratorAuthorityOutcome>(new ModeratorAuthorityOutcome.Granted());
     }
 
     private sealed class PublicDnsResolver : IOverlayDnsResolver
@@ -727,20 +718,15 @@ public sealed class OverlayCueServiceTests
         public Task<IReadOnlyList<IPAddress>> ResolveAsync(
             string host,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
-        }
+        ) => Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
     }
 
     private sealed class FakePresence : IOverlayLivePresence
     {
         internal bool Connected { get; set; }
 
-        public OverlayConnectionPresence Read(int hostId, Guid overlayId)
-        {
-            return new() { ActiveConnectionCount = Connected ? 1 : 0 };
-        }
+        public OverlayConnectionPresence Read(int hostId, Guid overlayId) =>
+            new() { ActiveConnectionCount = Connected ? 1 : 0 };
     }
 
     private sealed class FakeTransport : IOverlayCueTransport
@@ -763,15 +749,9 @@ public sealed class OverlayCueServiceTests
             _stopped.Writer.TryWrite(runId).ShouldBeTrue();
         }
 
-        internal ValueTask<Guid> ReadStartedAsync()
-        {
-            return _started.Reader.ReadAsync();
-        }
+        internal ValueTask<Guid> ReadStartedAsync() => _started.Reader.ReadAsync();
 
-        internal ValueTask<Guid> ReadStoppedAsync()
-        {
-            return _stopped.Reader.ReadAsync();
-        }
+        internal ValueTask<Guid> ReadStoppedAsync() => _stopped.Reader.ReadAsync();
     }
 
     private sealed class ControlledMediaFileDeletion : IOverlayMediaFileDeletion
@@ -819,10 +799,7 @@ public sealed class OverlayCueServiceTests
             }
         }
 
-        public override long GetTimestamp()
-        {
-            return GetUtcNow().UtcTicks;
-        }
+        public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
         public override ITimer CreateTimer(
             TimerCallback callback,
@@ -897,10 +874,7 @@ public sealed class OverlayCueServiceTests
                 return ValueTask.CompletedTask;
             }
 
-            internal bool IsDue(DateTimeOffset now)
-            {
-                return !_disposed && _dueAt <= now;
-            }
+            internal bool IsDue(DateTimeOffset now) => !_disposed && _dueAt <= now;
 
             internal void Fire()
             {

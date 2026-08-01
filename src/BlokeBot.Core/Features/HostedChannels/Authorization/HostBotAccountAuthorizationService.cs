@@ -138,9 +138,8 @@ public sealed class HostBotAccountAuthorizationService(
         return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
     }
 
-    public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-    {
-        return IO<BotAccount, AccessTokenUnavailableReason>.Create(async cancellationToken =>
+    public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+        IO<BotAccount, AccessTokenUnavailableReason>.Create(async cancellationToken =>
         {
             var status = await GetActiveTokenStatusAsync(
                 channelLogin,
@@ -159,7 +158,6 @@ public sealed class HostBotAccountAuthorizationService(
                     )
             );
         });
-    }
 
     public async Task<bool> CanAuthorizeAsync(
         int hostId,
@@ -181,31 +179,21 @@ public sealed class HostBotAccountAuthorizationService(
         return settings?.OverrideEnabled == true;
     }
 
-    public Task UseCustomBotAsync(int hostId, CancellationToken ct)
-    {
-        return SelectBotAccountAsync(hostId, BotAccountSelection.Custom, ct);
-    }
+    public Task UseCustomBotAsync(int hostId, CancellationToken ct) =>
+        SelectBotAccountAsync(hostId, BotAccountSelection.Custom, ct);
 
-    public Task UseMainBotAsync(int hostId, CancellationToken ct)
-    {
-        return SelectBotAccountAsync(hostId, BotAccountSelection.Main, ct);
-    }
+    public Task UseMainBotAsync(int hostId, CancellationToken ct) =>
+        SelectBotAccountAsync(hostId, BotAccountSelection.Main, ct);
 
     public Task<WhisperResponseConfigurationOutcome> EnableWhisperResponsesAsync(
         int hostId,
         CancellationToken ct
-    )
-    {
-        return ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Enabled, ct);
-    }
+    ) => ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Enabled, ct);
 
     public Task<WhisperResponseConfigurationOutcome> DisableWhisperResponsesAsync(
         int hostId,
         CancellationToken ct
-    )
-    {
-        return ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Disabled, ct);
-    }
+    ) => ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Disabled, ct);
 
     private async Task SelectBotAccountAsync(
         int hostId,
@@ -310,9 +298,8 @@ public sealed class HostBotAccountAuthorizationService(
         int hostId,
         HostBotAccountActor actor,
         HostBotAccountAuthorizationGrant grant
-    )
-    {
-        return IO<HostBotAccountAuthorizationOutcome, Never>.Create(async ct =>
+    ) =>
+        IO<HostBotAccountAuthorizationOutcome, Never>.Create(async ct =>
         {
             var mutationGate = CredentialMutationGate(hostId);
             HostBotAccountAuthorizationOutcome.Authorized? committed = null;
@@ -388,7 +375,6 @@ public sealed class HostBotAccountAuthorizationService(
             await changes.NotifyChangedAsync(ct);
             return Success(committed);
         });
-    }
 
     public async Task<HostBotAccountClearOutcome> ClearAsync(
         int hostId,
@@ -494,10 +480,7 @@ public sealed class HostBotAccountAuthorizationService(
 
     private static Result<HostBotAccountAuthorizationOutcome, Never> Success(
         HostBotAccountAuthorizationOutcome outcome
-    )
-    {
-        return Result<HostBotAccountAuthorizationOutcome, Never>.Success(outcome);
-    }
+    ) => Result<HostBotAccountAuthorizationOutcome, Never>.Success(outcome);
 
     private async Task<TokenStatus> GetStoredTokenStatusAsync(
         BlokeBotDbContext db,
@@ -731,30 +714,24 @@ public sealed class HostBotAccountAuthorizationService(
         }
     }
 
-    private SemaphoreSlim CredentialMutationGate(int hostId)
-    {
-        return _credentialMutationGates.GetOrAdd(hostId, static _ => new SemaphoreSlim(1, 1));
-    }
+    private SemaphoreSlim CredentialMutationGate(int hostId) =>
+        _credentialMutationGates.GetOrAdd(hostId, static _ => new SemaphoreSlim(1, 1));
 
     private static bool RefreshedIdentityMatches(
         HostBotAccountSettings settings,
         TokenValidation validation
-    )
-    {
-        return (
-                string.IsNullOrWhiteSpace(settings.TwitchUserId)
-                || string.Equals(settings.TwitchUserId, validation.UserId, StringComparison.Ordinal)
-            )
-            && (
-                string.IsNullOrWhiteSpace(settings.Login)
-                || string.Equals(settings.Login, validation.Login, StringComparison.Ordinal)
-            );
-    }
+    ) =>
+        (
+            string.IsNullOrWhiteSpace(settings.TwitchUserId)
+            || string.Equals(settings.TwitchUserId, validation.UserId, StringComparison.Ordinal)
+        )
+        && (
+            string.IsNullOrWhiteSpace(settings.Login)
+            || string.Equals(settings.Login, validation.Login, StringComparison.Ordinal)
+        );
 
-    private static bool ProtectedPayloadEquals(byte[] left, byte[] right)
-    {
-        return left.AsSpan().SequenceEqual(right);
-    }
+    private static bool ProtectedPayloadEquals(byte[] left, byte[] right) =>
+        left.AsSpan().SequenceEqual(right);
 
     private async Task<bool> DisableUnusableCredentialsIfCurrentAsync(
         BlokeBotDbContext db,
@@ -910,17 +887,13 @@ public sealed class HostBotAccountAuthorizationService(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return db.ReplyPinPolicies.AsNoTracking().AnyAsync(policy => policy.HostId == hostId, ct);
-    }
+    ) => db.ReplyPinPolicies.AsNoTracking().AnyAsync(policy => policy.HostId == hostId, ct);
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(
         HostBotAccountSettings settings,
         TokenStatus status
-    )
-    {
-        return status.Match<BotAccountAuthorizationStatus>(
+    ) =>
+        status.Match<BotAccountAuthorizationStatus>(
             unknown =>
                 new(
                     null,
@@ -980,12 +953,9 @@ public sealed class HostBotAccountAuthorizationService(
                     "The custom bot account is ready."
                 )
         );
-    }
 
-    private static bool TokenExpiresSoon(HostBotAccountTokenPayload payload)
-    {
-        return payload.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
-    }
+    private static bool TokenExpiresSoon(HostBotAccountTokenPayload payload) =>
+        payload.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
 
     private static void ClearAuthorization(HostBotAccountSettings settings)
     {
@@ -998,18 +968,14 @@ public sealed class HostBotAccountAuthorizationService(
         settings.TwitchUserId = null;
     }
 
-    private static TokenStatus ProtectionUnavailable(ImmutableArray<string> required)
-    {
-        return new TokenStatus.Unavailable(
+    private static TokenStatus ProtectionUnavailable(ImmutableArray<string> required) =>
+        new TokenStatus.Unavailable(
             AccessTokenUnavailableReason.CredentialProtectionUnavailable,
             required
         );
-    }
 
-    private static IEnumerable<string> SplitStoredScopes(string? scopes)
-    {
-        return (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
-    }
+    private static IEnumerable<string> SplitStoredScopes(string? scopes) =>
+        (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
     private static ActiveBotAccountTokenStatus ActiveStatus(
         string? configuredLogin,
@@ -1032,15 +998,11 @@ public sealed class HostBotAccountAuthorizationService(
         };
     }
 
-    private static bool IsReady(TokenStatus status)
-    {
-        return status.Match(_ => false, _ => false, _ => false, _ => false, _ => true);
-    }
+    private static bool IsReady(TokenStatus status) =>
+        status.Match(_ => false, _ => false, _ => false, _ => false, _ => true);
 
-    private static InvalidOperationException BotNotReady(string channelLogin)
-    {
-        return new($"The bot for #{channelLogin} is not ready yet.");
-    }
+    private static InvalidOperationException BotNotReady(string channelLogin) =>
+        new($"The bot for #{channelLogin} is not ready yet.");
 
     private enum BotAccountSelection
     {
@@ -1070,16 +1032,14 @@ public sealed class HostBotAccountAuthorizationService(
             Func<Refreshed, TResult> refreshed,
             Func<Rejected, TResult> rejected,
             Func<ProtectionUnavailable, TResult> protectionUnavailable
-        )
-        {
-            return this switch
+        ) =>
+            this switch
             {
                 Refreshed outcome => refreshed(outcome),
                 Rejected outcome => rejected(outcome),
                 ProtectionUnavailable outcome => protectionUnavailable(outcome),
                 _ => throw new UnreachableException(),
             };
-        }
     }
 }
 

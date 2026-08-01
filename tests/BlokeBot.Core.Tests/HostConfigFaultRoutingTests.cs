@@ -518,8 +518,7 @@ public sealed class HostConfigFaultRoutingTests
     private static void ConfigureModeratorAuthorityServices(
         BunitContext context,
         IHostBotAppAccessTokenSource tokens
-    )
-    {
+    ) =>
         context.Services.AddSingleton<ModeratorAuthorityService>(
             serviceProvider => new ModeratorAuthorityService(
                 tokens,
@@ -532,7 +531,6 @@ public sealed class HostConfigFaultRoutingTests
                 serviceProvider.GetRequiredService<TimeProvider>()
             )
         );
-    }
 
     private static async Task AssertTwitchOperationsPresentationAsync(
         TokenStatus status,
@@ -685,35 +683,29 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
-    private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page)
-    {
-        return page.FindAll("button")
+    private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page) =>
+        page.FindAll("button")
             .Single(button =>
                 button.TextContent.Contains("Available viewer commands", StringComparison.Ordinal)
             );
-    }
 
     private static IElement FindFeatureButton(
         IRenderedComponent<HostConfigPage> page,
         string featureName
-    )
-    {
-        return page.FindAll("#chat-tools button")
+    ) =>
+        page.FindAll("#chat-tools button")
             .Single(button => button.TextContent.Contains(featureName, StringComparison.Ordinal));
-    }
 
     private static Task ClickAccessModeAsync<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
     )
-        where TComponent : IComponent
-    {
-        return page.InvokeAsync(() =>
+        where TComponent : IComponent =>
+        page.InvokeAsync(() =>
             page.FindAll("button")
                 .Single(button => button.TextContent.Trim() == text)
                 .ClickAsync(new())
         );
-    }
 
     private static void AssertAccessMode<TComponent>(
         IRenderedComponent<TComponent> page,
@@ -803,21 +795,17 @@ public sealed class HostConfigFaultRoutingTests
     {
         public Exception? Failure { get; set; }
 
-        public BlokeBotDbContext CreateDbContext()
-        {
-            return Failure is null ? innerFactory.CreateDbContext() : throw Failure;
-        }
+        public BlokeBotDbContext CreateDbContext() =>
+            Failure is null ? innerFactory.CreateDbContext() : throw Failure;
 
         public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            return Failure is null
+        ) =>
+            Failure is null
                 ? new ValueTask<BlokeBotDbContext>(
                     innerFactory.CreateDbContextAsync(cancellationToken)
                 )
                 : ValueTask.FromException<BlokeBotDbContext>(Failure);
-        }
     }
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
@@ -826,10 +814,7 @@ public sealed class HostConfigFaultRoutingTests
 
         public int RequestCount { get; private set; }
 
-        public void Enqueue(Task<string> token)
-        {
-            _tokens.Enqueue(new(token, null));
-        }
+        public void Enqueue(Task<string> token) => _tokens.Enqueue(new(token, null));
 
         public PendingTokenRequest EnqueuePending()
         {
@@ -884,19 +869,15 @@ public sealed class HostConfigFaultRoutingTests
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler());
-        }
+        public HttpClient CreateClient(string name) => new(new Handler());
 
         private sealed class Handler : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(
+            ) =>
+                Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {
                         Content = new StringContent(
@@ -906,7 +887,6 @@ public sealed class HostConfigFaultRoutingTests
                         ),
                     }
                 );
-            }
         }
     }
 
@@ -926,10 +906,7 @@ public sealed class HostConfigFaultRoutingTests
             }
         }
 
-        public override long GetTimestamp()
-        {
-            return GetUtcNow().UtcTicks;
-        }
+        public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
         public override ITimer CreateTimer(
             TimerCallback callback,

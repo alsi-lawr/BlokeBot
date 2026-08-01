@@ -38,15 +38,9 @@ public readonly record struct PointAmount : IComparable<PointAmount>
 
     public bool IsZero => Value.IsZero;
 
-    public int CompareTo(PointAmount other)
-    {
-        return Value.CompareTo(other.Value);
-    }
+    public int CompareTo(PointAmount other) => Value.CompareTo(other.Value);
 
-    public PointAmount Add(PointAmount amount)
-    {
-        return new(Value + amount.Value);
-    }
+    public PointAmount Add(PointAmount amount) => new(Value + amount.Value);
 
     public PointAmount Subtract(PointAmount amount)
     {
@@ -58,19 +52,12 @@ public readonly record struct PointAmount : IComparable<PointAmount>
         return new PointAmount(Value - amount.Value);
     }
 
-    public string ToDisplayString()
-    {
-        return FormatForDisplay(Value, _displaySignificantFigures);
-    }
+    public string ToDisplayString() => FormatForDisplay(Value, _displaySignificantFigures);
 
-    public override string ToString()
-    {
-        return Value.ToString();
-    }
+    public override string ToString() => Value.ToString();
 
-    public static PointAmount ParseAbsolute(string? value)
-    {
-        return ParseNonNegativeAbsolute(value)
+    public static PointAmount ParseAbsolute(string? value) =>
+        ParseNonNegativeAbsolute(value)
             .Match(
                 static amount => amount,
                 error =>
@@ -88,7 +75,6 @@ public readonly record struct PointAmount : IComparable<PointAmount>
                         ),
                     }
             );
-    }
 
     internal static Result<PointAmount, PointAmountParseError> ParseNonNegativeAbsolute(
         string? value

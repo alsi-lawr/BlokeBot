@@ -88,9 +88,8 @@ public sealed class MomentConvergenceMigrationTests
         await Should.ThrowAsync<DbUpdateException>(() => verify.SaveChangesAsync());
     }
 
-    private static MomentDomainEvent Event(long candidateId, string operationKey, DateTime now)
-    {
-        return new()
+    private static MomentDomainEvent Event(long candidateId, string operationKey, DateTime now) =>
+        new()
         {
             HostId = 1,
             CandidateId = candidateId,
@@ -101,5 +100,4 @@ public sealed class MomentConvergenceMigrationTests
             PublicPayload = "{}",
             OccurredAtUtc = now,
         };
-    }
 }

@@ -194,8 +194,7 @@ public sealed class PublicChatPinStoreTests
         PublicChatPinWorkItem item,
         string scenario,
         string expectedReason
-    )
-    {
+    ) =>
         PublicChatPinProviderDecision
             .ClassifyUnpinRead(
                 item,
@@ -205,11 +204,9 @@ public sealed class PublicChatPinStoreTests
             )
             .ShouldBeOfType<PublicChatPinExecutionOutcome.Terminal>()
             .Reason.ShouldBe(expectedReason);
-    }
 
-    private static ChatPinnedMessageResult CurrentPin(string scenario)
-    {
-        return scenario switch
+    private static ChatPinnedMessageResult CurrentPin(string scenario) =>
+        scenario switch
         {
             "exact" => new ChatPinnedMessageResult.Found("message-id", "recorded-pinner"),
             "different-message" => new ChatPinnedMessageResult.Found(
@@ -223,7 +220,6 @@ public sealed class PublicChatPinStoreTests
             "unavailable" => new ChatPinnedMessageResult.Unavailable(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
-    }
 
     private static async Task SeedPinOperationAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -352,9 +348,8 @@ public sealed class PublicChatPinStoreTests
         return (host.Id, round.Id);
     }
 
-    private static PublicChatPinWorkItem WorkItem(bool isUnpin, string? recordedPinner)
-    {
-        return new(
+    private static PublicChatPinWorkItem WorkItem(bool isUnpin, string? recordedPinner) =>
+        new(
             1,
             true,
             isUnpin,
@@ -368,14 +363,11 @@ public sealed class PublicChatPinStoreTests
             300,
             true
         );
-    }
 
-    private static EfPublicChatPinStore Store(SqliteBlokeBotDbFactory dbFactory)
-    {
-        return new(
+    private static EfPublicChatPinStore Store(SqliteBlokeBotDbFactory dbFactory) =>
+        new(
             dbFactory,
             new ManualTestTimeProvider(new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero)),
             TestEventBus.Create<AppEventKind>()
         );
-    }
 }

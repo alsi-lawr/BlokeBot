@@ -123,9 +123,10 @@ public sealed class HostBroadcasterAuthorizationService(
         );
     }
 
-    public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(string channelLogin)
-    {
-        return IO<BotAccount, AccessTokenUnavailableReason>.Create(async ct =>
+    public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+        string channelLogin
+    ) =>
+        IO<BotAccount, AccessTokenUnavailableReason>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db
@@ -159,7 +160,6 @@ public sealed class HostBroadcasterAuthorizationService(
                     )
             );
         });
-    }
 
     private async Task<TokenStatus> ValidateOrRefreshAsync(
         BlokeBotDbContext db,

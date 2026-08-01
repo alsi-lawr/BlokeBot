@@ -66,14 +66,10 @@ internal static class LoginPage
         </script>
         """;
 
-    public static string Render()
-    {
-        return RenderPage();
-    }
+    public static string Render() => RenderPage();
 
-    private static string RenderPage()
-    {
-        return $$"""
+    private static string RenderPage() =>
+        $$"""
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -127,5 +123,4 @@ internal static class LoginPage
             </body>
             </html>
             """;
-    }
 }

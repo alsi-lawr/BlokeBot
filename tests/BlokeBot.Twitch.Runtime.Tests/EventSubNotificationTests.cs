@@ -86,16 +86,12 @@ public sealed class EventSubNotificationTests
         Parse(wrongVersion.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
     }
 
-    internal static EventSubEnvelope IncomingRaidEnvelope()
-    {
-        return JsonSerializer.Deserialize<EventSubEnvelope>(_incomingRaidJson)!;
-    }
+    internal static EventSubEnvelope IncomingRaidEnvelope() =>
+        JsonSerializer.Deserialize<EventSubEnvelope>(_incomingRaidJson)!;
 
-    private static EventSubNotification Parse(string json)
-    {
-        return EventSubNotification.Parse(
+    private static EventSubNotification Parse(string json) =>
+        EventSubNotification.Parse(
             JsonSerializer.Deserialize<EventSubEnvelope>(json)!,
             new JsonSerializerOptions(JsonSerializerDefaults.Web)
         );
-    }
 }

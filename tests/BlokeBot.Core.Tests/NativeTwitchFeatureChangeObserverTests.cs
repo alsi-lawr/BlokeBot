@@ -209,9 +209,8 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "token",
                     new TokenValidation(
@@ -223,20 +222,17 @@ public sealed class NativeTwitchFeatureChangeObserverTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("channel", "token")
                     )
                 )
             );
-        }
     }
 
     private sealed class ReadyBotAccount : IHostBotAccountTokenStatusProvider
@@ -265,10 +261,7 @@ public sealed class NativeTwitchFeatureChangeObserverTests
 
     private sealed class SingleHandlerFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
     private sealed class NativeReconciliationHandler : HttpMessageHandler

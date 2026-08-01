@@ -136,9 +136,8 @@ public partial class PlayQueuesPage
         SelectField(neighbour);
     }
 
-    private Task SaveAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task SaveAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -171,12 +170,9 @@ public partial class PlayQueuesPage
                 }
             }
         );
-    }
 
-    private void SetCreateGuidance()
-    {
+    private void SetCreateGuidance() =>
         _feedback = "New queue ready. Complete its details, then Save queue to create it.";
-    }
 
     private void SelectFirstField()
     {
@@ -202,30 +198,19 @@ public partial class PlayQueuesPage
         _fieldFocusRequest++;
     }
 
-    private bool IsFieldSelected(FieldDraft field)
-    {
-        return field.Identity == _selectedFieldIdentity;
-    }
+    private bool IsFieldSelected(FieldDraft field) => field.Identity == _selectedFieldIdentity;
 
-    private long FieldFocusRequest(FieldDraft field)
-    {
-        return field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
-    }
+    private long FieldFocusRequest(FieldDraft field) =>
+        field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
 
-    private static string FieldInventoryLabelId(FieldDraft field)
-    {
-        return $"queue-field-{field.Identity:N}-inventory-label";
-    }
+    private static string FieldInventoryLabelId(FieldDraft field) =>
+        $"queue-field-{field.Identity:N}-inventory-label";
 
-    private static string FieldEditorRegionId(FieldDraft field)
-    {
-        return $"queue-field-{field.Identity:N}-editor";
-    }
+    private static string FieldEditorRegionId(FieldDraft field) =>
+        $"queue-field-{field.Identity:N}-editor";
 
-    private static string FieldDisplayName(FieldDraft field)
-    {
-        return string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
-    }
+    private static string FieldDisplayName(FieldDraft field) =>
+        string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
 
     private static string QueueFieldSummary(FieldDraft field)
     {
@@ -239,9 +224,8 @@ public partial class PlayQueuesPage
         return $"{key} · {requirement} · {detail}";
     }
 
-    private Task ToggleOpenAsync()
-    {
-        return Run(async () =>
+    private Task ToggleOpenAsync() =>
+        Run(async () =>
         {
             var result = await _queues.SetOpenAsync(
                 HostId,
@@ -259,21 +243,13 @@ public partial class PlayQueuesPage
             );
             _operationFailed = result is PlayQueueResult<PlayQueueSummary>.Rejected;
         });
-    }
 
-    private Task SelectPartyAsync()
-    {
-        return SelectAsync(false);
-    }
+    private Task SelectPartyAsync() => SelectAsync(false);
 
-    private Task KeepPartyAsync()
-    {
-        return SelectAsync(true);
-    }
+    private Task KeepPartyAsync() => SelectAsync(true);
 
-    private Task SelectAsync(bool keep)
-    {
-        return Run(async () =>
+    private Task SelectAsync(bool keep) =>
+        Run(async () =>
         {
             var result = await _queues.SelectPartyAsync(
                 HostId,
@@ -288,27 +264,21 @@ public partial class PlayQueuesPage
             );
             _operationFailed = result is PlayQueueResult<PlayQueueSelection>.Rejected;
         });
-    }
 
-    private Task ReadyCheckAsync(long id)
-    {
-        return EntryMutationAsync(
+    private Task ReadyCheckAsync(long id) =>
+        EntryMutationAsync(
             () => _queues.StartReadyCheckAsync(HostId, id, CancellationToken.None),
             "Ready check started."
         );
-    }
 
-    private Task SkipAsync(long id)
-    {
-        return EntryMutationAsync(
+    private Task SkipAsync(long id) =>
+        EntryMutationAsync(
             () => _queues.SkipAsync(HostId, id, CancellationToken.None),
             "Viewer skipped temporarily."
         );
-    }
 
-    private Task ReplaceOneAsync(long id)
-    {
-        return Run(async () =>
+    private Task ReplaceOneAsync(long id) =>
+        Run(async () =>
         {
             var result = await _queues.ReplaceOneAsync(HostId, id, CancellationToken.None);
             _feedback = result.Match(
@@ -317,19 +287,15 @@ public partial class PlayQueuesPage
             );
             _operationFailed = result is PlayQueueResult<PlayQueueSelection>.Rejected;
         });
-    }
 
-    private Task NoShowAsync(long id)
-    {
-        return EntryMutationAsync(
+    private Task NoShowAsync(long id) =>
+        EntryMutationAsync(
             () => _queues.MarkNoShowAsync(HostId, id, CancellationToken.None),
             "No-show recorded."
         );
-    }
 
-    private Task SaveEntryAsync(long id)
-    {
-        return Run(async () =>
+    private Task SaveEntryAsync(long id) =>
+        Run(async () =>
         {
             var draft = _entryDrafts[id];
             if (
@@ -358,24 +324,20 @@ public partial class PlayQueuesPage
             );
             _operationFailed = result is PlayQueueResult<ModeratorPlayQueueEntryView>.Rejected;
         });
-    }
 
     private Task EntryMutationAsync(
         Func<Task<PlayQueueResult<ModeratorPlayQueueEntryView>>> mutate,
         string message
-    )
-    {
-        return Run(async () =>
+    ) =>
+        Run(async () =>
         {
             var result = await mutate();
             _feedback = result.Match(_ => message, rejected => rejected.Reason.Message);
             _operationFailed = result is PlayQueueResult<ModeratorPlayQueueEntryView>.Rejected;
         });
-    }
 
-    private Task DeliverLobbyAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task DeliverLobbyAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -403,11 +365,9 @@ public partial class PlayQueuesPage
                         : $"Private delivery failed for {string.Join(", ", failures.Select(value => $"@{value.Login}"))}. No public fallback was attempted.";
             }
         );
-    }
 
-    private Task Run(Func<Task> mutation)
-    {
-        return RunSelectedHostMutationAsync(
+    private Task Run(Func<Task> mutation) =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -415,7 +375,6 @@ public partial class PlayQueuesPage
                 await RefreshPageAsync();
             }
         );
-    }
 
     private void Fail(string value)
     {
@@ -423,29 +382,25 @@ public partial class PlayQueuesPage
         _feedback = value;
     }
 
-    private static string FieldSummary(ModeratorPlayQueueEntryView entry)
-    {
-        return entry.Public.Fields.Count == 0
+    private static string FieldSummary(ModeratorPlayQueueEntryView entry) =>
+        entry.Public.Fields.Count == 0
             ? "No entry details"
             : string.Join(
                 " · ",
                 entry.Public.Fields.Select(value => $"{value.Label}: {value.Value}")
             );
-    }
 
     private sealed class EntryDraft
     {
         public string Priority { get; set; } = "0";
         public string PrivateNote { get; set; } = string.Empty;
 
-        public static EntryDraft From(ModeratorPlayQueueEntryView entry)
-        {
-            return new EntryDraft
+        public static EntryDraft From(ModeratorPlayQueueEntryView entry) =>
+            new EntryDraft
             {
                 Priority = entry.Priority.ToString(CultureInfo.InvariantCulture),
                 PrivateNote = entry.PrivateModeratorNote,
             };
-        }
     }
 
     private sealed class QueueDraft
@@ -584,9 +539,8 @@ public partial class PlayQueuesPage
         public bool Required { get; set; }
         public string Choices { get; set; } = string.Empty;
 
-        public PlayQueueFieldCommand ToCommand()
-        {
-            return new(
+        public PlayQueueFieldCommand ToCommand() =>
+            new(
                 Key,
                 Label,
                 Required,
@@ -595,27 +549,19 @@ public partial class PlayQueuesPage
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
                 )
             );
-        }
 
-        public static FieldDraft New()
-        {
-            return new() { Key = "field", Label = "Field" };
-        }
+        public static FieldDraft New() => new() { Key = "field", Label = "Field" };
 
-        public static FieldDraft Standard(string key, string label)
-        {
-            return new() { Key = key, Label = label };
-        }
+        public static FieldDraft Standard(string key, string label) =>
+            new() { Key = key, Label = label };
 
-        public static FieldDraft From(PlayQueueFieldView field)
-        {
-            return new()
+        public static FieldDraft From(PlayQueueFieldView field) =>
+            new()
             {
                 Key = field.Key,
                 Label = field.Label,
                 Required = field.IsRequired,
                 Choices = string.Join(", ", field.Choices),
             };
-        }
     }
 }

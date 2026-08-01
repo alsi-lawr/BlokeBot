@@ -151,10 +151,7 @@ public partial class CustomCommandSettingsPage
             : EditableConfigurationFingerprint(_config);
     }
 
-    private Task SaveAsync()
-    {
-        return ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
-    }
+    private Task SaveAsync() => ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
 
     private async Task SaveCoreAsync()
     {
@@ -186,8 +183,7 @@ public partial class CustomCommandSettingsPage
             );
     }
 
-    private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command)
-    {
+    private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command) =>
         await RunSelectedHostMutationAsync(
             HostId,
             async () =>
@@ -229,7 +225,6 @@ public partial class CustomCommandSettingsPage
                 );
             }
         );
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -279,19 +274,15 @@ public partial class CustomCommandSettingsPage
         _pendingTabFocus = tab;
     }
 
-    private static CustomCommandSettingsTab PreviousTab(CustomCommandSettingsTab tab)
-    {
-        return tab == CustomCommandSettingsTab.Commands
+    private static CustomCommandSettingsTab PreviousTab(CustomCommandSettingsTab tab) =>
+        tab == CustomCommandSettingsTab.Commands
             ? CustomCommandSettingsTab.MessageLibrary
             : CustomCommandSettingsTab.Commands;
-    }
 
-    private static CustomCommandSettingsTab NextTab(CustomCommandSettingsTab tab)
-    {
-        return tab == CustomCommandSettingsTab.MessageLibrary
+    private static CustomCommandSettingsTab NextTab(CustomCommandSettingsTab tab) =>
+        tab == CustomCommandSettingsTab.MessageLibrary
             ? CustomCommandSettingsTab.Commands
             : CustomCommandSettingsTab.MessageLibrary;
-    }
 
     private void SelectValidationEditor(CustomCommandConfigurationValidationTarget target)
     {
@@ -319,12 +310,10 @@ public partial class CustomCommandSettingsPage
         }
     }
 
-    private bool IsEditorOpen(CustomCommandEditorKind kind, int id)
-    {
-        return _selectedEditor is { Kind: var selectedKind, Id: var selectedId }
-            && selectedKind == kind
-            && selectedId == id;
-    }
+    private bool IsEditorOpen(CustomCommandEditorKind kind, int id) =>
+        _selectedEditor is { Kind: var selectedKind, Id: var selectedId }
+        && selectedKind == kind
+        && selectedId == id;
 
     private void SelectEditor(CustomCommandEditorKind kind, int id, string focusControlId)
     {
@@ -362,9 +351,8 @@ public partial class CustomCommandSettingsPage
         };
     }
 
-    private bool SelectionBelongsToActiveTab(CustomCommandEditorSelection selection)
-    {
-        return _activeTab switch
+    private bool SelectionBelongsToActiveTab(CustomCommandEditorSelection selection) =>
+        _activeTab switch
         {
             CustomCommandSettingsTab.MessageLibrary => selection.Kind
                 == CustomCommandEditorKind.Reply,
@@ -374,51 +362,34 @@ public partial class CustomCommandSettingsPage
                     or CustomCommandEditorKind.ScheduledMessage,
             _ => false,
         };
-    }
 
-    private bool EditorExists(CustomCommandEditorSelection selection)
-    {
-        return _config is not null
-            && selection.Kind switch
-            {
-                CustomCommandEditorKind.Reply => _config.MessageEntries.Any(x =>
-                    x.Id == selection.Id
-                ),
-                CustomCommandEditorKind.Command => _config.Commands.Any(x => x.Id == selection.Id),
-                CustomCommandEditorKind.Counter => _config.Counters.Any(x => x.Id == selection.Id),
-                CustomCommandEditorKind.ScheduledMessage => _config.Announcements.Any(x =>
-                    x.Id == selection.Id
-                ),
-                _ => false,
-            };
-    }
+    private bool EditorExists(CustomCommandEditorSelection selection) =>
+        _config is not null
+        && selection.Kind switch
+        {
+            CustomCommandEditorKind.Reply => _config.MessageEntries.Any(x => x.Id == selection.Id),
+            CustomCommandEditorKind.Command => _config.Commands.Any(x => x.Id == selection.Id),
+            CustomCommandEditorKind.Counter => _config.Counters.Any(x => x.Id == selection.Id),
+            CustomCommandEditorKind.ScheduledMessage => _config.Announcements.Any(x =>
+                x.Id == selection.Id
+            ),
+            _ => false,
+        };
 
-    private long EditorFocusRequestFor(string controlId)
-    {
-        return _editorFocusControlId == controlId ? _fieldFocusRequest : 0;
-    }
+    private long EditorFocusRequestFor(string controlId) =>
+        _editorFocusControlId == controlId ? _fieldFocusRequest : 0;
 
-    private static string InventoryLabelId(CustomCommandEditorKind kind, int id)
-    {
-        return $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-inventory-label";
-    }
+    private static string InventoryLabelId(CustomCommandEditorKind kind, int id) =>
+        $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-inventory-label";
 
-    private static string EditorRegionId(CustomCommandEditorKind kind, int id)
-    {
-        return $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-editor";
-    }
+    private static string EditorRegionId(CustomCommandEditorKind kind, int id) =>
+        $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-editor";
 
-    private long CommandAdvancedOpenRequest(int commandId)
-    {
-        return _commandAdvancedEntityId == commandId ? _commandAdvancedOpenRequest : 0;
-    }
+    private long CommandAdvancedOpenRequest(int commandId) =>
+        _commandAdvancedEntityId == commandId ? _commandAdvancedOpenRequest : 0;
 
-    private long AnnouncementAdvancedOpenRequest(int announcementId)
-    {
-        return _announcementAdvancedEntityId == announcementId
-            ? _announcementAdvancedOpenRequest
-            : 0;
-    }
+    private long AnnouncementAdvancedOpenRequest(int announcementId) =>
+        _announcementAdvancedEntityId == announcementId ? _announcementAdvancedOpenRequest : 0;
 
     private bool _hasChanges =>
         _config is not null
@@ -591,15 +562,13 @@ public partial class CustomCommandSettingsPage
 
     private CustomCommandConfigurationValidationTarget? AliasCollisionTarget(
         CustomCommandConfigurationSaveFailure failure
-    )
-    {
-        return failure.Match<CustomCommandConfigurationValidationTarget?>(
+    ) =>
+        failure.Match<CustomCommandConfigurationValidationTarget?>(
             builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
             customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
             _ => null,
             cueReference => CommandTarget(cueReference.CommandId, cueReference.Field)
         );
-    }
 
     private CustomCommandConfigurationValidationTarget? CommandAliasesTarget(string alias)
     {
@@ -621,282 +590,194 @@ public partial class CustomCommandSettingsPage
     private static CustomCommandConfigurationValidationTarget ReplyTarget(
         int replyId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.MessageLibrary,
             CustomCommandValidationEntityKind.Reply,
             replyId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget VariantTarget(
         int replyId,
         int variantId
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.MessageLibrary,
             CustomCommandValidationEntityKind.Variant,
             replyId,
             CustomCommandValidationFieldKind.VariantText,
             variantId
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget CommandTarget(
         int commandId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Command,
             commandId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget CounterTarget(
         int counterId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Counter,
             counterId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
         int announcementId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.ScheduledMessage,
             announcementId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget ConfigurationTarget(
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Configuration,
             0,
             field
         );
-    }
 
     private static string MessageVariantFieldId(
         CustomMessageLibraryEntryEditor entry,
         CustomMessageVariantEditor variant
-    )
-    {
-        return $"message-entry-{entry.Id}-variant-{variant.Id}";
-    }
+    ) => $"message-entry-{entry.Id}-variant-{variant.Id}";
 
-    private static string CommandAliasesFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-aliases";
-    }
+    private static string CommandAliasesFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-aliases";
 
-    private static string MessageEntryNameFieldId(CustomMessageLibraryEntryEditor entry)
-    {
-        return $"message-entry-{entry.Id}-name";
-    }
+    private static string MessageEntryNameFieldId(CustomMessageLibraryEntryEditor entry) =>
+        $"message-entry-{entry.Id}-name";
 
-    private static string MessageSelectionFieldId(CustomMessageLibraryEntryEditor entry)
-    {
-        return $"message-entry-{entry.Id}-selection-mode";
-    }
+    private static string MessageSelectionFieldId(CustomMessageLibraryEntryEditor entry) =>
+        $"message-entry-{entry.Id}-selection-mode";
 
-    private static string MessageCurrentVariantFieldId(CustomMessageLibraryEntryEditor entry)
-    {
-        return $"message-entry-{entry.Id}-current-variant";
-    }
+    private static string MessageCurrentVariantFieldId(CustomMessageLibraryEntryEditor entry) =>
+        $"message-entry-{entry.Id}-current-variant";
 
-    private static string AddMessageVariantControlId(CustomMessageLibraryEntryEditor entry)
-    {
-        return $"message-entry-{entry.Id}-add-variant";
-    }
+    private static string AddMessageVariantControlId(CustomMessageLibraryEntryEditor entry) =>
+        $"message-entry-{entry.Id}-add-variant";
 
-    private static string CommandNameFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-name";
-    }
+    private static string CommandNameFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-name";
 
-    private static string CommandCooldownFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-cooldown";
-    }
+    private static string CommandCooldownFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-cooldown";
 
-    private static string CommandEnabledToggleId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-enabled";
-    }
+    private static string CommandEnabledToggleId(CustomCommandEditor command) =>
+        $"command-{command.Id}-enabled";
 
-    private static string CommandModeratorOnlyToggleId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-moderator-only";
-    }
+    private static string CommandModeratorOnlyToggleId(CustomCommandEditor command) =>
+        $"command-{command.Id}-moderator-only";
 
-    private static string CommandCooldownScopeFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-cooldown-scope";
-    }
+    private static string CommandCooldownScopeFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-cooldown-scope";
 
-    private static string CommandInvocationLimitFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-invocation-limit";
-    }
+    private static string CommandInvocationLimitFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-invocation-limit";
 
-    private static string CommandResetViewerFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-reset-viewer";
-    }
+    private static string CommandResetViewerFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-reset-viewer";
 
-    private static string CommandActionFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-action-kind";
-    }
+    private static string CommandActionFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-action-kind";
 
-    private static string CommandReplyFieldId(CustomCommandEditor command, int argumentCount)
-    {
-        return $"command-{command.Id}-{argumentCount}-argument-reply";
-    }
+    private static string CommandReplyFieldId(CustomCommandEditor command, int argumentCount) =>
+        $"command-{command.Id}-{argumentCount}-argument-reply";
 
-    private static string CommandCounterFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-counter-id";
-    }
+    private static string CommandCounterFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-counter-id";
 
-    private static string CommandOverlayTargetFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-overlay-target";
-    }
+    private static string CommandOverlayTargetFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-overlay-target";
 
-    private static string CommandOverlayCueFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-overlay-cue";
-    }
+    private static string CommandOverlayCueFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-overlay-cue";
 
-    private static string CommandQueuePolicyFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-queue-policy";
-    }
+    private static string CommandQueuePolicyFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-queue-policy";
 
-    private static string CommandReplyOrderFieldId(CustomCommandEditor command)
-    {
-        return $"command-{command.Id}-reply-order";
-    }
+    private static string CommandReplyOrderFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-reply-order";
 
-    private static string CounterNameFieldId(CustomCounterEditor counter)
-    {
-        return $"counter-{counter.Id}-name";
-    }
+    private static string CounterNameFieldId(CustomCounterEditor counter) =>
+        $"counter-{counter.Id}-name";
 
-    private static string CounterValueFieldId(CustomCounterEditor counter)
-    {
-        return $"counter-{counter.Id}-value";
-    }
+    private static string CounterValueFieldId(CustomCounterEditor counter) =>
+        $"counter-{counter.Id}-value";
 
-    private static string AnnouncementNameFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-name";
-    }
+    private static string AnnouncementNameFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-name";
 
-    private static string AnnouncementReplyFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-reply";
-    }
+    private static string AnnouncementReplyFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-reply";
 
-    private static string AnnouncementEnabledToggleId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-enabled";
-    }
+    private static string AnnouncementEnabledToggleId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-enabled";
 
-    private static string AnnouncementDeliveryFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-delivery";
-    }
+    private static string AnnouncementDeliveryFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-delivery";
 
-    private static string AnnouncementColorFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-color";
-    }
+    private static string AnnouncementColorFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-color";
 
-    private static string AnnouncementScheduleFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-schedule-kind";
-    }
+    private static string AnnouncementScheduleFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-schedule-kind";
 
-    private static string AnnouncementRetryDelayFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-retry-delay";
-    }
+    private static string AnnouncementRetryDelayFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-retry-delay";
 
     private static string AnnouncementOccurrenceLifetimeFieldId(
         CustomAnnouncementEditor announcement
-    )
-    {
-        return $"announcement-{announcement.Id}-occurrence-lifetime";
-    }
+    ) => $"announcement-{announcement.Id}-occurrence-lifetime";
 
-    private static string AnnouncementIntervalFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-interval-minutes";
-    }
+    private static string AnnouncementIntervalFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-interval-minutes";
 
-    private static string AnnouncementChatMessagesFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-required-chat-messages";
-    }
+    private static string AnnouncementChatMessagesFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-required-chat-messages";
 
-    private static string AnnouncementDayFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-day";
-    }
+    private static string AnnouncementDayFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-day";
 
-    private static string AnnouncementWeeklyTimeFieldId(CustomAnnouncementEditor announcement)
-    {
-        return $"announcement-{announcement.Id}-weekly-time";
-    }
+    private static string AnnouncementWeeklyTimeFieldId(CustomAnnouncementEditor announcement) =>
+        $"announcement-{announcement.Id}-weekly-time";
 
     private const string _timeZoneControlId = "custom-command-time-zone";
     private const string _reloadControlId = "custom-command-reload";
 
-    private string? ValidationMessage(CustomCommandConfigurationValidationTarget target)
-    {
-        return _validationErrors.FirstOrDefault(error => error.Target == target)?.Message;
-    }
+    private string? ValidationMessage(CustomCommandConfigurationValidationTarget target) =>
+        _validationErrors.FirstOrDefault(error => error.Target == target)?.Message;
 
-    private long FocusRequestFor(CustomCommandConfigurationValidationTarget target)
-    {
-        return _focusTarget == target ? _fieldFocusRequest : 0;
-    }
+    private long FocusRequestFor(CustomCommandConfigurationValidationTarget target) =>
+        _focusTarget == target ? _fieldFocusRequest : 0;
 
     private IReadOnlyDictionary<string, object> ValidationAttributes(
         string controlId,
         CustomCommandConfigurationValidationTarget target
-    )
-    {
-        return ValidationMessage(target) is null
+    ) =>
+        ValidationMessage(target) is null
             ? []
             : new Dictionary<string, object>
             {
                 ["aria-invalid"] = "true",
                 ["aria-describedby"] = $"{controlId}-error",
             };
-    }
 
     private RenderFragment ValidationMessageFor(
         string controlId,
@@ -920,9 +801,8 @@ public partial class CustomCommandSettingsPage
         };
     }
 
-    private static string? ValidationControlId(CustomCommandConfigurationValidationTarget target)
-    {
-        return target switch
+    private static string? ValidationControlId(CustomCommandConfigurationValidationTarget target) =>
+        target switch
         {
             {
                 EntityKind: CustomCommandValidationEntityKind.Configuration,
@@ -1010,19 +890,13 @@ public partial class CustomCommandSettingsPage
             } => $"announcement-{target.EntityId}-day",
             _ => null,
         };
-    }
 
-    private string TabClass(CustomCommandSettingsTab tab)
-    {
-        return tab == _activeTab
+    private string TabClass(CustomCommandSettingsTab tab) =>
+        tab == _activeTab
             ? "segmented-motion__tab segmented-motion__tab--active"
             : "segmented-motion__tab";
-    }
 
-    private int TabIndex(CustomCommandSettingsTab tab)
-    {
-        return _activeTab == tab ? 0 : -1;
-    }
+    private int TabIndex(CustomCommandSettingsTab tab) => _activeTab == tab ? 0 : -1;
 
     private void AddMessageEntry()
     {
@@ -1081,8 +955,7 @@ public partial class CustomCommandSettingsPage
             || routes.TwoArgumentMessageLibraryEntryId == messageEntryId;
     }
 
-    private void AddVariant(CustomMessageLibraryEntryEditor entry)
-    {
+    private void AddVariant(CustomMessageLibraryEntryEditor entry) =>
         entry.Variants.Add(
             new CustomMessageVariantEditor
             {
@@ -1090,7 +963,6 @@ public partial class CustomCommandSettingsPage
                 Text = "Type your reply here.",
             }
         );
-    }
 
     private void RemoveVariant(
         CustomMessageLibraryEntryEditor entry,
@@ -1155,9 +1027,8 @@ public partial class CustomCommandSettingsPage
         EnsureEditorSelection();
     }
 
-    private Task TestCueAsync(OverlayCueCustomCommandActionEditor action)
-    {
-        return ObserveUiOperationAsync(
+    private Task TestCueAsync(OverlayCueCustomCommandActionEditor action) =>
+        ObserveUiOperationAsync(
             nameof(TestCueAsync),
             async () =>
             {
@@ -1169,11 +1040,9 @@ public partial class CustomCommandSettingsPage
                 _cueTestOutcome = CueAdmissionMessage(outcome);
             }
         );
-    }
 
-    private static string CueAdmissionMessage(OverlayCueAdmissionOutcome outcome)
-    {
-        return outcome switch
+    private static string CueAdmissionMessage(OverlayCueAdmissionOutcome outcome) =>
+        outcome switch
         {
             OverlayCueAdmissionOutcome.Running => "Cue test started.",
             OverlayCueAdmissionOutcome.Queued => "Cue test queued.",
@@ -1187,15 +1056,9 @@ public partial class CustomCommandSettingsPage
             OverlayCueAdmissionOutcome.Expired => "The cue test expired before it could play.",
             _ => "The selected overlay player or cue is no longer available.",
         };
-    }
 
-    private Task ResetViewerAsync(CustomCommandEditor command)
-    {
-        return ObserveUiOperationAsync(
-            nameof(ResetViewerAsync),
-            () => ResetViewerCoreAsync(command)
-        );
-    }
+    private Task ResetViewerAsync(CustomCommandEditor command) =>
+        ObserveUiOperationAsync(nameof(ResetViewerAsync), () => ResetViewerCoreAsync(command));
 
     private async Task ResetViewerCoreAsync(CustomCommandEditor command)
     {
@@ -1243,23 +1106,16 @@ public partial class CustomCommandSettingsPage
         );
     }
 
-    private Task ResetAllViewersAsync(CustomCommandEditor command)
-    {
-        return ObserveUiOperationAsync(
+    private Task ResetAllViewersAsync(CustomCommandEditor command) =>
+        ObserveUiOperationAsync(
             nameof(ResetAllViewersAsync),
             () => ResetAllViewersCoreAsync(command)
         );
-    }
 
-    private void RequestResetAllViewers(CustomCommandEditor command)
-    {
+    private void RequestResetAllViewers(CustomCommandEditor command) =>
         _pendingResetAllCommandId = command.Id > 0 ? command.Id : null;
-    }
 
-    private void CancelResetAllViewers()
-    {
-        _pendingResetAllCommandId = null;
-    }
+    private void CancelResetAllViewers() => _pendingResetAllCommandId = null;
 
     private async Task ResetAllViewersCoreAsync(CustomCommandEditor command)
     {
@@ -1369,10 +1225,7 @@ public partial class CustomCommandSettingsPage
         EnsureEditorSelection();
     }
 
-    private int NextTemporaryId()
-    {
-        return _nextTemporaryId--;
-    }
+    private int NextTemporaryId() => _nextTemporaryId--;
 
     private string _selectedTimeZoneLabel =>
         _config is null ? string.Empty
@@ -1406,35 +1259,28 @@ public partial class CustomCommandSettingsPage
         return summaries.Count == 0 ? "Default settings" : string.Join(" · ", summaries);
     }
 
-    private static string CountLabel(int count, string singular)
-    {
-        return $"{count} {(count == 1 ? singular : singular + "s")}";
-    }
+    private static string CountLabel(int count, string singular) =>
+        $"{count} {(count == 1 ? singular : singular + "s")}";
 
-    private static string MessageSelectionLabel(CustomMessageSelectionMode mode)
-    {
-        return mode switch
+    private static string MessageSelectionLabel(CustomMessageSelectionMode mode) =>
+        mode switch
         {
             CustomMessageSelectionMode.First => "Always use the first message",
             CustomMessageSelectionMode.Random => "Pick a message at random",
             CustomMessageSelectionMode.Sequential => "Use each message in order",
             _ => "Choose a message",
         };
-    }
 
-    private static string CooldownScopeLabel(CustomCommandCooldownScope scope)
-    {
-        return scope switch
+    private static string CooldownScopeLabel(CustomCommandCooldownScope scope) =>
+        scope switch
         {
             CustomCommandCooldownScope.Global => "Everyone shares the wait",
             CustomCommandCooldownScope.User => "Each viewer has their own wait",
             _ => "Choose who waits",
         };
-    }
 
-    private static string InvocationLimitLabel(CustomCommandInvocationLimit limit)
-    {
-        return limit switch
+    private static string InvocationLimitLabel(CustomCommandInvocationLimit limit) =>
+        limit switch
         {
             CustomCommandInvocationLimit.Unlimited => "No use limit",
             CustomCommandInvocationLimit.OncePerStream => "Once each stream",
@@ -1442,22 +1288,18 @@ public partial class CustomCommandSettingsPage
             CustomCommandInvocationLimit.OncePerStreamPerUser => "Once per viewer each stream",
             _ => "Choose a use limit",
         };
-    }
 
-    private static string ActionKindLabel(CustomCommandActionKind action)
-    {
-        return action switch
+    private static string ActionKindLabel(CustomCommandActionKind action) =>
+        action switch
         {
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             CustomCommandActionKind.OverlayCue => "Play an overlay cue",
             _ => "Choose what happens",
         };
-    }
 
-    private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy)
-    {
-        return policy switch
+    private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy) =>
+        policy switch
         {
             OverlayCueQueuePolicy.Enqueue => "Wait for earlier cues",
             OverlayCueQueuePolicy.Replace => "Replace the current cue",
@@ -1465,44 +1307,36 @@ public partial class CustomCommandSettingsPage
             OverlayCueQueuePolicy.Concurrent => "Play at the same time",
             _ => "Choose a playback policy",
         };
-    }
 
-    private static string CueReplyOrderLabel(OverlayCueReplyOrder order)
-    {
-        return order switch
+    private static string CueReplyOrderLabel(OverlayCueReplyOrder order) =>
+        order switch
         {
             OverlayCueReplyOrder.Before => "Before requesting the cue",
             OverlayCueReplyOrder.After => "After the cue is accepted",
             _ => "Choose when to reply",
         };
-    }
 
-    private static string AnnouncementScheduleLabel(CustomAnnouncementScheduleKind schedule)
-    {
-        return schedule switch
+    private static string AnnouncementScheduleLabel(CustomAnnouncementScheduleKind schedule) =>
+        schedule switch
         {
             CustomAnnouncementScheduleKind.Interval => "On a timer",
             CustomAnnouncementScheduleKind.IntervalAfterChat => "On a timer, after chat activity",
             CustomAnnouncementScheduleKind.Weekly => "Once a week",
             _ => "Choose when to send",
         };
-    }
 
-    private static string AnnouncementDeliveryTypeLabel(CustomAnnouncementDeliveryType type)
-    {
-        return type switch
+    private static string AnnouncementDeliveryTypeLabel(CustomAnnouncementDeliveryType type) =>
+        type switch
         {
             CustomAnnouncementDeliveryType.ChatMessage => "Chat message",
             CustomAnnouncementDeliveryType.TwitchAnnouncement => "Twitch announcement",
             _ => "Choose delivery type",
         };
-    }
 
     private static string TwitchAnnouncementColorLabel(
         BlokeBot.Persistence.Models.TwitchAnnouncementColor color
-    )
-    {
-        return color switch
+    ) =>
+        color switch
         {
             BlokeBot.Persistence.Models.TwitchAnnouncementColor.Primary => "Channel color",
             BlokeBot.Persistence.Models.TwitchAnnouncementColor.Blue => "Blue",
@@ -1511,11 +1345,11 @@ public partial class CustomCommandSettingsPage
             BlokeBot.Persistence.Models.TwitchAnnouncementColor.Purple => "Purple",
             _ => "Choose color",
         };
-    }
 
-    private static string LatestDeliveryResultLabel(CustomAnnouncementLatestDeliveryResult result)
-    {
-        return result switch
+    private static string LatestDeliveryResultLabel(
+        CustomAnnouncementLatestDeliveryResult result
+    ) =>
+        result switch
         {
             CustomAnnouncementLatestDeliveryResult.None => "No delivery yet",
             CustomAnnouncementLatestDeliveryResult.Success => "Sent",
@@ -1528,11 +1362,11 @@ public partial class CustomCommandSettingsPage
                 "Delivery may have happened; not retried",
             _ => "Unknown delivery result",
         };
-    }
 
-    private static string TwitchAnnouncementCapabilityMessage(TwitchAnnouncementReadiness readiness)
-    {
-        return readiness.Availability switch
+    private static string TwitchAnnouncementCapabilityMessage(
+        TwitchAnnouncementReadiness readiness
+    ) =>
+        readiness.Availability switch
         {
             TwitchAnnouncementAvailability.Available =>
                 "Native Twitch announcements are ready for the active bot account.",
@@ -1544,32 +1378,22 @@ public partial class CustomCommandSettingsPage
                 "This native announcement is inactive while BlokeBot cannot verify the active bot's Twitch authority.",
             _ => "This native announcement is inactive.",
         };
-    }
 
-    private bool NativeDeliveryUnavailable(CustomAnnouncementEditor announcement)
-    {
-        return announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
-            && _config?.TwitchAnnouncementReadiness.Availability
-                != TwitchAnnouncementAvailability.Available;
-    }
+    private bool NativeDeliveryUnavailable(CustomAnnouncementEditor announcement) =>
+        announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+        && _config?.TwitchAnnouncementReadiness.Availability
+            != TwitchAnnouncementAvailability.Available;
 
-    private static string TimeZoneLabel(TimeZoneInfo timeZone)
-    {
-        return timeZone.DisplayName;
-    }
+    private static string TimeZoneLabel(TimeZoneInfo timeZone) => timeZone.DisplayName;
 
-    private static string AlertImportanceLabel(DurableAlertSeverity severity)
-    {
-        return severity switch
+    private static string AlertImportanceLabel(DurableAlertSeverity severity) =>
+        severity switch
         {
             DurableAlertSeverity.Critical => "Urgent",
             DurableAlertSeverity.Warning => "Warning",
             _ => "Information",
         };
-    }
 
-    private static string FormatLastSent(DateTime? value)
-    {
-        return value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");
-    }
+    private static string FormatLastSent(DateTime? value) =>
+        value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");
 }

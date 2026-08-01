@@ -18,8 +18,6 @@ public sealed record ToastRequest<TStrategy>
 
     public string Title { get; }
 
-    public static ToastRequest<TStrategy> WithTitle(string message, string title)
-    {
-        return new(message, title);
-    }
+    public static ToastRequest<TStrategy> WithTitle(string message, string title) =>
+        new(message, title);
 }

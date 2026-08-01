@@ -1149,15 +1149,10 @@ public sealed class OverlayBrowserSourceTests
             return document.RootElement.Clone();
         }
 
-        internal static string AccessKey(char seed)
-        {
-            return new string(seed, 43);
-        }
+        internal static string AccessKey(char seed) => new string(seed, 43);
 
-        private static string AccessKey(string seed)
-        {
-            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed)))[..43];
-        }
+        private static string AccessKey(string seed) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed)))[..43];
 
         public async ValueTask DisposeAsync()
         {
@@ -1217,15 +1212,9 @@ public sealed class OverlayBrowserSourceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        internal void Advance(TimeSpan duration)
-        {
-            _now += duration;
-        }
+        internal void Advance(TimeSpan duration) => _now += duration;
     }
 
     private sealed class PreviewAuthenticationSettings
@@ -1270,12 +1259,7 @@ public sealed class OverlayBrowserSourceTests
             AuthenticatedSession session,
             int requestedHostId,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<ModeratorAuthorityOutcome>(
-                new ModeratorAuthorityOutcome.Granted()
-            );
-        }
+        ) => Task.FromResult<ModeratorAuthorityOutcome>(new ModeratorAuthorityOutcome.Granted());
     }
 
     private sealed class PublicOverlayDnsResolver : IOverlayDnsResolver
@@ -1283,9 +1267,6 @@ public sealed class OverlayBrowserSourceTests
         public Task<IReadOnlyList<IPAddress>> ResolveAsync(
             string host,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
-        }
+        ) => Task.FromResult<IReadOnlyList<IPAddress>>([IPAddress.Parse("203.0.113.10")]);
     }
 }

@@ -19,20 +19,13 @@ public sealed class ReplyDeliveryMap
 
     public IReadOnlyCollection<string> WhisperKeys { get; }
 
-    public static ReplyDeliveryMap FromWhisperKeys(IEnumerable<string> whisperKeys)
-    {
-        return new(whisperKeys);
-    }
+    public static ReplyDeliveryMap FromWhisperKeys(IEnumerable<string> whisperKeys) =>
+        new(whisperKeys);
 
-    public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings)
-    {
-        return new(settings.Where(x => x.Target.IsWhisper()).Select(x => x.ReplyKey));
-    }
+    public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings) =>
+        new(settings.Where(x => x.Target.IsWhisper()).Select(x => x.ReplyKey));
 
-    public bool IsWhisper(string replyKey)
-    {
-        return _whisperKeys.Contains(replyKey);
-    }
+    public bool IsWhisper(string replyKey) => _whisperKeys.Contains(replyKey);
 
     public ReplyDeliveryMap Only(IEnumerable<string> allowedKeys)
     {
@@ -40,8 +33,6 @@ public sealed class ReplyDeliveryMap
         return new ReplyDeliveryMap(_whisperKeys.Where(allowed.Contains));
     }
 
-    public CommandResponseTarget TargetFor(string replyKey)
-    {
-        return IsWhisper(replyKey) ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat;
-    }
+    public CommandResponseTarget TargetFor(string replyKey) =>
+        IsWhisper(replyKey) ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat;
 }

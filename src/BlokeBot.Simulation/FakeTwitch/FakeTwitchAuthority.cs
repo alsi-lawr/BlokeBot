@@ -560,10 +560,8 @@ public sealed class FakeTwitchAuthority
         return $"{Definition.Name}-{kind}-{_nextId:D4}";
     }
 
-    private void Record(string kind, string detail)
-    {
+    private void Record(string kind, string detail) =>
         _transcript.Add(new(NextId("transcript"), kind, detail));
-    }
 
     private async Task DeliverInitialEventsAsync(FakeTwitchSession session, string type)
     {
@@ -673,9 +671,8 @@ public sealed class FakeTwitchAuthority
         );
     }
 
-    private static string Notification(string id, string type, object @event)
-    {
-        return JsonSerializer.Serialize(
+    private static string Notification(string id, string type, object @event) =>
+        JsonSerializer.Serialize(
             new
             {
                 metadata = new
@@ -688,7 +685,6 @@ public sealed class FakeTwitchAuthority
                 payload = new { subscription = new { type, version = "1" }, @event },
             }
         );
-    }
 
     private static string? ReadBearerToken(HttpRequest request)
     {
@@ -1347,17 +1343,14 @@ public static class FakeTwitchHostingExtensions
             : null;
     }
 
-    private static IResult Error(FakeTwitchProtocolException failure)
-    {
-        return Results.Json(
+    private static IResult Error(FakeTwitchProtocolException failure) =>
+        Results.Json(
             new { error = failure.Error, status = (int)failure.StatusCode },
             statusCode: (int)failure.StatusCode
         );
-    }
 
-    private static IResult Unsupported(HttpRequest request)
-    {
-        return Results.Json(
+    private static IResult Unsupported(HttpRequest request) =>
+        Results.Json(
             new
             {
                 error = "unsupported_route",
@@ -1366,7 +1359,6 @@ public static class FakeTwitchHostingExtensions
             },
             statusCode: StatusCodes.Status404NotFound
         );
-    }
 
     private sealed record SubscriptionRequest
     {

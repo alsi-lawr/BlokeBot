@@ -141,9 +141,8 @@ public sealed class NativeTwitchMigrationTests
         upgradedSchema.ShouldBe(freshSchema);
     }
 
-    private static Task<IReadOnlyList<string>> ReadSchemaAsync(DbConnection connection)
-    {
-        return ReadColumnAsync(
+    private static Task<IReadOnlyList<string>> ReadSchemaAsync(DbConnection connection) =>
+        ReadColumnAsync(
             connection,
             """
             SELECT type || '|' || name || '|' || tbl_name || '|' || COALESCE(sql, '')
@@ -153,7 +152,6 @@ public sealed class NativeTwitchMigrationTests
             ORDER BY type, name;
             """
         );
-    }
 
     private static async Task<IReadOnlyList<string>> ReadColumnAsync(
         DbConnection connection,

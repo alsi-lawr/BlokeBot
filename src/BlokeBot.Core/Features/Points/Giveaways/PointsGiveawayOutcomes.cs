@@ -30,10 +30,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return started(this);
-        }
+        ) => started(this);
     }
 
     public sealed record InvalidConfiguration(
@@ -49,10 +46,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return invalidConfiguration(this);
-        }
+        ) => invalidConfiguration(this);
     }
 
     public sealed record AlreadyActive(PointsSettings Settings) : PointsGiveawayStartOutcome
@@ -65,10 +59,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return alreadyActive(this);
-        }
+        ) => alreadyActive(this);
     }
 
     public sealed record Cooldown(PointsSettings Settings, TimeSpan TimeLeft)
@@ -82,10 +73,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return cooldown(this);
-        }
+        ) => cooldown(this);
     }
 
     public sealed record StreamOffline(PointsSettings Settings) : PointsGiveawayStartOutcome
@@ -98,10 +86,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return streamOffline(this);
-        }
+        ) => streamOffline(this);
     }
 
     public sealed record StreamLivenessUnavailable(
@@ -117,10 +102,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return streamLivenessUnavailable(this);
-        }
+        ) => streamLivenessUnavailable(this);
     }
 
     public sealed record FollowerEligibilityUnavailable(PointsSettings Settings)
@@ -134,10 +116,7 @@ public abstract record PointsGiveawayStartOutcome
             Func<StreamOffline, TResult> streamOffline,
             Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
-        )
-        {
-            return followerEligibilityUnavailable(this);
-        }
+        ) => followerEligibilityUnavailable(this);
     }
 }
 
@@ -161,10 +140,7 @@ public abstract record PointsGiveawayJoinOutcome
             Func<DuplicateJoin, TResult> duplicateJoin,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
             Func<NotEligible, TResult> notEligible
-        )
-        {
-            return joined(this);
-        }
+        ) => joined(this);
     }
 
     public sealed record NotActive(PointsSettings Settings, string User) : PointsGiveawayJoinOutcome
@@ -175,10 +151,7 @@ public abstract record PointsGiveawayJoinOutcome
             Func<DuplicateJoin, TResult> duplicateJoin,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
             Func<NotEligible, TResult> notEligible
-        )
-        {
-            return notActive(this);
-        }
+        ) => notActive(this);
     }
 
     public sealed record DuplicateJoin(PointsSettings Settings, string User)
@@ -190,10 +163,7 @@ public abstract record PointsGiveawayJoinOutcome
             Func<DuplicateJoin, TResult> duplicateJoin,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
             Func<NotEligible, TResult> notEligible
-        )
-        {
-            return duplicateJoin(this);
-        }
+        ) => duplicateJoin(this);
     }
 
     public sealed record FollowerEligibilityUnavailable(PointsSettings Settings, string User)
@@ -205,10 +175,7 @@ public abstract record PointsGiveawayJoinOutcome
             Func<DuplicateJoin, TResult> duplicateJoin,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
             Func<NotEligible, TResult> notEligible
-        )
-        {
-            return followerEligibilityUnavailable(this);
-        }
+        ) => followerEligibilityUnavailable(this);
     }
 
     public sealed record NotEligible(PointsSettings Settings, string User)
@@ -220,10 +187,7 @@ public abstract record PointsGiveawayJoinOutcome
             Func<DuplicateJoin, TResult> duplicateJoin,
             Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
             Func<NotEligible, TResult> notEligible
-        )
-        {
-            return notEligible(this);
-        }
+        ) => notEligible(this);
     }
 }
 
@@ -249,10 +213,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<NoEntrants, TResult> noEntrants,
             Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
-        )
-        {
-            return missing(this);
-        }
+        ) => missing(this);
     }
 
     public sealed record NotActive(PointsSettings Settings) : PointsGiveawayDrawOutcome
@@ -263,10 +224,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<NoEntrants, TResult> noEntrants,
             Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
-        )
-        {
-            return notActive(this);
-        }
+        ) => notActive(this);
     }
 
     public sealed record NoEntrants(PointsSettings Settings) : PointsGiveawayDrawOutcome
@@ -277,10 +235,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<NoEntrants, TResult> noEntrants,
             Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
-        )
-        {
-            return noEntrants(this);
-        }
+        ) => noEntrants(this);
     }
 
     public sealed record PayoutFailed(PointsSettings Settings, PointBalanceMutationFailure Failure)
@@ -292,10 +247,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<NoEntrants, TResult> noEntrants,
             Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
-        )
-        {
-            return payoutFailed(this);
-        }
+        ) => payoutFailed(this);
     }
 
     public sealed record Winners : PointsGiveawayDrawOutcome
@@ -323,10 +275,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<NoEntrants, TResult> noEntrants,
             Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
-        )
-        {
-            return winners(this);
-        }
+        ) => winners(this);
     }
 }
 
@@ -344,10 +293,7 @@ public abstract record PointsGiveawayCancelOutcome
         public override TResult Match<TResult>(
             Func<Cancelled, TResult> cancelled,
             Func<NotActive, TResult> notActive
-        )
-        {
-            return cancelled(this);
-        }
+        ) => cancelled(this);
     }
 
     public sealed record NotActive(PointsSettings Settings) : PointsGiveawayCancelOutcome
@@ -355,9 +301,6 @@ public abstract record PointsGiveawayCancelOutcome
         public override TResult Match<TResult>(
             Func<Cancelled, TResult> cancelled,
             Func<NotActive, TResult> notActive
-        )
-        {
-            return notActive(this);
-        }
+        ) => notActive(this);
     }
 }

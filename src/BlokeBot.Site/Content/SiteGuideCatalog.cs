@@ -61,12 +61,10 @@ internal static class SiteGuideCatalog
         ),
     ];
 
-    internal static SiteGuidePage Get(string route)
-    {
-        return _pages.TryGetValue(route, out var page)
+    internal static SiteGuidePage Get(string route) =>
+        _pages.TryGetValue(route, out var page)
             ? page
             : throw new InvalidOperationException($"No guide content is registered for '{route}'.");
-    }
 
     private static SiteLink GuideLink(string label, string href)
     {

@@ -20,14 +20,12 @@ public sealed class GuessingRoundService(
     PointsChangeNotifier pointsChanges
 )
 {
-    public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(int hostId, string name)
-    {
-        return IO<GuessingWinnerDeclarationOutcome, Never>.Create(async ct =>
+    public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(int hostId, string name) =>
+        IO<GuessingWinnerDeclarationOutcome, Never>.Create(async ct =>
             Result<GuessingWinnerDeclarationOutcome, Never>.Success(
                 await DeclareWinnerCoreAsync(hostId, name, ct)
             )
         );
-    }
 
     private async Task<GuessingWinnerDeclarationOutcome> DeclareWinnerCoreAsync(
         int hostId,
@@ -174,22 +172,21 @@ public sealed class GuessingRoundService(
 
         static Task<GuessingWinnerDeclarationOutcome> PayoutFailedAsync(
             PointBalanceMutationFailure failure
-        )
-        {
-            return Task.FromResult<GuessingWinnerDeclarationOutcome>(
+        ) =>
+            Task.FromResult<GuessingWinnerDeclarationOutcome>(
                 new GuessingWinnerDeclarationOutcome.PayoutFailed(failure)
             );
-        }
     }
 
-    public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(string hostLogin, string name)
-    {
-        return IO<GuessingWinnerDeclarationOutcome, Never>.Create(async ct =>
+    public IO<GuessingWinnerDeclarationOutcome, Never> DeclareWinner(
+        string hostLogin,
+        string name
+    ) =>
+        IO<GuessingWinnerDeclarationOutcome, Never>.Create(async ct =>
             Result<GuessingWinnerDeclarationOutcome, Never>.Success(
                 await DeclareWinnerByLoginAsync(hostLogin, name, ct)
             )
         );
-    }
 
     private async Task<GuessingWinnerDeclarationOutcome> DeclareWinnerByLoginAsync(
         string hostLogin,
@@ -207,14 +204,12 @@ public sealed class GuessingRoundService(
             : await DeclareWinnerCoreAsync(hostId.Value, name, ct);
     }
 
-    public IO<GuessingOperationOutcome, Never> StartRound(int hostId, int profileId)
-    {
-        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+    public IO<GuessingOperationOutcome, Never> StartRound(int hostId, int profileId) =>
+        IO<GuessingOperationOutcome, Never>.Create(async ct =>
             Result<GuessingOperationOutcome, Never>.Success(
                 await StartRoundCoreAsync(hostId, profileId, ct)
             )
         );
-    }
 
     private async Task<GuessingOperationOutcome> StartRoundCoreAsync(
         int hostId,
@@ -284,14 +279,12 @@ public sealed class GuessingRoundService(
         );
     }
 
-    public IO<GuessingOperationOutcome, Never> StartRound(string hostLogin, string? profileName)
-    {
-        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+    public IO<GuessingOperationOutcome, Never> StartRound(string hostLogin, string? profileName) =>
+        IO<GuessingOperationOutcome, Never>.Create(async ct =>
             Result<GuessingOperationOutcome, Never>.Success(
                 await StartRoundByLoginAsync(hostLogin, profileName, ct)
             )
         );
-    }
 
     private async Task<GuessingOperationOutcome> StartRoundByLoginAsync(
         string hostLogin,
@@ -321,12 +314,10 @@ public sealed class GuessingRoundService(
         return await StartRoundCoreAsync(hostId.Value, profileId.Value, ct);
     }
 
-    public IO<GuessingOperationOutcome, Never> StopGuessing(int hostId)
-    {
-        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+    public IO<GuessingOperationOutcome, Never> StopGuessing(int hostId) =>
+        IO<GuessingOperationOutcome, Never>.Create(async ct =>
             Result<GuessingOperationOutcome, Never>.Success(await StopGuessingCoreAsync(hostId, ct))
         );
-    }
 
     private async Task<GuessingOperationOutcome> StopGuessingCoreAsync(
         int hostId,
@@ -413,14 +404,12 @@ public sealed class GuessingRoundService(
         return new GuessingOperationOutcome.Succeeded(settings.GuessingStoppedReply);
     }
 
-    public IO<GuessingOperationOutcome, Never> StopGuessing(string hostLogin)
-    {
-        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+    public IO<GuessingOperationOutcome, Never> StopGuessing(string hostLogin) =>
+        IO<GuessingOperationOutcome, Never>.Create(async ct =>
             Result<GuessingOperationOutcome, Never>.Success(
                 await StopGuessingByLoginAsync(hostLogin, ct)
             )
         );
-    }
 
     private async Task<GuessingOperationOutcome> StopGuessingByLoginAsync(
         string hostLogin,
@@ -435,9 +424,8 @@ public sealed class GuessingRoundService(
         return hostId is null ? NotConfigured() : await StopGuessingCoreAsync(hostId.Value, ct);
     }
 
-    private static string Format(string template, string name, string login)
-    {
-        return MessageTemplateFormatter.Format(
+    private static string Format(string template, string name, string login) =>
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -445,11 +433,9 @@ public sealed class GuessingRoundService(
                 ["login"] = login,
             }
         );
-    }
 
-    private static string FormatRoundStarted(string template, string round, string options)
-    {
-        return MessageTemplateFormatter.Format(
+    private static string FormatRoundStarted(string template, string round, string options) =>
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -457,7 +443,6 @@ public sealed class GuessingRoundService(
                 ["options"] = options,
             }
         );
-    }
 
     private static string FormatOptions(IEnumerable<string> options)
     {
@@ -465,22 +450,15 @@ public sealed class GuessingRoundService(
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
 
-    private static GuessingOperationOutcome NotConfigured()
-    {
-        return new GuessingOperationOutcome.Rejected("This channel is not set up.");
-    }
+    private static GuessingOperationOutcome NotConfigured() =>
+        new GuessingOperationOutcome.Rejected("This channel is not set up.");
 
-    private static GuessingWinnerDeclarationOutcome Completed(GuessingOperationOutcome result)
-    {
-        return new GuessingWinnerDeclarationOutcome.Completed(result);
-    }
+    private static GuessingWinnerDeclarationOutcome Completed(GuessingOperationOutcome result) =>
+        new GuessingWinnerDeclarationOutcome.Completed(result);
 
     private static ValueTask<Option<int>> ResolveHostIdAsync(
         BlokeBotDbContext db,
         string hostLogin,
         CancellationToken ct
-    )
-    {
-        return BotHostQueries.FindHostId(db, hostLogin).RunAsync(ct);
-    }
+    ) => BotHostQueries.FindHostId(db, hostLogin).RunAsync(ct);
 }

@@ -13,9 +13,8 @@ public abstract record FollowerOnlyChatReadiness
         Func<WaitingUntil, TResult> waitingUntil,
         Func<NotFollowing, TResult> notFollowing,
         Func<UnableToVerify, TResult> unableToVerify
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             NotRequired value => notRequired(value),
             Exempt value => exempt(value),
@@ -25,7 +24,6 @@ public abstract record FollowerOnlyChatReadiness
             UnableToVerify value => unableToVerify(value),
             _ => throw new UnreachableException("Unknown follower-only chat readiness."),
         };
-    }
 
     public sealed record NotRequired : FollowerOnlyChatReadiness;
 

@@ -139,8 +139,7 @@ public sealed class ChatActivityHookTests
 
     private sealed class RecordingCommandModule(RuntimeHookRecorder recorder) : IChatCommandModule
     {
-        public void AddCommands(IChatCommandBuilder commands)
-        {
+        public void AddCommands(IChatCommandBuilder commands) =>
             commands.Map(
                 "ping",
                 async (context, _, cancellationToken) =>
@@ -149,7 +148,6 @@ public sealed class ChatActivityHookTests
                     await context.ReplyAsync("pong", cancellationToken);
                 }
             );
-        }
     }
 
     private sealed class RecordingChatMessageObserver(RuntimeHookRecorder recorder)
@@ -170,10 +168,7 @@ public sealed class ChatActivityHookTests
         public ValueTask MessageReceivedAsync(
             ChatMessage message,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromException(new InvalidOperationException("Observer failed."));
-        }
+        ) => ValueTask.FromException(new InvalidOperationException("Observer failed."));
     }
 
     private sealed class RecordingCommandResponseSender(RuntimeHookRecorder recorder)
@@ -200,15 +195,9 @@ public sealed class ChatActivityHookTests
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return Scope.Instance;
-        }
+            where TState : notnull => Scope.Instance;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

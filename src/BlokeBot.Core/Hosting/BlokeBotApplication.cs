@@ -165,12 +165,10 @@ public static class BlokeBotApplication
     public static async Task InitializeBlokeBotPersistenceAsync(
         this WebApplication app,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         await app
             .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
             .InitializeAsync(cancellationToken);
-    }
 
     public static WebApplication UseBlokeBotCore(
         this WebApplication app,
@@ -254,8 +252,7 @@ public static class BlokeBotApplication
         AuthorizationOptions options,
         string name,
         AuthSessionCapability capability
-    )
-    {
+    ) =>
         options.AddPolicy(
             name,
             policy =>
@@ -263,5 +260,4 @@ public static class BlokeBotApplication
                     .RequireAuthenticatedUser()
                     .AddRequirements(new AuthSessionCapabilityRequirement(capability))
         );
-    }
 }

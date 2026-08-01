@@ -190,10 +190,7 @@ public sealed class UiFaultRoutingTests
 
         protected override Task<Result<string, TestExpectedFailure>> LoadBackgroundValueAsync(
             CancellationToken ct
-        )
-        {
-            return Loader(ct);
-        }
+        ) => Loader(ct);
     }
 
     public sealed record TestExpectedFailure(string Message);

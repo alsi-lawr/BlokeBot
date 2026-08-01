@@ -277,20 +277,17 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         );
     }
 
-    private static EfPublicChatOutbox Outbox(SqliteBlokeBotDbFactory database)
-    {
-        return new(
+    private static EfPublicChatOutbox Outbox(SqliteBlokeBotDbFactory database) =>
+        new(
             database,
             StandardRetryPolicy,
             StandardLifetimePolicy,
             StandardRetentionPolicy,
             TestEventBus.Create<AppEventKind>()
         );
-    }
 
-    private static PublicChatDeliveryOutcome RateLimitedPreparationOutcome()
-    {
-        return PublicChatDeliveryClassifier.MapPreparationFailure(
+    private static PublicChatDeliveryOutcome RateLimitedPreparationOutcome() =>
+        PublicChatDeliveryClassifier.MapPreparationFailure(
             PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                 new HttpRequestException(
                     "rate limited",
@@ -300,7 +297,6 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 CancellationToken.None
             )
         );
-    }
 
     private static async Task AssertRateLimitedOutcomeAsync(SqliteBlokeBotDbFactory database)
     {
@@ -328,8 +324,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         EfPublicChatOutbox outbox,
         DateTimeOffset now,
         PublicChatDeliveryDeadline deadline
-    )
-    {
+    ) =>
         (
             await outbox.EnqueueAsync(
                 new PublicChatOutboxBatch
@@ -350,7 +345,6 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 CancellationToken.None
             )
         ).ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>();
-    }
 
     private static async Task SeedTwoHostsAndOutcomesAsync(SqliteBlokeBotDbFactory database)
     {
@@ -415,9 +409,8 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         await db.SaveChangesAsync();
     }
 
-    private static AutomaticRaidShoutoutOutcome Outcome(int hostId, string providerMessageId)
-    {
-        return new()
+    private static AutomaticRaidShoutoutOutcome Outcome(int hostId, string providerMessageId) =>
+        new()
         {
             Id = hostId,
             HostId = hostId,
@@ -432,5 +425,4 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             ClaimedAtUtc = DateTime.UtcNow,
             CompletedAtUtc = DateTime.UtcNow,
         };
-    }
 }

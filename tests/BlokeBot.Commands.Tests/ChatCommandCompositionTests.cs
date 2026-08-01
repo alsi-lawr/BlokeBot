@@ -41,17 +41,13 @@ public sealed class ChatCommandCompositionTests
         exception.Message.ShouldContain("registered explicitly");
     }
 
-    private static ChatCommandRegistration Registration(Action<IChatCommandBuilder> configure)
-    {
-        return new() { Configure = configure };
-    }
+    private static ChatCommandRegistration Registration(Action<IChatCommandBuilder> configure) =>
+        new() { Configure = configure };
 
     private sealed class CompositionModule : IChatCommandModule
     {
-        public void AddCommands(IChatCommandBuilder commands)
-        {
+        public void AddCommands(IChatCommandBuilder commands) =>
             commands.Map("module", (_, _, _) => ValueTask.CompletedTask);
-        }
     }
 
     private sealed class AllowFilter : IChatCommandFilter;

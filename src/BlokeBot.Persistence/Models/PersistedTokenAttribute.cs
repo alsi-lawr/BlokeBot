@@ -22,12 +22,10 @@ public static class PersistedEnumTokens<TEnum>
     public static IReadOnlyList<string> Values { get; } =
         Enum.GetValues<TEnum>().Select(Format).Order(StringComparer.OrdinalIgnoreCase).ToArray();
 
-    public static string Format(TEnum value)
-    {
-        return _tokensByValue.TryGetValue(value, out var token)
+    public static string Format(TEnum value) =>
+        _tokensByValue.TryGetValue(value, out var token)
             ? token
             : throw new ArgumentOutOfRangeException(nameof(value), value, null);
-    }
 
     public static TEnum Parse(string token)
     {
@@ -37,9 +35,8 @@ public static class PersistedEnumTokens<TEnum>
             : throw new FormatException($"Unknown persisted {typeof(TEnum).Name} token '{token}'.");
     }
 
-    private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue()
-    {
-        return Enum.GetValues<TEnum>()
+    private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue() =>
+        Enum.GetValues<TEnum>()
             .ToDictionary(
                 value => value,
                 value =>
@@ -51,7 +48,6 @@ public static class PersistedEnumTokens<TEnum>
                         $"{typeof(TEnum).Name}.{value} must declare {nameof(PersistedTokenAttribute)}."
                     )
             );
-    }
 
     private static IReadOnlyDictionary<string, TEnum> BuildValuesByToken()
     {

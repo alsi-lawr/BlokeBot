@@ -129,44 +129,36 @@ public sealed class BoundedDiscriminatorPersistenceTests
     }
 
     [Test]
-    public async Task InvalidReplyFeature_Persisted_Querying_ThrowsDataIntegrityFailure()
-    {
+    public async Task InvalidReplyFeature_Persisted_Querying_ThrowsDataIntegrityFailure() =>
         await AssertCorruptionFailureAsync(
             "UPDATE reply_delivery_settings SET Feature = 'invalid-feature'",
             typeof(ReplyFeature),
             async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
         );
-    }
 
     [Test]
-    public async Task InvalidReplyTarget_Persisted_Querying_ThrowsDataIntegrityFailure()
-    {
+    public async Task InvalidReplyTarget_Persisted_Querying_ThrowsDataIntegrityFailure() =>
         await AssertCorruptionFailureAsync(
             "UPDATE reply_delivery_settings SET Target = 'invalid-target'",
             typeof(ReplyDeliveryTarget),
             async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
         );
-    }
 
     [Test]
-    public async Task InvalidGuessOptionTarget_Persisted_Querying_ThrowsDataIntegrityFailure()
-    {
+    public async Task InvalidGuessOptionTarget_Persisted_Querying_ThrowsDataIntegrityFailure() =>
         await AssertCorruptionFailureAsync(
             "UPDATE guess_options SET ReplyTarget = 'invalid-target'",
             typeof(ReplyDeliveryTarget),
             async db => _ = await db.GuessOptions.AsNoTracking().SingleAsync()
         );
-    }
 
     [Test]
-    public async Task InvalidPointLedgerKind_Persisted_Querying_ThrowsDataIntegrityFailure()
-    {
+    public async Task InvalidPointLedgerKind_Persisted_Querying_ThrowsDataIntegrityFailure() =>
         await AssertCorruptionFailureAsync(
             "UPDATE point_ledger_entries SET Kind = 'invalid-kind'",
             typeof(PointLedgerKind),
             async db => _ = await db.PointLedgerEntries.AsNoTracking().SingleAsync()
         );
-    }
 
     private static async Task AssertCorruptionFailureAsync(
         string corruptionSql,
@@ -221,35 +213,30 @@ public sealed class BoundedDiscriminatorPersistenceTests
         }
     }
 
-    private static BotHost Host()
-    {
-        return new()
+    private static BotHost Host() =>
+        new()
         {
             Login = $"host-{Guid.NewGuid():N}",
             DisplayName = "Host",
             CreatedAtUtc = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc),
         };
-    }
 
-    private static GuessRoundProfile Profile(int hostId)
-    {
-        return new()
+    private static GuessRoundProfile Profile(int hostId) =>
+        new()
         {
             HostId = hostId,
             Name = "Default",
             Slug = "default",
             IsDefault = true,
         };
-    }
 
     private static ReplyDeliverySetting ReplySetting(
         int hostId,
         ReplyFeature feature,
         string replyKey,
         ReplyDeliveryTarget target
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             Feature = feature,
@@ -257,27 +244,26 @@ public sealed class BoundedDiscriminatorPersistenceTests
             ReplyKey = replyKey,
             Target = target,
         };
-    }
 
-    private static GuessOption GuessOption(int profileId, string name, ReplyDeliveryTarget target)
-    {
-        return new()
+    private static GuessOption GuessOption(
+        int profileId,
+        string name,
+        ReplyDeliveryTarget target
+    ) =>
+        new()
         {
             GuessRoundProfileId = profileId,
             Name = name,
             ReplyText = name,
             ReplyTarget = target,
         };
-    }
 
-    private static PointLedgerEntry LedgerEntry(int hostId, PointLedgerKind kind)
-    {
-        return new()
+    private static PointLedgerEntry LedgerEntry(int hostId, PointLedgerKind kind) =>
+        new()
         {
             HostId = hostId,
             CreatedAtUtc = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc),
             Kind = kind,
             Login = "viewer",
         };
-    }
 }

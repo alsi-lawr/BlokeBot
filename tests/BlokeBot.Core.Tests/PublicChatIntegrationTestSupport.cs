@@ -31,9 +31,8 @@ internal static class PublicChatIntegrationTestSupport
         IEnumerable<IPublicChatQueueAlertObserver>? observers = null,
         IEnumerable<IPublicChatTerminalRejectionObserver>? rejectionObservers = null,
         ILogger<PublicChatMessageQueue>? logger = null
-    )
-    {
-        return new(
+    ) =>
+        new(
             BotSettings.FromOptions(options ?? new BotOptions()),
             timeProvider,
             new PublicChatQueueBacklogMonitor(),
@@ -57,7 +56,6 @@ internal static class PublicChatIntegrationTestSupport
                 >(BotObserverBoundaries.PublicChatTerminalRejections)
             )
         );
-    }
 
     public static async Task StopAsync(CancellationTokenSource stopping, Task worker)
     {
@@ -65,47 +63,39 @@ internal static class PublicChatIntegrationTestSupport
         await worker;
     }
 
-    public static DateTimeOffset Utc(int hour, int minute, int second)
-    {
-        return new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
-    }
+    public static DateTimeOffset Utc(int hour, int minute, int second) =>
+        new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
 
-    public static PublicChatEnqueueCommand Command(string channel, string message)
-    {
-        return new()
+    public static PublicChatEnqueueCommand Command(string channel, string message) =>
+        new()
         {
             Channel = channel,
             Message = message,
             Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
         };
-    }
 
-    public static PublicChatPreparedSend Prepared(PublicChatClaimedMessage message)
-    {
-        return new()
+    public static PublicChatPreparedSend Prepared(PublicChatClaimedMessage message) =>
+        new()
         {
             Message = message,
             AppAccessToken = "app-token",
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
-    }
 
     public static PublicChatRetryPolicy CreateRetryPolicy(
         int attemptLimit,
         TimeSpan delay,
         TimeSpan maximumDelay,
         DelayBackoffType delayBackoffType
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             AttemptLimit = attemptLimit,
             Delay = delay,
             MaximumDelay = maximumDelay,
             DelayBackoffType = delayBackoffType,
         };
-    }
 }
 
 internal sealed class RecordingPublicChatLogger<TCategory> : ILogger<TCategory>
@@ -113,15 +103,9 @@ internal sealed class RecordingPublicChatLogger<TCategory> : ILogger<TCategory>
     public List<PublicChatLogEntry> Entries { get; } = [];
 
     public IDisposable? BeginScope<TState>(TState state)
-        where TState : notnull
-    {
-        return null;
-    }
+        where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel)
-    {
-        return true;
-    }
+    public bool IsEnabled(LogLevel logLevel) => true;
 
     public void Log<TState>(
         LogLevel logLevel,
@@ -184,10 +168,7 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
         );
     }
 
-    public ValueTask<PublicChatClaimedMessage> ReadAsync()
-    {
-        return _deliveries.Reader.ReadAsync();
-    }
+    public ValueTask<PublicChatClaimedMessage> ReadAsync() => _deliveries.Reader.ReadAsync();
 }
 
 internal sealed class ScriptedPublicChatTransport(
@@ -238,10 +219,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
     public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.EnqueueAsync(batch, cancellationToken);
-    }
+    ) => inner.EnqueueAsync(batch, cancellationToken);
 
     public async ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
         DateTimeOffset now,
@@ -271,10 +249,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         DateTimeOffset sendStartedAt,
         DateTimeOffset claimExpiresAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.BeginSendAsync(message, sendStartedAt, claimExpiresAt, cancellationToken);
-    }
+    ) => inner.BeginSendAsync(message, sendStartedAt, claimExpiresAt, cancellationToken);
 
     public async ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
         PublicChatClaimedMessage message,
@@ -318,47 +293,31 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         PublicChatFailureDiagnostic.Send diagnostic,
         DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.RecordPostBoundaryInterruptionAsync(
+    ) =>
+        inner.RecordPostBoundaryInterruptionAsync(
             message,
             diagnostic,
             interruptedAt,
             cancellationToken
         );
-    }
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
         DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
-    }
+    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.LoadOutstandingAsync(now, cancellationToken);
-    }
+    ) => inner.LoadOutstandingAsync(now, cancellationToken);
 
-    public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync()
-    {
-        return _deliveries.Reader.ReadAsync();
-    }
+    public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync() =>
+        _deliveries.Reader.ReadAsync();
 
-    public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync()
-    {
-        return _outcomes.Reader.ReadAsync();
-    }
+    public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync() => _outcomes.Reader.ReadAsync();
 
-    public ValueTask<PublicChatClaimOutcome> ReadClaimOutcomeAsync()
-    {
-        return _claims.Reader.ReadAsync();
-    }
+    public ValueTask<PublicChatClaimOutcome> ReadClaimOutcomeAsync() => _claims.Reader.ReadAsync();
 
     private void NotifyDelivery(PublicChatClaimedMessage message)
     {
@@ -380,10 +339,7 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
     public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.EnqueueAsync(batch, cancellationToken);
-    }
+    ) => inner.EnqueueAsync(batch, cancellationToken);
 
     public ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
         DateTimeOffset now,
@@ -391,16 +347,14 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         TimeSpan sendInterval,
         TimeSpan duplicateCooldown,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.TryClaimNextAsync(
+    ) =>
+        inner.TryClaimNextAsync(
             now,
             claimExpiresAt,
             sendInterval,
             duplicateCooldown,
             cancellationToken
         );
-    }
 
     public async ValueTask<PublicChatClaimUpdate> BeginSendAsync(
         PublicChatClaimedMessage message,
@@ -428,47 +382,34 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         PublicChatDeliveryOutcome outcome,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.RecordDeliveryOutcomeAsync(message, outcome, recordedAt, cancellationToken);
-    }
+    ) => inner.RecordDeliveryOutcomeAsync(message, outcome, recordedAt, cancellationToken);
 
     public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Send diagnostic,
         DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.RecordPostBoundaryInterruptionAsync(
+    ) =>
+        inner.RecordPostBoundaryInterruptionAsync(
             message,
             diagnostic,
             interruptedAt,
             cancellationToken
         );
-    }
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
         DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
-    }
+    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken
-    )
-    {
-        return inner.LoadOutstandingAsync(now, cancellationToken);
-    }
+    ) => inner.LoadOutstandingAsync(now, cancellationToken);
 
-    public ValueTask<PublicChatClaimedMessage> ReadBeginAttemptAsync()
-    {
-        return _beginAttempts.Reader.ReadAsync();
-    }
+    public ValueTask<PublicChatClaimedMessage> ReadBeginAttemptAsync() =>
+        _beginAttempts.Reader.ReadAsync();
 }
 
 internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimeProvider
@@ -490,10 +431,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
         }
     }
 
-    public override long GetTimestamp()
-    {
-        return GetUtcNow().UtcTicks;
-    }
+    public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
     public override ITimer CreateTimer(
         TimerCallback callback,

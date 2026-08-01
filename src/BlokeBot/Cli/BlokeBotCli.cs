@@ -135,9 +135,8 @@ internal sealed class BlokeBotServeCommand(IBlokeBotCommandRuntime runtime, IAns
         CommandContext context,
         BlokeBotServeSettings settings,
         CancellationToken cancellationToken
-    )
-    {
-        return runtime.ServeAsync(
+    ) =>
+        runtime.ServeAsync(
             new BlokeBotServeOptions(
                 settings.Host,
                 settings.Port,
@@ -147,7 +146,6 @@ internal sealed class BlokeBotServeCommand(IBlokeBotCommandRuntime runtime, IAns
             console,
             cancellationToken
         );
-    }
 }
 
 internal interface IBlokeBotCommandRuntime
@@ -165,10 +163,7 @@ internal sealed class BlokeBotCommandRuntime : IBlokeBotCommandRuntime
         BlokeBotServeOptions options,
         IAnsiConsole console,
         CancellationToken cancellationToken
-    )
-    {
-        return BlokeBotHost.RunAsync(options, console, cancellationToken);
-    }
+    ) => BlokeBotHost.RunAsync(options, console, cancellationToken);
 }
 
 internal sealed record BlokeBotServeOptions(
@@ -182,39 +177,24 @@ internal sealed class BlokeBotTypeRegistrar : ITypeRegistrar
 {
     private readonly IServiceCollection _services = new ServiceCollection();
 
-    public ITypeResolver Build()
-    {
-        return new BlokeBotTypeResolver(_services.BuildServiceProvider());
-    }
+    public ITypeResolver Build() => new BlokeBotTypeResolver(_services.BuildServiceProvider());
 
-    public void Register(Type service, Type implementation)
-    {
+    public void Register(Type service, Type implementation) =>
         _services.AddSingleton(service, implementation);
-    }
 
-    public void RegisterInstance(Type service, object implementation)
-    {
+    public void RegisterInstance(Type service, object implementation) =>
         _services.AddSingleton(service, implementation);
-    }
 
-    public void RegisterLazy(Type service, Func<object> factory)
-    {
+    public void RegisterLazy(Type service, Func<object> factory) =>
         _services.AddSingleton(service, _ => factory());
-    }
 
     internal void RegisterInstance<TService>(TService implementation)
-        where TService : class
-    {
-        RegisterInstance(typeof(TService), implementation);
-    }
+        where TService : class => RegisterInstance(typeof(TService), implementation);
 }
 
 internal sealed class BlokeBotTypeResolver(IServiceProvider services) : ITypeResolver, IDisposable
 {
-    public object? Resolve(Type? type)
-    {
-        return type is null ? null : services.GetService(type);
-    }
+    public object? Resolve(Type? type) => type is null ? null : services.GetService(type);
 
     public void Dispose()
     {

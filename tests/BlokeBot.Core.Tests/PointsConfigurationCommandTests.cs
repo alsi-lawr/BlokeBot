@@ -395,9 +395,8 @@ public sealed class PointsConfigurationCommandTests
         }
     }
 
-    private static PointsConfigurationSaveCommand ValidCommand(PointsConfiguration draft)
-    {
-        return PointsConfigurationValidator
+    private static PointsConfigurationSaveCommand ValidCommand(PointsConfiguration draft) =>
+        PointsConfigurationValidator
             .Validate(draft)
             .Match(
                 command => command,
@@ -406,12 +405,9 @@ public sealed class PointsConfigurationCommandTests
                         string.Join(" ", errors.Select(error => error.Message))
                     )
             );
-    }
 
-    private static PointsConfigurationService CreateService(SqliteBlokeBotDbFactory dbFactory)
-    {
-        return new(dbFactory, new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()));
-    }
+    private static PointsConfigurationService CreateService(SqliteBlokeBotDbFactory dbFactory) =>
+        new(dbFactory, new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()));
 
     private static async Task<int> SeedHostWithAliasAsync(
         SqliteBlokeBotDbFactory dbFactory,

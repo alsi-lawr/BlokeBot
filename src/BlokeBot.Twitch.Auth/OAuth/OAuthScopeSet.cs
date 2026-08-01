@@ -7,10 +7,7 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
 {
     private readonly ImmutableArray<string> _scopes;
 
-    private OAuthScopeSet(ImmutableArray<string> scopes)
-    {
-        _scopes = scopes;
-    }
+    private OAuthScopeSet(ImmutableArray<string> scopes) => _scopes = scopes;
 
     public static OAuthScopeSet Empty { get; } = new([]);
 
@@ -51,20 +48,12 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
             : new OAuthScopeSet(ImmutableArray.CreateRange(normalized));
     }
 
-    public string Serialize()
-    {
-        return string.Join(' ', _scopes);
-    }
+    public string Serialize() => string.Join(' ', _scopes);
 
-    public bool Equals(OAuthScopeSet? other)
-    {
-        return other is not null && _scopes.SequenceEqual(other._scopes);
-    }
+    public bool Equals(OAuthScopeSet? other) =>
+        other is not null && _scopes.SequenceEqual(other._scopes);
 
-    public override bool Equals(object? obj)
-    {
-        return obj is OAuthScopeSet other && Equals(other);
-    }
+    public override bool Equals(object? obj) => obj is OAuthScopeSet other && Equals(other);
 
     public override int GetHashCode()
     {
@@ -77,24 +66,14 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
         return hash.ToHashCode();
     }
 
-    public IEnumerator<string> GetEnumerator()
-    {
-        return ((IEnumerable<string>)_scopes).GetEnumerator();
-    }
+    public IEnumerator<string> GetEnumerator() => ((IEnumerable<string>)_scopes).GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    internal static bool IsValid(string scope)
-    {
-        return scope.Length > 0
-            && scope[0] != ':'
-            && scope[^1] != ':'
-            && !scope.Contains("::", StringComparison.Ordinal)
-            && scope.All(character =>
-                char.IsAsciiLetterOrDigit(character) || character is ':' or '_'
-            );
-    }
+    internal static bool IsValid(string scope) =>
+        scope.Length > 0
+        && scope[0] != ':'
+        && scope[^1] != ':'
+        && !scope.Contains("::", StringComparison.Ordinal)
+        && scope.All(character => char.IsAsciiLetterOrDigit(character) || character is ':' or '_');
 }

@@ -124,14 +124,12 @@ public sealed class ModeratorAuthorityService(
         }
     }
 
-    private static BotHostChoice? SelectedHost(AuthenticatedSession session)
-    {
-        return session.State.Match<BotHostChoice?>(
+    private static BotHostChoice? SelectedHost(AuthenticatedSession session) =>
+        session.State.Match<BotHostChoice?>(
             _ => null,
             selected => selected.Selection.Current,
             _ => null
         );
-    }
 
     private sealed record AuthorityCacheKey(string UserId, int HostId);
 

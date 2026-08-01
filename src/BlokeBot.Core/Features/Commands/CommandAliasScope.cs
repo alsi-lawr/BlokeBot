@@ -14,10 +14,7 @@ public abstract record CommandAliasScope
         public override TResult Match<TResult>(
             Func<Global, TResult> global,
             Func<Profile, TResult> profile
-        )
-        {
-            return global(this);
-        }
+        ) => global(this);
     }
 
     public sealed record Profile : CommandAliasScope
@@ -33,9 +30,6 @@ public abstract record CommandAliasScope
         public override TResult Match<TResult>(
             Func<Global, TResult> global,
             Func<Profile, TResult> profile
-        )
-        {
-            return profile(this);
-        }
+        ) => profile(this);
     }
 }

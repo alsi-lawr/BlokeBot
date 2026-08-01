@@ -93,9 +93,8 @@ public sealed class IndependentChatToolsMigrationTests
         (await ReadDefaultAsync(downgraded.Database.GetDbConnection())).ShouldBe("31");
     }
 
-    private static BotHost Host(string login, HostFeatureFlags features)
-    {
-        return new()
+    private static BotHost Host(string login, HostFeatureFlags features) =>
+        new()
         {
             TwitchUserId = $"{login}-id",
             Login = login,
@@ -103,7 +102,6 @@ public sealed class IndependentChatToolsMigrationTests
             EnabledFeatures = features,
             CreatedAtUtc = DateTime.UtcNow,
         };
-    }
 
     private static async Task<string> ReadDefaultAsync(DbConnection connection)
     {

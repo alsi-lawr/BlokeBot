@@ -8,10 +8,8 @@ internal static class BlokeBotServerUrlPolicy
     internal const int DefaultPort = 8080;
     internal const string DefaultUrl = "http://127.0.0.1:8080";
 
-    internal static string ExplicitUrl(string? host, int? port)
-    {
-        return $"http://{host ?? DefaultHost}:{port ?? DefaultPort}";
-    }
+    internal static string ExplicitUrl(string? host, int? port) =>
+        $"http://{host ?? DefaultHost}:{port ?? DefaultPort}";
 
     internal static string LocalUrl(IServerAddressesFeature? addresses)
     {

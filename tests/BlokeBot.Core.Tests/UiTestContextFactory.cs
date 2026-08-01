@@ -24,10 +24,7 @@ internal static class UiTestContextFactory
         SqliteBlokeBotDbFactory dbFactory,
         int hostId,
         string hostLogin = "streamer"
-    )
-    {
-        return CreateWithAuthorization(dbFactory, hostId, hostLogin).Context;
-    }
+    ) => CreateWithAuthorization(dbFactory, hostId, hostLogin).Context;
 
     public static UiTestContext CreateWithAuthorization(
         SqliteBlokeBotDbFactory dbFactory,
@@ -81,10 +78,7 @@ internal static class UiTestContextFactory
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class UnavailableTwitchAnnouncementReadinessProvider
@@ -93,11 +87,9 @@ internal static class UiTestContextFactory
         public Task<TwitchAnnouncementReadiness> GetReadinessAsync(
             string channelLogin,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(
+        ) =>
+            Task.FromResult(
                 new TwitchAnnouncementReadiness(TwitchAnnouncementAvailability.Unavailable, "bot")
             );
-        }
     }
 }

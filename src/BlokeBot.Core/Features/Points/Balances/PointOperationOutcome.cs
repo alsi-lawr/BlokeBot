@@ -15,10 +15,7 @@ public abstract record PointOperationOutcome
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Failed, TResult> failed
-        )
-        {
-            return succeeded(this);
-        }
+        ) => succeeded(this);
     }
 
     public sealed record Failed(string Message, CommandResponseTarget Target)
@@ -27,9 +24,6 @@ public abstract record PointOperationOutcome
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Failed, TResult> failed
-        )
-        {
-            return failed(this);
-        }
+        ) => failed(this);
     }
 }

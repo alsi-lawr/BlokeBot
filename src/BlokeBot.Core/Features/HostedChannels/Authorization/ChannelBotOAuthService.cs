@@ -73,18 +73,12 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
         return OAuthAuthorizationScopeSet.Create(scopes);
     }
 
-    private string AuthorizationClientId()
-    {
-        return configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
-    }
+    private string AuthorizationClientId() =>
+        configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
 
-    private string TokenExchangeClientId()
-    {
-        return configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
-    }
+    private string TokenExchangeClientId() =>
+        configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
 
-    private string TokenExchangeClientSecret()
-    {
-        return configuration.GetSection("TwitchBot:Identity")["ClientSecret"] ?? string.Empty;
-    }
+    private string TokenExchangeClientSecret() =>
+        configuration.GetSection("TwitchBot:Identity")["ClientSecret"] ?? string.Empty;
 }

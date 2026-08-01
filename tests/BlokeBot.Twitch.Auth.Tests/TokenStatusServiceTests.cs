@@ -276,102 +276,85 @@ public sealed class TokenStatusServiceTests
         IAccessTokenProvider provider,
         OAuthTransport transport,
         ILogger<TokenStatusService>? logger = null
-    )
-    {
-        return new(provider, transport, logger ?? new RecordingLogger<TokenStatusService>());
-    }
+    ) => new(provider, transport, logger ?? new RecordingLogger<TokenStatusService>());
 
     private static OAuthTransport Transport(
         string? validationJson,
         Exception? exception = null,
         HttpStatusCode rejectionStatus = HttpStatusCode.Unauthorized
-    )
-    {
-        return new(
+    ) =>
+        new(
             new StatusHttpClientFactory(validationJson, exception, rejectionStatus),
             TwitchEndpointPolicy.Default
         );
-    }
 
     private static TokenStatus Success(
         BlokeBot.Functional.Result<TokenStatus, TokenStatusError> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             status => status,
             error =>
                 throw new InvalidOperationException(
                     $"Expected token status success, received {error.GetType().Name}."
                 )
         );
-    }
 
     private static TokenStatusError Error(
         BlokeBot.Functional.Result<TokenStatus, TokenStatusError> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             status =>
                 throw new InvalidOperationException(
                     $"Expected token status error, received {status.GetType().Name}."
                 ),
             error => error
         );
-    }
 
     private sealed class RecordingTokenProvider(string accessToken) : IAccessTokenProvider
     {
         public int CallCount { get; private set; }
 
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(_ =>
             {
                 CallCount++;
                 return ValueTask.FromResult(
                     Result<string, AccessTokenUnavailableReason>.Success(accessToken)
                 );
             });
-        }
     }
 
     private sealed class ThrowingTokenProvider(Exception exception) : IAccessTokenProvider
     {
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromException<Result<string, AccessTokenUnavailableReason>>(exception)
             );
-        }
     }
 
     private sealed class CancellingTokenProvider(CancellationTokenSource cancellation)
         : IAccessTokenProvider
     {
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellation.Cancel();
                 return ValueTask.FromCanceled<Result<string, AccessTokenUnavailableReason>>(
                     cancellationToken
                 );
             });
-        }
     }
 
     private sealed class UnavailableTokenProvider : IAccessTokenProvider
     {
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<string, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.MissingRefreshToken
                     )
                 )
             );
-        }
     }
 
     private sealed class StatusHttpClientFactory(
@@ -380,13 +363,8 @@ public sealed class TokenStatusServiceTests
         HttpStatusCode rejectionStatus
     ) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(
-                new Handler(validationJson, exception, rejectionStatus),
-                disposeHandler: false
-            );
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(validationJson, exception, rejectionStatus), disposeHandler: false);
 
         private sealed class Handler(
             string? validationJson,
@@ -426,10 +404,8 @@ public sealed class TokenStatusServiceTests
     private sealed class CancellingValidationHttpClientFactory(CancellationTokenSource cancellation)
         : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(cancellation), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(cancellation), disposeHandler: false);
 
         private sealed class Handler(CancellationTokenSource cancellation) : HttpMessageHandler
         {
@@ -449,15 +425,9 @@ public sealed class TokenStatusServiceTests
         public List<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

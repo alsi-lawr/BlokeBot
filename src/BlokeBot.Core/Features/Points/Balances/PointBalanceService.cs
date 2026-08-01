@@ -90,12 +90,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         PointAmount amount,
         string actorLogin,
         string note
-    )
-    {
-        return PointMutationIO.Create(ct =>
-            AddAsync(hostId, targetLogin, amount, actorLogin, note, ct)
-        );
-    }
+    ) => PointMutationIO.Create(ct => AddAsync(hostId, targetLogin, amount, actorLogin, note, ct));
 
     private async ValueTask<PointMutationResult> AddAsync(
         int hostId,
@@ -148,12 +143,10 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         PointAmount amount,
         string actorLogin,
         string note
-    )
-    {
-        return PointMutationIO.Create(ct =>
+    ) =>
+        PointMutationIO.Create(ct =>
             RemoveAsync(hostId, targetLogin, amount, actorLogin, note, ct)
         );
-    }
 
     private async ValueTask<PointMutationResult> RemoveAsync(
         int hostId,
@@ -205,12 +198,8 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         string targetLogin,
         string actorLogin,
         string note
-    )
-    {
-        return PointMutationIO.Create(ct =>
-            DeleteBalanceAsync(hostId, targetLogin, actorLogin, note, ct)
-        );
-    }
+    ) =>
+        PointMutationIO.Create(ct => DeleteBalanceAsync(hostId, targetLogin, actorLogin, note, ct));
 
     private async ValueTask<PointMutationResult> DeleteBalanceAsync(
         int hostId,
@@ -258,10 +247,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         string fromLogin,
         string toLogin,
         PointAmount amount
-    )
-    {
-        return PointMutationIO.Create(ct => TransferAsync(hostId, fromLogin, toLogin, amount, ct));
-    }
+    ) => PointMutationIO.Create(ct => TransferAsync(hostId, fromLogin, toLogin, amount, ct));
 
     private async ValueTask<PointMutationResult> TransferAsync(
         int hostId,
@@ -344,10 +330,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         string login,
         PointAmount stake,
         PointGambleOutcome outcome
-    )
-    {
-        return PointMutationIO.Create(ct => ApplyGambleAsync(hostId, login, stake, outcome, ct));
-    }
+    ) => PointMutationIO.Create(ct => ApplyGambleAsync(hostId, login, stake, outcome, ct));
 
     private async ValueTask<PointMutationResult> ApplyGambleAsync(
         int hostId,
@@ -427,12 +410,10 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         string login,
         PointAmount amount,
         DateTime now
-    )
-    {
-        return PointMutationIO.Create(ct =>
+    ) =>
+        PointMutationIO.Create(ct =>
             AwardGiveawayAsync(db, hostId, giveawayId, login, amount, now, ct)
         );
-    }
 
     private async ValueTask<PointMutationResult> AwardGiveawayAsync(
         BlokeBotDbContext db,
@@ -477,12 +458,10 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         string login,
         PointAmount amount,
         DateTime now
-    )
-    {
-        return PointMutationIO.Create(ct =>
+    ) =>
+        PointMutationIO.Create(ct =>
             AwardGuessWinAsync(db, hostId, roundId, login, amount, now, ct)
         );
-    }
 
     private async ValueTask<PointMutationResult> AwardGuessWinAsync(
         BlokeBotDbContext db,
@@ -525,15 +504,11 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         return Success(next, amount);
     }
 
-    private static PointMutationResult Success(PointAmount balance, PointAmount amount)
-    {
-        return PointMutationResult.Success(new PointBalanceMutation(balance, amount));
-    }
+    private static PointMutationResult Success(PointAmount balance, PointAmount amount) =>
+        PointMutationResult.Success(new PointBalanceMutation(balance, amount));
 
-    private static PointMutationResult Failure(PointBalanceMutationFailure failure)
-    {
-        return PointMutationResult.Error(failure);
-    }
+    private static PointMutationResult Failure(PointBalanceMutationFailure failure) =>
+        PointMutationResult.Error(failure);
 
     private sealed record GambleMutation(
         PointAmount Balance,
@@ -553,8 +528,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         int? giveawayId,
         string note,
         DateTime now
-    )
-    {
+    ) =>
         db.PointLedgerEntries.Add(
             new PointLedgerEntry
             {
@@ -572,7 +546,6 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
                 Note = note,
             }
         );
-    }
 
     private static async Task<PointBalance> LoadBalanceForUpdateAsync(
         BlokeBotDbContext db,

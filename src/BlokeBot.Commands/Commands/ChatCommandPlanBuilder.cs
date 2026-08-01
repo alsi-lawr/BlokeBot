@@ -45,10 +45,8 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
         return this;
     }
 
-    public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler)
-    {
-        return Map(route.Value, handler);
-    }
+    public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler) =>
+        Map(route.Value, handler);
 
     public IChatCommandBuilder MapDynamic(DynamicChatCommandHandler handler)
     {
@@ -80,9 +78,8 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
         return this;
     }
 
-    public ChatCommandPlan Build()
-    {
-        return new()
+    public ChatCommandPlan Build() =>
+        new()
         {
             Routes = new ReadOnlyDictionary<string, ChatCommandHandler>(
                 _routes.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
@@ -91,5 +88,4 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
             Filters = Array.AsReadOnly<IChatCommandFilter>([.. _filters]),
             FallbackHandler = _fallbackHandler,
         };
-    }
 }

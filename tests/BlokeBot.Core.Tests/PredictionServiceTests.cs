@@ -269,10 +269,7 @@ public sealed class PredictionServiceTests
             .ShouldBe(expectedHistory);
     }
 
-    private static PredictionTemplateDraft ValidTemplate()
-    {
-        return new("Question", ["Yes", "No"], 60);
-    }
+    private static PredictionTemplateDraft ValidTemplate() => new("Question", ["Yes", "No"], 60);
 
     private static async Task SetNativeAsync(
         IDbContextFactory<BlokeBotDbContext> database,
@@ -348,9 +345,8 @@ public sealed class PredictionServiceTests
         return host;
     }
 
-    private static EventSubPredictionEvent Event(string status)
-    {
-        return new(
+    private static EventSubPredictionEvent Event(string status) =>
+        new(
             "first-id",
             "first",
             "prediction-id",
@@ -363,7 +359,6 @@ public sealed class PredictionServiceTests
             status is "resolved" ? "yes" : null,
             Guid.NewGuid().ToString("N")
         );
-    }
 
     private sealed class ReadyBroadcaster : IHostBroadcasterTokenStatusProvider
     {
@@ -371,9 +366,8 @@ public sealed class PredictionServiceTests
             int hostId,
             IEnumerable<string?> scopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "token",
                     new TokenValidation(
@@ -385,23 +379,16 @@ public sealed class PredictionServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public BlokeBot.Functional.IO<
             BotAccount,
             AccessTokenUnavailableReason
-        > GetBroadcasterAccount(string channelLogin)
-        {
-            throw new NotSupportedException();
-        }
+        > GetBroadcasterAccount(string channelLogin) => throw new NotSupportedException();
     }
 
     private sealed class SingleHandlerFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(handler, false);
-        }
+        public HttpClient CreateClient(string name) => new(handler, false);
     }
 
     private sealed class PredictionHandler : HttpMessageHandler
@@ -440,13 +427,11 @@ public sealed class PredictionServiceTests
             return Json(Prediction("ACTIVE"));
         }
 
-        private static HttpResponseMessage Json(string value)
-        {
-            return new(HttpStatusCode.OK)
+        private static HttpResponseMessage Json(string value) =>
+            new(HttpStatusCode.OK)
             {
                 Content = new StringContent(value, Encoding.UTF8, "application/json"),
             };
-        }
 
         private static string Prediction(string status)
         {

@@ -409,10 +409,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         }
 
         private static TService Uninitialized<TService>()
-            where TService : class
-        {
-            return (TService)RuntimeHelpers.GetUninitializedObject(typeof(TService));
-        }
+            where TService : class =>
+            (TService)RuntimeHelpers.GetUninitializedObject(typeof(TService));
 
         private sealed record ConfiguredEndpointServices(
             SqliteBlokeBotDbFactory DbFactory,
@@ -427,19 +425,13 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 new TokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1))
             );
 
-        public Uri CreateAuthorizationUri()
-        {
-            return authorizationUri;
-        }
+        public Uri CreateAuthorizationUri() => authorizationUri;
 
         public Task<OAuthFlowCompletionOutcome> CompleteAuthorizationAsync(
             string code,
             string state,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(CompletionOutcome);
-        }
+        ) => Task.FromResult(CompletionOutcome);
     }
 
     private protected sealed class EndpointOAuthHttpClientFactory(
@@ -451,10 +443,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
     {
         private readonly Handler _handler = new(userId, login, scopes, validationFailureStatus);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(
             string userId,
@@ -466,9 +455,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(
+            ) =>
+                Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
                         "/oauth2/token" => JsonResponse(
@@ -508,15 +496,12 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                         _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                     }
                 );
-            }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 

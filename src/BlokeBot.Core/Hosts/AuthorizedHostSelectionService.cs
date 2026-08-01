@@ -51,9 +51,8 @@ internal sealed class AuthorizedHostSelectionService(
     private static IO<Option<BotHostChoice>, Never> LoadSelfHostChoice(
         BlokeBotDbContext db,
         string userLogin
-    )
-    {
-        return IO<Option<BotHostChoice>, Never>.Create(async ct =>
+    ) =>
+        IO<Option<BotHostChoice>, Never>.Create(async ct =>
         {
             var selfHost = await db
                 .Hosts.AsNoTracking()
@@ -72,7 +71,6 @@ internal sealed class AuthorizedHostSelectionService(
                 )
             );
         });
-    }
 
     private async Task<IReadOnlyList<BotHostChoice>> LoadModeratedHostChoicesAsync(
         BlokeBotDbContext db,
@@ -119,12 +117,10 @@ internal sealed class AuthorizedHostSelectionService(
         return choices;
     }
 
-    private static BotHostChoice[] Sort(IEnumerable<BotHostChoice> choices)
-    {
-        return choices
+    private static BotHostChoice[] Sort(IEnumerable<BotHostChoice> choices) =>
+        choices
             .DistinctBy(host => host.Id)
             .OrderByDescending(host => host.Role == AuthRole.Streamer)
             .ThenBy(host => host.DisplayName)
             .ToArray();
-    }
 }

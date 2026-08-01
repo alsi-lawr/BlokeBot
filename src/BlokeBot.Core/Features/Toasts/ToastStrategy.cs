@@ -13,10 +13,7 @@ public interface IToastStrategy
 
 public readonly record struct ToastDismissal
 {
-    private ToastDismissal(TimeSpan? autoDismissAfter)
-    {
-        AutoDismissAfter = autoDismissAfter;
-    }
+    private ToastDismissal(TimeSpan? autoDismissAfter) => AutoDismissAfter = autoDismissAfter;
 
     internal TimeSpan? AutoDismissAfter { get; }
 

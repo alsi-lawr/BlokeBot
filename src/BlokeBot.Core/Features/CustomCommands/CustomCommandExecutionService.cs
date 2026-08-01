@@ -255,27 +255,21 @@ public sealed class CustomCommandExecutionService(
         );
     }
 
-    private static bool AdmissionAccepted(OverlayCueAdmissionOutcome admission)
-    {
-        return admission
+    private static bool AdmissionAccepted(OverlayCueAdmissionOutcome admission) =>
+        admission
             is OverlayCueAdmissionOutcome.Running
                 or OverlayCueAdmissionOutcome.Queued
                 or OverlayCueAdmissionOutcome.Disconnected;
-    }
 
     private static OverlayCueReferenceRequest ReferenceRequest(
         int hostId,
         OverlayCueCustomCommandAction action
-    )
-    {
-        return new(hostId, action.TargetOverlayPublicId, action.CuePublicId);
-    }
+    ) => new(hostId, action.TargetOverlayPublicId, action.CuePublicId);
 
     private static OverlayCueAdmissionOutcome AdmissionOutcome(
         OverlayCueReferenceOutcome references
-    )
-    {
-        return references switch
+    ) =>
+        references switch
         {
             OverlayCueReferenceOutcome.Disabled { Part: OverlayCueReferencePart.Parent } =>
                 new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled(),
@@ -285,7 +279,6 @@ public sealed class CustomCommandExecutionService(
                 "An available cue reference does not map to a failed admission."
             ),
         };
-    }
 
     private async Task<StreamIdentity> StreamIdAsync(
         CustomCommandInvocationLimit limit,
@@ -392,15 +385,11 @@ public sealed class CustomCommandExecutionService(
         return action.Counter.Value;
     }
 
-    private static bool HasCustomCommands(HostFeatureFlags features)
-    {
-        return (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
-    }
+    private static bool HasCustomCommands(HostFeatureFlags features) =>
+        (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
 
-    private static bool HasOverlays(HostFeatureFlags features)
-    {
-        return (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays;
-    }
+    private static bool HasOverlays(HostFeatureFlags features) =>
+        (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays;
 
     private abstract record StreamIdentity
     {

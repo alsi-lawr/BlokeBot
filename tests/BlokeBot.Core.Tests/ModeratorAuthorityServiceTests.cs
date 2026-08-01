@@ -329,18 +329,14 @@ public sealed class ModeratorAuthorityServiceTests
         return new MutationComponent(Task.FromResult(new AuthenticationState(principal)), services);
     }
 
-    private static HttpResponseMessage AllowedResponse()
-    {
-        return JsonResponse("""{"data":[{"broadcaster_login":"streamer"}],"pagination":{}}""");
-    }
+    private static HttpResponseMessage AllowedResponse() =>
+        JsonResponse("""{"data":[{"broadcaster_login":"streamer"}],"pagination":{}}""");
 
-    private static HttpResponseMessage JsonResponse(string json)
-    {
-        return new HttpResponseMessage(HttpStatusCode.OK)
+    private static HttpResponseMessage JsonResponse(string json) =>
+        new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
-    }
 
     private sealed class Fixture : IAsyncDisposable
     {
@@ -411,10 +407,7 @@ public sealed class ModeratorAuthorityServiceTests
             return new Fixture(database, time, tokens, helix, service, moderatorAccess, hostId);
         }
 
-        public ValueTask DisposeAsync()
-        {
-            return Database.DisposeAsync();
-        }
+        public ValueTask DisposeAsync() => Database.DisposeAsync();
     }
 
     private sealed class FakeAppAccessTokenSource : IHostBotAppAccessTokenSource
@@ -439,15 +432,9 @@ public sealed class ModeratorAuthorityServiceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        public void Advance(TimeSpan elapsed)
-        {
-            _now = _now.Add(elapsed);
-        }
+        public void Advance(TimeSpan elapsed) => _now = _now.Add(elapsed);
     }
 
     private sealed class ScriptedHttpClientFactory : IHttpClientFactory
@@ -456,15 +443,10 @@ public sealed class ModeratorAuthorityServiceTests
 
         public int RequestCount { get; private set; }
 
-        public void Respond(Func<HttpRequestMessage, HttpResponseMessage> response)
-        {
+        public void Respond(Func<HttpRequestMessage, HttpResponseMessage> response) =>
             _responses.Enqueue(response);
-        }
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this));
-        }
+        public HttpClient CreateClient(string name) => new(new Handler(this));
 
         private sealed class Handler(ScriptedHttpClientFactory owner) : HttpMessageHandler
         {
@@ -491,24 +473,18 @@ public sealed class ModeratorAuthorityServiceTests
             Services = services;
         }
 
-        public Task MutateAsync(int hostId, Func<Task> mutation)
-        {
-            return RunSelectedHostMutationAsync(hostId, mutation);
-        }
+        public Task MutateAsync(int hostId, Func<Task> mutation) =>
+            RunSelectedHostMutationAsync(hostId, mutation);
     }
 
     private sealed class RecordingNavigationManager : NavigationManager
     {
-        public RecordingNavigationManager()
-        {
+        public RecordingNavigationManager() =>
             Initialize("https://blokebot.test/", "https://blokebot.test/host");
-        }
 
         public string? LastUri { get; private set; }
 
-        protected override void NavigateToCore(string uri, NavigationOptions options)
-        {
+        protected override void NavigateToCore(string uri, NavigationOptions options) =>
             LastUri = ToAbsoluteUri(uri).ToString();
-        }
     }
 }

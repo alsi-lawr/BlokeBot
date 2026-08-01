@@ -70,10 +70,8 @@ public abstract record TokenStatus
         ImmutableArray<string> Missing
     ) : TokenStatus
     {
-        public override string ToString()
-        {
-            return $"TwitchTokenStatus.{nameof(MissingScopes)} {{ RequiredScopeCount = {RequiredScopes.Length}, GrantedScopeCount = {GrantedScopes.Length}, MissingScopeCount = {Missing.Length} }}";
-        }
+        public override string ToString() =>
+            $"TwitchTokenStatus.{nameof(MissingScopes)} {{ RequiredScopeCount = {RequiredScopes.Length}, GrantedScopeCount = {GrantedScopes.Length}, MissingScopeCount = {Missing.Length} }}";
     }
 
     public sealed record Ready(
@@ -83,10 +81,8 @@ public abstract record TokenStatus
         ImmutableArray<string> GrantedScopes
     ) : TokenStatus
     {
-        public override string ToString()
-        {
-            return $"TwitchTokenStatus.{nameof(Ready)} {{ RequiredScopeCount = {RequiredScopes.Length}, GrantedScopeCount = {GrantedScopes.Length} }}";
-        }
+        public override string ToString() =>
+            $"TwitchTokenStatus.{nameof(Ready)} {{ RequiredScopeCount = {RequiredScopes.Length}, GrantedScopeCount = {GrantedScopes.Length} }}";
     }
 
     public TResult Match<TResult>(

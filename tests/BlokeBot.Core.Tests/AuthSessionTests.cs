@@ -122,10 +122,8 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void LegacyPipeHostPayload_Decoding_ReturnsNull()
-    {
+    public void LegacyPipeHostPayload_Decoding_ReturnsNull() =>
         BotHostClaimCodec.Decode("42|streamer|Streamer|streamer|").ShouldBeNull();
-    }
 
     [Test]
     public void CreateAllowedUserWithModeratorSelection_CheckingHostConfigAccess_ReturnsTrue()

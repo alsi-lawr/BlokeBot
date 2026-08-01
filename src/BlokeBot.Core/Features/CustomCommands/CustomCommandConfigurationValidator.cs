@@ -234,14 +234,12 @@ public static class CustomCommandConfigurationValidator
     private static IReadOnlyList<CustomCounterValue> SnapshotCounters(
         IReadOnlyList<CustomCounterEditor> editors,
         IReadOnlyList<string> names
-    )
-    {
-        return editors
+    ) =>
+        editors
             .Select(
                 (editor, index) => new CustomCounterValue(editor.Id, names[index], editor.Value)
             )
             .ToArray();
-    }
 
     private static IReadOnlyList<CustomCommandValue> SnapshotCommands(
         IReadOnlyList<CustomCommandEditor> editors,
@@ -497,16 +495,14 @@ public static class CustomCommandConfigurationValidator
         );
     }
 
-    private static CustomCommandValidationFieldKind ReplyField(int argumentCount)
-    {
-        return argumentCount switch
+    private static CustomCommandValidationFieldKind ReplyField(int argumentCount) =>
+        argumentCount switch
         {
             0 => CustomCommandValidationFieldKind.ZeroArgumentReply,
             1 => CustomCommandValidationFieldKind.OneArgumentReply,
             2 => CustomCommandValidationFieldKind.TwoArgumentReply,
             _ => throw new ArgumentOutOfRangeException(nameof(argumentCount), argumentCount, null),
         };
-    }
 
     private static IReadOnlyList<CustomAnnouncementValue> SnapshotAnnouncements(
         IReadOnlyList<CustomAnnouncementEditor> editors,
@@ -829,83 +825,68 @@ public static class CustomCommandConfigurationValidator
         }
     }
 
-    private static int ClampVariantIndex(int index, int variantCount)
-    {
-        return variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
-    }
+    private static int ClampVariantIndex(int index, int variantCount) =>
+        variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
 
     private static CustomCommandConfigurationValidationTarget ReplyTarget(
         int replyId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.MessageLibrary,
             CustomCommandValidationEntityKind.Reply,
             replyId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget CounterTarget(
         int counterId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Counter,
             counterId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget CommandTarget(
         int commandId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Command,
             commandId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
         int announcementId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.ScheduledMessage,
             announcementId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget ConfigurationTarget(
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Configuration,
             0,
             field
         );
-    }
 
     private static void AddError(
         ICollection<CustomCommandConfigurationValidationError> errors,
         string message,
         CustomCommandConfigurationValidationTarget target
-    )
-    {
-        errors.Add(new(message, target));
-    }
+    ) => errors.Add(new(message, target));
 }
 
 public sealed record CustomCommandConfigurationValidationError(

@@ -167,9 +167,8 @@ public sealed class ViewerCommandCatalogTests
         int hostId,
         string alias,
         CustomCommandAction action
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             Name = alias,
@@ -179,7 +178,6 @@ public sealed class ViewerCommandCatalogTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
     [Test]
     public async Task ClosedRoundAndOffline_LoadingCatalog_UsesChannelWideAvailabilityOnly()
@@ -559,26 +557,22 @@ public sealed class ViewerCommandCatalogTests
         return new(host.Id);
     }
 
-    private static CommandAlias AppAlias(int hostId, AppCommandKind kind, string alias)
-    {
-        return AppAlias(hostId, null, kind, alias);
-    }
+    private static CommandAlias AppAlias(int hostId, AppCommandKind kind, string alias) =>
+        AppAlias(hostId, null, kind, alias);
 
     private static CommandAlias AppAlias(
         int hostId,
         int? profileId,
         AppCommandKind kind,
         string alias
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             GuessRoundProfileId = profileId,
             Kind = kind,
             Alias = alias,
         };
-    }
 
     private static AuthenticatedSession Session(int hostId, AuthRole role)
     {
@@ -595,12 +589,10 @@ public sealed class ViewerCommandCatalogTests
     private sealed class StaticLivenessProvider(HostStreamLivenessOutcome outcome)
         : IHostStreamLivenessProvider
     {
-        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
-        {
-            return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
                 ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
             );
-        }
     }
 
     private sealed class RecordingCueAdmissions : IOverlayCueAdmissionService
@@ -622,20 +614,12 @@ public sealed class ViewerCommandCatalogTests
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
             int hostId,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(new OverlayCueAdmissionCatalog([], []));
-        }
+        ) => Task.FromResult(new OverlayCueAdmissionCatalog([], []));
 
         public Task<OverlayCueAdmissionOutcome> AdmitAsync(
             OverlayCueAdmissionRequest request,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<OverlayCueAdmissionOutcome>(
-                new OverlayCueAdmissionOutcome.Missing()
-            );
-        }
+        ) => Task.FromResult<OverlayCueAdmissionOutcome>(new OverlayCueAdmissionOutcome.Missing());
     }
 
     private sealed record CatalogFixture(int HostId);

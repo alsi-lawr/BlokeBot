@@ -18,23 +18,13 @@ public interface IOverlayStateProvider
         ResolvedOverlayInstance instance,
         GuessingOverlaySampleState sample,
         CancellationToken cancellationToken
-    )
-    {
-        return Task.FromResult<OverlaySnapshotProjection>(
-            new OverlaySnapshotProjection.Unavailable()
-        );
-    }
+    ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
 
     Task<OverlaySnapshotProjection> ProjectSampleAsync(
         ResolvedOverlayInstance instance,
         GiveawayOverlaySampleState sample,
         CancellationToken cancellationToken
-    )
-    {
-        return Task.FromResult<OverlaySnapshotProjection>(
-            new OverlaySnapshotProjection.Unavailable()
-        );
-    }
+    ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
 }
 
 public enum GuessingOverlaySampleState
@@ -526,9 +516,8 @@ internal sealed class OverlayStateProvider(
         return Giveaway(instance, state);
     }
 
-    private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance)
-    {
-        return new OverlaySnapshotProjection.EmptyV1(
+    private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance) =>
+        new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
             {
                 ServerEpoch = serverEpoch.Value,
@@ -536,15 +525,13 @@ internal sealed class OverlayStateProvider(
                 GeneratedAtUtc = timeProvider.GetUtcNow(),
             }
         );
-    }
 
     private OverlaySnapshotProjection Guessing(
         ResolvedOverlayInstance instance,
         OverlayConfiguration.GuessingV1 configuration,
         GuessingV1OverlayPresentationState state
-    )
-    {
-        return new OverlaySnapshotProjection.GuessingV1(
+    ) =>
+        new OverlaySnapshotProjection.GuessingV1(
             new GuessingV1OverlaySnapshot
             {
                 ServerEpoch = serverEpoch.Value,
@@ -554,7 +541,6 @@ internal sealed class OverlayStateProvider(
                 State = state,
             }
         );
-    }
 
     private async Task<bool> RequiredFeaturesEnabledAsync(
         int hostId,
@@ -672,9 +658,8 @@ internal sealed class OverlayStateProvider(
     private OverlaySnapshotProjection Giveaway(
         ResolvedOverlayInstance instance,
         GiveawayV1OverlayPresentationState state
-    )
-    {
-        return new OverlaySnapshotProjection.GiveawayV1(
+    ) =>
+        new OverlaySnapshotProjection.GiveawayV1(
             new GiveawayV1OverlaySnapshot
             {
                 ServerEpoch = serverEpoch.Value,
@@ -683,7 +668,6 @@ internal sealed class OverlayStateProvider(
                 State = state,
             }
         );
-    }
 
     private static GuessingV1OverlayPresentationState ToPresentation(
         GuessingRoundProjectionRow row,
@@ -742,10 +726,8 @@ internal sealed class OverlayStateProvider(
         };
     }
 
-    private static DateTimeOffset Utc(DateTime value)
-    {
-        return new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc));
-    }
+    private static DateTimeOffset Utc(DateTime value) =>
+        new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 
     private sealed record GuessingRoundProjectionRow(
         GuessRoundStatus Status,

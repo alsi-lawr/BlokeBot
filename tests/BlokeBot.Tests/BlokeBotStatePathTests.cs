@@ -142,11 +142,9 @@ public sealed class BlokeBotStatePathTests
     private static BlokeBotStatePaths Resolve(
         BlokeBotOperatingSystem operatingSystem,
         BlokeBotPlatformEnvironment environment
-    )
-    {
-        return BlokeBotStatePathResolver
+    ) =>
+        BlokeBotStatePathResolver
             .Resolve(new(operatingSystem, environment, null, null, null))
             .ShouldBeOfType<BlokeBotStatePathResolution.Resolved>()
             .Paths;
-    }
 }

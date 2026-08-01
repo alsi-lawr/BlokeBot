@@ -25,10 +25,8 @@ internal sealed class HostBroadcasterOAuthStateStore(TimeProvider timeProvider)
             && (hostId = pending.HostId) > 0;
     }
 
-    internal static bool IsState(string? state)
-    {
-        return state?.StartsWith(_prefix, StringComparison.Ordinal) == true;
-    }
+    internal static bool IsState(string? state) =>
+        state?.StartsWith(_prefix, StringComparison.Ordinal) == true;
 
     private sealed record Pending(string UserId, int HostId, DateTimeOffset ExpiresAtUtc);
 }

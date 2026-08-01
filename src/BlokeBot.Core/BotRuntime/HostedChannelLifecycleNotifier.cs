@@ -29,8 +29,6 @@ internal sealed class HostedChannelLifecycleNotifier(
         }
     }
 
-    public async Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken)
-    {
+    public async Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken) =>
         await lifecycle.MarkStoppedAsync(channel, cancellationToken);
-    }
 }

@@ -40,15 +40,13 @@ public sealed class ChatPinClient(
         string moderatorId,
         string messageId,
         CancellationToken cancellationToken
-    )
-    {
-        return MutateAsync(
+    ) =>
+        MutateAsync(
             HttpMethod.Delete,
             Uri(broadcasterId, moderatorId, messageId, null),
             context,
             cancellationToken
         );
-    }
 
     public async Task<ChatPinnedMessageResult> GetAsync(
         HelixRequestContext context,
@@ -134,19 +132,17 @@ public sealed class ChatPinClient(
         string moderatorId,
         string? messageId,
         int? durationSeconds
-    )
-    {
-        return $"{endpointPolicy.HelixEndpoint("chat/pins").AbsoluteUri}?"
-            + QueryString.Create(
-                new Dictionary<string, string?>
-                {
-                    ["broadcaster_id"] = broadcasterId,
-                    ["moderator_id"] = moderatorId,
-                    ["message_id"] = messageId,
-                    ["duration_seconds"] = durationSeconds?.ToString(),
-                }
-            );
-    }
+    ) =>
+        $"{endpointPolicy.HelixEndpoint("chat/pins").AbsoluteUri}?"
+        + QueryString.Create(
+            new Dictionary<string, string?>
+            {
+                ["broadcaster_id"] = broadcasterId,
+                ["moderator_id"] = moderatorId,
+                ["message_id"] = messageId,
+                ["duration_seconds"] = durationSeconds?.ToString(),
+            }
+        );
 
     private sealed record PinnedMessageResponse
     {

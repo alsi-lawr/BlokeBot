@@ -126,19 +126,17 @@ public sealed class CustomCommandInvocationResetTests
     private sealed class StaticViewerResolver(CustomCommandViewer viewer)
         : ICustomCommandViewerResolver
     {
-        public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct)
-        {
-            return Task.FromResult<CustomCommandViewerResolution>(
+        public Task<CustomCommandViewerResolution> ResolveAsync(
+            string login,
+            CancellationToken ct
+        ) =>
+            Task.FromResult<CustomCommandViewerResolution>(
                 new CustomCommandViewerResolution.Found(viewer)
             );
-        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

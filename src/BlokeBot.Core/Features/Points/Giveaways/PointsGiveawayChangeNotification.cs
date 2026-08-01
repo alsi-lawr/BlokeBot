@@ -31,10 +31,8 @@ public sealed class PointsGiveawayChangeNotifier(
 internal sealed class PointsGiveawayChangeNotification(PointsGiveawayChangeNotifier changes)
     : IPointsGiveawayChangeNotification
 {
-    public async ValueTask NotifyAsync(int hostId, CancellationToken cancellationToken)
-    {
+    public async ValueTask NotifyAsync(int hostId, CancellationToken cancellationToken) =>
         await changes.NotifyChangedAsync(hostId, cancellationToken);
-    }
 }
 
 internal readonly record struct PointsGiveawayChangeNotificationCompleted;

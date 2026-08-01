@@ -10,18 +10,14 @@ internal static class BlokeBotHostLogging
     internal const string ConsoleOutputTemplate =
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}";
 
-    internal static string DefaultLogPath(string stateDirectory)
-    {
-        return Path.Combine(stateDirectory, "logs", "blokebot-.json");
-    }
+    internal static string DefaultLogPath(string stateDirectory) =>
+        Path.Combine(stateDirectory, "logs", "blokebot-.json");
 
-    internal static void ConfigureBootstrap()
-    {
+    internal static void ConfigureBootstrap() =>
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
             .CreateBootstrapLogger();
-    }
 
     internal static void ConfigureProduction(
         LoggerConfiguration loggerConfiguration,
@@ -51,15 +47,10 @@ internal static class BlokeBotHostLogging
             );
     }
 
-    internal static void HostFailure(Exception exception)
-    {
-        HostFailure(Log.Logger, exception);
-    }
+    internal static void HostFailure(Exception exception) => HostFailure(Log.Logger, exception);
 
-    internal static void HostFailure(Serilog.ILogger logger, Exception exception)
-    {
+    internal static void HostFailure(Serilog.ILogger logger, Exception exception) =>
         logger
             .ForContext("ErrorType", exception.GetType().FullName)
             .Error("BlokeBot host terminated unexpectedly");
-    }
 }

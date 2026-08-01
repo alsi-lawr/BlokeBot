@@ -10,16 +10,14 @@ public abstract record FollowerCheckOutcome
         Func<Eligible, TResult> eligible,
         Func<NotEligible, TResult> notEligible,
         Func<Unavailable, TResult> unavailable
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Eligible value => eligible(value),
             NotEligible value => notEligible(value),
             Unavailable value => unavailable(value),
             _ => throw new UnreachableException("Unknown follower check outcome."),
         };
-    }
 
     public sealed record Eligible : FollowerCheckOutcome;
 

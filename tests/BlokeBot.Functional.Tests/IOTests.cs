@@ -87,10 +87,7 @@ public sealed class IOTests
     public async Task UnexpectedException_Executing_PreservesInstanceAndStack()
     {
         var expected = new UnexpectedException();
-        ValueTask<int> ThrowUnexpected(CancellationToken _)
-        {
-            throw expected;
-        }
+        ValueTask<int> ThrowUnexpected(CancellationToken _) => throw expected;
 
         var io = IO<int, TestError>.FromException<ExpectedException>(
             ThrowUnexpected,

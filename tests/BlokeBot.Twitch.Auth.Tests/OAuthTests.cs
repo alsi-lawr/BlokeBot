@@ -541,38 +541,31 @@ public sealed class OAuthTests
         IAccessTokenCache cache,
         ITokenStore store,
         IOAuthClient oauth
-    )
-    {
-        return new(
+    ) =>
+        new(
             IdentityWithPath("tokens.json"),
             cache,
             store,
             oauth,
             new FixedTimeProvider(_currentTime)
         );
-    }
 
-    private static string Success(Result<string, AccessTokenUnavailableReason> result)
-    {
-        return result.Match(
+    private static string Success(Result<string, AccessTokenUnavailableReason> result) =>
+        result.Match(
             value => value,
             error => throw new InvalidOperationException($"Expected a token, received {error}.")
         );
-    }
 
     private static AccessTokenUnavailableReason Error(
         Result<string, AccessTokenUnavailableReason> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             _ => throw new InvalidOperationException("Expected token unavailability."),
             error => error
         );
-    }
 
-    private static BotIdentity IdentityWithPath(string path)
-    {
-        return BotIdentity.FromOptions(
+    private static BotIdentity IdentityWithPath(string path) =>
+        BotIdentity.FromOptions(
             new BotIdentityOptions
             {
                 BotUsername = "bot",
@@ -582,13 +575,9 @@ public sealed class OAuthTests
                 TokenCachePath = path,
             }
         );
-    }
 
     private sealed class FixedTimeProvider(DateTimeOffset currentTime) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return currentTime;
-        }
+        public override DateTimeOffset GetUtcNow() => currentTime;
     }
 }

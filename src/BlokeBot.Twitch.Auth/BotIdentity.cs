@@ -79,8 +79,6 @@ public sealed record BotIdentity
     }
 
     /// <inheritdoc />
-    public override string ToString()
-    {
-        return $"TwitchBotIdentity {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Count} }}";
-    }
+    public override string ToString() =>
+        $"TwitchBotIdentity {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Count} }}";
 }

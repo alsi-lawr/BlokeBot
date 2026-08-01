@@ -483,28 +483,23 @@ internal sealed class PointsGiveawayScheduler(
         await Task.Delay(delay, timeProvider, ct);
     }
 
-    private Task DelayForRecoveryAsync(CancellationToken ct)
-    {
-        return Task.Delay(_retryDelay, timeProvider, ct);
-    }
+    private Task DelayForRecoveryAsync(CancellationToken ct) =>
+        Task.Delay(_retryDelay, timeProvider, ct);
 
-    private void ReportRehydrationRetryScheduled(int attempt, Exception exception)
-    {
+    private void ReportRehydrationRetryScheduled(int attempt, Exception exception) =>
         log.LogError(
             "Points giveaway scheduler rehydration failed with {FailureType} on attempt {Attempt}; retry scheduled for {RetryAtUtc}.",
             exception.GetType().FullName,
             attempt,
             GetUtcNow().Add(_retryDelay)
         );
-    }
 
     private void ReportRetryScheduled(
         PointsGiveawaySchedulerOperation operation,
         int giveawayId,
         int attempt,
         Exception exception
-    )
-    {
+    ) =>
         log.LogError(
             "Points giveaway scheduler {Operation} failed for giveaway {GiveawayId} with {FailureType} on attempt {Attempt}; retry scheduled for {RetryAtUtc}.",
             operation,
@@ -513,21 +508,18 @@ internal sealed class PointsGiveawayScheduler(
             attempt,
             GetUtcNow().Add(_retryDelay)
         );
-    }
 
     private void ReportNotificationFailure(
         int giveawayId,
         PointsGiveawayNotificationKind kind,
         Exception exception
-    )
-    {
+    ) =>
         log.LogError(
             "Points giveaway {NotificationKind} notification failed for giveaway {GiveawayId} with {FailureType}; delivery is not retried because acceptance is ambiguous, and durable schedule processing continues.",
             kind,
             giveawayId,
             exception.GetType().FullName
         );
-    }
 
     private Task[] CancelAll()
     {
@@ -560,10 +552,7 @@ internal sealed class PointsGiveawayScheduler(
         }
     }
 
-    private DateTime GetUtcNow()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime GetUtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
     private static TimeSpan ValidRetryDelay(PointsGiveawaySchedulerRecoveryPolicy policy)
     {
@@ -610,26 +599,22 @@ internal sealed class PointsGiveawayScheduler(
         PointsGiveawaySchedulerOperation operation,
         int giveawayId,
         Exception exception
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Operation = operation,
             GiveawayId = giveawayId,
             Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(exception),
             Cause = exception,
         };
-    }
 
     private static OperationAttempt<TValue, TError> ToAttempt<TValue, TError>(
         Result<TValue, TError> result
-    )
-    {
-        return result.Match<OperationAttempt<TValue, TError>>(
+    ) =>
+        result.Match<OperationAttempt<TValue, TError>>(
             value => new OperationAttempt<TValue, TError>.Succeeded(value),
             failure => new OperationAttempt<TValue, TError>.Failed(failure)
         );
-    }
 
     private static IEnumerable<DateTime> ReminderTimes(PointsGiveawaySchedule schedule)
     {

@@ -6,10 +6,7 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public sealed record CustomCommandTimeZone
 {
-    internal CustomCommandTimeZone(string id)
-    {
-        Id = id;
-    }
+    internal CustomCommandTimeZone(string id) => Id = id;
 
     public string Id { get; }
 }
@@ -60,16 +57,14 @@ public abstract record CustomCommandActionValue
         Func<Message, TResult> message,
         Func<Counter, TResult> counter,
         Func<OverlayCue, TResult> overlayCue
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Message value => message(value),
             Counter value => counter(value),
             OverlayCue value => overlayCue(value),
             _ => throw new UnreachableException("Unknown custom command action value."),
         };
-    }
 
     public sealed record Message(CustomCommandReplyRoutes Routes) : CustomCommandActionValue
     {
@@ -148,16 +143,14 @@ public abstract record CustomAnnouncementScheduleValue
         Func<Interval, TResult> interval,
         Func<IntervalAfterChat, TResult> intervalAfterChat,
         Func<Weekly, TResult> weekly
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Interval value => interval(value),
             IntervalAfterChat value => intervalAfterChat(value),
             Weekly value => weekly(value),
             _ => throw new UnreachableException("Unknown custom announcement schedule value."),
         };
-    }
 
     public sealed record Interval(int IntervalMinutes) : CustomAnnouncementScheduleValue;
 
@@ -220,9 +213,8 @@ public abstract record CustomCommandConfigurationSaveFailure
         Func<CustomAliasCollision, TResult> customAliasCollision,
         Func<StaleEntity, TResult> staleEntity,
         Func<OverlayCueReference, TResult> overlayCueReference
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             BuiltInAliasCollision value => builtInAliasCollision(value),
             CustomAliasCollision value => customAliasCollision(value),
@@ -230,7 +222,6 @@ public abstract record CustomCommandConfigurationSaveFailure
             OverlayCueReference value => overlayCueReference(value),
             _ => throw new UnreachableException("Unknown custom command save failure."),
         };
-    }
 
     public sealed record BuiltInAliasCollision(string Alias) : CustomCommandConfigurationSaveFailure
     {

@@ -207,38 +207,32 @@ public sealed class UserLookupServiceTests
 
     private static Option<UserIdentity> Success(
         Result<Option<UserIdentity>, AccessTokenUnavailableReason> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             users => users,
             reason =>
                 throw new InvalidOperationException(
                     $"Expected a user lookup result, received {reason}."
                 )
         );
-    }
 
     private sealed class StaticAccessTokenProvider(string accessToken) : IAccessTokenProvider
     {
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(
                     Result<string, AccessTokenUnavailableReason>.Success(accessToken)
                 );
             });
-        }
     }
 
     private sealed class JsonHttpClientFactory(string response, HttpStatusCode statusCode)
         : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new JsonHttpMessageHandler(response, statusCode));
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new JsonHttpMessageHandler(response, statusCode));
     }
 
     private sealed class JsonHttpMessageHandler(string response, HttpStatusCode statusCode)

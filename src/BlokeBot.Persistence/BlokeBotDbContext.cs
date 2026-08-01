@@ -128,13 +128,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureOverlays(modelBuilder);
     }
 
-    private static string KindIn(string columnName, IEnumerable<string> values)
-    {
-        return $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
-    }
+    private static string KindIn(string columnName, IEnumerable<string> values) =>
+        $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
 
-    private static string KindInOrNull(string columnName, IEnumerable<string> values)
-    {
-        return $"{columnName} IS NULL OR {KindIn(columnName, values)}";
-    }
+    private static string KindInOrNull(string columnName, IEnumerable<string> values) =>
+        $"{columnName} IS NULL OR {KindIn(columnName, values)}";
 }

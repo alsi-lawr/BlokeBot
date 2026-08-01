@@ -20,9 +20,8 @@ public abstract record GuessRoundLifecycle
         DateTime startedAtUtc,
         DateTime? closedAtUtc,
         string? winningName
-    )
-    {
-        return status switch
+    ) =>
+        status switch
         {
             GuessRoundStatus.Open when closedAtUtc is null && winningName is null => new Open(
                 startedAtUtc
@@ -40,14 +39,10 @@ public abstract record GuessRoundLifecycle
             ),
             _ => throw new PersistenceDataIntegrityException(typeof(GuessRound)),
         };
-    }
 
     public sealed record Open : GuessRoundLifecycle
     {
-        internal Open(DateTime startedAtUtc)
-        {
-            StartedAtUtc = startedAtUtc;
-        }
+        internal Open(DateTime startedAtUtc) => StartedAtUtc = startedAtUtc;
 
         public override DateTime StartedAtUtc { get; }
 
@@ -55,10 +50,7 @@ public abstract record GuessRoundLifecycle
             Func<Open, TResult> open,
             Func<Closed, TResult> closed,
             Func<Completed, TResult> completed
-        )
-        {
-            return open(this);
-        }
+        ) => open(this);
     }
 
     public sealed record Closed : GuessRoundLifecycle
@@ -77,10 +69,7 @@ public abstract record GuessRoundLifecycle
             Func<Open, TResult> open,
             Func<Closed, TResult> closed,
             Func<Completed, TResult> completed
-        )
-        {
-            return closed(this);
-        }
+        ) => closed(this);
     }
 
     public sealed record Completed : GuessRoundLifecycle
@@ -102,9 +91,6 @@ public abstract record GuessRoundLifecycle
             Func<Open, TResult> open,
             Func<Closed, TResult> closed,
             Func<Completed, TResult> completed
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 }

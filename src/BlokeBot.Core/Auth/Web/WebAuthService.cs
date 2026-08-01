@@ -20,17 +20,14 @@ internal sealed class WebAuthService(
 {
     public WebAuthOptions CurrentOptions => configuration.CurrentOptions;
 
-    public Uri CreateAuthorizationUri(HttpRequest request, string state)
-    {
-        return oauth.CreateAuthorizationUri(request, CurrentOptions, state);
-    }
+    public Uri CreateAuthorizationUri(HttpRequest request, string state) =>
+        oauth.CreateAuthorizationUri(request, CurrentOptions, state);
 
     public IO<WebAuthenticationOutcome, WebAuthenticationError> Authenticate(
         HttpRequest request,
         string code
-    )
-    {
-        return IO<WebAuthenticationOutcome, WebAuthenticationError>.Create(async ct =>
+    ) =>
+        IO<WebAuthenticationOutcome, WebAuthenticationError>.Create(async ct =>
         {
             var currentOptions = CurrentOptions;
             if (!IsConfigured(currentOptions))
@@ -78,7 +75,6 @@ internal sealed class WebAuthService(
                 return Error(WebAuthenticationError.InvalidProviderPayload.From(exception));
             }
         });
-    }
 
     private async Task<
         Result<WebAuthenticationOutcome, WebAuthenticationError>
@@ -144,34 +140,24 @@ internal sealed class WebAuthService(
         );
     }
 
-    public bool IsConfigured(WebAuthOptions currentOptions)
-    {
-        return configuration.IsConfigured(currentOptions);
-    }
+    public bool IsConfigured(WebAuthOptions currentOptions) =>
+        configuration.IsConfigured(currentOptions);
 
-    private bool IsConfiguredBotAccount(string login)
-    {
-        return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
-            && string.Equals(
-                Login.Normalize(login),
-                botSettings.Identity.BotUsername,
-                StringComparison.Ordinal
-            );
-    }
+    private bool IsConfiguredBotAccount(string login) =>
+        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
+        && string.Equals(
+            Login.Normalize(login),
+            botSettings.Identity.BotUsername,
+            StringComparison.Ordinal
+        );
 
     private static Result<WebAuthenticationOutcome, WebAuthenticationError> Success(
         WebAuthenticationOutcome outcome
-    )
-    {
-        return Result<WebAuthenticationOutcome, WebAuthenticationError>.Success(outcome);
-    }
+    ) => Result<WebAuthenticationOutcome, WebAuthenticationError>.Success(outcome);
 
     private static Result<WebAuthenticationOutcome, WebAuthenticationError> Error(
         WebAuthenticationError error
-    )
-    {
-        return Result<WebAuthenticationOutcome, WebAuthenticationError>.Error(error);
-    }
+    ) => Result<WebAuthenticationOutcome, WebAuthenticationError>.Error(error);
 }
 
 internal abstract record WebAuthenticationOutcome
@@ -193,17 +179,13 @@ internal abstract record WebAuthenticationError
 
     internal sealed record TransportFailure(string FailureType) : WebAuthenticationError
     {
-        public static TransportFailure From(HttpRequestException exception)
-        {
-            return new(exception.GetType().Name);
-        }
+        public static TransportFailure From(HttpRequestException exception) =>
+            new(exception.GetType().Name);
     }
 
     internal sealed record InvalidProviderPayload(string FailureType) : WebAuthenticationError
     {
-        public static InvalidProviderPayload From(Exception exception)
-        {
-            return new(exception.GetType().Name);
-        }
+        public static InvalidProviderPayload From(Exception exception) =>
+            new(exception.GetType().Name);
     }
 }

@@ -20,10 +20,7 @@ public abstract record PointBalanceMutationFailure
             Func<UnknownUser, TResult> unknownUser,
             Func<InsufficientBalance, TResult> insufficientBalance,
             Func<CapExceeded, TResult> capExceeded
-        )
-        {
-            return invalidAmount(this);
-        }
+        ) => invalidAmount(this);
     }
 
     public sealed record UnknownUser : PointBalanceMutationFailure
@@ -33,10 +30,7 @@ public abstract record PointBalanceMutationFailure
             Func<UnknownUser, TResult> unknownUser,
             Func<InsufficientBalance, TResult> insufficientBalance,
             Func<CapExceeded, TResult> capExceeded
-        )
-        {
-            return unknownUser(this);
-        }
+        ) => unknownUser(this);
     }
 
     public sealed record InsufficientBalance(PointAmount Balance, PointAmount Amount)
@@ -47,10 +41,7 @@ public abstract record PointBalanceMutationFailure
             Func<UnknownUser, TResult> unknownUser,
             Func<InsufficientBalance, TResult> insufficientBalance,
             Func<CapExceeded, TResult> capExceeded
-        )
-        {
-            return insufficientBalance(this);
-        }
+        ) => insufficientBalance(this);
     }
 
     public sealed record CapExceeded(PointAmount Balance, PointAmount Amount)
@@ -61,9 +52,6 @@ public abstract record PointBalanceMutationFailure
             Func<UnknownUser, TResult> unknownUser,
             Func<InsufficientBalance, TResult> insufficientBalance,
             Func<CapExceeded, TResult> capExceeded
-        )
-        {
-            return capExceeded(this);
-        }
+        ) => capExceeded(this);
     }
 }

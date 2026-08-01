@@ -61,14 +61,12 @@ public sealed class HostedChannelRuntimeStatusTests
     private static ChannelBotAuthorizationService ChannelAuthorizationService(
         SqliteBlokeBotDbFactory dbFactory,
         params string[] scopes
-    )
-    {
-        return new(
+    ) =>
+        new(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             ChannelOAuthService(scopes)
         );
-    }
 
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
@@ -118,10 +116,7 @@ public sealed class HostedChannelRuntimeStatusTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("Remote bot status should not be queried.");
-        }
+        ) => throw new InvalidOperationException("Remote bot status should not be queried.");
     }
 
     private sealed class CountingHttpClientFactory : IHttpClientFactory
@@ -130,10 +125,7 @@ public sealed class HostedChannelRuntimeStatusTests
 
         public int RequestCount => _handler.RequestCount;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler : HttpMessageHandler
         {

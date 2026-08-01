@@ -4,9 +4,8 @@ namespace BlokeBot.Core.Features.Guessing.Replies;
 
 internal static class ReplySettingsMapper
 {
-    public static BotReplySettings ToEntity(ReplySettingsEditor editor)
-    {
-        return new()
+    public static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
+        new()
         {
             RoundStartedReply = editor.RoundStartedReply,
             RoundAlreadyOpenReply = editor.RoundAlreadyOpenReply,
@@ -22,11 +21,9 @@ internal static class ReplySettingsMapper
             WinnerReply = editor.WinnerReply,
             NoWinnersReply = editor.NoWinnersReply,
         };
-    }
 
-    public static ReplySettingsEditor ToEditor(BotReplySettings settings)
-    {
-        return new()
+    public static ReplySettingsEditor ToEditor(BotReplySettings settings) =>
+        new()
         {
             RoundStartedReply = settings.RoundStartedReply,
             RoundAlreadyOpenReply = settings.RoundAlreadyOpenReply,
@@ -44,5 +41,4 @@ internal static class ReplySettingsMapper
             WinnerReply = settings.WinnerReply,
             NoWinnersReply = settings.NoWinnersReply,
         };
-    }
 }

@@ -17,8 +17,6 @@ public sealed record WhisperSendResult
 
     public string? ResponseBody { get; init; }
 
-    public override string ToString()
-    {
-        return $"{nameof(WhisperSendResult)} {{ Status = {Status}, StatusCode = {StatusCode}, ResponseBody = [redacted] }}";
-    }
+    public override string ToString() =>
+        $"{nameof(WhisperSendResult)} {{ Status = {Status}, StatusCode = {StatusCode}, ResponseBody = [redacted] }}";
 }

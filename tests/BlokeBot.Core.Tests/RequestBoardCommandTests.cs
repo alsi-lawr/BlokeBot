@@ -115,8 +115,7 @@ public sealed class RequestBoardCommandTests
         ChatCommandDispatcher dispatcher,
         ChatMessage message,
         List<string> responses
-    )
-    {
+    ) =>
         await dispatcher.DispatchResponsesAsync(
             message,
             (response, _) =>
@@ -126,22 +125,19 @@ public sealed class RequestBoardCommandTests
             },
             CancellationToken.None
         );
-    }
 
     private static ChatMessage Message(
         string login,
         string text,
         IReadOnlyDictionary<string, string>? tags = null
-    )
-    {
-        return new ChatMessage(
+    ) =>
+        new ChatMessage(
             login,
             "streamer",
             text,
             $":{login}!u@h PRIVMSG #streamer :{text}",
             tags ?? new Dictionary<string, string>()
         );
-    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
     {

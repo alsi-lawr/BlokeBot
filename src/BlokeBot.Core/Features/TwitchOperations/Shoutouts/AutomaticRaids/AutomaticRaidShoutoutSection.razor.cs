@@ -250,10 +250,8 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         }
     }
 
-    private bool IsCurrentHost(int hostId, long version)
-    {
-        return _loadedHostId == hostId && _hostVersion == version;
-    }
+    private bool IsCurrentHost(int hostId, long version) =>
+        _loadedHostId == hostId && _hostVersion == version;
 
     private void SetEnabled(ChangeEventArgs args)
     {
@@ -372,14 +370,11 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         }
     }
 
-    private string? ErrorFor(AutomaticRaidShoutoutValidationField field)
-    {
-        return _validationErrors.FirstOrDefault(error => error.Field == field)?.Message;
-    }
+    private string? ErrorFor(AutomaticRaidShoutoutValidationField field) =>
+        _validationErrors.FirstOrDefault(error => error.Field == field)?.Message;
 
-    private string FieldDescription(AutomaticRaidShoutoutValidationField field)
-    {
-        return ErrorFor(field) is null
+    private string FieldDescription(AutomaticRaidShoutoutValidationField field) =>
+        ErrorFor(field) is null
             ? string.Empty
             : field switch
             {
@@ -391,12 +386,9 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
                     "automatic-raid-announcement-color-error",
                 _ => string.Empty,
             };
-    }
 
-    private string HasError(AutomaticRaidShoutoutValidationField field)
-    {
-        return ErrorFor(field) is null ? "false" : "true";
-    }
+    private string HasError(AutomaticRaidShoutoutValidationField field) =>
+        ErrorFor(field) is null ? "false" : "true";
 
     private void ClearError(AutomaticRaidShoutoutValidationField field)
     {
@@ -404,20 +396,17 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         _saveStatus = null;
     }
 
-    private static string PresentationLabel(AutomaticRaidChatPresentation presentation)
-    {
-        return presentation switch
+    private static string PresentationLabel(AutomaticRaidChatPresentation presentation) =>
+        presentation switch
         {
             AutomaticRaidChatPresentation.Regular => "Regular message",
             AutomaticRaidChatPresentation.Pinned => "Pinned message",
             AutomaticRaidChatPresentation.Announcement => "Announcement",
             _ => throw new ArgumentOutOfRangeException(nameof(presentation)),
         };
-    }
 
-    private static string OutcomeTitle(AutomaticRaidShoutoutOutcomeView outcome)
-    {
-        return outcome.ResultCode switch
+    private static string OutcomeTitle(AutomaticRaidShoutoutOutcomeView outcome) =>
+        outcome.ResultCode switch
         {
             AutomaticRaidShoutoutResultCode.Delivered => "Delivered",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
@@ -435,11 +424,9 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
                 "Sending shoutout",
             _ => "Shoutout was not sent",
         };
-    }
 
-    private static string OutcomeDescription(AutomaticRaidShoutoutOutcomeView outcome)
-    {
-        return outcome.ResultCode switch
+    private static string OutcomeDescription(AutomaticRaidShoutoutOutcomeView outcome) =>
+        outcome.ResultCode switch
         {
             AutomaticRaidShoutoutResultCode.Delivered => "BlokeBot sent the shoutout you selected.",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
@@ -464,7 +451,6 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
                 "BlokeBot cannot safely tell whether Twitch completed the request, so it will not retry.",
             _ => "BlokeBot is waiting for Twitch or chat to finish this shoutout.",
         };
-    }
 
     public void Dispose()
     {

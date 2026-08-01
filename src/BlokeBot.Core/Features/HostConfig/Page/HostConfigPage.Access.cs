@@ -22,20 +22,14 @@ public partial class HostConfigPage
             ? "segmented-motion segmented-motion--second"
             : "segmented-motion";
 
-    private static string AccessModeTabClass(bool active)
-    {
-        return active
-            ? "segmented-motion__tab segmented-motion__tab--active"
-            : "segmented-motion__tab";
-    }
+    private static string AccessModeTabClass(bool active) =>
+        active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
 
-    private Task AddAccessAsync(int hostId, AccessListEntryKind kind)
-    {
-        return ObserveUiOperationAsync(
+    private Task AddAccessAsync(int hostId, AccessListEntryKind kind) =>
+        ObserveUiOperationAsync(
             nameof(AddAccessAsync),
             () => RunSelectedHostMutationAsync(hostId, () => AddAccessCoreAsync(hostId, kind))
         );
-    }
 
     private async Task AddAccessCoreAsync(int hostId, AccessListEntryKind kind)
     {
@@ -53,9 +47,8 @@ public partial class HostConfigPage
         await LoadCoreAsync();
     }
 
-    private Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
-    {
-        return ObserveUiOperationAsync(
+    private Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login) =>
+        ObserveUiOperationAsync(
             nameof(RemoveAccessAsync),
             () =>
                 RunSelectedHostMutationAsync(
@@ -63,7 +56,6 @@ public partial class HostConfigPage
                     () => RemoveAccessCoreAsync(hostId, kind, login)
                 )
         );
-    }
 
     private async Task RemoveAccessCoreAsync(int hostId, AccessListEntryKind kind, string login)
     {
@@ -71,13 +63,11 @@ public partial class HostConfigPage
         await LoadCoreAsync();
     }
 
-    private Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
-    {
-        return ObserveUiOperationAsync(
+    private Task SetModsEnabledAsync(int hostId, ChangeEventArgs args) =>
+        ObserveUiOperationAsync(
             nameof(SetModsEnabledAsync),
             () => RunSelectedHostMutationAsync(hostId, () => SetModsEnabledCoreAsync(hostId, args))
         );
-    }
 
     private async Task SetModsEnabledCoreAsync(int hostId, ChangeEventArgs args)
     {
@@ -184,9 +174,8 @@ public partial class HostConfigPage
     private Task ApplyAllowModsByDefaultFailureAsync(
         HostModAccessSaveSubmission submission,
         HostModAccessSaveFailure failure
-    )
-    {
-        return InvokeAsync(() =>
+    ) =>
+        InvokeAsync(() =>
         {
             if (!_allowModsByDefaultSaves.IsCurrent(submission))
             {
@@ -203,7 +192,6 @@ public partial class HostConfigPage
             );
             StateHasChanged();
         });
-    }
 
     private async Task LoadAccessEntriesAsync(HostModAccessState access)
     {

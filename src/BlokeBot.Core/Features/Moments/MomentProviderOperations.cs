@@ -162,8 +162,6 @@ public sealed class MomentProviderOperations(
         };
     }
 
-    private static MomentProviderOutcome Failed(TwitchClip? clip, string reason)
-    {
-        return new MomentProviderOutcome.Failed(clip?.Id, null, reason);
-    }
+    private static MomentProviderOutcome Failed(TwitchClip? clip, string reason) =>
+        new MomentProviderOutcome.Failed(clip?.Id, null, reason);
 }

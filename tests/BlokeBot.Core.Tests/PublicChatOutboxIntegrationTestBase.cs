@@ -21,9 +21,8 @@ public abstract class PublicChatOutboxIntegrationTestBase
         string channel,
         DateTimeOffset enqueuedAt,
         params string[] messages
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Channel = channel,
             EnqueuedAt = enqueuedAt,
@@ -36,16 +35,14 @@ public abstract class PublicChatOutboxIntegrationTestBase
                 })
                 .ToImmutableArray(),
         };
-    }
 
     private protected static async Task<PublicChatClaimedMessage> ClaimAsync(
         IPublicChatOutbox outbox,
         DateTimeOffset now,
         TimeSpan sendInterval,
         TimeSpan duplicateCooldown = default
-    )
-    {
-        return (
+    ) =>
+        (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -56,7 +53,6 @@ public abstract class PublicChatOutboxIntegrationTestBase
         )
             .ShouldBeOfType<PublicChatClaimOutcome.Claimed>()
             .Message;
-    }
 
     private protected static async Task BeginAndDeliverAsync(
         IPublicChatOutbox outbox,
@@ -94,25 +90,19 @@ public abstract class PublicChatOutboxIntegrationTestBase
         );
     }
 
-    private protected static PublicChatDeliveryOutcome SafePreSendTransientOutcome()
-    {
-        return PublicChatDeliveryClassifier.MapPreparationFailure(
+    private protected static PublicChatDeliveryOutcome SafePreSendTransientOutcome() =>
+        PublicChatDeliveryClassifier.MapPreparationFailure(
             PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                 new IOException("secret preparation detail"),
                 CancellationToken.None
             )
         );
-    }
 
-    private protected static PublicChatTerminalRetentionPolicy Retention(TimeSpan duration)
-    {
-        return new() { Duration = duration };
-    }
+    private protected static PublicChatTerminalRetentionPolicy Retention(TimeSpan duration) =>
+        new() { Duration = duration };
 
-    private protected static PublicChatDeliveryLifetimePolicy Lifetime(TimeSpan maximumAge)
-    {
-        return new() { MaximumAge = maximumAge };
-    }
+    private protected static PublicChatDeliveryLifetimePolicy Lifetime(TimeSpan maximumAge) =>
+        new() { MaximumAge = maximumAge };
 
     private protected static void AssertExpired(
         PublicChatOutboxMessage row,

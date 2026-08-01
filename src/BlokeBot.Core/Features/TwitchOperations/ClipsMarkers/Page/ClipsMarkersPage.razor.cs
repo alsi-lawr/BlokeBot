@@ -63,33 +63,25 @@ public partial class ClipsMarkersPage
         }
     }
 
-    private Task CreateClipAsync()
-    {
-        return MutateAsync(hostId =>
+    private Task CreateClipAsync() =>
+        MutateAsync(hostId =>
             _clipsMarkers.CreateClipAsync(hostId, _clipHasDelay, CancellationToken.None)
         );
-    }
 
-    private Task CreateMarkerAsync()
-    {
-        return MutateAsync(hostId =>
+    private Task CreateMarkerAsync() =>
+        MutateAsync(hostId =>
             _clipsMarkers.CreateMarkerAsync(hostId, _markerDescription, CancellationToken.None)
         );
-    }
 
-    private Task RetryClipAsync(ClipAttemptReference attempt)
-    {
-        return MutateAsync(hostId =>
+    private Task RetryClipAsync(ClipAttemptReference attempt) =>
+        MutateAsync(hostId =>
             _clipsMarkers.RetryClipAsync(hostId, attempt, CancellationToken.None)
         );
-    }
 
-    private Task RetryMarkerAsync(StreamMarkerAttemptReference attempt)
-    {
-        return MutateAsync(hostId =>
+    private Task RetryMarkerAsync(StreamMarkerAttemptReference attempt) =>
+        MutateAsync(hostId =>
             _clipsMarkers.RetryMarkerAsync(hostId, attempt, CancellationToken.None)
         );
-    }
 
     private async Task MutateAsync(Func<int, Task<ClipMarkerOperationOutcome>> operation)
     {

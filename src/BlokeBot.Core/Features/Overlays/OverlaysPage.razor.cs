@@ -266,9 +266,8 @@ public partial class OverlaysPage
         _cueDraftJson = cue.Configuration.ToPersistenceJson();
     }
 
-    private Task SaveCueAsync()
-    {
-        return RunOperationAsync(async () =>
+    private Task SaveCueAsync() =>
+        RunOperationAsync(async () =>
         {
             var result = await _cues.SaveCueAsync(
                 PageContext.Session,
@@ -293,11 +292,9 @@ public partial class OverlaysPage
             SetSuccess("Cue saved.");
             await LoadCueDataAsync();
         });
-    }
 
-    private Task DeleteCueAsync()
-    {
-        return RunOperationAsync(async () =>
+    private Task DeleteCueAsync() =>
+        RunOperationAsync(async () =>
         {
             if (_selectedCue is null)
             {
@@ -318,11 +315,9 @@ public partial class OverlaysPage
             SetSuccess("Cue deleted. Any transient playback was cancelled.");
             await LoadCueDataAsync();
         });
-    }
 
-    private Task PlayCueTestAsync()
-    {
-        return RunOperationAsync(async () =>
+    private Task PlayCueTestAsync() =>
+        RunOperationAsync(async () =>
         {
             if (Host is null || _selectedCue is null || _cueTargetId is null)
             {
@@ -362,11 +357,9 @@ public partial class OverlaysPage
                     break;
             }
         });
-    }
 
-    private Task UploadAssetAsync(InputFileChangeEventArgs args)
-    {
-        return RunOperationAsync(async () =>
+    private Task UploadAssetAsync(InputFileChangeEventArgs args) =>
+        RunOperationAsync(async () =>
         {
             var file = args.File;
             await using var stream = file.OpenReadStream(file.Size);
@@ -385,11 +378,9 @@ public partial class OverlaysPage
             SetSuccess("Media uploaded and validated.");
             await LoadCueDataAsync();
         });
-    }
 
-    private Task ReplaceAssetAsync(OverlayMediaAssetView asset, InputFileChangeEventArgs args)
-    {
-        return RunOperationAsync(async () =>
+    private Task ReplaceAssetAsync(OverlayMediaAssetView asset, InputFileChangeEventArgs args) =>
+        RunOperationAsync(async () =>
         {
             var file = args.File;
             await using var stream = file.OpenReadStream(file.Size);
@@ -411,11 +402,9 @@ public partial class OverlaysPage
             SetSuccess("Media replaced. New playback uses the new content revision.");
             await LoadCueDataAsync();
         });
-    }
 
-    private Task DeleteAssetAsync(OverlayMediaAssetView asset)
-    {
-        return RunOperationAsync(async () =>
+    private Task DeleteAssetAsync(OverlayMediaAssetView asset) =>
+        RunOperationAsync(async () =>
         {
             var result = await _cues.DeleteAssetAsync(
                 PageContext.Session,
@@ -431,11 +420,9 @@ public partial class OverlaysPage
             SetSuccess("Media deleted.");
             await LoadCueDataAsync();
         });
-    }
 
-    private static string DefaultCueJson()
-    {
-        return """
+    private static string DefaultCueJson() =>
+        """
             {
               "schemaVersion": 1,
               "layers": [
@@ -455,11 +442,9 @@ public partial class OverlaysPage
               ]
             }
             """;
-    }
 
-    private static string QueuePolicyLabel(OverlayCueQueuePolicy policy)
-    {
-        return policy switch
+    private static string QueuePolicyLabel(OverlayCueQueuePolicy policy) =>
+        policy switch
         {
             OverlayCueQueuePolicy.Enqueue => "Enqueue",
             OverlayCueQueuePolicy.Replace => "Replace current",
@@ -467,19 +452,11 @@ public partial class OverlaysPage
             OverlayCueQueuePolicy.Concurrent => "Allow concurrent",
             _ => policy.ToString(),
         };
-    }
 
-    private static string ByteLabel(long value)
-    {
-        return value >= 1024 * 1024
-            ? $"{value / (1024m * 1024m):0.##} MB"
-            : $"{value / 1024m:0.##} KB";
-    }
+    private static string ByteLabel(long value) =>
+        value >= 1024 * 1024 ? $"{value / (1024m * 1024m):0.##} MB" : $"{value / 1024m:0.##} KB";
 
-    private void NewOverlay()
-    {
-        NewOverlay(setFeedback: true);
-    }
+    private void NewOverlay() => NewOverlay(setFeedback: true);
 
     private void NewOverlay(bool setFeedback)
     {
@@ -503,10 +480,8 @@ public partial class OverlaysPage
         }
     }
 
-    private void SelectOverlay(OverlayInstanceView overlay)
-    {
+    private void SelectOverlay(OverlayInstanceView overlay) =>
         SelectOverlay(overlay, clearFeedback: true);
-    }
 
     private void SelectOverlay(OverlayInstanceView overlay, bool clearFeedback)
     {
@@ -536,9 +511,8 @@ public partial class OverlaysPage
         }
     }
 
-    private Task SaveAsync()
-    {
-        return RunOperationAsync(async () =>
+    private Task SaveAsync() =>
+        RunOperationAsync(async () =>
         {
             if (_isCreating)
             {
@@ -619,7 +593,6 @@ public partial class OverlaysPage
             SetSuccess("Overlay saved.");
             await LoadAsync(current.Id);
         });
-    }
 
     private async Task ToggleAvailabilityAsync()
     {
@@ -768,9 +741,8 @@ public partial class OverlaysPage
         });
     }
 
-    private Task PublishTestAsync()
-    {
-        return RunOperationAsync(async () =>
+    private Task PublishTestAsync() =>
+        RunOperationAsync(async () =>
         {
             if (_selected is null || !_selectedFeatureEnabled)
             {
@@ -819,7 +791,6 @@ public partial class OverlaysPage
                 }
             );
         });
-    }
 
     private async Task CopyBrowserSourceUrlAsync()
     {
@@ -908,9 +879,8 @@ public partial class OverlaysPage
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
-    private OverlayConfiguration DraftConfiguration()
-    {
-        return _draftType switch
+    private OverlayConfiguration DraftConfiguration() =>
+        _draftType switch
         {
             OverlayType.Empty => new OverlayConfiguration.EmptyV1(),
             OverlayType.Guessing => new OverlayConfiguration.GuessingV1(
@@ -926,12 +896,9 @@ public partial class OverlaysPage
             ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
-    }
 
-    private string AbsoluteUrl(string relativeUrl)
-    {
-        return _navigation.ToAbsoluteUri(relativeUrl).AbsoluteUri;
-    }
+    private string AbsoluteUrl(string relativeUrl) =>
+        _navigation.ToAbsoluteUri(relativeUrl).AbsoluteUri;
 
     private void SetSuccess(string message)
     {
@@ -945,24 +912,17 @@ public partial class OverlaysPage
         _operationFailed = true;
     }
 
-    private static string CountLabel(int count)
-    {
-        return count == 1 ? "1 saved overlay" : $"{count} saved overlays";
-    }
+    private static string CountLabel(int count) =>
+        count == 1 ? "1 saved overlay" : $"{count} saved overlays";
 
-    private static string CueCountLabel(int count)
-    {
-        return count == 1 ? "1 saved cue" : $"{count} saved cues";
-    }
+    private static string CueCountLabel(int count) =>
+        count == 1 ? "1 saved cue" : $"{count} saved cues";
 
-    private static string UpdatedLabel(OverlayInstanceView overlay)
-    {
-        return $"updated {overlay.UpdatedAtUtc:yyyy-MM-dd HH:mm} UTC";
-    }
+    private static string UpdatedLabel(OverlayInstanceView overlay) =>
+        $"updated {overlay.UpdatedAtUtc:yyyy-MM-dd HH:mm} UTC";
 
-    private static string TypeLabel(OverlayType type)
-    {
-        return type switch
+    private static string TypeLabel(OverlayType type) =>
+        type switch
         {
             OverlayType.Empty => "Empty",
             OverlayType.Guessing => "Guessing",
@@ -970,11 +930,9 @@ public partial class OverlaysPage
             OverlayType.Giveaway => "Giveaway",
             _ => "Unsupported",
         };
-    }
 
-    private static string SampleLabel(GuessingOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleLabel(GuessingOverlaySampleState sample) =>
+        sample switch
         {
             GuessingOverlaySampleState.NoRound => "No round",
             GuessingOverlaySampleState.Open => "Open",
@@ -982,11 +940,9 @@ public partial class OverlaysPage
             GuessingOverlaySampleState.Completed => "Result",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
-    private static string SampleToken(GuessingOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleToken(GuessingOverlaySampleState sample) =>
+        sample switch
         {
             GuessingOverlaySampleState.NoRound => "no-round",
             GuessingOverlaySampleState.Open => "open",
@@ -994,11 +950,9 @@ public partial class OverlaysPage
             GuessingOverlaySampleState.Completed => "completed",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
-    private static string SampleLabel(GiveawayOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleLabel(GiveawayOverlaySampleState sample) =>
+        sample switch
         {
             GiveawayOverlaySampleState.Idle => "Idle",
             GiveawayOverlaySampleState.Open => "Open",
@@ -1007,11 +961,9 @@ public partial class OverlaysPage
             GiveawayOverlaySampleState.Cancelled => "Cancelled",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
-    private static string SampleToken(GiveawayOverlaySampleState sample)
-    {
-        return sample switch
+    private static string SampleToken(GiveawayOverlaySampleState sample) =>
+        sample switch
         {
             GiveawayOverlaySampleState.Idle => "idle",
             GiveawayOverlaySampleState.Open => "open",
@@ -1020,14 +972,11 @@ public partial class OverlaysPage
             GiveawayOverlaySampleState.Cancelled => "cancelled",
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-    }
 
-    private string InventoryPresenceLabel(OverlayInstanceView overlay)
-    {
-        return OtherConnectionCount(overlay) > 0
+    private string InventoryPresenceLabel(OverlayInstanceView overlay) =>
+        OtherConnectionCount(overlay) > 0
             ? "Diagnostic: connected"
             : "Diagnostic: no other connection";
-    }
 
     private int OtherConnectionCount(OverlayInstanceView overlay)
     {
@@ -1061,12 +1010,10 @@ public partial class OverlaysPage
         base.Dispose(disposing);
     }
 
-    private string PreviewButtonClass(OverlayPreviewMode mode)
-    {
-        return _previewMode == mode
+    private string PreviewButtonClass(OverlayPreviewMode mode) =>
+        _previewMode == mode
             ? "segmented-motion__tab segmented-motion__tab--active"
             : "segmented-motion__tab";
-    }
 
     private enum OverlayPreviewMode
     {

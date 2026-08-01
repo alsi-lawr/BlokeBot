@@ -12,10 +12,11 @@ public sealed record FollowerOnlyChatStatusPanelLoadIdentity
 
     public string ReloadKey { get; }
 
-    public static FollowerOnlyChatStatusPanelLoadIdentity? From(string hostLogin, string? reloadKey)
-    {
-        return string.IsNullOrWhiteSpace(hostLogin)
+    public static FollowerOnlyChatStatusPanelLoadIdentity? From(
+        string hostLogin,
+        string? reloadKey
+    ) =>
+        string.IsNullOrWhiteSpace(hostLogin)
             ? null
             : new(hostLogin.Trim().ToLowerInvariant(), reloadKey ?? string.Empty);
-    }
 }

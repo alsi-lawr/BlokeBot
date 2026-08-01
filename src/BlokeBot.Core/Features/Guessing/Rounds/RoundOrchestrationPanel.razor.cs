@@ -83,18 +83,9 @@ public partial class RoundOrchestrationPanel
         await WinnerNameChanged.InvokeAsync(WinnerName);
     }
 
-    private async Task InvokeDeclareWinnerAsync()
-    {
-        await DeclareWinner.InvokeAsync();
-    }
+    private async Task InvokeDeclareWinnerAsync() => await DeclareWinner.InvokeAsync();
 
-    private async Task InvokeStartRoundAsync()
-    {
-        await StartRound.InvokeAsync();
-    }
+    private async Task InvokeStartRoundAsync() => await StartRound.InvokeAsync();
 
-    private async Task InvokeStopGuessingAsync()
-    {
-        await StopGuessing.InvokeAsync();
-    }
+    private async Task InvokeStopGuessingAsync() => await StopGuessing.InvokeAsync();
 }

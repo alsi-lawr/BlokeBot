@@ -50,15 +50,13 @@ public abstract record CustomCommandAliasConflict
 {
     private CustomCommandAliasConflict() { }
 
-    public TResult Match<TResult>(Func<BuiltIn, TResult> builtIn, Func<Custom, TResult> custom)
-    {
-        return this switch
+    public TResult Match<TResult>(Func<BuiltIn, TResult> builtIn, Func<Custom, TResult> custom) =>
+        this switch
         {
             BuiltIn value => builtIn(value),
             Custom value => custom(value),
             _ => throw new UnreachableException("Unknown custom command alias conflict."),
         };
-    }
 
     public sealed record BuiltIn(string Alias) : CustomCommandAliasConflict;
 

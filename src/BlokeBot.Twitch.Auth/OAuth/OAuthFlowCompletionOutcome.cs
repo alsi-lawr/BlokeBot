@@ -14,10 +14,7 @@ public abstract record OAuthFlowCompletionOutcome
         public override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<InvalidState, TResult> invalidState
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 
     public sealed record InvalidState : OAuthFlowCompletionOutcome
@@ -25,9 +22,6 @@ public abstract record OAuthFlowCompletionOutcome
         public override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<InvalidState, TResult> invalidState
-        )
-        {
-            return invalidState(this);
-        }
+        ) => invalidState(this);
     }
 }

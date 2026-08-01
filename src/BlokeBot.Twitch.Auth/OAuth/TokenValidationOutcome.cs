@@ -14,10 +14,7 @@ public abstract record TokenValidationOutcome
         public override TResult Match<TResult>(
             Func<Validated, TResult> validated,
             Func<NotValidated, TResult> notValidated
-        )
-        {
-            return validated(this);
-        }
+        ) => validated(this);
     }
 
     public sealed record NotValidated : TokenValidationOutcome
@@ -25,9 +22,6 @@ public abstract record TokenValidationOutcome
         public override TResult Match<TResult>(
             Func<Validated, TResult> validated,
             Func<NotValidated, TResult> notValidated
-        )
-        {
-            return notValidated(this);
-        }
+        ) => notValidated(this);
     }
 }

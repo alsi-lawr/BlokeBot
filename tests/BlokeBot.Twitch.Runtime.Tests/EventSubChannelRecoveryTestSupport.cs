@@ -91,10 +91,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
     private protected static EventSubChannelFailureDetails ClassifiedFailure(
         EventSubChannelFailureContext context
-    )
-    {
-        return context.ShouldBeOfType<EventSubChannelFailureContext.ClassifiedException>().Details;
-    }
+    ) => context.ShouldBeOfType<EventSubChannelFailureContext.ClassifiedException>().Details;
 
     private protected static void AssertFailure(
         EventSubChannelStatus status,
@@ -106,8 +103,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
         EventSubChannelRecoveryTrigger trigger,
         EventSubChannelNextAction nextAction,
         DateTimeOffset changedAt
-    )
-    {
+    ) =>
         AssertFailure(
             status,
             channel,
@@ -119,7 +115,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
             nextAction,
             changedAt
         );
-    }
 
     private protected static void AssertFailure(
         EventSubChannelStatus status,
@@ -178,9 +173,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
         internal FixedTimeProvider Clock { get; } = clock;
 
-        public ValueTask DisposeAsync()
-        {
-            return Session.DisposeAsync();
-        }
+        public ValueTask DisposeAsync() => Session.DisposeAsync();
     }
 }

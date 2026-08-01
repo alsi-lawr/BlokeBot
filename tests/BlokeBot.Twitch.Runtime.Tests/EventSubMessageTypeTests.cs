@@ -17,14 +17,9 @@ public sealed class EventSubMessageTypeTests
     public void KnownUnknownOrEmptyMessageType_Parsing_ReturnsTypedValue(
         string raw,
         EventSubMessageType expectedMessageType
-    )
-    {
-        EventSubMessageTypes.Parse(raw).ShouldBe(expectedMessageType);
-    }
+    ) => EventSubMessageTypes.Parse(raw).ShouldBe(expectedMessageType);
 
     [Test]
-    public void MissingMessageType_Parsing_ReturnsUnknown()
-    {
+    public void MissingMessageType_Parsing_ReturnsUnknown() =>
         EventSubMessageTypes.Parse(null).ShouldBe(EventSubMessageType.Unknown);
-    }
 }

@@ -49,9 +49,8 @@ internal static class PointLedgerKindPersistence
         _momentRewardToken,
     ];
 
-    public static string ToToken(PointLedgerKind kind)
-    {
-        return kind switch
+    public static string ToToken(PointLedgerKind kind) =>
+        kind switch
         {
             PointLedgerKind.Add => _addToken,
             PointLedgerKind.Remove => _removeToken,
@@ -67,11 +66,9 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.MomentReward => _momentRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
-    }
 
-    public static PointLedgerKind FromToken(string token)
-    {
-        return token switch
+    public static PointLedgerKind FromToken(string token) =>
+        token switch
         {
             _addToken => PointLedgerKind.Add,
             _removeToken => PointLedgerKind.Remove,
@@ -87,5 +84,4 @@ internal static class PointLedgerKindPersistence
             _momentRewardToken => PointLedgerKind.MomentReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
-    }
 }

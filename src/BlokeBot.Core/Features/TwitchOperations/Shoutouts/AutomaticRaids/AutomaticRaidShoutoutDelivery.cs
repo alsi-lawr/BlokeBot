@@ -85,25 +85,16 @@ internal sealed class AutomaticRaidNativeShoutoutSender(
 
     private static AutomaticRaidShoutoutDeliveryResult.NotDelivered NotDelivered(
         AutomaticRaidShoutoutResultCode reason
-    )
-    {
-        return new(reason);
-    }
+    ) => new(reason);
 
-    private static AutomaticRaidShoutoutResultCode IsAuthorityFailure(string message)
-    {
-        return
-            message.Contains("permission", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("moderator", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("reconnect", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("connect the bot", StringComparison.OrdinalIgnoreCase)
-            || message.Equals(
-                ShoutoutService.UnauthorizedAuthorityMessage,
-                StringComparison.Ordinal
-            )
+    private static AutomaticRaidShoutoutResultCode IsAuthorityFailure(string message) =>
+        message.Contains("permission", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("moderator", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("reconnect", StringComparison.OrdinalIgnoreCase)
+        || message.Contains("connect the bot", StringComparison.OrdinalIgnoreCase)
+        || message.Equals(ShoutoutService.UnauthorizedAuthorityMessage, StringComparison.Ordinal)
             ? AutomaticRaidShoutoutResultCode.AuthorityRequired
             : AutomaticRaidShoutoutResultCode.NotReady;
-    }
 }
 
 internal abstract record AutomaticRaidChannelInformationResult
@@ -241,9 +232,8 @@ internal sealed class AutomaticRaidAnnouncementSender(
         };
     }
 
-    private static TransportAnnouncementColor ToTransportColor(PersistedAnnouncementColor color)
-    {
-        return color switch
+    private static TransportAnnouncementColor ToTransportColor(PersistedAnnouncementColor color) =>
+        color switch
         {
             PersistedAnnouncementColor.Primary => TransportAnnouncementColor.Primary,
             PersistedAnnouncementColor.Blue => TransportAnnouncementColor.Blue,
@@ -256,7 +246,6 @@ internal sealed class AutomaticRaidAnnouncementSender(
                 "Unsupported Twitch announcement color."
             ),
         };
-    }
 }
 
 internal sealed class AutomaticRaidShoutoutDelivery(
@@ -444,9 +433,8 @@ internal sealed class AutomaticRaidShoutoutDelivery(
         AutomaticRaidShoutoutDeliveryRequest request,
         string message,
         CancellationToken cancellationToken
-    )
-    {
-        return await announcements.SendAsync(
+    ) =>
+        await announcements.SendAsync(
             request.HostLogin,
             message,
             request.Configuration.AnnouncementColor,
@@ -477,7 +465,6 @@ internal sealed class AutomaticRaidShoutoutDelivery(
                 new AutomaticRaidShoutoutDeliveryResult.Ambiguous(),
             _ => NotDelivered(AutomaticRaidShoutoutResultCode.Unexpected),
         };
-    }
 
     private async Task AlertAsync(
         AutomaticRaidShoutoutDeliveryRequest request,
@@ -507,10 +494,7 @@ internal sealed class AutomaticRaidShoutoutDelivery(
 
     private static AutomaticRaidShoutoutDeliveryResult.NotDelivered NotDelivered(
         AutomaticRaidShoutoutResultCode reason
-    )
-    {
-        return new(reason);
-    }
+    ) => new(reason);
 }
 
 internal static class AutomaticRaidDeliveryCorrelation

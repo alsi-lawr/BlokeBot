@@ -60,14 +60,8 @@ public sealed class CooldownStoreTests
     {
         private DateTimeOffset _now = new(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        public void Advance(TimeSpan value)
-        {
-            _now += value;
-        }
+        public void Advance(TimeSpan value) => _now += value;
     }
 }

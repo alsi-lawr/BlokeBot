@@ -46,10 +46,8 @@ public sealed class OverlayCueConfigurationTests
         """{"schemaVersion":1,"layers":[{"type":"externalWeb","url":"https://example.test/","startOffsetMilliseconds":0,"durationMilliseconds":1000,"zIndex":0,"rectangle":{"xPercent":0,"yPercent":0,"widthPercent":100,"heightPercent":100},"unknown":true}]}"""
     )]
     [Arguments("""{"schemaVersion":2,"layers":[]}""")]
-    public void CueV1_RejectsActiveSchemesUnknownFieldsAndVersions(string json)
-    {
+    public void CueV1_RejectsActiveSchemesUnknownFieldsAndVersions(string json) =>
         OverlayCueConfiguration.Parse(json).ShouldBeOfType<OverlayCueConfigurationResult.Invalid>();
-    }
 
     [Test]
     public async Task RemotePolicy_RejectsPrivateDnsUnlessOwnerExplicitlyOptsIn()

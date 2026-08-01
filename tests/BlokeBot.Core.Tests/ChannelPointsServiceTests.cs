@@ -349,9 +349,8 @@ public sealed class ChannelPointsServiceTests
         );
     }
 
-    private static ChannelPointsRewardDraft ValidDraft()
-    {
-        return new(
+    private static ChannelPointsRewardDraft ValidDraft() =>
+        new(
             "Managed",
             "Prompt",
             100,
@@ -365,11 +364,9 @@ public sealed class ChannelPointsServiceTests
             false,
             "#FFFFFF"
         );
-    }
 
-    private static EventSubRewardRedemptionEvent Redemption(string id)
-    {
-        return new(
+    private static EventSubRewardRedemptionEvent Redemption(string id) =>
+        new(
             "one-id",
             "one",
             id,
@@ -382,7 +379,6 @@ public sealed class ChannelPointsServiceTests
             DateTimeOffset.UtcNow,
             $"message-{id}"
         );
-    }
 
     private static async Task SetNativeAsync(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
@@ -403,9 +399,8 @@ public sealed class ChannelPointsServiceTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "token",
                     new TokenValidation(
@@ -417,20 +412,17 @@ public sealed class ChannelPointsServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class ChannelPointsHttpClientFactory : IHttpClientFactory
@@ -444,10 +436,7 @@ public sealed class ChannelPointsServiceTests
         internal int ManageableRewardsLists { get; private set; }
         internal int RedemptionStatusLists { get; private set; }
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this));
-        }
+        public HttpClient CreateClient(string name) => new(new Handler(this));
 
         private sealed class Handler(ChannelPointsHttpClientFactory owner) : HttpMessageHandler
         {
@@ -519,18 +508,14 @@ public sealed class ChannelPointsServiceTests
                 );
             }
 
-            private static HttpResponseMessage Json(string value)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage Json(string value) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(value, Encoding.UTF8, "application/json"),
                 };
-            }
 
-            private static string RewardResponse()
-            {
-                return """{"data":[{"id":"managed","title":"Managed","prompt":"Prompt","cost":100,"is_enabled":true,"is_paused":false,"is_user_input_required":true,"max_per_stream_setting":{"is_enabled":false},"max_per_user_per_stream_setting":{"is_enabled":false},"global_cooldown_setting":{"is_enabled":false},"should_redemptions_skip_request_queue":false,"background_color":"#FFFFFF"}]}""";
-            }
+            private static string RewardResponse() =>
+                """{"data":[{"id":"managed","title":"Managed","prompt":"Prompt","cost":100,"is_enabled":true,"is_paused":false,"is_user_input_required":true,"max_per_stream_setting":{"is_enabled":false},"max_per_user_per_stream_setting":{"is_enabled":false},"global_cooldown_setting":{"is_enabled":false},"should_redemptions_skip_request_queue":false,"background_color":"#FFFFFF"}]}""";
         }
     }
 }

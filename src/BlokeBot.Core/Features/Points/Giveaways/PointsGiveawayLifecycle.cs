@@ -18,9 +18,8 @@ public abstract record PointsGiveawayLifecycle
         PointsGiveawayStatus status,
         DateTime startedAtUtc,
         DateTime? completedAtUtc
-    )
-    {
-        return status switch
+    ) =>
+        status switch
         {
             PointsGiveawayStatus.Active when completedAtUtc is null => new Active(),
             PointsGiveawayStatus.Completed
@@ -37,7 +36,6 @@ public abstract record PointsGiveawayLifecycle
             ),
             _ => throw new PersistenceDataIntegrityException(typeof(PointsGiveaway)),
         };
-    }
 
     public sealed record Active : PointsGiveawayLifecycle
     {
@@ -46,18 +44,12 @@ public abstract record PointsGiveawayLifecycle
             Func<Completed, TResult> completed,
             Func<Cancelled, TResult> cancelled,
             Func<Expired, TResult> expired
-        )
-        {
-            return active(this);
-        }
+        ) => active(this);
     }
 
     public sealed record Completed : PointsGiveawayLifecycle
     {
-        internal Completed(DateTime completedAtUtc)
-        {
-            CompletedAtUtc = completedAtUtc;
-        }
+        internal Completed(DateTime completedAtUtc) => CompletedAtUtc = completedAtUtc;
 
         public DateTime CompletedAtUtc { get; }
 
@@ -66,18 +58,12 @@ public abstract record PointsGiveawayLifecycle
             Func<Completed, TResult> completed,
             Func<Cancelled, TResult> cancelled,
             Func<Expired, TResult> expired
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 
     public sealed record Cancelled : PointsGiveawayLifecycle
     {
-        internal Cancelled(DateTime completedAtUtc)
-        {
-            CompletedAtUtc = completedAtUtc;
-        }
+        internal Cancelled(DateTime completedAtUtc) => CompletedAtUtc = completedAtUtc;
 
         public DateTime CompletedAtUtc { get; }
 
@@ -86,18 +72,12 @@ public abstract record PointsGiveawayLifecycle
             Func<Completed, TResult> completed,
             Func<Cancelled, TResult> cancelled,
             Func<Expired, TResult> expired
-        )
-        {
-            return cancelled(this);
-        }
+        ) => cancelled(this);
     }
 
     public sealed record Expired : PointsGiveawayLifecycle
     {
-        internal Expired(DateTime completedAtUtc)
-        {
-            CompletedAtUtc = completedAtUtc;
-        }
+        internal Expired(DateTime completedAtUtc) => CompletedAtUtc = completedAtUtc;
 
         public DateTime CompletedAtUtc { get; }
 
@@ -106,9 +86,6 @@ public abstract record PointsGiveawayLifecycle
             Func<Completed, TResult> completed,
             Func<Cancelled, TResult> cancelled,
             Func<Expired, TResult> expired
-        )
-        {
-            return expired(this);
-        }
+        ) => expired(this);
     }
 }

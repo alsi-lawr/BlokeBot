@@ -152,9 +152,8 @@ internal sealed record HelixCustomRewardWire
     [JsonPropertyName("background_color")]
     public string? BackgroundColor { get; init; }
 
-    public HelixCustomReward ToDomain()
-    {
-        return new(
+    public HelixCustomReward ToDomain() =>
+        new(
             Id,
             Title,
             Prompt,
@@ -171,7 +170,6 @@ internal sealed record HelixCustomRewardWire
             ShouldRedemptionsSkipRequestQueue,
             BackgroundColor
         );
-    }
 }
 
 internal sealed record HelixRewardLimitWire
@@ -233,9 +231,8 @@ internal sealed record HelixRewardRedemptionWire
     [JsonPropertyName("redeemed_at")]
     public DateTimeOffset RedeemedAt { get; init; }
 
-    public HelixRewardRedemption ToDomain()
-    {
-        return new(
+    public HelixRewardRedemption ToDomain() =>
+        new(
             Id,
             Reward.Id,
             Reward.Title,
@@ -251,7 +248,6 @@ internal sealed record HelixRewardRedemptionWire
             },
             RedeemedAt
         );
-    }
 }
 
 internal sealed record HelixRedemptionRewardWire

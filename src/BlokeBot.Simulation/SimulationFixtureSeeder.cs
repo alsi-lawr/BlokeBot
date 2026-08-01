@@ -248,15 +248,13 @@ internal sealed class SimulationFixtureSeeder(
         );
     }
 
-    private static GuessVote Vote(string login, string guess, DateTime guessedAtUtc)
-    {
-        return new GuessVote
+    private static GuessVote Vote(string login, string guess, DateTime guessedAtUtc) =>
+        new GuessVote
         {
             Login = login,
             GuessName = guess,
             GuessedAtUtc = guessedAtUtc,
         };
-    }
 
     private static async Task SeedPointsAsync(
         BlokeBotDbContext db,
@@ -340,16 +338,14 @@ internal sealed class SimulationFixtureSeeder(
         string login,
         string amount,
         DateTime updatedAtUtc
-    )
-    {
-        return new PointBalance
+    ) =>
+        new PointBalance
         {
             HostId = hostId,
             Login = login,
             Amount = amount,
             UpdatedAtUtc = updatedAtUtc,
         };
-    }
 
     private static async Task SeedCustomCommandsAsync(
         BlokeBotDbContext db,
@@ -819,9 +815,8 @@ internal sealed class SimulationFixtureSeeder(
         AutomaticRaidShoutoutOutcomeStatus status,
         AutomaticRaidShoutoutResultCode resultCode,
         DateTime timestamp
-    )
-    {
-        return new AutomaticRaidShoutoutOutcome
+    ) =>
+        new AutomaticRaidShoutoutOutcome
         {
             HostId = hostId,
             ProviderMessageId = providerMessageId,
@@ -835,5 +830,4 @@ internal sealed class SimulationFixtureSeeder(
             ClaimedAtUtc = timestamp,
             CompletedAtUtc = timestamp.AddSeconds(2),
         };
-    }
 }

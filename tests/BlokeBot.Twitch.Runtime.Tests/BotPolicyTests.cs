@@ -227,9 +227,8 @@ public sealed class BotPolicyTests
         policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
     }
 
-    private static BotPolicyOptions ValidOptions()
-    {
-        return new()
+    private static BotPolicyOptions ValidOptions() =>
+        new()
         {
             IrcSession = new IrcSessionResilienceOptions
             {
@@ -271,11 +270,9 @@ public sealed class BotPolicyTests
                 Duration = TimeSpan.FromDays(7),
             },
         };
-    }
 
-    private static Dictionary<string, string?> ValidConfiguration()
-    {
-        return new()
+    private static Dictionary<string, string?> ValidConfiguration() =>
+        new()
         {
             ["TwitchBot:Policies:IrcSession:AttemptLimit"] = "5",
             ["TwitchBot:Policies:IrcSession:Delay"] = "00:00:03",
@@ -299,13 +296,10 @@ public sealed class BotPolicyTests
             ["TwitchBot:Policies:PublicChatDeliveryLifetime:MaximumAge"] = "00:00:30",
             ["TwitchBot:Policies:PublicChatTerminalRetention:Duration"] = "7.00:00:00",
         };
-    }
 
-    private static ValidateOptionsResult ValidateLifetime(TimeSpan? maximumAge)
-    {
-        return new PublicChatDeliveryLifetimeOptionsValidator().Validate(
+    private static ValidateOptionsResult ValidateLifetime(TimeSpan? maximumAge) =>
+        new PublicChatDeliveryLifetimeOptionsValidator().Validate(
             "public chat lifetime",
             new PublicChatDeliveryLifetimeOptions { MaximumAge = maximumAge }
         );
-    }
 }

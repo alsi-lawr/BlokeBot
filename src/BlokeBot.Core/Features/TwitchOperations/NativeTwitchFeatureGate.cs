@@ -30,10 +30,7 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
         string channel,
         NativeTwitchFeature feature,
         CancellationToken cancellationToken
-    )
-    {
-        return await IsEnabledAsync(channel, Map(feature), cancellationToken);
-    }
+    ) => await IsEnabledAsync(channel, Map(feature), cancellationToken);
 
     public async ValueTask<bool> IsEnabledAsync(
         string channel,
@@ -56,9 +53,8 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
             .SingleOrDefaultAsync(cancellationToken);
     }
 
-    private static HostFeatureFlags Map(NativeTwitchFeature feature)
-    {
-        return feature switch
+    private static HostFeatureFlags Map(NativeTwitchFeature feature) =>
+        feature switch
         {
             NativeTwitchFeature.Shoutouts => HostFeatureFlags.Shoutouts,
             NativeTwitchFeature.Polls => HostFeatureFlags.Polls,
@@ -66,7 +62,6 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
             NativeTwitchFeature.Predictions => HostFeatureFlags.Predictions,
             _ => throw new ArgumentOutOfRangeException(nameof(feature), feature, null),
         };
-    }
 
     private static void EnsureNativeFeature(HostFeatureFlags feature)
     {

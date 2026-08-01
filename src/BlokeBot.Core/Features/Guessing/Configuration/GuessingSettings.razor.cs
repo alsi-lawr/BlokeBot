@@ -77,10 +77,7 @@ public partial class GuessingSettings
         await LoadAsync();
     }
 
-    private Task LoadAsync()
-    {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
-    }
+    private Task LoadAsync() => ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
 
     private async Task LoadCoreAsync()
     {
@@ -121,18 +118,12 @@ public partial class GuessingSettings
         );
     }
 
-    private void RemoveOption(GuessOptionEditor option)
-    {
-        _config?.Profile.Options.Remove(option);
-    }
+    private void RemoveOption(GuessOptionEditor option) => _config?.Profile.Options.Remove(option);
 
-    private Task CreateProfileAsync()
-    {
-        return ObserveUiOperationAsync(nameof(CreateProfileAsync), CreateProfileCoreAsync);
-    }
+    private Task CreateProfileAsync() =>
+        ObserveUiOperationAsync(nameof(CreateProfileAsync), CreateProfileCoreAsync);
 
-    private async Task CreateProfileCoreAsync()
-    {
+    private async Task CreateProfileCoreAsync() =>
         await GuessingConfigurationValidator
             .ValidateNewProfile(_newProfileName)
             .Match(
@@ -145,10 +136,8 @@ public partial class GuessingSettings
                     return Task.CompletedTask;
                 }
             );
-    }
 
-    private async Task CreateProfileAsync(GuessingProfileCreateCommand command)
-    {
+    private async Task CreateProfileAsync(GuessingProfileCreateCommand command) =>
         await RunSelectedHostMutationAsync(
             HostId,
             async () =>
@@ -176,12 +165,9 @@ public partial class GuessingSettings
                 );
             }
         );
-    }
 
-    private Task DeleteProfileAsync()
-    {
-        return ObserveUiOperationAsync(nameof(DeleteProfileAsync), DeleteProfileCoreAsync);
-    }
+    private Task DeleteProfileAsync() =>
+        ObserveUiOperationAsync(nameof(DeleteProfileAsync), DeleteProfileCoreAsync);
 
     private Task DeleteProfileCoreAsync()
     {
@@ -204,8 +190,7 @@ public partial class GuessingSettings
             );
     }
 
-    private async Task DeleteProfileAsync(GuessingProfileDeleteCommand command)
-    {
+    private async Task DeleteProfileAsync(GuessingProfileDeleteCommand command) =>
         await RunSelectedHostMutationAsync(
             HostId,
             async () =>
@@ -234,17 +219,11 @@ public partial class GuessingSettings
                 );
             }
         );
-    }
 
-    private Task SaveAsync()
-    {
-        return ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
-    }
+    private Task SaveAsync() => ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
 
-    private async Task SaveCoreAsync()
-    {
+    private async Task SaveCoreAsync() =>
         _ = await TrySaveAsync(reloadAfterConcurrentFailure: true);
-    }
 
     private async Task<bool> TrySaveAsync(bool reloadAfterConcurrentFailure)
     {
@@ -314,13 +293,8 @@ public partial class GuessingSettings
         return saved;
     }
 
-    private Task SelectProfileAsync(ChangeEventArgs args)
-    {
-        return ObserveUiOperationAsync(
-            nameof(SelectProfileAsync),
-            () => SelectProfileCoreAsync(args)
-        );
-    }
+    private Task SelectProfileAsync(ChangeEventArgs args) =>
+        ObserveUiOperationAsync(nameof(SelectProfileAsync), () => SelectProfileCoreAsync(args));
 
     private async Task SelectProfileCoreAsync(ChangeEventArgs args)
     {
@@ -343,10 +317,8 @@ public partial class GuessingSettings
         await LoadConfigurationAsync(new GuessingProfileSelection.Selected(profileId));
     }
 
-    private Task SaveAndSwitchAsync()
-    {
-        return ObserveUiOperationAsync(nameof(SaveAndSwitchAsync), SaveAndSwitchCoreAsync);
-    }
+    private Task SaveAndSwitchAsync() =>
+        ObserveUiOperationAsync(nameof(SaveAndSwitchAsync), SaveAndSwitchCoreAsync);
 
     private async Task SaveAndSwitchCoreAsync()
     {
@@ -364,10 +336,8 @@ public partial class GuessingSettings
         await LoadConfigurationAsync(new GuessingProfileSelection.Selected(profileId));
     }
 
-    private Task DiscardAndSwitchAsync()
-    {
-        return ObserveUiOperationAsync(nameof(DiscardAndSwitchAsync), DiscardAndSwitchCoreAsync);
-    }
+    private Task DiscardAndSwitchAsync() =>
+        ObserveUiOperationAsync(nameof(DiscardAndSwitchAsync), DiscardAndSwitchCoreAsync);
 
     private async Task DiscardAndSwitchCoreAsync()
     {
@@ -380,15 +350,10 @@ public partial class GuessingSettings
         await LoadConfigurationAsync(new GuessingProfileSelection.Selected(profileId));
     }
 
-    private void KeepEditing()
-    {
-        _pendingProfileId = null;
-    }
+    private void KeepEditing() => _pendingProfileId = null;
 
-    private bool HasUnsavedChanges()
-    {
-        return _config is not null && _loadedDraft is not null && !_loadedDraft.Matches(_config);
-    }
+    private bool HasUnsavedChanges() =>
+        _config is not null && _loadedDraft is not null && !_loadedDraft.Matches(_config);
 
     private async Task LoadConfigurationAsync(GuessingProfileSelection selection)
     {
@@ -431,8 +396,5 @@ public partial class GuessingSettings
 
     private static string ValidationMessage(
         IReadOnlyList<GuessingConfigurationValidationError> errors
-    )
-    {
-        return string.Join(" ", errors.Select(error => error.Message));
-    }
+    ) => string.Join(" ", errors.Select(error => error.Message));
 }

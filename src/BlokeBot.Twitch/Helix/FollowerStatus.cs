@@ -10,16 +10,14 @@ public abstract record FollowerStatus
         Func<Follows, TResult> follows,
         Func<DoesNotFollow, TResult> doesNotFollow,
         Func<Unavailable, TResult> unavailable
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Follows value => follows(value),
             DoesNotFollow value => doesNotFollow(value),
             Unavailable value => unavailable(value),
             _ => throw new UnreachableException("Unknown follower status."),
         };
-    }
 
     public sealed record Follows : FollowerStatus;
 

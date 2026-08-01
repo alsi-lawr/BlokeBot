@@ -73,10 +73,7 @@ public partial class AlertsPage
         }
     }
 
-    private Task RefreshAsync()
-    {
-        return LoadAsync();
-    }
+    private Task RefreshAsync() => LoadAsync();
 
     private async Task RetryLoadAsync()
     {
@@ -85,33 +82,26 @@ public partial class AlertsPage
         await LoadAsync();
     }
 
-    private static string FormatTimestamp(DateTime? value)
-    {
-        return value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
-    }
+    private static string FormatTimestamp(DateTime? value) =>
+        value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
 
-    private static string AlertAreaLabel(string source)
-    {
-        return source switch
+    private static string AlertAreaLabel(string source) =>
+        source switch
         {
             "twitch-outbound-queue" => "Chat messages",
             _ => "BlokeBot",
         };
-    }
 
-    private static string ImportanceLabel(DurableAlertSeverity severity)
-    {
-        return severity switch
+    private static string ImportanceLabel(DurableAlertSeverity severity) =>
+        severity switch
         {
             DurableAlertSeverity.Critical => "Urgent",
             DurableAlertSeverity.Warning => "Warning",
             _ => "Information",
         };
-    }
 
-    private static string SeverityBadgeClass(DurableAlertSeverity severity)
-    {
-        return severity switch
+    private static string SeverityBadgeClass(DurableAlertSeverity severity) =>
+        severity switch
         {
             DurableAlertSeverity.Critical =>
                 "inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700",
@@ -120,5 +110,4 @@ public partial class AlertsPage
             _ =>
                 "inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700",
         };
-    }
 }

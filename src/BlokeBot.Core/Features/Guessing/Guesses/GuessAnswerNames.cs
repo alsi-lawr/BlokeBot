@@ -22,10 +22,7 @@ internal sealed class GuessAnswerNames
 
     public string Value => string.Join(", ", _values.Select(name => name.Value));
 
-    public bool Contains(GuessName name)
-    {
-        return _values.Contains(name);
-    }
+    public bool Contains(GuessName name) => _values.Contains(name);
 
     public static GuessAnswerNames Parse(string? value)
     {

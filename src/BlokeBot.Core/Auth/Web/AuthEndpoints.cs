@@ -432,23 +432,20 @@ internal static class AuthEndpoints
     internal static RecoveredModeratorHostSelection ClearRevokedModeratorHost(
         AuthenticatedSession session,
         int hostId
-    )
-    {
-        return new(
+    ) =>
+        new(
             session
                 .AvailableHosts.Where(host => host.Id != hostId || host.Role != AuthRole.Moderator)
                 .ToArray(),
             null
         );
-    }
 
     internal static IResult MapAuthenticationError(
         WebAuthenticationError error,
         HttpContext context,
         ILogger<WebAuthEndpointLog> logger
-    )
-    {
-        return error switch
+    ) =>
+        error switch
         {
             WebAuthenticationError.TransportFailure transport => ProviderFailure(
                 context,
@@ -464,7 +461,6 @@ internal static class AuthEndpoints
             ),
             _ => throw new UnreachableException(),
         };
-    }
 
     internal static IResult ProviderFailure(
         HttpContext context,
@@ -515,10 +511,7 @@ internal static class AuthEndpoints
         BlokeBotAuthReturnAction returnAction,
         string? supportReference = null,
         BlokeBotAuthContext? resultContext = null
-    )
-    {
-        return new(outcome, status, retryAction, returnAction, supportReference, resultContext);
-    }
+    ) => new(outcome, status, retryAction, returnAction, supportReference, resultContext);
 
     private abstract record LoginAction
     {
@@ -534,10 +527,7 @@ internal static class AuthEndpoints
             internal override TResult Match<TResult>(
                 Func<ShowLoginPage, TResult> showLoginPage,
                 Func<StartOAuth, TResult> startOAuth
-            )
-            {
-                return showLoginPage(this);
-            }
+            ) => showLoginPage(this);
         }
 
         internal sealed record StartOAuth : LoginAction
@@ -545,10 +535,7 @@ internal static class AuthEndpoints
             internal override TResult Match<TResult>(
                 Func<ShowLoginPage, TResult> showLoginPage,
                 Func<StartOAuth, TResult> startOAuth
-            )
-            {
-                return startOAuth(this);
-            }
+            ) => startOAuth(this);
         }
     }
 }

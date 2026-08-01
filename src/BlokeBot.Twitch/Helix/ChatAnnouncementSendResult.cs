@@ -13,9 +13,8 @@ public abstract record ChatAnnouncementSendResult
         Func<RateLimited, TResult> rateLimited,
         Func<Unexpected, TResult> unexpected,
         Func<Ambiguous, TResult> ambiguous
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Sent value => sent(value),
             Invalid value => invalid(value),
@@ -25,7 +24,6 @@ public abstract record ChatAnnouncementSendResult
             Ambiguous value => ambiguous(value),
             _ => throw new UnreachableException("Unknown chat announcement send result."),
         };
-    }
 
     public sealed record Sent : ChatAnnouncementSendResult;
 

@@ -32,12 +32,10 @@ public sealed class AutomaticRaidShoutoutTemplateTests
     [Arguments("before}")]
     [Arguments("{after")]
     [Arguments("{{display_name}}")]
-    public void MalformedOrUnknownSyntax_IsRejected(string source)
-    {
+    public void MalformedOrUnknownSyntax_IsRejected(string source) =>
         AutomaticRaidShoutoutTemplate
             .Parse(source)
             .ShouldBeOfType<AutomaticRaidTemplateParseOutcome.Invalid>();
-    }
 
     [Test]
     public void AuthoredBudget_CountsLiteralsAndFallbacksButNotTokenSyntax()
@@ -87,8 +85,6 @@ public sealed class AutomaticRaidShoutoutTemplateTests
         AutomaticRaidShoutoutTemplate.MaximumRenderedCharacters.ShouldBe(500);
     }
 
-    private static AutomaticRaidTemplateValues Values(string displayName)
-    {
-        return new("@raider", displayName, "https://twitch.tv/raider", 1, null, null);
-    }
+    private static AutomaticRaidTemplateValues Values(string displayName) =>
+        new("@raider", displayName, "https://twitch.tv/raider", 1, null, null);
 }

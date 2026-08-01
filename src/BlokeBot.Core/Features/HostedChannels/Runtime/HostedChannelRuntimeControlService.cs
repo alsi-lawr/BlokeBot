@@ -18,9 +18,8 @@ public sealed class HostedChannelRuntimeControlService(
     private TimeSpan _runtimeChangeCooldown =>
         TimeSpan.FromSeconds(Math.Max(0, options.Value.BotStateChangeCooldownSeconds));
 
-    public IO<HostedChannelRuntimeControlOutcome, Never> Start(int hostId)
-    {
-        return IO<HostedChannelRuntimeControlOutcome, Never>.Create(async ct =>
+    public IO<HostedChannelRuntimeControlOutcome, Never> Start(int hostId) =>
+        IO<HostedChannelRuntimeControlOutcome, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
@@ -67,11 +66,9 @@ public sealed class HostedChannelRuntimeControlService(
             await changes.NotifyChangedAsync(ct);
             return Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
-    }
 
-    public IO<HostedChannelRuntimeControlOutcome, Never> Stop(int hostId)
-    {
-        return IO<HostedChannelRuntimeControlOutcome, Never>.Create(async ct =>
+    public IO<HostedChannelRuntimeControlOutcome, Never> Stop(int hostId) =>
+        IO<HostedChannelRuntimeControlOutcome, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
@@ -102,7 +99,6 @@ public sealed class HostedChannelRuntimeControlService(
             await changes.NotifyChangedAsync(ct);
             return Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
-    }
 
     private HostedChannelRuntimeControlOutcome.Cooldown? CooldownMessage(BotHost host)
     {
@@ -124,10 +120,7 @@ public sealed class HostedChannelRuntimeControlService(
 
     private static Result<HostedChannelRuntimeControlOutcome, Never> Success(
         HostedChannelRuntimeControlOutcome outcome
-    )
-    {
-        return Result<HostedChannelRuntimeControlOutcome, Never>.Success(outcome);
-    }
+    ) => Result<HostedChannelRuntimeControlOutcome, Never>.Success(outcome);
 }
 
 public abstract record HostedChannelRuntimeControlOutcome

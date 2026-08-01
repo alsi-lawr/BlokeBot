@@ -18,10 +18,7 @@ public abstract record AuthSessionState
             Func<NoSelection, TResult> noSelection,
             Func<Selected, TResult> selected,
             Func<Invalid, TResult> invalid
-        )
-        {
-            return noSelection(this);
-        }
+        ) => noSelection(this);
     }
 
     public sealed record Selected(BotHostSelection Selection) : AuthSessionState
@@ -30,10 +27,7 @@ public abstract record AuthSessionState
             Func<NoSelection, TResult> noSelection,
             Func<Selected, TResult> selected,
             Func<Invalid, TResult> invalid
-        )
-        {
-            return selected(this);
-        }
+        ) => selected(this);
     }
 
     public sealed record Invalid : AuthSessionState
@@ -42,9 +36,6 @@ public abstract record AuthSessionState
             Func<NoSelection, TResult> noSelection,
             Func<Selected, TResult> selected,
             Func<Invalid, TResult> invalid
-        )
-        {
-            return invalid(this);
-        }
+        ) => invalid(this);
     }
 }

@@ -117,22 +117,13 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             return new InterceptedSqliteBlokeBotDbFactory(keeperConnection, options);
         }
 
-        public BlokeBotDbContext CreateDbContext()
-        {
-            return new(options);
-        }
+        public BlokeBotDbContext CreateDbContext() => new(options);
 
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            return Task.FromResult(CreateDbContext());
-        }
+        ) => Task.FromResult(CreateDbContext());
 
-        public async ValueTask DisposeAsync()
-        {
-            await keeperConnection.DisposeAsync();
-        }
+        public async ValueTask DisposeAsync() => await keeperConnection.DisposeAsync();
     }
 
     private protected sealed class CommitCancellationInterceptor : DbTransactionInterceptor
@@ -143,10 +134,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
 
         public CancellationToken ObservedCancellationToken { get; private set; }
 
-        public void FailNextCommit()
-        {
-            _failNextCommit = true;
-        }
+        public void FailNextCommit() => _failNextCommit = true;
 
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(
             DbTransaction transaction,

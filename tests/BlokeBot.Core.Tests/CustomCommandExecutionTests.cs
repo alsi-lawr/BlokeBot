@@ -807,14 +807,12 @@ public sealed class CustomCommandExecutionTests
         await db.SaveChangesAsync();
     }
 
-    private static CommandResponder RecordEvents(ICollection<string> events)
-    {
-        return (response, _) =>
+    private static CommandResponder RecordEvents(ICollection<string> events) =>
+        (response, _) =>
         {
             events.Add($"reply:{response.Message}");
             return ValueTask.CompletedTask;
         };
-    }
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -928,9 +926,8 @@ public sealed class CustomCommandExecutionTests
         string channel,
         string text,
         IReadOnlyDictionary<string, string>? tags = null
-    )
-    {
-        return new(
+    ) =>
+        new(
             login,
             channel,
             text,
@@ -938,22 +935,19 @@ public sealed class CustomCommandExecutionTests
             tags
                 ?? new Dictionary<string, string> { ["user-id"] = $"{login.ToLowerInvariant()}-id" }
         );
-    }
 
     private static ChatCommandContext Context(
         string login,
         string text,
         CommandResponder? responder = null,
         IReadOnlyDictionary<string, string>? tags = null
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Message = Message(login, "streamer", text, tags),
             CommandName = text.TrimStart('!'),
             Responder = responder ?? ((_, _) => ValueTask.CompletedTask),
         };
-    }
 
     private static async Task SetLimitAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -973,23 +967,19 @@ public sealed class CustomCommandExecutionTests
         string channel,
         string text,
         List<string> replies
-    )
-    {
+    ) =>
         await dispatcher.DispatchResponsesAsync(
             Message(login, channel, text),
             RecordMessages(replies),
             CancellationToken.None
         );
-    }
 
-    private static CommandResponder RecordMessages(List<string> replies)
-    {
-        return (response, _) =>
+    private static CommandResponder RecordMessages(List<string> replies) =>
+        (response, _) =>
         {
             replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
-    }
 
     private sealed record CommandSeed(int CommandId, int MessageLibraryEntryId, int? CounterId);
 
@@ -1022,10 +1012,7 @@ public sealed class CustomCommandExecutionTests
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
             int hostId,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(new OverlayCueAdmissionCatalog([], []));
-        }
+        ) => Task.FromResult(new OverlayCueAdmissionCatalog([], []));
 
         public Task<OverlayCueAdmissionOutcome> AdmitAsync(
             OverlayCueAdmissionRequest request,
@@ -1042,15 +1029,9 @@ public sealed class CustomCommandExecutionTests
     {
         private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _current;
-        }
+        public override DateTimeOffset GetUtcNow() => _current;
 
-        public void Advance(TimeSpan interval)
-        {
-            _current += interval;
-        }
+        public void Advance(TimeSpan interval) => _current += interval;
     }
 
     private sealed class MutableStreamLivenessProvider(string? streamId)

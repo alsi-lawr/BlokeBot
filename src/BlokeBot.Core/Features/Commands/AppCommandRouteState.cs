@@ -22,10 +22,7 @@ public abstract record AppCommandRouteState
         public override TResult Match<TResult>(
             Func<Host, TResult> host,
             Func<GuessingProfile, TResult> guessingProfile
-        )
-        {
-            return host(this);
-        }
+        ) => host(this);
     }
 
     public sealed record GuessingProfile : AppCommandRouteState
@@ -45,9 +42,6 @@ public abstract record AppCommandRouteState
         public override TResult Match<TResult>(
             Func<Host, TResult> host,
             Func<GuessingProfile, TResult> guessingProfile
-        )
-        {
-            return guessingProfile(this);
-        }
+        ) => guessingProfile(this);
     }
 }

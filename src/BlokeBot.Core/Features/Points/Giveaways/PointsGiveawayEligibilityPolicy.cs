@@ -11,9 +11,8 @@ public sealed class PointsGiveawayEligibilityPolicy(
     ILogger<PointsGiveawayEligibilityPolicy> log
 )
 {
-    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string hostLogin)
-    {
-        return IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string hostLogin) =>
+        IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
         {
             try
             {
@@ -37,7 +36,6 @@ public sealed class PointsGiveawayEligibilityPolicy(
                 throw new PointsGiveawayStreamLivenessException(hostLogin, exception);
             }
         });
-    }
 
     public async Task<bool> IsFollowerEligibilityAvailableAsync(
         string hostLogin,
@@ -59,9 +57,8 @@ public sealed class PointsGiveawayEligibilityPolicy(
         string hostLogin,
         string login,
         IReadOnlyDictionary<string, string> tags
-    )
-    {
-        return settings.GiveawayEligibility switch
+    ) =>
+        settings.GiveawayEligibility switch
         {
             PointsEligibilityMode.Subscribers => Immediate(
                 HasSubscriberBadge(tags)
@@ -71,14 +68,11 @@ public sealed class PointsGiveawayEligibilityPolicy(
             PointsEligibilityMode.Followers => botStatus.CheckFollower(hostLogin, login),
             _ => Immediate(new FollowerCheckOutcome.Eligible()),
         };
-    }
 
-    private static IO<FollowerCheckOutcome, Never> Immediate(FollowerCheckOutcome outcome)
-    {
-        return IO<FollowerCheckOutcome, Never>.Create(_ =>
+    private static IO<FollowerCheckOutcome, Never> Immediate(FollowerCheckOutcome outcome) =>
+        IO<FollowerCheckOutcome, Never>.Create(_ =>
             ValueTask.FromResult(Result<FollowerCheckOutcome, Never>.Success(outcome))
         );
-    }
 
     private static bool HasSubscriberBadge(IReadOnlyDictionary<string, string> tags)
     {

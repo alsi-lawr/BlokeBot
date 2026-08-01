@@ -561,16 +561,14 @@ public sealed class CustomCommandSettingsUiTests
         IRenderedComponent<CustomCommandSettingsPage> page,
         SeededConfiguration seeded,
         ValidationSection section
-    )
-    {
-        return section switch
+    ) =>
+        section switch
         {
             ValidationSection.Replies => InvalidateReply(page, seeded),
             ValidationSection.Commands => InvalidateCommand(page, seeded),
             ValidationSection.Counters => InvalidateCounter(page, seeded),
             _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
         };
-    }
 
     private static ValidationSectionExpectation InvalidateReply(
         IRenderedComponent<CustomCommandSettingsPage> page,

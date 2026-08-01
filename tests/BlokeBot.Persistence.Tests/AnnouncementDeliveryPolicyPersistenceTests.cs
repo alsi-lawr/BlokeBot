@@ -308,8 +308,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         int hostId,
         long? retryDelayTicks,
         long? occurrenceLifetimeTicks
-    )
-    {
+    ) =>
         await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
@@ -321,7 +320,6 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
                 """
             )
         );
-    }
 
     private static CustomAnnouncement CreateAnnouncement(int hostId)
     {
@@ -348,15 +346,13 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         };
     }
 
-    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy Policy(int hostId)
-    {
-        return new()
+    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy Policy(int hostId) =>
+        new()
         {
             HostId = hostId,
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
             OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
-    }
 
     private static async Task<int> CreateMessageEntryAsync(BlokeBotDbContext db, int hostId)
     {

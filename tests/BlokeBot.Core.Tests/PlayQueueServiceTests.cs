@@ -468,9 +468,8 @@ public sealed class PlayQueueServiceTests
             );
     }
 
-    private static ConfigurePlayQueueCommand Queue(string slug)
-    {
-        return new(
+    private static ConfigurePlayQueueCommand Queue(string slug) =>
+        new(
             slug,
             "Community squad",
             "Example game",
@@ -489,32 +488,24 @@ public sealed class PlayQueueServiceTests
             ],
             [new("Tank", 1), new("Healer", 1), new("Damage", 2)]
         );
-    }
 
-    private static JoinPlayQueueCommand Join(string login, string region, string role)
-    {
-        return new(
+    private static JoinPlayQueueCommand Join(string login, string region, string role) =>
+        new(
             new(login),
             0,
             new Dictionary<string, string> { ["region"] = region, ["preferred-role"] = role }
         );
-    }
 
     private static PlayQueueService CreateService(
         SqliteBlokeBotDbFactory database,
         TimeProvider? clock = null
-    )
-    {
-        return new(database, TestEventBus.Create<AppEventKind>(), clock ?? TimeProvider.System);
-    }
+    ) => new(database, TestEventBus.Create<AppEventKind>(), clock ?? TimeProvider.System);
 
-    private static PlayQueueResult<T>.Succeeded Success<T>(PlayQueueResult<T> result)
-    {
-        return result.Match(
+    private static PlayQueueResult<T>.Succeeded Success<T>(PlayQueueResult<T> result) =>
+        result.Match(
             value => value,
             rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
-    }
 
     private static async Task AssertExpiredReadyCheckPersistedAsync(
         SqliteBlokeBotDbFactory database,
@@ -557,15 +548,9 @@ public sealed class PlayQueueServiceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        public void Advance(TimeSpan value)
-        {
-            _now += value;
-        }
+        public void Advance(TimeSpan value) => _now += value;
     }
 
     public enum ExpiredQueueMutation

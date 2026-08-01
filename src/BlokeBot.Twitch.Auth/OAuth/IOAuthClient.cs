@@ -12,10 +12,8 @@ public interface IOAuthClient
     /// <returns>The authorization URI.</returns>
     Uri BuildAuthorizeUri(string state);
 
-    Uri BuildAuthorizeUri(string state, IEnumerable<string?> additionalScopes)
-    {
-        return BuildAuthorizeUri(state);
-    }
+    Uri BuildAuthorizeUri(string state, IEnumerable<string?> additionalScopes) =>
+        BuildAuthorizeUri(state);
 
     /// <summary>
     /// Exchanges an authorization code for tokens.

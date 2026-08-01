@@ -179,14 +179,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         int commandId,
         CustomCommandValidationFieldKind field,
         string message
-    )
-    {
-        return new CustomCommandConfigurationSaveFailure.OverlayCueReference(
-            commandId,
-            field,
-            message
-        );
-    }
+    ) => new CustomCommandConfigurationSaveFailure.OverlayCueReference(commandId, field, message);
 
     private static async Task<Dictionary<int, CustomMessageLibraryEntry>> StageMessageEntriesAsync(
         BlokeBotDbContext db,
@@ -630,8 +623,6 @@ public sealed class CustomCommandConfigurationGraphWriter(
         return configured.Select(configuredId).Any(id => id > 0 && !storedIds.Contains(id));
     }
 
-    private static string TemporaryName(string entityName, int editorId)
-    {
-        return $"__editing_{entityName}_{editorId}_{Guid.NewGuid():N}";
-    }
+    private static string TemporaryName(string entityName, int editorId) =>
+        $"__editing_{entityName}_{editorId}_{Guid.NewGuid():N}";
 }

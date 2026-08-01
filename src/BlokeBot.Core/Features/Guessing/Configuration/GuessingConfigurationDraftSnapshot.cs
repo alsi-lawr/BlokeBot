@@ -38,10 +38,9 @@ internal sealed class GuessingConfigurationDraftSnapshot
         _unpinWhenRoundStops = configuration.Pin.UnpinWhenRoundStops;
     }
 
-    internal static GuessingConfigurationDraftSnapshot Capture(GuessingConfiguration configuration)
-    {
-        return new(configuration);
-    }
+    internal static GuessingConfigurationDraftSnapshot Capture(
+        GuessingConfiguration configuration
+    ) => new(configuration);
 
     internal bool Matches(GuessingConfiguration configuration)
     {
@@ -65,20 +64,17 @@ internal sealed class GuessingConfigurationDraftSnapshot
             && _unpinWhenRoundStops == current._unpinWhenRoundStops;
     }
 
-    private static GuessingCommandAliases CaptureAliases(CommandAliasEditor aliases)
-    {
-        return new(
+    private static GuessingCommandAliases CaptureAliases(CommandAliasEditor aliases) =>
+        new(
             aliases.StartAliases,
             aliases.StopAliases,
             aliases.WinAliases,
             aliases.GuessAliases,
             aliases.GuessesAliases
         );
-    }
 
-    private static GuessingReplySettings CaptureReplies(ReplySettingsEditor replies)
-    {
-        return new(
+    private static GuessingReplySettings CaptureReplies(ReplySettingsEditor replies) =>
+        new(
             replies.RoundStartedReply,
             replies.RoundAlreadyOpenReply,
             replies.NoOpenRoundReply,
@@ -93,24 +89,19 @@ internal sealed class GuessingConfigurationDraftSnapshot
             replies.WinnerReply,
             replies.NoWinnersReply
         );
-    }
 
-    private static GuessOptionValue[] CaptureOptions(IEnumerable<GuessOptionEditor> options)
-    {
-        return options
+    private static GuessOptionValue[] CaptureOptions(IEnumerable<GuessOptionEditor> options) =>
+        options
             .Select(option => new GuessOptionValue(
                 option.Name,
                 option.ReplyText,
                 option.ReplyTarget
             ))
             .ToArray();
-    }
 
-    private static string[] CaptureWhisperReplyKeys(GuessingConfiguration configuration)
-    {
-        return configuration
+    private static string[] CaptureWhisperReplyKeys(GuessingConfiguration configuration) =>
+        configuration
             .ReplyDelivery.ToMap()
             .WhisperKeys.OrderBy(key => key, StringComparer.Ordinal)
             .ToArray();
-    }
 }

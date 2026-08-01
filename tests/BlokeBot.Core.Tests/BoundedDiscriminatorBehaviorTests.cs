@@ -187,25 +187,17 @@ public sealed class BoundedDiscriminatorBehaviorTests
 
     private static void AssertSuccess(
         Result<PointBalanceMutation, PointBalanceMutationFailure> result
-    )
-    {
-        result.Match(static _ => true, static _ => false).ShouldBeTrue();
-    }
+    ) => result.Match(static _ => true, static _ => false).ShouldBeTrue();
 
-    private static ReplyDeliverySetting Setting(string key, ReplyDeliveryTarget target)
-    {
-        return new()
+    private static ReplyDeliverySetting Setting(string key, ReplyDeliveryTarget target) =>
+        new()
         {
             Feature = ReplyFeature.Guessing,
             ReplyKey = key,
             Target = target,
         };
-    }
 
-    private static PointAmount Amount(int value)
-    {
-        return PointAmount.ParseAbsolute(value.ToString());
-    }
+    private static PointAmount Amount(int value) => PointAmount.ParseAbsolute(value.ToString());
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {

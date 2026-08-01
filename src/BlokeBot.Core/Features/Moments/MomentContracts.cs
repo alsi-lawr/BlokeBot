@@ -119,10 +119,7 @@ public abstract record MomentResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return succeeded(this);
-        }
+        ) => succeeded(this);
     }
 
     public sealed record Rejected(MomentRejection Reason) : MomentResult<T>
@@ -130,10 +127,7 @@ public abstract record MomentResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }
 
@@ -180,16 +174,12 @@ public interface IMomentProviderOperations
 
 internal static class MomentInput
 {
-    public static string NormalizeLogin(string value)
-    {
-        return value.Trim().TrimStart('@').ToLowerInvariant();
-    }
+    public static string NormalizeLogin(string value) =>
+        value.Trim().TrimStart('@').ToLowerInvariant();
 
-    public static bool IsValidLogin(string value)
-    {
-        return value.Length is >= 1 and <= 128
-            && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
-    }
+    public static bool IsValidLogin(string value) =>
+        value.Length is >= 1 and <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     public static string IdentityKey(MomentViewerIdentity viewer)
     {

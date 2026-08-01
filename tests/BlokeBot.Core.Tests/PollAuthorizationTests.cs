@@ -74,20 +74,17 @@ public sealed class PollAuthorizationTests
         status.ShouldBeOfType<TokenStatus.Unavailable>();
     }
 
-    private static HostBroadcasterAuthorizationService Service(SqliteBlokeBotDbFactory factory)
-    {
-        return new(
+    private static HostBroadcasterAuthorizationService Service(SqliteBlokeBotDbFactory factory) =>
+        new(
             factory,
             HostBotAccountTokenProtectionTestSupport.CreateProtector(),
             null!,
             null!,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
-    }
 
-    private static HostBotAccountAuthorizationGrant Grant(string id)
-    {
-        return new(
+    private static HostBotAccountAuthorizationGrant Grant(string id) =>
+        new(
             new HostBotAccountTokenPayload("access", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
             id,
             LoginName.Parse("host"),
@@ -95,5 +92,4 @@ public sealed class PollAuthorizationTests
             null,
             OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
         );
-    }
 }

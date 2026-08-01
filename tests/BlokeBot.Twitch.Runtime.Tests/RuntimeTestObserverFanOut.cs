@@ -9,9 +9,8 @@ internal static class RuntimeTestObserverFanOut
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary)
-        where TDeadLetter : IObserverDeadLetterPayload
-    {
-        return new(
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -19,16 +18,14 @@ internal static class RuntimeTestObserverFanOut
             new TestReporter(),
             new TestCorrelationIdProvider()
         );
-    }
 
     internal static ObserverFanOut<TBoundary, TEvent, TDeadLetter> EscalatingContinue<
         TBoundary,
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary, Exception reporterFailure)
-        where TDeadLetter : IObserverDeadLetterPayload
-    {
-        return new(
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -36,7 +33,6 @@ internal static class RuntimeTestObserverFanOut
             new ThrowingReporter(reporterFailure),
             new TestCorrelationIdProvider()
         );
-    }
 
     private sealed class TestReporter : IObserverFailureDiagnosticReporter
     {
@@ -56,10 +52,8 @@ internal static class RuntimeTestObserverFanOut
     {
         private int _next;
 
-        public ObserverCorrelationId Next()
-        {
-            return ObserverCorrelationId.Named($"runtime-test-{++_next}");
-        }
+        public ObserverCorrelationId Next() =>
+            ObserverCorrelationId.Named($"runtime-test-{++_next}");
     }
 
     private sealed class ThrowingReporter(Exception failure) : IObserverFailureDiagnosticReporter
@@ -67,9 +61,6 @@ internal static class RuntimeTestObserverFanOut
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromException(failure);
-        }
+        ) => ValueTask.FromException(failure);
     }
 }

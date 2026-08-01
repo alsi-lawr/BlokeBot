@@ -48,10 +48,7 @@ public partial class CollapsibleSection
         get => string.IsNullOrWhiteSpace(ContentId) ? field : ContentId;
     } = $"disclosure-{Guid.NewGuid():N}";
 
-    protected override void OnInitialized()
-    {
-        _isOpen = InitiallyOpen;
-    }
+    protected override void OnInitialized() => _isOpen = InitiallyOpen;
 
     protected override void OnParametersSet()
     {

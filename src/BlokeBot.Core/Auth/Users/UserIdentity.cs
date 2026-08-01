@@ -25,10 +25,8 @@ internal sealed record UserIdentity
         string login,
         string displayName,
         string profileImageUrl
-    )
-    {
-        return string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(login)
+    ) =>
+        string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(login)
             ? Option<UserIdentity>.None
             : Option<UserIdentity>.Some(new UserIdentity(id, login, displayName, profileImageUrl));
-    }
 }

@@ -78,9 +78,8 @@ public sealed class ChatAnnouncementClient(
         }
     }
 
-    private static string ToProviderColor(TwitchAnnouncementColor color)
-    {
-        return color switch
+    private static string ToProviderColor(TwitchAnnouncementColor color) =>
+        color switch
         {
             TwitchAnnouncementColor.Primary => "primary",
             TwitchAnnouncementColor.Blue => "blue",
@@ -93,7 +92,6 @@ public sealed class ChatAnnouncementClient(
                 "Unsupported announcement color."
             ),
         };
-    }
 
     private sealed record ChatAnnouncementRequest
     {
