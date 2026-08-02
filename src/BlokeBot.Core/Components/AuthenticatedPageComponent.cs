@@ -171,13 +171,11 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
         return "/" + navigation.ToBaseRelativePath(navigation.Uri);
     }
 
-    protected void ReportUiFault(string operation, Exception exception)
-    {
+    protected void ReportUiFault(string operation, Exception exception) =>
         UiFaults.Report(
             exception,
             new UiFaultContext(GetType().Name, operation, HostId == 0 ? null : HostId, null)
         );
-    }
 
     public void Dispose()
     {

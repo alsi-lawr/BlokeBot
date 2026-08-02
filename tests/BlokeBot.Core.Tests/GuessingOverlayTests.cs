@@ -244,28 +244,22 @@ public sealed class GuessingOverlayTests
         dashboard.ShouldContain("Result animation duration");
     }
 
-    private static ResolvedOverlayInstance Instance(int hostId)
-    {
-        return new ResolvedOverlayInstance(
+    private static ResolvedOverlayInstance Instance(int hostId) =>
+        new ResolvedOverlayInstance(
             hostId,
             Guid.NewGuid(),
             OverlayType.Guessing,
             new OverlayConfiguration.GuessingV1(true, 9),
             new OverlayRevision(3)
         );
-    }
 
     private static async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenAsync(
         OverlayLiveCoordinator coordinator,
         ResolvedOverlayInstance instance
-    )
-    {
-        return (
-            await coordinator.OpenAsync(instance, coordinator.Generation, CancellationToken.None)
-        )
+    ) =>
+        (await coordinator.OpenAsync(instance, coordinator.Generation, CancellationToken.None))
             .ShouldBeOfType<OverlayLiveOpenResult.Opened>()
             .Connection;
-    }
 
     private static async Task<OverlayLiveTransportMessage> ReadAsync(
         OverlayLiveCoordinator.OverlayLiveConnection connection
@@ -315,15 +309,13 @@ public sealed class GuessingOverlayTests
         return new ProjectionSeed(host.Id, profile.Id);
     }
 
-    private static GuessVote Vote(string login, string answer, int minutes)
-    {
-        return new GuessVote
+    private static GuessVote Vote(string login, string answer, int minutes) =>
+        new GuessVote
         {
             Login = login,
             GuessName = answer,
             GuessedAtUtc = _now.UtcDateTime.AddMinutes(minutes),
         };
-    }
 
     private static async Task UpdateRoundAsync(
         SqliteBlokeBotDbFactory database,
@@ -358,9 +350,8 @@ public sealed class GuessingOverlayTests
             );
     }
 
-    private static string SourcePath(string fileName)
-    {
-        return Path.GetFullPath(
+    private static string SourcePath(string fileName) =>
+        Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
                 "..",
@@ -375,16 +366,12 @@ public sealed class GuessingOverlayTests
                 fileName
             )
         );
-    }
 
     private sealed record ProjectionSeed(int HostId, int ProfileId);
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class BlockingGuessingProvider : IOverlayStateProvider
@@ -393,10 +380,7 @@ public sealed class GuessingOverlayTests
         private TaskCompletionSource? _blockedProjectionEntered;
         private TaskCompletionSource? _blockedProjectionRelease;
 
-        internal void SetPhase(int hostId, GuessingOverlayPhase phase)
-        {
-            _phases[hostId] = phase;
-        }
+        internal void SetPhase(int hostId, GuessingOverlayPhase phase) => _phases[hostId] = phase;
 
         internal (Task Entered, Action Release) BlockNextProjection()
         {

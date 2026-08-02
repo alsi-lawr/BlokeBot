@@ -94,8 +94,6 @@ internal sealed record RedemptionWaitingAgePresentation(
             : $"{totalDays} {Pluralize(totalDays, "day")} {remainingHours} {Pluralize(remainingHours, "hour")}";
     }
 
-    private static string Pluralize(int value, string singular)
-    {
-        return value == 1 ? singular : $"{singular}s";
-    }
+    private static string Pluralize(int value, string singular) =>
+        value == 1 ? singular : $"{singular}s";
 }

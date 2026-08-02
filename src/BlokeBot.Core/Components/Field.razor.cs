@@ -71,10 +71,7 @@ public partial class Field
 
     private string? _errorId => _hasError ? $"{_inputId}-error" : null;
 
-    public ValueTask FocusAsync()
-    {
-        return _input.FocusAsync();
-    }
+    public ValueTask FocusAsync() => _input.FocusAsync();
 
     private long _handledFocusRequest;
 
@@ -89,8 +86,6 @@ public partial class Field
         await FocusAsync();
     }
 
-    private Task OnInput(ChangeEventArgs e)
-    {
-        return ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
-    }
+    private Task OnInput(ChangeEventArgs e) =>
+        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
 }

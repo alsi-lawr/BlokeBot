@@ -55,10 +55,8 @@ internal sealed class HostBotOAuthStateStore(TimeProvider timeProvider)
         return new HostBotOAuthStateConsumption.Consumed(pending.HostId);
     }
 
-    internal static bool IsHostBotState(string? state)
-    {
-        return state?.StartsWith(_prefix, StringComparison.Ordinal) == true;
-    }
+    internal static bool IsHostBotState(string? state) =>
+        state?.StartsWith(_prefix, StringComparison.Ordinal) == true;
 
     private void RemoveExpired()
     {

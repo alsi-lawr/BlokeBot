@@ -182,9 +182,8 @@ public sealed class StartupMessageConfigurationTests
     private static StartupMessageConfigurationService Service(
         SqliteBlokeBotDbFactory dbFactory,
         int maximumLength = 500
-    )
-    {
-        return new(
+    ) =>
+        new(
             dbFactory,
             BotSettings.FromOptions(
                 new BotOptions
@@ -194,7 +193,6 @@ public sealed class StartupMessageConfigurationTests
                 }
             )
         );
-    }
 
     private static AuthenticatedSession Session(int hostId, AuthRole role)
     {

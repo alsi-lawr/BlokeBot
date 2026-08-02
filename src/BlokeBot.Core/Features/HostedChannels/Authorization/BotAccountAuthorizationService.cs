@@ -23,13 +23,8 @@ public sealed record BotAccountAuthorizationStatus(
 
 public sealed class BotAccountAuthorizationService(IBotAccountAuthorizationPolicy policy)
 {
-    public Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct)
-    {
-        return policy.GetStatusAsync(ct);
-    }
+    public Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct) =>
+        policy.GetStatusAsync(ct);
 
-    public Task ClearAsync(CancellationToken ct)
-    {
-        return policy.ClearAsync(ct);
-    }
+    public Task ClearAsync(CancellationToken ct) => policy.ClearAsync(ct);
 }

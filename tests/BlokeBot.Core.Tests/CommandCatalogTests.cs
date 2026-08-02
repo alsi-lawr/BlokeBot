@@ -351,20 +351,23 @@ public sealed class CommandCatalogTests
         return host.Id;
     }
 
-    private static CommandStrategyCatalog<GuessCommandKind, AppCommandRouteState> GuessingCatalog()
-    {
-        return new([
+    private static CommandStrategyCatalog<
+        GuessCommandKind,
+        AppCommandRouteState
+    > GuessingCatalog() =>
+        new([
             new StartGuessingCommandStrategy(null!, null!),
             new StopGuessingCommandStrategy(null!, null!),
             new WinGuessingCommandStrategy(null!, null!),
             new GuessCommandStrategy(null!, null!),
             new AvailableGuessesCommandStrategy(null!),
         ]);
-    }
 
-    private static CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState> PointsCatalog()
-    {
-        return new([
+    private static CommandStrategyCatalog<
+        PointsCommandKind,
+        AppCommandRouteState
+    > PointsCatalog() =>
+        new([
             new PointsBalanceCommandStrategy(null!, null!),
             new GivePointsCommandStrategy(null!, null!, null!),
             new AddPointsCommandStrategy(null!, null!, null!),
@@ -375,5 +378,4 @@ public sealed class CommandCatalogTests
             new EndGiveawayCommandStrategy(null!, null!),
             new CancelGiveawayCommandStrategy(null!, null!),
         ]);
-    }
 }

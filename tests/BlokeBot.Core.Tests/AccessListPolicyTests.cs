@@ -417,15 +417,13 @@ public sealed class AccessListPolicyTests
         result.Match(_ => true, failure => throw new InvalidOperationException(failure.Message));
     }
 
-    private static HostModAccessSaveCommand ValidSaveCommand(int hostId, bool allowModsByDefault)
-    {
-        return HostModAccessSaveValidator
+    private static HostModAccessSaveCommand ValidSaveCommand(int hostId, bool allowModsByDefault) =>
+        HostModAccessSaveValidator
             .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowModsByDefault))
             .Match(
                 command => command,
                 errors => throw new InvalidOperationException(errors[0].Message)
             );
-    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {

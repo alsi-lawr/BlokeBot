@@ -55,11 +55,9 @@ public sealed class PointsCommandRouteResolver(
 
         static ValueTask<
             CommandRouteResolution<PointsCommandKind, AppCommandRouteState>
-        > Unresolved()
-        {
-            return ValueTask.FromResult<
-                CommandRouteResolution<PointsCommandKind, AppCommandRouteState>
-            >(new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved());
-        }
+        > Unresolved() =>
+            ValueTask.FromResult<CommandRouteResolution<PointsCommandKind, AppCommandRouteState>>(
+                new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved()
+            );
     }
 }

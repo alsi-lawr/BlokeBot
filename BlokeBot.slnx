@@ -1,4 +1,18 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".csharpierignore" />
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="dotnet-tools.json" />
+    <File Path="flake.lock" />
+    <File Path="flake.nix" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/BlokeBot.Commands/BlokeBot.Commands.csproj" />
     <Project Path="src/BlokeBot.Core/BlokeBot.Core.csproj" />
@@ -25,5 +39,21 @@
     <Project Path="tests/BlokeBot.Twitch.Runtime.Tests/BlokeBot.Twitch.Runtime.Tests.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Tests/BlokeBot.Twitch.Tests.csproj" />
     <Project Path="tests/BlokeBot.Tests/BlokeBot.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Viset/">
+    <File Path="capture/.gitignore" />
+    <File Path="capture/.luarc.json" />
+    <File Path="capture/.nvim.lua" />
+    <File Path="capture/community-guides.lua" />
+    <File Path="capture/guessing-workflow.lua" />
+    <File Path="capture/home-scroll.lua" />
+    <File Path="capture/media-manifest.json" />
+    <File Path="capture/README.md" />
+    <File Path="capture/screenshots.lua" />
+    <File Path="capture/twitch-operations.lua" />
+    <File Path="capture/v0.5-guides.lua" />
+  </Folder>
+  <Folder Name="/Viset/.viset/">
+    <File Path="capture/.viset/viset.d.lua" />
   </Folder>
 </Solution>

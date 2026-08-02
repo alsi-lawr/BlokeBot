@@ -71,12 +71,8 @@ internal sealed class DisabledCustomAnnouncementSender : ICustomAnnouncementSend
     public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
         CustomAnnouncementDeliveryRequest request,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
-            new AnnouncementEnqueueOutcome.Rejected()
-        );
-    }
+    ) =>
+        ValueTask.FromResult<AnnouncementEnqueueOutcome>(new AnnouncementEnqueueOutcome.Rejected());
 }
 
 internal sealed class TwitchAnnouncementCustomAnnouncementSender(
@@ -88,9 +84,8 @@ internal sealed class TwitchAnnouncementCustomAnnouncementSender(
     public async ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
         CustomAnnouncementDeliveryRequest request,
         CancellationToken cancellationToken
-    )
-    {
-        return request.DeliveryType switch
+    ) =>
+        request.DeliveryType switch
         {
             CustomAnnouncementDeliveryType.ChatMessage => await EnqueueChatAsync(
                 queue,
@@ -105,7 +100,6 @@ internal sealed class TwitchAnnouncementCustomAnnouncementSender(
                 CustomAnnouncementLatestDeliveryResult.Invalid
             ),
         };
-    }
 
     private async Task<AnnouncementEnqueueOutcome> SendAnnouncementAsync(
         CustomAnnouncementDeliveryRequest request,
@@ -170,9 +164,8 @@ internal sealed class TwitchAnnouncementCustomAnnouncementSender(
         PublicChatMessageQueue queue,
         CustomAnnouncementDeliveryRequest request,
         CancellationToken cancellationToken
-    )
-    {
-        return await queue.EnqueueAsync(
+    ) =>
+        await queue.EnqueueAsync(
             new PublicChatEnqueueCommand
             {
                 Channel = request.Channel,
@@ -198,13 +191,11 @@ internal sealed class TwitchAnnouncementCustomAnnouncementSender(
                 ),
             _ => throw new UnreachableException("Unknown public-chat enqueue outcome."),
         };
-    }
 
     private static TransportTwitchAnnouncementColor ToTransportColor(
         BlokeBot.Persistence.Models.TwitchAnnouncementColor color
-    )
-    {
-        return color switch
+    ) =>
+        color switch
         {
             BlokeBot.Persistence.Models.TwitchAnnouncementColor.Primary =>
                 TransportTwitchAnnouncementColor.Primary,
@@ -222,5 +213,4 @@ internal sealed class TwitchAnnouncementCustomAnnouncementSender(
                 "Unsupported Twitch announcement color."
             ),
         };
-    }
 }

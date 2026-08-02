@@ -197,9 +197,8 @@ public sealed class MomentProviderOperationsTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "broadcaster-token",
                     new TokenValidation(
@@ -211,20 +210,17 @@ public sealed class MomentProviderOperationsTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class ProviderHttpClientFactory(ClipFailure clipFailure, bool markerAmbiguous)
@@ -236,10 +232,8 @@ public sealed class MomentProviderOperationsTests
 
         public int MarkerPosts { get; private set; }
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
         private sealed class Handler(ProviderHttpClientFactory owner) : HttpMessageHandler
         {
@@ -274,9 +268,8 @@ public sealed class MomentProviderOperationsTests
             }
         }
 
-        private HttpResponseMessage ClipResponse()
-        {
-            return clipFailure switch
+        private HttpResponseMessage ClipResponse() =>
+            clipFailure switch
             {
                 ClipFailure.ProviderRejected => Error(HttpStatusCode.BadRequest, "not permitted"),
                 ClipFailure.Offline => Error(HttpStatusCode.BadRequest, "channel is not live"),
@@ -284,11 +277,9 @@ public sealed class MomentProviderOperationsTests
                 ClipFailure.Unauthorized => Error(HttpStatusCode.Unauthorized, "invalid token"),
                 _ => throw new ArgumentOutOfRangeException(),
             };
-        }
 
-        private static HttpResponseMessage Error(HttpStatusCode status, string message)
-        {
-            return new(status)
+        private static HttpResponseMessage Error(HttpStatusCode status, string message) =>
+            new(status)
             {
                 Content = new StringContent(
                     $$"""{"message":"{{message}}"}""",
@@ -296,15 +287,12 @@ public sealed class MomentProviderOperationsTests
                     "application/json"
                 ),
             };
-        }
 
-        private static HttpResponseMessage Json(string json)
-        {
-            return new(HttpStatusCode.OK)
+        private static HttpResponseMessage Json(string json) =>
+            new(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),
             };
-        }
     }
 
     private sealed class DelayedSuccessfulClipHttpClientFactory : IHttpClientFactory
@@ -325,15 +313,10 @@ public sealed class MomentProviderOperationsTests
 
         public int MarkerPosts => _markerPostCounter.Value;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
-        public void ReleaseClipPost()
-        {
-            _releaseClipPost.TrySetResult();
-        }
+        public void ReleaseClipPost() => _releaseClipPost.TrySetResult();
 
         private sealed class Handler(DelayedSuccessfulClipHttpClientFactory owner)
             : HttpMessageHandler
@@ -374,13 +357,11 @@ public sealed class MomentProviderOperationsTests
             }
         }
 
-        private static HttpResponseMessage Json(string json)
-        {
-            return new(HttpStatusCode.OK)
+        private static HttpResponseMessage Json(string json) =>
+            new(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),
             };
-        }
 
         private sealed class AtomicCounter
         {
@@ -388,18 +369,12 @@ public sealed class MomentProviderOperationsTests
 
             public int Value => Volatile.Read(ref _value);
 
-            public void Increment()
-            {
-                Interlocked.Increment(ref _value);
-            }
+            public void Increment() => Interlocked.Increment(ref _value);
         }
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

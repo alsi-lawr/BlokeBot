@@ -91,31 +91,13 @@ public sealed class PlayQueueCommandModule(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
-    )
-    {
-        return RespondViewerMutationAsync(
-            context,
-            args,
-            "You left the queue.",
-            queues.LeaveAsync,
-            ct
-        );
-    }
+    ) => RespondViewerMutationAsync(context, args, "You left the queue.", queues.LeaveAsync, ct);
 
     private ValueTask ReadyAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
-    )
-    {
-        return RespondViewerMutationAsync(
-            context,
-            args,
-            "You are marked ready.",
-            queues.ReadyAsync,
-            ct
-        );
-    }
+    ) => RespondViewerMutationAsync(context, args, "You are marked ready.", queues.ReadyAsync, ct);
 
     private async ValueTask PositionAsync(
         ChatCommandContext context,

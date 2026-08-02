@@ -368,13 +368,11 @@ public sealed class HostBotAccountAuthorizationTests
             result.Account.ShouldBe(expected);
         }
 
-        async Task<(string Channel, BotAccount Account)> ResolveAsync(string channel)
-        {
-            return (
+        async Task<(string Channel, BotAccount Account)> ResolveAsync(string channel) =>
+            (
                 channel,
                 Success(await service.GetBotAccount(channel).ExecuteAsync(CancellationToken.None))
             );
-        }
     }
 
     [Test]
@@ -687,26 +685,22 @@ public sealed class HostBotAccountAuthorizationTests
         );
     }
 
-    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result)
-    {
-        return result.Match(
+    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
+        result.Match(
             account => account,
             reason =>
                 throw new InvalidOperationException(
                     $"Expected an authorized bot account, received {reason}."
                 )
         );
-    }
 
     private static AccessTokenUnavailableReason Error(
         Result<BotAccount, AccessTokenUnavailableReason> result
-    )
-    {
-        return result.Match(
+    ) =>
+        result.Match(
             _ => throw new InvalidOperationException("Expected token unavailability."),
             reason => reason
         );
-    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
@@ -777,9 +771,8 @@ public sealed class HostBotAccountAuthorizationTests
         string accessToken,
         IReadOnlyList<string> scopes,
         DateTimeOffset? expiresAtUtc = null
-    )
-    {
-        return new(
+    ) =>
+        new(
             new HostBotAccountTokenPayload(
                 accessToken,
                 "override-refresh",
@@ -791,7 +784,6 @@ public sealed class HostBotAccountAuthorizationTests
             "https://static-cdn.jtvnw.net/custombot.png",
             OAuthScopeSet.Create(scopes)
         );
-    }
 
     private static async Task SetRuntimeStateAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -808,14 +800,12 @@ public sealed class HostBotAccountAuthorizationTests
 
     private sealed class StaticTokenProvider(string accessToken) : IAccessTokenProvider
     {
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<string, AccessTokenUnavailableReason>.Success(accessToken)
                 )
             );
-        }
     }
 
     private sealed class HostBotAccountHttpClientFactory(HttpStatusCode? tokenStatusCode = null)
@@ -823,19 +813,15 @@ public sealed class HostBotAccountAuthorizationTests
     {
         private readonly Handler _handler = new(tokenStatusCode);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(HttpStatusCode? tokenStatusCode) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(
+            ) =>
+                Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
                         "/oauth2/token" => tokenStatusCode is { } statusCode
@@ -854,11 +840,9 @@ public sealed class HostBotAccountAuthorizationTests
                         _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                     }
                 );
-            }
 
-            private static HttpResponseMessage ValidationResponse(HttpRequestMessage request)
-            {
-                return request.Headers.Authorization?.Parameter switch
+            private static HttpResponseMessage ValidationResponse(HttpRequestMessage request) =>
+                request.Headers.Authorization?.Parameter switch
                 {
                     "global-token" => JsonResponse(
                         """
@@ -877,15 +861,12 @@ public sealed class HostBotAccountAuthorizationTests
                     ),
                     _ => new HttpResponseMessage(HttpStatusCode.Unauthorized),
                 };
-            }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 }

@@ -13,10 +13,8 @@ internal readonly record struct PublicChatFailureType(string Value)
 
 internal readonly record struct PublicChatHttpStatusCode(int Value)
 {
-    internal static PublicChatHttpStatusCode From(HttpStatusCode statusCode)
-    {
-        return new((int)statusCode);
-    }
+    internal static PublicChatHttpStatusCode From(HttpStatusCode statusCode) =>
+        new((int)statusCode);
 }
 
 internal readonly record struct PublicChatProviderRejectionCode(string Value);
@@ -39,10 +37,7 @@ internal abstract record PublicChatHttpStatus
         internal override TResult Match<TResult>(
             Func<PublicChatHttpStatusCode, TResult> known,
             Func<TResult> unavailable
-        )
-        {
-            return known(Code);
-        }
+        ) => known(Code);
     }
 
     internal sealed record Unavailable : PublicChatHttpStatus
@@ -50,10 +45,7 @@ internal abstract record PublicChatHttpStatus
         internal override TResult Match<TResult>(
             Func<PublicChatHttpStatusCode, TResult> known,
             Func<TResult> unavailable
-        )
-        {
-            return unavailable();
-        }
+        ) => unavailable();
     }
 }
 
@@ -75,10 +67,7 @@ internal abstract record PublicChatFailureDiagnostic
         internal override TResult Match<TResult>(
             Func<Preparation, TResult> preparation,
             Func<Send, TResult> send
-        )
-        {
-            return preparation(this);
-        }
+        ) => preparation(this);
     }
 
     internal sealed record Send : PublicChatFailureDiagnostic
@@ -86,10 +75,7 @@ internal abstract record PublicChatFailureDiagnostic
         internal override TResult Match<TResult>(
             Func<Preparation, TResult> preparation,
             Func<Send, TResult> send
-        )
-        {
-            return send(this);
-        }
+        ) => send(this);
     }
 }
 
@@ -108,10 +94,7 @@ internal abstract record PublicChatRejectionReason
         internal override TResult Match<TResult>(
             Func<PublicChatProviderRejectionCode, TResult> providerCode,
             Func<TResult> unspecified
-        )
-        {
-            return providerCode(Code);
-        }
+        ) => providerCode(Code);
     }
 
     internal sealed record Unspecified : PublicChatRejectionReason
@@ -119,10 +102,7 @@ internal abstract record PublicChatRejectionReason
         internal override TResult Match<TResult>(
             Func<PublicChatProviderRejectionCode, TResult> providerCode,
             Func<TResult> unspecified
-        )
-        {
-            return unspecified();
-        }
+        ) => unspecified();
     }
 }
 
@@ -164,10 +144,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return sent(this);
-        }
+        ) => sent(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -178,10 +155,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            sent(this);
-        }
+        ) => sent(this);
     }
 
     internal sealed record MissingChannel : PublicChatDeliveryOutcome
@@ -195,10 +169,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return missingChannel(this);
-        }
+        ) => missingChannel(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -209,10 +180,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            missingChannel(this);
-        }
+        ) => missingChannel(this);
     }
 
     internal sealed record MissingBot : PublicChatDeliveryOutcome
@@ -226,10 +194,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return missingBot(this);
-        }
+        ) => missingBot(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -240,10 +205,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            missingBot(this);
-        }
+        ) => missingBot(this);
     }
 
     internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
@@ -258,10 +220,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -272,10 +231,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
     }
 
     internal sealed record SafePreSendTransient : PublicChatDeliveryOutcome
@@ -291,10 +247,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return safePreSendTransient(this);
-        }
+        ) => safePreSendTransient(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -305,10 +258,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            safePreSendTransient(this);
-        }
+        ) => safePreSendTransient(this);
     }
 
     internal sealed record Rejection : PublicChatDeliveryOutcome
@@ -324,10 +274,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return rejection(this);
-        }
+        ) => rejection(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -338,10 +285,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            rejection(this);
-        }
+        ) => rejection(this);
     }
 
     internal sealed record Ambiguous : PublicChatDeliveryOutcome
@@ -357,10 +301,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return ambiguous(this);
-        }
+        ) => ambiguous(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -371,10 +312,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            ambiguous(this);
-        }
+        ) => ambiguous(this);
     }
 
     internal sealed record Unexpected : PublicChatDeliveryOutcome
@@ -392,10 +330,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return unexpected(this);
-        }
+        ) => unexpected(this);
 
         internal override void Match(
             Action<Sent> sent,
@@ -406,15 +341,10 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
             Action<Unexpected> unexpected
-        )
-        {
-            unexpected(this);
-        }
+        ) => unexpected(this);
 
-        public override string ToString()
-        {
-            return $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
-        }
+        public override string ToString() =>
+            $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
     }
 }
 
@@ -428,10 +358,8 @@ internal sealed record PublicChatPreparedSend
 
     internal required string BotUserId { get; init; }
 
-    public override string ToString()
-    {
-        return $"{nameof(PublicChatPreparedSend)} {{ OutboxMessageId = {Message.Id} }}";
-    }
+    public override string ToString() =>
+        $"{nameof(PublicChatPreparedSend)} {{ OutboxMessageId = {Message.Id} }}";
 }
 
 internal abstract record PublicChatPreparationOutcome
@@ -458,10 +386,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return ready(this);
-        }
+        ) => ready(this);
     }
 
     internal sealed record MissingChannel : PublicChatPreparationOutcome
@@ -473,10 +398,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return missingChannel(this);
-        }
+        ) => missingChannel(this);
     }
 
     internal sealed record MissingBot : PublicChatPreparationOutcome
@@ -488,10 +410,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return missingBot(this);
-        }
+        ) => missingBot(this);
     }
 
     internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
@@ -504,10 +423,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
     }
 
     internal sealed record SafePreSendTransient : PublicChatPreparationOutcome
@@ -521,10 +437,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return safePreSendTransient(this);
-        }
+        ) => safePreSendTransient(this);
     }
 
     internal sealed record Unexpected : PublicChatPreparationOutcome
@@ -540,15 +453,10 @@ internal abstract record PublicChatPreparationOutcome
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
-        )
-        {
-            return unexpected(this);
-        }
+        ) => unexpected(this);
 
-        public override string ToString()
-        {
-            return $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
-        }
+        public override string ToString() =>
+            $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
     }
 }
 
@@ -569,15 +477,9 @@ internal abstract record PublicChatTransportSendResult
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return sent(this);
-        }
+        ) => sent(this);
 
-        internal override void Match(Action<Sent> sent, Action<Rejected> rejected)
-        {
-            sent(this);
-        }
+        internal override void Match(Action<Sent> sent, Action<Rejected> rejected) => sent(this);
     }
 
     internal sealed record Rejected : PublicChatTransportSendResult
@@ -587,14 +489,9 @@ internal abstract record PublicChatTransportSendResult
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
 
-        internal override void Match(Action<Sent> sent, Action<Rejected> rejected)
-        {
+        internal override void Match(Action<Sent> sent, Action<Rejected> rejected) =>
             rejected(this);
-        }
     }
 }

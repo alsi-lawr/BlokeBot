@@ -26,10 +26,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return parsed(this);
-        }
+        ) => parsed(this);
     }
 
     public sealed record NotPrivMsg : IrcPrivMsgParseOutcome
@@ -43,10 +40,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return notPrivMsg(this);
-        }
+        ) => notPrivMsg(this);
     }
 
     public sealed record MissingTagTerminator : IrcPrivMsgParseOutcome
@@ -60,10 +54,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return missingTagTerminator(this);
-        }
+        ) => missingTagTerminator(this);
     }
 
     public sealed record MissingPrefix : IrcPrivMsgParseOutcome
@@ -77,10 +68,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return missingPrefix(this);
-        }
+        ) => missingPrefix(this);
     }
 
     public sealed record MalformedPrefix : IrcPrivMsgParseOutcome
@@ -94,10 +82,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return malformedPrefix(this);
-        }
+        ) => malformedPrefix(this);
     }
 
     public sealed record MissingUserLogin : IrcPrivMsgParseOutcome
@@ -111,10 +96,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return missingUserLogin(this);
-        }
+        ) => missingUserLogin(this);
     }
 
     public sealed record MalformedCommand : IrcPrivMsgParseOutcome
@@ -128,10 +110,7 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return malformedCommand(this);
-        }
+        ) => malformedCommand(this);
     }
 
     public sealed record MissingChannelOrText : IrcPrivMsgParseOutcome
@@ -145,9 +124,6 @@ public abstract record IrcPrivMsgParseOutcome
             Func<MissingUserLogin, TResult> missingUserLogin,
             Func<MalformedCommand, TResult> malformedCommand,
             Func<MissingChannelOrText, TResult> missingChannelOrText
-        )
-        {
-            return missingChannelOrText(this);
-        }
+        ) => missingChannelOrText(this);
     }
 }

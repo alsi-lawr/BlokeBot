@@ -286,12 +286,7 @@ public sealed class MomentUiTests
             bool markerFallbackEnabled,
             string description,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<MomentProviderOutcome>(
-                new MomentProviderOutcome.ClipReady(clipId)
-            );
-        }
+        ) => Task.FromResult<MomentProviderOutcome>(new MomentProviderOutcome.ClipReady(clipId));
     }
 
     private sealed class UnusedMomentProvider : IMomentProviderOperations
@@ -302,26 +297,22 @@ public sealed class MomentUiTests
             bool markerFallbackEnabled,
             string description,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<MomentProviderOutcome>(
+        ) =>
+            Task.FromResult<MomentProviderOutcome>(
                 new MomentProviderOutcome.Failed(null, null, "Not used by this UI test.")
             );
-        }
     }
 
     private sealed class OfflineStreamLivenessProvider : IHostStreamLivenessProvider
     {
-        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
-        {
-            return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
                         new HostStreamLivenessOutcome.Offline()
                     )
                 )
             );
-        }
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

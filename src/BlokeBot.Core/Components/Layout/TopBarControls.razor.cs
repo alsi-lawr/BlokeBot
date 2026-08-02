@@ -76,10 +76,7 @@ public partial class TopBarControls : IDisposable
         await LoadAlertCountAsync();
     }
 
-    public void Dispose()
-    {
-        _alertsSubscription?.Dispose();
-    }
+    public void Dispose() => _alertsSubscription?.Dispose();
 
     private async Task LoadAlertCountAsync()
     {
@@ -103,8 +100,6 @@ public partial class TopBarControls : IDisposable
         }
     }
 
-    private static bool ShowsHostSelector(AuthenticatedSession session)
-    {
-        return !session.IsAdminEditing && !session.IsBotAccount;
-    }
+    private static bool ShowsHostSelector(AuthenticatedSession session) =>
+        !session.IsAdminEditing && !session.IsBotAccount;
 }

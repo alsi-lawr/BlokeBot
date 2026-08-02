@@ -97,10 +97,7 @@ internal sealed record HelixClipCreateWire
     [JsonPropertyName("edit_url")]
     public string EditUrl { get; init; } = string.Empty;
 
-    public HelixClipCreate ToDomain()
-    {
-        return new(Id, EditUrl);
-    }
+    public HelixClipCreate ToDomain() => new(Id, EditUrl);
 }
 
 internal sealed record HelixClipsResponse
@@ -135,19 +132,8 @@ internal sealed record HelixClipWire
     [JsonPropertyName("video_id")]
     public string? VideoId { get; init; }
 
-    public HelixClip ToDomain()
-    {
-        return new(
-            Id,
-            Url,
-            EditUrl,
-            BroadcasterId,
-            BroadcasterLogin,
-            CreatorId,
-            CreatorLogin,
-            VideoId
-        );
-    }
+    public HelixClip ToDomain() =>
+        new(Id, Url, EditUrl, BroadcasterId, BroadcasterLogin, CreatorId, CreatorLogin, VideoId);
 }
 
 internal sealed record HelixStreamMarkerResponse
@@ -173,10 +159,8 @@ internal sealed record HelixStreamMarkerWire
     [JsonPropertyName("URL")]
     public string? Url { get; init; }
 
-    public HelixStreamMarker ToDomain(string? videoId)
-    {
-        return new(Id, Description, PositionSeconds, CreatedAt, Url, videoId);
-    }
+    public HelixStreamMarker ToDomain(string? videoId) =>
+        new(Id, Description, PositionSeconds, CreatedAt, Url, videoId);
 }
 
 internal sealed record HelixStreamMarkersResponse

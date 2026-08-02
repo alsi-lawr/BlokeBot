@@ -348,11 +348,9 @@ public sealed class ViewerCommandCatalogService(
     private static bool IsCustomActionAvailable(
         CustomCommandAction action,
         IReadOnlySet<CueActionIdentity> availableCueActions
-    )
-    {
-        return action is not OverlayCueCustomCommandAction cue
-            || availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId));
-    }
+    ) =>
+        action is not OverlayCueCustomCommandAction cue
+        || availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId));
 
     private async Task<IReadOnlySet<CueActionIdentity>> AvailableCueActionsAsync(
         int hostId,
@@ -391,9 +389,8 @@ public sealed class ViewerCommandCatalogService(
             .ToHashSet();
     }
 
-    private static bool IsAppRouteEnabled(AppCommandKind kind, HostFeatureFlags enabledFeatures)
-    {
-        return kind switch
+    private static bool IsAppRouteEnabled(AppCommandKind kind, HostFeatureFlags enabledFeatures) =>
+        kind switch
         {
             AppCommandKind.Commands => true,
             AppCommandKind.Start
@@ -403,7 +400,6 @@ public sealed class ViewerCommandCatalogService(
             or AppCommandKind.Guesses => enabledFeatures.Contains(HostFeatureFlags.Guessing),
             _ => enabledFeatures.Contains(HostFeatureFlags.Points),
         };
-    }
 
     private sealed record AppAlias(AppCommandKind Kind, int? ProfileId, string Alias);
 
@@ -418,9 +414,8 @@ public sealed class ViewerCommandCatalogService(
         int? CustomCommandId
     )
     {
-        public static Candidate Fixed(FixedChatCommandRoute route)
-        {
-            return new(
+        public static Candidate Fixed(FixedChatCommandRoute route) =>
+            new(
                 route.Value,
                 $"fixed:{route.Value}",
                 ViewerCommandCatalogSource.BuiltIn,
@@ -428,16 +423,12 @@ public sealed class ViewerCommandCatalogService(
                 null,
                 null
             );
-        }
 
-        public static Candidate App(string alias, AppCommandKind kind)
-        {
-            return new(alias, $"app:{kind}", ViewerCommandCatalogSource.BuiltIn, false, kind, null);
-        }
+        public static Candidate App(string alias, AppCommandKind kind) =>
+            new(alias, $"app:{kind}", ViewerCommandCatalogSource.BuiltIn, false, kind, null);
 
-        public static Candidate Custom(string alias, int commandId)
-        {
-            return new(
+        public static Candidate Custom(string alias, int commandId) =>
+            new(
                 alias,
                 $"custom:{commandId}",
                 ViewerCommandCatalogSource.Custom,
@@ -445,6 +436,5 @@ public sealed class ViewerCommandCatalogService(
                 null,
                 commandId
             );
-        }
     }
 }

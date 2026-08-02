@@ -101,24 +101,16 @@ internal sealed class PublicChatQueueBacklogMonitor
 
     private static List<PendingChannelGroup> PendingByChannel(
         IReadOnlyList<PublicChatPendingMessage> pending
-    )
-    {
-        return pending
+    ) =>
+        pending
             .GroupBy(x => NormalizeChannel(x.Channel), StringComparer.OrdinalIgnoreCase)
             .Where(group => !string.IsNullOrWhiteSpace(group.Key))
             .Select(group => new PendingChannelGroup(group.Key, group.ToList()))
             .ToList();
-    }
 
-    private static string NormalizeChannel(string channel)
-    {
-        return channel.Trim().ToLowerInvariant();
-    }
+    private static string NormalizeChannel(string channel) => channel.Trim().ToLowerInvariant();
 
-    private static TimeSpan Min(TimeSpan left, TimeSpan right)
-    {
-        return left <= right ? left : right;
-    }
+    private static TimeSpan Min(TimeSpan left, TimeSpan right) => left <= right ? left : right;
 
     private sealed record PendingChannelGroup(
         string Channel,

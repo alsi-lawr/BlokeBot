@@ -237,10 +237,8 @@ public sealed class HostFeatureTests
         resolved.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, profileId));
     }
 
-    private static ChatCommandContext CommandContext(string channel, string commandName)
-    {
-        return TestCommandContext.Create("viewer", channel, commandName);
-    }
+    private static ChatCommandContext CommandContext(string channel, string commandName) =>
+        TestCommandContext.Create("viewer", channel, commandName);
 
     private static async Task SeedAliasAsync(
         SqliteBlokeBotDbFactory dbFactory,

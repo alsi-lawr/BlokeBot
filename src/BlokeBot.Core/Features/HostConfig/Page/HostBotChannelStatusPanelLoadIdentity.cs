@@ -12,10 +12,11 @@ public sealed record HostBotChannelStatusPanelLoadIdentity
 
     public string ReloadKey { get; }
 
-    public static HostBotChannelStatusPanelLoadIdentity? From(string hostLogin, string? reloadKey)
-    {
-        return string.IsNullOrWhiteSpace(hostLogin)
+    public static HostBotChannelStatusPanelLoadIdentity? From(
+        string hostLogin,
+        string? reloadKey
+    ) =>
+        string.IsNullOrWhiteSpace(hostLogin)
             ? null
             : new(hostLogin.Trim().ToLowerInvariant(), reloadKey ?? string.Empty);
-    }
 }

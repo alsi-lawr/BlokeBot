@@ -159,10 +159,7 @@ public sealed class ValidationTests
 
     private static IReadOnlyList<TError> GetErrors<TValue, TError>(
         Validation<TValue, TError> validation
-    )
-    {
-        return validation.Match<IReadOnlyList<TError>>(_ => [], errors => errors);
-    }
+    ) => validation.Match<IReadOnlyList<TError>>(_ => [], errors => errors);
 
     private sealed record AggregateError(string Message);
 

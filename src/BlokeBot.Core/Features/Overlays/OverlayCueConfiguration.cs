@@ -73,10 +73,7 @@ public sealed record OverlayCueConfiguration
     private const int _maximumJsonBytes = 32768;
     public const int MaximumLayerCount = 16;
 
-    private OverlayCueConfiguration(ImmutableArray<OverlayCueLayer> layers)
-    {
-        Layers = layers;
-    }
+    private OverlayCueConfiguration(ImmutableArray<OverlayCueLayer> layers) => Layers = layers;
 
     public int SchemaVersion => 1;
 
@@ -529,15 +526,9 @@ public sealed record OverlayCueConfiguration
         return char.ToLowerInvariant(text[0]) + text[1..];
     }
 
-    private static OverlayCueConfigurationResult.Invalid Invalid(string message)
-    {
-        return new(message);
-    }
+    private static OverlayCueConfigurationResult.Invalid Invalid(string message) => new(message);
 
-    private static LayerParseResult.Invalid LayerInvalid(string message)
-    {
-        return new(message);
-    }
+    private static LayerParseResult.Invalid LayerInvalid(string message) => new(message);
 
     private abstract record LayerParseResult
     {

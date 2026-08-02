@@ -19,8 +19,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class SimulationNativeFixtureTests
 {
     [Test]
-    public void NativeAliasesResolveToTheFiveExactRoutes()
-    {
+    public void NativeAliasesResolveToTheFiveExactRoutes() =>
         new Dictionary<string, string>
         {
             ["native-shoutouts"] = "/twitch-operations/shoutouts",
@@ -29,13 +28,10 @@ public sealed class SimulationNativeFixtureTests
             ["native-channel-points"] = "/twitch-operations/channel-points",
             ["native-predictions"] = "/twitch-operations/predictions",
         }.ShouldAllBe(pair => SimulationViewCatalog.PathFor(pair.Key) == pair.Value);
-    }
 
     [Test]
-    public void OverlayAliasResolvesToTheDeterministicDashboardRoute()
-    {
+    public void OverlayAliasResolvesToTheDeterministicDashboardRoute() =>
         SimulationViewCatalog.PathFor("overlays").ShouldBe("/overlays");
-    }
 
     [Test]
     public async Task OfflineSimulationSeedsAutomaticConfigurationOutcomesAndLocalDelivery()

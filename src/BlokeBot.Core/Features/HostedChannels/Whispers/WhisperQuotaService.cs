@@ -68,9 +68,8 @@ public sealed class WhisperQuotaService(
         string botTwitchUserId,
         string recipientTwitchUserId,
         string recipientLogin
-    )
-    {
-        return IO<WhisperQuotaReservation, WhisperQuotaReservationError>.Create(ct =>
+    ) =>
+        IO<WhisperQuotaReservation, WhisperQuotaReservationError>.Create(ct =>
             PersistReservationAsync(
                 hostId,
                 botTwitchUserId,
@@ -79,7 +78,6 @@ public sealed class WhisperQuotaService(
                 ct
             )
         );
-    }
 
     private async ValueTask<
         Result<WhisperQuotaReservation, WhisperQuotaReservationError>
@@ -185,30 +183,16 @@ public sealed class WhisperQuotaService(
         await db.SaveChangesAsync(ct);
     }
 
-    private DateTime CurrentDayUtc()
-    {
-        return clock.GetUtcNow().UtcDateTime.Date;
-    }
+    private DateTime CurrentDayUtc() => clock.GetUtcNow().UtcDateTime.Date;
 
-    private static string NormalizeId(string? value)
-    {
-        return value?.Trim() ?? string.Empty;
-    }
+    private static string NormalizeId(string? value) => value?.Trim() ?? string.Empty;
 
-    private static WhisperQuotaStatus EmptyStatus()
-    {
-        return new(0, UniqueRecipientLimit, false);
-    }
+    private static WhisperQuotaStatus EmptyStatus() => new(0, UniqueRecipientLimit, false);
 
     private static Result<WhisperQuotaReservation, WhisperQuotaReservationError> Success(
         WhisperQuotaReservation reservation
-    )
-    {
-        return Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Success(reservation);
-    }
+    ) => Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Success(reservation);
 
-    private static WhisperQuotaStatus Status(WhisperQuotaBucket bucket)
-    {
-        return new(bucket.Recipients.Count, UniqueRecipientLimit, bucket.Exhausted);
-    }
+    private static WhisperQuotaStatus Status(WhisperQuotaBucket bucket) =>
+        new(bucket.Recipients.Count, UniqueRecipientLimit, bucket.Exhausted);
 }

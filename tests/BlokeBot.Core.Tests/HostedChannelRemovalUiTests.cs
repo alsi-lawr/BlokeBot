@@ -85,9 +85,8 @@ public sealed class HostedChannelRemovalUiTests
         });
     }
 
-    private static HostedChannelAdminView Host()
-    {
-        return new(
+    private static HostedChannelAdminView Host() =>
+        new(
             42,
             "streamer",
             "Streamer",
@@ -95,5 +94,4 @@ public sealed class HostedChannelRemovalUiTests
             true,
             new HostedChannelRuntimeLifecycle.Stopped(null)
         );
-    }
 }

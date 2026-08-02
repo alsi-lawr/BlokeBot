@@ -2,9 +2,8 @@ namespace BlokeBot.Twitch.Auth;
 
 internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport) : IOAuthClient
 {
-    public Uri BuildAuthorizeUri(string state)
-    {
-        return transport.CreateAuthorizationUri(
+    public Uri BuildAuthorizeUri(string state) =>
+        transport.CreateAuthorizationUri(
             new AuthorizationUriRequest(
                 identity.ClientId,
                 identity.RedirectUri,
@@ -13,7 +12,6 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
                 AuthorizationVerificationPolicy.ForceAccountVerification
             )
         );
-    }
 
     public Uri BuildAuthorizeUri(string state, IEnumerable<string?> additionalScopes)
     {
@@ -48,9 +46,8 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
     public async Task<TokenSet> RefreshAsync(
         string refreshToken,
         CancellationToken cancellationToken
-    )
-    {
-        return ToTokenSet(
+    ) =>
+        ToTokenSet(
             await transport.RefreshAsync(
                 identity.ClientId,
                 identity.ClientSecret,
@@ -58,15 +55,11 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
                 cancellationToken
             )
         );
-    }
 
     public Task<TokenValidationOutcome> ValidateAsync(
         string accessToken,
         CancellationToken cancellationToken
-    )
-    {
-        return transport.ValidateTokenAsync(accessToken, cancellationToken);
-    }
+    ) => transport.ValidateTokenAsync(accessToken, cancellationToken);
 
     private static TokenSet ToTokenSet(OAuthTokenResponse payload)
     {

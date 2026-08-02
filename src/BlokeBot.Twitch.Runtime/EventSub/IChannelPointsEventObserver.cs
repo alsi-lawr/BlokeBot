@@ -24,17 +24,6 @@ public sealed record EventSubRewardRedemptionEvent(
     string MessageId
 )
 {
-    public HelixRewardRedemption ToHelix()
-    {
-        return new(
-            RedemptionId,
-            RewardId,
-            RewardTitle,
-            UserId,
-            UserLogin,
-            UserInput,
-            Status,
-            RedeemedAt
-        );
-    }
+    public HelixRewardRedemption ToHelix() =>
+        new(RedemptionId, RewardId, RewardTitle, UserId, UserLogin, UserInput, Status, RedeemedAt);
 }

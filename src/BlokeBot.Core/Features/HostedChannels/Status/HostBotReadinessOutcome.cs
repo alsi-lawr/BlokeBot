@@ -26,9 +26,8 @@ public abstract record HostBotReadinessOutcome
         Func<NotModerator, TResult> notModerator,
         Func<MissingFollowerReadScope, TResult> missingFollowerReadScope,
         Func<Ready, TResult> ready
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             NotConfigured value => notConfigured(value),
             TokenUnavailable value => tokenUnavailable(value),
@@ -44,7 +43,6 @@ public abstract record HostBotReadinessOutcome
             Ready value => ready(value),
             _ => throw new UnreachableException("Unknown host bot readiness outcome."),
         };
-    }
 
     public sealed record NotConfigured : HostBotReadinessOutcome;
 

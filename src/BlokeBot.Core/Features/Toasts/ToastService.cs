@@ -64,8 +64,5 @@ public sealed class ToastService
         return removed;
     }
 
-    private void NotifyChanged()
-    {
-        Changed?.Invoke();
-    }
+    private void NotifyChanged() => Changed?.Invoke();
 }

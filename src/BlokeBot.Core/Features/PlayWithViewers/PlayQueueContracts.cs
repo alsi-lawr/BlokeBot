@@ -141,10 +141,7 @@ public abstract record PlayQueueResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return succeeded(this);
-        }
+        ) => succeeded(this);
     }
 
     public sealed record Rejected(PlayQueueRejection Reason) : PlayQueueResult<T>
@@ -152,10 +149,7 @@ public abstract record PlayQueueResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }
 
@@ -184,28 +178,19 @@ public abstract record PlayQueueRejection(string Message)
 
 internal static class PlayQueueInput
 {
-    public static string NormalizeLogin(string value)
-    {
-        return value.Trim().TrimStart('@').ToLowerInvariant();
-    }
+    public static string NormalizeLogin(string value) =>
+        value.Trim().TrimStart('@').ToLowerInvariant();
 
-    public static bool IsValidLogin(string value)
-    {
-        return value.Length is >= 1 and <= 128
-            && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
-    }
+    public static bool IsValidLogin(string value) =>
+        value.Length is >= 1 and <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
-    public static string NormalizeSlug(string value)
-    {
-        return value.Trim().ToLowerInvariant();
-    }
+    public static string NormalizeSlug(string value) => value.Trim().ToLowerInvariant();
 
-    public static bool IsValidSlug(string value)
-    {
-        return value.Length is >= 1 and <= 48
-            && value[0] is >= 'a' and <= 'z'
-            && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
-    }
+    public static bool IsValidSlug(string value) =>
+        value.Length is >= 1 and <= 48
+        && value[0] is >= 'a' and <= 'z'
+        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
 
     public static string NormalizeKey(string value)
     {

@@ -20,16 +20,14 @@ public abstract class CustomCommandAction
 
     public CustomMessageLibraryEntry? TwoArgumentMessageLibraryEntry { get; set; }
 
-    public int? ReplyIdForArgumentCount(int argumentCount)
-    {
-        return argumentCount switch
+    public int? ReplyIdForArgumentCount(int argumentCount) =>
+        argumentCount switch
         {
             0 => ZeroArgumentMessageLibraryEntryId,
             1 => OneArgumentMessageLibraryEntryId,
             2 => TwoArgumentMessageLibraryEntryId,
             _ => null,
         };
-    }
 }
 
 public sealed class MessageCustomCommandAction : CustomCommandAction

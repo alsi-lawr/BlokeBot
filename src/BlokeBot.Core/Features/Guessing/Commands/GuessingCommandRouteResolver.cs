@@ -59,11 +59,9 @@ public sealed class GuessingCommandRouteResolver(
 
         static ValueTask<
             CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
-        > Unresolved()
-        {
-            return ValueTask.FromResult<
-                CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
-            >(new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved());
-        }
+        > Unresolved() =>
+            ValueTask.FromResult<CommandRouteResolution<GuessCommandKind, AppCommandRouteState>>(
+                new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved()
+            );
     }
 }

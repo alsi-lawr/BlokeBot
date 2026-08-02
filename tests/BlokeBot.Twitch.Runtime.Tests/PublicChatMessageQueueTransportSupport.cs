@@ -23,12 +23,10 @@ public abstract partial class PublicChatMessageQueueTestBase
         public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
             PublicChatClaimedMessage message,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult<PublicChatPreparationOutcome>(
+        ) =>
+            ValueTask.FromResult<PublicChatPreparationOutcome>(
                 new PublicChatPreparationOutcome.Ready { Send = Prepared(message) }
             );
-        }
 
         public ValueTask<PublicChatTransportSendResult> SendAsync(
             PublicChatPreparedSend prepared,
@@ -49,10 +47,7 @@ public abstract partial class PublicChatMessageQueueTestBase
             );
         }
 
-        public ValueTask<PublicChatClaimedMessage> ReadAsync()
-        {
-            return _delivered.Reader.ReadAsync();
-        }
+        public ValueTask<PublicChatClaimedMessage> ReadAsync() => _delivered.Reader.ReadAsync();
     }
 
     private protected sealed class ScriptedTransport(
@@ -112,10 +107,7 @@ public abstract partial class PublicChatMessageQueueTestBase
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<PublicChatQueueBacklog> ReadAsync()
-        {
-            return _alerts.Reader.ReadAsync();
-        }
+        public ValueTask<PublicChatQueueBacklog> ReadAsync() => _alerts.Reader.ReadAsync();
     }
 
     private protected sealed class ThrowingQueueAlertObserver(string failureMessage)
@@ -124,9 +116,6 @@ public abstract partial class PublicChatMessageQueueTestBase
         public ValueTask QueueBackedUpAsync(
             PublicChatQueueBacklog backlog,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException(failureMessage);
-        }
+        ) => throw new InvalidOperationException(failureMessage);
     }
 }

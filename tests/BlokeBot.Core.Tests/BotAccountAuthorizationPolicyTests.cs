@@ -187,9 +187,8 @@ public sealed class BotAccountAuthorizationPolicyTests
         status.Message.ShouldBe("The Twitch bot runner is not configured.");
     }
 
-    private static BotSettings Settings(string tokenCachePath)
-    {
-        return BotSettings.FromOptions(
+    private static BotSettings Settings(string tokenCachePath) =>
+        BotSettings.FromOptions(
             new BotOptions
             {
                 Identity = new BotIdentityOptions
@@ -208,27 +207,22 @@ public sealed class BotAccountAuthorizationPolicyTests
                 },
             }
         );
-    }
 
     private static async Task<BotAccountAuthorizationStatus> LoadConfiguredStatusAsync(
         TokenStatus status
-    )
-    {
-        return await ConfiguredService(
+    ) =>
+        await ConfiguredService(
                 new StaticTokenStatusSource(Result<TokenStatus, TokenStatusError>.Success(status))
             )
             .GetStatusAsync(CancellationToken.None);
-    }
 
     private static async Task<BotAccountAuthorizationStatus> LoadConfiguredStatusAsync(
         TokenStatusError error
-    )
-    {
-        return await ConfiguredService(
+    ) =>
+        await ConfiguredService(
                 new StaticTokenStatusSource(Result<TokenStatus, TokenStatusError>.Error(error))
             )
             .GetStatusAsync(CancellationToken.None);
-    }
 
     private static BotAccountAuthorizationService ConfiguredService(ITokenStatusSource tokenStatus)
     {
@@ -247,20 +241,15 @@ public sealed class BotAccountAuthorizationPolicyTests
         );
     }
 
-    private static ImmutableArray<string> RequiredScopes()
-    {
-        return
+    private static ImmutableArray<string> RequiredScopes() =>
         [
             Scopes.UserReadModeratedChannels,
             Scopes.UserReadFollows,
             Scopes.ModeratorManageAnnouncements,
         ];
-    }
 
-    private static TokenValidation Validation(IEnumerable<string> scopes)
-    {
-        return new("bot-id", "bot", OAuthScopeSet.Create(scopes));
-    }
+    private static TokenValidation Validation(IEnumerable<string> scopes) =>
+        new("bot-id", "bot", OAuthScopeSet.Create(scopes));
 
     private sealed class RecordingAccessTokenCache : IAccessTokenCache
     {
@@ -269,10 +258,7 @@ public sealed class BotAccountAuthorizationPolicyTests
         Task<TResult> IAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
             Func<IAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("Read-through should not run while clearing.");
-        }
+        ) => throw new InvalidOperationException("Read-through should not run while clearing.");
 
         public Task ClearAsync(CancellationToken cancellationToken)
         {
@@ -286,22 +272,17 @@ public sealed class BotAccountAuthorizationPolicyTests
     {
         public IO<TokenStatus, TokenStatusError> GetUserAccessTokenStatus(
             IEnumerable<string?> requiredScopes
-        )
-        {
-            return IO<TokenStatus, TokenStatusError>.Create(cancellationToken =>
+        ) =>
+            IO<TokenStatus, TokenStatusError>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(result);
             });
-        }
     }
 
     private sealed class CurrentUserHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new CurrentUserHttpMessageHandler());
-        }
+        public HttpClient CreateClient(string name) => new(new CurrentUserHttpMessageHandler());
     }
 
     private sealed class CurrentUserHttpMessageHandler : HttpMessageHandler
@@ -309,9 +290,8 @@ public sealed class BotAccountAuthorizationPolicyTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(
+        ) =>
+            Task.FromResult(
                 new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
@@ -321,15 +301,11 @@ public sealed class BotAccountAuthorizationPolicyTests
                     ),
                 }
             );
-        }
     }
 
     private sealed class RejectingHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new RejectingHttpMessageHandler());
-        }
+        public HttpClient CreateClient(string name) => new(new RejectingHttpMessageHandler());
     }
 
     private sealed class RejectingHttpMessageHandler : HttpMessageHandler
@@ -337,9 +313,6 @@ public sealed class BotAccountAuthorizationPolicyTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("HTTP should not be requested while clearing.");
-        }
+        ) => throw new InvalidOperationException("HTTP should not be requested while clearing.");
     }
 }

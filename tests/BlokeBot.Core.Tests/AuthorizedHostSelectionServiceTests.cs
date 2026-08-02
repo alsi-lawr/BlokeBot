@@ -105,10 +105,7 @@ public sealed class AuthorizedHostSelectionServiceTests
 
     private sealed class JsonHttpClientFactory(string response) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new JsonHttpMessageHandler(response));
-        }
+        public HttpClient CreateClient(string name) => new(new JsonHttpMessageHandler(response));
     }
 
     private sealed class JsonHttpMessageHandler(string response) : HttpMessageHandler
@@ -116,14 +113,12 @@ public sealed class AuthorizedHostSelectionServiceTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(
+        ) =>
+            Task.FromResult(
                 new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(response, Encoding.UTF8, "application/json"),
                 }
             );
-        }
     }
 }

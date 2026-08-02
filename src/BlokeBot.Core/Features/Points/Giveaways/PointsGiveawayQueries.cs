@@ -14,44 +14,35 @@ internal static class PointsGiveawayQueries
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await db
-                .PointsSettings.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.HostId == hostId, ct)
-            ?? new PointsSettings { HostId = hostId };
-    }
+    ) =>
+        await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
+        ?? new PointsSettings { HostId = hostId };
 
     public static async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await ReplyDeliverySettingWriter.LoadAsync(
+    ) =>
+        await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
             ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
             ct
         );
-    }
 
     public static async Task<bool> HasActiveGiveawayAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await db.PointsGiveaways.AnyAsync(
+    ) =>
+        await db.PointsGiveaways.AnyAsync(
             x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active,
             ct
         );
-    }
 
-    public static IO<Option<int>, Never> FindActiveGiveawayId(BlokeBotDbContext db, int hostId)
-    {
-        return IO<Option<int>, Never>.Create(async ct =>
+    public static IO<Option<int>, Never> FindActiveGiveawayId(BlokeBotDbContext db, int hostId) =>
+        IO<Option<int>, Never>.Create(async ct =>
         {
             var giveawayId = await db
                 .PointsGiveaways.AsNoTracking()
@@ -63,15 +54,13 @@ internal static class PointsGiveawayQueries
                 giveawayId.HasValue ? Option<int>.Some(giveawayId.Value) : Option<int>.None
             );
         });
-    }
 
     public static IO<Option<DateTime>, Never> FindLastStartedAfter(
         BlokeBotDbContext db,
         int hostId,
         DateTime startedAfterUtc
-    )
-    {
-        return IO<Option<DateTime>, Never>.Create(async ct =>
+    ) =>
+        IO<Option<DateTime>, Never>.Create(async ct =>
         {
             var startedAt = await db
                 .PointsGiveaways.AsNoTracking()
@@ -83,7 +72,6 @@ internal static class PointsGiveawayQueries
                 startedAt.HasValue ? Option<DateTime>.Some(startedAt.Value) : Option<DateTime>.None
             );
         });
-    }
 
     public static async Task<PointsGiveawayView?> LoadActiveViewAsync(
         BlokeBotDbContext db,

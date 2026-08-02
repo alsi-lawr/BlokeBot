@@ -179,8 +179,6 @@ public sealed class BlokeBotAuthResultPageTests
         return (context.Response.StatusCode, page);
     }
 
-    private static int CountOccurrences(string value, string pattern)
-    {
-        return value.Split(pattern, StringSplitOptions.None).Length - 1;
-    }
+    private static int CountOccurrences(string value, string pattern) =>
+        value.Split(pattern, StringSplitOptions.None).Length - 1;
 }

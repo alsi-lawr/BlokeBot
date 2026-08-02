@@ -117,9 +117,8 @@ internal static class BlokeBotStatePathResolver
 
     private static BlokeBotDefaultStateDirectory DefaultStateDirectory(
         BlokeBotStatePathRequest request
-    )
-    {
-        return request.OperatingSystem switch
+    ) =>
+        request.OperatingSystem switch
         {
             BlokeBotOperatingSystem.Linux => LinuxStateDirectory(request.Environment),
             BlokeBotOperatingSystem.MacOS => HomeStateDirectory(
@@ -144,7 +143,6 @@ internal static class BlokeBotStatePathResolver
                 ),
             _ => throw new InvalidOperationException("Unknown operating system."),
         };
-    }
 
     private static BlokeBotDefaultStateDirectory LinuxStateDirectory(
         BlokeBotPlatformEnvironment environment
@@ -170,29 +168,22 @@ internal static class BlokeBotStatePathResolver
         BlokeBotOperatingSystem operatingSystem,
         string? homeDirectory,
         params string[] segments
-    )
-    {
-        return string.IsNullOrWhiteSpace(homeDirectory)
+    ) =>
+        string.IsNullOrWhiteSpace(homeDirectory)
             ? new BlokeBotDefaultStateDirectory.Failed(
                 "The user home directory is unavailable. Use 'blokebot serve --data-dir PATH' or set the database and token-cache paths explicitly."
             )
             : new BlokeBotDefaultStateDirectory.Resolved(
                 Combine(operatingSystem, homeDirectory, segments)
             );
-    }
 
     private static BlokeBotStatePathResolution.Resolved Resolved(
         string databasePath,
         string tokenCachePath
-    )
-    {
-        return new(new BlokeBotStatePaths(databasePath, tokenCachePath));
-    }
+    ) => new(new BlokeBotStatePaths(databasePath, tokenCachePath));
 
-    private static string? ExplicitPath(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
+    private static string? ExplicitPath(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string Combine(
         BlokeBotOperatingSystem operatingSystem,
@@ -273,11 +264,9 @@ internal static class BlokeBotStatePathPreparer
         }
     }
 
-    private static string ParentDirectory(string path)
-    {
-        return Path.GetDirectoryName(path)
-            ?? throw new IOException($"The state path '{path}' has no parent directory.");
-    }
+    private static string ParentDirectory(string path) =>
+        Path.GetDirectoryName(path)
+        ?? throw new IOException($"The state path '{path}' has no parent directory.");
 
     private static void EnsureDirectoryWritable(string directory)
     {
@@ -319,13 +308,11 @@ internal static class BlokeBotStatePathPreparer
         }
     }
 
-    private static bool IsPathFailure(Exception exception)
-    {
-        return exception
+    private static bool IsPathFailure(Exception exception) =>
+        exception
             is IOException
                 or UnauthorizedAccessException
                 or SecurityException
                 or ArgumentException
                 or NotSupportedException;
-    }
 }

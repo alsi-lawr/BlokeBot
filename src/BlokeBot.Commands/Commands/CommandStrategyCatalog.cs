@@ -38,12 +38,10 @@ public sealed class CommandStrategyCatalog<TKind, TState>
 
     public IReadOnlyList<CommandStrategyDescriptor<TKind>> Descriptors { get; }
 
-    public CommandStrategyLookup<TKind, TState> Find(TKind kind)
-    {
-        return _strategies.TryGetValue(kind, out var strategy)
+    public CommandStrategyLookup<TKind, TState> Find(TKind kind) =>
+        _strategies.TryGetValue(kind, out var strategy)
             ? new CommandStrategyLookup<TKind, TState>.Found(strategy)
             : new CommandStrategyLookup<TKind, TState>.Missing();
-    }
 }
 
 public abstract record CommandStrategyLookup<TKind, TState>
@@ -61,10 +59,7 @@ public abstract record CommandStrategyLookup<TKind, TState>
         public override TResult Match<TResult>(
             Func<Missing, TResult> missing,
             Func<Found, TResult> found
-        )
-        {
-            return missing(this);
-        }
+        ) => missing(this);
     }
 
     public sealed record Found(ICommandStrategy<TKind, TState> Strategy)
@@ -73,10 +68,7 @@ public abstract record CommandStrategyLookup<TKind, TState>
         public override TResult Match<TResult>(
             Func<Missing, TResult> missing,
             Func<Found, TResult> found
-        )
-        {
-            return found(this);
-        }
+        ) => found(this);
     }
 }
 

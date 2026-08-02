@@ -48,14 +48,8 @@ public sealed class HostBotOAuthStateStoreTests
     {
         private DateTimeOffset _utcNow = utcNow;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _utcNow;
-        }
+        public override DateTimeOffset GetUtcNow() => _utcNow;
 
-        internal void Advance(TimeSpan duration)
-        {
-            _utcNow = _utcNow.Add(duration);
-        }
+        internal void Advance(TimeSpan duration) => _utcNow = _utcNow.Add(duration);
     }
 }

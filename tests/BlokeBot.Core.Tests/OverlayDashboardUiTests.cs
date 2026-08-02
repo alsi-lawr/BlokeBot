@@ -349,24 +349,18 @@ public sealed class OverlayDashboardUiTests
         IRenderedComponent<OverlaysPage> page,
         string groupLabel,
         string buttonLabel
-    )
-    {
-        return FindButton(page, groupLabel, buttonLabel).GetAttribute("aria-pressed");
-    }
+    ) => FindButton(page, groupLabel, buttonLabel).GetAttribute("aria-pressed");
 
     private static AngleSharp.Dom.IElement FindButton(
         IRenderedComponent<OverlaysPage> page,
         string groupLabel,
         string buttonLabel
-    )
-    {
-        return page.FindAll($"[aria-label='{groupLabel}'] button")
+    ) =>
+        page.FindAll($"[aria-label='{groupLabel}'] button")
             .Single(button => button.TextContent.Trim() == buttonLabel);
-    }
 
-    private static string SourcePath(string fileName)
-    {
-        return Path.GetFullPath(
+    private static string SourcePath(string fileName) =>
+        Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
                 "..",
@@ -381,7 +375,6 @@ public sealed class OverlayDashboardUiTests
                 fileName
             )
         );
-    }
 
     private static async Task<OverlaySeed> SeedAsync(SqliteBlokeBotDbFactory database)
     {
@@ -492,11 +485,6 @@ public sealed class OverlayDashboardUiTests
             AuthenticatedSession session,
             int requestedHostId,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<ModeratorAuthorityOutcome>(
-                new ModeratorAuthorityOutcome.Granted()
-            );
-        }
+        ) => Task.FromResult<ModeratorAuthorityOutcome>(new ModeratorAuthorityOutcome.Granted());
     }
 }

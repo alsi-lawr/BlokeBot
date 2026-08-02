@@ -28,12 +28,10 @@ public sealed class HostConfigService(
     CommandsConfigurationService commands
 )
 {
-    public IO<Option<HostConfigState>, Never> Load(AuthenticatedSession session)
-    {
-        return IO<Option<HostConfigState>, Never>.Create(async ct =>
+    public IO<Option<HostConfigState>, Never> Load(AuthenticatedSession session) =>
+        IO<Option<HostConfigState>, Never>.Create(async ct =>
             Result<Option<HostConfigState>, Never>.Success(await LoadStateAsync(session, ct))
         );
-    }
 
     private async Task<Option<HostConfigState>> LoadStateAsync(
         AuthenticatedSession session,
@@ -158,20 +156,17 @@ public sealed class HostConfigService(
 
     private static TwitchOperationsAuthorizationState TwitchOperationsAuthorization(
         TokenStatus status
-    )
-    {
-        return status switch
+    ) =>
+        status switch
         {
             TokenStatus.Ready => TwitchOperationsAuthorizationState.Ready,
             TokenStatus.Unavailable { Reason: AccessTokenUnavailableReason.MissingRefreshToken } =>
                 TwitchOperationsAuthorizationState.Missing,
             _ => TwitchOperationsAuthorizationState.Stale,
         };
-    }
 
-    private static BotAccountAuthorizationStatus DisabledBotOverrideStatus()
-    {
-        return new(
+    private static BotAccountAuthorizationStatus DisabledBotOverrideStatus() =>
+        new(
             null,
             null,
             null,
@@ -181,5 +176,4 @@ public sealed class HostConfigService(
             [],
             "Create your channel setup before using a custom bot."
         );
-    }
 }

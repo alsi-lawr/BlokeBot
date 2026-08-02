@@ -111,9 +111,8 @@ public sealed class HostedChannelLifecycleNotifierTests
         SqliteBlokeBotDbFactory dbFactory,
         PollHttpClientFactory http,
         EventBus<AppEventKind> events
-    )
-    {
-        return new PollService(
+    ) =>
+        new PollService(
             dbFactory,
             new ReadyBroadcasterProvider(),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
@@ -124,14 +123,12 @@ public sealed class HostedChannelLifecycleNotifierTests
             new DurableAlertService(dbFactory, TimeProvider.System, events),
             new NativeTwitchFeatureGate(dbFactory)
         );
-    }
 
     private static ClipMarkerService CreateClipMarkerService(
         SqliteBlokeBotDbFactory dbFactory,
         EventBus<AppEventKind> events
-    )
-    {
-        return new(
+    ) =>
+        new(
             dbFactory,
             new ReadyBroadcasterProvider(),
             new HelixClient(
@@ -146,7 +143,6 @@ public sealed class HostedChannelLifecycleNotifierTests
             TimeProvider.System,
             new NativeTwitchFeatureGate(dbFactory)
         );
-    }
 
     private static async Task SeedStartingHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
@@ -166,9 +162,8 @@ public sealed class HostedChannelLifecycleNotifierTests
         await db.SaveChangesAsync();
     }
 
-    private static HttpResponseMessage PollResponse(string id, string status, int votes)
-    {
-        return new(HttpStatusCode.OK)
+    private static HttpResponseMessage PollResponse(string id, string status, int votes) =>
+        new(HttpStatusCode.OK)
         {
             Content = new StringContent(
                 $$"""
@@ -178,15 +173,12 @@ public sealed class HostedChannelLifecycleNotifierTests
                 "application/json"
             ),
         };
-    }
 
-    private static HttpResponseMessage EmptyPollResponse()
-    {
-        return new(HttpStatusCode.OK)
+    private static HttpResponseMessage EmptyPollResponse() =>
+        new(HttpStatusCode.OK)
         {
             Content = new StringContent("""{"data":[]}""", Encoding.UTF8, "application/json"),
         };
-    }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
     {
@@ -194,9 +186,8 @@ public sealed class HostedChannelLifecycleNotifierTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "broadcaster-token",
                     new TokenValidation(
@@ -208,20 +199,17 @@ public sealed class HostedChannelLifecycleNotifierTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class PollHttpClientFactory : IHttpClientFactory
@@ -230,15 +218,10 @@ public sealed class HostedChannelLifecycleNotifierTests
 
         internal int Requests { get; private set; }
 
-        internal void Enqueue(HttpResponseMessage response)
-        {
-            _responses.Enqueue(response);
-        }
+        internal void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
         private sealed class Handler(PollHttpClientFactory owner) : HttpMessageHandler
         {

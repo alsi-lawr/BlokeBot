@@ -5,14 +5,10 @@ namespace BlokeBot.Core.Features.Points.Replies;
 
 public static class PointsDefaults
 {
-    public static PointsSettings Settings()
-    {
-        return new();
-    }
+    public static PointsSettings Settings() => new();
 
-    public static PointsReplySettingsEditor Replies(PointsSettings settings)
-    {
-        return new()
+    public static PointsReplySettingsEditor Replies(PointsSettings settings) =>
+        new()
         {
             BalanceReply = settings.BalanceReply,
             OtherBalanceReply = settings.OtherBalanceReply,
@@ -38,5 +34,4 @@ public static class PointsDefaults
             NotEligibleReply = settings.NotEligibleReply,
             FollowerEligibilityUnavailableReply = settings.FollowerEligibilityUnavailableReply,
         };
-    }
 }

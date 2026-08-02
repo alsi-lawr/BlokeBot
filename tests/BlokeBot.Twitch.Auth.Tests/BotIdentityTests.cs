@@ -55,12 +55,10 @@ public sealed class BotIdentityTests
     }
 
     [Test]
-    public void EmptyScopes_MappingPermissiveIdentity_RejectsInvalidSet()
-    {
+    public void EmptyScopes_MappingPermissiveIdentity_RejectsInvalidSet() =>
         Should.Throw<ArgumentException>(() =>
             BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] })
         );
-    }
 
     [Test]
     public void BlankScopes_MappingConfiguredIdentity_RejectsInvalidSet()
@@ -89,9 +87,8 @@ public sealed class BotIdentityTests
         identity.ToString().ShouldContain("[redacted]");
     }
 
-    private static BotIdentityOptions ValidOptions(string[] scopes)
-    {
-        return new()
+    private static BotIdentityOptions ValidOptions(string[] scopes) =>
+        new()
         {
             BotUsername = "TestBot",
             ClientId = "client-value",
@@ -100,5 +97,4 @@ public sealed class BotIdentityTests
             Scopes = scopes,
             TokenCachePath = "tokens.json",
         };
-    }
 }

@@ -314,10 +314,7 @@ public sealed class GuessingAliasTests
 
     private static GuessingConfigurationService ConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
-    )
-    {
-        return new(dbFactory, new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()));
-    }
+    ) => new(dbFactory, new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()));
 
     private static async Task<GuessingConfiguration> LoadConfigurationAsync(
         GuessingConfigurationService service,
@@ -334,9 +331,8 @@ public sealed class GuessingAliasTests
         );
     }
 
-    private static GuessingConfigurationSaveCommand ValidCommand(GuessingConfiguration draft)
-    {
-        return GuessingConfigurationValidator
+    private static GuessingConfigurationSaveCommand ValidCommand(GuessingConfiguration draft) =>
+        GuessingConfigurationValidator
             .Validate(draft)
             .Match(
                 command => command,
@@ -345,17 +341,14 @@ public sealed class GuessingAliasTests
                         string.Join(" ", errors.Select(error => error.Message))
                     )
             );
-    }
 
-    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory)
-    {
-        return new(
+    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
+        new(
             dbFactory,
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
-    }
 
     private static CommandStrategyContext<GuessCommandKind, AppCommandRouteState> CommandContext(
         string channel,

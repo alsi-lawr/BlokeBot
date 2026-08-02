@@ -301,19 +301,13 @@ public sealed class OverlayInstanceService(
         AuthenticatedSession session,
         ChangeOverlayInstanceAvailabilityCommand command,
         CancellationToken ct
-    )
-    {
-        return SetEnabledAsync(session, command, true, ct);
-    }
+    ) => SetEnabledAsync(session, command, true, ct);
 
     public Task<OverlayInstanceResult<OverlayInstanceView>> DisableAsync(
         AuthenticatedSession session,
         ChangeOverlayInstanceAvailabilityCommand command,
         CancellationToken ct
-    )
-    {
-        return SetEnabledAsync(session, command, false, ct);
-    }
+    ) => SetEnabledAsync(session, command, false, ct);
 
     public async Task<OverlayInstanceResult<OverlayInstanceKeyRotation>> RotateKeyAsync(
         AuthenticatedSession session,
@@ -711,8 +705,7 @@ public sealed class OverlayInstanceService(
         await events.PublishAsync(AppEventKind.OverlaysChanged, ct);
     }
 
-    private void LogDenied(string operation, string actorUserId, int? hostId, string reason)
-    {
+    private void LogDenied(string operation, string actorUserId, int? hostId, string reason) =>
         logger.LogWarning(
             "Overlay instance operation {Operation} was denied for actor {ActorUserId} on selected host {HostId}: {Reason}.",
             operation,
@@ -720,16 +713,14 @@ public sealed class OverlayInstanceService(
             hostId,
             reason
         );
-    }
 
     private static OverlayInstanceDomainEvent DomainEvent(
         AuthorizedActor actor,
         OverlayInstance overlay,
         OverlayInstanceEventKind kind,
         DateTime occurredAtUtc
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = actor.HostId,
             OverlayPublicId = overlay.PublicId,
@@ -741,7 +732,6 @@ public sealed class OverlayInstanceService(
             KeyVersion = overlay.KeyVersion,
             OccurredAtUtc = occurredAtUtc,
         };
-    }
 
     private static void ApplyUpdateToSnapshot(
         OverlayInstance overlay,
@@ -762,9 +752,8 @@ public sealed class OverlayInstanceService(
         overlay.Revision++;
     }
 
-    private static OverlayInstanceView ToView(OverlayInstance overlay)
-    {
-        return new(
+    private static OverlayInstanceView ToView(OverlayInstance overlay) =>
+        new(
             overlay.PublicId,
             overlay.Name,
             overlay.Type,
@@ -774,7 +763,6 @@ public sealed class OverlayInstanceService(
             new DateTimeOffset(DateTime.SpecifyKind(overlay.UpdatedAtUtc, DateTimeKind.Utc)),
             new OverlayRevision(overlay.Revision)
         );
-    }
 
     private static OverlayInstanceRejection? ValidateCreate(CreateOverlayInstanceCommand command)
     {
@@ -808,19 +796,17 @@ public sealed class OverlayInstanceService(
             );
     }
 
-    private static BotHostChoice? SelectedHost(AuthenticatedSession session)
-    {
-        return session.State.Match<BotHostChoice?>(
+    private static BotHostChoice? SelectedHost(AuthenticatedSession session) =>
+        session.State.Match<BotHostChoice?>(
             _ => null,
             selected => selected.Selection.Current,
             _ => null
         );
-    }
 
-    private static bool ValidOverlayIdAndRevision(Guid overlayId, OverlayRevision expectedRevision)
-    {
-        return overlayId != Guid.Empty && expectedRevision.Value > 0;
-    }
+    private static bool ValidOverlayIdAndRevision(
+        Guid overlayId,
+        OverlayRevision expectedRevision
+    ) => overlayId != Guid.Empty && expectedRevision.Value > 0;
 
     private static async Task<bool> RequiredFeaturesEnabledAsync(
         BlokeBotDbContext db,
@@ -837,38 +823,22 @@ public sealed class OverlayInstanceService(
         return enabledFeatures is { } value && OverlayRequiredFeatures.AreEnabled(type, value);
     }
 
-    private static SemaphoreSlim MutationGate(Guid overlayId)
-    {
-        return _mutationGates[(int)((uint)overlayId.GetHashCode() % _mutationGates.Length)];
-    }
+    private static SemaphoreSlim MutationGate(Guid overlayId) =>
+        _mutationGates[(int)((uint)overlayId.GetHashCode() % _mutationGates.Length)];
 
-    private static SemaphoreSlim[] CreateMutationGates()
-    {
-        return Enumerable
-            .Range(0, _mutationGateCount)
-            .Select(_ => new SemaphoreSlim(1, 1))
-            .ToArray();
-    }
+    private static SemaphoreSlim[] CreateMutationGates() =>
+        Enumerable.Range(0, _mutationGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-    private static string PersistedEventName(OverlayInstanceEventKind kind)
-    {
-        return PersistedEnumTokens<OverlayInstanceEventKind>.Format(kind);
-    }
+    private static string PersistedEventName(OverlayInstanceEventKind kind) =>
+        PersistedEnumTokens<OverlayInstanceEventKind>.Format(kind);
 
-    private DateTime Now()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime Now() => timeProvider.GetUtcNow().UtcDateTime;
 
-    private static OverlayInstanceResult<T> Succeeded<T>(T value)
-    {
-        return new OverlayInstanceResult<T>.Succeeded(value);
-    }
+    private static OverlayInstanceResult<T> Succeeded<T>(T value) =>
+        new OverlayInstanceResult<T>.Succeeded(value);
 
-    private static OverlayInstanceResult<T> Rejected<T>(OverlayInstanceRejection rejection)
-    {
-        return new OverlayInstanceResult<T>.Rejected(rejection);
-    }
+    private static OverlayInstanceResult<T> Rejected<T>(OverlayInstanceRejection rejection) =>
+        new OverlayInstanceResult<T>.Rejected(rejection);
 
     private sealed record AuthorizedActor(int HostId, string UserId, string Login);
 

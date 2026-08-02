@@ -447,15 +447,9 @@ public sealed class ClipMarkerServiceTests
     {
         private DateTimeOffset _now = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _now;
-        }
+        public override DateTimeOffset GetUtcNow() => _now;
 
-        internal void Advance(TimeSpan by)
-        {
-            _now += by;
-        }
+        internal void Advance(TimeSpan by) => _now += by;
     }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
@@ -464,9 +458,8 @@ public sealed class ClipMarkerServiceTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "broadcaster-token",
                     new TokenValidation(
@@ -478,20 +471,17 @@ public sealed class ClipMarkerServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class ClipMarkerHttpClientFactory : IHttpClientFactory
@@ -502,10 +492,8 @@ public sealed class ClipMarkerServiceTests
 
         internal int MarkerPosts { get; private set; }
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
         private sealed class Handler(ClipMarkerHttpClientFactory owner) : HttpMessageHandler
         {
@@ -557,13 +545,11 @@ public sealed class ClipMarkerServiceTests
                 }
             }
 
-            private static HttpResponseMessage Json(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage Json(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 }

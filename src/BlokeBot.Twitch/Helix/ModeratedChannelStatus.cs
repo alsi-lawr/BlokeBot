@@ -12,9 +12,8 @@ public abstract record ModeratedChannelStatus
         Func<MissingPermission, TResult> missingPermission,
         Func<IsModerator, TResult> isModerator,
         Func<NotModerator, TResult> notModerator
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Unknown value => unknown(value),
             NeedsAuthorization value => needsAuthorization(value),
@@ -23,7 +22,6 @@ public abstract record ModeratedChannelStatus
             NotModerator value => notModerator(value),
             _ => throw new UnreachableException("Unknown moderated channel status."),
         };
-    }
 
     public sealed record Unknown : ModeratedChannelStatus;
 

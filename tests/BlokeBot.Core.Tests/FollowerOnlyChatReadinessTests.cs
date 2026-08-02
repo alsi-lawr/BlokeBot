@@ -127,27 +127,21 @@ public sealed class FollowerOnlyChatReadinessTests
     private static FollowerOnlyChatReadinessService CreateService(
         IHostBotAccountTokenStatusProvider botTokens,
         FollowerOnlyChatHttpClientFactory http
-    )
-    {
-        return new(
+    ) =>
+        new(
             new StaticAppAccessTokenSource(),
             botTokens,
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             Settings(),
             new FixedTimeProvider(_now)
         );
-    }
 
     private static ValueTask<FollowerOnlyChatReadiness> GetReadinessAsync(
         FollowerOnlyChatReadinessService service
-    )
-    {
-        return service.GetReadiness("streamer").RunAsync(CancellationToken.None);
-    }
+    ) => service.GetReadiness("streamer").RunAsync(CancellationToken.None);
 
-    private static BotSettings Settings()
-    {
-        return BotSettings.FromOptions(
+    private static BotSettings Settings() =>
+        BotSettings.FromOptions(
             new BotOptions
             {
                 Identity = new BotIdentityOptions
@@ -161,7 +155,6 @@ public sealed class FollowerOnlyChatReadinessTests
                 },
             }
         );
-    }
 
     private static ActiveBotAccountTokenStatus Ready(string userId)
     {
@@ -207,10 +200,8 @@ public sealed class FollowerOnlyChatReadinessTests
 
     private sealed class StaticAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult("app-token");
-        }
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-token");
     }
 
     private sealed class RecordingTokenStatusProvider(ActiveBotAccountTokenStatus status)
@@ -231,20 +222,14 @@ public sealed class FollowerOnlyChatReadinessTests
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class FollowerOnlyChatHttpClientFactory : IHttpClientFactory
     {
         private readonly Handler _handler;
 
-        public FollowerOnlyChatHttpClientFactory()
-        {
-            _handler = new Handler(this);
-        }
+        public FollowerOnlyChatHttpClientFactory() => _handler = new Handler(this);
 
         public bool FollowerMode { get; init; }
 
@@ -270,10 +255,7 @@ public sealed class FollowerOnlyChatReadinessTests
 
         public string? FollowedRequestModeratorId { get; private set; }
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(FollowerOnlyChatHttpClientFactory owner) : HttpMessageHandler
         {
@@ -334,13 +316,11 @@ public sealed class FollowerOnlyChatReadinessTests
                 );
             }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
 
             private static string? QueryValue(Uri? uri, string key)
             {

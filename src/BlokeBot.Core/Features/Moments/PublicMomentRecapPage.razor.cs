@@ -31,19 +31,15 @@ public partial class PublicMomentRecapPage
         _loading = false;
     }
 
-    private async Task ReloadAsync()
-    {
+    private async Task ReloadAsync() =>
         _page = string.IsNullOrWhiteSpace(StreamIdentity)
             ? await _moments.GetWeeklyRecapAsync(Channel, DateTime.UtcNow, CancellationToken.None)
             : await _moments.GetStreamRecapAsync(Channel, StreamIdentity, CancellationToken.None);
-    }
 
-    private MomentViewerIdentity Identity()
-    {
-        return _session.IsAuthenticated
+    private MomentViewerIdentity Identity() =>
+        _session.IsAuthenticated
             ? new(_session.Login, _session.UserId, _session.DisplayName)
             : new(MomentInput.NormalizeLogin(_login));
-    }
 
     private async Task VoteAsync(Guid publicId)
     {

@@ -92,9 +92,8 @@ internal static class BlokeBotAuthResultPage
         return Results.Content(html, "text/html", Encoding.UTF8, (int)result.Status);
     }
 
-    private static BlokeBotAuthResultView View(BlokeBotAuthResult result)
-    {
-        return result.Outcome switch
+    private static BlokeBotAuthResultView View(BlokeBotAuthResult result) =>
+        result.Outcome switch
         {
             BlokeBotAuthOutcome.Success => SuccessView(result.Context),
             BlokeBotAuthOutcome.Cancelled => new(
@@ -152,11 +151,9 @@ internal static class BlokeBotAuthResultPage
                 null
             ),
         };
-    }
 
-    private static BlokeBotAuthResultView SuccessView(BlokeBotAuthContext? context)
-    {
-        return context switch
+    private static BlokeBotAuthResultView SuccessView(BlokeBotAuthContext? context) =>
+        context switch
         {
             BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.ChannelConnection) => new(
                 "Twitch access saved",
@@ -172,11 +169,9 @@ internal static class BlokeBotAuthResultPage
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
-    }
 
-    private static BlokeBotAuthResultView WrongAccountView(BlokeBotAuthContext? context)
-    {
-        return context switch
+    private static BlokeBotAuthResultView WrongAccountView(BlokeBotAuthContext? context) =>
+        context switch
         {
             BlokeBotAuthContext.RequiredChannel required => new(
                 "Use the channel account",
@@ -186,11 +181,9 @@ internal static class BlokeBotAuthResultPage
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
-    }
 
-    private static BlokeBotAuthResultAction? RetryAction(BlokeBotAuthRetryAction action)
-    {
-        return action switch
+    private static BlokeBotAuthResultAction? RetryAction(BlokeBotAuthRetryAction action) =>
+        action switch
         {
             BlokeBotAuthRetryAction.None => null,
             BlokeBotAuthRetryAction.SignIn => new("/auth/login?start=true", "Try again"),
@@ -200,18 +193,15 @@ internal static class BlokeBotAuthResultPage
             BlokeBotAuthRetryAction.HostBot => new("/oauth/host-bot/start", "Try again"),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
-    }
 
-    private static BlokeBotAuthResultAction ReturnAction(BlokeBotAuthReturnAction action)
-    {
-        return action switch
+    private static BlokeBotAuthResultAction ReturnAction(BlokeBotAuthReturnAction action) =>
+        action switch
         {
             BlokeBotAuthReturnAction.SignIn => new("/auth/login", "Return to sign in"),
             BlokeBotAuthReturnAction.ChannelSetup => new("/host", "Return to Channel setup"),
             BlokeBotAuthReturnAction.Admin => new("/admin", "Return to Admin"),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };
-    }
 
     private sealed record BlokeBotAuthResultView(
         string Title,

@@ -271,9 +271,8 @@ public sealed record BotPolicies
 
 internal static class RetryDelayRangeValidator
 {
-    internal static ValidateOptionsResult Validate<TOptions>(TOptions options)
-    {
-        return options switch
+    internal static ValidateOptionsResult Validate<TOptions>(TOptions options) =>
+        options switch
         {
             IrcSessionResilienceOptions value => Validate(value.Delay, value.MaximumDelay),
             EventSubSessionResilienceOptions value => Validate(value.Delay, value.MaximumDelay),
@@ -281,12 +280,9 @@ internal static class RetryDelayRangeValidator
             PublicChatRetryOptions value => Validate(value.Delay, value.MaximumDelay),
             _ => ValidateOptionsResult.Success,
         };
-    }
 
-    private static ValidateOptionsResult Validate(TimeSpan? delay, TimeSpan? maximumDelay)
-    {
-        return delay is { } minimum && maximumDelay is { } maximum && maximum < minimum
+    private static ValidateOptionsResult Validate(TimeSpan? delay, TimeSpan? maximumDelay) =>
+        delay is { } minimum && maximumDelay is { } maximum && maximum < minimum
             ? ValidateOptionsResult.Fail("MaximumDelay must be greater than or equal to Delay.")
             : ValidateOptionsResult.Success;
-    }
 }

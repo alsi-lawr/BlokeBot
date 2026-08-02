@@ -15,10 +15,8 @@ public sealed record BlokeBotPageContext(
 
 public sealed class BlokeBotPageContextAccessor
 {
-    public BlokeBotPageContext FromPrincipal(ClaimsPrincipal? user)
-    {
-        return FromSession(AuthenticatedSession.FromPrincipal(user));
-    }
+    public BlokeBotPageContext FromPrincipal(ClaimsPrincipal? user) =>
+        FromSession(AuthenticatedSession.FromPrincipal(user));
 
     public async Task<BlokeBotPageContext> FromAsync(
         Task<AuthenticationState> authenticationStateTask
@@ -28,8 +26,6 @@ public sealed class BlokeBotPageContextAccessor
         return FromPrincipal(authState.User);
     }
 
-    private static BlokeBotPageContext FromSession(AuthenticatedSession session)
-    {
-        return new BlokeBotPageContext(session, session.Login, session.IsBotAccount);
-    }
+    private static BlokeBotPageContext FromSession(AuthenticatedSession session) =>
+        new BlokeBotPageContext(session, session.Login, session.IsBotAccount);
 }

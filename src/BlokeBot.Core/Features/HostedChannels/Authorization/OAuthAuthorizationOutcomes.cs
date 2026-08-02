@@ -14,10 +14,7 @@ public abstract record OAuthAuthorizationStartOutcome
         public override TResult Match<TResult>(
             Func<Ready, TResult> ready,
             Func<ConfigurationUnavailable, TResult> configurationUnavailable
-        )
-        {
-            return ready(this);
-        }
+        ) => ready(this);
     }
 
     public sealed record ConfigurationUnavailable : OAuthAuthorizationStartOutcome
@@ -25,10 +22,7 @@ public abstract record OAuthAuthorizationStartOutcome
         public override TResult Match<TResult>(
             Func<Ready, TResult> ready,
             Func<ConfigurationUnavailable, TResult> configurationUnavailable
-        )
-        {
-            return configurationUnavailable(this);
-        }
+        ) => configurationUnavailable(this);
     }
 }
 
@@ -48,10 +42,7 @@ public abstract record OAuthAuthorizationCompletionOutcome<TGrant>
             Func<Completed, TResult> completed,
             Func<ConfigurationUnavailable, TResult> configurationUnavailable,
             Func<ProviderNotValidated, TResult> providerNotValidated
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 
     public sealed record ConfigurationUnavailable : OAuthAuthorizationCompletionOutcome<TGrant>
@@ -60,10 +51,7 @@ public abstract record OAuthAuthorizationCompletionOutcome<TGrant>
             Func<Completed, TResult> completed,
             Func<ConfigurationUnavailable, TResult> configurationUnavailable,
             Func<ProviderNotValidated, TResult> providerNotValidated
-        )
-        {
-            return configurationUnavailable(this);
-        }
+        ) => configurationUnavailable(this);
     }
 
     public sealed record ProviderNotValidated : OAuthAuthorizationCompletionOutcome<TGrant>
@@ -72,9 +60,6 @@ public abstract record OAuthAuthorizationCompletionOutcome<TGrant>
             Func<Completed, TResult> completed,
             Func<ConfigurationUnavailable, TResult> configurationUnavailable,
             Func<ProviderNotValidated, TResult> providerNotValidated
-        )
-        {
-            return providerNotValidated(this);
-        }
+        ) => providerNotValidated(this);
     }
 }

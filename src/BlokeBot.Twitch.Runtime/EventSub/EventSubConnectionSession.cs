@@ -143,10 +143,7 @@ internal sealed class EventSubConnectionSession(
 
     private async Task<IReadOnlyList<string>> GetDesiredChannelsAsync(
         CancellationToken cancellationToken
-    )
-    {
-        return BotChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken));
-    }
+    ) => BotChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken));
 
     internal async Task DispatchChatMessageAsync(
         EventSubChatMessageEvent chatEvent,
@@ -256,8 +253,7 @@ internal sealed class EventSubConnectionSession(
     private async ValueTask NotifyMessageObserversAsync(
         ChatMessage message,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         _ = await messageObserverFanOut.DispatchAsync(
             _messageObservers,
             _ => new ObserverDispatch<ChatMessage, ChatObserverDeadLetter>
@@ -271,7 +267,6 @@ internal sealed class EventSubConnectionSession(
                 observer.MessageReceivedAsync(chatMessage, token),
             cancellationToken
         );
-    }
 
     private static IReadOnlyDictionary<string, string> CreateTags(
         EventSubChatMessageEvent chatEvent

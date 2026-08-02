@@ -121,9 +121,10 @@ public sealed class AutomaticRaidShoutoutConfigurationService(
             .ToArrayAsync(cancellationToken);
     }
 
-    internal static AutomaticRaidShoutoutConfiguration Map(AutomaticRaidShoutoutSettings settings)
-    {
-        return new(
+    internal static AutomaticRaidShoutoutConfiguration Map(
+        AutomaticRaidShoutoutSettings settings
+    ) =>
+        new(
             settings.Enabled,
             settings.MinimumViewerCount,
             settings.Mechanism,
@@ -132,7 +133,6 @@ public sealed class AutomaticRaidShoutoutConfigurationService(
             settings.PinDurationSeconds,
             settings.AnnouncementColor
         );
-    }
 
     internal static IReadOnlyList<AutomaticRaidShoutoutValidationError> Validate(
         AutomaticRaidShoutoutConfiguration configuration
@@ -180,9 +180,7 @@ public sealed class AutomaticRaidShoutoutConfigurationService(
         }
         return errors;
 
-        void Add(AutomaticRaidShoutoutValidationField field, string message)
-        {
+        void Add(AutomaticRaidShoutoutValidationField field, string message) =>
             errors.Add(new AutomaticRaidShoutoutValidationError(field, message));
-        }
     }
 }

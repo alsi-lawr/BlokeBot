@@ -257,10 +257,8 @@ internal sealed partial class EventSubChannelSession(
         _currentWork = Task.Run(() => operation(token), CancellationToken.None);
     }
 
-    private static Exception CombineCleanupFailures(Exception? previous, Exception current)
-    {
-        return previous is null
+    private static Exception CombineCleanupFailures(Exception? previous, Exception current) =>
+        previous is null
             ? current
             : new AggregateException("EventSub channel session cleanup failed.", previous, current);
-    }
 }

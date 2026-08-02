@@ -402,20 +402,17 @@ public sealed class PersistenceInvariantTests
         ]);
     }
 
-    private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status)
-    {
-        return new()
+    private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>
+        new()
         {
             HostId = hostId,
             Status = status,
             StartedAtUtc = DateTime.UtcNow,
             EndsAtUtc = DateTime.UtcNow.AddMinutes(5),
         };
-    }
 
-    private static GuessRound Round(int hostId, int profileId, GuessRoundStatus status)
-    {
-        return new()
+    private static GuessRound Round(int hostId, int profileId, GuessRoundStatus status) =>
+        new()
         {
             HostId = hostId,
             GuessRoundProfileId = profileId,
@@ -423,48 +420,40 @@ public sealed class PersistenceInvariantTests
             StartedAtUtc = DateTime.UtcNow,
             ClosedAtUtc = status == GuessRoundStatus.Open ? null : DateTime.UtcNow,
         };
-    }
 
-    private static CustomMessageLibraryEntry MessageEntry(int hostId, string name)
-    {
-        return new()
+    private static CustomMessageLibraryEntry MessageEntry(int hostId, string name) =>
+        new()
         {
             HostId = hostId,
             Name = name,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
-    private static CustomCounter Counter(int hostId, string name)
-    {
-        return new()
+    private static CustomCounter Counter(int hostId, string name) =>
+        new()
         {
             HostId = hostId,
             Name = name,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
-    private static CustomCommand Command(int hostId, string name)
-    {
-        return new()
+    private static CustomCommand Command(int hostId, string name) =>
+        new()
         {
             HostId = hostId,
             Name = name,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
     private static CustomAnnouncement Announcement(
         int hostId,
         string name,
         CustomMessageLibraryEntry entry
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             Name = name,
@@ -473,19 +462,16 @@ public sealed class PersistenceInvariantTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
     private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy DeliveryPolicy(
         int hostId
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
             OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
-    }
 
     private static void AssertTokens<TEnum>(IReadOnlyList<(TEnum Value, string Token)> cases)
         where TEnum : struct, Enum

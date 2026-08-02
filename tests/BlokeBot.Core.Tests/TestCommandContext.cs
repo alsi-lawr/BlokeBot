@@ -4,10 +4,8 @@ namespace BlokeBot.Core.Tests;
 
 internal static class TestCommandContext
 {
-    public static ChatCommandContext Create(string login, string channel, string commandName)
-    {
-        return Create(login, channel, commandName, [], (_, _) => ValueTask.CompletedTask);
-    }
+    public static ChatCommandContext Create(string login, string channel, string commandName) =>
+        Create(login, channel, commandName, [], (_, _) => ValueTask.CompletedTask);
 
     public static ChatCommandContext Create(
         string login,
@@ -15,15 +13,13 @@ internal static class TestCommandContext
         string commandName,
         IReadOnlyList<string> args,
         CommandResponder respond
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Message = Message(login, channel, commandName, args),
             CommandName = commandName,
             Responder = respond,
         };
-    }
 
     private static ChatMessage Message(
         string login,

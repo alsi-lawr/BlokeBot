@@ -53,9 +53,8 @@ public sealed class HostedChannelRuntimeStatusService(
             .ToArray();
     }
 
-    public IO<Option<HostedChannelRuntimeStatus>, Never> LoadHostStatus(int hostId)
-    {
-        return IO<Option<HostedChannelRuntimeStatus>, Never>.Create(async ct =>
+    public IO<Option<HostedChannelRuntimeStatus>, Never> LoadHostStatus(int hostId) =>
+        IO<Option<HostedChannelRuntimeStatus>, Never>.Create(async ct =>
         {
             var fieldsResult = await LoadHostRuntimeFields(hostId).ExecuteAsync(ct);
             var fields = fieldsResult.Match(value => value, _ => throw new UnreachableException());
@@ -92,11 +91,9 @@ public sealed class HostedChannelRuntimeStatusService(
                     )
             );
         });
-    }
 
-    public IO<Option<HostedChannelRuntimeSummary>, Never> LoadHostRuntimeSummary(int hostId)
-    {
-        return IO<Option<HostedChannelRuntimeSummary>, Never>.Create(async ct =>
+    public IO<Option<HostedChannelRuntimeSummary>, Never> LoadHostRuntimeSummary(int hostId) =>
+        IO<Option<HostedChannelRuntimeSummary>, Never>.Create(async ct =>
         {
             var fieldsResult = await LoadHostRuntimeFields(hostId).ExecuteAsync(ct);
             var fields = fieldsResult.Match(value => value, _ => throw new UnreachableException());
@@ -114,11 +111,9 @@ public sealed class HostedChannelRuntimeStatusService(
                 ))
             );
         });
-    }
 
-    private IO<Option<HostRuntimeFields>, Never> LoadHostRuntimeFields(int hostId)
-    {
-        return IO<Option<HostRuntimeFields>, Never>.Create(async ct =>
+    private IO<Option<HostRuntimeFields>, Never> LoadHostRuntimeFields(int hostId) =>
+        IO<Option<HostRuntimeFields>, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var fields = await db
@@ -136,7 +131,6 @@ public sealed class HostedChannelRuntimeStatusService(
                 Option<HostRuntimeFields>.FromNullable(fields)
             );
         });
-    }
 
     private sealed record HostRuntimeFields(
         DateTime? ChannelBotAuthorizedAtUtc,

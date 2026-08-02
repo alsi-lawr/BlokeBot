@@ -54,18 +54,9 @@ public partial class ConnectedChannelsSummary
                 $"Connected: {string.Join(", ", connected.Channels.Select(channel => $"#{channel}"))}"
         );
 
-    protected override void OnInitialized()
-    {
-        _botStatus.Changed += OnBotStatusChanged;
-    }
+    protected override void OnInitialized() => _botStatus.Changed += OnBotStatusChanged;
 
-    public void Dispose()
-    {
-        _botStatus.Changed -= OnBotStatusChanged;
-    }
+    public void Dispose() => _botStatus.Changed -= OnBotStatusChanged;
 
-    private void OnBotStatusChanged()
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
+    private void OnBotStatusChanged() => _ = InvokeAsync(StateHasChanged);
 }

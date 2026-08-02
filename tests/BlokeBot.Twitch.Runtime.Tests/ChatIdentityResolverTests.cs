@@ -465,20 +465,17 @@ public sealed class ChatIdentityResolverTests
         chat.Messages.ShouldBeEmpty();
     }
 
-    private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory)
-    {
-        return new(
+    private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory) =>
+        new(
             Identity(),
             new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
-    }
 
     private static EventSubChannelOperations CreateEventSubOperations(
         IdentityHttpClientFactory factory,
         IBroadcasterAccountProvider broadcasters
-    )
-    {
-        return new EventSubChannelOperations(
+    ) =>
+        new EventSubChannelOperations(
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
@@ -489,7 +486,6 @@ public sealed class ChatIdentityResolverTests
             new EnabledNativeTwitchFeatureStateProvider(),
             broadcasters
         );
-    }
 
     private static async Task<BotAccount> ResolveBroadcasterAsync(
         EventSubChannelOperations operations
@@ -538,9 +534,8 @@ public sealed class ChatIdentityResolverTests
         }
     }
 
-    private static BotSettings Settings(string startupMessage = "")
-    {
-        return BotSettings.FromOptions(
+    private static BotSettings Settings(string startupMessage = "") =>
+        BotSettings.FromOptions(
             new BotOptions
             {
                 Identity = new BotIdentityOptions
@@ -555,11 +550,9 @@ public sealed class ChatIdentityResolverTests
                 StartupMessage = startupMessage,
             }
         );
-    }
 
-    private static BotIdentity Identity()
-    {
-        return new BotIdentity
+    private static BotIdentity Identity() =>
+        new BotIdentity
         {
             BotUsername = "bot",
             ClientId = "client-id",
@@ -568,7 +561,6 @@ public sealed class ChatIdentityResolverTests
             Scopes = OAuthAuthorizationScopeSet.Create(["chat:read"]),
             TokenCachePath = "tokens.json",
         };
-    }
 
     private static PublicChatClaimedMessage Message(string channel)
     {
@@ -599,10 +591,8 @@ public sealed class ChatIdentityResolverTests
 
         internal IReadOnlyList<EventSubRequest> EventSubRequests => _handler.EventSubRequests;
 
-        internal void FailNextEventSubPostAfter(int successfulPosts)
-        {
+        internal void FailNextEventSubPostAfter(int successfulPosts) =>
             _handler.FailNextEventSubPostAfter(successfulPosts);
-        }
 
         internal int AppTokenRequestCount => _handler.AppTokenRequestCount;
 
@@ -614,10 +604,7 @@ public sealed class ChatIdentityResolverTests
 
         internal string LastQuery => _handler.LastQuery;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         internal sealed record EventSubRequest(
             HttpMethod Method,
@@ -636,13 +623,11 @@ public sealed class ChatIdentityResolverTests
 
             internal List<EventSubRequest> EventSubRequests { get; } = [];
 
-            internal void FailNextEventSubPostAfter(int successfulPosts)
-            {
+            internal void FailNextEventSubPostAfter(int successfulPosts) =>
                 _failEventSubPostAt =
                     EventSubRequests.Count(request => request.Method == HttpMethod.Post)
                     + successfulPosts
                     + 1;
-            }
 
             internal int AppTokenRequestCount { get; private set; }
 
@@ -734,28 +719,24 @@ public sealed class ChatIdentityResolverTests
                 );
             }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 
     private sealed class StaticAccountProvider(BotAccount account) : IBotAccountProvider
     {
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(account)
                 );
             });
-        }
     }
 
     private sealed class ScriptedBroadcasterAccountProvider(
@@ -768,26 +749,22 @@ public sealed class ChatIdentityResolverTests
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(_results.Dequeue());
             });
-        }
     }
 
     private sealed class UnusedAccountProvider : IBotAccountProvider
     {
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromException<Result<BotAccount, AccessTokenUnavailableReason>>(
                     new InvalidOperationException("Account lookup was not expected.")
                 )
             );
-        }
     }
 
     private sealed class UnusedChatSender : IPublicChatMessageSender
@@ -797,10 +774,7 @@ public sealed class ChatIdentityResolverTests
             string message,
             PublicChatDeliveryDeadline deadline,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("Chat delivery was not expected.");
-        }
+        ) => throw new InvalidOperationException("Chat delivery was not expected.");
     }
 
     private sealed class ScriptedChatSender(PublicChatSendOutcome outcome)
@@ -829,14 +803,10 @@ public sealed class ChatIdentityResolverTests
 
     private sealed class UnusedLifecycleNotifier : IBotChannelLifecycleNotifier
     {
-        public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
-        {
+        public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Channel startup was not expected.");
-        }
 
-        public Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken)
-        {
+        public Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Channel stop was not expected.");
-        }
     }
 }

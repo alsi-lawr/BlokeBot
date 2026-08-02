@@ -81,25 +81,16 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             PointsGiveawaySchedule schedule,
             string message,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromException(new HttpRequestException(failureMessage));
-        }
+        ) => ValueTask.FromException(new HttpRequestException(failureMessage));
     }
 
     private protected class StaticTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         protected DateTimeOffset UtcNow { get; set; } = utcNow;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return UtcNow;
-        }
+        public override DateTimeOffset GetUtcNow() => UtcNow;
 
-        public override long GetTimestamp()
-        {
-            return UtcNow.UtcTicks;
-        }
+        public override long GetTimestamp() => UtcNow.UtcTicks;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     }
@@ -128,17 +119,11 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     {
         internal static CompletedTimer Instance { get; } = new();
 
-        public bool Change(TimeSpan dueTime, TimeSpan period)
-        {
-            return false;
-        }
+        public bool Change(TimeSpan dueTime, TimeSpan period) => false;
 
         public void Dispose() { }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private protected sealed class RecordingGiveawayScheduler : IPointsGiveawayScheduler
@@ -147,28 +132,16 @@ public abstract partial class PointsGiveawaySchedulerTestBase
 
         public List<PointsGiveawaySchedule> Scheduled { get; } = [];
 
-        public void Schedule(PointsGiveawaySchedule schedule)
-        {
-            Scheduled.Add(schedule);
-        }
+        public void Schedule(PointsGiveawaySchedule schedule) => Scheduled.Add(schedule);
 
-        public void Cancel(int giveawayId)
-        {
-            Cancelled.Add(giveawayId);
-        }
+        public void Cancel(int giveawayId) => Cancelled.Add(giveawayId);
     }
 
     private protected sealed class FixedPointsRandom : IPointsRandom
     {
-        public double NextDouble()
-        {
-            return 0;
-        }
+        public double NextDouble() => 0;
 
-        public int Next(int minValue, int maxValue)
-        {
-            return minValue;
-        }
+        public int Next(int minValue, int maxValue) => minValue;
     }
 
     private protected sealed class FakeHttpClientFactory(bool streamIsLive = false)
@@ -176,19 +149,15 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     {
         private readonly Handler _handler = new(streamIsLive);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(bool streamIsLive) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(
+            ) =>
+                Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {
                         Content = new StringContent(
@@ -222,25 +191,20 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                         ),
                     }
                 );
-            }
         }
     }
 
     private protected sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult("app-token");
-        }
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-token");
     }
 
     private protected sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
         : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-        {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
             throw failure;
-        }
     }
 
     private protected sealed class UnavailableHostBotAccountTokenStatusProvider
@@ -250,9 +214,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(
+        ) =>
+            Task.FromResult(
                 new ActiveBotAccountTokenStatus
                 {
                     BotLogin = string.Empty,
@@ -262,7 +225,6 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                     ),
                 }
             );
-        }
     }
 
     private protected sealed class RecordingLogger<T> : ILogger<T>
@@ -270,15 +232,9 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         public List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return NullLoggerScope.Instance;
-        }
+            where TState : notnull => NullLoggerScope.Instance;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -286,10 +242,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        )
-        {
-            Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
-        }
+        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
     }
 
     private protected sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);

@@ -163,12 +163,10 @@ public sealed class PointsGiveawayDrawService(
             return completed;
         }
 
-        Task<PointsGiveawayDrawOutcome> PayoutFailedAsync(PointBalanceMutationFailure failure)
-        {
-            return Task.FromResult<PointsGiveawayDrawOutcome>(
+        Task<PointsGiveawayDrawOutcome> PayoutFailedAsync(PointBalanceMutationFailure failure) =>
+            Task.FromResult<PointsGiveawayDrawOutcome>(
                 new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure)
             );
-        }
     }
 
     private PointAmount RandomPayout(string minimum, string maximum)

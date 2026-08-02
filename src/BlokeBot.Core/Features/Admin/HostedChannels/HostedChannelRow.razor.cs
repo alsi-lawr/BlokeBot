@@ -129,17 +129,13 @@ public partial class HostedChannelRow
         return trimmed.Length == 0 ? "?" : trimmed[..1].ToUpperInvariant();
     }
 
-    private static string StatusBadgeClass(bool active)
-    {
-        return active
+    private static string StatusBadgeClass(bool active) =>
+        active
             ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
             : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
-    }
 
-    private static string StatusDotClass(bool active)
-    {
-        return active ? "status-pill__dot bg-emerald-500" : "status-pill__dot bg-amber-500";
-    }
+    private static string StatusDotClass(bool active) =>
+        active ? "status-pill__dot bg-emerald-500" : "status-pill__dot bg-amber-500";
 
     private async Task RemoveHostAsync()
     {
@@ -172,10 +168,8 @@ public partial class HostedChannelRow
         _showRemovalConfirmation = true;
     }
 
-    private void UpdateRemovalConfirmation(ChangeEventArgs args)
-    {
+    private void UpdateRemovalConfirmation(ChangeEventArgs args) =>
         _removalConfirmation = args.Value?.ToString() ?? string.Empty;
-    }
 
     private void CancelRemoval()
     {

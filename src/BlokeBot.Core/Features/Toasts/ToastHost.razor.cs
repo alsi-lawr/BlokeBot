@@ -86,10 +86,8 @@ public partial class ToastHost
         _dismissingToastIds.Remove(toastId);
     }
 
-    private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId)
-    {
-        return args.Key is "Enter" or " " ? BeginDismissAsync(toastId) : Task.CompletedTask;
-    }
+    private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId) =>
+        args.Key is "Enter" or " " ? BeginDismissAsync(toastId) : Task.CompletedTask;
 
     private async Task AutoDismissAsync(Guid toastId, TimeSpan delay, CancellationToken ct)
     {
@@ -101,10 +99,7 @@ public partial class ToastHost
         catch (OperationCanceledException) { }
     }
 
-    private void OnToastsChanged()
-    {
-        _ = InvokeAsync(RefreshToasts);
-    }
+    private void OnToastsChanged() => _ = InvokeAsync(RefreshToasts);
 
     private void RefreshToasts()
     {
@@ -148,24 +143,18 @@ public partial class ToastHost
         return _dismissingToastIds.Contains(toast.Id) ? $"{classes} toast-card--removing" : classes;
     }
 
-    private static string DismissLabel(ToastNotification toast)
-    {
-        return $"Dismiss notification: {toast.Title}. {toast.Message}";
-    }
+    private static string DismissLabel(ToastNotification toast) =>
+        $"Dismiss notification: {toast.Title}. {toast.Message}";
 
-    private static string ToneCssClass(ToastTone tone)
-    {
-        return tone switch
+    private static string ToneCssClass(ToastTone tone) =>
+        tone switch
         {
             ToastTone.Positive => "positive",
             ToastTone.Caution => "caution",
             ToastTone.Critical => "critical",
             _ => "neutral",
         };
-    }
 
-    private static string ToastRole(ToastNotification toast)
-    {
-        return toast.Kind is ToastKind.Error or ToastKind.Warning ? "alert" : "status";
-    }
+    private static string ToastRole(ToastNotification toast) =>
+        toast.Kind is ToastKind.Error or ToastKind.Warning ? "alert" : "status";
 }

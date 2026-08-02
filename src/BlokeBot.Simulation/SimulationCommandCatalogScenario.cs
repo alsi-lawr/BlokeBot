@@ -28,9 +28,8 @@ internal sealed class SimulationCommandCatalogScenario(
 {
     private SimulationStreamLiveness _liveness = SimulationStreamLiveness.Production;
 
-    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
-    {
-        return _liveness switch
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+        _liveness switch
         {
             SimulationStreamLiveness.Production => productionStreams.GetStreamLiveness(
                 channelLogin
@@ -49,7 +48,6 @@ internal sealed class SimulationCommandCatalogScenario(
             ),
             _ => throw new ArgumentOutOfRangeException(),
         };
-    }
 
     public async Task SetLivenessAsync(string state, CancellationToken ct)
     {
@@ -238,12 +236,12 @@ internal sealed class SimulationCommandCatalogScenario(
         return responses;
     }
 
-    private static IO<HostStreamLivenessOutcome, Never> Outcome(HostStreamLivenessOutcome outcome)
-    {
-        return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+    private static IO<HostStreamLivenessOutcome, Never> Outcome(
+        HostStreamLivenessOutcome outcome
+    ) =>
+        IO<HostStreamLivenessOutcome, Never>.Create(_ =>
             ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
         );
-    }
 
     private static Task<int> HostIdAsync(BlokeBotDbContext db, CancellationToken ct)
     {

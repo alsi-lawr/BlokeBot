@@ -16,10 +16,7 @@ public abstract record WhisperResponseConfigurationOutcome
             Func<Configured, TResult> configured,
             Func<HostNotFound, TResult> hostNotFound,
             Func<CustomBotRequired, TResult> customBotRequired
-        )
-        {
-            return configured(this);
-        }
+        ) => configured(this);
     }
 
     public sealed record HostNotFound : WhisperResponseConfigurationOutcome
@@ -28,10 +25,7 @@ public abstract record WhisperResponseConfigurationOutcome
             Func<Configured, TResult> configured,
             Func<HostNotFound, TResult> hostNotFound,
             Func<CustomBotRequired, TResult> customBotRequired
-        )
-        {
-            return hostNotFound(this);
-        }
+        ) => hostNotFound(this);
     }
 
     public sealed record CustomBotRequired : WhisperResponseConfigurationOutcome
@@ -40,9 +34,6 @@ public abstract record WhisperResponseConfigurationOutcome
             Func<Configured, TResult> configured,
             Func<HostNotFound, TResult> hostNotFound,
             Func<CustomBotRequired, TResult> customBotRequired
-        )
-        {
-            return customBotRequired(this);
-        }
+        ) => customBotRequired(this);
     }
 }

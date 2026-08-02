@@ -7,8 +7,5 @@ internal sealed class DenyAllFilter : IChatCommandFilter
     public ValueTask<bool> AllowAsync(
         ChatCommandContext context,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult(false);
-    }
+    ) => ValueTask.FromResult(false);
 }

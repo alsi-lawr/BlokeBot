@@ -380,14 +380,12 @@ public sealed class FakeTwitchIntegrationTests
 
     private sealed class ReplyCommandModule : IChatCommandModule
     {
-        public void AddCommands(IChatCommandBuilder commands)
-        {
+        public void AddCommands(IChatCommandBuilder commands) =>
             commands.Map(
                 "hello",
                 async (context, _, cancellationToken) =>
                     await context.ReplyAsync("normal command response", cancellationToken)
             );
-        }
     }
 
     private sealed class RecordingChatObserver : IChatMessageObserver
@@ -448,24 +446,19 @@ public sealed class FakeTwitchIntegrationTests
     {
         public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult<IReadOnlyList<string>>(["samplechannel"]);
-        }
+        ) => ValueTask.FromResult<IReadOnlyList<string>>(["samplechannel"]);
     }
 
     private sealed class StaticBotAccountProvider : IBotAccountProvider
     {
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("blokebot", FakeTwitchAuthority.BotAccessToken)
                     )
                 )
             );
-        }
     }
 
     private sealed class LoopbackEventSubOperations(
@@ -478,14 +471,12 @@ public sealed class FakeTwitchIntegrationTests
         public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
             string channel,
             EventSubAuthorizationContext authorization
-        )
-        {
-            return authorization.Match(
+        ) =>
+            authorization.Match(
                 _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
                 _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
                 _ => Success("samplechannel", FakeTwitchAuthority.BroadcasterAccessToken)
             );
-        }
 
         public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
             string channel,
@@ -584,9 +575,8 @@ public sealed class FakeTwitchIntegrationTests
         private static EventSubSubscriptionRequest BroadcasterAndModerator(
             string type,
             string sessionId
-        )
-        {
-            return new(
+        ) =>
+            new(
                 type,
                 "1",
                 new Dictionary<string, string>
@@ -596,73 +586,56 @@ public sealed class FakeTwitchIntegrationTests
                 },
                 sessionId
             );
-        }
 
-        private static EventSubSubscriptionRequest BroadcasterOnly(string type, string sessionId)
-        {
-            return new(
+        private static EventSubSubscriptionRequest BroadcasterOnly(string type, string sessionId) =>
+            new(
                 type,
                 "1",
                 new Dictionary<string, string> { ["broadcaster_user_id"] = "1000" },
                 sessionId
             );
-        }
 
         public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
             string channel,
             EventSubOperationSubscriptionKind kind,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult(true);
-        }
+        ) => ValueTask.FromResult(true);
 
         public ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
             string channel,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult<EventSubStartupDeliveryOutcome>(
+        ) =>
+            ValueTask.FromResult<EventSubStartupDeliveryOutcome>(
                 new EventSubStartupDeliveryOutcome.Completed()
             );
-        }
 
         public ValueTask NotifyChannelStartedAsync(
             string channel,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.CompletedTask;
-        }
+        ) => ValueTask.CompletedTask;
 
         public ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
             ActiveEventSubSubscription subscription,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
+        ) =>
+            ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
                 new EventSubSubscriptionDeletionOutcome.Deleted()
             );
-        }
 
-        public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken)
-        {
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
 
         private static IO<BotAccount, AccessTokenUnavailableReason> Success(
             string login,
             string accessToken
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount(login, accessToken)
                     )
                 )
             );
-        }
     }
 
     private sealed class AlwaysEnabledNativeTwitch : INativeTwitchFeatureStateProvider
@@ -671,10 +644,7 @@ public sealed class FakeTwitchIntegrationTests
             string channel,
             NativeTwitchFeature feature,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult(true);
-        }
+        ) => ValueTask.FromResult(true);
     }
 
     private sealed class NoOpDiagnosticReporter : IEventSubChannelDiagnosticReporter
@@ -736,17 +706,11 @@ public sealed class FakeTwitchIntegrationTests
             return await client.GetAsync(uri);
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await app.DisposeAsync();
-        }
+        public async ValueTask DisposeAsync() => await app.DisposeAsync();
     }
 
     private sealed class LoopbackHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new HttpClient();
-        }
+        public HttpClient CreateClient(string name) => new HttpClient();
     }
 }

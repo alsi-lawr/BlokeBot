@@ -299,9 +299,8 @@ public sealed class PlayQueueService(
         string queueSlug,
         PlayQueueViewerIdentity viewer,
         CancellationToken ct
-    )
-    {
-        return MutateViewerAsync(
+    ) =>
+        MutateViewerAsync(
             hostId,
             queueSlug,
             viewer,
@@ -325,16 +324,14 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     public Task<PlayQueueResult<PublicPlayQueueEntryView>> ReadyAsync(
         int hostId,
         string queueSlug,
         PlayQueueViewerIdentity viewer,
         CancellationToken ct
-    )
-    {
-        return MutateViewerAsync(
+    ) =>
+        MutateViewerAsync(
             hostId,
             queueSlug,
             viewer,
@@ -368,15 +365,13 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     public Task<PlayQueueResult<ModeratorPlayQueueEntryView>> StartReadyCheckAsync(
         int hostId,
         long entryId,
         CancellationToken ct
-    )
-    {
-        return MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
+    ) =>
+        MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
             hostId,
             entryId,
             async (db, queue, entry, now) =>
@@ -406,15 +401,13 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     public Task<PlayQueueResult<ModeratorPlayQueueEntryView>> MarkNoShowAsync(
         int hostId,
         long entryId,
         CancellationToken ct
-    )
-    {
-        return SetModeratorOutcomeAsync(
+    ) =>
+        SetModeratorOutcomeAsync(
             hostId,
             entryId,
             PlayQueueEntryStatus.NoShow,
@@ -422,15 +415,13 @@ public sealed class PlayQueueService(
             "No-show",
             ct
         );
-    }
 
     public Task<PlayQueueResult<ModeratorPlayQueueEntryView>> SkipAsync(
         int hostId,
         long entryId,
         CancellationToken ct
-    )
-    {
-        return SetModeratorOutcomeAsync(
+    ) =>
+        SetModeratorOutcomeAsync(
             hostId,
             entryId,
             PlayQueueEntryStatus.Skipped,
@@ -438,7 +429,6 @@ public sealed class PlayQueueService(
             "Skipped by moderator",
             ct
         );
-    }
 
     public Task<PlayQueueResult<ModeratorPlayQueueEntryView>> UpdateEntryAsync(
         int hostId,
@@ -484,9 +474,8 @@ public sealed class PlayQueueService(
         int hostId,
         long entryId,
         CancellationToken ct
-    )
-    {
-        return MutateModeratorEntryAsync<PlayQueueSelection>(
+    ) =>
+        MutateModeratorEntryAsync<PlayQueueSelection>(
             hostId,
             entryId,
             async (db, queue, entry, now) =>
@@ -582,16 +571,14 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     public Task<PlayQueueResult<PlayQueueSummary>> SetOpenAsync(
         int hostId,
         string queueSlug,
         bool isOpen,
         CancellationToken ct
-    )
-    {
-        return MutateAsync<PlayQueueSummary>(
+    ) =>
+        MutateAsync<PlayQueueSummary>(
             hostId,
             PlayQueueInput.NormalizeSlug(queueSlug),
             async (db, now) =>
@@ -636,16 +623,14 @@ public sealed class PlayQueueService(
             (db, now) =>
                 ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
         );
-    }
 
     public Task<PlayQueueResult<PlayQueueSelection>> SelectPartyAsync(
         int hostId,
         string queueSlug,
         bool keepCurrentParty,
         CancellationToken ct
-    )
-    {
-        return MutateAsync<PlayQueueSelection>(
+    ) =>
+        MutateAsync<PlayQueueSelection>(
             hostId,
             PlayQueueInput.NormalizeSlug(queueSlug),
             async (db, now) =>
@@ -749,7 +734,6 @@ public sealed class PlayQueueService(
             (db, now) =>
                 ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
         );
-    }
 
     public async Task<PublicPlayQueueSnapshot?> GetPublicPageAsync(
         string hostLogin,
@@ -807,9 +791,8 @@ public sealed class PlayQueueService(
         int hostId,
         string queueSlug,
         CancellationToken ct
-    )
-    {
-        return ReadPageAsync(
+    ) =>
+        ReadPageAsync(
             hostId,
             PlayQueueInput.NormalizeSlug(queueSlug),
             async (db, queue) =>
@@ -849,7 +832,6 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     public async Task<PlayQueueResult<PublicPlayQueueEntryView>> GetPositionAsync(
         int hostId,
@@ -923,9 +905,8 @@ public sealed class PlayQueueService(
         PlayQueueEventKind eventKind,
         string reason,
         CancellationToken ct
-    )
-    {
-        return MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
+    ) =>
+        MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
             hostId,
             entryId,
             async (db, queue, entry, now) =>
@@ -958,7 +939,6 @@ public sealed class PlayQueueService(
             },
             ct
         );
-    }
 
     private Task<PlayQueueResult<T>> MutateModeratorEntryAsync<T>(
         int hostId,
@@ -971,9 +951,8 @@ public sealed class PlayQueueService(
             Task<PlayQueueResult<T>>
         > mutate,
         CancellationToken ct
-    )
-    {
-        return MutateAsync(
+    ) =>
+        MutateAsync(
             hostId,
             $"entry-{entryId}",
             async (db, now) =>
@@ -1002,7 +981,6 @@ public sealed class PlayQueueService(
             ct,
             (db, now) => ConvergeEntryQueueAsync(db, hostId, entryId, now, ct)
         );
-    }
 
     private Task<PlayQueueResult<PublicPlayQueueEntryView>> MutateViewerAsync(
         int hostId,
@@ -1144,15 +1122,13 @@ public sealed class PlayQueueService(
         }
     }
 
-    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
-    {
-        return HostFeatureAvailability.IsEnabledAsync(
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(
             dbFactory,
             hostId,
             HostFeatureFlags.PlayWithViewers,
             ct
         );
-    }
 
     private async Task<bool> ConvergeQueueAsync(
         BlokeBotDbContext db,
@@ -1324,9 +1300,8 @@ public sealed class PlayQueueService(
 
     private static IOrderedEnumerable<PlayQueueEntry> OrderedWaiting(
         IEnumerable<PlayQueueEntry> entries
-    )
-    {
-        return entries
+    ) =>
+        entries
             .Where(value =>
                 value.Status
                     is PlayQueueEntryStatus.Waiting
@@ -1336,39 +1311,34 @@ public sealed class PlayQueueService(
             .OrderByDescending(value => value.Priority)
             .ThenBy(value => value.JoinedAtUtc)
             .ThenBy(value => value.Id);
-    }
 
     private async Task<PlayQueue?> LoadQueueAsync(
         BlokeBotDbContext db,
         int hostId,
         string slug,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .PlayQueues.Include(value => value.Fields)
             .Include(value => value.RoleRequirements)
             .Include(value => value.Entries)
                 .ThenInclude(value => value.Values)
                     .ThenInclude(value => value.Field)
             .SingleOrDefaultAsync(value => value.HostId == hostId && value.Slug == slug, ct);
-    }
 
     private async Task<PlayQueue?> LoadQueueAsync(
         BlokeBotDbContext db,
         int hostId,
         int queueId,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .PlayQueues.Include(value => value.Fields)
             .Include(value => value.RoleRequirements)
             .Include(value => value.Entries)
                 .ThenInclude(value => value.Values)
                     .ThenInclude(value => value.Field)
             .SingleOrDefaultAsync(value => value.HostId == hostId && value.Id == queueId, ct);
-    }
 
     private static async Task<PlayQueueEntry?> FindEntryAsync(
         BlokeBotDbContext db,
@@ -1450,9 +1420,8 @@ public sealed class PlayQueueService(
         BlokeBotDbContext db,
         int queueId,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .PlayQueueParticipation.Where(value => value.QueueId == queueId)
             .GroupBy(value => value.IdentityKey)
             .ToDictionaryAsync(
@@ -1460,7 +1429,6 @@ public sealed class PlayQueueService(
                 group => group.Max(value => value.ParticipatedAtUtc),
                 ct
             );
-    }
 
     private async Task<PlayQueueSummary> LoadSummaryAsync(
         BlokeBotDbContext db,
@@ -1475,9 +1443,8 @@ public sealed class PlayQueueService(
         return ToSummary(queue, hostLogin);
     }
 
-    private static PlayQueueSummary ToSummary(PlayQueue queue, string hostLogin)
-    {
-        return new(
+    private static PlayQueueSummary ToSummary(PlayQueue queue, string hostLogin) =>
+        new(
             queue.Id,
             queue.HostId,
             hostLogin,
@@ -1509,7 +1476,6 @@ public sealed class PlayQueueService(
                 .Select(value => new PlayQueueRoleRequirementView(value.Role, value.MinimumCount))
                 .ToArray()
         );
-    }
 
     private async Task<PublicPlayQueueEntryView> ToPublicViewAsync(
         BlokeBotDbContext db,
@@ -1543,9 +1509,8 @@ public sealed class PlayQueueService(
         PlayQueue queue,
         PlayQueueEntry entry,
         long position
-    )
-    {
-        return new(
+    ) =>
+        new(
             entry.Id,
             position,
             queue.ShowParticipantNames ? entry.DisplayName : null,
@@ -1553,7 +1518,6 @@ public sealed class PlayQueueService(
             entry.ReadyExpiresAtUtc,
             []
         );
-    }
 
     private async Task<ModeratorPlayQueueEntryView> ToModeratorViewAsync(
         BlokeBotDbContext db,
@@ -1806,38 +1770,27 @@ public sealed class PlayQueueService(
     private static bool FieldShapeMatches(
         IReadOnlyCollection<PlayQueueField> stored,
         IReadOnlyList<PlayQueueFieldCommand> commanded
-    )
-    {
-        return stored.Count == commanded.Count
-            && stored
-                .OrderBy(value => value.Position)
-                .Zip(commanded)
-                .All(pair =>
-                    pair.First.Key == PlayQueueInput.NormalizeKey(pair.Second.Key)
-                    && pair.First.Label == pair.Second.Label.Trim()
-                    && pair.First.IsRequired == pair.Second.IsRequired
-                    && pair.First.Choices == string.Join('\n', pair.Second.Choices ?? [])
-                );
-    }
+    ) =>
+        stored.Count == commanded.Count
+        && stored
+            .OrderBy(value => value.Position)
+            .Zip(commanded)
+            .All(pair =>
+                pair.First.Key == PlayQueueInput.NormalizeKey(pair.Second.Key)
+                && pair.First.Label == pair.Second.Label.Trim()
+                && pair.First.IsRequired == pair.Second.IsRequired
+                && pair.First.Choices == string.Join('\n', pair.Second.Choices ?? [])
+            );
 
-    private static string PreferredRole(PlayQueueEntry entry)
-    {
-        return entry.Values.FirstOrDefault(value => value.Field?.Key == "preferred-role")?.Value
-            ?? string.Empty;
-    }
+    private static string PreferredRole(PlayQueueEntry entry) =>
+        entry.Values.FirstOrDefault(value => value.Field?.Key == "preferred-role")?.Value
+        ?? string.Empty;
 
-    private static IReadOnlyList<string> Choices(string value)
-    {
-        return value.Split(
-            '\n',
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-        );
-    }
+    private static IReadOnlyList<string> Choices(string value) =>
+        value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static string? CleanOptional(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
+    private static string? CleanOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void AddEvent(
         BlokeBotDbContext db,
@@ -1876,20 +1829,13 @@ public sealed class PlayQueueService(
         return _mutationGates[(hostId & int.MaxValue) % _mutationGates.Length];
     }
 
-    private static SemaphoreSlim[] CreateGates()
-    {
-        return Enumerable.Range(0, _gateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
-    }
+    private static SemaphoreSlim[] CreateGates() =>
+        Enumerable.Range(0, _gateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-    private static PlayQueueResult<T>.Succeeded Succeeded<T>(T value)
-    {
-        return new(value);
-    }
+    private static PlayQueueResult<T>.Succeeded Succeeded<T>(T value) => new(value);
 
-    private static PlayQueueResult<T>.Rejected Rejected<T>(PlayQueueRejection reason)
-    {
-        return new(reason);
-    }
+    private static PlayQueueResult<T>.Rejected Rejected<T>(PlayQueueRejection reason) =>
+        new(reason);
 
     private sealed record ConfigurationValues(
         IReadOnlyList<(PlayQueueField Field, string Value)> Values,

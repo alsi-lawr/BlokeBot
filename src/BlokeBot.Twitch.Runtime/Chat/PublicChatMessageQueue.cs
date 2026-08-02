@@ -386,8 +386,7 @@ internal sealed class PublicChatMessageQueue(
         }
     }
 
-    private void LogOutcome(PublicChatClaimedMessage message, PublicChatDeliveryOutcome outcome)
-    {
+    private void LogOutcome(PublicChatClaimedMessage message, PublicChatDeliveryOutcome outcome) =>
         outcome.Match(
             static _ => { },
             _ => LogMissingIdentity(message, nameof(PublicChatDeliveryOutcome.MissingChannel)),
@@ -411,16 +410,13 @@ internal sealed class PublicChatMessageQueue(
             ambiguous => LogFailure(LogLevel.Warning, message, "Ambiguous", ambiguous.Diagnostic),
             unexpected => LogFailure(LogLevel.Error, message, "Unexpected", unexpected.Diagnostic)
         );
-    }
 
-    private void LogMissingIdentity(PublicChatClaimedMessage message, string identityOutcome)
-    {
+    private void LogMissingIdentity(PublicChatClaimedMessage message, string identityOutcome) =>
         log.LogWarning(
             "Public chat outbox message {OutboxMessageId} reached terminal identity outcome {IdentityOutcome} during preparation.",
             message.Id,
             identityOutcome
         );
-    }
 
     private void LogFailure(
         LogLevel level,
@@ -589,8 +585,7 @@ internal sealed class PublicChatMessageQueue(
     private void ReportTerminalRejectionEscalation(
         ObserverFanOutEscalationException escalation,
         PublicChatTerminalRejection rejection
-    )
-    {
+    ) =>
         log.LogError(
             "Public chat terminal rejection handling escalated for channel #{Channel} and provider code {ProviderCode} after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures. Continuing queued chat processing.",
             rejection.Channel,
@@ -598,25 +593,16 @@ internal sealed class PublicChatMessageQueue(
             escalation.Failures.Count,
             escalation.HandlingFailures.Count
         );
-    }
 
     private int _maxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
 
-    private DateTimeOffset UtcNow()
-    {
-        return timeProvider.GetUtcNow();
-    }
+    private DateTimeOffset UtcNow() => timeProvider.GetUtcNow();
 
-    private static TimeSpan Min(TimeSpan left, TimeSpan right)
-    {
-        return left <= right ? left : right;
-    }
+    private static TimeSpan Min(TimeSpan left, TimeSpan right) => left <= right ? left : right;
 }
 
 internal sealed class PublicChatOutboxWorker(PublicChatMessageQueue queue) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        return queue.RunAsync(stoppingToken);
-    }
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        queue.RunAsync(stoppingToken);
 }

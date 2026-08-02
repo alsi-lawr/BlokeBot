@@ -120,23 +120,19 @@ public sealed class CommandTests
         return services.BuildServiceProvider().GetRequiredService<ChatCommandDispatcher>();
     }
 
-    private static ChatMessage Message(string login, string text)
-    {
-        return new(
+    private static ChatMessage Message(string login, string text) =>
+        new(
             login,
             "channel",
             text,
             $":{login}!u@h PRIVMSG #channel :{text}",
             new Dictionary<string, string>()
         );
-    }
 
-    private static CommandResponder RecordResponses(List<CommandResponse> responses)
-    {
-        return (response, _) =>
+    private static CommandResponder RecordResponses(List<CommandResponse> responses) =>
+        (response, _) =>
         {
             responses.Add(response);
             return ValueTask.CompletedTask;
         };
-    }
 }

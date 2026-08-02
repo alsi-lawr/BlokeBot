@@ -291,16 +291,14 @@ public sealed class GiveawayOverlayTests
         help.ShouldContain("without replaying suppressed updates");
     }
 
-    private static ResolvedOverlayInstance Instance(int hostId)
-    {
-        return new ResolvedOverlayInstance(
+    private static ResolvedOverlayInstance Instance(int hostId) =>
+        new ResolvedOverlayInstance(
             hostId,
             Guid.NewGuid(),
             OverlayType.Giveaway,
             new OverlayConfiguration.GiveawayV1("Community giveaway", true, true, true),
             new OverlayRevision(4)
         );
-    }
 
     private static async Task<int> SeedAsync(SqliteBlokeBotDbFactory database)
     {
@@ -370,14 +368,10 @@ public sealed class GiveawayOverlayTests
     private static async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenAsync(
         OverlayLiveCoordinator coordinator,
         ResolvedOverlayInstance instance
-    )
-    {
-        return (
-            await coordinator.OpenAsync(instance, coordinator.Generation, CancellationToken.None)
-        )
+    ) =>
+        (await coordinator.OpenAsync(instance, coordinator.Generation, CancellationToken.None))
             .ShouldBeOfType<OverlayLiveOpenResult.Opened>()
             .Connection;
-    }
 
     private static async Task<OverlayLiveTransportMessage> ReadAsync(
         OverlayLiveCoordinator.OverlayLiveConnection connection
@@ -387,9 +381,8 @@ public sealed class GiveawayOverlayTests
         return await connection.Messages.ReadAsync(timeout.Token);
     }
 
-    private static string SourcePath(string fileName)
-    {
-        return Path.GetFullPath(
+    private static string SourcePath(string fileName) =>
+        Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
                 "..",
@@ -404,14 +397,10 @@ public sealed class GiveawayOverlayTests
                 fileName
             )
         );
-    }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class GiveawayLiveProvider : IOverlayStateProvider
@@ -433,10 +422,7 @@ public sealed class GiveawayOverlayTests
             return (entered.Task, () => release.TrySetResult());
         }
 
-        internal void SetPhase(int hostId, GiveawayOverlayPhase phase)
-        {
-            _phases[hostId] = phase;
-        }
+        internal void SetPhase(int hostId, GiveawayOverlayPhase phase) => _phases[hostId] = phase;
 
         public async Task<OverlaySnapshotProjection> ProjectAsync(
             ResolvedOverlayInstance instance,

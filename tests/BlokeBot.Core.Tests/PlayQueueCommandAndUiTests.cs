@@ -286,9 +286,8 @@ public sealed class PlayQueueCommandAndUiTests
             .ShouldHaveSingleItem();
     }
 
-    private static ConfigurePlayQueueCommand Queue(string slug)
-    {
-        return new(
+    private static ConfigurePlayQueueCommand Queue(string slug) =>
+        new(
             slug,
             "Community squad",
             "Example game",
@@ -305,21 +304,16 @@ public sealed class PlayQueueCommandAndUiTests
             ],
             [new("Tank", 1)]
         );
-    }
 
-    private static IRenderedComponent<PublicPlayQueuePage> RenderPublicPage(BunitContext context)
-    {
-        return context.Render<PublicPlayQueuePage>(parameters =>
+    private static IRenderedComponent<PublicPlayQueuePage> RenderPublicPage(BunitContext context) =>
+        context.Render<PublicPlayQueuePage>(parameters =>
             parameters
                 .Add(value => value.Channel, "streamer")
                 .Add(value => value.QueueSlug, "squad")
         );
-    }
 
-    private static IElement FindButton(IRenderedComponent<PublicPlayQueuePage> page, string text)
-    {
-        return page.FindAll("button").Single(button => button.TextContent.Trim() == text);
-    }
+    private static IElement FindButton(IRenderedComponent<PublicPlayQueuePage> page, string text) =>
+        page.FindAll("button").Single(button => button.TextContent.Trim() == text);
 
     private static async Task AssertIdentityAsync(
         SqliteBlokeBotDbFactory database,
@@ -349,8 +343,7 @@ public sealed class PlayQueueCommandAndUiTests
         ChatCommandDispatcher dispatcher,
         ChatMessage message,
         List<string> responses
-    )
-    {
+    ) =>
         await dispatcher.DispatchResponsesAsync(
             message,
             (response, _) =>
@@ -360,16 +353,12 @@ public sealed class PlayQueueCommandAndUiTests
             },
             CancellationToken.None
         );
-    }
 
     private static ChatMessage Message(
         string login,
         string text,
         IReadOnlyDictionary<string, string>? tags = null
-    )
-    {
-        return new(login, "streamer", text, string.Empty, tags ?? new Dictionary<string, string>());
-    }
+    ) => new(login, "streamer", text, string.Empty, tags ?? new Dictionary<string, string>());
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
     {

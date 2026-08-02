@@ -8,10 +8,7 @@ public sealed class OAuthAuthorizationScopeSet
 {
     private readonly OAuthScopeSet _scopes;
 
-    private OAuthAuthorizationScopeSet(OAuthScopeSet scopes)
-    {
-        _scopes = scopes;
-    }
+    private OAuthAuthorizationScopeSet(OAuthScopeSet scopes) => _scopes = scopes;
 
     public int Count => _scopes.Count;
 
@@ -31,33 +28,17 @@ public sealed class OAuthAuthorizationScopeSet
         return new OAuthAuthorizationScopeSet(normalized);
     }
 
-    public string Serialize()
-    {
-        return _scopes.Serialize();
-    }
+    public string Serialize() => _scopes.Serialize();
 
-    public bool Equals(OAuthAuthorizationScopeSet? other)
-    {
-        return other is not null && _scopes.Equals(other._scopes);
-    }
+    public bool Equals(OAuthAuthorizationScopeSet? other) =>
+        other is not null && _scopes.Equals(other._scopes);
 
-    public override bool Equals(object? obj)
-    {
-        return obj is OAuthAuthorizationScopeSet other && Equals(other);
-    }
+    public override bool Equals(object? obj) =>
+        obj is OAuthAuthorizationScopeSet other && Equals(other);
 
-    public override int GetHashCode()
-    {
-        return _scopes.GetHashCode();
-    }
+    public override int GetHashCode() => _scopes.GetHashCode();
 
-    public IEnumerator<string> GetEnumerator()
-    {
-        return _scopes.GetEnumerator();
-    }
+    public IEnumerator<string> GetEnumerator() => _scopes.GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

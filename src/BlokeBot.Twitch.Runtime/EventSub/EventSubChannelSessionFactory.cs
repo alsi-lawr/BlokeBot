@@ -12,9 +12,8 @@ internal sealed class EventSubChannelSessionFactory(
 {
     internal bool HasPendingReconciliation => pendingDeletions.HasPendingReconciliation;
 
-    internal EventSubChannelSession Create(string sessionId)
-    {
-        return new(
+    internal EventSubChannelSession Create(string sessionId) =>
+        new(
             sessionId,
             operations,
             recovery,
@@ -24,5 +23,4 @@ internal sealed class EventSubChannelSessionFactory(
             diagnostics,
             timeProvider
         );
-    }
 }

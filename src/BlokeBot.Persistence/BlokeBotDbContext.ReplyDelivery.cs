@@ -5,8 +5,7 @@ namespace BlokeBot.Persistence;
 
 public sealed partial class BlokeBotDbContext
 {
-    private static void ConfigureReplyDelivery(ModelBuilder modelBuilder)
-    {
+    private static void ConfigureReplyDelivery(ModelBuilder modelBuilder) =>
         modelBuilder.Entity<ReplyDeliverySetting>(b =>
         {
             b.ToTable(
@@ -50,5 +49,4 @@ public sealed partial class BlokeBotDbContext
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-    }
 }

@@ -93,10 +93,7 @@ public sealed class BotRuntimeHostedServiceTests
 
         internal RecordingIdleWait IdleWait { get; } = idleWait;
 
-        public void Dispose()
-        {
-            Service.Dispose();
-        }
+        public void Dispose() => Service.Dispose();
     }
 
     private sealed class CancelingConnectionSession(CancellationTokenSource stopping)
@@ -123,10 +120,7 @@ public sealed class BotRuntimeHostedServiceTests
     {
         internal List<RuntimeSessionHealthReport> Reports { get; } = [];
 
-        public void Report(RuntimeSessionHealthReport report)
-        {
-            Reports.Add(report);
-        }
+        public void Report(RuntimeSessionHealthReport report) => Reports.Add(report);
     }
 
     private sealed class RecordingIdleWait : IRuntimeIdleWait

@@ -330,9 +330,8 @@ internal sealed class CustomAnnouncementScheduler(
         CustomAnnouncement announcement,
         AnnouncementCandidate candidate,
         DateTimeOffset now
-    )
-    {
-        return announcement.Schedule switch
+    ) =>
+        announcement.Schedule switch
         {
             IntervalCustomAnnouncementSchedule interval =>
                 new AnnouncementScheduleEvaluation.Evaluated(
@@ -352,7 +351,6 @@ internal sealed class CustomAnnouncementScheduler(
             ),
             _ => throw new UnreachableException("Unknown custom announcement schedule."),
         };
-    }
 
     private static AnnouncementDueResult IsIntervalDue(
         CustomAnnouncement announcement,
@@ -514,8 +512,7 @@ internal sealed class CustomAnnouncementScheduler(
         CustomAnnouncement announcement,
         AnnouncementCandidate candidate,
         string reason
-    )
-    {
+    ) =>
         log.LogWarning(
             "Custom announcement {AnnouncementId} occurrence completed for host {HostLogin}; Status: {Status}; Reason: {Reason}; AttemptCount: {AttemptCount}; DueAtUtc: {DueAtUtc}; ExpiresAtUtc: {ExpiresAtUtc}.",
             announcement.Id,
@@ -526,37 +523,28 @@ internal sealed class CustomAnnouncementScheduler(
             announcement.OccurrenceDueAtUtc,
             announcement.OccurrenceExpiresAtUtc
         );
-    }
 
-    private static bool IsTerminal(AnnouncementOccurrenceStatus status)
-    {
-        return status
+    private static bool IsTerminal(AnnouncementOccurrenceStatus status) =>
+        status
             is AnnouncementOccurrenceStatus.SkippedExpired
                 or AnnouncementOccurrenceStatus.TerminalRejected
                 or AnnouncementOccurrenceStatus.TerminalAmbiguous
                 or AnnouncementOccurrenceStatus.TerminalUnexpected
                 or AnnouncementOccurrenceStatus.TerminalInvalidTimeZone
                 or AnnouncementOccurrenceStatus.TerminalMissingMessage;
-    }
 
-    private TimeSpan TickInterval()
-    {
-        return TimeSpan.FromSeconds(
+    private TimeSpan TickInterval() =>
+        TimeSpan.FromSeconds(
             Math.Max(1, options.Value.CustomCommands.AnnouncementSchedulerTickSeconds)
         );
-    }
 
-    private static DateTimeOffset RequireUtc(DateTime? value, string field)
-    {
-        return value is { } dateTime
+    private static DateTimeOffset RequireUtc(DateTime? value, string field) =>
+        value is { } dateTime
             ? AsUtc(dateTime)
             : throw new UnreachableException($"Announcement occurrence {field} is required.");
-    }
 
-    private static DateTimeOffset AsUtc(DateTime value)
-    {
-        return new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
-    }
+    private static DateTimeOffset AsUtc(DateTime value) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
 
     private string? SelectMessage(CustomMessageLibraryEntry? entry, DateTimeOffset selectedAt)
     {
@@ -587,10 +575,8 @@ internal sealed class CustomAnnouncementScheduler(
             );
     }
 
-    private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right)
-    {
-        return left <= right ? left : right;
-    }
+    private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right) =>
+        left <= right ? left : right;
 
     private sealed record AnnouncementCandidate(
         int AnnouncementId,

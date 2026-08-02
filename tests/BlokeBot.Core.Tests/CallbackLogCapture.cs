@@ -9,10 +9,7 @@ internal sealed class CallbackLogCapture : ILoggerProvider
 
     public IReadOnlyCollection<CallbackLogEntry> Entries => _entries.ToArray();
 
-    public ILogger CreateLogger(string categoryName)
-    {
-        return new Logger(categoryName, _entries);
-    }
+    public ILogger CreateLogger(string categoryName) => new Logger(categoryName, _entries);
 
     public void Dispose() { }
 
@@ -20,15 +17,9 @@ internal sealed class CallbackLogCapture : ILoggerProvider
         : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

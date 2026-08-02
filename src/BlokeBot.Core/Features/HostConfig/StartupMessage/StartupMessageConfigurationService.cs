@@ -87,12 +87,10 @@ public sealed class StartupMessageConfigurationService(
             : new StartupChatMessage.Disabled();
     }
 
-    private StartupChatMessage ConfiguredDefault()
-    {
-        return string.IsNullOrWhiteSpace(botSettings.StartupMessage)
+    private StartupChatMessage ConfiguredDefault() =>
+        string.IsNullOrWhiteSpace(botSettings.StartupMessage)
             ? new StartupChatMessage.Disabled()
             : new StartupChatMessage.Enabled(botSettings.StartupMessage.Trim());
-    }
 
     private static bool CanConfigure(AuthenticatedSession session, int hostId)
     {

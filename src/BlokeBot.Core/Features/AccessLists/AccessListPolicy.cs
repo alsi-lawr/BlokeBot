@@ -21,10 +21,7 @@ internal abstract record AccessListPolicy
             Func<Disabled, TResult> disabled,
             Func<BlacklistByDefault, TResult> blacklistByDefault,
             Func<WhitelistRequired, TResult> whitelistRequired
-        )
-        {
-            return disabled(this);
-        }
+        ) => disabled(this);
     }
 
     internal sealed record BlacklistByDefault : AccessListPolicy
@@ -33,10 +30,7 @@ internal abstract record AccessListPolicy
             Func<Disabled, TResult> disabled,
             Func<BlacklistByDefault, TResult> blacklistByDefault,
             Func<WhitelistRequired, TResult> whitelistRequired
-        )
-        {
-            return blacklistByDefault(this);
-        }
+        ) => blacklistByDefault(this);
     }
 
     internal sealed record WhitelistRequired : AccessListPolicy
@@ -45,10 +39,7 @@ internal abstract record AccessListPolicy
             Func<Disabled, TResult> disabled,
             Func<BlacklistByDefault, TResult> blacklistByDefault,
             Func<WhitelistRequired, TResult> whitelistRequired
-        )
-        {
-            return whitelistRequired(this);
-        }
+        ) => whitelistRequired(this);
     }
 }
 
@@ -56,14 +47,12 @@ internal sealed record AccessListEntryValue(AccessListEntryKind Kind, string Log
 
 internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist)
 {
-    public bool Allows(string normalizedLogin, AccessListPolicy policy)
-    {
-        return policy.Match(
+    public bool Allows(string normalizedLogin, AccessListPolicy policy) =>
+        policy.Match(
             _ => false,
             _ => !Blacklist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase),
             _ => Whitelist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase)
         );
-    }
 
     public static AccessListSnapshot From(IEnumerable<AccessListEntryValue> entries)
     {

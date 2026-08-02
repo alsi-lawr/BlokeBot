@@ -11,10 +11,7 @@ public sealed class ViewerCommandCatalogModule(
     ViewerCommandCatalogService catalog
 ) : IChatCommandModule
 {
-    public void AddCommands(IChatCommandBuilder commands)
-    {
-        commands.MapDynamic(ExecuteAsync);
-    }
+    public void AddCommands(IChatCommandBuilder commands) => commands.MapDynamic(ExecuteAsync);
 
     private async ValueTask<CommandHandlingOutcome> ExecuteAsync(
         ChatCommandContext context,

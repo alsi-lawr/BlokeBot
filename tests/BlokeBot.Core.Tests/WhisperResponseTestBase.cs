@@ -14,13 +14,11 @@ namespace BlokeBot.Core.Tests;
 
 public abstract class WhisperResponseTestBase
 {
-    private protected static WhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory)
-    {
-        return new(
+    private protected static WhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory) =>
+        new(
             dbFactory,
             new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
         );
-    }
 
     private protected static async Task<PrivateDeliveryError> SendPrivateFailureAsync(
         WhisperHarness harness,
@@ -39,9 +37,8 @@ public abstract class WhisperResponseTestBase
         return failure.Error;
     }
 
-    private protected static BotSettings BotOptions()
-    {
-        return BotSettings.FromOptions(
+    private protected static BotSettings BotOptions() =>
+        BotSettings.FromOptions(
             new BotOptions
             {
                 Identity = new BotIdentityOptions
@@ -54,7 +51,6 @@ public abstract class WhisperResponseTestBase
                 },
             }
         );
-    }
 
     private protected static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -229,18 +225,12 @@ public abstract class WhisperResponseTestBase
             return new("viewer", "streamer", "!points", "raw", tags);
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await _dbFactory.DisposeAsync();
-        }
+        public async ValueTask DisposeAsync() => await _dbFactory.DisposeAsync();
     }
 
     private protected sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private protected sealed record SentChatMessage(
@@ -332,10 +322,7 @@ public abstract class WhisperResponseTestBase
 
         internal int WhisperRequestCount => _handler.WhisperRequestCount;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(
             HttpStatusCode whisperStatus,
@@ -354,9 +341,8 @@ public abstract class WhisperResponseTestBase
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return request.RequestUri?.AbsolutePath switch
+            ) =>
+                request.RequestUri?.AbsolutePath switch
                 {
                     "/oauth2/validate" => Task.FromResult(ValidationResponse(request)),
                     "/oauth2/token" when !validationAccepted => Task.FromResult(
@@ -375,7 +361,6 @@ public abstract class WhisperResponseTestBase
                     "/helix/whispers" => Task.FromResult(WhisperResponse()),
                     _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
                 };
-            }
 
             private HttpResponseMessage WhisperResponse()
             {
@@ -421,13 +406,11 @@ public abstract class WhisperResponseTestBase
                     : new HttpResponseMessage(HttpStatusCode.Unauthorized);
             }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 
@@ -438,15 +421,9 @@ public abstract class WhisperResponseTestBase
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

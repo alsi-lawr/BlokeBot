@@ -524,10 +524,7 @@ public sealed class TransportClientTests
         request.Headers.GetValues("Client-Id").Single().ShouldBe("client-id");
     }
 
-    private static HelixRequestContext Context()
-    {
-        return new("client-id", "access-token");
-    }
+    private static HelixRequestContext Context() => new("client-id", "access-token");
 
     private static ScriptedHttpClientFactory RespondingWith(HttpStatusCode statusCode)
     {
@@ -536,13 +533,11 @@ public sealed class TransportClientTests
         return factory;
     }
 
-    private static HttpResponseMessage JsonResponse(string json)
-    {
-        return new(HttpStatusCode.OK)
+    private static HttpResponseMessage JsonResponse(string json) =>
+        new(HttpStatusCode.OK)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
-    }
 
     private sealed class ScriptedHttpClientFactory : IHttpClientFactory
     {
@@ -554,15 +549,10 @@ public sealed class TransportClientTests
 
         internal void Respond(
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> response
-        )
-        {
-            _responses.Enqueue(response);
-        }
+        ) => _responses.Enqueue(response);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
         private sealed class Handler(ScriptedHttpClientFactory owner) : HttpMessageHandler
         {

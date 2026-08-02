@@ -86,10 +86,7 @@ public partial class PointsConfigurationPage
         await LoadAsync();
     }
 
-    private Task LoadAsync()
-    {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
-    }
+    private Task LoadAsync() => ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
 
     private async Task LoadCoreAsync()
     {
@@ -107,10 +104,7 @@ public partial class PointsConfigurationPage
         _validationErrors = [];
     }
 
-    private Task SaveAsync()
-    {
-        return ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
-    }
+    private Task SaveAsync() => ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
 
     private async Task SaveCoreAsync()
     {
@@ -159,8 +153,7 @@ public partial class PointsConfigurationPage
             );
     }
 
-    private async Task SaveCommandAsync(PointsConfigurationSaveCommand command)
-    {
+    private async Task SaveCommandAsync(PointsConfigurationSaveCommand command) =>
         await RunSelectedHostMutationAsync(
             HostId,
             async () =>
@@ -188,5 +181,4 @@ public partial class PointsConfigurationPage
                 );
             }
         );
-    }
 }

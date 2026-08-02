@@ -20,10 +20,8 @@ internal sealed class FakeOAuthClient : IOAuthClient
 
     public int RefreshCalls { get; private set; }
 
-    public Uri BuildAuthorizeUri(string state)
-    {
-        return new($"https://id.twitch.tv/oauth2/authorize?state={state}");
-    }
+    public Uri BuildAuthorizeUri(string state) =>
+        new($"https://id.twitch.tv/oauth2/authorize?state={state}");
 
     public Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {

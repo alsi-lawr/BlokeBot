@@ -791,20 +791,12 @@ public sealed class CustomCommandConfigurationTests
         public Task<OverlayCueAdmissionCatalog> QueryCatalogAsync(
             int hostId,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(new OverlayCueAdmissionCatalog([], []));
-        }
+        ) => Task.FromResult(new OverlayCueAdmissionCatalog([], []));
 
         public Task<OverlayCueAdmissionOutcome> AdmitAsync(
             OverlayCueAdmissionRequest request,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<OverlayCueAdmissionOutcome>(
-                new OverlayCueAdmissionOutcome.Missing()
-            );
-        }
+        ) => Task.FromResult<OverlayCueAdmissionOutcome>(new OverlayCueAdmissionOutcome.Missing());
     }
 
     private sealed class AvailableTwitchAnnouncementReadinessProvider(
@@ -814,10 +806,7 @@ public sealed class CustomCommandConfigurationTests
         public Task<TwitchAnnouncementReadiness> GetReadinessAsync(
             string channelLogin,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(new TwitchAnnouncementReadiness(availability, "bot"));
-        }
+        ) => Task.FromResult(new TwitchAnnouncementReadiness(availability, "bot"));
     }
 
     private sealed class UnsupportedCustomCommandActionEditor : ICustomCommandActionEditor
@@ -827,16 +816,13 @@ public sealed class CustomCommandConfigurationTests
         public CustomCommandReplyRoutesEditor ReplyRoutes { get; set; } = new();
     }
 
-    private static CustomCommandReplyRoutesEditor ReplyRoutes(int? zeroArgumentReplyId)
-    {
-        return new() { ZeroArgumentMessageLibraryEntryId = zeroArgumentReplyId };
-    }
+    private static CustomCommandReplyRoutesEditor ReplyRoutes(int? zeroArgumentReplyId) =>
+        new() { ZeroArgumentMessageLibraryEntryId = zeroArgumentReplyId };
 
     private static CustomCommandConfigurationSaveCommand ValidCommand(
         CustomCommandConfiguration draft
-    )
-    {
-        return CustomCommandConfigurationValidator
+    ) =>
+        CustomCommandConfigurationValidator
             .Validate(draft)
             .Match(
                 command => command,
@@ -845,42 +831,35 @@ public sealed class CustomCommandConfigurationTests
                         string.Join(" ", errors.Select(error => error.Message))
                     )
             );
-    }
 
     private static IReadOnlyList<CustomCommandConfigurationValidationError> ValidationErrors(
         CustomCommandConfiguration draft
-    )
-    {
-        return CustomCommandConfigurationValidator
+    ) =>
+        CustomCommandConfigurationValidator
             .Validate(draft)
             .Match(_ => Array.Empty<CustomCommandConfigurationValidationError>(), errors => errors);
-    }
 
     private static CustomCommandConfigurationValidationTarget CommandTarget(
         int commandId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.Command,
             commandId,
             field
         );
-    }
 
     private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
         int announcementId,
         CustomCommandValidationFieldKind field
-    )
-    {
-        return new(
+    ) =>
+        new(
             CustomCommandSettingsTab.Commands,
             CustomCommandValidationEntityKind.ScheduledMessage,
             announcementId,
             field
         );
-    }
 
     private static async Task SaveValidAsync(
         CustomCommandConfigurationService service,

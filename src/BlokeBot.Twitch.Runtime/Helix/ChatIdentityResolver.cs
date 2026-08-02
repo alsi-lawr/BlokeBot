@@ -74,10 +74,7 @@ internal abstract record ChatIdentityResolution
             Func<Resolved, TResult> resolved,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot
-        )
-        {
-            return resolved(this);
-        }
+        ) => resolved(this);
     }
 
     internal sealed record MissingChannel : ChatIdentityResolution
@@ -86,10 +83,7 @@ internal abstract record ChatIdentityResolution
             Func<Resolved, TResult> resolved,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot
-        )
-        {
-            return missingChannel(this);
-        }
+        ) => missingChannel(this);
     }
 
     internal sealed record MissingBot : ChatIdentityResolution
@@ -98,9 +92,6 @@ internal abstract record ChatIdentityResolution
             Func<Resolved, TResult> resolved,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot
-        )
-        {
-            return missingBot(this);
-        }
+        ) => missingBot(this);
     }
 }

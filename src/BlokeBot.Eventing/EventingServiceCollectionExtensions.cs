@@ -36,15 +36,13 @@ public static class EventingServiceCollectionExtensions
         TEvent,
         TDeadLetter
     >(this IServiceCollection services, ObserverBoundary boundary)
-        where TDeadLetter : IObserverDeadLetterPayload
-    {
-        return services.AddObserverFanOut<TBoundary, TEvent, TDeadLetter>(
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        services.AddObserverFanOut<TBoundary, TEvent, TDeadLetter>(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
             }
         );
-    }
 
     public static IServiceCollection AddEventBus<TKey>(
         this IServiceCollection services,

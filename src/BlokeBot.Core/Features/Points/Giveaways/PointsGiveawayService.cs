@@ -20,9 +20,8 @@ public sealed class PointsGiveawayService(
     PointsGiveawayChangeNotifier changes
 )
 {
-    public IO<Option<PointsGiveawayView>, Never> GetActiveGiveaway(int hostId)
-    {
-        return IO<Option<PointsGiveawayView>, Never>.Create(async ct =>
+    public IO<Option<PointsGiveawayView>, Never> GetActiveGiveaway(int hostId) =>
+        IO<Option<PointsGiveawayView>, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             return Result<Option<PointsGiveawayView>, Never>.Success(
@@ -31,7 +30,6 @@ public sealed class PointsGiveawayService(
                 )
             );
         });
-    }
 
     public async Task<PointOperationOutcome> StartAsync(
         int hostId,
@@ -298,10 +296,7 @@ public sealed class PointsGiveawayService(
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
         CancellationToken ct
-    )
-    {
-        return await draws.DrawOutcomeAsync(giveawayId, ct);
-    }
+    ) => await draws.DrawOutcomeAsync(giveawayId, ct);
 
     private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
     {

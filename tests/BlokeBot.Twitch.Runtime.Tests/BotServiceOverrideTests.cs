@@ -168,8 +168,7 @@ public sealed class BotServiceOverrideTests
         return services;
     }
 
-    private static void ConfigureBot(BotOptions options)
-    {
+    private static void ConfigureBot(BotOptions options) =>
         options.Identity = new BotIdentityOptions
         {
             BotUsername = "MainBot",
@@ -179,7 +178,6 @@ public sealed class BotServiceOverrideTests
             Scopes = ["chat:read"],
             TokenCachePath = "private-token-cache.json",
         };
-    }
 
     private static BotPolicyOptions ValidPolicies()
     {
@@ -267,27 +265,22 @@ public sealed class BotServiceOverrideTests
             .GetSection("TwitchBot");
     }
 
-    private static ChatMessage SourceMessage()
-    {
-        return new("viewer", "streamer", "!command", "raw", new Dictionary<string, string>());
-    }
+    private static ChatMessage SourceMessage() =>
+        new("viewer", "streamer", "!command", "raw", new Dictionary<string, string>());
 
-    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result)
-    {
-        return result.Match(
+    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
+        result.Match(
             account => account,
             reason =>
                 throw new InvalidOperationException($"Expected a bot account, received {reason}.")
         );
-    }
 
     private sealed class RecordingAccessTokenProvider : IAccessTokenProvider
     {
         internal int CallCount { get; private set; }
 
-        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-        {
-            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+            IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 CallCount++;
@@ -295,7 +288,6 @@ public sealed class BotServiceOverrideTests
                     Result<string, AccessTokenUnavailableReason>.Success("default-token")
                 );
             });
-        }
     }
 
     private sealed class RecordingChatMessageSender : IPublicChatMessageSender
@@ -321,9 +313,8 @@ public sealed class BotServiceOverrideTests
     {
         internal List<string> Channels { get; } = [];
 
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Channels.Add(channelLogin);
@@ -333,14 +324,12 @@ public sealed class BotServiceOverrideTests
                     )
                 );
             });
-        }
     }
 
     private sealed class FirstFeatureAccountProvider : IBotAccountProvider
     {
-        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(
@@ -349,7 +338,6 @@ public sealed class BotServiceOverrideTests
                     )
                 );
             });
-        }
     }
 
     private sealed class FeatureResponseSender : ICommandResponseSender

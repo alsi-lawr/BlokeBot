@@ -17,10 +17,7 @@ public abstract record GuessingWinnerDeclarationOutcome
         public override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<PayoutFailed, TResult> payoutFailed
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 
     public sealed record PayoutFailed(PointBalanceMutationFailure Failure)
@@ -33,9 +30,6 @@ public abstract record GuessingWinnerDeclarationOutcome
         public override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<PayoutFailed, TResult> payoutFailed
-        )
-        {
-            return payoutFailed(this);
-        }
+        ) => payoutFailed(this);
     }
 }

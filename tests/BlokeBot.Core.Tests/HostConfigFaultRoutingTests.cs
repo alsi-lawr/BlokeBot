@@ -40,8 +40,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostConfigFaultRoutingTests
 {
     [Test]
-    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat()
-    {
+    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat() =>
         await AssertTwitchOperationsPresentationAsync(
             ReadyBroadcasterStatus(),
             owner: true,
@@ -55,11 +54,9 @@ public sealed class HostConfigFaultRoutingTests
                 BroadcasterActions(page).ShouldBeEmpty();
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect()
-    {
+    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: true,
@@ -73,11 +70,9 @@ public sealed class HostConfigFaultRoutingTests
                 action.Markup.ShouldContain("Connect operations");
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect()
-    {
+    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Invalid([]),
             owner: true,
@@ -91,11 +86,9 @@ public sealed class HostConfigFaultRoutingTests
                 action.Markup.ShouldContain("Reconnect operations");
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction()
-    {
+    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: false,
@@ -107,7 +100,6 @@ public sealed class HostConfigFaultRoutingTests
                 BroadcasterActions(page).ShouldBeEmpty();
             }
         );
-    }
 
     [Test]
     public async Task ViewerCommandsDisclosure_OpeningAndEvents_PreserveDirtyHostDrafts()
@@ -518,8 +510,7 @@ public sealed class HostConfigFaultRoutingTests
     private static void ConfigureModeratorAuthorityServices(
         BunitContext context,
         IHostBotAppAccessTokenSource tokens
-    )
-    {
+    ) =>
         context.Services.AddSingleton<ModeratorAuthorityService>(
             serviceProvider => new ModeratorAuthorityService(
                 tokens,
@@ -532,7 +523,6 @@ public sealed class HostConfigFaultRoutingTests
                 serviceProvider.GetRequiredService<TimeProvider>()
             )
         );
-    }
 
     private static async Task AssertTwitchOperationsPresentationAsync(
         TokenStatus status,
@@ -565,16 +555,13 @@ public sealed class HostConfigFaultRoutingTests
 
     private static IReadOnlyList<IRenderedComponent<AuthPopupButton>> BroadcasterActions(
         IRenderedComponent<HostConfigPage> page
-    )
-    {
-        return page.FindComponents<AuthPopupButton>()
+    ) =>
+        page.FindComponents<AuthPopupButton>()
             .Where(action => action.Instance.Url == "/oauth/broadcaster/start")
             .ToArray();
-    }
 
-    private static TokenStatus ReadyBroadcasterStatus()
-    {
-        return new TokenStatus.Ready(
+    private static TokenStatus ReadyBroadcasterStatus() =>
+        new TokenStatus.Ready(
             "broadcaster-token",
             new TokenValidation(
                 "123",
@@ -584,7 +571,6 @@ public sealed class HostConfigFaultRoutingTests
             [.. HostBroadcasterAuthorizationService.MilestoneScopes],
             [.. HostBroadcasterAuthorizationService.MilestoneScopes]
         );
-    }
 
     private static void SetModeratorClaims(BunitAuthorizationContext authorization, int hostId)
     {
@@ -685,35 +671,29 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
-    private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page)
-    {
-        return page.FindAll("button")
+    private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page) =>
+        page.FindAll("button")
             .Single(button =>
                 button.TextContent.Contains("Available viewer commands", StringComparison.Ordinal)
             );
-    }
 
     private static IElement FindFeatureButton(
         IRenderedComponent<HostConfigPage> page,
         string featureName
-    )
-    {
-        return page.FindAll("#chat-tools button")
+    ) =>
+        page.FindAll("#chat-tools button")
             .Single(button => button.TextContent.Contains(featureName, StringComparison.Ordinal));
-    }
 
     private static Task ClickAccessModeAsync<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
     )
-        where TComponent : IComponent
-    {
-        return page.InvokeAsync(() =>
+        where TComponent : IComponent =>
+        page.InvokeAsync(() =>
             page.FindAll("button")
                 .Single(button => button.TextContent.Trim() == text)
                 .ClickAsync(new())
         );
-    }
 
     private static void AssertAccessMode<TComponent>(
         IRenderedComponent<TComponent> page,
@@ -803,21 +783,17 @@ public sealed class HostConfigFaultRoutingTests
     {
         public Exception? Failure { get; set; }
 
-        public BlokeBotDbContext CreateDbContext()
-        {
-            return Failure is null ? innerFactory.CreateDbContext() : throw Failure;
-        }
+        public BlokeBotDbContext CreateDbContext() =>
+            Failure is null ? innerFactory.CreateDbContext() : throw Failure;
 
         public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            return Failure is null
+        ) =>
+            Failure is null
                 ? new ValueTask<BlokeBotDbContext>(
                     innerFactory.CreateDbContextAsync(cancellationToken)
                 )
                 : ValueTask.FromException<BlokeBotDbContext>(Failure);
-        }
     }
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
@@ -826,10 +802,7 @@ public sealed class HostConfigFaultRoutingTests
 
         public int RequestCount { get; private set; }
 
-        public void Enqueue(Task<string> token)
-        {
-            _tokens.Enqueue(new(token, null));
-        }
+        public void Enqueue(Task<string> token) => _tokens.Enqueue(new(token, null));
 
         public PendingTokenRequest EnqueuePending()
         {
@@ -869,34 +842,24 @@ public sealed class HostConfigFaultRoutingTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult(status);
-        }
+        ) => Task.FromResult(status);
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            throw new NotSupportedException();
-        }
+        ) => throw new NotSupportedException();
     }
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler());
-        }
+        public HttpClient CreateClient(string name) => new(new Handler());
 
         private sealed class Handler : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(
+            ) =>
+                Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {
                         Content = new StringContent(
@@ -906,7 +869,6 @@ public sealed class HostConfigFaultRoutingTests
                         ),
                     }
                 );
-            }
         }
     }
 
@@ -926,10 +888,7 @@ public sealed class HostConfigFaultRoutingTests
             }
         }
 
-        public override long GetTimestamp()
-        {
-            return GetUtcNow().UtcTicks;
-        }
+        public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
         public override ITimer CreateTimer(
             TimerCallback callback,

@@ -7,9 +7,8 @@ namespace BlokeBot.Twitch.Auth;
 /// </summary>
 public sealed class UnavailableAccessTokenProvider : IAccessTokenProvider
 {
-    public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-    {
-        return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+    public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+        IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(
@@ -18,5 +17,4 @@ public sealed class UnavailableAccessTokenProvider : IAccessTokenProvider
                 )
             );
         });
-    }
 }

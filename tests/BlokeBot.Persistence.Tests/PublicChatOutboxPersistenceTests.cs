@@ -178,9 +178,8 @@ public sealed class PublicChatOutboxPersistenceTests
         string message,
         Guid claimToken,
         DateTime now
-    )
-    {
-        return db.Database.ExecuteSqlInterpolatedAsync(
+    ) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO public_chat_outbox
                 (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
@@ -193,5 +192,4 @@ public sealed class PublicChatOutboxPersistenceTests
                  0, {claimToken}, 1, {now.AddMinutes(5)})
             """
         );
-    }
 }

@@ -158,18 +158,12 @@ public sealed class ChannelBotAuthorizationTests
         string userId,
         string login,
         params string[] scopes
-    )
-    {
-        return new(userId, LoginName.Parse(login), OAuthScopeSet.Create(scopes));
-    }
+    ) => new(userId, LoginName.Parse(login), OAuthScopeSet.Create(scopes));
 
     private static ChannelBotAuthorizationService ChannelAuthorizationService(
         SqliteBlokeBotDbFactory dbFactory,
         params string[] scopes
-    )
-    {
-        return new(dbFactory, ChangeNotifier(), ChannelOAuthService(scopes));
-    }
+    ) => new(dbFactory, ChangeNotifier(), ChannelOAuthService(scopes));
 
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
@@ -219,10 +213,8 @@ public sealed class ChannelBotAuthorizationTests
         );
     }
 
-    private static HostedChannelChangeNotifier ChangeNotifier()
-    {
-        return new(TestEventBus.Create<AppEventKind>());
-    }
+    private static HostedChannelChangeNotifier ChangeNotifier() =>
+        new(TestEventBus.Create<AppEventKind>());
 
     private static IConfiguration ConfigurationWithScopes(params string[] scopes)
     {
@@ -285,10 +277,7 @@ public sealed class ChannelBotAuthorizationTests
 
         public string? ValidatedToken => _handler.ValidatedToken;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler(HttpStatusCode validationStatus) : HttpMessageHandler
         {
@@ -324,21 +313,16 @@ public sealed class ChannelBotAuthorizationTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 
     private sealed class EmptyHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new();
-        }
+        public HttpClient CreateClient(string name) => new();
     }
 }

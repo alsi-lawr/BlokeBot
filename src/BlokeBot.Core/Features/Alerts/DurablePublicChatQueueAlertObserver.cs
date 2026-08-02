@@ -56,9 +56,8 @@ internal sealed class DurablePublicChatQueueAlertObserver(
             .ExecuteAsync(cancellationToken);
     }
 
-    private IO<Option<QueueAlertHost>, Never> ResolveHost(string channel)
-    {
-        return IO<Option<QueueAlertHost>, Never>.Create(async ct =>
+    private IO<Option<QueueAlertHost>, Never> ResolveHost(string channel) =>
+        IO<Option<QueueAlertHost>, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db
@@ -70,17 +69,12 @@ internal sealed class DurablePublicChatQueueAlertObserver(
                 Option<QueueAlertHost>.FromNullable(host)
             );
         });
-    }
 
-    private static string Message(string hostLogin, PublicChatQueueBacklog backlog)
-    {
-        return $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
-    }
+    private static string Message(string hostLogin, PublicChatQueueBacklog backlog) =>
+        $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
 
-    private static string SourceKey(string channel, DateTimeOffset oldestPendingAt)
-    {
-        return $"{channel}:{oldestPendingAt.UtcDateTime:O}";
-    }
+    private static string SourceKey(string channel, DateTimeOffset oldestPendingAt) =>
+        $"{channel}:{oldestPendingAt.UtcDateTime:O}";
 
     private static string FormatAge(TimeSpan age)
     {

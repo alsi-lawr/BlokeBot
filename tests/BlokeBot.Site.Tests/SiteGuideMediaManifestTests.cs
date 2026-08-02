@@ -254,10 +254,8 @@ public sealed class SiteGuideMediaManifestTests
         yield return media.LightLaptopSource;
     }
 
-    private static IEnumerable<string> OptionalSources(SiteMedia? media)
-    {
-        return media is null ? [] : Sources(media);
-    }
+    private static IEnumerable<string> OptionalSources(SiteMedia? media) =>
+        media is null ? [] : Sources(media);
 
     private static (int Width, int Height) ReadDimensions(string path)
     {
@@ -302,10 +300,8 @@ public sealed class SiteGuideMediaManifestTests
         throw new InvalidOperationException("The animated WebP does not contain a VP8X chunk.");
     }
 
-    private static int ReadUInt24LittleEndian(ReadOnlySpan<byte> bytes)
-    {
-        return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
-    }
+    private static int ReadUInt24LittleEndian(ReadOnlySpan<byte> bytes) =>
+        bytes[0] | (bytes[1] << 8) | (bytes[2] << 16);
 
     private static string FindRepositoryRoot()
     {

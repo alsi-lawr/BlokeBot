@@ -23,17 +23,13 @@ internal sealed class WebAuthConfiguration(
         }
     }
 
-    public bool IsConfigured(WebAuthOptions currentOptions)
-    {
-        return !string.IsNullOrWhiteSpace(Identity.ClientId)
-            && !string.IsNullOrWhiteSpace(Identity.ClientSecret)
-            && !string.IsNullOrWhiteSpace(currentOptions.CallbackPath);
-    }
+    public bool IsConfigured(WebAuthOptions currentOptions) =>
+        !string.IsNullOrWhiteSpace(Identity.ClientId)
+        && !string.IsNullOrWhiteSpace(Identity.ClientSecret)
+        && !string.IsNullOrWhiteSpace(currentOptions.CallbackPath);
 
-    private static string First(string? configuredValue, string? fallbackValue)
-    {
-        return !string.IsNullOrWhiteSpace(configuredValue)
+    private static string First(string? configuredValue, string? fallbackValue) =>
+        !string.IsNullOrWhiteSpace(configuredValue)
             ? configuredValue
             : fallbackValue ?? string.Empty;
-    }
 }

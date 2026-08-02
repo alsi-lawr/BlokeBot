@@ -1111,29 +1111,24 @@ public sealed class RequestBoardService(
         );
     }
 
-    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
-    {
-        return HostFeatureAvailability.IsEnabledAsync(
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(
             dbFactory,
             hostId,
             HostFeatureFlags.RequestBoards,
             ct
         );
-    }
 
-    private Task<bool> FeatureIsEnabledAsync(string hostLogin, CancellationToken ct)
-    {
-        return HostFeatureAvailability.IsEnabledAsync(
+    private Task<bool> FeatureIsEnabledAsync(string hostLogin, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(
             dbFactory,
             hostLogin,
             HostFeatureFlags.RequestBoards,
             ct
         );
-    }
 
-    private static bool ShouldRefund(RequestBoardRefundPolicy policy, RequestClosure closure)
-    {
-        return policy switch
+    private static bool ShouldRefund(RequestBoardRefundPolicy policy, RequestClosure closure) =>
+        policy switch
         {
             RequestBoardRefundPolicy.Never => false,
             RequestBoardRefundPolicy.RejectedOrWithdrawn => closure
@@ -1142,7 +1137,6 @@ public sealed class RequestBoardService(
             RequestBoardRefundPolicy.AnyUnfulfilledClosure => true,
             _ => throw new ArgumentOutOfRangeException(nameof(policy), policy, null),
         };
-    }
 
     private static async Task<PointBalance> LoadBalanceAsync(
         BlokeBotDbContext db,
@@ -1180,8 +1174,7 @@ public sealed class RequestBoardService(
         PointAmount balanceAfter,
         string note,
         DateTime now
-    )
-    {
+    ) =>
         db.PointLedgerEntries.Add(
             new PointLedgerEntry
             {
@@ -1196,7 +1189,6 @@ public sealed class RequestBoardService(
                 Note = note,
             }
         );
-    }
 
     private static void AddEvent(
         BlokeBotDbContext db,
@@ -1496,12 +1488,8 @@ public sealed class RequestBoardService(
         );
     }
 
-    private static ValidatedSubmission InvalidField(RequestBoardField field, string detail)
-    {
-        return ValidatedSubmission.Invalid(
-            new RequestBoardRejection.Invalid($"{field.Label} {detail}.")
-        );
-    }
+    private static ValidatedSubmission InvalidField(RequestBoardField field, string detail) =>
+        ValidatedSubmission.Invalid(new RequestBoardRejection.Invalid($"{field.Label} {detail}."));
 
     private static RequestBoardRejection? ValidateModeration(ModerateRequestCommand command)
     {
@@ -1539,9 +1527,8 @@ public sealed class RequestBoardService(
     private static bool CanTransition(
         RequestSubmissionStatus current,
         RequestSubmissionStatus target
-    )
-    {
-        return (current, target) switch
+    ) =>
+        (current, target) switch
         {
             (RequestSubmissionStatus.Pending, RequestSubmissionStatus.Approved) => true,
             (RequestSubmissionStatus.Pending, RequestSubmissionStatus.Rejected) => true,
@@ -1555,30 +1542,23 @@ public sealed class RequestBoardService(
             (RequestSubmissionStatus.Accepted, RequestSubmissionStatus.Rejected) => true,
             _ => false,
         };
-    }
 
-    private static RequestSubmissionStatus[] ActiveSubmissionStatuses()
-    {
-        return
+    private static RequestSubmissionStatus[] ActiveSubmissionStatuses() =>
         [
             RequestSubmissionStatus.Pending,
             RequestSubmissionStatus.Approved,
             RequestSubmissionStatus.Queued,
             RequestSubmissionStatus.Accepted,
         ];
-    }
 
-    private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags)
-    {
-        return tags.Select(value => value.Trim().ToLowerInvariant())
+    private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags) =>
+        tags.Select(value => value.Trim().ToLowerInvariant())
             .Where(value => value.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-    }
 
-    private static int EffectiveMaximumLength(RequestBoardFieldCommand field)
-    {
-        return field.Kind switch
+    private static int EffectiveMaximumLength(RequestBoardFieldCommand field) =>
+        field.Kind switch
         {
             RequestBoardFieldKind.Text or RequestBoardFieldKind.Url => field.MaximumLength,
             RequestBoardFieldKind.TwitchClip => 2048,
@@ -1586,7 +1566,6 @@ public sealed class RequestBoardService(
             RequestBoardFieldKind.Number => 128,
             _ => throw new ArgumentOutOfRangeException(nameof(field.Kind), field.Kind, null),
         };
-    }
 
     private static bool FieldShapeMatches(
         IReadOnlyCollection<RequestBoardField> existing,
@@ -1613,30 +1592,22 @@ public sealed class RequestBoardService(
             );
     }
 
-    private static IReadOnlyList<string> ParseChoices(string value)
-    {
-        return value.Split(
-            '\n',
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-        );
-    }
+    private static IReadOnlyList<string> ParseChoices(string value) =>
+        value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static IEnumerable<RequestSubmission> OrderSubmissions(
         IEnumerable<RequestSubmission> submissions
-    )
-    {
-        return submissions
+    ) =>
+        submissions
             .OrderBy(value => StatusOrder(value.Status))
             .ThenByDescending(value => value.Priority)
             .ThenByDescending(value => value.VoteCount)
             .ThenBy(value => value.QueuePosition == 0 ? long.MaxValue : value.QueuePosition)
             .ThenBy(value => value.CreatedAtUtc)
             .ThenBy(value => value.Id);
-    }
 
-    private static int StatusOrder(RequestSubmissionStatus status)
-    {
-        return status switch
+    private static int StatusOrder(RequestSubmissionStatus status) =>
+        status switch
         {
             RequestSubmissionStatus.Accepted => 0,
             RequestSubmissionStatus.Queued => 1,
@@ -1648,11 +1619,9 @@ public sealed class RequestBoardService(
             RequestSubmissionStatus.Merged => 7,
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
         };
-    }
 
-    private static PublicRequestSubmissionView ToPublicView(RequestSubmission submission)
-    {
-        return new PublicRequestSubmissionView(
+    private static PublicRequestSubmissionView ToPublicView(RequestSubmission submission) =>
+        new PublicRequestSubmissionView(
             submission.Id,
             submission.SubmitterLogin,
             submission.Title,
@@ -1676,7 +1645,6 @@ public sealed class RequestBoardService(
                 ))
                 .ToArray()
         );
-    }
 
     private static async Task<ModeratorRequestSubmissionView> ToModeratorViewAsync(
         BlokeBotDbContext db,
@@ -1711,9 +1679,8 @@ public sealed class RequestBoardService(
         );
     }
 
-    private static RequestBoardSummary ToSummary(RequestBoard board, string hostLogin)
-    {
-        return new RequestBoardSummary(
+    private static RequestBoardSummary ToSummary(RequestBoard board, string hostLogin) =>
+        new RequestBoardSummary(
             board.Id,
             board.HostId,
             hostLogin,
@@ -1743,7 +1710,6 @@ public sealed class RequestBoardService(
                 ))
                 .ToArray()
         );
-    }
 
     private static async Task<RequestBoardSummary> LoadSummaryAsync(
         BlokeBotDbContext db,
@@ -1759,36 +1725,26 @@ public sealed class RequestBoardService(
         return ToSummary(board, hostLogin);
     }
 
-    private static SemaphoreSlim[] CreateRetryGates()
-    {
-        return Enumerable.Range(0, _retryGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
-    }
+    private static SemaphoreSlim[] CreateRetryGates() =>
+        Enumerable.Range(0, _retryGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-    private static SemaphoreSlim RetryGateFor(SemaphoreSlim[] gates, int hash)
-    {
-        return gates[(int)((uint)hash % (uint)gates.Length)];
-    }
+    private static SemaphoreSlim RetryGateFor(SemaphoreSlim[] gates, int hash) =>
+        gates[(int)((uint)hash % (uint)gates.Length)];
 
-    private static bool IsRetryCollision(Exception exception)
-    {
-        return exception switch
+    private static bool IsRetryCollision(Exception exception) =>
+        exception switch
         {
             SqliteException { SqliteErrorCode: 5 or 6 } => true,
             SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 } => true,
             DbUpdateException { InnerException: { } inner } => IsRetryCollision(inner),
             _ => false,
         };
-    }
 
-    private static RequestBoardResult<T> Succeeded<T>(T value)
-    {
-        return new RequestBoardResult<T>.Succeeded(value);
-    }
+    private static RequestBoardResult<T> Succeeded<T>(T value) =>
+        new RequestBoardResult<T>.Succeeded(value);
 
-    private static RequestBoardResult<T> Rejected<T>(RequestBoardRejection rejection)
-    {
-        return new RequestBoardResult<T>.Rejected(rejection);
-    }
+    private static RequestBoardResult<T> Rejected<T>(RequestBoardRejection rejection) =>
+        new RequestBoardResult<T>.Rejected(rejection);
 
     private sealed record ValidatedSubmission(
         string Title,
@@ -1800,9 +1756,8 @@ public sealed class RequestBoardService(
         RequestBoardRejection? Rejection
     )
     {
-        public static ValidatedSubmission Invalid(RequestBoardRejection rejection)
-        {
-            return new(
+        public static ValidatedSubmission Invalid(RequestBoardRejection rejection) =>
+            new(
                 string.Empty,
                 string.Empty,
                 null,
@@ -1811,7 +1766,6 @@ public sealed class RequestBoardService(
                 new Dictionary<int, string>(),
                 rejection
             );
-        }
     }
 
     private enum RequestClosure

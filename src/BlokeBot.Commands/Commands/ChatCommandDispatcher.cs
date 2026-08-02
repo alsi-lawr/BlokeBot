@@ -4,10 +4,7 @@ public sealed class ChatCommandDispatcher
 {
     private readonly ChatCommandPlan _plan;
 
-    internal ChatCommandDispatcher(ChatCommandRegistry registry)
-    {
-        _plan = registry.Plan;
-    }
+    internal ChatCommandDispatcher(ChatCommandRegistry registry) => _plan = registry.Plan;
 
     public async ValueTask DispatchResponsesAsync(
         ChatMessage message,

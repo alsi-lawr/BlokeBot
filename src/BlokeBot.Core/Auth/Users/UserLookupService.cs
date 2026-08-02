@@ -9,25 +9,21 @@ internal sealed class UserLookupService(
     HelixClient helix
 )
 {
-    public IO<Option<UserIdentity>, AccessTokenUnavailableReason> FindByLogin(string login)
-    {
-        return IO<Option<UserIdentity>, AccessTokenUnavailableReason>.Create(
-            async cancellationToken =>
-            {
-                var accessToken = await tokens.GetAccessToken().ExecuteAsync(cancellationToken);
-                return await accessToken.Match(
-                    async token =>
-                        Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Success(
-                            await FindByLoginAsync(token, login, cancellationToken)
-                        ),
-                    reason =>
-                        Task.FromResult(
-                            Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Error(reason)
-                        )
-                );
-            }
-        );
-    }
+    public IO<Option<UserIdentity>, AccessTokenUnavailableReason> FindByLogin(string login) =>
+        IO<Option<UserIdentity>, AccessTokenUnavailableReason>.Create(async cancellationToken =>
+        {
+            var accessToken = await tokens.GetAccessToken().ExecuteAsync(cancellationToken);
+            return await accessToken.Match(
+                async token =>
+                    Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Success(
+                        await FindByLoginAsync(token, login, cancellationToken)
+                    ),
+                reason =>
+                    Task.FromResult(
+                        Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Error(reason)
+                    )
+            );
+        });
 
     private async Task<Option<UserIdentity>> FindByLoginAsync(
         string accessToken,
@@ -62,10 +58,8 @@ internal sealed class UserLookupService(
         return ToIdentity(user);
     }
 
-    private static Option<UserIdentity> ToIdentity(HelixUser? user)
-    {
-        return user is null
+    private static Option<UserIdentity> ToIdentity(HelixUser? user) =>
+        user is null
             ? Option<UserIdentity>.None
             : UserIdentity.Create(user.Id, user.Login, user.DisplayName, user.ProfileImageUrl);
-    }
 }

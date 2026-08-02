@@ -113,13 +113,11 @@ public partial class HostConfigPage
             ? "The bot is already stopping."
             : "The bot is not running right now.";
 
-    private Task ClearChannelAuthorizationAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task ClearChannelAuthorizationAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(ClearChannelAuthorizationAsync),
             () => ClearChannelAuthorizationWithOwnerAuthorityAsync(hostId)
         );
-    }
 
     private async Task ClearChannelAuthorizationWithOwnerAuthorityAsync(int hostId)
     {
@@ -152,9 +150,8 @@ public partial class HostConfigPage
         );
     }
 
-    private Task ClearBotOverrideAuthorizationAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task ClearBotOverrideAuthorizationAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(ClearBotOverrideAuthorizationAsync),
             () =>
                 RunSelectedHostMutationAsync(
@@ -162,7 +159,6 @@ public partial class HostConfigPage
                     () => ClearBotOverrideAuthorizationCoreAsync(hostId)
                 )
         );
-    }
 
     private async Task ClearBotOverrideAuthorizationCoreAsync(int hostId)
     {
@@ -194,13 +190,11 @@ public partial class HostConfigPage
         );
     }
 
-    private Task StartAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task StartAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(StartAsync),
             () => RunSelectedHostMutationAsync(hostId, () => StartCoreAsync(hostId))
         );
-    }
 
     private async Task StartCoreAsync(int hostId)
     {
@@ -218,13 +212,11 @@ public partial class HostConfigPage
         }
     }
 
-    private Task StopAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task StopAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(StopAsync),
             () => RunSelectedHostMutationAsync(hostId, () => StopCoreAsync(hostId))
         );
-    }
 
     private async Task StopCoreAsync(int hostId)
     {
@@ -242,9 +234,8 @@ public partial class HostConfigPage
         }
     }
 
-    private static string RuntimeControlMessage(HostedChannelRuntimeControlOutcome outcome)
-    {
-        return outcome switch
+    private static string RuntimeControlMessage(HostedChannelRuntimeControlOutcome outcome) =>
+        outcome switch
         {
             HostedChannelRuntimeControlOutcome.HostNotFound => "Channel setup was not found.",
             HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired =>
@@ -255,24 +246,19 @@ public partial class HostConfigPage
                 $"Wait until {cooldown.NextAllowedAtUtc.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",
             _ => throw new UnreachableException(),
         };
-    }
 
-    private void TrackPendingRuntimeTransition()
-    {
+    private void TrackPendingRuntimeTransition() =>
         _pendingRuntimeTransition = PendingTransition(_runtimeLifecycle);
-    }
 
     private static PendingRuntimeTransition? PendingTransition(
         HostedChannelRuntimeLifecycle? lifecycle
-    )
-    {
-        return lifecycle?.Match<PendingRuntimeTransition?>(
+    ) =>
+        lifecycle?.Match<PendingRuntimeTransition?>(
             static _ => null,
             static _ => PendingRuntimeTransition.Starting,
             static _ => null,
             static _ => PendingRuntimeTransition.Stopping
         );
-    }
 
     private enum PendingRuntimeTransition
     {

@@ -60,18 +60,13 @@ internal sealed class OverlayLiveCoordinator(
         return Task.CompletedTask;
     }
 
-    public void PublishState(ResolvedOverlayInstance instance)
-    {
+    public void PublishState(ResolvedOverlayInstance instance) =>
         QueuePublication(instance, OverlayLivePublicationKind.State);
-    }
 
-    public void PublishTest(ResolvedOverlayInstance instance)
-    {
+    public void PublishTest(ResolvedOverlayInstance instance) =>
         QueuePublication(instance, OverlayLivePublicationKind.Test);
-    }
 
-    void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan)
-    {
+    void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan) =>
         PublishCueMessage(
             target,
             (sequence, occurredAtUtc) =>
@@ -90,10 +85,8 @@ internal sealed class OverlayLiveCoordinator(
                     }
                 )
         );
-    }
 
-    void IOverlayCueTransport.Stop(ResolvedOverlayInstance target, Guid runId)
-    {
+    void IOverlayCueTransport.Stop(ResolvedOverlayInstance target, Guid runId) =>
         PublishCueMessage(
             target,
             (sequence, occurredAtUtc) =>
@@ -107,7 +100,6 @@ internal sealed class OverlayLiveCoordinator(
                     }
                 )
         );
-    }
 
     public OverlayConnectionPresence Read(int hostId, Guid overlayId)
     {
@@ -515,15 +507,13 @@ internal sealed class OverlayLiveCoordinator(
     private static GiveawayV1OverlayLivePayload GiveawayPayload(
         GiveawayV1OverlaySnapshot snapshot,
         string animation
-    )
-    {
-        return new GiveawayV1OverlayLivePayload
+    ) =>
+        new GiveawayV1OverlayLivePayload
         {
             WinnerAnimationDurationMilliseconds = snapshot.WinnerAnimationDurationMilliseconds,
             Animation = animation,
             State = snapshot.State,
         };
-    }
 
     private OverlayLiveTransportMessage GuessingEvent(
         OverlayLivePublicationKind kind,
@@ -553,15 +543,13 @@ internal sealed class OverlayLiveCoordinator(
     private static GuessingV1OverlayLivePayload GuessingPayload(
         GuessingV1OverlaySnapshot snapshot,
         string animation
-    )
-    {
-        return new GuessingV1OverlayLivePayload
+    ) =>
+        new GuessingV1OverlayLivePayload
         {
             ResultDurationMilliseconds = snapshot.ResultDurationMilliseconds,
             Animation = animation,
             State = snapshot.State,
         };
-    }
 
     private static string AnimationFor(GuessingOverlayPhase previous, GuessingOverlayPhase current)
     {
@@ -612,9 +600,8 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    private static CuePlaybackLayerPayload ToPayload(OverlayCuePlaybackLayer layer)
-    {
-        return layer switch
+    private static CuePlaybackLayerPayload ToPayload(OverlayCuePlaybackLayer layer) =>
+        layer switch
         {
             OverlayCuePlaybackLayer.UploadedMedia value => new CuePlaybackLayerPayload
             {
@@ -653,7 +640,6 @@ internal sealed class OverlayLiveCoordinator(
             },
             _ => throw new InvalidOperationException("Unsupported cue playback layer."),
         };
-    }
 
     private void InvalidateAllConnections()
     {
@@ -710,20 +696,15 @@ internal sealed class OverlayLiveCoordinator(
         return presence;
     }
 
-    private long CurrentSequence(Guid overlayId)
-    {
-        return _sequences.GetValueOrDefault(overlayId);
-    }
+    private long CurrentSequence(Guid overlayId) => _sequences.GetValueOrDefault(overlayId);
 
-    private static OverlayConnectionPresence EmptyPresence()
-    {
-        return new OverlayConnectionPresence
+    private static OverlayConnectionPresence EmptyPresence() =>
+        new OverlayConnectionPresence
         {
             ActiveConnectionCount = 0,
             MostRecentConnectedAtUtc = null,
             MostRecentDisconnectedAtUtc = null,
         };
-    }
 
     public async ValueTask DisposeAsync()
     {
@@ -764,15 +745,13 @@ internal sealed class OverlayLiveCoordinator(
             _mostRecentDisconnectedAtUtc = disconnectedAtUtc;
         }
 
-        internal OverlayConnectionPresence Snapshot()
-        {
-            return new OverlayConnectionPresence
+        internal OverlayConnectionPresence Snapshot() =>
+            new OverlayConnectionPresence
             {
                 ActiveConnectionCount = _activeConnectionCount,
                 MostRecentConnectedAtUtc = _mostRecentConnectedAtUtc,
                 MostRecentDisconnectedAtUtc = _mostRecentDisconnectedAtUtc,
             };
-        }
     }
 
     private sealed class OverlayPublicationSlot : IAsyncDisposable
@@ -788,15 +767,11 @@ internal sealed class OverlayLiveCoordinator(
             );
         private readonly Task _worker;
 
-        internal OverlayPublicationSlot(Func<OverlayPublication, Task> publish)
-        {
+        internal OverlayPublicationSlot(Func<OverlayPublication, Task> publish) =>
             _worker = RunAsync(publish);
-        }
 
-        internal void Queue(OverlayPublication publication)
-        {
+        internal void Queue(OverlayPublication publication) =>
             _publications.Writer.TryWrite(publication);
-        }
 
         private async Task RunAsync(Func<OverlayPublication, Task> publish)
         {
@@ -853,15 +828,10 @@ internal sealed class OverlayLiveCoordinator(
 
         internal ChannelReader<OverlayLiveTransportMessage> Messages => _messages.Reader;
 
-        internal bool TryWrite(OverlayLiveTransportMessage message)
-        {
-            return IsActive && _messages.Writer.TryWrite(message);
-        }
+        internal bool TryWrite(OverlayLiveTransportMessage message) =>
+            IsActive && _messages.Writer.TryWrite(message);
 
-        internal bool Deactivate()
-        {
-            return Interlocked.Exchange(ref _active, 0) == 1;
-        }
+        internal bool Deactivate() => Interlocked.Exchange(ref _active, 0) == 1;
 
         internal void Invalidate(OverlayLiveControlEnvelope envelope)
         {
@@ -882,10 +852,7 @@ internal sealed class OverlayLiveCoordinator(
             }
         }
 
-        internal void Complete()
-        {
-            _messages.Writer.TryComplete();
-        }
+        internal void Complete() => _messages.Writer.TryComplete();
     }
 }
 

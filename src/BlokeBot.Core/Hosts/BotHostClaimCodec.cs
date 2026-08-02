@@ -8,9 +8,8 @@ internal static class BotHostClaimCodec
 {
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static string Encode(BotHostChoice host)
-    {
-        return JsonSerializer.Serialize(
+    public static string Encode(BotHostChoice host) =>
+        JsonSerializer.Serialize(
             new Payload
             {
                 Id = host.Id,
@@ -21,7 +20,6 @@ internal static class BotHostClaimCodec
             },
             _jsonOptions
         );
-    }
 
     public static BotHostChoice? Decode(string value)
     {
@@ -59,14 +57,12 @@ internal static class BotHostClaimCodec
         }
     }
 
-    public static bool Equivalent(BotHostChoice left, BotHostChoice right)
-    {
-        return left.Id == right.Id
-            && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
-            && left.Role == right.Role
-            && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
-    }
+    public static bool Equivalent(BotHostChoice left, BotHostChoice right) =>
+        left.Id == right.Id
+        && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
+        && left.Role == right.Role
+        && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
 
     private sealed record Payload
     {

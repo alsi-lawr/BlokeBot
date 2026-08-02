@@ -3,8 +3,6 @@ namespace BlokeBot.Core.Features.HostedChannels.Status;
 internal sealed class OAuthHostBotAppAccessTokenSource(AppAccessTokenProvider appTokens)
     : IHostBotAppAccessTokenSource
 {
-    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-    {
-        return appTokens.GetAccessTokenAsync(cancellationToken);
-    }
+    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+        appTokens.GetAccessTokenAsync(cancellationToken);
 }

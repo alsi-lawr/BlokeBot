@@ -76,8 +76,7 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
         bool isBotAdmin,
         string? adminEditingLogin,
         BotHostChoice? adminReturnHost = null
-    )
-    {
+    ) =>
         await SignInHostSelectionAsync(
             context,
             hosts,
@@ -86,12 +85,9 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
             adminEditingLogin,
             adminReturnHost
         );
-    }
 
-    public async Task SignOutAsync(HttpContext context)
-    {
+    public async Task SignOutAsync(HttpContext context) =>
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    }
 
     private static ClaimsPrincipal CreatePrincipal(
         string userId,
@@ -158,15 +154,13 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
         );
     }
 
-    public bool IsConfiguredBotAccount(string login)
-    {
-        return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
-            && string.Equals(
-                Login.Normalize(login),
-                botSettings.Identity.BotUsername,
-                StringComparison.Ordinal
-            );
-    }
+    public bool IsConfiguredBotAccount(string login) =>
+        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
+        && string.Equals(
+            Login.Normalize(login),
+            botSettings.Identity.BotUsername,
+            StringComparison.Ordinal
+        );
 
     private static BotHostChoice? SelectInitialHost(
         IReadOnlyList<BotHostChoice> hosts,
@@ -201,8 +195,7 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
         return canCreateHost ? null : hosts[0];
     }
 
-    private static async Task SignInAsync(HttpContext context, ClaimsPrincipal principal)
-    {
+    private static async Task SignInAsync(HttpContext context, ClaimsPrincipal principal) =>
         await context.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal,
@@ -213,5 +206,4 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
                 IsPersistent = false,
             }
         );
-    }
 }

@@ -11,10 +11,7 @@ internal sealed class SimulationReadiness(
 {
     private int _persistenceReady;
 
-    public void MarkPersistenceReady()
-    {
-        Interlocked.Exchange(ref _persistenceReady, 1);
-    }
+    public void MarkPersistenceReady() => Interlocked.Exchange(ref _persistenceReady, 1);
 
     public SimulationReadinessProjection Project()
     {

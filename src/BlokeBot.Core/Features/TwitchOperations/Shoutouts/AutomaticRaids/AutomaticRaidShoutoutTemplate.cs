@@ -77,10 +77,8 @@ public sealed class AutomaticRaidShoutoutTemplate
             new AutomaticRaidShoutoutTemplate(source, segments.ToArray(), authoredCharacters)
         );
 
-        AutomaticRaidTemplateParseOutcome Invalid(string message)
-        {
-            return new AutomaticRaidTemplateParseOutcome.Invalid(message);
-        }
+        AutomaticRaidTemplateParseOutcome Invalid(string message) =>
+            new AutomaticRaidTemplateParseOutcome.Invalid(message);
 
         void AddLiteral()
         {
@@ -164,10 +162,8 @@ public sealed class AutomaticRaidShoutoutTemplate
 
     private sealed record LiteralSegment(string Text) : Segment
     {
-        internal override void Append(StringBuilder builder, AutomaticRaidTemplateValues values)
-        {
+        internal override void Append(StringBuilder builder, AutomaticRaidTemplateValues values) =>
             builder.Append(Text);
-        }
     }
 
     private sealed record TokenSegment(TokenKind Kind, string? Fallback) : Segment
@@ -189,10 +185,8 @@ public sealed class AutomaticRaidShoutoutTemplate
             builder.Append(value);
         }
 
-        private string Optional(string? value)
-        {
-            return string.IsNullOrWhiteSpace(value) ? Fallback! : value;
-        }
+        private string Optional(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? Fallback! : value;
     }
 
     private enum TokenKind

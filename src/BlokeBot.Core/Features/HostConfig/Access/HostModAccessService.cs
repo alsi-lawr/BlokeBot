@@ -114,24 +114,18 @@ public sealed class HostModAccessService(
         }
     }
 
-    public Task EnableModeratorAccessAsync(int hostId, CancellationToken ct)
-    {
-        return UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = true, ct);
-    }
+    public Task EnableModeratorAccessAsync(int hostId, CancellationToken ct) =>
+        UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = true, ct);
 
-    public Task DisableModeratorAccessAsync(int hostId, CancellationToken ct)
-    {
-        return UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = false, ct);
-    }
+    public Task DisableModeratorAccessAsync(int hostId, CancellationToken ct) =>
+        UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = false, ct);
 
     public IO<HostModAccessSaved, HostModAccessSaveFailure> SaveModeratorAccess(
         HostModAccessSaveCommand command
-    )
-    {
-        return IO<HostModAccessSaved, HostModAccessSaveFailure>.Create(ct =>
+    ) =>
+        IO<HostModAccessSaved, HostModAccessSaveFailure>.Create(ct =>
             ExecuteSaveModeratorAccessAsync(command, ct)
         );
-    }
 
     private async ValueTask<
         Result<HostModAccessSaved, HostModAccessSaveFailure>

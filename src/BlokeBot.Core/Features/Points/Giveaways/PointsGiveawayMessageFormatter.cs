@@ -15,9 +15,8 @@ public sealed class PointsGiveawayMessageFormatter
     public PointOperationOutcome Reply(
         PointsGiveawayStartOutcome outcome,
         ReplyDeliveryMap delivery
-    )
-    {
-        return outcome.Match<PointOperationOutcome>(
+    ) =>
+        outcome.Match<PointOperationOutcome>(
             started =>
                 Succeeded(FormatPlain(started.Settings.GiveawayStartedReply, started.Settings)),
             invalidConfiguration =>
@@ -57,11 +56,12 @@ public sealed class PointsGiveawayMessageFormatter
                     delivery.TargetFor(PointsReplyKeys.FollowerEligibilityUnavailable)
                 )
         );
-    }
 
-    public PointOperationOutcome Reply(PointsGiveawayJoinOutcome outcome, ReplyDeliveryMap delivery)
-    {
-        return outcome.Match<PointOperationOutcome>(
+    public PointOperationOutcome Reply(
+        PointsGiveawayJoinOutcome outcome,
+        ReplyDeliveryMap delivery
+    ) =>
+        outcome.Match<PointOperationOutcome>(
             joined =>
                 Succeeded(
                     FormatUser(joined.Settings.GiveawayJoinedReply, joined.Settings, joined.User),
@@ -99,11 +99,12 @@ public sealed class PointsGiveawayMessageFormatter
                     delivery.TargetFor(PointsReplyKeys.NotEligible)
                 )
         );
-    }
 
-    public PointOperationOutcome Reply(PointsGiveawayDrawOutcome outcome, ReplyDeliveryMap delivery)
-    {
-        return outcome.Match<PointOperationOutcome>(
+    public PointOperationOutcome Reply(
+        PointsGiveawayDrawOutcome outcome,
+        ReplyDeliveryMap delivery
+    ) =>
+        outcome.Match<PointOperationOutcome>(
             _ => Failed(string.Empty, CommandResponseTarget.Chat),
             notActive =>
                 Failed(
@@ -124,14 +125,12 @@ public sealed class PointsGiveawayMessageFormatter
                     )
                 )
         );
-    }
 
     public PointOperationOutcome Reply(
         PointsGiveawayCancelOutcome outcome,
         ReplyDeliveryMap delivery
-    )
-    {
-        return outcome.Match<PointOperationOutcome>(
+    ) =>
+        outcome.Match<PointOperationOutcome>(
             cancelled =>
                 Succeeded(
                     FormatPlain(cancelled.Settings.GiveawayCancelledReply, cancelled.Settings)
@@ -142,35 +141,23 @@ public sealed class PointsGiveawayMessageFormatter
                     delivery.TargetFor(PointsReplyKeys.GiveawayNotActive)
                 )
         );
-    }
 
-    public string FormatUpdate(string template, PointsSettings settings, TimeSpan timeLeft)
-    {
-        return FormatTimeLeft(template, settings, timeLeft);
-    }
+    public string FormatUpdate(string template, PointsSettings settings, TimeSpan timeLeft) =>
+        FormatTimeLeft(template, settings, timeLeft);
 
     private static PointOperationOutcome Succeeded(
         string message,
         CommandResponseTarget target = CommandResponseTarget.Chat
-    )
-    {
-        return new PointOperationOutcome.Succeeded(message, target);
-    }
+    ) => new PointOperationOutcome.Succeeded(message, target);
 
-    private static PointOperationOutcome Failed(string message, CommandResponseTarget target)
-    {
-        return new PointOperationOutcome.Failed(message, target);
-    }
+    private static PointOperationOutcome Failed(string message, CommandResponseTarget target) =>
+        new PointOperationOutcome.Failed(message, target);
 
-    private static string FormatPlain(string template, PointsSettings settings)
-    {
-        return Format(template, settings, string.Empty, string.Empty, string.Empty);
-    }
+    private static string FormatPlain(string template, PointsSettings settings) =>
+        Format(template, settings, string.Empty, string.Empty, string.Empty);
 
-    private static string FormatUser(string template, PointsSettings settings, string user)
-    {
-        return Format(template, settings, user, string.Empty, string.Empty);
-    }
+    private static string FormatUser(string template, PointsSettings settings, string user) =>
+        Format(template, settings, user, string.Empty, string.Empty);
 
     private static string FormatWinners(
         string template,
@@ -189,10 +176,7 @@ public sealed class PointsGiveawayMessageFormatter
         string template,
         PointsSettings settings,
         TimeSpan timeLeft
-    )
-    {
-        return Format(template, settings, string.Empty, string.Empty, DescribeTimeLeft(timeLeft));
-    }
+    ) => Format(template, settings, string.Empty, string.Empty, DescribeTimeLeft(timeLeft));
 
     private static string Format(
         string template,
@@ -200,9 +184,8 @@ public sealed class PointsGiveawayMessageFormatter
         string user,
         string winners,
         string timeLeft
-    )
-    {
-        return MessageTemplateFormatter.Format(
+    ) =>
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -212,7 +195,6 @@ public sealed class PointsGiveawayMessageFormatter
                 ["time_left"] = timeLeft,
             }
         );
-    }
 
     private static string DescribeTimeLeft(TimeSpan timeLeft)
     {

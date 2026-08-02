@@ -60,9 +60,8 @@ public partial class HostConfigPage
 
     private string _whisperQuotaText => _whisperQuotaPresentation.Text;
 
-    private Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
-    {
-        return ObserveUiOperationAsync(
+    private Task SetBotOverrideEnabledAsync(int hostId, bool enabled) =>
+        ObserveUiOperationAsync(
             nameof(SetBotOverrideEnabledAsync),
             () =>
                 RunSelectedHostMutationAsync(
@@ -70,7 +69,6 @@ public partial class HostConfigPage
                     () => SetBotOverrideEnabledCoreAsync(hostId, enabled)
                 )
         );
-    }
 
     private async Task SetBotOverrideEnabledCoreAsync(int hostId, bool enabled)
     {
@@ -113,9 +111,8 @@ public partial class HostConfigPage
         }
     }
 
-    private Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
-    {
-        return ObserveUiOperationAsync(
+    private Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled) =>
+        ObserveUiOperationAsync(
             nameof(SetWhisperResponsesEnabledAsync),
             () =>
                 RunSelectedHostMutationAsync(
@@ -123,7 +120,6 @@ public partial class HostConfigPage
                     () => SetWhisperResponsesEnabledCoreAsync(hostId, enabled)
                 )
         );
-    }
 
     private async Task SetWhisperResponsesEnabledCoreAsync(int hostId, bool enabled)
     {
@@ -136,15 +132,13 @@ public partial class HostConfigPage
             .Match<Action>(_ => ShowSavedStatus, _ => ShowRejectedStatus, _ => ShowRejectedStatus)
             .Invoke();
 
-        void ShowRejectedStatus()
-        {
+        void ShowRejectedStatus() =>
             _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(
                     "Turn on custom bot before enabling whisper responses.",
                     "Whisper responses not saved"
                 )
             );
-        }
 
         void ShowSavedStatus()
         {

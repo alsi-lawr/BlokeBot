@@ -34,9 +34,8 @@ public sealed class PublicChatPinWorkerTests
         store.BeginAttemptCount.ShouldBe(reconcileOnly ? 0 : 1);
     }
 
-    private static PublicChatPinWorkItem WorkItem(bool reconcileOnly)
-    {
-        return new(
+    private static PublicChatPinWorkItem WorkItem(bool reconcileOnly) =>
+        new(
             1,
             reconcileOnly,
             false,
@@ -50,7 +49,6 @@ public sealed class PublicChatPinWorkerTests
             300,
             true
         );
-    }
 
     private sealed class RecordingStore(PublicChatPinWorkItem item, List<string> calls)
         : IPublicChatPinStore

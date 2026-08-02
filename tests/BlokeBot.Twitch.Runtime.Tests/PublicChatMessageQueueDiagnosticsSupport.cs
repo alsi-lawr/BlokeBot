@@ -18,15 +18,9 @@ public abstract partial class PublicChatMessageQueueTestBase
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -34,10 +28,7 @@ public abstract partial class PublicChatMessageQueueTestBase
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        )
-        {
-            Entries.Add(new LogEntry(formatter(state, exception), exception));
-        }
+        ) => Entries.Add(new LogEntry(formatter(state, exception), exception));
     }
 
     private protected sealed record LogEntry(string Message, Exception? Exception);
@@ -59,10 +50,7 @@ public abstract partial class PublicChatMessageQueueTestBase
             }
         }
 
-        public override long GetTimestamp()
-        {
-            return GetUtcNow().UtcTicks;
-        }
+        public override long GetTimestamp() => GetUtcNow().UtcTicks;
 
         public override ITimer CreateTimer(
             TimerCallback callback,

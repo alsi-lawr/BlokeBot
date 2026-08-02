@@ -63,15 +63,10 @@ public abstract partial class PublicChatMessageQueueTestBase
             }
         }
 
-        public ValueTask<BeginSendCall> ReadBeginSendAsync()
-        {
-            return _beginSendCalls.Reader.ReadAsync();
-        }
+        public ValueTask<BeginSendCall> ReadBeginSendAsync() => _beginSendCalls.Reader.ReadAsync();
 
-        public ValueTask<RecordDeliveryCall> ReadRecordDeliveryAsync()
-        {
-            return _recordDeliveryCalls.Reader.ReadAsync();
-        }
+        public ValueTask<RecordDeliveryCall> ReadRecordDeliveryAsync() =>
+            _recordDeliveryCalls.Reader.ReadAsync();
 
         public async ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
             PublicChatOutboxBatch batch,
@@ -193,10 +188,8 @@ public abstract partial class PublicChatMessageQueueTestBase
             );
         }
 
-        private static PublicChatClaimUpdate Next(ConcurrentQueue<PublicChatClaimUpdate> script)
-        {
-            return script.TryDequeue(out var update) ? update : new PublicChatClaimUpdate.Applied();
-        }
+        private static PublicChatClaimUpdate Next(ConcurrentQueue<PublicChatClaimUpdate> script) =>
+            script.TryDequeue(out var update) ? update : new PublicChatClaimUpdate.Applied();
 
         private static void Observe<TCall>(Channel<TCall> channel, TCall call)
         {
@@ -206,10 +199,7 @@ public abstract partial class PublicChatMessageQueueTestBase
             }
         }
 
-        private int NextSequence()
-        {
-            return Interlocked.Increment(ref _nextSequence);
-        }
+        private int NextSequence() => Interlocked.Increment(ref _nextSequence);
     }
 
     private protected sealed record EnqueueCall(

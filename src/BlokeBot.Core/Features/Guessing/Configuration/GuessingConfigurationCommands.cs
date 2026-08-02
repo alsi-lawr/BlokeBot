@@ -13,9 +13,7 @@ public sealed record GuessingCommandAliases(
     string GuessesAliases
 )
 {
-    internal IReadOnlyList<CommandAliasDraft> ToDrafts()
-    {
-        return
+    internal IReadOnlyList<CommandAliasDraft> ToDrafts() =>
         [
             new(AppCommandKind.Start, StartAliases),
             new(AppCommandKind.Stop, StopAliases),
@@ -23,7 +21,6 @@ public sealed record GuessingCommandAliases(
             new(AppCommandKind.Guess, GuessAliases),
             new(AppCommandKind.Guesses, GuessesAliases),
         ];
-    }
 }
 
 public sealed record GuessingReplySettings(

@@ -71,10 +71,7 @@ public partial class GuessOptionsSettingsSection
             ? "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground opacity-60"
             : "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground";
 
-    private async Task InvokeAddOptionAsync()
-    {
-        await AddOption.InvokeAsync();
-    }
+    private async Task InvokeAddOptionAsync() => await AddOption.InvokeAsync();
 
     private async Task SetAnswerWhispersAsync(ChangeEventArgs args)
     {

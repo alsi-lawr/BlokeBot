@@ -18,9 +18,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
         TimeProvider clock,
         ICustomAnnouncementSender sender,
         ILogger<CustomAnnouncementScheduler>? logger = null
-    )
-    {
-        return new CustomAnnouncementScheduler(
+    ) =>
+        new CustomAnnouncementScheduler(
             dbFactory,
             sender,
             new TimeProviderCustomAnnouncementTickScheduler(clock),
@@ -36,7 +35,6 @@ public abstract class CustomAnnouncementSchedulerTestBase
             ),
             logger ?? NullLogger<CustomAnnouncementScheduler>.Instance
         );
-    }
 
     private protected static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -70,9 +68,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
         string[] variants,
         DateTime createdAtUtc,
         DateTime? lastSentAtUtc = null
-    )
-    {
-        return await SeedAnnouncementWithPolicyAsync(
+    ) =>
+        await SeedAnnouncementWithPolicyAsync(
             dbFactory,
             hostId,
             schedule,
@@ -82,7 +79,6 @@ public abstract class CustomAnnouncementSchedulerTestBase
             TimeSpan.FromSeconds(30),
             lastSentAtUtc
         );
-    }
 
     private protected static async Task<AnnouncementSeed> SeedAnnouncementWithPolicyAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -136,10 +132,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
         return new AnnouncementSeed(announcement.Id, entry.Id);
     }
 
-    private protected static ChatMessage Message(string login, string channel, string text)
-    {
-        return new(login, channel, text, text, new Dictionary<string, string>());
-    }
+    private protected static ChatMessage Message(string login, string channel, string text) =>
+        new(login, channel, text, text, new Dictionary<string, string>());
 
     private protected sealed record AnnouncementSeed(int AnnouncementId, int MessageLibraryEntryId);
 
@@ -225,15 +219,9 @@ public abstract class CustomAnnouncementSchedulerTestBase
         public List<string> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -241,10 +229,7 @@ public abstract class CustomAnnouncementSchedulerTestBase
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        )
-        {
-            Entries.Add(formatter(state, exception));
-        }
+        ) => Entries.Add(formatter(state, exception));
     }
 
     private protected sealed class RecordingChatMessageSender : ICustomAnnouncementSender
@@ -296,14 +281,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
     {
         private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow()
-        {
-            return _current;
-        }
+        public override DateTimeOffset GetUtcNow() => _current;
 
-        public void SetUtcNow(DateTimeOffset value)
-        {
-            _current = value;
-        }
+        public void SetUtcNow(DateTimeOffset value) => _current = value;
     }
 }

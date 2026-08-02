@@ -7,24 +7,20 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueTestBase
 {
     [Test]
-    public Task MissingChannelIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend()
-    {
-        return AssertMissingIdentityAsync(
+    public Task MissingChannelIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend() =>
+        AssertMissingIdentityAsync(
             new PublicChatPreparationOutcome.MissingChannel(),
             typeof(PublicChatDeliveryOutcome.MissingChannel),
             nameof(PublicChatPreparationOutcome.MissingChannel)
         );
-    }
 
     [Test]
-    public Task MissingBotIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend()
-    {
-        return AssertMissingIdentityAsync(
+    public Task MissingBotIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend() =>
+        AssertMissingIdentityAsync(
             new PublicChatPreparationOutcome.MissingBot(),
             typeof(PublicChatDeliveryOutcome.MissingBot),
             nameof(PublicChatPreparationOutcome.MissingBot)
         );
-    }
 
     [Test]
     public async Task ExplicitRejection_Processing_RecordsTerminalAfterSendBoundary()

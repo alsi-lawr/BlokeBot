@@ -60,10 +60,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         AppCommandRouteState route,
         CancellationToken ct
-    )
-    {
-        return (await AvailableGuessesResponseAsync(hostLogin, route, ct)).Message;
-    }
+    ) => (await AvailableGuessesResponseAsync(hostLogin, route, ct)).Message;
 
     public async Task<CommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
@@ -94,10 +91,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         AppCommandRouteState route,
         CancellationToken ct
-    )
-    {
-        return (await ModeratorOnlyResponseAsync(hostLogin, route, ct)).Message;
-    }
+    ) => (await ModeratorOnlyResponseAsync(hostLogin, route, ct)).Message;
 
     public async Task<CommandResponse> UsageResponseAsync(
         string hostLogin,
@@ -149,10 +143,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string command,
         AppCommandRouteState route,
         CancellationToken ct
-    )
-    {
-        return (await UsageResponseAsync(hostLogin, kind, command, route, ct)).Message;
-    }
+    ) => (await UsageResponseAsync(hostLogin, kind, command, route, ct)).Message;
 
     private static Task<GuessingReplySettingsResolution> LoadReplySettingsAsync(
         BlokeBotDbContext db,
@@ -160,9 +151,8 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         GuessRoundReference? round,
         AppCommandRouteState route,
         CancellationToken ct
-    )
-    {
-        return round is not null
+    ) =>
+        round is not null
             ? GuessingReplySettingsQueries.LoadForRoundAsync(db, hostId, round.ProfileId, ct)
             : route.Match(
                 _ => GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct),
@@ -174,12 +164,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
                         ct
                     )
             );
-    }
 
-    private static CommandResponse NotConfiguredResponse()
-    {
-        return CommandResponse.Chat("This channel is not set up.");
-    }
+    private static CommandResponse NotConfiguredResponse() =>
+        CommandResponse.Chat("This channel is not set up.");
 
     private static string FormatOptions(IEnumerable<string> options)
     {
@@ -191,8 +178,5 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         BlokeBotDbContext db,
         string hostLogin,
         CancellationToken ct
-    )
-    {
-        return BotHostQueries.FindHostId(db, hostLogin).RunAsync(ct);
-    }
+    ) => BotHostQueries.FindHostId(db, hostLogin).RunAsync(ct);
 }

@@ -12,9 +12,8 @@ public enum EventSubMessageType
 
 internal static class EventSubMessageTypes
 {
-    public static EventSubMessageType Parse(string? messageType)
-    {
-        return messageType switch
+    public static EventSubMessageType Parse(string? messageType) =>
+        messageType switch
         {
             "session_welcome" => EventSubMessageType.SessionWelcome,
             "session_keepalive" => EventSubMessageType.SessionKeepalive,
@@ -23,5 +22,4 @@ internal static class EventSubMessageTypes
             "revocation" => EventSubMessageType.Revocation,
             _ => EventSubMessageType.Unknown,
         };
-    }
 }

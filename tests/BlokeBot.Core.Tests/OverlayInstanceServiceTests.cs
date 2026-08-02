@@ -565,10 +565,8 @@ public sealed class OverlayInstanceServiceTests
         (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(1);
     }
 
-    private static CreateOverlayInstanceCommand Create(string name)
-    {
-        return new(name, OverlayType.Empty, new OverlayConfiguration.EmptyV1());
-    }
+    private static CreateOverlayInstanceCommand Create(string name) =>
+        new(name, OverlayType.Empty, new OverlayConfiguration.EmptyV1());
 
     private static AuthenticatedSession Session(AuthRole role, int hostId, bool isBot = false)
     {
@@ -652,14 +650,10 @@ public sealed class OverlayInstanceServiceTests
             return new Fixture(database, hostId, otherHostId, authority, logger, service);
         }
 
-        public ValueTask DisposeAsync()
-        {
-            return Database.DisposeAsync();
-        }
+        public ValueTask DisposeAsync() => Database.DisposeAsync();
 
-        private static BotHost Host(string login)
-        {
-            return new()
+        private static BotHost Host(string login) =>
+            new()
             {
                 TwitchUserId = $"{login}-id",
                 Login = login,
@@ -667,7 +661,6 @@ public sealed class OverlayInstanceServiceTests
                 EnabledFeatures = HostFeatureFlags.All,
                 CreatedAtUtc = DateTime.UtcNow,
             };
-        }
     }
 
     private sealed class FakeModeratorAuthority : IModeratorAuthorityService
@@ -689,10 +682,7 @@ public sealed class OverlayInstanceServiceTests
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class RecordingLogger : ILogger<OverlayInstanceService>
@@ -700,15 +690,9 @@ public sealed class OverlayInstanceServiceTests
         internal List<string> Messages { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
+            where TState : notnull => null;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -716,17 +700,12 @@ public sealed class OverlayInstanceServiceTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        )
-        {
-            Messages.Add(formatter(state, exception));
-        }
+        ) => Messages.Add(formatter(state, exception));
     }
 }
 
 internal static class OverlayInstanceTestResultExtensions
 {
-    internal static T SucceededValue<T>(this OverlayInstanceResult<T> result)
-    {
-        return result.ShouldBeOfType<OverlayInstanceResult<T>.Succeeded>().Value;
-    }
+    internal static T SucceededValue<T>(this OverlayInstanceResult<T> result) =>
+        result.ShouldBeOfType<OverlayInstanceResult<T>.Succeeded>().Value;
 }

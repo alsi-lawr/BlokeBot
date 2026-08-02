@@ -325,10 +325,8 @@ public sealed class ChannelPointsService(
         }
     }
 
-    public async Task ReconcileAsync(int hostId, CancellationToken ct)
-    {
+    public async Task ReconcileAsync(int hostId, CancellationToken ct) =>
         await ReconcileCoreAsync(hostId, ct);
-    }
 
     private async Task<ChannelPointsReconciliationOutcome> ReconcileCoreAsync(
         int hostId,
@@ -520,14 +518,12 @@ public sealed class ChannelPointsService(
     private async Task<ChannelPointsAuthorizationReadiness> ReadinessAsync(
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await ReadyTokenAsync(hostId, ct) is null
+    ) =>
+        await ReadyTokenAsync(hostId, ct) is null
             ? new ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization(
                 "Reconnect the selected broadcaster with Twitch Channel Points permissions."
             )
             : new ChannelPointsAuthorizationReadiness.Ready();
-    }
 
     private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct)
     {
@@ -554,36 +550,29 @@ public sealed class ChannelPointsService(
         return null;
     }
 
-    private static ChannelPointsOperationOutcome Disabled()
-    {
-        return new ChannelPointsOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
-    }
+    private static ChannelPointsOperationOutcome Disabled() =>
+        new ChannelPointsOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
 
     private static Task<bool> HostIsEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return db.Hosts.AnyAsync(
+    ) =>
+        db.Hosts.AnyAsync(
             host =>
                 host.Id == hostId
                 && (host.EnabledFeatures & HostFeatureFlags.RewardsAndRedemptions)
                     == HostFeatureFlags.RewardsAndRedemptions,
             ct
         );
-    }
 
-    private static ChannelPointsOperationOutcome NotReady()
-    {
-        return new ChannelPointsOperationOutcome.NotReady(
+    private static ChannelPointsOperationOutcome NotReady() =>
+        new ChannelPointsOperationOutcome.NotReady(
             "Reconnect the selected broadcaster with Twitch Channel Points permissions."
         );
-    }
 
-    private static ChannelPointsOperationOutcome Map(HelixChannelPointsOutcome value)
-    {
-        return value switch
+    private static ChannelPointsOperationOutcome Map(HelixChannelPointsOutcome value) =>
+        value switch
         {
             HelixChannelPointsOutcome.Unauthorized => NotReady(),
             HelixChannelPointsOutcome.Ineligible => new ChannelPointsOperationOutcome.Ineligible(
@@ -595,11 +584,9 @@ public sealed class ChannelPointsService(
                 "Twitch did not permit this Channel Points operation."
             ),
         };
-    }
 
-    private static HelixCustomRewardDraft ToProvider(ChannelPointsRewardDraft x)
-    {
-        return new(
+    private static HelixCustomRewardDraft ToProvider(ChannelPointsRewardDraft x) =>
+        new(
             x.Title.Trim(),
             x.Prompt?.Trim(),
             x.Cost,
@@ -613,7 +600,6 @@ public sealed class ChannelPointsService(
             x.ShouldRedemptionsSkipRequestQueue,
             x.BackgroundColor
         );
-    }
 
     private async Task<ChannelPointsReconciliationOutcome> ReconcileRedemptionsAsync(
         HelixRequestContext context,
@@ -783,30 +769,24 @@ public sealed class ChannelPointsService(
 
     private static IOrderedEnumerable<HelixRewardRedemption> OrderByRedemptionRecency(
         IEnumerable<HelixRewardRedemption> redemptions
-    )
-    {
-        return redemptions
+    ) =>
+        redemptions
             .OrderByDescending(x => x.RedeemedAt)
             .ThenByDescending(x => x.Id, StringComparer.Ordinal);
-    }
 
     private static ChannelPointsReconciliationOutcome ReconciliationFailure(
         HelixCustomRewardsLookupOutcome result
-    )
-    {
-        return result is HelixCustomRewardsLookupOutcome.Ineligible
+    ) =>
+        result is HelixCustomRewardsLookupOutcome.Ineligible
             ? new ChannelPointsReconciliationOutcome.Ineligible()
             : new ChannelPointsReconciliationOutcome.Incomplete();
-    }
 
     private static ChannelPointsReconciliationOutcome ReconciliationFailure(
         HelixRewardRedemptionsLookupOutcome result
-    )
-    {
-        return result is HelixRewardRedemptionsLookupOutcome.Ineligible
+    ) =>
+        result is HelixRewardRedemptionsLookupOutcome.Ineligible
             ? new ChannelPointsReconciliationOutcome.Ineligible()
             : new ChannelPointsReconciliationOutcome.Incomplete();
-    }
 
     private abstract record ChannelPointsReconciliationOutcome
     {
@@ -842,10 +822,7 @@ public sealed class ChannelPointsService(
 
         public int PageSize => Math.Min(_redemptionsPageSize, _terminalToKeep - Redemptions.Count);
 
-        public bool TryRequest()
-        {
-            return _progress.TryRequest(Cursor);
-        }
+        public bool TryRequest() => _progress.TryRequest(Cursor);
 
         public bool TryReceive(HelixRewardRedemptionsPage page)
         {
@@ -866,16 +843,11 @@ public sealed class ChannelPointsService(
 
         private HashSet<string> _returnedCursors { get; } = new(StringComparer.Ordinal);
 
-        public bool TryRequest(string? cursor)
-        {
-            return string.IsNullOrWhiteSpace(cursor) || _requestedCursors.Add(cursor);
-        }
+        public bool TryRequest(string? cursor) =>
+            string.IsNullOrWhiteSpace(cursor) || _requestedCursors.Add(cursor);
 
-        public bool TryReceive(string? cursor, int additions)
-        {
-            return string.IsNullOrWhiteSpace(cursor)
-                || (additions > 0 && _returnedCursors.Add(cursor));
-        }
+        public bool TryReceive(string? cursor, int additions) =>
+            string.IsNullOrWhiteSpace(cursor) || (additions > 0 && _returnedCursors.Add(cursor));
     }
 
     private static (TwitchCustomReward Reward, bool Changed) UpsertReward(
@@ -1020,9 +992,8 @@ public sealed class ChannelPointsService(
         return remove.Length > 0;
     }
 
-    private static ChannelPointsRewardView View(TwitchCustomReward x)
-    {
-        return new(
+    private static ChannelPointsRewardView View(TwitchCustomReward x) =>
+        new(
             x.ProviderRewardId,
             x.Title,
             x.Prompt,
@@ -1040,14 +1011,12 @@ public sealed class ChannelPointsService(
             x.ShouldRedemptionsSkipRequestQueue,
             x.BackgroundColor
         );
-    }
 
     private static ChannelPointsRedemptionView View(
         TwitchRewardRedemption x,
         IReadOnlyList<TwitchCustomReward> rewards
-    )
-    {
-        return new(
+    ) =>
+        new(
             x.ProviderRedemptionId,
             x.ProviderRewardId,
             x.RewardTitle,
@@ -1058,5 +1027,4 @@ public sealed class ChannelPointsService(
             x.UpdatedAtUtc,
             rewards.Any(y => y.ProviderRewardId == x.ProviderRewardId && y.IsManageable)
         );
-    }
 }

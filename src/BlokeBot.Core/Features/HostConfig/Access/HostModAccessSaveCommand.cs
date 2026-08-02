@@ -8,10 +8,8 @@ public abstract record HostModeratorAccessMode
 
     internal abstract bool AllowModsByDefault { get; }
 
-    public static HostModeratorAccessMode FromAllowModsByDefault(bool allowModsByDefault)
-    {
-        return allowModsByDefault ? new AllModerators() : new AllowlistOnly();
-    }
+    public static HostModeratorAccessMode FromAllowModsByDefault(bool allowModsByDefault) =>
+        allowModsByDefault ? new AllModerators() : new AllowlistOnly();
 
     public sealed record AllModerators : HostModeratorAccessMode
     {
@@ -42,16 +40,14 @@ public static class HostModAccessSaveValidator
     public static Validation<HostModAccessSaveCommand, HostModAccessSaveValidationError> Validate(
         int hostId,
         HostModeratorAccessMode mode
-    )
-    {
-        return hostId > 0
+    ) =>
+        hostId > 0
             ? Validation<HostModAccessSaveCommand, HostModAccessSaveValidationError>.Valid(
                 new HostModAccessSaveCommand(hostId, mode)
             )
             : Validation<HostModAccessSaveCommand, HostModAccessSaveValidationError>.Invalid(
                 new HostModAccessSaveValidationError.InvalidHost()
             );
-    }
 }
 
 public abstract record HostModAccessSaveValidationError

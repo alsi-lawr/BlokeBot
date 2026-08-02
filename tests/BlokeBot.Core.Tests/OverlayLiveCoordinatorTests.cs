@@ -53,27 +53,23 @@ public sealed class OverlayLiveCoordinatorTests
         await coordinator.StopAsync(CancellationToken.None);
     }
 
-    private static OverlayLiveCoordinator Coordinator(IOverlayStateProvider provider)
-    {
-        return new OverlayLiveCoordinator(
+    private static OverlayLiveCoordinator Coordinator(IOverlayStateProvider provider) =>
+        new OverlayLiveCoordinator(
             new OverlayServerEpoch(),
             provider,
             TimeProvider.System,
             TestEventBus.Create<AppEventKind>(),
             NullLogger<OverlayLiveCoordinator>.Instance
         );
-    }
 
-    private static ResolvedOverlayInstance Instance()
-    {
-        return new ResolvedOverlayInstance(
+    private static ResolvedOverlayInstance Instance() =>
+        new ResolvedOverlayInstance(
             71,
             Guid.NewGuid(),
             BlokeBot.Persistence.Models.OverlayType.Empty,
             new OverlayConfiguration.EmptyV1(),
             new OverlayRevision(9)
         );
-    }
 
     private static async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenAsync(
         OverlayLiveCoordinator coordinator,
@@ -108,9 +104,8 @@ public sealed class OverlayLiveCoordinatorTests
         ).ShouldBeOfType<OverlayLiveTransportMessage.Event>();
     }
 
-    private static OverlaySnapshotProjection Projection(ResolvedOverlayInstance instance)
-    {
-        return new OverlaySnapshotProjection.EmptyV1(
+    private static OverlaySnapshotProjection Projection(ResolvedOverlayInstance instance) =>
+        new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
             {
                 ServerEpoch = Guid.Parse("1c23f9b8-9367-477c-bb20-08a48246840b"),
@@ -118,7 +113,6 @@ public sealed class OverlayLiveCoordinatorTests
                 GeneratedAtUtc = DateTimeOffset.UnixEpoch,
             }
         );
-    }
 
     private sealed class BlockingSecondProjectionProvider : IOverlayStateProvider
     {
@@ -146,10 +140,7 @@ public sealed class OverlayLiveCoordinatorTests
             return Projection(instance);
         }
 
-        internal void ReleaseSecondProjection()
-        {
-            _release.TrySetResult();
-        }
+        internal void ReleaseSecondProjection() => _release.TrySetResult();
     }
 
     private sealed class FailingSecondProjectionProvider : IOverlayStateProvider

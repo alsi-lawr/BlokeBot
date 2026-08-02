@@ -159,8 +159,6 @@ public partial class BotAccountAuthorizationSection
             _ => "Refresh to check this Twitch connection.",
         };
 
-    private async Task SetEnableToggleAsync(ChangeEventArgs args)
-    {
+    private async Task SetEnableToggleAsync(ChangeEventArgs args) =>
         await EnableToggleChanged(args.Value is true);
-    }
 }

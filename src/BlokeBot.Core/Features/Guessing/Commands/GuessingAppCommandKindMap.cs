@@ -15,9 +15,8 @@ public static class GuessingAppCommandKindMap
             AppCommandKind.Guesses,
         };
 
-    public static AppCommandKind ToAppKind(GuessCommandKind kind)
-    {
-        return kind switch
+    public static AppCommandKind ToAppKind(GuessCommandKind kind) =>
+        kind switch
         {
             GuessCommandKind.Start => AppCommandKind.Start,
             GuessCommandKind.Stop => AppCommandKind.Stop,
@@ -26,11 +25,9 @@ public static class GuessingAppCommandKindMap
             GuessCommandKind.Guesses => AppCommandKind.Guesses,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
-    }
 
-    public static Option<GuessCommandKind> FromAppKind(AppCommandKind appKind)
-    {
-        return appKind switch
+    public static Option<GuessCommandKind> FromAppKind(AppCommandKind appKind) =>
+        appKind switch
         {
             AppCommandKind.Start => Option<GuessCommandKind>.Some(GuessCommandKind.Start),
             AppCommandKind.Stop => Option<GuessCommandKind>.Some(GuessCommandKind.Stop),
@@ -39,5 +36,4 @@ public static class GuessingAppCommandKindMap
             AppCommandKind.Guesses => Option<GuessCommandKind>.Some(GuessCommandKind.Guesses),
             _ => Option<GuessCommandKind>.None,
         };
-    }
 }

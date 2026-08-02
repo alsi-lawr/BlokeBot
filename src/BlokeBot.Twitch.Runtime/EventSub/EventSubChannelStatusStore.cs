@@ -105,9 +105,8 @@ internal sealed class EventSubChannelStatusStore : IEventSubChannelStatusAccesso
 
     private static EventSubChannelStatusSnapshot CreateSnapshot(
         Dictionary<string, EventSubChannelStatus> states
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Channels = Array.AsReadOnly(
                 states
@@ -115,7 +114,6 @@ internal sealed class EventSubChannelStatusStore : IEventSubChannelStatusAccesso
                     .ToArray()
             ),
         };
-    }
 
     internal sealed class EventSubChannelStatusScope(EventSubChannelStatusStore owner, long id)
         : IDisposable
@@ -125,25 +123,13 @@ internal sealed class EventSubChannelStatusStore : IEventSubChannelStatusAccesso
         internal Dictionary<string, EventSubChannelStatus> States { get; } =
             new(StringComparer.OrdinalIgnoreCase);
 
-        internal void Activate()
-        {
-            owner.Activate(this);
-        }
+        internal void Activate() => owner.Activate(this);
 
-        internal void Set(EventSubChannelStatus status)
-        {
-            owner.Set(this, status);
-        }
+        internal void Set(EventSubChannelStatus status) => owner.Set(this, status);
 
-        internal void Remove(string channel)
-        {
-            owner.Remove(this, channel);
-        }
+        internal void Remove(string channel) => owner.Remove(this, channel);
 
-        public void Dispose()
-        {
-            owner.Deactivate(this);
-        }
+        public void Dispose() => owner.Deactivate(this);
     }
 }
 

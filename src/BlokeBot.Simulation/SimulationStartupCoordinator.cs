@@ -67,13 +67,11 @@ internal sealed class SimulationStartupCoordinator(SimulationFixtureSeeder fixtu
         );
     }
 
-    private static bool IsRedirect(HttpStatusCode statusCode)
-    {
-        return statusCode
+    private static bool IsRedirect(HttpStatusCode statusCode) =>
+        statusCode
             is HttpStatusCode.Moved
                 or HttpStatusCode.Redirect
                 or HttpStatusCode.RedirectMethod
                 or HttpStatusCode.TemporaryRedirect
                 or HttpStatusCode.PermanentRedirect;
-    }
 }

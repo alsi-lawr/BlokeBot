@@ -67,12 +67,10 @@ public sealed class PointsConfigurationService(
     public IO<PointsConfigurationSaved, PointsConfigurationSaveFailure> SaveConfiguration(
         int hostId,
         PointsConfigurationSaveCommand command
-    )
-    {
-        return IO<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Create(ct =>
+    ) =>
+        IO<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Create(ct =>
             ExecuteSaveAsync(hostId, command, ct)
         );
-    }
 
     private async ValueTask<
         Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>
@@ -147,27 +145,23 @@ public sealed class PointsConfigurationService(
             .FollowerEligibilityUnavailableReply;
     }
 
-    private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind)
-    {
-        return CommandAliasRegistry.JoinAliases(
+    private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
+        CommandAliasRegistry.JoinAliases(
             aliases,
             PointsAppCommandKindMap.ToAppKind(kind),
             new CommandAliasScope.Global()
         );
-    }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    )
-    {
-        return await db
+    ) =>
+        await db
             .HostBotAccountSettings.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
             .SingleOrDefaultAsync(ct);
-    }
 
     private static async Task<PointsConfigurationSaveFailure?> ReplaceAliasesAsync(
         BlokeBotDbContext db,

@@ -59,12 +59,10 @@ public partial class AccountMenu
 
     private string _role => Session.DisplayRole;
 
-    private string? AccountImageUrl()
-    {
-        return _isAdminEditing && !string.IsNullOrWhiteSpace(_selection?.Current.ProfileImageUrl)
+    private string? AccountImageUrl() =>
+        _isAdminEditing && !string.IsNullOrWhiteSpace(_selection?.Current.ProfileImageUrl)
             ? _selection.Current.ProfileImageUrl
             : Session.ProfileImageUrl;
-    }
 
     private string IdentityText()
     {

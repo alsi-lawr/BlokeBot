@@ -93,10 +93,8 @@ public sealed class WebAuthCallbackEndpointTests
         }
 
         private static TService Uninitialized<TService>()
-            where TService : class
-        {
-            return (TService)RuntimeHelpers.GetUninitializedObject(typeof(TService));
-        }
+            where TService : class =>
+            (TService)RuntimeHelpers.GetUninitializedObject(typeof(TService));
     }
 
     private static void AssertRedacted(CallbackLogCapture logs, params string[] sentinels)

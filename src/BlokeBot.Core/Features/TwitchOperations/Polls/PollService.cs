@@ -448,8 +448,7 @@ public sealed class PollService(
         return null;
     }
 
-    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct)
-    {
+    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct) =>
         await alerts
             .Create(
                 hostId,
@@ -461,7 +460,6 @@ public sealed class PollService(
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);
-    }
 
     private static bool ArchiveMissingActivePoll(BlokeBotDbContext db, int hostId)
     {
@@ -543,16 +541,14 @@ public sealed class PollService(
             );
     }
 
-    private static TwitchPollStatus ToPersistedStatus(HelixPollStatus status)
-    {
-        return status switch
+    private static TwitchPollStatus ToPersistedStatus(HelixPollStatus status) =>
+        status switch
         {
             HelixPollStatus.Active => TwitchPollStatus.Active,
             HelixPollStatus.Completed => TwitchPollStatus.Completed,
             HelixPollStatus.Terminated => TwitchPollStatus.Terminated,
             _ => TwitchPollStatus.Archived,
         };
-    }
 
     private sealed record PollUpsertOutcome(TwitchPoll Poll, bool Changed);
 
@@ -570,9 +566,8 @@ public sealed class PollService(
         db.TwitchPolls.RemoveRange(excess);
     }
 
-    private static PollTemplateView View(TwitchPollTemplate template)
-    {
-        return new(
+    private static PollTemplateView View(TwitchPollTemplate template) =>
+        new(
             template.Id,
             template.Title,
             template.Choices.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
@@ -580,11 +575,9 @@ public sealed class PollService(
             template.ChannelPointsVotingEnabled,
             template.ChannelPointsPerVote
         );
-    }
 
-    private static PollView View(TwitchPoll poll)
-    {
-        return new(
+    private static PollView View(TwitchPoll poll) =>
+        new(
             poll.ProviderPollId,
             poll.Title,
             JsonSerializer.Deserialize<PollChoiceView[]>(poll.ChoicesJson) ?? [],
@@ -594,5 +587,4 @@ public sealed class PollService(
             poll.EndsAtUtc,
             poll.EndedAtUtc
         );
-    }
 }

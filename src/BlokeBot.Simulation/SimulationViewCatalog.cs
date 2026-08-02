@@ -28,8 +28,6 @@ internal static class SimulationViewCatalog
             $"/points/leaderboard/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
     };
 
-    public static string PathFor(string? view)
-    {
-        return view is not null && _paths.TryGetValue(view, out var path) ? path : "/";
-    }
+    public static string PathFor(string? view) =>
+        view is not null && _paths.TryGetValue(view, out var path) ? path : "/";
 }

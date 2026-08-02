@@ -52,10 +52,7 @@ internal static class EventSubChannelRecoveryResilience
     internal static void ConfigureAttempt(
         ResiliencePipelineBuilder builder,
         EventSubChannelRecoveryPolicy policy
-    )
-    {
-        builder.AddTimeout(policy.AttemptTimeout);
-    }
+    ) => builder.AddTimeout(policy.AttemptTimeout);
 }
 
 internal static class EventSubChannelFailureClassifier
@@ -98,17 +95,13 @@ internal static class EventSubChannelFailureClassifier
         );
     }
 
-    internal static bool IsRecoverable(EventSubChannelFailureClassification classification)
-    {
-        return classification
+    internal static bool IsRecoverable(EventSubChannelFailureClassification classification) =>
+        classification
             is EventSubChannelFailureClassification.Timeout
                 or EventSubChannelFailureClassification.Transient;
-    }
 
-    private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode)
-    {
-        return RuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
-    }
+    private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode) =>
+        RuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
 }
 
 internal readonly record struct EventSubChannelFailureDetails(
@@ -118,10 +111,8 @@ internal readonly record struct EventSubChannelFailureDetails(
     Exception Exception
 )
 {
-    internal EventSubChannelFailure ToPublicFailure()
-    {
-        return new() { Classification = Classification, FailureType = FailureType };
-    }
+    internal EventSubChannelFailure ToPublicFailure() =>
+        new() { Classification = Classification, FailureType = FailureType };
 }
 
 internal abstract record EventSubChannelFailureContext
@@ -142,10 +133,8 @@ internal abstract record EventSubChannelFailureContext
         Func<TokenUnavailable, TResult> tokenUnavailable
     );
 
-    internal EventSubChannelFailure ToPublicFailure()
-    {
-        return new() { Classification = Classification, FailureType = FailureType };
-    }
+    internal EventSubChannelFailure ToPublicFailure() =>
+        new() { Classification = Classification, FailureType = FailureType };
 
     internal sealed record ClassifiedException(EventSubChannelFailureDetails Details)
         : EventSubChannelFailureContext
@@ -163,15 +152,10 @@ internal abstract record EventSubChannelFailureContext
             Func<MissingBot, TResult> missingBot,
             Func<StartupMessageRejected, TResult> startupMessageRejected,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return classifiedException(this);
-        }
+        ) => classifiedException(this);
 
-        public override string ToString()
-        {
-            return $"{nameof(ClassifiedException)} {{ Phase = {Phase}, Classification = {Classification}, FailureType = {FailureType} }}";
-        }
+        public override string ToString() =>
+            $"{nameof(ClassifiedException)} {{ Phase = {Phase}, Classification = {Classification}, FailureType = {FailureType} }}";
     }
 
     internal sealed record MissingChannel : EventSubChannelFailureContext
@@ -189,10 +173,7 @@ internal abstract record EventSubChannelFailureContext
             Func<MissingBot, TResult> missingBot,
             Func<StartupMessageRejected, TResult> startupMessageRejected,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return missingChannel(this);
-        }
+        ) => missingChannel(this);
     }
 
     internal sealed record MissingBot : EventSubChannelFailureContext
@@ -210,10 +191,7 @@ internal abstract record EventSubChannelFailureContext
             Func<MissingBot, TResult> missingBot,
             Func<StartupMessageRejected, TResult> startupMessageRejected,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return missingBot(this);
-        }
+        ) => missingBot(this);
     }
 
     internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
@@ -232,10 +210,7 @@ internal abstract record EventSubChannelFailureContext
             Func<MissingBot, TResult> missingBot,
             Func<StartupMessageRejected, TResult> startupMessageRejected,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
     }
 
     internal sealed record StartupMessageRejected : EventSubChannelFailureContext
@@ -253,10 +228,7 @@ internal abstract record EventSubChannelFailureContext
             Func<MissingBot, TResult> missingBot,
             Func<StartupMessageRejected, TResult> startupMessageRejected,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return startupMessageRejected(this);
-        }
+        ) => startupMessageRejected(this);
     }
 }
 
@@ -278,16 +250,10 @@ internal sealed class EventSubChannelRecoveryPipeline(
     internal ValueTask<TResult> ExecuteAttemptAsync<TResult>(
         Func<CancellationToken, ValueTask<TResult>> operation,
         CancellationToken cancellationToken
-    )
-    {
-        return attemptPipeline.ExecuteAsync(operation, cancellationToken);
-    }
+    ) => attemptPipeline.ExecuteAsync(operation, cancellationToken);
 
     internal ValueTask<EventSubChannelReconciliationOutcome> ExecuteRecoveryAsync(
         Func<CancellationToken, ValueTask<EventSubChannelReconciliationOutcome>> operation,
         CancellationToken cancellationToken
-    )
-    {
-        return recoveryPipeline.ExecuteAsync(operation, cancellationToken);
-    }
+    ) => recoveryPipeline.ExecuteAsync(operation, cancellationToken);
 }

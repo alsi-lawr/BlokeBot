@@ -9,10 +9,7 @@ public sealed class CommandStrategyModule<TKind, TState>(
 ) : IChatCommandModule
     where TKind : struct, Enum
 {
-    public void AddCommands(IChatCommandBuilder commands)
-    {
-        commands.MapDynamic(RouteAsync);
-    }
+    public void AddCommands(IChatCommandBuilder commands) => commands.MapDynamic(RouteAsync);
 
     private async ValueTask<CommandHandlingOutcome> RouteAsync(
         ChatCommandContext context,

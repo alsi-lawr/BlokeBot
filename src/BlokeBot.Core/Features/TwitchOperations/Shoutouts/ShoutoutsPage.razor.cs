@@ -141,8 +141,6 @@ public partial class ShoutoutsPage
         );
     }
 
-    private Task RunAutomaticRaidMutationAsync(int hostId, Func<Task> mutation)
-    {
-        return RunSelectedHostMutationAsync(hostId, mutation);
-    }
+    private Task RunAutomaticRaidMutationAsync(int hostId, Func<Task> mutation) =>
+        RunSelectedHostMutationAsync(hostId, mutation);
 }

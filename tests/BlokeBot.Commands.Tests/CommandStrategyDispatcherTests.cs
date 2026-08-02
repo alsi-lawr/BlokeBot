@@ -73,14 +73,12 @@ public sealed class CommandStrategyDispatcherTests
         public ValueTask<CommandRouteResolution<TestKind, string>> ResolveAsync(
             ChatCommandContext context,
             CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult<CommandRouteResolution<TestKind, string>>(
+        ) =>
+            ValueTask.FromResult<CommandRouteResolution<TestKind, string>>(
                 new CommandRouteResolution<TestKind, string>.Resolved(
                     new CommandRoute<TestKind, string>(kind, state)
                 )
             );
-        }
     }
 
     private sealed class TestStrategy(TestKind kind, CommandStrategyAccess<TestKind, string> access)
@@ -95,40 +93,31 @@ public sealed class CommandStrategyDispatcherTests
         public async ValueTask ExecuteAsync(
             CommandStrategyContext<TestKind, string> context,
             CancellationToken cancellationToken
-        )
-        {
+        ) =>
             await context.Command.ReplyAsync(
                 $"{Kind}:{context.State}:{context.Args[0]}",
                 cancellationToken
             );
-        }
     }
 
     private static ValueTask<CommandResponse> ModeratorResponse(
         CommandStrategyContext<TestKind, string> context,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult(CommandResponse.Chat("mods only"));
-    }
+    ) => ValueTask.FromResult(CommandResponse.Chat("mods only"));
 
-    private static ChatMessage Message(string login, string text)
-    {
-        return new(
+    private static ChatMessage Message(string login, string text) =>
+        new(
             login,
             "channel",
             text,
             $":{login}!u@h PRIVMSG #channel :{text}",
             new Dictionary<string, string>()
         );
-    }
 
-    private static CommandResponder ReplyTo(List<string> replies)
-    {
-        return (response, _) =>
+    private static CommandResponder ReplyTo(List<string> replies) =>
+        (response, _) =>
         {
             replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
-    }
 }

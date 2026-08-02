@@ -126,30 +126,19 @@ public partial class SelectedChannelBotStatus
             )
             : "Channel owner needs to reconnect the bot";
 
-    protected override void OnInitialized()
-    {
+    protected override void OnInitialized() =>
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             InvokeAsync,
             ReloadForEventAsync,
             StateHasChanged
         );
-    }
 
-    protected override async Task OnParametersSetAsync()
-    {
-        await LoadSelectedHostStatusAsync();
-    }
+    protected override async Task OnParametersSetAsync() => await LoadSelectedHostStatusAsync();
 
-    public void Dispose()
-    {
-        _hostedChannelSubscription?.Dispose();
-    }
+    public void Dispose() => _hostedChannelSubscription?.Dispose();
 
-    private bool CanAuthorizeSelectedHost()
-    {
-        return Session.CanAuthorizeSelectedHost;
-    }
+    private bool CanAuthorizeSelectedHost() => Session.CanAuthorizeSelectedHost;
 
     private async Task LoadSelectedHostStatusAsync()
     {

@@ -33,9 +33,8 @@ internal sealed record AnnouncementDeliveryPolicy
 
 internal static class AnnouncementDeliveryPolicyMapper
 {
-    internal static AnnouncementDeliveryPolicy ToDomain(CustomAnnouncementDeliveryPolicy? policy)
-    {
-        return policy switch
+    internal static AnnouncementDeliveryPolicy ToDomain(CustomAnnouncementDeliveryPolicy? policy) =>
+        policy switch
         {
             RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy retry =>
                 new AnnouncementDeliveryPolicy(retry.RetryDelay, retry.OccurrenceLifetime),
@@ -46,5 +45,4 @@ internal static class AnnouncementDeliveryPolicyMapper
                 "Unknown persisted custom announcement delivery policy."
             ),
         };
-    }
 }

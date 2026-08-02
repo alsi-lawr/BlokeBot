@@ -24,18 +24,13 @@ public partial class HostConfigPage
         _commandsDirty = false;
     }
 
-    private void MarkCommandsDirty()
-    {
-        _commandsDirty = true;
-    }
+    private void MarkCommandsDirty() => _commandsDirty = true;
 
-    private Task SaveCommandsAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task SaveCommandsAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(SaveCommandsAsync),
             () => RunSelectedHostMutationAsync(hostId, () => SaveCommandsCoreAsync(hostId))
         );
-    }
 
     private async Task SaveCommandsCoreAsync(int hostId)
     {
@@ -115,8 +110,6 @@ public partial class HostConfigPage
         }
     }
 
-    private void PublishCommandsError(string message)
-    {
+    private void PublishCommandsError(string message) =>
         _toasts.Publish(ToastRequest<ErrorToastStrategy>.WithTitle(message, "Commands not saved"));
-    }
 }

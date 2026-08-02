@@ -17,9 +17,8 @@ public abstract record HostedChannelRuntimeLifecycle
     internal static HostedChannelRuntimeLifecycle FromPersistence(
         BotChannelRuntimeState state,
         DateTime? changedAtUtc
-    )
-    {
-        return state switch
+    ) =>
+        state switch
         {
             BotChannelRuntimeState.Stopped => new Stopped(changedAtUtc),
             BotChannelRuntimeState.Starting when changedAtUtc is { } starting => new Starting(
@@ -31,14 +30,10 @@ public abstract record HostedChannelRuntimeLifecycle
             ),
             _ => throw new PersistenceDataIntegrityException(typeof(BotHost)),
         };
-    }
 
     public sealed record Stopped : HostedChannelRuntimeLifecycle
     {
-        internal Stopped(DateTime? changedAtUtc)
-        {
-            ChangedAtUtc = changedAtUtc;
-        }
+        internal Stopped(DateTime? changedAtUtc) => ChangedAtUtc = changedAtUtc;
 
         public DateTime? ChangedAtUtc { get; }
 
@@ -47,18 +42,12 @@ public abstract record HostedChannelRuntimeLifecycle
             Func<Starting, TResult> starting,
             Func<Started, TResult> started,
             Func<Stopping, TResult> stopping
-        )
-        {
-            return stopped(this);
-        }
+        ) => stopped(this);
     }
 
     public sealed record Starting : HostedChannelRuntimeLifecycle
     {
-        internal Starting(DateTime changedAtUtc)
-        {
-            ChangedAtUtc = changedAtUtc;
-        }
+        internal Starting(DateTime changedAtUtc) => ChangedAtUtc = changedAtUtc;
 
         public DateTime ChangedAtUtc { get; }
 
@@ -67,18 +56,12 @@ public abstract record HostedChannelRuntimeLifecycle
             Func<Starting, TResult> starting,
             Func<Started, TResult> started,
             Func<Stopping, TResult> stopping
-        )
-        {
-            return starting(this);
-        }
+        ) => starting(this);
     }
 
     public sealed record Started : HostedChannelRuntimeLifecycle
     {
-        internal Started(DateTime changedAtUtc)
-        {
-            ChangedAtUtc = changedAtUtc;
-        }
+        internal Started(DateTime changedAtUtc) => ChangedAtUtc = changedAtUtc;
 
         public DateTime ChangedAtUtc { get; }
 
@@ -87,18 +70,12 @@ public abstract record HostedChannelRuntimeLifecycle
             Func<Starting, TResult> starting,
             Func<Started, TResult> started,
             Func<Stopping, TResult> stopping
-        )
-        {
-            return started(this);
-        }
+        ) => started(this);
     }
 
     public sealed record Stopping : HostedChannelRuntimeLifecycle
     {
-        internal Stopping(DateTime changedAtUtc)
-        {
-            ChangedAtUtc = changedAtUtc;
-        }
+        internal Stopping(DateTime changedAtUtc) => ChangedAtUtc = changedAtUtc;
 
         public DateTime ChangedAtUtc { get; }
 
@@ -107,9 +84,6 @@ public abstract record HostedChannelRuntimeLifecycle
             Func<Starting, TResult> starting,
             Func<Started, TResult> started,
             Func<Stopping, TResult> stopping
-        )
-        {
-            return stopping(this);
-        }
+        ) => stopping(this);
     }
 }

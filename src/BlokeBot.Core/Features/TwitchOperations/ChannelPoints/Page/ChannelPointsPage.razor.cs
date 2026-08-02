@@ -145,9 +145,8 @@ public partial class ChannelPointsPage
         ChannelPointsRewardView reward,
         bool isEnabled,
         bool isPaused
-    )
-    {
-        return MutateAsync(async hostId =>
+    ) =>
+        MutateAsync(async hostId =>
             Publish(
                 await _channelPoints.UpdateRewardAsync(
                     hostId,
@@ -159,7 +158,6 @@ public partial class ChannelPointsPage
                 )
             )
         );
-    }
 
     private async Task DeleteRewardAsync(string rewardId)
     {
@@ -181,9 +179,8 @@ public partial class ChannelPointsPage
         );
     }
 
-    private Task UpdateRedemptionAsync(string redemptionId, bool fulfill)
-    {
-        return MutateAsync(async hostId =>
+    private Task UpdateRedemptionAsync(string redemptionId, bool fulfill) =>
+        MutateAsync(async hostId =>
             Publish(
                 await _channelPoints.UpdateRedemptionAsync(
                     hostId,
@@ -193,7 +190,6 @@ public partial class ChannelPointsPage
                 )
             )
         );
-    }
 
     private async Task MutateAsync(Func<int, Task> operation)
     {
@@ -208,9 +204,8 @@ public partial class ChannelPointsPage
         );
     }
 
-    private ChannelPointsRewardDraft Draft(int cost)
-    {
-        return new(
+    private ChannelPointsRewardDraft Draft(int cost) =>
+        new(
             _rewardTitle,
             _rewardPrompt,
             cost,
@@ -224,11 +219,9 @@ public partial class ChannelPointsPage
             _rewardQueueSkip,
             string.IsNullOrWhiteSpace(_rewardBackgroundColor) ? null : _rewardBackgroundColor
         );
-    }
 
-    private static ChannelPointsRewardDraft Draft(ChannelPointsRewardView reward)
-    {
-        return new(
+    private static ChannelPointsRewardDraft Draft(ChannelPointsRewardView reward) =>
+        new(
             reward.Title,
             reward.Prompt,
             reward.Cost,
@@ -242,12 +235,9 @@ public partial class ChannelPointsPage
             reward.ShouldRedemptionsSkipRequestQueue,
             reward.BackgroundColor
         );
-    }
 
-    private static int? ParseNullableInt(string value)
-    {
-        return int.TryParse(value, out var parsed) ? parsed : null;
-    }
+    private static int? ParseNullableInt(string value) =>
+        int.TryParse(value, out var parsed) ? parsed : null;
 
     private void Publish(ChannelPointsOperationOutcome outcome)
     {
@@ -294,8 +284,6 @@ public partial class ChannelPointsPage
         }
     }
 
-    private void Warn(string message)
-    {
+    private void Warn(string message) =>
         _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
-    }
 }

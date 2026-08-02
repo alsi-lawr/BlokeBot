@@ -9,12 +9,8 @@ public sealed record HostBotChannelStatusLoadFailure(
 {
     public static Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure> FromReadiness(
         HostBotReadinessOutcome readiness
-    )
-    {
-        return
-            readiness
-                is HostBotReadinessOutcome.Unknown
-                    or HostBotReadinessOutcome.IdentityLookupFailed
+    ) =>
+        readiness is HostBotReadinessOutcome.Unknown or HostBotReadinessOutcome.IdentityLookupFailed
             ? Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>.Error(
                 new(
                     "BlokeBot could not check whether the bot is a mod.",
@@ -24,5 +20,4 @@ public sealed record HostBotChannelStatusLoadFailure(
             : Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>.Success(
                 HostBotChannelStatus.FromReadiness(readiness)
             );
-    }
 }

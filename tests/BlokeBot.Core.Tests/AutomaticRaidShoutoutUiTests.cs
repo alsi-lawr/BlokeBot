@@ -254,13 +254,14 @@ public sealed class AutomaticRaidShoutoutUiTests
         });
     }
 
-    private static void Open(IRenderedComponent<AutomaticRaidShoutoutSection> section, string title)
-    {
+    private static void Open(
+        IRenderedComponent<AutomaticRaidShoutoutSection> section,
+        string title
+    ) =>
         section
             .FindAll("button.disclosure-trigger")
             .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
             .Click();
-    }
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory factory,

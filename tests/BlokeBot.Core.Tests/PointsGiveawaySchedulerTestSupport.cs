@@ -52,37 +52,31 @@ public abstract partial class PointsGiveawaySchedulerTestBase
 
     private protected static PointOperationOutcome.Succeeded Successful(
         PointOperationOutcome outcome
-    )
-    {
-        return outcome.Match(
+    ) =>
+        outcome.Match(
             succeeded => succeeded,
             _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
         );
-    }
 
-    private protected static PointOperationOutcome.Failed Failed(PointOperationOutcome outcome)
-    {
-        return outcome.Match(
+    private protected static PointOperationOutcome.Failed Failed(PointOperationOutcome outcome) =>
+        outcome.Match(
             _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
             failed => failed
         );
-    }
 
     private protected static PointsGiveawayScheduler CreateScheduler(
         IPointsGiveawaySchedulerOperations operations,
         TimeProvider timeProvider,
         IPointsGiveawaySchedulerNotification notification,
         ILogger<PointsGiveawayScheduler> logger
-    )
-    {
-        return new(
+    ) =>
+        new(
             operations,
             notification,
             new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
             timeProvider,
             logger
         );
-    }
 
     private protected static PointsGiveawayService CreateGiveawayService(
         SqliteBlokeBotDbFactory dbFactory,
@@ -120,34 +114,20 @@ public abstract partial class PointsGiveawaySchedulerTestBase
 
     private protected static PointsGiveawayDrawService CreateDrawService(
         IDbContextFactory<BlokeBotDbContext> dbFactory
-    )
-    {
-        return new(dbFactory, new PointBalanceService(dbFactory), new FixedPointsRandom());
-    }
+    ) => new(dbFactory, new PointBalanceService(dbFactory), new FixedPointsRandom());
 
-    private protected static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now)
-    {
-        return new(
-            42,
-            7,
-            "streamer",
-            now.AddHours(-3).UtcDateTime,
-            now.AddHours(1).UtcDateTime,
-            null
-        );
-    }
+    private protected static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now) =>
+        new(42, 7, "streamer", now.AddHours(-3).UtcDateTime, now.AddHours(1).UtcDateTime, null);
 
     private protected static Result<
         TValue,
         PointsGiveawaySchedulerTransientFailure
-    > Failure<TValue>()
-    {
-        return Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
+    > Failure<TValue>() =>
+        Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
             new PointsGiveawaySchedulerTransientFailure(
                 new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
             )
         );
-    }
 
     private protected static async Task<int> SeedHostAsync(
         IDbContextFactory<BlokeBotDbContext> dbFactory,

@@ -284,10 +284,8 @@ public sealed class ManagementPageWorkspaceTests
         IRenderedComponent<TComponent> page,
         string label
     )
-        where TComponent : IComponent
-    {
-        return page.FindAll("button").Single(button => button.TextContent.Trim() == label);
-    }
+        where TComponent : IComponent =>
+        page.FindAll("button").Single(button => button.TextContent.Trim() == label);
 
     private static void AssertEditorAssociation<TComponent>(IRenderedComponent<TComponent> page)
         where TComponent : IComponent
@@ -332,9 +330,6 @@ public sealed class ManagementPageWorkspaceTests
             string lobbyCode,
             IReadOnlyList<PrivateLobbyRecipient> recipients,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>([]);
-        }
+        ) => Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>([]);
     }
 }

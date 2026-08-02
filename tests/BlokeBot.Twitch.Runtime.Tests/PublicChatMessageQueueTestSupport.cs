@@ -21,9 +21,8 @@ public abstract partial class PublicChatMessageQueueTestBase
             PublicChatQueueAlertDeadLetter
         >? fanOut = null,
         ILogger<PublicChatMessageQueue>? logger = null
-    )
-    {
-        return new(
+    ) =>
+        new(
             BotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
             new PublicChatQueueBacklogMonitor(),
@@ -32,7 +31,6 @@ public abstract partial class PublicChatMessageQueueTestBase
             transport,
             logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
-    }
 
     private protected static async Task AssertMissingIdentityAsync(
         PublicChatPreparationOutcome outcome,
@@ -75,24 +73,20 @@ public abstract partial class PublicChatMessageQueueTestBase
         entry.Message.ShouldNotContain("secret chat payload");
     }
 
-    private protected static PublicChatEnqueueCommand Command(string channel, string message)
-    {
-        return new()
+    private protected static PublicChatEnqueueCommand Command(string channel, string message) =>
+        new()
         {
             Channel = channel,
             Message = message,
             Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
         };
-    }
 
-    private protected static PublicChatEnqueueOutcome.Accepted Accepted(int messageCount = 1)
-    {
-        return new(
+    private protected static PublicChatEnqueueOutcome.Accepted Accepted(int messageCount = 1) =>
+        new(
             new PublicChatOutboxReceipt(
                 Enumerable.Range(1, messageCount).Select(Convert.ToInt64).ToImmutableArray()
             )
         );
-    }
 
     private protected static PublicChatClaimedMessage Claimed(
         string message,
@@ -117,16 +111,14 @@ public abstract partial class PublicChatMessageQueueTestBase
         };
     }
 
-    private protected static PublicChatPreparedSend Prepared(PublicChatClaimedMessage message)
-    {
-        return new()
+    private protected static PublicChatPreparedSend Prepared(PublicChatClaimedMessage message) =>
+        new()
         {
             Message = message,
             AppAccessToken = "app-token",
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
-    }
 
     private protected static ValueTask<PublicChatPreparationOutcome> Ready(
         PublicChatClaimedMessage message,
@@ -139,9 +131,8 @@ public abstract partial class PublicChatMessageQueueTestBase
         );
     }
 
-    private protected static ScriptedTransport SuccessfulScriptedTransport()
-    {
-        return new(
+    private protected static ScriptedTransport SuccessfulScriptedTransport() =>
+        new(
             Ready,
             static (_, cancellationToken) =>
             {
@@ -151,20 +142,17 @@ public abstract partial class PublicChatMessageQueueTestBase
                 );
             }
         );
-    }
 
     private protected static ObserverFanOut<
         PublicChatQueueAlertObserverBoundary,
         PublicChatQueueBacklog,
         PublicChatQueueAlertDeadLetter
-    > QueueAlertFanOut()
-    {
-        return RuntimeTestObserverFanOut.Continue<
+    > QueueAlertFanOut() =>
+        RuntimeTestObserverFanOut.Continue<
             PublicChatQueueAlertObserverBoundary,
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(BotObserverBoundaries.PublicChatQueueAlerts);
-    }
 
     private protected static async Task StopAsync(CancellationTokenSource stopping, Task worker)
     {
@@ -172,8 +160,6 @@ public abstract partial class PublicChatMessageQueueTestBase
         await worker;
     }
 
-    private protected static DateTimeOffset Utc(int hour, int minute, int second)
-    {
-        return new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
-    }
+    private protected static DateTimeOffset Utc(int hour, int minute, int second) =>
+        new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
 }

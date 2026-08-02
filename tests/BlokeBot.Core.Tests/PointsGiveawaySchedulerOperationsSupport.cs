@@ -80,9 +80,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         public IO<
             IReadOnlyList<PointsGiveawaySchedule>,
             PointsGiveawaySchedulerTransientFailure
-        > LoadActive()
-        {
-            return IO<
+        > LoadActive() =>
+            IO<
                 IReadOnlyList<PointsGiveawaySchedule>,
                 PointsGiveawaySchedulerTransientFailure
             >.Create(_ =>
@@ -91,78 +90,60 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                 BeforeLoadResult?.Invoke();
                 return ValueTask.FromResult(Next(LoadOutcomes, Active));
             });
-        }
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildUpdate(
             int giveawayId,
             DateTime endsAtUtc
-        )
-        {
-            return IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
+        ) =>
+            IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
             {
                 UpdateAttempts++;
                 return ValueTask.FromResult(Next(UpdateOutcomes, Option<string>.None));
             });
-        }
 
         public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
             int giveawayId
-        )
-        {
-            return IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>.Create(
-                _ =>
+        ) =>
+            IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>.Create(_ =>
+            {
+                DrawAttempts++;
+                if (DrawException is { } exception)
                 {
-                    DrawAttempts++;
-                    if (DrawException is { } exception)
-                    {
-                        return ValueTask.FromException<
-                            Result<
-                                PointsGiveawayDrawOutcome,
-                                PointsGiveawaySchedulerTransientFailure
-                            >
-                        >(exception);
-                    }
-
-                    return ValueTask.FromResult(
-                        Next(DrawOutcomes, new PointsGiveawayDrawOutcome.Missing())
-                    );
+                    return ValueTask.FromException<
+                        Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>
+                    >(exception);
                 }
-            );
-        }
+
+                return ValueTask.FromResult(
+                    Next(DrawOutcomes, new PointsGiveawayDrawOutcome.Missing())
+                );
+            });
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
             PointsGiveawayDrawOutcome outcome
-        )
-        {
-            return IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
+        ) =>
+            IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
             {
                 DrawNotificationAttempts++;
                 return ValueTask.FromResult(Next(DrawNotificationOutcomes, Option<string>.None));
             });
-        }
 
         public IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure> Expire(
             int giveawayId
-        )
-        {
-            return IO<
-                PointsGiveawayExpirationOutcome,
-                PointsGiveawaySchedulerTransientFailure
-            >.Create(_ =>
+        ) =>
+            IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure>.Create(_ =>
             {
                 ExpirationAttempts++;
                 return ValueTask.FromResult(
                     Next(ExpirationOutcomes, PointsGiveawayExpirationOutcome.Expired)
                 );
             });
-        }
 
         public IO<
             PointsGiveawayChangeNotificationCompleted,
             PointsGiveawaySchedulerNotificationFailure
-        > NotifyChanged(int hostId)
-        {
-            return IO<
+        > NotifyChanged(int hostId) =>
+            IO<
                 PointsGiveawayChangeNotificationCompleted,
                 PointsGiveawaySchedulerNotificationFailure
             >.Create(_ =>
@@ -176,16 +157,13 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                     )
                 );
             });
-        }
 
         private static Result<TValue, TError> Next<TValue, TError>(
             Queue<Result<TValue, TError>> outcomes,
             TValue defaultValue
-        )
-        {
-            return outcomes.TryDequeue(out var outcome)
+        ) =>
+            outcomes.TryDequeue(out var outcome)
                 ? outcome
                 : Result<TValue, TError>.Success(defaultValue);
-        }
     }
 }

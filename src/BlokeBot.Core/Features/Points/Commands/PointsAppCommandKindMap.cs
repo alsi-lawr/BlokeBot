@@ -19,9 +19,8 @@ public static class PointsAppCommandKindMap
             AppCommandKind.CancelGiveaway,
         };
 
-    public static AppCommandKind ToAppKind(PointsCommandKind kind)
-    {
-        return kind switch
+    public static AppCommandKind ToAppKind(PointsCommandKind kind) =>
+        kind switch
         {
             PointsCommandKind.Points => AppCommandKind.Points,
             PointsCommandKind.GivePoints => AppCommandKind.GivePoints,
@@ -34,11 +33,9 @@ public static class PointsAppCommandKindMap
             PointsCommandKind.CancelGiveaway => AppCommandKind.CancelGiveaway,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
-    }
 
-    public static Option<PointsCommandKind> FromAppKind(AppCommandKind appKind)
-    {
-        return appKind switch
+    public static Option<PointsCommandKind> FromAppKind(AppCommandKind appKind) =>
+        appKind switch
         {
             AppCommandKind.Points => Option<PointsCommandKind>.Some(PointsCommandKind.Points),
             AppCommandKind.GivePoints => Option<PointsCommandKind>.Some(
@@ -59,5 +56,4 @@ public static class PointsAppCommandKindMap
             ),
             _ => Option<PointsCommandKind>.None,
         };
-    }
 }

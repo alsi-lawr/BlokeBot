@@ -21,10 +21,7 @@ public abstract record CommandStrategyAccess<TKind, TState>
         public override TResult Match<TResult>(
             Func<Everyone, TResult> everyone,
             Func<ModeratorOnly, TResult> moderatorOnly
-        )
-        {
-            return everyone(this);
-        }
+        ) => everyone(this);
     }
 
     public sealed record ModeratorOnly(ModeratorOnlyResponse<TKind, TState> Response)
@@ -33,9 +30,6 @@ public abstract record CommandStrategyAccess<TKind, TState>
         public override TResult Match<TResult>(
             Func<Everyone, TResult> everyone,
             Func<ModeratorOnly, TResult> moderatorOnly
-        )
-        {
-            return moderatorOnly(this);
-        }
+        ) => moderatorOnly(this);
     }
 }

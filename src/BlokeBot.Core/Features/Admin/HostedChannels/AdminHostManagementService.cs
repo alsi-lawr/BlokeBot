@@ -14,9 +14,8 @@ internal sealed class AdminHostManagementService(
     HostedChannelDirectoryService hostedChannels
 )
 {
-    public IO<AdminHostOperationOutcome, AdminHostOperationError> CreateHost(string login)
-    {
-        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> CreateHost(string login) =>
+        IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
             Result<Option<UserIdentity>, AccessTokenUnavailableReason> user;
             try
@@ -44,11 +43,9 @@ internal sealed class AdminHostManagementService(
                     Task.FromResult(Error(new AdminHostOperationError.BotTokenUnavailable(reason)))
             );
         });
-    }
 
-    public IO<AdminHostOperationOutcome, AdminHostOperationError> RemoveHost(int hostId)
-    {
-        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> RemoveHost(int hostId) =>
+        IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
             await runtime.Stop(hostId).ExecuteAsync(ct);
             var removed = await hostRemoval.RemoveAsync(hostId, ct);
@@ -58,17 +55,12 @@ internal sealed class AdminHostManagementService(
                 )
             );
         });
-    }
 
-    public IO<AdminHostOperationOutcome, AdminHostOperationError> StartBot(int hostId)
-    {
-        return ApplyRuntimeOperation(hostId, runtime.Start(hostId));
-    }
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> StartBot(int hostId) =>
+        ApplyRuntimeOperation(hostId, runtime.Start(hostId));
 
-    public IO<AdminHostOperationOutcome, AdminHostOperationError> StopBot(int hostId)
-    {
-        return ApplyRuntimeOperation(hostId, runtime.Stop(hostId));
-    }
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> StopBot(int hostId) =>
+        ApplyRuntimeOperation(hostId, runtime.Stop(hostId));
 
     public AdminHostOperationOutcome RefreshPendingRuntime(
         int hostId,
@@ -85,9 +77,8 @@ internal sealed class AdminHostManagementService(
     private IO<AdminHostOperationOutcome, AdminHostOperationError> ApplyRuntimeOperation(
         int hostId,
         IO<HostedChannelRuntimeControlOutcome, Never> operation
-    )
-    {
-        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
+    ) =>
+        IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
             var result = await operation.ExecuteAsync(ct);
             var outcome = result.Match(value => value, _ => throw new UnreachableException());
@@ -107,7 +98,6 @@ internal sealed class AdminHostManagementService(
                     : new AdminHostOperationOutcome.Completed(message)
             );
         });
-    }
 
     private async Task<Result<AdminHostOperationOutcome, AdminHostOperationError>> CreateHostAsync(
         UserIdentity user,
@@ -129,9 +119,8 @@ internal sealed class AdminHostManagementService(
         );
     }
 
-    private static string RuntimeFailureMessage(HostedChannelRuntimeControlOutcome outcome)
-    {
-        return outcome switch
+    private static string RuntimeFailureMessage(HostedChannelRuntimeControlOutcome outcome) =>
+        outcome switch
         {
             HostedChannelRuntimeControlOutcome.HostNotFound => "Channel setup was not found.",
             HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired =>
@@ -142,41 +131,26 @@ internal sealed class AdminHostManagementService(
                 $"Wait until {cooldown.NextAllowedAtUtc.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",
             _ => throw new UnreachableException(),
         };
-    }
 
-    private static string RuntimeStatusMessage(HostedChannelRuntimeLifecycle? lifecycle)
-    {
-        return lifecycle?.Match(
-                static _ => "Bot offline.",
-                static _ => "Bot starting.",
-                static _ => "Bot running.",
-                static _ => "Bot stopping."
-            ) ?? "Bot offline.";
-    }
+    private static string RuntimeStatusMessage(HostedChannelRuntimeLifecycle? lifecycle) =>
+        lifecycle?.Match(
+            static _ => "Bot offline.",
+            static _ => "Bot starting.",
+            static _ => "Bot running.",
+            static _ => "Bot stopping."
+        ) ?? "Bot offline.";
 
-    private static bool IsRuntimeTransitionPending(HostedChannelRuntimeLifecycle? lifecycle)
-    {
-        return lifecycle?.Match(
-                static _ => false,
-                static _ => true,
-                static _ => false,
-                static _ => true
-            ) ?? false;
-    }
+    private static bool IsRuntimeTransitionPending(HostedChannelRuntimeLifecycle? lifecycle) =>
+        lifecycle?.Match(static _ => false, static _ => true, static _ => false, static _ => true)
+        ?? false;
 
     private static Result<AdminHostOperationOutcome, AdminHostOperationError> Success(
         AdminHostOperationOutcome outcome
-    )
-    {
-        return Result<AdminHostOperationOutcome, AdminHostOperationError>.Success(outcome);
-    }
+    ) => Result<AdminHostOperationOutcome, AdminHostOperationError>.Success(outcome);
 
     private static Result<AdminHostOperationOutcome, AdminHostOperationError> Error(
         AdminHostOperationError error
-    )
-    {
-        return Result<AdminHostOperationOutcome, AdminHostOperationError>.Error(error);
-    }
+    ) => Result<AdminHostOperationOutcome, AdminHostOperationError>.Error(error);
 }
 
 public abstract record AdminHostOperationOutcome

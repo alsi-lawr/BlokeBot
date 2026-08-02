@@ -17,20 +17,15 @@ public static class IrcProtocol
     /// </summary>
     /// <param name="line">The raw IRC line.</param>
     /// <returns><see langword="true" /> when the line is a ping.</returns>
-    public static bool IsPing(string line)
-    {
-        return line.StartsWith("PING ", StringComparison.Ordinal);
-    }
+    public static bool IsPing(string line) => line.StartsWith("PING ", StringComparison.Ordinal);
 
     /// <summary>
     /// Creates the matching pong line for a ping line.
     /// </summary>
     /// <param name="line">The raw ping line.</param>
     /// <returns>The pong line to send to the server.</returns>
-    public static string CreatePong(string line)
-    {
-        return line.Replace("PING", "PONG", StringComparison.Ordinal);
-    }
+    public static string CreatePong(string line) =>
+        line.Replace("PING", "PONG", StringComparison.Ordinal);
 
     /// <summary>
     /// Parses a Twitch private message line and returns the exact parser outcome.
@@ -115,13 +110,11 @@ public static class IrcProtocol
         return new ReadOnlyDictionary<string, string>(tags);
     }
 
-    private static string UnescapeTagValue(string value)
-    {
-        return value
+    private static string UnescapeTagValue(string value) =>
+        value
             .Replace(@"\s", " ", StringComparison.Ordinal)
             .Replace(@"\:", ";", StringComparison.Ordinal)
             .Replace(@"\\", @"\", StringComparison.Ordinal)
             .Replace(@"\r", "\r", StringComparison.Ordinal)
             .Replace(@"\n", "\n", StringComparison.Ordinal);
-    }
 }

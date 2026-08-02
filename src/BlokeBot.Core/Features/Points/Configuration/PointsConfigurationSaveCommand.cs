@@ -17,9 +17,7 @@ public sealed record PointsCommandAliases(
     string CancelGiveawayAliases
 )
 {
-    internal IReadOnlyList<CommandAliasDraft> ToDrafts()
-    {
-        return
+    internal IReadOnlyList<CommandAliasDraft> ToDrafts() =>
         [
             new(AppCommandKind.Points, PointsAliases),
             new(AppCommandKind.GivePoints, GivePointsAliases),
@@ -31,7 +29,6 @@ public sealed record PointsCommandAliases(
             new(AppCommandKind.EndGiveaway, EndGiveawayAliases),
             new(AppCommandKind.CancelGiveaway, CancelGiveawayAliases),
         ];
-    }
 }
 
 public sealed record PointsReplySettings(

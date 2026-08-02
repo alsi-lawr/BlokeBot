@@ -70,10 +70,7 @@ public sealed class OverlayPrivateAccess
     [JsonIgnore]
     public string RelativeUrl { get; }
 
-    public override string ToString()
-    {
-        return "[REDACTED OVERLAY ACCESS]";
-    }
+    public override string ToString() => "[REDACTED OVERLAY ACCESS]";
 }
 
 public abstract record OverlayInstanceResult<T>
@@ -90,10 +87,7 @@ public abstract record OverlayInstanceResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return succeeded(this);
-        }
+        ) => succeeded(this);
     }
 
     public sealed record Rejected(OverlayInstanceRejection Reason) : OverlayInstanceResult<T>
@@ -101,10 +95,7 @@ public abstract record OverlayInstanceResult<T>
         public override TResult Match<TResult>(
             Func<Succeeded, TResult> succeeded,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }
 
@@ -170,10 +161,7 @@ public abstract record OverlayResolutionResult
         public override TResult Match<TResult>(
             Func<Resolved, TResult> resolved,
             Func<NotFound, TResult> notFound
-        )
-        {
-            return resolved(this);
-        }
+        ) => resolved(this);
     }
 
     public sealed record NotFound : OverlayResolutionResult
@@ -181,9 +169,6 @@ public abstract record OverlayResolutionResult
         public override TResult Match<TResult>(
             Func<Resolved, TResult> resolved,
             Func<NotFound, TResult> notFound
-        )
-        {
-            return notFound(this);
-        }
+        ) => notFound(this);
     }
 }

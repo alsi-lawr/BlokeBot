@@ -21,14 +21,12 @@ public sealed class GuessingVoteService(
         string hostLogin,
         string login,
         string name
-    )
-    {
-        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+    ) =>
+        IO<GuessingOperationOutcome, Never>.Create(async ct =>
             Result<GuessingOperationOutcome, Never>.Success(
                 await PersistGuessAsync(hostLogin, login, name, ct)
             )
         );
-    }
 
     private async Task<GuessingOperationOutcome> PersistGuessAsync(
         string hostLogin,
@@ -141,9 +139,8 @@ public sealed class GuessingVoteService(
             : CommandResponseTarget.Chat;
     }
 
-    private static string Format(string template, string name, string login)
-    {
-        return MessageTemplateFormatter.Format(
+    private static string Format(string template, string name, string login) =>
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -151,10 +148,7 @@ public sealed class GuessingVoteService(
                 ["login"] = login,
             }
         );
-    }
 
-    private static GuessingOperationOutcome NotConfigured()
-    {
-        return new GuessingOperationOutcome.Rejected("This channel is not set up.");
-    }
+    private static GuessingOperationOutcome NotConfigured() =>
+        new GuessingOperationOutcome.Rejected("This channel is not set up.");
 }

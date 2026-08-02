@@ -11,9 +11,8 @@ public abstract record ModeratorAuthorityOutcome
         Func<Revoked, TResult> revoked,
         Func<HostMismatch, TResult> hostMismatch,
         Func<Unavailable, TResult> unavailable
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Granted value => granted(value),
             Revoked value => revoked(value),
@@ -21,7 +20,6 @@ public abstract record ModeratorAuthorityOutcome
             Unavailable value => unavailable(value),
             _ => throw new UnreachableException("Unknown moderator authority outcome."),
         };
-    }
 
     public sealed record Granted : ModeratorAuthorityOutcome;
 

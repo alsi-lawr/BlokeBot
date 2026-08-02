@@ -269,9 +269,8 @@ public sealed class PollServiceTests
         );
     }
 
-    private static TwitchPollTemplate Template(int hostId, string title)
-    {
-        return new()
+    private static TwitchPollTemplate Template(int hostId, string title) =>
+        new()
         {
             HostId = hostId,
             Title = title,
@@ -283,11 +282,13 @@ public sealed class PollServiceTests
                 new TwitchPollTemplateChoice { Position = 1, Title = "No" },
             ],
         };
-    }
 
-    private static EventSubPollEvent ProviderPollEvent(string status, int votes, string messageId)
-    {
-        return new(
+    private static EventSubPollEvent ProviderPollEvent(
+        string status,
+        int votes,
+        string messageId
+    ) =>
+        new(
             "host-id",
             "host",
             "poll-id",
@@ -298,16 +299,14 @@ public sealed class PollServiceTests
             new DateTimeOffset(2026, 7, 26, 10, 1, 0, TimeSpan.Zero),
             messageId
         );
-    }
 
     private static HttpResponseMessage CreateResponse(
         string id,
         string broadcasterId,
         string title,
         string status
-    )
-    {
-        return new(HttpStatusCode.OK)
+    ) =>
+        new(HttpStatusCode.OK)
         {
             Content = new StringContent(
                 $$"""
@@ -317,7 +316,6 @@ public sealed class PollServiceTests
                 "application/json"
             ),
         };
-    }
 
     private sealed class ReadyBroadcasterProvider : StaticBroadcasterProvider
     {
@@ -343,23 +341,18 @@ public sealed class PollServiceTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult(status);
-        }
+        ) => Task.FromResult(status);
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class PollHttpClientFactory : IHttpClientFactory
@@ -372,15 +365,10 @@ public sealed class PollServiceTests
 
         internal int EndRequests { get; private set; }
 
-        internal void Enqueue(HttpResponseMessage response)
-        {
-            _responses.Enqueue(response);
-        }
+        internal void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(new Handler(this), disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(this), disposeHandler: false);
 
         private sealed class Handler(PollHttpClientFactory owner) : HttpMessageHandler
         {

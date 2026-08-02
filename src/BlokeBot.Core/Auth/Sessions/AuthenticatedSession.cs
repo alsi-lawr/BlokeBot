@@ -37,9 +37,8 @@ public sealed record AuthenticatedSession
         : !string.IsNullOrWhiteSpace(Login) ? Login
         : "Twitch user";
 
-    public bool HasCapability(AuthSessionCapability capability)
-    {
-        return capability switch
+    public bool HasCapability(AuthSessionCapability capability) =>
+        capability switch
         {
             AuthSessionCapability.BotAdmin => IsBotAdmin,
             AuthSessionCapability.HostSelected => State.Match(_ => false, _ => true, _ => false),
@@ -55,7 +54,6 @@ public sealed record AuthenticatedSession
                 ),
             _ => false,
         };
-    }
 
     public bool CanOpenHostConfig(IReadOnlySet<int> existingHostIds)
     {
@@ -76,15 +74,13 @@ public sealed record AuthenticatedSession
             );
     }
 
-    public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds)
-    {
-        return !IsBotAccount
-            && State.Match(
-                _ => false,
-                selected => existingHostIds.Contains(selected.Selection.Current.Id),
-                _ => false
-            );
-    }
+    public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds) =>
+        !IsBotAccount
+        && State.Match(
+            _ => false,
+            selected => existingHostIds.Contains(selected.Selection.Current.Id),
+            _ => false
+        );
 
     public bool CanAuthorizeSelectedHost =>
         State.Match(
@@ -105,14 +101,8 @@ public sealed record AuthenticatedSession
 
     public bool CanAuthorizeSelectedHostBotAccount => CanManageSelectedHostConfig;
 
-    public bool CurrentHostRoleIs(AuthRole role)
-    {
-        return State.Match(
-            _ => false,
-            selected => selected.Selection.Current.Role == role,
-            _ => false
-        );
-    }
+    public bool CurrentHostRoleIs(AuthRole role) =>
+        State.Match(_ => false, selected => selected.Selection.Current.Role == role, _ => false);
 
     public static AuthenticatedSession FromPrincipal(ClaimsPrincipal? user)
     {
@@ -256,14 +246,8 @@ public sealed record AuthenticatedSession
         return Result<BotHostChoice?, InvalidSessionClaims>.Error(new());
     }
 
-    private static bool BooleanClaim(ClaimsPrincipal user, string claimType)
-    {
-        return string.Equals(
-            user.FindFirstValue(claimType),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
-    }
+    private static bool BooleanClaim(ClaimsPrincipal user, string claimType) =>
+        string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);
 
     private sealed record DecodedSessionClaims(
         BotHostChoice[] AvailableHosts,
@@ -292,10 +276,7 @@ public sealed record AuthenticatedSession
             internal override TResult Match<TResult>(
                 Func<Valid, TResult> valid,
                 Func<Invalid, TResult> invalid
-            )
-            {
-                return valid(this);
-            }
+            ) => valid(this);
         }
 
         internal sealed record Invalid(BotHostChoice[] Hosts) : DecodedHostClaims(Hosts)
@@ -303,10 +284,7 @@ public sealed record AuthenticatedSession
             internal override TResult Match<TResult>(
                 Func<Valid, TResult> valid,
                 Func<Invalid, TResult> invalid
-            )
-            {
-                return invalid(this);
-            }
+            ) => invalid(this);
         }
     }
 }

@@ -85,9 +85,8 @@ internal sealed partial class EfPublicChatOutbox
         PublicChatClaimedMessage message,
         DateTime nowUtc,
         CancellationToken cancellationToken
-    )
-    {
-        return db
+    ) =>
+        db
             .PublicChatOutboxMessages.Where(row =>
                 row.Id == message.Id
                 && row.Status == PublicChatOutboxStatus.Claimed
@@ -112,7 +111,6 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.RejectionCode, (string?)null),
                 cancellationToken
             );
-    }
 
     private static async Task<DateTimeOffset?> NextUnsentExpiryAtAsync(
         BlokeBotDbContext db,
@@ -398,9 +396,8 @@ internal sealed partial class EfPublicChatOutbox
         return Min(exactPurgeAt, AddOrMaximum(now, _maximumMaintenanceWake));
     }
 
-    private static IQueryable<PublicChatOutboxMessage> TerminalRows(BlokeBotDbContext db)
-    {
-        return db.PublicChatOutboxMessages.Where(row =>
+    private static IQueryable<PublicChatOutboxMessage> TerminalRows(BlokeBotDbContext db) =>
+        db.PublicChatOutboxMessages.Where(row =>
             row.Status == PublicChatOutboxStatus.SafePreSendExhausted
             || row.Status == PublicChatOutboxStatus.MissingChannel
             || row.Status == PublicChatOutboxStatus.MissingBot
@@ -409,5 +406,4 @@ internal sealed partial class EfPublicChatOutbox
             || row.Status == PublicChatOutboxStatus.Unexpected
             || row.Status == PublicChatOutboxStatus.Expired
         );
-    }
 }

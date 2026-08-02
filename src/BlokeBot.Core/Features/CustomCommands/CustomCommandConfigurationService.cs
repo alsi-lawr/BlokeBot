@@ -96,12 +96,10 @@ public sealed class CustomCommandConfigurationService(
     public IO<
         CustomCommandConfigurationSaved,
         CustomCommandConfigurationSaveFailure
-    > SaveConfiguration(int hostId, CustomCommandConfigurationSaveCommand command)
-    {
-        return IO<CustomCommandConfigurationSaved, CustomCommandConfigurationSaveFailure>.Create(
-            ct => ExecuteSaveAsync(hostId, command, ct)
+    > SaveConfiguration(int hostId, CustomCommandConfigurationSaveCommand command) =>
+        IO<CustomCommandConfigurationSaved, CustomCommandConfigurationSaveFailure>.Create(ct =>
+            ExecuteSaveAsync(hostId, command, ct)
         );
-    }
 
     private async ValueTask<
         Result<CustomCommandConfigurationSaved, CustomCommandConfigurationSaveFailure>
@@ -162,15 +160,13 @@ public sealed class CustomCommandConfigurationService(
 
     private static CustomCommandConfigurationSaveFailure AliasFailure(
         CustomCommandAliasConflict conflict
-    )
-    {
-        return conflict.Match<CustomCommandConfigurationSaveFailure>(
+    ) =>
+        conflict.Match<CustomCommandConfigurationSaveFailure>(
             builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
                 builtIn.Alias
             ),
             custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(custom.Alias)
         );
-    }
 
     private async Task<CustomCommandConfigurationSaveCommand> DisableUnavailableNativeAnnouncementsAsync(
         BlokeBotDbContext db,

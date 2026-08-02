@@ -76,10 +76,7 @@ public sealed class ClipMarkerService(
         int hostId,
         bool hasDelay,
         CancellationToken ct
-    )
-    {
-        return CreateClipAsync(hostId, hasDelay, NewAttemptKey(), ct);
-    }
+    ) => CreateClipAsync(hostId, hasDelay, NewAttemptKey(), ct);
 
     public Task<ClipMarkerOperationOutcome> CreateClipAsync(
         int hostId,
@@ -97,10 +94,7 @@ public sealed class ClipMarkerService(
         bool hasDelay,
         string idempotencyKey,
         CancellationToken ct
-    )
-    {
-        return CreateClipAsync(hostId, hasDelay, idempotencyKey, HostFeatureFlags.Moments, ct);
-    }
+    ) => CreateClipAsync(hostId, hasDelay, idempotencyKey, HostFeatureFlags.Moments, ct);
 
     private async Task<ClipMarkerOperationOutcome> CreateClipAsync(
         int hostId,
@@ -265,10 +259,7 @@ public sealed class ClipMarkerService(
         int hostId,
         string description,
         CancellationToken ct
-    )
-    {
-        return CreateMarkerAsync(hostId, description, NewAttemptKey(), ct);
-    }
+    ) => CreateMarkerAsync(hostId, description, NewAttemptKey(), ct);
 
     public Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
         int hostId,
@@ -286,10 +277,7 @@ public sealed class ClipMarkerService(
         string description,
         string idempotencyKey,
         CancellationToken ct
-    )
-    {
-        return CreateMarkerAsync(hostId, description, idempotencyKey, HostFeatureFlags.Moments, ct);
-    }
+    ) => CreateMarkerAsync(hostId, description, idempotencyKey, HostFeatureFlags.Moments, ct);
 
     private async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
         int hostId,
@@ -926,8 +914,7 @@ public sealed class ClipMarkerService(
         return null;
     }
 
-    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct)
-    {
+    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct) =>
         await alerts
             .Create(
                 hostId,
@@ -939,7 +926,6 @@ public sealed class ClipMarkerService(
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);
-    }
 
     private async Task<ClipMarkerOperationOutcome> CompleteClipAsync(
         BlokeBotDbContext db,
@@ -1029,21 +1015,16 @@ public sealed class ClipMarkerService(
         db.TwitchStreamMarkers.RemoveRange(excess);
     }
 
-    private static HostFeatureFlags OwnerFeature(string idempotencyKey)
-    {
-        return idempotencyKey.StartsWith("moment:", StringComparison.Ordinal)
+    private static HostFeatureFlags OwnerFeature(string idempotencyKey) =>
+        idempotencyKey.StartsWith("moment:", StringComparison.Ordinal)
             ? HostFeatureFlags.Moments
             : HostFeatureFlags.ClipsAndMarkers;
-    }
 
-    private static bool IsOwnedBy(string idempotencyKey, HostFeatureFlags authorizingFeature)
-    {
-        return OwnerFeature(idempotencyKey) == authorizingFeature;
-    }
+    private static bool IsOwnedBy(string idempotencyKey, HostFeatureFlags authorizingFeature) =>
+        OwnerFeature(idempotencyKey) == authorizingFeature;
 
-    private static ClipView View(TwitchClip clip)
-    {
-        return new(
+    private static ClipView View(TwitchClip clip) =>
+        new(
             new ClipAttemptReference(clip.Id),
             clip.Status.ToString(),
             clip.ProviderClipId,
@@ -1055,11 +1036,9 @@ public sealed class ClipMarkerService(
             clip.RequestedAtUtc,
             clip.ResolvedAtUtc
         );
-    }
 
-    private static StreamMarkerView View(TwitchStreamMarker marker)
-    {
-        return new(
+    private static StreamMarkerView View(TwitchStreamMarker marker) =>
+        new(
             new StreamMarkerAttemptReference(marker.Id),
             marker.Status.ToString(),
             marker.ProviderMarkerId,
@@ -1070,11 +1049,9 @@ public sealed class ClipMarkerService(
             marker.FailureReason,
             marker.CreatedAtUtc
         );
-    }
 
-    private static ClipMarkerOperationOutcome Outcome(TwitchClip clip)
-    {
-        return clip.Status switch
+    private static ClipMarkerOperationOutcome Outcome(TwitchClip clip) =>
+        clip.Status switch
         {
             TwitchClipStatus.Pending => new ClipMarkerOperationOutcome.ClipPending(View(clip)),
             TwitchClipStatus.Available => new ClipMarkerOperationOutcome.ClipAvailable(View(clip)),
@@ -1083,11 +1060,9 @@ public sealed class ClipMarkerService(
             ),
             _ => new ClipMarkerOperationOutcome.ClipFailed(View(clip)),
         };
-    }
 
-    private static ClipMarkerOperationOutcome MarkerOutcome(TwitchStreamMarker marker)
-    {
-        return marker.Status switch
+    private static ClipMarkerOperationOutcome MarkerOutcome(TwitchStreamMarker marker) =>
+        marker.Status switch
         {
             TwitchStreamMarkerStatus.Succeeded => new ClipMarkerOperationOutcome.MarkerCreated(
                 View(marker)
@@ -1097,12 +1072,8 @@ public sealed class ClipMarkerService(
             ),
             _ => new ClipMarkerOperationOutcome.MarkerFailed(View(marker)),
         };
-    }
 
-    private static string NewAttemptKey()
-    {
-        return Guid.NewGuid().ToString("N");
-    }
+    private static string NewAttemptKey() => Guid.NewGuid().ToString("N");
 
     private static async Task<T?> ReadClaimAfterCollisionAsync<T>(
         Func<Task<T?>> read,
@@ -1123,22 +1094,18 @@ public sealed class ClipMarkerService(
         }
     }
 
-    private static bool IsClaimCollision(Exception exception)
-    {
-        return IsBusy(exception)
-            || exception
-                is SqliteException
-                {
-                    SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
-                    SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
-                }
-            || exception is DbUpdateException { InnerException: { } inner }
-                && IsClaimCollision(inner);
-    }
+    private static bool IsClaimCollision(Exception exception) =>
+        IsBusy(exception)
+        || exception
+            is SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
+                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
+            }
+        || exception is DbUpdateException { InnerException: { } inner } && IsClaimCollision(inner);
 
-    private static bool IsBusy(Exception exception)
-    {
-        return exception switch
+    private static bool IsBusy(Exception exception) =>
+        exception switch
         {
             SqliteException
             {
@@ -1147,7 +1114,6 @@ public sealed class ClipMarkerService(
             DbUpdateException { InnerException: { } inner } => IsBusy(inner),
             _ => false,
         };
-    }
 
     private static string ValidateAttemptKey(string value)
     {

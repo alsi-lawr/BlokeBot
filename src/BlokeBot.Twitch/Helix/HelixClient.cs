@@ -713,10 +713,8 @@ public sealed class HelixClient(
         return new HelixStreamMarkerCreateOutcome.ProviderRejected();
     }
 
-    private static bool Contains(string text, string value)
-    {
-        return text.Contains(value, StringComparison.OrdinalIgnoreCase);
-    }
+    private static bool Contains(string text, string value) =>
+        text.Contains(value, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsActivePollConflict(string error)
     {
@@ -863,10 +861,7 @@ public sealed class HelixClient(
         HelixRequestContext context,
         string channelLogin,
         CancellationToken cancellationToken
-    )
-    {
-        return await GetStreamAsync(context, channelLogin, cancellationToken) is not null;
-    }
+    ) => await GetStreamAsync(context, channelLogin, cancellationToken) is not null;
 
     public async Task<HelixStream?> GetStreamAsync(
         HelixRequestContext context,
@@ -1226,9 +1221,8 @@ public sealed class HelixClient(
 
     private static HelixCustomRewardsLookupOutcome ToCustomRewardsLookupOutcome(
         HelixChannelPointsOutcome outcome
-    )
-    {
-        return outcome switch
+    ) =>
+        outcome switch
         {
             HelixChannelPointsOutcome.Unauthorized =>
                 new HelixCustomRewardsLookupOutcome.Unauthorized(),
@@ -1236,13 +1230,11 @@ public sealed class HelixClient(
                 new HelixCustomRewardsLookupOutcome.Ineligible(),
             _ => new HelixCustomRewardsLookupOutcome.Unavailable(),
         };
-    }
 
     private static HelixRewardRedemptionsLookupOutcome ToRedemptionsLookupOutcome(
         HelixChannelPointsOutcome outcome
-    )
-    {
-        return outcome switch
+    ) =>
+        outcome switch
         {
             HelixChannelPointsOutcome.Unauthorized =>
                 new HelixRewardRedemptionsLookupOutcome.Unauthorized(),
@@ -1250,28 +1242,23 @@ public sealed class HelixClient(
                 new HelixRewardRedemptionsLookupOutcome.Ineligible(),
             _ => new HelixRewardRedemptionsLookupOutcome.Unavailable(),
         };
-    }
 
-    private static string RedemptionSortToken(HelixRewardRedemptionSort sort)
-    {
-        return sort switch
+    private static string RedemptionSortToken(HelixRewardRedemptionSort sort) =>
+        sort switch
         {
             HelixRewardRedemptionSort.Newest => "NEWEST",
             HelixRewardRedemptionSort.Oldest => "OLDEST",
             _ => throw new ArgumentOutOfRangeException(nameof(sort)),
         };
-    }
 
-    private static string RedemptionStatusToken(HelixRewardRedemptionStatus status)
-    {
-        return status switch
+    private static string RedemptionStatusToken(HelixRewardRedemptionStatus status) =>
+        status switch
         {
             HelixRewardRedemptionStatus.Unfulfilled => "UNFULFILLED",
             HelixRewardRedemptionStatus.Fulfilled => "FULFILLED",
             HelixRewardRedemptionStatus.Canceled => "CANCELED",
             _ => throw new ArgumentOutOfRangeException(nameof(status)),
         };
-    }
 
     private string ModeratedChannelsUri(string userId, string? cursor)
     {

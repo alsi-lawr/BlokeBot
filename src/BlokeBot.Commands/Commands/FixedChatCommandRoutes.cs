@@ -63,8 +63,6 @@ public static class FixedChatCommandRoutes
             StringComparer.OrdinalIgnoreCase
         );
 
-    public static string? FindCollision(IEnumerable<string> aliases)
-    {
-        return aliases.FirstOrDefault(All.Contains);
-    }
+    public static string? FindCollision(IEnumerable<string> aliases) =>
+        aliases.FirstOrDefault(All.Contains);
 }

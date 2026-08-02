@@ -52,18 +52,14 @@ public sealed class HostModAccessSaveSequenceTests
         sequence.Complete(submission);
     }
 
-    private static HostModAccessSaveCommand Command(HostModeratorAccessMode mode)
-    {
-        return HostModAccessSaveValidator
+    private static HostModAccessSaveCommand Command(HostModeratorAccessMode mode) =>
+        HostModAccessSaveValidator
             .Validate(1, mode)
             .Match(
                 command => command,
                 errors => throw new InvalidOperationException(errors[0].Message)
             );
-    }
 
-    private static HostModAccessState Access(bool allowModsByDefault)
-    {
-        return new(true, allowModsByDefault, ["allowed"], ["blocked"]);
-    }
+    private static HostModAccessState Access(bool allowModsByDefault) =>
+        new(true, allowModsByDefault, ["allowed"], ["blocked"]);
 }

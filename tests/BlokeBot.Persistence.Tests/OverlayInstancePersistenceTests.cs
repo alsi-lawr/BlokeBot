@@ -152,9 +152,8 @@ public sealed class OverlayInstancePersistenceTests
         Guid publicId,
         byte[] digest,
         string configuration
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             PublicId = publicId,
             HostId = hostId,
@@ -168,12 +167,9 @@ public sealed class OverlayInstancePersistenceTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-    }
 
-    private static byte[] RandomDigest(byte seed)
-    {
-        return Enumerable.Range(0, 32).Select(value => (byte)(seed + value)).ToArray();
-    }
+    private static byte[] RandomDigest(byte seed) =>
+        Enumerable.Range(0, 32).Select(value => (byte)(seed + value)).ToArray();
 
     private static async Task<IReadOnlyList<string>> ReadSchemaAsync(BlokeBotDbContext db)
     {

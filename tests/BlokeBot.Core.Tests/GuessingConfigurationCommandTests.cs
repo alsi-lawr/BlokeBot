@@ -134,10 +134,7 @@ public sealed class GuessingConfigurationCommandTests
 
     private static GuessingConfigurationService ConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
-    )
-    {
-        return new(dbFactory, new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()));
-    }
+    ) => new(dbFactory, new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()));
 
     private static async Task<GuessingConfiguration> LoadAsync(
         GuessingConfigurationService service,
@@ -154,22 +151,17 @@ public sealed class GuessingConfigurationCommandTests
         );
     }
 
-    private static GuessingConfigurationSaveCommand ValidCommand(GuessingConfiguration draft)
-    {
-        return GuessingConfigurationValidator
+    private static GuessingConfigurationSaveCommand ValidCommand(GuessingConfiguration draft) =>
+        GuessingConfigurationValidator
             .Validate(draft)
             .Match(
                 command => command,
                 errors => throw new InvalidOperationException(ValidationMessage(errors))
             );
-    }
 
     private static string ValidationMessage(
         IReadOnlyList<GuessingConfigurationValidationError> errors
-    )
-    {
-        return string.Join(" ", errors.Select(error => error.Message));
-    }
+    ) => string.Join(" ", errors.Select(error => error.Message));
 
     private static async Task<ProfileSeed> SeedProfilesAsync(SqliteBlokeBotDbFactory dbFactory)
     {

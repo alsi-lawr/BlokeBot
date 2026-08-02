@@ -3,9 +3,10 @@ namespace BlokeBot.Core.Features.HostedChannels.Authorization;
 internal sealed class DisabledBotAccountAuthorizationPolicy(BotSettings settings)
     : IBotAccountAuthorizationPolicy
 {
-    public Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken cancellationToken)
-    {
-        return Task.FromResult(
+    public Task<BotAccountAuthorizationStatus> GetStatusAsync(
+        CancellationToken cancellationToken
+    ) =>
+        Task.FromResult(
             new BotAccountAuthorizationStatus(
                 settings.Identity.BotUsername,
                 null,
@@ -17,10 +18,6 @@ internal sealed class DisabledBotAccountAuthorizationPolicy(BotSettings settings
                 "The Twitch bot runner is not configured."
             )
         );
-    }
 
-    public Task ClearAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
+    public Task ClearAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

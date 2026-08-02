@@ -24,12 +24,7 @@ internal sealed class ReplyOnlyPointsGiveawaySchedulerNotification
         PointsGiveawaySchedule schedule,
         string message,
         CancellationToken cancellationToken
-    )
-    {
-        return schedule.Reply is { } reply
-            ? reply(message, cancellationToken)
-            : ValueTask.CompletedTask;
-    }
+    ) => schedule.Reply is { } reply ? reply(message, cancellationToken) : ValueTask.CompletedTask;
 }
 
 internal sealed class PublicChatPointsGiveawaySchedulerNotification(

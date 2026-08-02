@@ -10,8 +10,7 @@ namespace BlokeBot.Core.BotRuntime;
 
 internal static class BotOAuthEndpoints
 {
-    public static void MapUnavailableBotOAuthEndpoint(this WebApplication app)
-    {
+    public static void MapUnavailableBotOAuthEndpoint(this WebApplication app) =>
         app.MapGet(
                 "/oauth/start",
                 (HttpContext context) =>
@@ -30,7 +29,6 @@ internal static class BotOAuthEndpoints
                         )
             )
             .RequireAuthorization();
-    }
 
     public static void MapBotOAuthEndpoints(this WebApplication app)
     {
@@ -674,9 +672,8 @@ internal static class BotOAuthEndpoints
     private static IResult MapChannelAuthorization(
         ChannelBotAuthorizationOutcome outcome,
         string requiredChannelLogin
-    )
-    {
-        return outcome switch
+    ) =>
+        outcome switch
         {
             ChannelBotAuthorizationOutcome.Authorized => Result(
                 BlokeBotAuthOutcome.Success,
@@ -708,11 +705,9 @@ internal static class BotOAuthEndpoints
             ),
             _ => throw new UnreachableException(),
         };
-    }
 
-    private static IResult MapHostBotAuthorization(HostBotAccountAuthorizationOutcome outcome)
-    {
-        return outcome switch
+    private static IResult MapHostBotAuthorization(HostBotAccountAuthorizationOutcome outcome) =>
+        outcome switch
         {
             HostBotAccountAuthorizationOutcome.Authorized => Result(
                 BlokeBotAuthOutcome.Success,
@@ -755,11 +750,9 @@ internal static class BotOAuthEndpoints
             ),
             _ => throw new UnreachableException(),
         };
-    }
 
-    private static IResult ConnectionAccessResult(AuthenticatedSession session)
-    {
-        return session.State.Match<IResult>(
+    private static IResult ConnectionAccessResult(AuthenticatedSession session) =>
+        session.State.Match<IResult>(
             static _ =>
                 Result(
                     BlokeBotAuthOutcome.NoChannelSelected,
@@ -782,16 +775,14 @@ internal static class BotOAuthEndpoints
                     BlokeBotAuthReturnAction.ChannelSetup
                 )
         );
-    }
 
     private static IResult ProviderErrorResult(
         string error,
         BlokeBotAuthRetryAction retryAction,
         HttpContext context,
         ILogger<BotOAuthEndpointLog> logger
-    )
-    {
-        return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
+    ) =>
+        string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
             ? Result(
                 BlokeBotAuthOutcome.Cancelled,
                 BlokeBotAuthStatus.BadRequest,
@@ -805,22 +796,18 @@ internal static class BotOAuthEndpoints
                 "OAuthErrorQuery",
                 "OAuthErrorQuery"
             );
-    }
 
-    private static HostBotAccountActor HostBotAccountActorFor(AuthenticatedSession session)
-    {
-        return session.CurrentHostRoleIs(AuthRole.Admin)
+    private static HostBotAccountActor HostBotAccountActorFor(AuthenticatedSession session) =>
+        session.CurrentHostRoleIs(AuthRole.Admin)
             ? new HostBotAccountActor.BotAdministrator(session.UserId, session.Login)
             : new HostBotAccountActor.ChannelOwner(session.UserId, session.Login);
-    }
 
     private static IResult BotAccountProviderErrorResult(
         string error,
         HttpContext context,
         ILogger<BotOAuthEndpointLog> logger
-    )
-    {
-        return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
+    ) =>
+        string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
             ? Result(
                 BlokeBotAuthOutcome.Cancelled,
                 BlokeBotAuthStatus.BadRequest,
@@ -833,7 +820,6 @@ internal static class BotOAuthEndpoints
                 "OAuthErrorQuery",
                 "OAuthErrorQuery"
             );
-    }
 
     private static IResult ProviderFailureResult(
         BlokeBotAuthRetryAction retryAction,
@@ -875,15 +861,13 @@ internal static class BotOAuthEndpoints
         string classification,
         string failureType,
         string supportReference
-    )
-    {
+    ) =>
         logger.LogWarning(
             "Twitch bot OAuth failed; Classification: {Classification}; FailureType: {FailureType}; SupportReference: {SupportReference}.",
             classification,
             failureType,
             supportReference
         );
-    }
 
     private static BlokeBotAuthResult Result(
         BlokeBotAuthOutcome outcome,
@@ -892,14 +876,13 @@ internal static class BotOAuthEndpoints
         BlokeBotAuthReturnAction returnAction,
         string? supportReference = null,
         BlokeBotAuthContext? resultContext = null
-    )
-    {
-        return new(outcome, status, retryAction, returnAction, supportReference, resultContext);
-    }
+    ) => new(outcome, status, retryAction, returnAction, supportReference, resultContext);
 
-    private static CookieOptions ChannelBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)
-    {
-        return new()
+    private static CookieOptions ChannelBotStateCookieOptions(
+        HttpRequest request,
+        TimeSpan? maxAge
+    ) =>
+        new()
         {
             HttpOnly = true,
             IsEssential = true,
@@ -908,7 +891,6 @@ internal static class BotOAuthEndpoints
             SameSite = SameSiteMode.Lax,
             Secure = request.IsHttps,
         };
-    }
 
     private static void DeleteChannelBotStateCookie(HttpContext context)
     {

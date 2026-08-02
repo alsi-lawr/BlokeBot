@@ -311,15 +311,12 @@ public sealed class ShoutoutServiceTests
         }
     }
 
-    private static string[] RequiredScopes()
-    {
-        return
+    private static string[] RequiredScopes() =>
         [
             Scopes.UserReadModeratedChannels,
             Scopes.ModeratorReadShoutouts,
             Scopes.ModeratorManageShoutouts,
         ];
-    }
 
     private static ActiveBotAccountTokenStatus TokenStatus(IReadOnlyList<string> scopes)
     {
@@ -336,12 +333,10 @@ public sealed class ShoutoutServiceTests
         };
     }
 
-    private static BotSettings Settings()
-    {
-        return BotSettings.FromOptions(
+    private static BotSettings Settings() =>
+        BotSettings.FromOptions(
             new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
         );
-    }
 
     public enum ShoutoutScenario
     {
@@ -358,27 +353,20 @@ public sealed class ShoutoutServiceTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(status);
-        }
+        ) => Task.FromResult(status);
     }
 
     private sealed class ScenarioHttpClientFactory(ShoutoutScenario scenario) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new HttpClient(new Handler(scenario));
-        }
+        public HttpClient CreateClient(string name) => new HttpClient(new Handler(scenario));
 
         private sealed class Handler(ShoutoutScenario scenario) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return request.RequestUri!.AbsolutePath switch
+            ) =>
+                request.RequestUri!.AbsolutePath switch
                 {
                     "/helix/users" => Task.FromResult(
                         Json(
@@ -399,15 +387,12 @@ public sealed class ShoutoutServiceTests
                     ),
                     _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
                 };
-            }
 
-            private static HttpResponseMessage Json(string value)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage Json(string value) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(value, Encoding.UTF8, "application/json"),
                 };
-            }
         }
     }
 }

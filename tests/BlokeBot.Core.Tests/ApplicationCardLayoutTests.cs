@@ -328,20 +328,14 @@ public sealed class ApplicationCardLayoutTests
         throw new DirectoryNotFoundException("Could not find the BlokeBot repository root.");
     }
 
-    private static string ReadRepositoryFile(string repositoryRoot, params string[] relativePath)
-    {
-        return File.ReadAllText(Path.Combine([repositoryRoot, .. relativePath]));
-    }
+    private static string ReadRepositoryFile(string repositoryRoot, params string[] relativePath) =>
+        File.ReadAllText(Path.Combine([repositoryRoot, .. relativePath]));
 
-    private static string Normalize(string value)
-    {
-        return string.Join(" ", value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-    }
+    private static string Normalize(string value) =>
+        string.Join(" ", value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-    private static string LocationKey(CardAuthoringLocation location)
-    {
-        return $"{location.Kind}|{location.SourcePath}|{location.Line}";
-    }
+    private static string LocationKey(CardAuthoringLocation location) =>
+        $"{location.Kind}|{location.SourcePath}|{location.Line}";
 
     private enum CardAuthoringKind
     {

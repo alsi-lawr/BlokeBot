@@ -48,9 +48,8 @@ internal sealed class PointsGiveawaySchedulerUnhealthyException(
 
 internal static class PointsGiveawaySchedulerFailureClassifier
 {
-    internal static bool IsTransient(Exception exception)
-    {
-        return exception switch
+    internal static bool IsTransient(Exception exception) =>
+        exception switch
         {
             SqliteException sqliteException => IsTransient(sqliteException),
             DbUpdateException { InnerException: SqliteException sqliteException } => IsTransient(
@@ -59,42 +58,32 @@ internal static class PointsGiveawaySchedulerFailureClassifier
             TimeoutException => true,
             _ => false,
         };
-    }
 
-    internal static bool IsNotificationFailure(Exception exception)
-    {
-        return IsTransient(exception)
-            || exception
-                is HttpRequestException
-                    or IOException
-                    or ObserverFanOutEscalationException
-                    or OperationCanceledException;
-    }
+    internal static bool IsNotificationFailure(Exception exception) =>
+        IsTransient(exception)
+        || exception
+            is HttpRequestException
+                or IOException
+                or ObserverFanOutEscalationException
+                or OperationCanceledException;
 
     internal static PointsGiveawaySchedulerFailureClassification ClassifyUnhealthy(
         Exception exception
-    )
-    {
-        return
-            exception
-                is ArgumentException
-                    or InvalidOperationException
-                    or NotSupportedException
-                    or UnreachableException
-                    or DbException
-                    or DbUpdateException
-                    or PointsGiveawayDrawCommitAmbiguousException
-                    or PointsGiveawayDrawPostCommitException
-                    or PointsGiveawayExpirationCommitAmbiguousException
-                    or PointsGiveawayExpirationPostCommitException
+    ) =>
+        exception
+            is ArgumentException
+                or InvalidOperationException
+                or NotSupportedException
+                or UnreachableException
+                or DbException
+                or DbUpdateException
+                or PointsGiveawayDrawCommitAmbiguousException
+                or PointsGiveawayDrawPostCommitException
+                or PointsGiveawayExpirationCommitAmbiguousException
+                or PointsGiveawayExpirationPostCommitException
             ? PointsGiveawaySchedulerFailureClassification.Terminal
             : PointsGiveawaySchedulerFailureClassification.Unexpected;
-    }
 
-    private static bool IsTransient(SqliteException exception)
-    {
-        return exception.SqliteErrorCode
-            is SQLitePCL.raw.SQLITE_BUSY
-                or SQLitePCL.raw.SQLITE_LOCKED;
-    }
+    private static bool IsTransient(SqliteException exception) =>
+        exception.SqliteErrorCode is SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED;
 }

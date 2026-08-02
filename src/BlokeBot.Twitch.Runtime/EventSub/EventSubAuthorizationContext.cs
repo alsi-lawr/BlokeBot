@@ -25,10 +25,7 @@ public abstract record EventSubAuthorizationContext
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
             Func<Broadcaster, TResult> broadcaster
-        )
-        {
-            return configuredBot(this);
-        }
+        ) => configuredBot(this);
     }
 
     public sealed record ConfiguredBotOperations : EventSubAuthorizationContext
@@ -37,18 +34,12 @@ public abstract record EventSubAuthorizationContext
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
             Func<Broadcaster, TResult> broadcaster
-        )
-        {
-            return configuredBotOperations(this);
-        }
+        ) => configuredBotOperations(this);
     }
 
     public sealed record Broadcaster : EventSubAuthorizationContext
     {
-        internal Broadcaster(EventSubBroadcasterOperationKind operation)
-        {
-            Operation = operation;
-        }
+        internal Broadcaster(EventSubBroadcasterOperationKind operation) => Operation = operation;
 
         internal EventSubBroadcasterOperationKind Operation { get; }
 
@@ -56,10 +47,7 @@ public abstract record EventSubAuthorizationContext
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
             Func<Broadcaster, TResult> broadcaster
-        )
-        {
-            return broadcaster(this);
-        }
+        ) => broadcaster(this);
     }
 
     public static EventSubAuthorizationContext ConfiguredBotAuthority { get; } =

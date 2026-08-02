@@ -48,27 +48,19 @@ internal interface IPublicChatPinStore
 
 internal sealed class UnavailablePublicChatPinStore : IPublicChatPinStore
 {
-    public ValueTask<PublicChatPinWorkItem?> TryClaimAsync(CancellationToken cancellationToken)
-    {
-        return ValueTask.FromResult<PublicChatPinWorkItem?>(null);
-    }
+    public ValueTask<PublicChatPinWorkItem?> TryClaimAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<PublicChatPinWorkItem?>(null);
 
     public ValueTask CompleteAsync(
         PublicChatPinWorkItem item,
         PublicChatPinExecutionOutcome outcome,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.CompletedTask;
-    }
+    ) => ValueTask.CompletedTask;
 
     public ValueTask<bool> BeginAttemptAsync(
         PublicChatPinWorkItem item,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult(false);
-    }
+    ) => ValueTask.FromResult(false);
 }
 
 internal interface IPublicChatPinProvider

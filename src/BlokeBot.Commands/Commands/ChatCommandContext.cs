@@ -26,13 +26,9 @@ public sealed record ChatCommandContext
     /// <param name="message">The reply text.</param>
     /// <param name="cancellationToken">A token that cancels the reply operation.</param>
     /// <returns>A task that completes when the reply is sent.</returns>
-    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken)
-    {
-        return Responder(CommandResponse.Chat(message), cancellationToken);
-    }
+    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken) =>
+        Responder(CommandResponse.Chat(message), cancellationToken);
 
-    public ValueTask RespondAsync(CommandResponse response, CancellationToken cancellationToken)
-    {
-        return Responder(response, cancellationToken);
-    }
+    public ValueTask RespondAsync(CommandResponse response, CancellationToken cancellationToken) =>
+        Responder(response, cancellationToken);
 }

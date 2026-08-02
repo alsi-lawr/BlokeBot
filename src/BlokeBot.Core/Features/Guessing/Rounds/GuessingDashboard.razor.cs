@@ -84,14 +84,12 @@ public partial class GuessingDashboard
             ? "No round running"
             : $"{_state.CurrentRound.ProfileName}: {RoundStatusLabel(_state.CurrentRound.Lifecycle)}";
 
-    private static string RoundStatusLabel(GuessRoundLifecycle lifecycle)
-    {
-        return lifecycle.Match(
+    private static string RoundStatusLabel(GuessRoundLifecycle lifecycle) =>
+        lifecycle.Match(
             static _ => "Accepting guesses",
             static _ => "Waiting for a winner",
             static _ => "Finished"
         );
-    }
 
     private string _segmentedControlClass =>
         _activeTab switch
@@ -290,18 +288,15 @@ public partial class GuessingDashboard
         await LoadLeaderboardAsync();
     }
 
-    private Task RefreshAsync()
-    {
-        return _activeTab switch
+    private Task RefreshAsync() =>
+        _activeTab switch
         {
             DashboardTab.History => LoadRecentRoundsAsync(),
             DashboardTab.Leaderboard => LoadLeaderboardAsync(),
             _ => LoadAsync(),
         };
-    }
 
-    private async Task LoadFeatureStateAsync()
-    {
+    private async Task LoadFeatureStateAsync() =>
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -309,43 +304,29 @@ public partial class GuessingDashboard
                 HostFeatureFlags.Guessing,
                 CancellationToken.None
             );
-    }
 
-    private Task StartRoundAsync()
-    {
-        return RunAsync(() => _rounds.StartRound(HostId, _selectedProfileId));
-    }
+    private Task StartRoundAsync() =>
+        RunAsync(() => _rounds.StartRound(HostId, _selectedProfileId));
 
-    private static DateTime? StartOfLocalDateUtc(DateTime? value)
-    {
-        return value is { } date
+    private static DateTime? StartOfLocalDateUtc(DateTime? value) =>
+        value is { } date
             ? DateTime.SpecifyKind(date.Date, DateTimeKind.Local).ToUniversalTime()
             : null;
-    }
 
-    private static DateTime? EndOfLocalDateUtc(DateTime? value)
-    {
-        return value is { } date
+    private static DateTime? EndOfLocalDateUtc(DateTime? value) =>
+        value is { } date
             ? DateTime.SpecifyKind(date.Date.AddDays(1), DateTimeKind.Local).ToUniversalTime()
             : null;
-    }
 
-    private static string FormatEndedAt(GuessRoundHistoryEntry round)
-    {
-        return round.Lifecycle.ClosedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
-    }
+    private static string FormatEndedAt(GuessRoundHistoryEntry round) =>
+        round.Lifecycle.ClosedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
 
-    private Task StopGuessingAsync()
-    {
-        return RunAsync(() => _rounds.StopGuessing(HostId));
-    }
+    private Task StopGuessingAsync() => RunAsync(() => _rounds.StopGuessing(HostId));
 
-    private string TabClass(DashboardTab tab)
-    {
-        return _activeTab == tab
+    private string TabClass(DashboardTab tab) =>
+        _activeTab == tab
             ? "segmented-motion__tab segmented-motion__tab--active"
             : "segmented-motion__tab";
-    }
 
     private async Task RunAsync(Func<IO<GuessingOperationOutcome, Never>> operation)
     {

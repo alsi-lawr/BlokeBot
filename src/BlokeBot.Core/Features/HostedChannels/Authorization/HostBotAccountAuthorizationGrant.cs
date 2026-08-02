@@ -11,8 +11,6 @@ public sealed record HostBotAccountAuthorizationGrant(
     OAuthScopeSet Scopes
 )
 {
-    public override string ToString()
-    {
-        return $"{nameof(HostBotAccountAuthorizationGrant)} {{ Token = [REDACTED] }}";
-    }
+    public override string ToString() =>
+        $"{nameof(HostBotAccountAuthorizationGrant)} {{ Token = [REDACTED] }}";
 }

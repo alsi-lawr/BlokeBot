@@ -13,36 +13,26 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public abstract class RuntimeSessionResilienceTestBase
 {
-    private protected static Task<RuntimeSessionEstablishment> IdleAsync()
-    {
-        return Task.FromResult<RuntimeSessionEstablishment>(new RuntimeSessionEstablishment.Idle());
-    }
+    private protected static Task<RuntimeSessionEstablishment> IdleAsync() =>
+        Task.FromResult<RuntimeSessionEstablishment>(new RuntimeSessionEstablishment.Idle());
 
-    private protected static bool IsConnected(BotRuntimeStatus status)
-    {
-        return status.Match(static _ => false, static _ => false, static _ => true);
-    }
+    private protected static bool IsConnected(BotRuntimeStatus status) =>
+        status.Match(static _ => false, static _ => false, static _ => true);
 
     private protected static Task<RuntimeSessionEstablishment> EstablishedAsync(
         ScriptedEstablishedSession session
-    )
-    {
-        return Task.FromResult<RuntimeSessionEstablishment>(
+    ) =>
+        Task.FromResult<RuntimeSessionEstablishment>(
             new RuntimeSessionEstablishment.Established { Session = session }
         );
-    }
 
     private protected static Task<RuntimeSessionEstablishment> FailedEstablishmentAsync(
         Exception exception
-    )
-    {
-        return Task.FromException<RuntimeSessionEstablishment>(exception);
-    }
+    ) => Task.FromException<RuntimeSessionEstablishment>(exception);
 
-    private protected static Task<RuntimeReconnectRequest> FailedListeningAsync(Exception exception)
-    {
-        return Task.FromException<RuntimeReconnectRequest>(exception);
-    }
+    private protected static Task<RuntimeReconnectRequest> FailedListeningAsync(
+        Exception exception
+    ) => Task.FromException<RuntimeReconnectRequest>(exception);
 
     private protected static void AssertReport(
         RuntimeSessionHealthReport report,
@@ -118,9 +108,8 @@ public abstract class RuntimeSessionResilienceTestBase
         Task<RuntimeSessionOutcome> EstablishAsync(
             RuntimeConnectionTarget target,
             CancellationToken cancellationToken
-        )
-        {
-            return RuntimeSessionRunner.EstablishOnceAsync(
+        ) =>
+            RuntimeSessionRunner.EstablishOnceAsync(
                 ChatRuntime.Irc,
                 token => session.EstablishAsync(target, token),
                 pipeline.ExecuteAsync,
@@ -129,11 +118,9 @@ public abstract class RuntimeSessionResilienceTestBase
                 status,
                 cancellationToken
             );
-        }
 
-        Task RunAsync(CancellationToken cancellationToken)
-        {
-            return RuntimeSessionRunner.RunUntilStoppedAsync(
+        Task RunAsync(CancellationToken cancellationToken) =>
+            RuntimeSessionRunner.RunUntilStoppedAsync(
                 ChatRuntime.Irc,
                 new RuntimeConnectionTarget.Initial(),
                 EstablishAsync,
@@ -143,7 +130,6 @@ public abstract class RuntimeSessionResilienceTestBase
                 idleWait,
                 cancellationToken
             );
-        }
 
         return new(session, health, status, idleWait, EstablishAsync, RunAsync);
     }
@@ -172,15 +158,10 @@ public abstract class RuntimeSessionResilienceTestBase
         internal Task<RuntimeSessionOutcome> EstablishSessionAsync(
             RuntimeConnectionTarget target,
             CancellationToken cancellationToken
-        )
-        {
-            return establishSession(target, cancellationToken);
-        }
+        ) => establishSession(target, cancellationToken);
 
-        internal Task RunRuntimeAsync(CancellationToken cancellationToken)
-        {
-            return runRuntime(cancellationToken);
-        }
+        internal Task RunRuntimeAsync(CancellationToken cancellationToken) =>
+            runRuntime(cancellationToken);
     }
 
     private protected sealed class ScriptedConnectionSession
@@ -201,10 +182,7 @@ public abstract class RuntimeSessionResilienceTestBase
                 CancellationToken,
                 Task<RuntimeSessionEstablishment>
             > operation
-        )
-        {
-            _operations.Enqueue(operation);
-        }
+        ) => _operations.Enqueue(operation);
 
         public Task<RuntimeSessionEstablishment> EstablishAsync(
             RuntimeConnectionTarget target,
@@ -228,10 +206,8 @@ public abstract class RuntimeSessionResilienceTestBase
 
         internal Exception? DisposeException { get; init; }
 
-        internal void Enqueue(Func<CancellationToken, Task<RuntimeReconnectRequest>> listener)
-        {
+        internal void Enqueue(Func<CancellationToken, Task<RuntimeReconnectRequest>> listener) =>
             _listeners.Enqueue(listener);
-        }
 
         public Task<RuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)
         {
@@ -252,10 +228,7 @@ public abstract class RuntimeSessionResilienceTestBase
     {
         internal List<RuntimeSessionHealthReport> Reports { get; } = [];
 
-        public void Report(RuntimeSessionHealthReport report)
-        {
-            Reports.Add(report);
-        }
+        public void Report(RuntimeSessionHealthReport report) => Reports.Add(report);
     }
 
     private protected sealed class RecordingIdleWait : IRuntimeIdleWait
@@ -274,15 +247,9 @@ public abstract class RuntimeSessionResilienceTestBase
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return Scope.Instance;
-        }
+            where TState : notnull => Scope.Instance;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,

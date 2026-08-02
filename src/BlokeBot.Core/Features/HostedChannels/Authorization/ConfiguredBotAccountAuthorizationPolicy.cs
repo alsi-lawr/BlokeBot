@@ -127,9 +127,8 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     private static BotAccountAuthorizationStatus Unknown(
         string configuredBotLogin,
         TokenStatus.Unknown status
-    )
-    {
-        return new(
+    ) =>
+        new(
             configuredBotLogin,
             null,
             null,
@@ -139,14 +138,12 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
             status.Error.RequiredScopes,
             "BlokeBot could not check the bot account right now."
         );
-    }
 
     private static BotAccountAuthorizationStatus NotAuthorized(
         string configuredBotLogin,
         TokenStatus.Unavailable status
-    )
-    {
-        return new(
+    ) =>
+        new(
             configuredBotLogin,
             null,
             null,
@@ -156,14 +153,12 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
             status.RequiredScopes,
             "No bot account is connected yet."
         );
-    }
 
     private static BotAccountAuthorizationStatus NotAuthorized(
         string configuredBotLogin,
         TokenStatus.Invalid status
-    )
-    {
-        return new(
+    ) =>
+        new(
             configuredBotLogin,
             null,
             null,
@@ -173,5 +168,4 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
             status.RequiredScopes,
             "BlokeBot could not check the connected bot account."
         );
-    }
 }

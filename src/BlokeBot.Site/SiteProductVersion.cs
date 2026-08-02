@@ -14,10 +14,8 @@ internal sealed record SiteProductVersion(string Value)
             )
         );
 
-    internal static string Display(string informationalVersion)
-    {
-        return informationalVersion.StartsWith("0.0.0-dev+", StringComparison.Ordinal)
+    internal static string Display(string informationalVersion) =>
+        informationalVersion.StartsWith("0.0.0-dev+", StringComparison.Ordinal)
             ? informationalVersion
             : informationalVersion.Split('+', 2)[0];
-    }
 }

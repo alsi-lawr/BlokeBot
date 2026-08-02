@@ -15,10 +15,7 @@ public abstract record CommandRouteResolution<TKind, TState>
         public override TResult Match<TResult>(
             Func<Unresolved, TResult> unresolved,
             Func<Resolved, TResult> resolved
-        )
-        {
-            return unresolved(this);
-        }
+        ) => unresolved(this);
     }
 
     public sealed record Resolved(CommandRoute<TKind, TState> Route)
@@ -27,9 +24,6 @@ public abstract record CommandRouteResolution<TKind, TState>
         public override TResult Match<TResult>(
             Func<Unresolved, TResult> unresolved,
             Func<Resolved, TResult> resolved
-        )
-        {
-            return resolved(this);
-        }
+        ) => resolved(this);
     }
 }

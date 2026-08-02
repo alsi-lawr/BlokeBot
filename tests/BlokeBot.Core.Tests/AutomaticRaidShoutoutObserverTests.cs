@@ -487,19 +487,15 @@ public sealed class AutomaticRaidShoutoutObserverTests
     private static AutomaticRaidShoutoutObserver Observer(
         IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
         IAutomaticRaidShoutoutDelivery delivery
-    )
-    {
-        return new(factory, delivery, new FixedTimeProvider(_now));
-    }
+    ) => new(factory, delivery, new FixedTimeProvider(_now));
 
     private static EventSubIncomingRaidEvent Raid(
         string messageId,
         DateTimeOffset timestamp,
         int viewers,
         string target = "host"
-    )
-    {
-        return new(
+    ) =>
+        new(
             messageId,
             timestamp,
             "raider-id",
@@ -510,7 +506,6 @@ public sealed class AutomaticRaidShoutoutObserverTests
             target,
             viewers
         );
-    }
 
     private static async Task<int> SeedAsync(
         IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
@@ -563,9 +558,8 @@ public sealed class AutomaticRaidShoutoutObserverTests
         AutomaticRaidShoutoutOutcomeStatus status,
         AutomaticRaidShoutoutResultCode? resultCode,
         DateTime? completedAtUtc
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             HostId = hostId,
             ProviderMessageId = providerMessageId,
@@ -579,14 +573,10 @@ public sealed class AutomaticRaidShoutoutObserverTests
             ClaimedAtUtc = _now.UtcDateTime,
             CompletedAtUtc = completedAtUtc,
         };
-    }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class RecordingDelivery(AutomaticRaidShoutoutDeliveryResult result)
@@ -762,22 +752,13 @@ public sealed class AutomaticRaidShoutoutObserverTests
             return factory;
         }
 
-        public BlokeBot.Persistence.BlokeBotDbContext CreateDbContext()
-        {
-            return new(_options);
-        }
+        public BlokeBot.Persistence.BlokeBotDbContext CreateDbContext() => new(_options);
 
         public ValueTask<BlokeBot.Persistence.BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            return ValueTask.FromResult(CreateDbContext());
-        }
+        ) => ValueTask.FromResult(CreateDbContext());
 
-        public async ValueTask DisposeAsync()
-        {
-            await _keeper.DisposeAsync();
-        }
+        public async ValueTask DisposeAsync() => await _keeper.DisposeAsync();
     }
 
     private sealed class ThrowingDelivery : IAutomaticRaidShoutoutDelivery
@@ -785,10 +766,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
             AutomaticRaidShoutoutDeliveryRequest request,
             CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("interrupted after the durable claim");
-        }
+        ) => throw new InvalidOperationException("interrupted after the durable claim");
     }
 
     public enum DeliveryResultShape

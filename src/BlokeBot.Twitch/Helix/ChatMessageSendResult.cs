@@ -13,8 +13,6 @@ public sealed record ChatMessageSendResult
     [JsonPropertyName("message_id")]
     public required string MessageId { get; init; }
 
-    public override string ToString()
-    {
-        return $"{nameof(ChatMessageSendResult)} {{ IsSent = {IsSent}, DropReason = {DropReason} }}";
-    }
+    public override string ToString() =>
+        $"{nameof(ChatMessageSendResult)} {{ IsSent = {IsSent}, DropReason = {DropReason} }}";
 }

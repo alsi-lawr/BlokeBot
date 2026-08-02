@@ -35,9 +35,8 @@ public sealed class ChannelBotAuthorizationService(
     public IO<ChannelBotAuthorizationOutcome, Never> Authorize(
         int hostId,
         ChannelBotAuthorizationGrant grant
-    )
-    {
-        return IO<ChannelBotAuthorizationOutcome, Never>.Create(async ct =>
+    ) =>
+        IO<ChannelBotAuthorizationOutcome, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
@@ -63,7 +62,6 @@ public sealed class ChannelBotAuthorizationService(
             await changes.NotifyChangedAsync(ct);
             return Success(new ChannelBotAuthorizationOutcome.Authorized());
         });
-    }
 
     public async Task ClearAsync(int hostId, CancellationToken ct)
     {
@@ -80,25 +78,17 @@ public sealed class ChannelBotAuthorizationService(
         await changes.NotifyChangedAsync(ct);
     }
 
-    public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes)
-    {
-        return authorizedAtUtc is not null && HasRequiredScopes(authorizedScopes);
-    }
+    public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes) =>
+        authorizedAtUtc is not null && HasRequiredScopes(authorizedScopes);
 
-    private bool HasRequiredScopes(string? authorizedScopes)
-    {
-        return MissingRequiredScopes(SplitStoredScopes(authorizedScopes)).Length == 0;
-    }
+    private bool HasRequiredScopes(string? authorizedScopes) =>
+        MissingRequiredScopes(SplitStoredScopes(authorizedScopes)).Length == 0;
 
-    private string[] MissingRequiredScopes(IEnumerable<string> grantedScopes)
-    {
-        return ScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
-    }
+    private string[] MissingRequiredScopes(IEnumerable<string> grantedScopes) =>
+        ScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
 
-    private static IEnumerable<string> SplitStoredScopes(string? scopes)
-    {
-        return (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
-    }
+    private static IEnumerable<string> SplitStoredScopes(string? scopes) =>
+        (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
     private static bool GrantMatchesHost(
         string? hostTwitchUserId,
@@ -116,10 +106,7 @@ public sealed class ChannelBotAuthorizationService(
 
     private static Result<ChannelBotAuthorizationOutcome, Never> Success(
         ChannelBotAuthorizationOutcome outcome
-    )
-    {
-        return Result<ChannelBotAuthorizationOutcome, Never>.Success(outcome);
-    }
+    ) => Result<ChannelBotAuthorizationOutcome, Never>.Success(outcome);
 }
 
 public abstract record ChannelBotAuthorizationOutcome

@@ -154,10 +154,7 @@ public partial class AdminPage
         await LoadAsync();
     }
 
-    private async Task RefreshBotAccountAuthorizationAsync()
-    {
-        await LoadAsync();
-    }
+    private async Task RefreshBotAccountAuthorizationAsync() => await LoadAsync();
 
     private async Task ReloadForEventAsync()
     {

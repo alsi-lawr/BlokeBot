@@ -48,10 +48,7 @@ public partial class HostConfigPage
         await LoadAsync();
     }
 
-    private Task LoadAsync()
-    {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
-    }
+    private Task LoadAsync() => ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
 
     private async Task LoadCoreAsync()
     {
@@ -132,14 +129,12 @@ public partial class HostConfigPage
         }
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
-    {
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) =>
         _ = InvokeAsync(() =>
         {
             RequestFragmentReveal(args.Location);
             StateHasChanged();
         });
-    }
 
     private Task OnNativeFragmentChangedAsync(string location)
     {

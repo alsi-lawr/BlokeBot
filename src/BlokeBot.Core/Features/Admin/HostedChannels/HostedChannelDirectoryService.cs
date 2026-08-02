@@ -51,9 +51,8 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
         return ids.ToHashSet();
     }
 
-    public IO<Option<BotHostChoice>, Never> LoadHostChoice(int hostId, AuthRole role)
-    {
-        return IO<Option<BotHostChoice>, Never>.Create(async ct =>
+    public IO<Option<BotHostChoice>, Never> LoadHostChoice(int hostId, AuthRole role) =>
+        IO<Option<BotHostChoice>, Never>.Create(async ct =>
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             var host = await db
@@ -71,7 +70,6 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
                 Option<BotHostChoice>.FromNullable(host)
             );
         });
-    }
 
     public async Task<IReadOnlyList<BotHostChoice>> LoadExistingHostChoicesAsync(
         IReadOnlyList<BotHostChoice> choices,

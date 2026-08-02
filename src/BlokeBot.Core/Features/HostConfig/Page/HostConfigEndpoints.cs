@@ -7,8 +7,7 @@ namespace BlokeBot.Core.Features.HostConfig.Page;
 
 internal static class HostConfigEndpoints
 {
-    public static void MapHostConfigEndpoints(this WebApplication app)
-    {
+    public static void MapHostConfigEndpoints(this WebApplication app) =>
         app.MapGet(
                 "/host/create",
                 async (
@@ -68,5 +67,4 @@ internal static class HostConfigEndpoints
                 }
             )
             .RequireAuthorization();
-    }
 }

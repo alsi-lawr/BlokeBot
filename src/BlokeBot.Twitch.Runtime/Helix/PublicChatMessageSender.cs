@@ -11,10 +11,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         string message,
         PublicChatDeliveryDeadline deadline,
         CancellationToken cancellationToken
-    )
-    {
-        return SendCoreAsync(channel, message, deadline, null, null, cancellationToken);
-    }
+    ) => SendCoreAsync(channel, message, deadline, null, null, cancellationToken);
 
     public ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
@@ -22,17 +19,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         PublicChatDeliveryDeadline deadline,
         PublicChatPinIntent pinIntent,
         CancellationToken cancellationToken
-    )
-    {
-        return SendCoreAsync(
-            channel,
-            message,
-            deadline,
-            null,
-            pinIntent.Validate(),
-            cancellationToken
-        );
-    }
+    ) => SendCoreAsync(channel, message, deadline, null, pinIntent.Validate(), cancellationToken);
 
     public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
         string channel,
@@ -40,17 +27,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         PublicChatDeliveryDeadline deadline,
         PublicChatDeliveryCorrelation correlation,
         CancellationToken cancellationToken
-    )
-    {
-        return SendCoreAsync(
-            channel,
-            message,
-            deadline,
-            correlation.Validate(),
-            null,
-            cancellationToken
-        );
-    }
+    ) => SendCoreAsync(channel, message, deadline, correlation.Validate(), null, cancellationToken);
 
     public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
         string channel,
@@ -59,9 +36,8 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         PublicChatDeliveryCorrelation correlation,
         PublicChatPinIntent pinIntent,
         CancellationToken cancellationToken
-    )
-    {
-        return SendCoreAsync(
+    ) =>
+        SendCoreAsync(
             channel,
             message,
             deadline,
@@ -69,7 +45,6 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
             pinIntent.Validate(),
             cancellationToken
         );
-    }
 
     private async ValueTask<PublicChatSendOutcome> SendCoreAsync(
         string channel,

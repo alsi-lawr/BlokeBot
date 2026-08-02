@@ -19,8 +19,7 @@ internal sealed class BotRuntimeStatusStore : IBotRuntimeStatusAccessor
         }
     }
 
-    public void MarkAuthorized()
-    {
+    public void MarkAuthorized() =>
         UpdateCurrent(static current =>
             current.Match<BotRuntimeStatus>(
                 static _ => new BotRuntimeStatus.Authorized(),
@@ -28,22 +27,13 @@ internal sealed class BotRuntimeStatusStore : IBotRuntimeStatusAccessor
                 static connected => connected
             )
         );
-    }
 
-    public void MarkUnauthorized()
-    {
-        SetCurrent(new BotRuntimeStatus.Unauthorized());
-    }
+    public void MarkUnauthorized() => SetCurrent(new BotRuntimeStatus.Unauthorized());
 
-    public void MarkConnected(IEnumerable<string> channels)
-    {
+    public void MarkConnected(IEnumerable<string> channels) =>
         SetCurrent(new BotRuntimeStatus.Connected(channels));
-    }
 
-    public void MarkDisconnected()
-    {
-        UpdateCurrent(DisconnectedStatus);
-    }
+    public void MarkDisconnected() => UpdateCurrent(DisconnectedStatus);
 
     internal void ActivateEventSubScope(long scopeId)
     {
@@ -90,10 +80,7 @@ internal sealed class BotRuntimeStatusStore : IBotRuntimeStatusAccessor
         changed?.Invoke();
     }
 
-    private void SetCurrent(BotRuntimeStatus status)
-    {
-        UpdateCurrent(_ => status);
-    }
+    private void SetCurrent(BotRuntimeStatus status) => UpdateCurrent(_ => status);
 
     private void UpdateCurrent(Func<BotRuntimeStatus, BotRuntimeStatus> transition)
     {
@@ -107,12 +94,10 @@ internal sealed class BotRuntimeStatusStore : IBotRuntimeStatusAccessor
         changed?.Invoke();
     }
 
-    private static BotRuntimeStatus DisconnectedStatus(BotRuntimeStatus status)
-    {
-        return status.Match<BotRuntimeStatus>(
+    private static BotRuntimeStatus DisconnectedStatus(BotRuntimeStatus status) =>
+        status.Match<BotRuntimeStatus>(
             static unauthorized => unauthorized,
             static authorized => authorized,
             static _ => new BotRuntimeStatus.Authorized()
         );
-    }
 }

@@ -56,8 +56,5 @@ internal sealed class FakeTwitchHost : IAsyncDisposable
         );
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await App.DisposeAsync();
-    }
+    public async ValueTask DisposeAsync() => await App.DisposeAsync();
 }

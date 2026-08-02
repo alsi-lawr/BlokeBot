@@ -6,8 +6,5 @@ internal sealed class EnabledNativeTwitchFeatureStateProvider : INativeTwitchFea
         string channel,
         NativeTwitchFeature feature,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult(true);
-    }
+    ) => ValueTask.FromResult(true);
 }

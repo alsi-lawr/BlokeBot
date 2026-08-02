@@ -4,13 +4,7 @@ public sealed class PointsRandom : IPointsRandom
 {
     private readonly Random _random = new();
 
-    public double NextDouble()
-    {
-        return _random.NextDouble();
-    }
+    public double NextDouble() => _random.NextDouble();
 
-    public int Next(int minValue, int maxValue)
-    {
-        return _random.Next(minValue, maxValue);
-    }
+    public int Next(int minValue, int maxValue) => _random.Next(minValue, maxValue);
 }

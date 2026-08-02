@@ -20,18 +20,14 @@ internal sealed class BotRuntimeHostedService : BackgroundService
         _eventSub = eventSub;
     }
 
-    internal Task RunSelectedRuntimeAsync(CancellationToken cancellationToken)
-    {
-        return _settings.Runtime switch
+    internal Task RunSelectedRuntimeAsync(CancellationToken cancellationToken) =>
+        _settings.Runtime switch
         {
             ChatRuntime.Irc => _irc.RunAsync(cancellationToken),
             ChatRuntime.EventSub => _eventSub.RunAsync(cancellationToken),
             _ => throw new UnreachableException("Unknown validated Twitch bot runtime."),
         };
-    }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        return RunSelectedRuntimeAsync(stoppingToken);
-    }
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        RunSelectedRuntimeAsync(stoppingToken);
 }

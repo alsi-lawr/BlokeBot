@@ -306,11 +306,9 @@ public sealed class ShoutoutService(
         string botId,
         string broadcasterId,
         CancellationToken ct
-    )
-    {
-        return await helix.GetModeratedChannelStatusAsync(context, botId, broadcasterId, ct)
-            is ModeratedChannelStatus.IsModerator;
-    }
+    ) =>
+        await helix.GetModeratedChannelStatusAsync(context, botId, broadcasterId, ct)
+        is ModeratedChannelStatus.IsModerator;
 
     private static async Task StoreCooldownAsync(
         BlokeBotDbContext db,

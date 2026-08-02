@@ -263,17 +263,15 @@ public sealed class HostBotStatusTests
         );
     }
 
-    private static ValueTask<HostBotReadinessOutcome> ReadinessAsync(HostBotStatusService service)
-    {
-        return service.GetReadiness("streamer").RunAsync(CancellationToken.None);
-    }
+    private static ValueTask<HostBotReadinessOutcome> ReadinessAsync(
+        HostBotStatusService service
+    ) => service.GetReadiness("streamer").RunAsync(CancellationToken.None);
 
     private static HostBotStatusService CreateStreamService(
         HostBotStatusHttpClientFactory httpClientFactory,
         IHostBotAppAccessTokenSource? appTokens = null
-    )
-    {
-        return new(
+    ) =>
+        new(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
             new HelixClient(
@@ -282,11 +280,9 @@ public sealed class HostBotStatusTests
             ),
             Settings()
         );
-    }
 
-    private static BotSettings Settings()
-    {
-        return BotSettings.FromOptions(
+    private static BotSettings Settings() =>
+        BotSettings.FromOptions(
             new BotOptions
             {
                 Identity = new BotIdentityOptions
@@ -300,16 +296,12 @@ public sealed class HostBotStatusTests
                 },
             }
         );
-    }
 
-    private static string[] RequiredScopes()
-    {
-        return [Scopes.UserReadModeratedChannels, Scopes.ModeratorReadFollowers];
-    }
+    private static string[] RequiredScopes() =>
+        [Scopes.UserReadModeratedChannels, Scopes.ModeratorReadFollowers];
 
-    private static ActiveBotAccountTokenStatus UnavailableTokenStatus()
-    {
-        return new ActiveBotAccountTokenStatus
+    private static ActiveBotAccountTokenStatus UnavailableTokenStatus() =>
+        new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
             Status = new TokenStatus.Unavailable(
@@ -317,20 +309,16 @@ public sealed class HostBotStatusTests
                 ImmutableArray.CreateRange(RequiredScopes())
             ),
         };
-    }
 
-    private static ActiveBotAccountTokenStatus InvalidTokenStatus()
-    {
-        return new ActiveBotAccountTokenStatus
+    private static ActiveBotAccountTokenStatus InvalidTokenStatus() =>
+        new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
             Status = new TokenStatus.Invalid(ImmutableArray.CreateRange(RequiredScopes())),
         };
-    }
 
-    private static ActiveBotAccountTokenStatus UnknownTokenStatus()
-    {
-        return new ActiveBotAccountTokenStatus
+    private static ActiveBotAccountTokenStatus UnknownTokenStatus() =>
+        new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
             Status = new TokenStatus.Unknown(
@@ -341,7 +329,6 @@ public sealed class HostBotStatusTests
                 )
             ),
         };
-    }
 
     private static ActiveBotAccountTokenStatus AuthorizedTokenStatus(
         IReadOnlyList<string> grantedScopes,
@@ -383,27 +370,20 @@ public sealed class HostBotStatusTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(status);
-        }
+        ) => Task.FromResult(status);
     }
 
     private sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult("app-token");
-        }
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-token");
     }
 
     private sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
         : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
-        {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
             throw failure;
-        }
     }
 
     private sealed class HostBotStatusHttpClientFactory : IHttpClientFactory
@@ -438,10 +418,7 @@ public sealed class HostBotStatusTests
 
         public int TokenRequestCount => _handler.TokenRequestCount;
 
-        public HttpClient CreateClient(string name)
-        {
-            return new(_handler, disposeHandler: false);
-        }
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 
         private sealed class Handler : HttpMessageHandler
         {
@@ -541,13 +518,11 @@ public sealed class HostBotStatusTests
                 return JsonResponse("""{"access_token":"app-token","expires_in":3600}""");
             }
 
-            private static HttpResponseMessage JsonResponse(string json)
-            {
-                return new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json) =>
+                new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
-            }
 
             private static string? QueryValue(Uri? uri, string key)
             {
@@ -586,15 +561,9 @@ public sealed class HostBotStatusTests
         public List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return NullLoggerScope.Instance;
-        }
+            where TState : notnull => NullLoggerScope.Instance;
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -602,10 +571,7 @@ public sealed class HostBotStatusTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        )
-        {
-            Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
-        }
+        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
     }
 
     private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);

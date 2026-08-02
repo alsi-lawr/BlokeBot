@@ -117,12 +117,13 @@ public sealed class GuessingUnsavedChangesUiTests
         persisted.Name.ShouldBe("red");
     }
 
-    private static void ChooseDialogAction(IRenderedComponent<GuessingSettings> page, string action)
-    {
+    private static void ChooseDialogAction(
+        IRenderedComponent<GuessingSettings> page,
+        string action
+    ) =>
         page.FindAll("[data-unsaved-profile-dialog] button")
             .Single(button => button.TextContent.Trim() == action)
             .Click();
-    }
 
     private static void AssertSelectedProfile(
         IRenderedComponent<GuessingSettings> page,

@@ -170,8 +170,7 @@ internal sealed class IrcConnectionSession(
     private async ValueTask NotifyMessageObserversAsync(
         ChatMessage message,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         _ = await messageObserverFanOut.DispatchAsync(
             _messageObservers,
             _ => new ObserverDispatch<ChatMessage, ChatObserverDeadLetter>
@@ -185,7 +184,6 @@ internal sealed class IrcConnectionSession(
                 observer.MessageReceivedAsync(chatMessage, token),
             cancellationToken
         );
-    }
 
     internal async Task SyncJoinedChannelsAsync(
         StreamWriter writer,
@@ -459,11 +457,9 @@ internal sealed class IrcConnectionSession(
             }
         }
 
-        private static Exception CombineCleanupFailures(Exception? previous, Exception current)
-        {
-            return previous is null
+        private static Exception CombineCleanupFailures(Exception? previous, Exception current) =>
+            previous is null
                 ? current
                 : new AggregateException("IRC session cleanup failed.", previous, current);
-        }
     }
 }

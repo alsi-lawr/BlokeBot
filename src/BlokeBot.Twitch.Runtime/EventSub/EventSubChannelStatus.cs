@@ -75,10 +75,7 @@ public abstract record EventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        )
-        {
-            return healthy(this);
-        }
+        ) => healthy(this);
     }
 
     public sealed record Recovering : EventSubChannelStatus
@@ -101,10 +98,7 @@ public abstract record EventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        )
-        {
-            return recovering(this);
-        }
+        ) => recovering(this);
     }
 
     public sealed record Degraded : EventSubChannelStatus
@@ -127,10 +121,7 @@ public abstract record EventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        )
-        {
-            return degraded(this);
-        }
+        ) => degraded(this);
     }
 }
 

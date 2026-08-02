@@ -85,14 +85,10 @@ public partial class MomentsPage
         }
     }
 
-    private MomentDraft Draft(Guid id)
-    {
-        return _drafts[id];
-    }
+    private MomentDraft Draft(Guid id) => _drafts[id];
 
-    private Task SaveSettingsAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task SaveSettingsAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -121,11 +117,9 @@ public partial class MomentsPage
                 await ReloadAsync();
             }
         );
-    }
 
-    private Task CaptureAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task CaptureAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -150,26 +144,17 @@ public partial class MomentsPage
                 await ReloadAsync();
             }
         );
-    }
 
-    private Task ApproveAsync(Guid id)
-    {
-        return MutateAsync(id, _moments.ApproveAsync, "Moment approved.");
-    }
+    private Task ApproveAsync(Guid id) =>
+        MutateAsync(id, _moments.ApproveAsync, "Moment approved.");
 
-    private Task EditAsync(Guid id)
-    {
-        return MutateAsync(id, _moments.EditAsync, "Moment metadata saved.");
-    }
+    private Task EditAsync(Guid id) =>
+        MutateAsync(id, _moments.EditAsync, "Moment metadata saved.");
 
-    private Task RejectAsync(Guid id)
-    {
-        return MutateAsync(id, _moments.RejectAsync, "Moment rejected.");
-    }
+    private Task RejectAsync(Guid id) => MutateAsync(id, _moments.RejectAsync, "Moment rejected.");
 
-    private Task MergeAsync(Guid id)
-    {
-        return RunSelectedHostMutationAsync(
+    private Task MergeAsync(Guid id) =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -194,11 +179,9 @@ public partial class MomentsPage
                 await ReloadAsync();
             }
         );
-    }
 
-    private Task FinalizeWeekAsync()
-    {
-        return RunSelectedHostMutationAsync(
+    private Task FinalizeWeekAsync() =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -220,7 +203,6 @@ public partial class MomentsPage
                 await ReloadAsync();
             }
         );
-    }
 
     private Task MutateAsync(
         Guid id,
@@ -231,9 +213,8 @@ public partial class MomentsPage
             Task<MomentResult<ModeratorMomentView>>
         > operation,
         string success
-    )
-    {
-        return RunSelectedHostMutationAsync(
+    ) =>
+        RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
@@ -256,7 +237,6 @@ public partial class MomentsPage
                 await ReloadAsync();
             }
         );
-    }
 
     private void SetFeedback(string feedback, bool failed)
     {

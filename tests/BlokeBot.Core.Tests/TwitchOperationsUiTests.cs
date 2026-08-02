@@ -491,16 +491,13 @@ public sealed class TwitchOperationsUiTests
         return host;
     }
 
-    private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page)
-    {
-        return page.FindAll(".disclosure-title, .task-panel__title")
+    private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page) =>
+        page.FindAll(".disclosure-title, .task-panel__title")
             .Select(element => element.TextContent.Trim())
             .ToArray();
-    }
 
-    private static ChannelPointsRewardView Reward()
-    {
-        return new(
+    private static ChannelPointsRewardView Reward() =>
+        new(
             "reward-1",
             "Choose the next emote",
             "Tell us which emote to use.",
@@ -518,14 +515,12 @@ public sealed class TwitchOperationsUiTests
             false,
             "#9147FF"
         );
-    }
 
     private static ChannelPointsRedemptionView Redemption(
         string providerRedemptionId,
         DateTime redeemedAtUtc
-    )
-    {
-        return new(
+    ) =>
+        new(
             providerRedemptionId,
             "reward-1",
             "Choose the next emote",
@@ -536,7 +531,6 @@ public sealed class TwitchOperationsUiTests
             redeemedAtUtc,
             true
         );
-    }
 
     private sealed class RecordingChannelPointsOperations(ChannelPointsDashboardState state)
         : IChannelPointsDashboardOperations
@@ -546,21 +540,16 @@ public sealed class TwitchOperationsUiTests
         public Task<ChannelPointsDashboardState> LoadAsync(
             int hostId,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult(state);
-        }
+        ) => Task.FromResult(state);
 
         public Task<ChannelPointsOperationOutcome> CreateRewardAsync(
             int hostId,
             ChannelPointsRewardDraft draft,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<ChannelPointsOperationOutcome>(
+        ) =>
+            Task.FromResult<ChannelPointsOperationOutcome>(
                 new ChannelPointsOperationOutcome.RewardCreated(Reward())
             );
-        }
 
         public Task<ChannelPointsOperationOutcome> UpdateRewardAsync(
             int hostId,
@@ -582,32 +571,25 @@ public sealed class TwitchOperationsUiTests
             string rewardId,
             bool confirmed,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<ChannelPointsOperationOutcome>(
+        ) =>
+            Task.FromResult<ChannelPointsOperationOutcome>(
                 new ChannelPointsOperationOutcome.RewardDeleted()
             );
-        }
 
         public Task<ChannelPointsOperationOutcome> UpdateRedemptionAsync(
             int hostId,
             string redemptionId,
             bool fulfill,
             CancellationToken cancellationToken
-        )
-        {
-            return Task.FromResult<ChannelPointsOperationOutcome>(
+        ) =>
+            Task.FromResult<ChannelPointsOperationOutcome>(
                 new ChannelPointsOperationOutcome.RedemptionUpdated()
             );
-        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return now;
-        }
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
@@ -616,9 +598,8 @@ public sealed class TwitchOperationsUiTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult<TokenStatus>(
+        ) =>
+            Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "broadcaster-token",
                     new TokenValidation(
@@ -630,38 +611,29 @@ public sealed class TwitchOperationsUiTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
-        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        ) =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
-        }
     }
 
     private sealed class RejectingHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name)
-        {
-            return new(new RejectingHandler());
-        }
+        public HttpClient CreateClient(string name) => new(new RejectingHandler());
 
         private sealed class RejectingHandler : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
-            }
+            ) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         }
     }
 

@@ -37,10 +37,7 @@ internal abstract record RuntimeSessionHealthReport
             Func<RetryScheduled, TResult> retryScheduled,
             Func<ReconnectScheduled, TResult> reconnectScheduled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return retryScheduled(this);
-        }
+        ) => retryScheduled(this);
     }
 
     internal sealed record ReconnectScheduled : RuntimeSessionHealthReport
@@ -49,10 +46,7 @@ internal abstract record RuntimeSessionHealthReport
             Func<RetryScheduled, TResult> retryScheduled,
             Func<ReconnectScheduled, TResult> reconnectScheduled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return reconnectScheduled(this);
-        }
+        ) => reconnectScheduled(this);
     }
 
     internal sealed record Unhealthy : RuntimeSessionHealthReport
@@ -61,10 +55,7 @@ internal abstract record RuntimeSessionHealthReport
             Func<RetryScheduled, TResult> retryScheduled,
             Func<ReconnectScheduled, TResult> reconnectScheduled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return unhealthy(this);
-        }
+        ) => unhealthy(this);
     }
 }
 
@@ -76,8 +67,7 @@ internal interface IRuntimeSessionHealthReporter
 internal sealed class RuntimeSessionHealthLogger(ILogger<RuntimeSessionHealthLogger> log)
     : IRuntimeSessionHealthReporter
 {
-    public void Report(RuntimeSessionHealthReport report)
-    {
+    public void Report(RuntimeSessionHealthReport report) =>
         report
             .Match<Action>(
                 retry =>
@@ -109,5 +99,4 @@ internal sealed class RuntimeSessionHealthLogger(ILogger<RuntimeSessionHealthLog
                         )
             )
             .Invoke();
-    }
 }

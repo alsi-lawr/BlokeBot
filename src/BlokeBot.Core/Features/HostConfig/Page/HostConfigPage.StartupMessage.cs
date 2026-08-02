@@ -37,13 +37,11 @@ public partial class HostConfigPage
         _startupMessageDirty = true;
     }
 
-    private Task SaveStartupMessageAsync(int hostId)
-    {
-        return ObserveUiOperationAsync(
+    private Task SaveStartupMessageAsync(int hostId) =>
+        ObserveUiOperationAsync(
             nameof(SaveStartupMessageAsync),
             () => RunSelectedHostMutationAsync(hostId, () => SaveStartupMessageCoreAsync(hostId))
         );
-    }
 
     private async Task SaveStartupMessageCoreAsync(int hostId)
     {
@@ -92,10 +90,8 @@ public partial class HostConfigPage
         }
     }
 
-    private void PublishStartupMessageError(string message)
-    {
+    private void PublishStartupMessageError(string message) =>
         _toasts.Publish(
             ToastRequest<ErrorToastStrategy>.WithTitle(message, "Startup message not saved")
         );
-    }
 }

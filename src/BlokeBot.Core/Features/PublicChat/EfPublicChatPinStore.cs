@@ -189,8 +189,7 @@ internal sealed class EfPublicChatPinStore(
         BlokeBotDbContext db,
         PublicChatPinWorkItem item,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         await db
             .ActivePublicChatPins.Where(pin =>
                 pin.HostId == item.HostId
@@ -201,7 +200,6 @@ internal sealed class EfPublicChatPinStore(
                 && pin.PinnerTwitchUserId == item.RecordedPinnerTwitchUserId
             )
             .ExecuteDeleteAsync(cancellationToken);
-    }
 
     private async Task AddAlertAsync(
         BlokeBotDbContext db,
@@ -279,9 +277,8 @@ internal sealed class EfPublicChatPinStore(
     private static PublicChatPinWorkItem ToWorkItem(
         PublicChatPinOperation operation,
         bool reconcileOnly
-    )
-    {
-        return new PublicChatPinWorkItem(
+    ) =>
+        new PublicChatPinWorkItem(
             operation.Id,
             reconcileOnly,
             operation.Kind == PublicChatPinOperationKind.Unpin,
@@ -295,10 +292,6 @@ internal sealed class EfPublicChatPinStore(
             operation.DurationSeconds,
             operation.UnpinOnOwnerCompletion
         );
-    }
 
-    private DateTime UtcNow()
-    {
-        return timeProvider.GetUtcNow().UtcDateTime;
-    }
+    private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 }

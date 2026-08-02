@@ -10,12 +10,10 @@ internal sealed class AccessTokenProvider(
     TimeProvider timeProvider
 ) : IAccessTokenProvider
 {
-    public IO<string, AccessTokenUnavailableReason> GetAccessToken()
-    {
-        return IO<string, AccessTokenUnavailableReason>.Create(async cancellationToken =>
+    public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
+        IO<string, AccessTokenUnavailableReason>.Create(async cancellationToken =>
             await cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken)
         );
-    }
 
     private async Task<
         Result<string, AccessTokenUnavailableReason>
@@ -59,13 +57,11 @@ internal sealed class AccessTokenProvider(
     private Task<Option<string>> TryGetAccessTokenAsync(
         IAccessTokenCacheTransaction transaction,
         CancellationToken cancellationToken
-    )
-    {
-        return transaction.Current.Match(
+    ) =>
+        transaction.Current.Match(
             current => TryGetCurrentAccessTokenAsync(current, transaction, cancellationToken),
             static () => Task.FromResult(Option<string>.None)
         );
-    }
 
     private async Task<Option<string>> TryGetCurrentAccessTokenAsync(
         TokenSet current,

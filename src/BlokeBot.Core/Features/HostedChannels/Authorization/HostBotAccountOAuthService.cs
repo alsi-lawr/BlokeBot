@@ -8,10 +8,8 @@ public sealed class HostBotAccountOAuthService(
     HelixClient helix
 )
 {
-    public OAuthAuthorizationStartOutcome CreateAuthorizationUriForDefaultScopes(string state)
-    {
-        return CreateAuthorizationUriForScopes(state, RequestedScopes());
-    }
+    public OAuthAuthorizationStartOutcome CreateAuthorizationUriForDefaultScopes(string state) =>
+        CreateAuthorizationUriForScopes(state, RequestedScopes());
 
     public OAuthAuthorizationStartOutcome CreateAuthorizationUriForScopes(
         string state,
@@ -68,10 +66,7 @@ public sealed class HostBotAccountOAuthService(
         );
     }
 
-    public OAuthAuthorizationScopeSet RequestedScopes()
-    {
-        return settings.Identity.Scopes;
-    }
+    public OAuthAuthorizationScopeSet RequestedScopes() => settings.Identity.Scopes;
 
     private async Task<
         OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>
@@ -115,16 +110,12 @@ public sealed class HostBotAccountOAuthService(
         );
     }
 
-    private static bool IsConfiguredForAuthorization(BotIdentity identity)
-    {
-        return !string.IsNullOrWhiteSpace(identity.ClientId)
-            && !string.IsNullOrWhiteSpace(identity.RedirectUri);
-    }
+    private static bool IsConfiguredForAuthorization(BotIdentity identity) =>
+        !string.IsNullOrWhiteSpace(identity.ClientId)
+        && !string.IsNullOrWhiteSpace(identity.RedirectUri);
 
-    private static bool IsConfiguredForTokenExchange(BotIdentity identity)
-    {
-        return !string.IsNullOrWhiteSpace(identity.ClientId)
-            && !string.IsNullOrWhiteSpace(identity.ClientSecret)
-            && !string.IsNullOrWhiteSpace(identity.RedirectUri);
-    }
+    private static bool IsConfiguredForTokenExchange(BotIdentity identity) =>
+        !string.IsNullOrWhiteSpace(identity.ClientId)
+        && !string.IsNullOrWhiteSpace(identity.ClientSecret)
+        && !string.IsNullOrWhiteSpace(identity.RedirectUri);
 }
