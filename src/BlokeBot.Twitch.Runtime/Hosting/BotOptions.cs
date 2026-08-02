@@ -62,12 +62,10 @@ public sealed record PublicChatQueueAlertOptions
 
 public static class BotOptionsValidation
 {
-    public static bool IsValid(BotOptions options)
-    {
-        return Enum.IsDefined(options.Runtime)
-            && options.ChatMessageSendIntervalSeconds >= 0
-            && options.DuplicateChatMessageCooldownSeconds >= 0
-            && options.MaxChatMessageLength >= 0
-            && options.PublicChatQueueAlerts.StuckAfterSeconds > 0;
-    }
+    public static bool IsValid(BotOptions options) =>
+        Enum.IsDefined(options.Runtime)
+        && options.ChatMessageSendIntervalSeconds >= 0
+        && options.DuplicateChatMessageCooldownSeconds >= 0
+        && options.MaxChatMessageLength >= 0
+        && options.PublicChatQueueAlerts.StuckAfterSeconds > 0;
 }

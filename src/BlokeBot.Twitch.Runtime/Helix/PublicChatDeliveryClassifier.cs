@@ -63,9 +63,8 @@ internal static class PublicChatDeliveryClassifier
 
     internal static PublicChatDeliveryOutcome MapPreparationFailure(
         PublicChatPreparationOutcome outcome
-    )
-    {
-        return outcome.Match<PublicChatDeliveryOutcome>(
+    ) =>
+        outcome.Match<PublicChatDeliveryOutcome>(
             _ =>
                 throw new InvalidOperationException(
                     "A ready public chat preparation is not a delivery failure."
@@ -83,58 +82,47 @@ internal static class PublicChatDeliveryClassifier
                 Cause = unexpected.Cause,
             }
         );
-    }
 
-    internal static PublicChatDeliveryOutcome MapSendResult(PublicChatTransportSendResult result)
-    {
-        return result.Match<PublicChatDeliveryOutcome>(
+    internal static PublicChatDeliveryOutcome MapSendResult(PublicChatTransportSendResult result) =>
+        result.Match<PublicChatDeliveryOutcome>(
             sent => new PublicChatDeliveryOutcome.Sent(sent.TwitchMessageId),
             rejected => new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
         );
-    }
 
-    private static bool IsSafePreSendTransient(Exception exception)
-    {
-        return exception switch
+    private static bool IsSafePreSendTransient(Exception exception) =>
+        exception switch
         {
             TimeoutRejectedException or TimeoutException or OperationCanceledException => true,
             HttpRequestException http => IsTransientHttpStatus(http.StatusCode),
             SocketException or IOException => true,
             _ => false,
         };
-    }
 
-    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            || statusCode is HttpStatusCode.RequestTimeout
-            || (int)statusCode == 429
-            || (int)statusCode >= 500;
-    }
+    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode) =>
+        statusCode is null
+        || statusCode is HttpStatusCode.RequestTimeout
+        || (int)statusCode == 429
+        || (int)statusCode >= 500;
 
     private static PublicChatFailureDiagnostic.Preparation PreparationDiagnostic(
         Exception exception
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             FailureType = PublicChatFailureType.From(exception),
             HttpStatus = exception is HttpRequestException { StatusCode: { } status }
                 ? new PublicChatHttpStatus.Known(PublicChatHttpStatusCode.From(status))
                 : new PublicChatHttpStatus.Unavailable(),
         };
-    }
 
-    private static PublicChatFailureDiagnostic.Send SendDiagnostic(Exception exception)
-    {
-        return new()
+    private static PublicChatFailureDiagnostic.Send SendDiagnostic(Exception exception) =>
+        new()
         {
             FailureType = PublicChatFailureType.From(exception),
             HttpStatus = exception is HttpRequestException { StatusCode: { } status }
                 ? new PublicChatHttpStatus.Known(PublicChatHttpStatusCode.From(status))
                 : new PublicChatHttpStatus.Unavailable(),
         };
-    }
 
     private static void PropagateCallerCancellation(
         Exception exception,

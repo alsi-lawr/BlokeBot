@@ -21,8 +21,7 @@ internal sealed class PublicChatTerminalRejectionDispatcher(
     public async Task NotifyAsync(
         PublicChatTerminalRejection rejection,
         CancellationToken cancellationToken
-    )
-    {
+    ) =>
         _ = await fanOut.DispatchAsync(
             _observers,
             _ => new ObserverDispatch<
@@ -41,5 +40,4 @@ internal sealed class PublicChatTerminalRejectionDispatcher(
             static (observer, value, token) => observer.TerminalRejectionAsync(value, token),
             cancellationToken
         );
-    }
 }

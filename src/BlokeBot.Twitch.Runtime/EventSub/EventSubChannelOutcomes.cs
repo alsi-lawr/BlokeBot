@@ -30,9 +30,8 @@ internal abstract record EventSubChannelReconciliationOutcome
         Func<StartupMessageRejected, TResult> startupMessageRejected,
         Func<TokenUnavailable, TResult> tokenUnavailable,
         Func<UnresolvedDeletion, TResult> unresolvedDeletion
-    )
-    {
-        return this switch
+    ) =>
+        this switch
         {
             Completed outcome => completed(outcome),
             MissingChannel outcome => missingChannel(outcome),
@@ -42,7 +41,6 @@ internal abstract record EventSubChannelReconciliationOutcome
             UnresolvedDeletion outcome => unresolvedDeletion(outcome),
             _ => throw new UnreachableException("Unknown EventSub channel reconciliation outcome."),
         };
-    }
 
     internal sealed record Completed : EventSubChannelReconciliationOutcome;
 
@@ -59,10 +57,7 @@ internal abstract record EventSubChannelReconciliationOutcome
     {
         internal required EventSubChannelFailureDetails Failure { get; init; }
 
-        public override string ToString()
-        {
-            return nameof(UnresolvedDeletion);
-        }
+        public override string ToString() => nameof(UnresolvedDeletion);
     }
 }
 
@@ -80,10 +75,7 @@ internal abstract record EventSubStartupDeliveryOutcome
         internal override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return completed(this);
-        }
+        ) => completed(this);
     }
 
     internal sealed record Rejected : EventSubStartupDeliveryOutcome
@@ -91,9 +83,6 @@ internal abstract record EventSubStartupDeliveryOutcome
         internal override TResult Match<TResult>(
             Func<Completed, TResult> completed,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }

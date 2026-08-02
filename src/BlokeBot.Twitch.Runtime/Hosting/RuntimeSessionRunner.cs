@@ -382,16 +382,14 @@ internal static class RuntimeSessionRunner
         int attempt,
         Exception exception,
         CancellationToken cancellationToken
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Runtime = runtime,
             Classification = classify(exception, cancellationToken),
             Attempt = attempt,
             Exception = exception,
         };
-    }
 }
 
 internal abstract record RuntimeConnectionTarget
@@ -408,10 +406,7 @@ internal abstract record RuntimeConnectionTarget
         internal override TResult Match<TResult>(
             Func<Initial, TResult> initial,
             Func<EventSubReconnect, TResult> eventSubReconnect
-        )
-        {
-            return initial(this);
-        }
+        ) => initial(this);
     }
 
     internal sealed record EventSubReconnect : RuntimeConnectionTarget
@@ -421,10 +416,7 @@ internal abstract record RuntimeConnectionTarget
         internal override TResult Match<TResult>(
             Func<Initial, TResult> initial,
             Func<EventSubReconnect, TResult> eventSubReconnect
-        )
-        {
-            return eventSubReconnect(this);
-        }
+        ) => eventSubReconnect(this);
     }
 }
 
@@ -444,10 +436,7 @@ internal abstract record RuntimeSessionEstablishment
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return idle(this);
-        }
+        ) => idle(this);
     }
 
     internal sealed record Established : RuntimeSessionEstablishment
@@ -458,10 +447,7 @@ internal abstract record RuntimeSessionEstablishment
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return established(this);
-        }
+        ) => established(this);
     }
 
     internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
@@ -471,10 +457,7 @@ internal abstract record RuntimeSessionEstablishment
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<TokenUnavailable, TResult> tokenUnavailable
-        )
-        {
-            return tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
     }
 }
 
@@ -508,10 +491,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Canceled, TResult> canceled,
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return idle(this);
-        }
+        ) => idle(this);
     }
 
     internal sealed record Established : RuntimeSessionOutcome
@@ -526,10 +506,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Canceled, TResult> canceled,
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return established(this);
-        }
+        ) => established(this);
     }
 
     internal sealed record Canceled : RuntimeSessionOutcome
@@ -540,10 +517,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Canceled, TResult> canceled,
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return canceled(this);
-        }
+        ) => canceled(this);
     }
 
     internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
@@ -555,10 +529,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Canceled, TResult> canceled,
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return tokenUnavailable(this);
-        }
+        ) => tokenUnavailable(this);
     }
 
     internal sealed record Unhealthy : RuntimeSessionOutcome
@@ -571,10 +542,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Canceled, TResult> canceled,
             Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return unhealthy(this);
-        }
+        ) => unhealthy(this);
     }
 }
 
@@ -598,10 +566,7 @@ internal abstract record RuntimeListenOutcome
             Func<ProtocolHandoff, TResult> protocolHandoff,
             Func<Canceled, TResult> canceled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return reconnect(this);
-        }
+        ) => reconnect(this);
     }
 
     internal sealed record ProtocolHandoff : RuntimeListenOutcome
@@ -617,10 +582,7 @@ internal abstract record RuntimeListenOutcome
             Func<ProtocolHandoff, TResult> protocolHandoff,
             Func<Canceled, TResult> canceled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return protocolHandoff(this);
-        }
+        ) => protocolHandoff(this);
     }
 
     internal sealed record Canceled : RuntimeListenOutcome
@@ -630,10 +592,7 @@ internal abstract record RuntimeListenOutcome
             Func<ProtocolHandoff, TResult> protocolHandoff,
             Func<Canceled, TResult> canceled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return canceled(this);
-        }
+        ) => canceled(this);
     }
 
     internal sealed record Unhealthy : RuntimeListenOutcome
@@ -645,10 +604,7 @@ internal abstract record RuntimeListenOutcome
             Func<ProtocolHandoff, TResult> protocolHandoff,
             Func<Canceled, TResult> canceled,
             Func<Unhealthy, TResult> unhealthy
-        )
-        {
-            return unhealthy(this);
-        }
+        ) => unhealthy(this);
     }
 }
 
@@ -666,10 +622,7 @@ internal abstract record RuntimeSessionHandoff
         internal override TResult Match<TResult>(
             Func<None, TResult> none,
             Func<Pending, TResult> pending
-        )
-        {
-            return none(this);
-        }
+        ) => none(this);
     }
 
     internal sealed record Pending : RuntimeSessionHandoff
@@ -681,10 +634,7 @@ internal abstract record RuntimeSessionHandoff
         internal override TResult Match<TResult>(
             Func<None, TResult> none,
             Func<Pending, TResult> pending
-        )
-        {
-            return pending(this);
-        }
+        ) => pending(this);
     }
 }
 
@@ -706,8 +656,6 @@ internal sealed class RuntimeIdleWait(TimeProvider timeProvider) : IRuntimeIdleW
 {
     private static readonly TimeSpan _idleInterval = TimeSpan.FromSeconds(30);
 
-    public ValueTask WaitAsync(CancellationToken cancellationToken)
-    {
-        return new(Task.Delay(_idleInterval, timeProvider, cancellationToken));
-    }
+    public ValueTask WaitAsync(CancellationToken cancellationToken) =>
+        new(Task.Delay(_idleInterval, timeProvider, cancellationToken));
 }

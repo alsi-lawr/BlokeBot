@@ -71,9 +71,8 @@ public sealed record BotSettings
         return Create(options, BotIdentity.FromConfiguredOptions(options.Identity, boundary));
     }
 
-    private static BotSettings Create(BotOptions options, BotIdentity identity)
-    {
-        return new()
+    private static BotSettings Create(BotOptions options, BotIdentity identity) =>
+        new()
         {
             Runtime = options.Runtime,
             ChatMessageSendIntervalSeconds = options.ChatMessageSendIntervalSeconds,
@@ -92,10 +91,7 @@ public sealed record BotSettings
             },
             Identity = identity,
         };
-    }
 
-    public override string ToString()
-    {
-        return $"TwitchBotSettings {{ Runtime = {Runtime}, StartupMessage = [redacted], Identity = {Identity} }}";
-    }
+    public override string ToString() =>
+        $"TwitchBotSettings {{ Runtime = {Runtime}, StartupMessage = [redacted], Identity = {Identity} }}";
 }

@@ -10,8 +10,7 @@ internal sealed partial class EventSubChannelSession
         EventSubChannelRecoveryTrigger trigger,
         int attempt,
         EventSubChannelReconciliationOutcome outcome
-    )
-    {
+    ) =>
         outcome
             .Match<Action>(
                 _ => () => PublishSuccess(channel, target, attempt, trigger),
@@ -64,7 +63,6 @@ internal sealed partial class EventSubChannelSession
                         )
             )
             .Invoke();
-    }
 
     private void PublishSuccess(
         string channel,
@@ -109,8 +107,7 @@ internal sealed partial class EventSubChannelSession
         EventSubChannelRecoveryTrigger trigger,
         int attempt,
         EventSubChannelFailureContext failure
-    )
-    {
+    ) =>
         Publish(
             new EventSubChannelDiagnosticReport.Recovering
             {
@@ -127,7 +124,6 @@ internal sealed partial class EventSubChannelSession
                 Failure = failure,
             }
         );
-    }
 
     private void PublishDegraded(
         string channel,

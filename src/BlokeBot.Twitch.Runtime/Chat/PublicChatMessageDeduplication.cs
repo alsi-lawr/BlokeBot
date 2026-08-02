@@ -23,10 +23,8 @@ internal static class PublicChatMessageDeduplication
         return Hash($"automatic-raid:{validated.HostId}:{validated.ProviderMessageId}");
     }
 
-    private static PublicChatDeduplicationKey Hash(string material)
-    {
-        return new PublicChatDeduplicationKey(
+    private static PublicChatDeduplicationKey Hash(string material) =>
+        new PublicChatDeduplicationKey(
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))
         );
-    }
 }

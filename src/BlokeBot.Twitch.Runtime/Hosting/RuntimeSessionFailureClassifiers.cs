@@ -12,9 +12,8 @@ internal static class IrcSessionFailureClassifier
     internal static RuntimeSessionFailureClassification Classify(
         Exception exception,
         CancellationToken cancellationToken
-    )
-    {
-        return exception switch
+    ) =>
+        exception switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
                 RuntimeSessionFailureClassification.Cancellation,
@@ -28,14 +27,13 @@ internal static class IrcSessionFailureClassifier
                 RuntimeSessionFailureClassification.Terminal,
             _ => RuntimeSessionFailureClassification.Unexpected,
         };
-    }
 
-    private static RuntimeSessionFailureClassification ClassifyHttp(HttpRequestException exception)
-    {
-        return RuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
+    private static RuntimeSessionFailureClassification ClassifyHttp(
+        HttpRequestException exception
+    ) =>
+        RuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
             ? RuntimeSessionFailureClassification.Transient
             : RuntimeSessionFailureClassification.Terminal;
-    }
 }
 
 internal static class EventSubSessionFailureClassifier
@@ -43,9 +41,8 @@ internal static class EventSubSessionFailureClassifier
     internal static RuntimeSessionFailureClassification Classify(
         Exception exception,
         CancellationToken cancellationToken
-    )
-    {
-        return exception switch
+    ) =>
+        exception switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
                 RuntimeSessionFailureClassification.Cancellation,
@@ -59,29 +56,24 @@ internal static class EventSubSessionFailureClassifier
                 RuntimeSessionFailureClassification.Terminal,
             _ => RuntimeSessionFailureClassification.Unexpected,
         };
-    }
 
-    private static RuntimeSessionFailureClassification ClassifyHttp(HttpRequestException exception)
-    {
-        return RuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
+    private static RuntimeSessionFailureClassification ClassifyHttp(
+        HttpRequestException exception
+    ) =>
+        RuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
             ? RuntimeSessionFailureClassification.Transient
             : RuntimeSessionFailureClassification.Terminal;
-    }
 }
 
 internal static class RuntimeSessionFailureClassifier
 {
-    internal static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
-            || (int)statusCode >= 500;
-    }
+    internal static bool IsTransientHttpStatus(HttpStatusCode? statusCode) =>
+        statusCode is null
+        || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+        || (int)statusCode >= 500;
 
-    internal static bool IsRetryable(RuntimeSessionFailureClassification classification)
-    {
-        return classification
+    internal static bool IsRetryable(RuntimeSessionFailureClassification classification) =>
+        classification
             is RuntimeSessionFailureClassification.Transient
                 or RuntimeSessionFailureClassification.Timeout;
-    }
 }

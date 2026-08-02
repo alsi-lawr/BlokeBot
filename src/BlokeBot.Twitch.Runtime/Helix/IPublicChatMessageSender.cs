@@ -26,10 +26,7 @@ public interface IPublicChatMessageSender
         PublicChatDeliveryDeadline deadline,
         PublicChatDeliveryCorrelation correlation,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
-    }
+    ) => ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
 
     ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
         string channel,
@@ -38,10 +35,7 @@ public interface IPublicChatMessageSender
         PublicChatDeliveryCorrelation correlation,
         PublicChatPinIntent pinIntent,
         CancellationToken cancellationToken
-    )
-    {
-        return ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
-    }
+    ) => ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
 
     ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
@@ -49,10 +43,7 @@ public interface IPublicChatMessageSender
         PublicChatDeliveryDeadline deadline,
         PublicChatPinIntent pinIntent,
         CancellationToken cancellationToken
-    )
-    {
-        return SendAsync(channel, message, deadline, cancellationToken);
-    }
+    ) => SendAsync(channel, message, deadline, cancellationToken);
 }
 
 public sealed record PublicChatDeliveryCorrelation(int HostId, string ProviderMessageId)
@@ -101,10 +92,7 @@ public abstract record PublicChatSendOutcome
         public override TResult Match<TResult>(
             Func<Accepted, TResult> accepted,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return accepted(this);
-        }
+        ) => accepted(this);
     }
 
     /// <summary>
@@ -115,9 +103,6 @@ public abstract record PublicChatSendOutcome
         public override TResult Match<TResult>(
             Func<Accepted, TResult> accepted,
             Func<Rejected, TResult> rejected
-        )
-        {
-            return rejected(this);
-        }
+        ) => rejected(this);
     }
 }

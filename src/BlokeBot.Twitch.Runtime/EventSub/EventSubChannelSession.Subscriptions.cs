@@ -9,9 +9,8 @@ internal sealed partial class EventSubChannelSession
         EventSubChannelReconciliationTarget target,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
-    )
-    {
-        return target switch
+    ) =>
+        target switch
         {
             EventSubChannelReconciliationTarget.Present => EnsurePresentAsync(
                 channel,
@@ -25,7 +24,6 @@ internal sealed partial class EventSubChannelSession
             ),
             _ => throw new UnreachableException("Unknown EventSub channel reconciliation target."),
         };
-    }
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsurePresentAsync(
         string channel,
@@ -637,9 +635,8 @@ internal sealed partial class EventSubChannelSession
     private static EventSubOperationSubscriptionState GetOperationState(
         ActiveEventSubSubscription subscription,
         EventSubOperationSubscriptionKind kind
-    )
-    {
-        return kind switch
+    ) =>
+        kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts => subscription.ShoutoutSubscriptions,
             EventSubOperationSubscriptionKind.Raids => subscription.RaidSubscriptions,
@@ -651,15 +648,13 @@ internal sealed partial class EventSubChannelSession
                 "Unknown Native Twitch EventSub subscription kind."
             ),
         };
-    }
 
     private static ActiveEventSubSubscription WithOperationState(
         ActiveEventSubSubscription subscription,
         EventSubOperationSubscriptionKind kind,
         EventSubOperationSubscriptionState state
-    )
-    {
-        return kind switch
+    ) =>
+        kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts => subscription with
             {
@@ -685,13 +680,11 @@ internal sealed partial class EventSubChannelSession
                 "Unknown Native Twitch EventSub subscription kind."
             ),
         };
-    }
 
     private static EventSubAuthorizationContext AuthorizationFor(
         EventSubOperationSubscriptionKind kind
-    )
-    {
-        return kind switch
+    ) =>
+        kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts =>
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
@@ -707,13 +700,11 @@ internal sealed partial class EventSubChannelSession
                 "Unknown Native Twitch EventSub subscription kind."
             ),
         };
-    }
 
     private static AccessTokenUnavailableReason UnavailableReasonFor(
         EventSubOperationSubscriptionKind kind
-    )
-    {
-        return kind switch
+    ) =>
+        kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts =>
                 AccessTokenUnavailableReason.MissingRefreshToken,
@@ -729,7 +720,6 @@ internal sealed partial class EventSubChannelSession
                 "Unknown Native Twitch EventSub subscription kind."
             ),
         };
-    }
 
     private void ReplaceTrackedSubscription(ActiveEventSubSubscription subscription)
     {

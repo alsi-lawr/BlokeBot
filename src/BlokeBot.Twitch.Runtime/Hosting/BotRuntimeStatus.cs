@@ -27,10 +27,7 @@ public abstract record BotRuntimeStatus
             Func<Unauthorized, TResult> unauthorized,
             Func<Authorized, TResult> authorized,
             Func<Connected, TResult> connected
-        )
-        {
-            return unauthorized(this);
-        }
+        ) => unauthorized(this);
     }
 
     /// <summary>
@@ -42,10 +39,7 @@ public abstract record BotRuntimeStatus
             Func<Unauthorized, TResult> unauthorized,
             Func<Authorized, TResult> authorized,
             Func<Connected, TResult> connected
-        )
-        {
-            return authorized(this);
-        }
+        ) => authorized(this);
     }
 
     /// <summary>
@@ -75,9 +69,6 @@ public abstract record BotRuntimeStatus
             Func<Unauthorized, TResult> unauthorized,
             Func<Authorized, TResult> authorized,
             Func<Connected, TResult> connected
-        )
-        {
-            return connected(this);
-        }
+        ) => connected(this);
     }
 }

@@ -10,8 +10,7 @@ internal static class RuntimeSessionResilience
         ResiliencePipelineBuilder builder,
         IrcSessionResiliencePolicy policy,
         IRuntimeSessionHealthReporter health
-    )
-    {
+    ) =>
         Configure(
             builder,
             ChatRuntime.Irc,
@@ -23,14 +22,12 @@ internal static class RuntimeSessionResilience
             IrcSessionFailureClassifier.Classify,
             health
         );
-    }
 
     internal static void ConfigureEventSub(
         ResiliencePipelineBuilder builder,
         EventSubSessionResiliencePolicy policy,
         IRuntimeSessionHealthReporter health
-    )
-    {
+    ) =>
         Configure(
             builder,
             ChatRuntime.EventSub,
@@ -42,7 +39,6 @@ internal static class RuntimeSessionResilience
             EventSubSessionFailureClassifier.Classify,
             health
         );
-    }
 
     private static void Configure(
         ResiliencePipelineBuilder builder,
@@ -106,14 +102,12 @@ internal sealed class IrcSessionResiliencePipeline(ResiliencePipeline pipeline)
     internal ValueTask<RuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<RuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
-    )
-    {
-        return pipeline.ExecuteAsync(
+    ) =>
+        pipeline.ExecuteAsync(
             static (callback, token) => new ValueTask<RuntimeSessionEstablishment>(callback(token)),
             operation,
             cancellationToken
         );
-    }
 }
 
 internal sealed class EventSubSessionResiliencePipeline(ResiliencePipeline pipeline)
@@ -121,12 +115,10 @@ internal sealed class EventSubSessionResiliencePipeline(ResiliencePipeline pipel
     internal ValueTask<RuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<RuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
-    )
-    {
-        return pipeline.ExecuteAsync(
+    ) =>
+        pipeline.ExecuteAsync(
             static (callback, token) => new ValueTask<RuntimeSessionEstablishment>(callback(token)),
             operation,
             cancellationToken
         );
-    }
 }

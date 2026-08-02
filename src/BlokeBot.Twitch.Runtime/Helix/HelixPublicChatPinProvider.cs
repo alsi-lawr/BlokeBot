@@ -245,9 +245,8 @@ internal static class PublicChatPinProviderDecision
         ChatPinnedMessageResult current,
         string attemptedPinnerTwitchUserId,
         string unresolvedReason
-    )
-    {
-        return current switch
+    ) =>
+        current switch
         {
             ChatPinnedMessageResult.Found found
                 when found.MessageId == item.TwitchMessageId
@@ -264,7 +263,6 @@ internal static class PublicChatPinProviderDecision
             ),
             _ => new PublicChatPinExecutionOutcome.Terminal(unresolvedReason),
         };
-    }
 
     internal static PublicChatPinExecutionOutcome? ClassifyUnpinRead(
         PublicChatPinWorkItem item,

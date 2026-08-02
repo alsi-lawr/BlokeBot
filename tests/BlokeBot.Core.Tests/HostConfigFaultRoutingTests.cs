@@ -40,8 +40,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostConfigFaultRoutingTests
 {
     [Test]
-    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat()
-    {
+    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat() =>
         await AssertTwitchOperationsPresentationAsync(
             ReadyBroadcasterStatus(),
             owner: true,
@@ -55,11 +54,9 @@ public sealed class HostConfigFaultRoutingTests
                 BroadcasterActions(page).ShouldBeEmpty();
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect()
-    {
+    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: true,
@@ -73,11 +70,9 @@ public sealed class HostConfigFaultRoutingTests
                 action.Markup.ShouldContain("Connect operations");
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect()
-    {
+    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Invalid([]),
             owner: true,
@@ -91,11 +86,9 @@ public sealed class HostConfigFaultRoutingTests
                 action.Markup.ShouldContain("Reconnect operations");
             }
         );
-    }
 
     [Test]
-    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction()
-    {
+    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction() =>
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: false,
@@ -107,7 +100,6 @@ public sealed class HostConfigFaultRoutingTests
                 BroadcasterActions(page).ShouldBeEmpty();
             }
         );
-    }
 
     [Test]
     public async Task ViewerCommandsDisclosure_OpeningAndEvents_PreserveDirtyHostDrafts()
@@ -563,16 +555,13 @@ public sealed class HostConfigFaultRoutingTests
 
     private static IReadOnlyList<IRenderedComponent<AuthPopupButton>> BroadcasterActions(
         IRenderedComponent<HostConfigPage> page
-    )
-    {
-        return page.FindComponents<AuthPopupButton>()
+    ) =>
+        page.FindComponents<AuthPopupButton>()
             .Where(action => action.Instance.Url == "/oauth/broadcaster/start")
             .ToArray();
-    }
 
-    private static TokenStatus ReadyBroadcasterStatus()
-    {
-        return new TokenStatus.Ready(
+    private static TokenStatus ReadyBroadcasterStatus() =>
+        new TokenStatus.Ready(
             "broadcaster-token",
             new TokenValidation(
                 "123",
@@ -582,7 +571,6 @@ public sealed class HostConfigFaultRoutingTests
             [.. HostBroadcasterAuthorizationService.MilestoneScopes],
             [.. HostBroadcasterAuthorizationService.MilestoneScopes]
         );
-    }
 
     private static void SetModeratorClaims(BunitAuthorizationContext authorization, int hostId)
     {
@@ -854,17 +842,11 @@ public sealed class HostConfigFaultRoutingTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        )
-        {
-            return Task.FromResult(status);
-        }
+        ) => Task.FromResult(status);
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        )
-        {
-            throw new NotSupportedException();
-        }
+        ) => throw new NotSupportedException();
     }
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory

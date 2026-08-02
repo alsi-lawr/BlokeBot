@@ -8,9 +8,8 @@ internal sealed class EventSubRuntime(
     IRuntimeIdleWait idleWait
 )
 {
-    public Task RunAsync(CancellationToken stoppingToken)
-    {
-        return RuntimeSessionRunner.RunUntilStoppedAsync(
+    public Task RunAsync(CancellationToken stoppingToken) =>
+        RuntimeSessionRunner.RunUntilStoppedAsync(
             ChatRuntime.EventSub,
             new RuntimeConnectionTarget.Initial(),
             EstablishSessionAsync,
@@ -20,14 +19,12 @@ internal sealed class EventSubRuntime(
             idleWait,
             stoppingToken
         );
-    }
 
     internal Task<RuntimeSessionOutcome> EstablishSessionAsync(
         RuntimeConnectionTarget target,
         CancellationToken stoppingToken
-    )
-    {
-        return RuntimeSessionRunner.EstablishOnceAsync(
+    ) =>
+        RuntimeSessionRunner.EstablishOnceAsync(
             ChatRuntime.EventSub,
             cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
@@ -36,5 +33,4 @@ internal sealed class EventSubRuntime(
             status,
             stoppingToken
         );
-    }
 }

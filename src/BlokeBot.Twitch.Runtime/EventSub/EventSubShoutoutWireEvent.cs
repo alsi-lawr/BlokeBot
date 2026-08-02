@@ -34,9 +34,11 @@ internal sealed record EventSubShoutoutWireEvent
     [JsonPropertyName("target_cooldown_ends_at")]
     public DateTimeOffset? TargetCooldownEndsAt { get; init; }
 
-    internal EventSubShoutoutEvent ToDomain(EventSubShoutoutDirection direction, string messageId)
-    {
-        return new(
+    internal EventSubShoutoutEvent ToDomain(
+        EventSubShoutoutDirection direction,
+        string messageId
+    ) =>
+        new(
             BroadcasterUserId,
             BroadcasterUserLogin,
             FromBroadcasterUserId,
@@ -50,5 +52,4 @@ internal sealed record EventSubShoutoutWireEvent
             direction,
             messageId
         );
-    }
 }

@@ -18,9 +18,8 @@ internal sealed class EventSubChannelOperations(
     public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
         string channel,
         EventSubAuthorizationContext authorization
-    )
-    {
-        return authorization.Match(
+    ) =>
+        authorization.Match(
             _ => accounts.GetBotAccount(channel),
             _ => accounts.GetBotAccount(channel),
             _ =>
@@ -33,7 +32,6 @@ internal sealed class EventSubChannelOperations(
                     )
                 )
         );
-    }
 
     public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
@@ -309,9 +307,8 @@ internal sealed class EventSubChannelOperations(
         BotAccount account,
         string sessionId,
         CancellationToken ct
-    )
-    {
-        return CreateBroadcasterOperationSubscriptionsAsync(
+    ) =>
+        CreateBroadcasterOperationSubscriptionsAsync(
             channel,
             authorization,
             account,
@@ -319,7 +316,6 @@ internal sealed class EventSubChannelOperations(
             ["channel.poll.begin", "channel.poll.progress", "channel.poll.end"],
             ct
         );
-    }
 
     private ValueTask<EventSubSubscriptionSetupOutcome> CreateRewardRedemptionSubscriptionsAsync(
         string channel,
@@ -327,9 +323,8 @@ internal sealed class EventSubChannelOperations(
         BotAccount account,
         string sessionId,
         CancellationToken ct
-    )
-    {
-        return CreateBroadcasterOperationSubscriptionsAsync(
+    ) =>
+        CreateBroadcasterOperationSubscriptionsAsync(
             channel,
             authorization,
             account,
@@ -340,7 +335,6 @@ internal sealed class EventSubChannelOperations(
             ],
             ct
         );
-    }
 
     private ValueTask<EventSubSubscriptionSetupOutcome> CreatePredictionSubscriptionsAsync(
         string channel,
@@ -348,9 +342,8 @@ internal sealed class EventSubChannelOperations(
         BotAccount account,
         string sessionId,
         CancellationToken ct
-    )
-    {
-        return CreateBroadcasterOperationSubscriptionsAsync(
+    ) =>
+        CreateBroadcasterOperationSubscriptionsAsync(
             channel,
             authorization,
             account,
@@ -363,7 +356,6 @@ internal sealed class EventSubChannelOperations(
             ],
             ct
         );
-    }
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateBroadcasterOperationSubscriptionsAsync(
         string channel,
@@ -435,10 +427,8 @@ internal sealed class EventSubChannelOperations(
         );
     }
 
-    public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken ct)
-    {
-        return new(lifecycle.ChannelStartedAsync(channel, ct));
-    }
+    public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken ct) =>
+        new(lifecycle.ChannelStartedAsync(channel, ct));
 
     public async ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
@@ -508,19 +498,16 @@ internal sealed class EventSubChannelOperations(
         );
     }
 
-    public ValueTask CompleteStopAsync(string channel, CancellationToken ct)
-    {
-        return new(lifecycle.ChannelStoppedAsync(channel, ct));
-    }
+    public ValueTask CompleteStopAsync(string channel, CancellationToken ct) =>
+        new(lifecycle.ChannelStoppedAsync(channel, ct));
 
     private static ActiveEventSubSubscription CreateActive(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
         IReadOnlyList<string> ids
-    )
-    {
-        return new()
+    ) =>
+        new()
         {
             Channel = channel,
             SubscriptionId = ids[0],
@@ -530,5 +517,4 @@ internal sealed class EventSubChannelOperations(
             AccessToken = account.AccessToken,
             Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
         };
-    }
 }
