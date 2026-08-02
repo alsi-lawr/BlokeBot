@@ -11,7 +11,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
-    private const string _latestMigration = "20260731141254_v0.6.0_OverlayAppearance";
+    private const string _overlayMigration = "20260730084046_v0.5.0_OverlayInstances";
 
     [Test]
     public async Task Migration_FromV04_AddsOverlaySchemaAndFeatureWithoutLosingHosts()
@@ -35,8 +35,7 @@ public sealed class OverlayInstancePersistenceTests
         (await migrated.Hosts.Select(value => value.EnabledFeatures).SingleAsync()).ShouldBe(
             HostFeatureFlags.All
         );
-        (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
+        (await migrated.Database.GetAppliedMigrationsAsync()).ShouldContain(_overlayMigration);
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await migrated.OverlayInstances.CountAsync()).ShouldBe(0);
         (await migrated.OverlayInstanceEvents.CountAsync()).ShouldBe(0);

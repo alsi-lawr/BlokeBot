@@ -1,3 +1,5 @@
+using BlokeBot.Core.Features.PlayWithViewers;
+
 namespace BlokeBot.Core.Features.Overlays;
 
 internal enum OverlayLivePublicationKind
@@ -166,6 +168,32 @@ internal sealed record EventFeedV1OverlayLiveEnvelope
     public required string EventType { get; init; }
     public required DateTimeOffset OccurredAtUtc { get; init; }
     public required EventFeedV1OverlayLivePayload Payload { get; init; }
+}
+
+internal sealed record ViewerQueueV1OverlayLivePayload
+{
+    public string OverlayType => "viewerQueue";
+
+    public int SchemaVersion => 1;
+
+    public required string Animation { get; init; }
+
+    public required PlayQueueOverlayState State { get; init; }
+}
+
+internal sealed record ViewerQueueV1OverlayLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public required string EventType { get; init; }
+
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+
+    public required ViewerQueueV1OverlayLivePayload Payload { get; init; }
 }
 
 internal sealed record CuePlayerV1OverlayLivePayload

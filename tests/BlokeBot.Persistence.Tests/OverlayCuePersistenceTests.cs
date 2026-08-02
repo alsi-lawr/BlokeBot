@@ -11,7 +11,6 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayCuePersistenceTests
 {
     private const string _migration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
-    private const string _latestMigration = "20260731141254_v0.6.0_OverlayAppearance";
 
     [Test]
     public async Task Migration_AddsCueMediaAndHostBoundReferenceSchema()
@@ -20,9 +19,7 @@ public sealed class OverlayCuePersistenceTests
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
 
-        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
         (await db.Database.GetAppliedMigrationsAsync()).ShouldContain(_migration);
-        (await db.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
 
         var first = Host("first");

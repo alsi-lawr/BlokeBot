@@ -478,6 +478,7 @@ public sealed class OverlayAppearanceTests
               }
               removeAttribute(name) { this.attributes.delete(name); }
               querySelector() { return null; }
+              querySelectorAll() { return []; }
             }
             class FakeHtmlElement extends FakeElement {}
             class FakeSvgElement extends FakeElement {

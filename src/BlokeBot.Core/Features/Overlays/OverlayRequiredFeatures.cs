@@ -10,6 +10,7 @@ internal static class OverlayRequiredFeatures
             OverlayType.Guessing => HostFeatureFlags.Overlays | HostFeatureFlags.Guessing,
             OverlayType.Giveaway => HostFeatureFlags.Overlays | HostFeatureFlags.Points,
             OverlayType.EventFeed => HostFeatureFlags.Overlays,
+            OverlayType.ViewerQueue => HostFeatureFlags.Overlays | HostFeatureFlags.PlayWithViewers,
             _ => HostFeatureFlags.Overlays,
         };
 

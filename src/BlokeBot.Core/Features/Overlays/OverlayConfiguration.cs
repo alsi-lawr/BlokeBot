@@ -60,6 +60,7 @@ public abstract record OverlayConfiguration
                 OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
                 OverlayType.Giveaway => ParseGiveaway(document.RootElement),
                 OverlayType.EventFeed => ParseEventFeed(document.RootElement),
+                OverlayType.ViewerQueue => ParseViewerQueue(document.RootElement),
                 _ => new OverlayConfigurationParseResult.Invalid(
                     "The overlay type is not supported."
                 ),
@@ -240,6 +241,39 @@ public abstract record OverlayConfiguration
         {
             return new OverlayConfigurationParseResult.Invalid(
                 "An event feed configuration must use EventFeedV1 with capacity 1 to 25, dropNewest or replaceNewestSameKind overflow, and exact pointAward, guessingWinner, and giveawayWinner settings."
+            );
+        }
+    }
+
+    private static OverlayConfigurationParseResult ParseViewerQueue(JsonElement root)
+    {
+        try
+        {
+            var dto = root.Deserialize<ViewerQueueConfigurationDto>(
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    PropertyNameCaseInsensitive = false,
+                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+                }
+            );
+            return dto is null || dto.SchemaVersion != 1 || dto.Appearance is null
+                ? new OverlayConfigurationParseResult.Invalid(
+                    "A Viewer Queue configuration must contain schemaVersion 1, a saved queue, current and next row counts from 0 to 12, and appearance."
+                )
+                : new OverlayConfigurationParseResult.Valid(
+                    new ViewerQueueV1(
+                        dto.QueueId,
+                        dto.CurrentRows,
+                        dto.NextRows,
+                        ParseAppearance(dto.Appearance)
+                    )
+                );
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            return new OverlayConfigurationParseResult.Invalid(
+                "A Viewer Queue configuration must contain schemaVersion 1, a saved queue, current and next row counts from 0 to 12, and appearance."
             );
         }
     }
@@ -599,6 +633,69 @@ public abstract record OverlayConfiguration
             }
         }
     }
+
+    public sealed record ViewerQueueV1 : OverlayConfiguration
+    {
+        public const int MinimumRows = 0;
+        public const int MaximumRows = 12;
+        public const int DefaultCurrentRows = 4;
+        public const int DefaultNextRows = 6;
+
+        public ViewerQueueV1(
+            int queueId,
+            int currentRows,
+            int nextRows,
+            OverlayAppearance? appearance = null
+        )
+        {
+            if (
+                queueId <= 0
+                || currentRows is < MinimumRows or > MaximumRows
+                || nextRows is < MinimumRows or > MaximumRows
+            )
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(queueId),
+                    "Choose a saved queue and show from 0 to 12 current and next rows."
+                );
+            }
+
+            QueueId = queueId;
+            CurrentRows = currentRows;
+            NextRows = nextRows;
+            Appearance = appearance ?? OverlayAppearance.ViewerQueueDefault;
+        }
+
+        public override OverlayType Type => OverlayType.ViewerQueue;
+
+        public override int SchemaVersion => 1;
+
+        public int QueueId { get; }
+
+        public int CurrentRows { get; }
+
+        public int NextRows { get; }
+
+        public OverlayAppearance Appearance { get; }
+
+        internal override string ToPersistenceJson() =>
+            JsonSerializer.Serialize(
+                new ViewerQueueConfigurationDto(
+                    SchemaVersion,
+                    QueueId,
+                    CurrentRows,
+                    NextRows,
+                    new OverlayAppearanceDto(
+                        Appearance.X,
+                        Appearance.Y,
+                        Appearance.Width,
+                        Appearance.Height,
+                        Appearance.Css
+                    )
+                ),
+                _persistenceJsonOptions
+            );
+    }
 }
 
 public enum EventFeedOverflowPolicy
@@ -655,6 +752,14 @@ internal sealed record EventFeedKindConfigurationDto(
     string? Template,
     string? Priority,
     int DurationSeconds
+);
+
+internal sealed record ViewerQueueConfigurationDto(
+    int SchemaVersion,
+    int QueueId,
+    int CurrentRows,
+    int NextRows,
+    OverlayAppearanceDto? Appearance
 );
 
 public abstract record OverlayConfigurationParseResult

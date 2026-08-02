@@ -1,5 +1,6 @@
 @page "/overlays/sources"
 @using BlokeBot.Core.Features.HostedChannels
+@using BlokeBot.Core.Features.PlayWithViewers
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
@@ -10,6 +11,7 @@
 @inject IOverlayLivePresence _presence
 @inject NavigationManager _navigation
 @inject IJSRuntime _js
+@inject PlayQueueService _queues
 
 <PageTitle>BlokeBot | Overlays</PageTitle>
 
@@ -161,6 +163,18 @@
                                     }
                                 </div>
                             }
+                            else if (_selected.Type is OverlayType.ViewerQueue)
+                            {
+                                <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Viewer Queue sample state">
+                                    @foreach (var sample in Enum.GetValues<ViewerQueueOverlaySampleState>())
+                                    {
+                                        <button class="@(_previewMode is OverlayPreviewMode.Representative && _viewerQueuePreviewSample == sample ? "btn-primary" : "btn-secondary")"
+                                                type="button"
+                                                aria-pressed="@(_previewMode is OverlayPreviewMode.Representative && _viewerQueuePreviewSample == sample ? "true" : "false")"
+                                                @onclick="() => SetPreviewSample(sample)">@SampleLabel(sample)</button>
+                                    }
+                                </div>
+                            }
 
                             <div class="relative mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]"
                                  data-appearance-canvas>
@@ -174,6 +188,8 @@
                                         data-show-entrant-count="@_draftShowEntrantCount.ToString().ToLowerInvariant()"
                                         data-show-countdown="@_draftShowCountdown.ToString().ToLowerInvariant()"
                                         data-show-join-command="@_draftShowJoinCommand.ToString().ToLowerInvariant()"
+                                        data-current-rows="@_viewerQueueCurrentRows"
+                                        data-next-rows="@_viewerQueueNextRows"
                                         src="@_previewUrl"
                                         title="@($"{_selected.Name} overlay preview")"
                                         referrerpolicy="no-referrer"></iframe>
@@ -285,6 +301,10 @@
                                     <option value="@OverlayType.Empty">Empty</option>
                                     <option value="@OverlayType.CuePlayer">Cue player</option>
                                     <option value="@OverlayType.EventFeed">Event feed</option>
+                                    @if (_playWithViewersFeatureEnabled || _draftType is OverlayType.ViewerQueue)
+                                    {
+                                        <option value="@OverlayType.ViewerQueue">Viewer Queue</option>
+                                    }
                                     @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
                                     {
                                         <option value="@OverlayType.Guessing">Guessing round</option>
@@ -375,6 +395,53 @@
                                     <section class="control-surface rounded-lg p-3"><OverlayStateToggle Label="Guessing winners" @bind-Value="_guessEventEnabled" />@if (_guessEventEnabled) { <div data-event-feed-details><label class="label mt-3" for="guess-event-template">Template</label><textarea id="guess-event-template" class="input min-h-24" @bind="_guessEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Guessing winner priority" @bind="_guessEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Guessing winner seconds" type="number" min="1" max="30" @bind="_guessEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{roundName} {winningAnswer} {winners} {winnerCount} {amount} {pointLabel}")</p></div> }</section>
                                     <section class="control-surface rounded-lg p-3"><OverlayStateToggle Label="Giveaway winners" @bind-Value="_giveawayEventEnabled" />@if (_giveawayEventEnabled) { <div data-event-feed-details><label class="label mt-3" for="giveaway-event-template">Template</label><textarea id="giveaway-event-template" class="input min-h-24" @bind="_giveawayEventTemplate"></textarea><div class="mt-3 grid grid-cols-2 gap-3"><select class="input" aria-label="Giveaway winner priority" @bind="_giveawayEventPriority"><option value="@OverlayEventFeedPriority.Normal">Normal</option><option value="@OverlayEventFeedPriority.High">High</option></select><input class="input" aria-label="Giveaway winner seconds" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div><p class="mt-2 text-xs text-muted-foreground">@("{winners} {winnerCount} {prizes} {pointLabel}")</p></div> }</section>
                                 </div>
+                            }
+                            else if (_draftType is OverlayType.ViewerQueue)
+                            {
+                                @if (!_playWithViewersFeatureEnabled)
+                                {
+                                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4"
+                                         data-overlay-disabled-recovery>
+                                        <p class="text-sm font-semibold text-slate-950">This Viewer Queue overlay is paused.</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-700">
+                                            Play with viewers is off. The saved setup and queue stay in place, but preview, display, test pulses, changes, and animations remain paused.
+                                            <a class="font-semibold text-blue-700 underline" href="host">Turn Play with viewers on in Channel setup</a>
+                                            to show the queue as it is now without playing missed animations.
+                                        </p>
+                                    </div>
+                                }
+                                else if (_queueOptions.Count == 0)
+                                {
+                                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                        <p class="text-sm font-semibold text-slate-950">Create a play-with-viewers queue first.</p>
+                                        <p class="mt-1 text-sm text-slate-700"><a class="font-semibold text-blue-700 underline" href="/queues">Create a queue</a>, then return here to add its Browser Source.</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="mt-4 grid gap-4 md:grid-cols-3">
+                                        <div class="space-y-2">
+                                            <label class="label" for="viewer-queue-source">Queue</label>
+                                            <select id="viewer-queue-source" class="input" @bind="_viewerQueueId">
+                                                @foreach (var queue in _queueOptions)
+                                                {
+                                                    <option value="@queue.Id">@queue.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="label" for="viewer-queue-current-rows">Current party rows</label>
+                                            <input id="viewer-queue-current-rows" class="input" type="number" min="0" max="12" @bind="_viewerQueueCurrentRows" />
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="label" for="viewer-queue-next-rows">Next rows</label>
+                                            <input id="viewer-queue-next-rows" class="input" type="number" min="0" max="12" @bind="_viewerQueueNextRows" />
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                                        The Browser Source shows the number of current and next players you choose, plus everyone waiting. Names follow the queue's public-name setting, and every optional entry field is public.
+                                    </p>
+                                }
                             }
                             else
                             {

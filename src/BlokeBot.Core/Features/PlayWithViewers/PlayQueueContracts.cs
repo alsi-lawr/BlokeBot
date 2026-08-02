@@ -20,7 +20,6 @@ public sealed record PlayQueueViewerIdentity(
 public sealed record PlayQueueFieldCommand(
     string Key,
     string Label,
-    bool IsRequired,
     IReadOnlyList<string>? Choices = null
 );
 
@@ -51,7 +50,6 @@ public sealed record PlayQueueFieldView(
     int Id,
     string Key,
     string Label,
-    bool IsRequired,
     IReadOnlyList<string> Choices
 );
 
@@ -79,15 +77,17 @@ public sealed record PlayQueueSummary(
 public sealed record PlayQueueEntryFieldView(string Key, string Label, string Value);
 
 public sealed record PublicPlayQueueEntryView(
-    long Id,
     long Position,
     string? DisplayName,
     PlayQueueEntryStatus Status,
-    DateTime? ReadyExpiresAtUtc,
     IReadOnlyList<PlayQueueEntryFieldView> Fields
-);
+)
+{
+    internal long InternalEntryId { get; init; }
+}
 
 public sealed record ModeratorPlayQueueEntryView(
+    long EntryId,
     PublicPlayQueueEntryView Public,
     string NormalizedLogin,
     string? TwitchUserId,
@@ -103,6 +103,111 @@ public sealed record PublicPlayQueueSnapshot(
     IReadOnlyList<PublicPlayQueueEntryView> Waiting,
     IReadOnlyList<PublicPlayQueueEntryView> CurrentParty
 );
+
+public sealed record PlayQueueOverlayEntry(
+    string? DisplayName,
+    IReadOnlyList<PlayQueueEntryFieldView> Fields
+);
+
+public sealed record PlayQueueOverlayState(
+    string QueueName,
+    string ActivityName,
+    bool IsOpen,
+    int TotalQueueSize,
+    IReadOnlyList<PlayQueueOverlayEntry> CurrentParty,
+    IReadOnlyList<PlayQueueOverlayEntry> Next
+);
+
+public interface IPlayQueueProjectionReader
+{
+    Task<PlayQueueOverlayState?> ReadOverlayStateAsync(
+        int hostId,
+        int queueId,
+        int currentLimit,
+        int nextLimit,
+        CancellationToken cancellationToken
+    );
+}
+
+public enum PlayQueueOverlayTransition
+{
+    None,
+    PartyChanged,
+    ReadyOutcome,
+    SelectedNext,
+}
+
+public readonly record struct PlayQueueCommittedChange(
+    int HostId,
+    int QueueId,
+    PlayQueueOverlayTransition Transition
+);
+
+public interface IPlayQueueChangeObserver
+{
+    ValueTask PlayQueueChangedAsync(
+        PlayQueueCommittedChange change,
+        CancellationToken cancellationToken
+    );
+}
+
+public sealed class PlayQueueChangeNotifier
+{
+    private readonly object _gate = new();
+    private readonly List<IPlayQueueChangeObserver> _observers = [];
+
+    public IDisposable Subscribe(IPlayQueueChangeObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        lock (_gate)
+        {
+            _observers.Add(observer);
+        }
+
+        return new Subscription(this, observer);
+    }
+
+    public async ValueTask NotifyAsync(
+        PlayQueueCommittedChange change,
+        CancellationToken cancellationToken
+    )
+    {
+        IPlayQueueChangeObserver[] observers;
+        lock (_gate)
+        {
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            await observer.PlayQueueChangedAsync(change, cancellationToken);
+        }
+    }
+
+    private void Unsubscribe(IPlayQueueChangeObserver observer)
+    {
+        lock (_gate)
+        {
+            _observers.Remove(observer);
+        }
+    }
+
+    private sealed class Subscription(
+        PlayQueueChangeNotifier owner,
+        IPlayQueueChangeObserver observer
+    ) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                owner.Unsubscribe(observer);
+            }
+        }
+    }
+}
 
 public sealed record ModeratorPlayQueuePage(
     PlayQueueSummary Queue,

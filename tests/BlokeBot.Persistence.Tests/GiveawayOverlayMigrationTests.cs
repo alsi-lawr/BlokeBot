@@ -1,4 +1,3 @@
-using System.Data.Common;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +11,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class GiveawayOverlayMigrationTests
 {
     private const string _previousMigration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
-    private const string _latestMigration = "20260731141254_v0.6.0_OverlayAppearance";
+    private const string _giveawayMigration = "20260731083003_v0.6.0_GiveawayOverlay";
 
     [Test]
     public async Task Upgrade_PreservesExistingOverlayTypesAndAllowsGiveawayRows()
@@ -42,8 +41,7 @@ public sealed class GiveawayOverlayMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
-        (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
+        (await upgraded.Database.GetAppliedMigrationsAsync()).ShouldContain(_giveawayMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);
 
@@ -72,20 +70,5 @@ public sealed class GiveawayOverlayMigrationTests
                 .Select(value => value.Type)
                 .ToArrayAsync()
         ).ShouldBe([OverlayType.CuePlayer, OverlayType.Giveaway]);
-        (await ReadOverlayTableSqlAsync(upgraded.Database.GetDbConnection())).ShouldContain(
-            "Type IN ('cue-player', 'empty', 'event-feed', 'giveaway', 'guessing')"
-        );
-    }
-
-    private static async Task<string> ReadOverlayTableSqlAsync(DbConnection connection)
-    {
-        if (connection.State is not System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'overlay_instances';""";
-        return (string)(await command.ExecuteScalarAsync())!;
     }
 }

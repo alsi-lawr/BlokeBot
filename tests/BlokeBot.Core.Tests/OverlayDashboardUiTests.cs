@@ -25,7 +25,7 @@ public sealed class OverlayDashboardUiTests
         var seed = await SeedAsync(database);
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
         context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotOverlays();
+        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -122,6 +122,51 @@ public sealed class OverlayDashboardUiTests
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ViewerQueueEditor_ReusesPreviewAppearanceAndParentRecovery(bool enabled)
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedViewerQueueAsync(database, enabled);
+        await using var context = UiTestContextFactory.Create(database, seed.HostId);
+        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
+        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+
+        var page = context.Render<OverlaysPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            ((IHtmlSelectElement)page.Find("#overlay-type")).Value.ShouldBe(
+                OverlayType.ViewerQueue.ToString()
+            );
+            page.FindAll("input[type='checkbox']").ShouldBeEmpty();
+        });
+        if (enabled)
+        {
+            page.Find("#viewer-queue-current-rows").GetAttribute("min").ShouldBe("0");
+            page.Find("#viewer-queue-current-rows").GetAttribute("max").ShouldBe("12");
+            page.Find("#viewer-queue-next-rows").GetAttribute("min").ShouldBe("0");
+            page.Find("#viewer-queue-next-rows").GetAttribute("max").ShouldBe("12");
+            page.FindAll("[aria-label='Viewer Queue sample state'] button").Count.ShouldBe(5);
+            page.FindAll("iframe").ShouldHaveSingleItem();
+            page.Find("[data-appearance-editor]").ShouldNotBeNull();
+            page.Markup.IndexOf("data-appearance-preview", StringComparison.Ordinal)
+                .ShouldBeLessThan(
+                    page.Markup.IndexOf("data-overlay-editor", StringComparison.Ordinal)
+                );
+            return;
+        }
+
+        page.FindAll("iframe").ShouldBeEmpty();
+        page.Find("[data-overlay-disabled-recovery]")
+            .TextContent.ShouldContain("Turn Play with viewers on in Channel setup");
+        page.FindAll("button")
+            .Single(button => button.TextContent.Trim() == "Save overlay")
+            .HasAttribute("disabled")
+            .ShouldBeTrue();
+    }
+
+    [Test]
     public void DashboardSource_UsesWideSingleEditorOpaquePreviewAndExplicitSafetyCopy()
     {
         var source = File.ReadAllText(SourcePath("OverlaysPage.razor"));
@@ -182,7 +227,7 @@ public sealed class OverlayDashboardUiTests
             context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotOverlays();
+            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
             var page = context.Render<OverlaysPage>();
 
@@ -223,7 +268,7 @@ public sealed class OverlayDashboardUiTests
             context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotOverlays();
+            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
             var page = context.Render<OverlaysPage>();
 
@@ -251,7 +296,7 @@ public sealed class OverlayDashboardUiTests
         var seed = await SeedGuessingAsync(database);
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
         context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotOverlays();
+        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -333,7 +378,7 @@ public sealed class OverlayDashboardUiTests
 
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
         context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotOverlays();
+        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
         var page = context.Render<OverlaysPage>();
 
         page.WaitForAssertion(() =>
@@ -389,7 +434,7 @@ public sealed class OverlayDashboardUiTests
             context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotOverlays();
+            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
             var page = context.Render<OverlaysPage>();
 
             page.WaitForAssertion(() =>
@@ -424,7 +469,7 @@ public sealed class OverlayDashboardUiTests
             context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotOverlays();
+            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
             var page = context.Render<OverlaysPage>();
 
             page.WaitForAssertion(() =>
@@ -565,6 +610,58 @@ public sealed class OverlayDashboardUiTests
             IsEnabled = true,
             ConfigurationJson =
                 """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
+            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
+            KeyVersion = 1,
+            Revision = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        db.OverlayInstances.Add(overlay);
+        await db.SaveChangesAsync();
+        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
+    }
+
+    private static async Task<OverlaySeed> SeedViewerQueueAsync(
+        SqliteBlokeBotDbFactory database,
+        bool enabled
+    )
+    {
+        const string PrivateAccessKey = "viewer-queue-component-key-00000000000000";
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            TwitchUserId = "queue-streamer-id",
+            Login = "queue-streamer",
+            DisplayName = "Queue Streamer",
+            EnabledFeatures =
+                HostFeatureFlags.Overlays
+                | (enabled ? HostFeatureFlags.PlayWithViewers : HostFeatureFlags.None),
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        var queue = new PlayQueue
+        {
+            HostId = host.Id,
+            Slug = "squad",
+            Name = "Community squad",
+            ActivityName = "Example game",
+            Capacity = 4,
+            IsOpen = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        db.PlayQueues.Add(queue);
+        await db.SaveChangesAsync();
+        var overlay = new OverlayInstance
+        {
+            PublicId = Guid.Parse("ecb603ce-c294-4d24-952e-a7dc5074ba3d"),
+            HostId = host.Id,
+            Name = "Viewer queue",
+            Type = OverlayType.ViewerQueue,
+            IsEnabled = true,
+            ConfigurationJson =
+                $$$"""{"schemaVersion":1,"queueId":{{{queue.Id}}},"currentRows":4,"nextRows":6,"appearance":{"x":160,"y":140,"width":1200,"height":800,"css":""}}""",
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
             KeyVersion = 1,
             Revision = 1,

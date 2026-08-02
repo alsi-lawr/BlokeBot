@@ -93,7 +93,6 @@ public sealed class PlayQueueField
     public int Position { get; set; }
     public string Key { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
-    public bool IsRequired { get; set; }
     public string Choices { get; set; } = string.Empty;
 }
 

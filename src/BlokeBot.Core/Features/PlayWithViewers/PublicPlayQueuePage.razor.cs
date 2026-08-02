@@ -15,10 +15,13 @@ public partial class PublicPlayQueuePage
 
     [Parameter]
     public string QueueSlug { get; set; } = string.Empty;
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private PublicPlayQueueSnapshot? _page;
     private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
-    private string _login = string.Empty;
     private string _feedback = string.Empty;
     private bool _failed;
     private bool _loading = true;
@@ -36,14 +39,15 @@ public partial class PublicPlayQueuePage
 
     private void SetValue(string key, string value) => _values[key] = value;
 
+    private string _loginUrl =>
+        $"/auth/login?start=true&returnUrl={Uri.EscapeDataString(_navigation.ToBaseRelativePath(_navigation.Uri).Insert(0, "/"))}";
+
     private PlayQueueViewerIdentity Identity() =>
-        _session.IsAuthenticated
-            ? new(_session.Login, _session.UserId, _session.DisplayName)
-            : new(PlayQueueInput.NormalizeLogin(_login));
+        new(_session.Login, _session.UserId, _session.DisplayName);
 
     private async Task JoinAsync()
     {
-        if (_page is null)
+        if (_page is null || !_session.IsAuthenticated)
         {
             return;
         }
@@ -97,7 +101,7 @@ public partial class PublicPlayQueuePage
         Func<PublicPlayQueueEntryView, string>? message = null
     )
     {
-        if (_page is null)
+        if (_page is null || !_session.IsAuthenticated)
         {
             return;
         }

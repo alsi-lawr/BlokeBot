@@ -21,6 +21,8 @@ internal sealed class SimulationFixtureSeeder(
         "simulation-giveaway-overlay-key-0000000000000";
     internal const string EventFeedOverlayAccessKey =
         "simulation-event-feed-overlay-key-000000000000";
+    internal const string ViewerQueueOverlayAccessKey =
+        "simulation-viewer-queue-overlay-key-0000000";
 
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
@@ -48,6 +50,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
         await SeedMomentAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
@@ -119,6 +122,36 @@ internal sealed class SimulationFixtureSeeder(
                     Body = "helpfulviewer received 100 points",
                     DurationSeconds = 6,
                     EnqueuedAtUtc = now.AddSeconds(1),
+                }
+            );
+        }
+
+        if (
+            !await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("1a10c145-e2d2-4605-9659-7250b191b5a1"),
+                cancellationToken
+            )
+        )
+        {
+            var queueId = await db
+                .PlayQueues.Where(value => value.HostId == hostId && value.Slug == "main")
+                .Select(value => value.Id)
+                .SingleAsync(cancellationToken);
+            db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    PublicId = Guid.Parse("1a10c145-e2d2-4605-9659-7250b191b5a1"),
+                    HostId = hostId,
+                    Name = "Viewer queue",
+                    Type = OverlayType.ViewerQueue,
+                    IsEnabled = true,
+                    ConfigurationJson =
+                        $$$"""{"schemaVersion":1,"queueId":{{{queueId}}},"currentRows":4,"nextRows":6,"appearance":{"x":160,"y":140,"width":1200,"height":800,"css":""}}""",
+                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(ViewerQueueOverlayAccessKey),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
                 }
             );
         }
@@ -679,18 +712,95 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.PlayQueues.Add(
-            new PlayQueue
+        var platform = new PlayQueueField
+        {
+            Position = 0,
+            Key = "platform",
+            Label = "Platform",
+            Choices = "PC\nConsole",
+        };
+        var role = new PlayQueueField
+        {
+            Position = 1,
+            Key = "preferred-role",
+            Label = "Preferred role",
+            Choices = "Tank\nSupport\nDamage",
+        };
+        var queue = new PlayQueue
+        {
+            HostId = hostId,
+            Slug = "main",
+            Name = "Community night",
+            ActivityName = "BlokeQuest",
+            Capacity = 2,
+            IsOpen = true,
+            SelectionMode = PlayQueueSelectionMode.JoinOrder,
+            ShowParticipantNames = true,
+            CurrentPartyNumber = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            Fields = [platform, role],
+        };
+        queue.Entries.AddRange(
+            Entry("nightowl", "NightOwl", PlayQueueEntryStatus.Selected, -8, 1, "PC", "Tank"),
+            Entry(
+                "newviewer",
+                "NewViewer",
+                PlayQueueEntryStatus.Selected,
+                -7,
+                1,
+                "Console",
+                "Support"
+            ),
+            Entry(
+                "playerthree",
+                "PlayerThree",
+                PlayQueueEntryStatus.Waiting,
+                -6,
+                null,
+                "PC",
+                "Damage"
+            ),
+            Entry("playerfour", "PlayerFour", PlayQueueEntryStatus.Waiting, -5, null, "PC", ""),
+            Entry(
+                "playerfive",
+                "PlayerFive",
+                PlayQueueEntryStatus.Waiting,
+                -4,
+                null,
+                "Console",
+                "Support"
+            )
+        );
+        db.PlayQueues.Add(queue);
+        return;
+
+        PlayQueueEntry Entry(
+            string login,
+            string displayName,
+            PlayQueueEntryStatus status,
+            int joinedMinutes,
+            int? partyNumber,
+            string platformValue,
+            string roleValue
+        ) =>
+            new()
             {
                 HostId = hostId,
-                Slug = "main",
-                Name = "Community night",
-                ActivityName = "BlokeQuest",
-                IsOpen = true,
-                CreatedAtUtc = now,
+                IdentityKey = $"id:simulation-{login}",
+                TwitchUserId = $"simulation-{login}",
+                NormalizedLogin = login,
+                DisplayName = displayName,
+                Status = status,
+                PartyNumber = partyNumber,
+                JoinedAtUtc = now.AddMinutes(joinedMinutes),
                 UpdatedAtUtc = now,
-            }
-        );
+                Values =
+                [
+                    new PlayQueueEntryValue { Field = platform, Value = platformValue },
+                    new PlayQueueEntryValue { Field = role, Value = roleValue },
+                ],
+            };
     }
 
     private static async Task SeedMomentAsync(

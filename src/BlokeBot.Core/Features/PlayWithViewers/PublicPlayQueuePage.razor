@@ -36,7 +36,7 @@
 
             <section class="card p-6" aria-labelledby="join-heading">
                 <h2 id="join-heading" class="text-xl font-semibold">Join the queue</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Your entry details are visible only to moderators. Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
+                <p class="mt-1 text-sm text-muted-foreground">Entry fields are optional and public. Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
                 @if (_session.IsAuthenticated)
                 {
                     <p class="mt-2 text-sm text-muted-foreground">
@@ -47,26 +47,15 @@
                 else
                 {
                     <p class="mt-2 text-sm text-muted-foreground">
-                        Not signed in. Enter your Twitch login to use the anonymous login fallback.
+                        Sign in with Twitch to join, leave, check your position, or answer a ready check.
+                        <a class="font-semibold text-blue-700 underline" href="@_loginUrl">Sign in with Twitch</a>
                     </p>
                 }
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    @if (!_session.IsAuthenticated)
-                    {
-                        <div class="field space-y-2" data-field>
-                            <label class="label" for="queue-viewer-login">Twitch login</label>
-                            <input id="queue-viewer-login"
-                                   class="input"
-                                   maxlength="128"
-                                   autocomplete="username"
-                                   value="@_login"
-                                   @oninput="args => _login = args.Value?.ToString() ?? string.Empty" />
-                        </div>
-                    }
                     @foreach (var field in _page.Queue.Fields)
                     {
                         <div>
-                            <label class="mb-1 block text-sm font-semibold" for="@($"queue-viewer-{field.Key}")">@field.Label @(field.IsRequired ? "(required)" : null)</label>
+                            <label class="mb-1 block text-sm font-semibold" for="@($"queue-viewer-{field.Key}")">@field.Label <span class="font-normal text-muted-foreground">(optional, public)</span></label>
                             @if (field.Choices.Count > 0)
                             {
                                 <select id="@($"queue-viewer-{field.Key}")" class="input" value="@Value(field.Key)" @onchange="args => SetValue(field.Key, args.Value?.ToString() ?? string.Empty)">
@@ -85,10 +74,10 @@
                     }
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <button class="btn-primary" type="button" disabled="@(!_page.Queue.IsOpen)" @onclick="JoinAsync">Join</button>
-                    <button class="btn-secondary" type="button" @onclick="LeaveAsync">Leave</button>
-                    <button class="btn-secondary" type="button" @onclick="PositionAsync">Check position</button>
-                    <button class="btn-secondary" type="button" @onclick="ReadyAsync">I'm ready</button>
+                    <button class="btn-primary" type="button" disabled="@(!_page.Queue.IsOpen || !_session.IsAuthenticated)" @onclick="JoinAsync">Join</button>
+                    <button class="btn-secondary" type="button" disabled="@(!_session.IsAuthenticated)" @onclick="LeaveAsync">Leave</button>
+                    <button class="btn-secondary" type="button" disabled="@(!_session.IsAuthenticated)" @onclick="PositionAsync">Check position</button>
+                    <button class="btn-secondary" type="button" disabled="@(!_session.IsAuthenticated)" @onclick="ReadyAsync">I'm ready</button>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_feedback))
                 {
@@ -109,6 +98,10 @@
                                     <span> · @entry.DisplayName</span>
                                 }
                                 <span class="block text-xs text-muted-foreground">@entry.Status</span>
+                                @foreach (var field in entry.Fields)
+                                {
+                                    <span class="block text-xs text-muted-foreground">@field.Label: @(string.IsNullOrEmpty(field.Value) ? "Not provided" : field.Value)</span>
+                                }
                             </li>
                         }
                     </ol>
@@ -118,7 +111,13 @@
                     <ul class="mt-4 grid gap-2">
                         @foreach (var entry in _page.CurrentParty)
                         {
-                            <li class="surface-muted rounded-lg p-3">@(entry.DisplayName ?? "Selected viewer")</li>
+                            <li class="surface-muted rounded-lg p-3">
+                                @(entry.DisplayName ?? "Selected viewer")
+                                @foreach (var field in entry.Fields)
+                                {
+                                    <span class="block text-xs text-muted-foreground">@field.Label: @(string.IsNullOrEmpty(field.Value) ? "Not provided" : field.Value)</span>
+                                }
+                            </li>
                         }
                     </ul>
                 </div>

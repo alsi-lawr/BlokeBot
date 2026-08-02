@@ -82,7 +82,7 @@ public partial class PlayQueuesPage
         {
             foreach (var entry in _moderatorPage.Waiting.Concat(_moderatorPage.CurrentParty))
             {
-                _entryDrafts[entry.Public.Id] = EntryDraft.From(entry);
+                _entryDrafts[entry.EntryId] = EntryDraft.From(entry);
             }
         }
     }
@@ -215,13 +215,12 @@ public partial class PlayQueuesPage
     private static string QueueFieldSummary(FieldDraft field)
     {
         var key = string.IsNullOrWhiteSpace(field.Key) ? "No key" : field.Key;
-        var requirement = field.Required ? "Required" : "Optional";
         var choices = field.Choices.Split(
             ',',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
         );
         var detail = choices.Length == 0 ? "Free text" : $"{choices.Length} choices";
-        return $"{key} · {requirement} · {detail}";
+        return $"{key} · Optional · Public · {detail}";
     }
 
     private Task ToggleOpenAsync() =>
@@ -536,14 +535,12 @@ public partial class PlayQueuesPage
         public Guid Identity { get; } = Guid.NewGuid();
         public string Key { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
-        public bool Required { get; set; }
         public string Choices { get; set; } = string.Empty;
 
         public PlayQueueFieldCommand ToCommand() =>
             new(
                 Key,
                 Label,
-                Required,
                 Choices.Split(
                     ',',
                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
@@ -560,7 +557,6 @@ public partial class PlayQueuesPage
             {
                 Key = field.Key,
                 Label = field.Label,
-                Required = field.IsRequired,
                 Choices = string.Join(", ", field.Choices),
             };
     }

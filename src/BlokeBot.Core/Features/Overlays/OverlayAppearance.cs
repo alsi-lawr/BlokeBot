@@ -84,6 +84,8 @@ public sealed record OverlayAppearance
 
     public static OverlayAppearance EventFeedDefault => new(160, 690, 1600, 270, string.Empty);
 
+    public static OverlayAppearance ViewerQueueDefault => new(160, 140, 1200, 800, string.Empty);
+
     public static string? ValidateCss(string css)
     {
         if (Encoding.UTF8.GetByteCount(css) > MaximumCssBytes)

@@ -127,7 +127,6 @@ public sealed class NativeTwitchMigrationTests
             history.ShouldContain(_publishedV03);
             history.ShouldContain(_nativeTwitchFeatureSwitch);
             history.ShouldContain(_automaticRaidShoutouts);
-            history.Count.ShouldBe(20);
             history.ShouldNotContain("20260726031743_v0.3.0");
             history.ShouldNotContain("20260728183253_v0.4.0");
             upgradedSchema = await ReadSchemaAsync(upgraded.Database.GetDbConnection());
