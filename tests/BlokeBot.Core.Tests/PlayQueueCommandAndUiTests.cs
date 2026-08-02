@@ -8,6 +8,7 @@ using BlokeBot.Persistence.Models;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -17,6 +18,104 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class PlayQueueCommandAndUiTests
 {
+    [Test]
+    public async Task ModeratorEditor_RendersTaskLabelsAndPlainWholeNumberGuidance()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database);
+        var service = new PlayQueueService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        await using var context = UiTestContextFactory.Create(database, host);
+        context.Services.AddSingleton(service);
+        context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
+
+        var page = context.Render<PlayQueuesPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("#queue-mode")
+                .QuerySelectorAll("option")
+                .Select(option => option.TextContent)
+                .ShouldBe(["First to join", "Viewers who played least recently"]);
+            page.Find("label[for='queue-roles']").TextContent.ShouldBe("Party role targets");
+            page.Markup.ShouldContain("support=1, tank=1");
+            page.Markup.ShouldContain("best effort");
+            page.Markup.ShouldContain("viewer page and Viewer Queue overlay");
+        });
+
+        page.Find("#queue-capacity").Input("not-a-number");
+        FindButton(page, "Save queue").Click();
+        page.WaitForAssertion(() =>
+            page.Find("[role='alert']")
+                .TextContent.ShouldContain(
+                    "Enter whole numbers for party size, ready-check time, history, no-show wait, and party role targets."
+                )
+        );
+
+        Enum.GetValues<PlayQueueEntryStatus>()
+            .Select(PlayQueuesPage.EntryStatusLabel)
+            .ShouldBe([
+                "Waiting",
+                "Awaiting response",
+                "Ready",
+                "Selected",
+                "Left queue",
+                "Skipped",
+                "Did not respond",
+            ]);
+    }
+
+    [Test]
+    public async Task ModeratorLobbyFailure_StatesThatPrivateMessageWasNotPostedPublicly()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database);
+        var service = new PlayQueueService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        _ = await service.ConfigureAsync(
+            host,
+            Queue("squad") with
+            {
+                Capacity = 1,
+                Fields = [],
+                RoleRequirements = [],
+            },
+            CancellationToken.None
+        );
+        _ = await service.JoinAsync(
+            host,
+            "squad",
+            new JoinPlayQueueCommand(
+                new("viewer", "viewer-id", "Viewer"),
+                0,
+                new Dictionary<string, string>()
+            ),
+            CancellationToken.None
+        );
+        _ = await service.SelectPartyAsync(host, "squad", false, CancellationToken.None);
+        await using var context = UiTestContextFactory.Create(database, host);
+        context.Services.AddSingleton(service);
+        context.Services.AddSingleton<IPrivateLobbyDelivery>(new FailingPrivateLobbyDelivery());
+
+        var page = context.Render<PlayQueuesPage>();
+
+        page.WaitForElement("#queue-lobby-code").Input("join-code");
+        FindButton(page, "Whisper party").Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("[role='alert']")
+                .TextContent.ShouldBe(
+                    "We couldn’t send the lobby message privately to @viewer. It was not posted publicly."
+                )
+        );
+    }
+
     [Test]
     public async Task ChatCommands_RequireSlugForMultipleQueuesAndSupportViewerLifecycle()
     {
@@ -302,7 +401,8 @@ public sealed class PlayQueueCommandAndUiTests
                 .Add(value => value.QueueSlug, "squad")
         );
 
-    private static IElement FindButton(IRenderedComponent<PublicPlayQueuePage> page, string text) =>
+    private static IElement FindButton<TComponent>(IRenderedComponent<TComponent> page, string text)
+        where TComponent : IComponent =>
         page.FindAll("button").Single(button => button.TextContent.Trim() == text);
 
     private static async Task AssertIdentityAsync(
@@ -363,5 +463,34 @@ public sealed class PlayQueueCommandAndUiTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
+    }
+
+    private sealed class NoopPrivateLobbyDelivery : IPrivateLobbyDelivery
+    {
+        public Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
+            string hostLogin,
+            string lobbyCode,
+            IReadOnlyList<PrivateLobbyRecipient> recipients,
+            CancellationToken ct
+        ) => Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>([]);
+    }
+
+    private sealed class FailingPrivateLobbyDelivery : IPrivateLobbyDelivery
+    {
+        public Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
+            string hostLogin,
+            string lobbyCode,
+            IReadOnlyList<PrivateLobbyRecipient> recipients,
+            CancellationToken ct
+        ) =>
+            Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>(
+                recipients
+                    .Select(recipient => new PrivateLobbyDeliveryOutcome(
+                        recipient.Login,
+                        false,
+                        "Unavailable"
+                    ))
+                    .ToArray()
+            );
     }
 }

@@ -90,7 +90,7 @@
                                 <select id="queue-mode" class="input" @bind="_draft.SelectionMode">
                                     @foreach (var mode in Enum.GetValues<PlayQueueSelectionMode>())
                                     {
-                                        <option value="@mode">@mode</option>
+                                        <option value="@mode">@SelectionModeLabel(mode)</option>
                                     }
                                 </select>
                             </div>
@@ -118,7 +118,7 @@
                                     aria-describedby="queue-field-limit"
                                     @onclick="AddField">Add field</button>
                         </div>
-                        <p class="mt-1 text-sm text-muted-foreground">Every field is optional and visible on the viewer page and Viewer Queue overlays.</p>
+                        <p class="mt-1 text-sm text-muted-foreground">Every field is optional and visible on the viewer page and Viewer Queue overlay.</p>
                         <div class="management-field-workspace-container mt-3">
                             <div class="management-field-workspace">
                                 <div class="management-field-inventory" aria-label="Entry fields">
@@ -171,8 +171,8 @@
                                 }
                             </div>
                         </div>
-                        <Field Id="queue-roles" Label="Preferred party roles (role=count, comma separated)" @bind-Value="_draft.RoleRequirements" />
-                        <p class="mt-1 text-sm text-muted-foreground">Role targets are best effort. Viewers who leave the optional role field blank remain eligible for the party.</p>
+                        <Field Id="queue-roles" Label="Party role targets" @bind-Value="_draft.RoleRequirements" />
+                        <p class="mt-1 text-sm text-muted-foreground">Separate targets with commas, for example <code>support=1, tank=1</code>. Party role targets are best effort. Viewers who leave the optional role field blank remain eligible for the party.</p>
                     </section>
 
                     @if (_moderatorPage is not null)
@@ -214,7 +214,7 @@
                                 {
                                     <article class="surface-muted rounded-lg p-4">
                                         <div class="flex flex-wrap items-start justify-between gap-3">
-                                            <div><strong>#@entry.Public.Position · @@@entry.NormalizedLogin</strong><p class="text-xs text-muted-foreground">@entry.Public.Status · priority @entry.Priority · @FieldSummary(entry)</p></div>
+                                            <div><strong>#@entry.Public.Position · @@@entry.NormalizedLogin</strong><p class="text-xs text-muted-foreground">@EntryStatusLabel(entry.Public.Status) · priority @entry.Priority · @FieldSummary(entry)</p></div>
                                             <div class="flex flex-wrap gap-2">
                                                 <button class="btn-secondary" type="button" @onclick="() => ReadyCheckAsync(entry.EntryId)">Ready check</button>
                                                 <button class="btn-secondary" type="button" @onclick="() => SkipAsync(entry.EntryId)">Skip</button>

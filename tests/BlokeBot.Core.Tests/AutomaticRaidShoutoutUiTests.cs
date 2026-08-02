@@ -72,10 +72,16 @@ public sealed class AutomaticRaidShoutoutUiTests
         section.Find("#automatic-raid-pin-duration").Input("600");
         section.Find("#automatic-raid-presentation-announcement").Change("Announcement");
         section.FindAll("#automatic-raid-pin-duration").ShouldBeEmpty();
-        section
+        var colorOptions = section
             .Find("#automatic-raid-announcement-color")
             .QuerySelectorAll("option")
-            .Length.ShouldBe(5);
+            .ToArray();
+        colorOptions
+            .Select(option => option.TextContent)
+            .ShouldBe(["Default", "Blue", "Green", "Orange", "Purple"]);
+        colorOptions
+            .Select(option => option.GetAttribute("value"))
+            .ShouldBe(["Primary", "Blue", "Green", "Orange", "Purple"]);
 
         section.Find("#automatic-raid-presentation-pinned").Change("Pinned");
         section.Find("#automatic-raid-pin-duration").GetAttribute("value").ShouldBe("600");

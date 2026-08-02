@@ -18,6 +18,25 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentUiTests
 {
     [Test]
+    public void ModeratorPresentationMappings_CoverEveryPersistedMomentValue()
+    {
+        Enum.GetValues<MomentRewardPolicy>()
+            .Select(MomentsPage.RewardPolicyLabel)
+            .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
+        Enum.GetValues<MomentCandidateState>()
+            .Select(MomentsPage.CandidateStateLabel)
+            .ShouldBe([
+                "Creating clip",
+                "Clip ready",
+                "Marker ready",
+                "Could not create clip",
+                "Approved",
+                "Rejected",
+                "Merged into another moment",
+            ]);
+    }
+
+    [Test]
     public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndUsesSemanticSettingsAlignment()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -61,8 +80,46 @@ public sealed class MomentUiTests
                     "moment-reward-amount",
                     "moment-marker-fallback",
                 ]);
+            page.Find("#moment-reward-policy")
+                .QuerySelectorAll("option")
+                .Select(option => option.TextContent)
+                .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
             page.Markup.ShouldNotContain("pt-6");
         });
+    }
+
+    [Test]
+    public async Task ModeratorPage_UnavailableStreamUsesTaskRecoveryLanguage()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var service = new MomentHubService(
+            database,
+            new UnusedMomentProvider(),
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        await using var context = UiTestContextFactory.Create(database, hostId);
+        context.Services.AddSingleton(service);
+        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+            new UnavailableStreamLivenessProvider()
+        );
+
+        var page = context.Render<MomentsPage>();
+
+        page.WaitForAssertion(() =>
+            page.Markup.ShouldContain(
+                "We can’t confirm the live stream right now. Try again in a moment."
+            )
+        );
+        page.FindAll("button").Single(button => button.TextContent.Trim() == "Capture now").Click();
+        page.WaitForAssertion(() =>
+            page.Find("[role='alert']")
+                .TextContent.ShouldBe(
+                    "We can’t confirm the live stream right now. Try again in a moment."
+                )
+        );
+        page.Markup.ShouldNotContain("Twitch stream identity is temporarily unavailable");
     }
 
     [Test]
@@ -310,6 +367,21 @@ public sealed class MomentUiTests
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
                         new HostStreamLivenessOutcome.Offline()
+                    )
+                )
+            );
+    }
+
+    private sealed class UnavailableStreamLivenessProvider : IHostStreamLivenessProvider
+    {
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<HostStreamLivenessOutcome, Never>.Success(
+                        new HostStreamLivenessOutcome.Unavailable(
+                            HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                            new HttpRequestException("Unavailable")
+                        )
                     )
                 )
             );
