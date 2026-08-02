@@ -152,7 +152,23 @@ internal sealed class SimulationApplicationHost(
 
     public async ValueTask DisposeAsync()
     {
-        await App.DisposeAsync();
-        await FakeTwitch.DisposeAsync();
+        try
+        {
+            try
+            {
+                if (!App.Lifetime.ApplicationStopped.IsCancellationRequested)
+                {
+                    await App.StopAsync();
+                }
+            }
+            finally
+            {
+                await App.DisposeAsync();
+            }
+        }
+        finally
+        {
+            await FakeTwitch.DisposeAsync();
+        }
     }
 }
