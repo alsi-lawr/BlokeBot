@@ -18,7 +18,9 @@ internal static class SiteGuideCatalog
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
-                GuideLink("Overlays and Browser Sources", "overlays"),
+                GuideLink("Browser Sources", "overlays"),
+                GuideLink("Cues", "overlays/cues"),
+                GuideLink("Media library", "overlays/media"),
             ]
         ),
         new(
@@ -369,103 +371,318 @@ internal static class SiteGuideCatalog
         yield return new SiteGuidePage
         {
             Route = "/overlays",
-            Eyebrow = "Stream presentation",
-            Title = "Create and manage Browser Source overlays",
+            Eyebrow = "Stream presentation · Browser Sources",
+            Title = "Create Browser Sources for OBS",
             Summary =
-                "Create a private transparent Browser Source, preview the production renderer and recover safely when its URL or live connection changes.",
+                "Create private Browser Sources, preview and position their content, then keep each saved source working in OBS.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlays.png",
-                LightPhoneSource: "media/phone-light-overlays.png",
-                DarkLaptopSource: "media/laptop-dark-overlays.png",
-                LightLaptopSource: "media/laptop-light-overlays.png",
-                PhoneAlt: "BlokeBot Overlays page on a phone showing the saved Browser Source and its editor.",
-                LaptopAlt: "BlokeBot Overlays page showing the saved Browser Source, editor and production preview.",
-                "The dashboard keeps Browser Source inventory, configuration, preview and delivery diagnostics together."
+                DarkPhoneSource: "media/phone-dark-overlay-sources.png",
+                LightPhoneSource: "media/phone-light-overlay-sources.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-sources.png",
+                LightLaptopSource: "media/laptop-light-overlay-sources.png",
+                PhoneAlt: "BlokeBot Browser Sources on a phone with a saved source, Preview and appearance controls.",
+                LaptopAlt: "BlokeBot Browser Sources with saved sources beside a Preview-first appearance editor.",
+                "Browser Sources keeps the saved-source list beside the selected source's Preview and settings."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Check access and prerequisites",
+                    Heading = "Prepare the channel and OBS",
                     Bullets =
                     [
-                        "Choose the channel you intend to show on stream. Its owner or a permitted moderator can manage its overlays.",
-                        "Open Channel setup, turn on Overlays for that channel and save the change.",
-                        "Use broadcasting software that supports a web Browser Source, such as OBS Studio.",
-                        "BlokeBot v0.5 supports the transparent Empty V1 overlay at a 1920 × 1080 canvas. It has no custom CSS, JavaScript or visual fields.",
+                        "Choose the channel you intend to show on stream. The owner or a permitted moderator can manage its Browser Sources.",
+                        "Open Channel setup, turn on Overlays and save. Guessing, Points and Play with viewers must also be on before their matching Browser Sources can preview or display.",
+                        "Use broadcasting software with web Browser Sources, such as OBS Studio.",
+                        "Open Overlays under Chat tools. Sources, Cues and Media are separate tabs at /overlays/sources, /overlays/cues and /overlays/media in BlokeBot.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Create the Browser Source",
+                    Heading = "Create and protect a Browser Source",
                     Steps =
                     [
-                        "Open Overlays under Chat tools and select New.",
-                        "Name the overlay, then select Create overlay. New only starts an unsaved editor; it does not create anything by itself.",
-                        "Copy the private Browser Source URL when it appears. BlokeBot shows that URL only after creation or rotation.",
-                        "In OBS, add a Browser Source, paste the URL, set Width to 1920 and Height to 1080, then place the source in the scene.",
-                        "Keep the page background transparent. A blank canvas is the normal resting state for Empty V1.",
+                        "On Sources, select New, enter a name, choose its type and complete the type-specific settings.",
+                        "Select Create overlay. New opens an unsaved editor; creation happens only after this final action.",
+                        "Copy the private Browser Source URL when it appears. BlokeBot can show it only after creation or rotation.",
+                        "In OBS, add a Browser Source, paste the URL, set Width to 1920 and Height to 1080, and place it in the scene.",
                     ],
                     Note =
-                        "Treat the private URL like a password. Do not put it in chat, screenshots, stream recordings or public notes. The Browser Source is marked private for search engines, but possession of the URL still grants access.",
+                        "Treat the private URL like a password. Keep it out of chat, screenshots, stream recordings and public notes. Rotate it immediately if it may have been shared; the old URL then stops working.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Preview and confirm delivery",
+                    Heading = "Preview and edit appearance",
                     Bullets =
                     [
-                        "Live preview uses the same document, client, CSS and 1920 × 1080 renderer as the Browser Source. It does not reveal the private URL.",
-                        "Representative preview shows the supported Empty V1 state without opening a live connection.",
-                        "Send test pulse publishes temporary presentation data only to the selected overlay. It does not change stream or chat data.",
-                        "Connection status is approximate diagnostic presence. It excludes this dashboard's Live preview and does not prove that the OBS source is visible in the current scene.",
+                        "Preview is above configuration. Choose Live for the current saved state or Representative to inspect a useful example before the real trigger happens.",
+                        "The 1920 × 1080 canvas shows how the selected Browser Source will look in OBS. Drag anywhere on the selected body to move it; drag an edge or corner to resize it.",
+                        "Use the arrow keys on the selected body for one-pixel movement, or Shift plus an arrow for ten pixels. The keyboard-operable edges and corners resize in the same increments.",
+                        "Enter X, Y, Width and Height for precise geometry. Reset restores the type's default placement.",
+                        "Unsaved geometry, styling and display choices update only the signed-in Preview. Select Save overlay before expecting OBS or another private Browser Source to change.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Understand live updates and reconnection",
+                    Heading = "Use Advanced styling safely",
                     Paragraphs =
                     [
-                        "A Browser Source loads the current snapshot before listening for live updates. If an update is missed, the client reloads current state rather than applying an uncertain sequence.",
-                        "Temporary network loss triggers bounded automatic reconnection. A server restart or a newer state replaces the earlier live sequence, so the source converges on the latest supported presentation without replaying stale events.",
+                        "Advanced styling starts collapsed. Overlay-local CSS applies only to the selected source. Available selectors are .overlay, .card, .accent, .kicker, .title, .detail and .result.",
                     ],
                     Bullets =
                     [
-                        "Leave the source enabled in OBS when you want it to reconnect automatically.",
-                        "After a long outage, reload the Browser Source if OBS still shows an old state.",
-                        "Use Live preview and Send test pulse to separate a renderer problem from an OBS scene or source-visibility problem.",
-                    ],
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Rename, disable, rotate or delete",
-                    Bullets =
-                    [
-                        "Rename changes the dashboard label without changing the private URL.",
-                        "Disable immediately makes the Browser Source unavailable. Enable restores the same current URL.",
-                        "Rotate private URL immediately revokes the old URL. Copy the replacement once and update every OBS source that used the old one.",
-                        "If the URL may have been shared or captured, rotate it rather than relying on obscurity.",
-                        "Delete permanently removes the overlay and stops every Browser Source using its URL.",
+                        "Use the listed selectors to adjust colours and type without changing the BlokeBot dashboard or another Browser Source.",
+                        "Imports, external URLs, markup, scripts, at-rules and selectors outside the selected Browser Source are rejected.",
+                        "If CSS is rejected, correct the message shown and save again. The invalid change is not partly applied; the last saved appearance remains live.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Fix common failures",
+                    Heading = "Guessing rounds",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-guessing.png",
+                        LightPhoneSource: "media/phone-light-overlay-guessing.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-guessing.png",
+                        LightLaptopSource: "media/laptop-light-overlay-guessing.png",
+                        PhoneAlt: "Guessing Browser Source on a phone showing a representative open round in Preview.",
+                        LaptopAlt: "Guessing Browser Source showing representative round choices, draggable Preview and settings.",
+                        "Representative states let you place the Guessing Browser Source before a real round begins."
+                    ),
                     Bullets =
                     [
-                        "No Overlays menu: select the correct channel and turn on Overlays in Channel setup.",
-                        "No saved overlay after selecting New: complete the name and select Create overlay.",
-                        "Private URL unavailable: create the overlay or rotate its URL; BlokeBot cannot reveal an earlier URL again.",
-                        "Overlay unavailable in OBS: check that it is enabled and that OBS has the current private URL, especially after rotation.",
-                        "No live client detected: select Live preview or connect the Browser Source in OBS before sending a test pulse.",
-                        "Blank but connected: Empty V1 is transparent at rest. Send a test pulse and check the production preview before changing the OBS scene.",
-                        "Stale after reconnect: reload the Browser Source so it requests the current snapshot and starts a fresh live connection.",
+                        "Turn on Guessing game, create the Browser Source, and choose whether the number of guesses is shown.",
+                        "Use Representative to inspect Open, Closed and Result states. Save the appearance, then use the normal Guessing dashboard to start, stop and resolve a round.",
+                        "The first configured answer is its main answer; aliases still work for viewers but do not change the displayed setup language.",
+                        "If Preview is paused, restore both Overlays and Guessing game in Channel setup. Saved setup remains in place while either feature is off.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Active Giveaways",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-giveaway.png",
+                        LightPhoneSource: "media/phone-light-overlay-giveaway.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-giveaway.png",
+                        LightLaptopSource: "media/laptop-light-overlay-giveaway.png",
+                        PhoneAlt: "Giveaway Browser Source on a phone showing an active giveaway in Preview.",
+                        LaptopAlt: "Giveaway Browser Source showing an active giveaway, compact display controls and appearance editing.",
+                        "The active Giveaway Preview shows useful live content; without an active giveaway the Browser Source renders nothing."
+                    ),
+                    Bullets =
+                    [
+                        "Turn on Points, choose a Giveaway title, and use the compact controls for entrant count, close-time countdown and current join command.",
+                        "Use Representative to inspect Open, Closing, Completed or Cancelled presentation, then save before running the giveaway from Points.",
+                        "When there is no active giveaway, the Browser Source renders nothing. There is no viewer-facing idle card.",
+                        "If it stays blank during an active giveaway, check that both Overlays and Points are on, the source is enabled, OBS has the current private URL and the giveaway is actually running.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Event feed",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-event-feed.png",
+                        LightPhoneSource: "media/phone-light-overlay-event-feed.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-event-feed.png",
+                        LightLaptopSource: "media/laptop-light-overlay-event-feed.png",
+                        PhoneAlt: "Event feed Browser Source on a phone showing a representative channel event and compact source controls.",
+                        LaptopAlt: "Event feed Browser Source showing its Preview, waiting-card limit and enabled event sources.",
+                        "One Event feed can present point awards, Guessing winners and Giveaway winners."
+                    ),
+                    Bullets =
+                    [
+                        "Choose the maximum waiting cards and what happens when the feed is full.",
+                        "Turn point awards, Guessing winners and Giveaway winners on or off independently. Settings for an off source collapse without discarding its saved values.",
+                        "For each enabled source, edit its message, priority and display time, then choose a Representative event to check the result.",
+                        "If an expected card is missing, confirm its feature and event source are on. Re-enable the source for future events; events missed while it was off are not replayed.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Viewer Queue",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-viewer-queue.png",
+                        LightPhoneSource: "media/phone-light-overlay-viewer-queue.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-viewer-queue.png",
+                        LightLaptopSource: "media/laptop-light-overlay-viewer-queue.png",
+                        PhoneAlt: "Viewer Queue Browser Source on a phone showing a safe representative public queue summary.",
+                        LaptopAlt: "Viewer Queue Browser Source showing a representative party and safe public queue summary in Preview.",
+                        "Viewer Queue presents current, next and waiting viewers without exposing private party information."
+                    ),
+                    Bullets =
+                    [
+                        "Turn on Play with viewers and create a queue first. Joining its viewer page requires Twitch sign-in; there is no unsigned typed-login fallback.",
+                        "Choose the queue and how many Current party and Next rows to show, then inspect Open, Ready check and Party selected examples.",
+                        "Every configured field is optional and public on the viewer page and Viewer Queue overlay. Ask only for details that are safe to show on stream.",
+                        "Configured entry answers are public on the Viewer Queue overlay. Lobby messages and moderator notes remain private, and the overlay does not show a wait estimate.",
+                        "If the Preview is paused, restore both Overlays and Play with viewers. The current queue and saved appearance remain in place and missed animations are not replayed.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Cue player and live recovery",
+                    Bullets =
+                    [
+                        "A Cue player is a Browser Source target for reusable Cues. Create and protect its private URL here, then build and test content on the Cues page.",
+                        "Send test pulse checks the selected enabled source. A connected Preview or OBS source should respond without exposing its private URL.",
+                        "If OBS is stale after a network loss or restart, reload that Browser Source so it reads the latest saved state and reconnects.",
+                        "Rename keeps the private URL. Disable stops display while retaining setup. Rotate revokes the old URL. Delete permanently removes the source.",
                     ],
                 },
             ],
             Next =
             [
-                new SiteLink("Choose other channel tools", "tools"),
+                new SiteLink("Build reusable Cues", "overlays/cues"),
+                new SiteLink("Manage Cue media", "overlays/media"),
                 new SiteLink("Troubleshoot the bot", "troubleshooting"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/cues",
+            Eyebrow = "Stream presentation · Cues",
+            Title = "Build and trigger reusable Cues",
+            Summary =
+                "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-cues.png",
+                LightPhoneSource: "media/phone-light-overlay-cues.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
+                LightLaptopSource: "media/laptop-light-overlay-cues.png",
+                PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
+                LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
+                "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Prepare a Cue player",
+                    Steps =
+                    [
+                        "Turn on Overlays in Channel setup.",
+                        "On Sources, create an enabled Cue player Browser Source, copy its private URL and add it to OBS at 1920 × 1080.",
+                        "Open Cues at /overlays/cues and choose the saved Cue player under Test playback.",
+                    ],
+                    Note =
+                        "If Overlays is off, Cue editing and playback are paused while saved Cues remain. Re-enabling does not play Cue requests that were missed while the feature was off.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Build reusable content",
+                    Steps =
+                    [
+                        "Select New cue, name it, set its total duration and choose what happens when another Cue is already playing.",
+                        "Add uploaded media, online media or a web page. Reorder or remove content as needed; content lower in the list appears in front when stacking values match.",
+                        "For each item, set when it starts, how long it plays, stacking order, left, top, width and height.",
+                        "For image, audio and video content, set volume where available and choose Show all, Fill and crop or Stretch to fill.",
+                        "Turn Cue enabled on and select Create cue or Save cue.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Choose overlap and test playback",
+                    Bullets =
+                    [
+                        "Play after the current cue waits; Replace the current cue interrupts it; Skip while another cue plays drops the new request; Play at the same time overlaps them.",
+                        "Choose an enabled Cue player and select Play test cue. Watch the embedded preview or OBS source for the saved result.",
+                        "A test may wait briefly when the Cue player is disconnected. If it expires or is rejected, reconnect the player and try one fresh test rather than repeatedly adding requests.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Trigger a Cue from chat",
+                    Steps =
+                    [
+                        "Open Custom commands and create or edit a command.",
+                        "Under What happens, choose Play an overlay cue, then choose the Cue player, saved Cue, busy-player behavior and whether the chat reply is sent before or after the Cue is accepted.",
+                        "Use the command's Test cue action, save the command, and send its main command word in chat.",
+                    ],
+                    Bullets =
+                    [
+                        "The command, Cue, Cue player and Overlays feature must all be enabled for playback.",
+                        "A replaced or deleted Cue or target is reported as unavailable. Choose a current saved Cue and Browser Source, then save the command again.",
+                        "The selected Cue can use safe chat context without exposing the private Browser Source URL.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover embedded content",
+                    Bullets =
+                    [
+                        "Use complete secure addresses beginning with https:// for online media and web pages. A blocked, invalid or unreachable address must be corrected at its source.",
+                        "Some sites prevent embedding. Use an embeddable page or media address instead; do not weaken Browser Source safety settings.",
+                        "If uploaded media is missing or was replaced, open Media, repair that asset, return to the Cue and confirm the saved selection.",
+                        "If the layer layout is wrong, correct its timing, order or percentage geometry, save, and run one new test.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Manage the Media library", "overlays/media"),
+                new SiteLink("Manage Browser Sources", "overlays"),
+                new SiteLink("Create Custom Commands", "commands"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/media",
+            Eyebrow = "Stream presentation · Media library",
+            Title = "Manage media for Cues",
+            Summary =
+                "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-media.png",
+                LightPhoneSource: "media/phone-light-overlay-media.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-media.png",
+                LightLaptopSource: "media/laptop-light-overlay-media.png",
+                PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
+                LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
+                "Media stays in the selected channel's private storage and is available to its Cues."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Upload accepted browser media",
+                    Steps =
+                    [
+                        "Turn on Overlays, choose the channel and open Media at /overlays/media.",
+                        "Enter a clear Media name, then drag an image, audio or video file onto the Media file area, or choose it with the standard file picker.",
+                        "Wait for the upload result and confirm the saved file appears under Saved media.",
+                        "Open Cues, add Uploaded media and choose the saved name.",
+                    ],
+                    Note =
+                        "Uploads stay in private channel storage. The page shows current use and capacity; another channel cannot select or serve this channel's media.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Preview, replace or delete",
+                    Bullets =
+                    [
+                        "Preview a saved image, audio or video before assigning it to a live Cue.",
+                        "Replace file keeps the saved media item while updating its content for future playback. Test every Cue that depends on it before going live.",
+                        "Delete only after checking dependent Cues. A Cue does not silently substitute another file when its selected media is unavailable.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover an upload or playback failure",
+                    Bullets =
+                    [
+                        "Unsupported file: choose an ordinary browser-supported image, audio or video file rather than renaming an incompatible file.",
+                        "Storage full: delete media that is no longer used or replace a large file with a smaller browser-ready version, then upload once.",
+                        "Upload interrupted: keep the original file, reload the page and confirm whether a saved item exists before retrying.",
+                        "Cue cannot play the file: preview the saved media, replace it when damaged or unsupported, then save and test the dependent Cue again.",
+                        "Media page unavailable: restore Overlays in Channel setup. Saved media remains while the feature is off.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Build reusable Cues", "overlays/cues"),
+                new SiteLink("Manage Browser Sources", "overlays"),
             ],
         };
 
@@ -506,7 +723,7 @@ internal static class SiteGuideCatalog
                     [
                         "Select New, give the board a Command and URL name, title and description, then choose whether it accepts submissions.",
                         "Set the point cost, refund policy, active-submission limit, submission cooldown, voting switch and per-viewer vote limit.",
-                        "Add only the fields participants need. A field can be Text, URL, Twitch clip, Number or Choice; set its label, required state and applicable length, choice or number limits.",
+                        "Add only the fields participants need. A field can be Text, Link, Choose from a list, Number or Twitch clip link; set its label and applicable length, choice or number limits.",
                         "Select Save board, then use Open public board and read the Board rules exactly as a participant will see them.",
                     ],
                     Paragraphs =
@@ -519,9 +736,9 @@ internal static class SiteGuideCatalog
                     Heading = "Submit and vote",
                     Bullets =
                     [
-                        "On the public page, sign in with Twitch, complete Title and the configured fields, then select Submit request. The page shows the request ID and its current public state.",
+                        "On the public page, sign in with Twitch, complete Title and the configured fields, then select Submit request. The page shows the request number and its current public state.",
                         "In chat, use !request <board> <title> | field=value | category=value | tags=a,b. Required field keys come from that board's configuration.",
-                        "Use !requestvote <request-id> to vote in chat, or Vote on the public board. Repeating the same vote does not add another vote.",
+                        "Use !requestvote <request-number> to vote in chat, or Vote on the public board. Repeating the same vote does not add another vote.",
                         "A submitter can Withdraw an active request from the public page. Private moderator text is never shown there.",
                     ],
                     Note =
@@ -533,10 +750,10 @@ internal static class SiteGuideCatalog
                     Steps =
                     [
                         "Review the submitted values and any possible-duplicate warning. Set public category, tags, priority and Public note when they help participants.",
-                        "Move Pending to Approved or Rejected. Approved requests can move to Queued or Accepted; Queued or Accepted requests can move to Completed.",
-                        "Use Merge with the target request ID when two entries are the same request. The public board keeps the merged outcome and the surviving request's combined support.",
-                        "When the dashboard is not convenient, use !requestapprove, !requestreject, !requestqueue, !requestaccept or !requestcomplete followed by one request ID.",
-                        "To merge in chat, use !requestmerge <source-id> <target-id>.",
+                        "Move Awaiting review to Approved or Rejected. Approved requests can move to In queue or Accepted; In queue or Accepted requests can move to Completed. Submitters may Withdraw, and merged duplicates become Merged into another request.",
+                        "Use Merge with the target request number when two entries are the same request. The public board keeps the Merged into another request outcome and the surviving request's combined support.",
+                        "When the dashboard is not convenient, use !requestapprove, !requestreject, !requestqueue, !requestaccept or !requestcomplete followed by one request number.",
+                        "To merge in chat, use !requestmerge <source-number> <target-number>.",
                     ],
                     Paragraphs =
                     [
@@ -548,10 +765,10 @@ internal static class SiteGuideCatalog
                     Heading = "Points, failure and recovery",
                     Bullets =
                     [
-                        "A non-zero cost is reserved and deducted from the viewer's available balance when the board accepts the initial submission, before moderator review. It remains reserved through Pending, Approved, Queued and Accepted. Never manually charge the viewer as well.",
-                        "Completion consumes the reservation. A closure refunds it only under the configured policy: Never does not refund; Rejected or withdrawn refunds those two closures; Any unfulfilled closure also refunds other closures that did not complete.",
+                        "A non-zero cost is held from the viewer's available balance when the board accepts the initial submission, before moderator review. The reservation moves from No points charged to Points held, then finishes as Points refunded or Points charged. Never charge the viewer manually as well.",
+                        "Completion charges the held points. A closure follows the selected policy: Never refund, Refund if rejected or withdrawn, or Refund if not fulfilled.",
                         "If validation, the cooldown, a limit or the balance rejects a submission, correct the message shown and submit once. If an outcome is already visible, reload before trying again.",
-                        "If request state and points still disagree after reload, leave the request unchanged and send the channel, board name, request ID, approximate time and visible message to the server owner. Do not share Twitch tokens or private notes.",
+                        "If request state and points still disagree after reload, leave the request unchanged and send the channel, board name, request number, approximate time and visible message to the server owner. Do not share Twitch tokens or private notes.",
                     ],
                 },
             ],
@@ -564,13 +781,13 @@ internal static class SiteGuideCatalog
             Eyebrow = "Community interaction · Queues",
             Title = "Build fair play-with-viewers parties",
             Summary =
-                "Open a queue, collect private entry details, run ready checks and deliver lobby information without posting it publicly.",
+                "Open a queue, collect optional public entry details, run ready checks and deliver private lobby information without posting it publicly.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/phone-dark-play-with-viewers.png",
                 LightPhoneSource: "media/community/phone-light-play-with-viewers.png",
                 DarkLaptopSource: "media/community/laptop-dark-play-with-viewers.png",
                 LightLaptopSource: "media/community/laptop-light-play-with-viewers.png",
-                PhoneAlt: "The Sample Channel Community night party viewer page on a narrow screen, showing the public queue rule and private entry form.",
+                PhoneAlt: "The Sample Channel Community night party viewer page on a narrow screen, showing the public queue rule and optional entry form.",
                 LaptopAlt: "The Sample Channel Play with viewers moderator page, showing a saved queue, party size and fair-selection configuration.",
                 "The moderator route /queues and viewer route /queues/{channel}/{queue-name} share one live queue."
             ),
@@ -582,8 +799,8 @@ internal static class SiteGuideCatalog
                     Bullets =
                     [
                         "A channel owner or permitted moderator chooses the channel and opens Play with viewers at /queues.",
-                        "Open viewer page uses /queues/{channel}/{queue-name}. Signed-in participants use their Twitch identity; an unsigned participant can enter a Twitch login as the bounded fallback.",
-                        "Moderator controls, entry answers, priorities, private notes and lobby messages are never shown on the public page.",
+                        "Open viewer page uses /queues/{channel}/{queue-name}. Joining requires Twitch sign-in; there is no unsigned typed-login fallback.",
+                        "Moderator controls, priorities, moderator notes and lobby messages are never shown on the public page. Configured entry fields and their answers are public.",
                     ],
                     Note =
                         "The words in braces describe a route value. Replace them with the channel login and the queue's Command and URL name; do not type the braces.",
@@ -594,13 +811,13 @@ internal static class SiteGuideCatalog
                     Steps =
                     [
                         "Select New, set the Command and URL name, Queue name, Game or activity and Party size.",
-                        "Choose Join order or Least recent participation. The viewer page states the resulting fair-selection rule before anyone joins.",
-                        "Set Ready expiry, History retention and Skip/no-show exclusion. Add private entry fields and any required roles in role=count form.",
+                        "Choose First to join or Viewers who played least recently. The viewer page states the resulting fair-selection rule before anyone joins.",
+                        "Set Ready expiry, History retention and Skip/no-show exclusion. Add optional public entry fields and any required roles in role=count form.",
                         "Decide whether participant names may be shown publicly, turn Queue open on, save, then inspect Open viewer page at both wide and narrow widths.",
                     ],
                     Paragraphs =
                     [
-                        "Platform, region, rank, preferred role and every custom entry field are private to moderators even when public participant names are enabled.",
+                        "Every configured field is optional and public on the viewer page and Viewer Queue overlay, including fields such as platform, region, rank and preferred role. Lobby messages and moderator notes remain private.",
                     ],
                 },
                 new SiteGuideSection
@@ -610,7 +827,7 @@ internal static class SiteGuideCatalog
                     [
                         "On the viewer page, fill the requested fields and select Join. Check position reports the current place; Leave removes the entry; I'm ready answers an active ready check.",
                         "In chat use !queue [queue], !join [queue] key=value, !leave [queue], !position [queue] and !ready [queue]. The queue name is optional when the channel has only one queue.",
-                        "Joining twice keeps one entry. Signed-in Twitch ID is authoritative; normalized-login fallback lets an unsigned viewer participate without creating duplicate public names.",
+                        "Joining twice keeps one entry. The signed-in Twitch identity is authoritative and prevents a second typed identity from creating a duplicate entry.",
                     ],
                 },
                 new SiteGuideSection
@@ -618,10 +835,10 @@ internal static class SiteGuideCatalog
                     Heading = "Select and run a party",
                     Steps =
                     [
-                        "Review Waiting viewers and the visible next-candidate order. Adjust Priority or Private moderator note only when a documented channel rule requires it.",
+                        "Review Waiting viewers and the visible next-candidate order. Entries move through Waiting, Awaiting response, Ready, Selected, Left queue, Skipped and Did not respond. Adjust Priority or Moderator note only when a documented channel rule requires it.",
                         "Start a Ready check for candidates. Participants must use I'm ready or !ready before Ready expiry; then select Select next party.",
                         "Use Keep party to retain the current group, Replace one for a single change, or Skip and No-show when someone cannot play. The configured exclusion prevents immediate re-entry after a skip or no-show.",
-                        "Enter the Private lobby message and select Whisper party. Confirm success before starting; never paste a private lobby code into public chat as a fallback.",
+                        "Enter the Lobby message and select Whisper party. Confirm success before starting; never paste a private lobby code into public chat as a fallback.",
                     ],
                     Paragraphs =
                     [
@@ -668,7 +885,7 @@ internal static class SiteGuideCatalog
                     [
                         "Choose the channel and open Moments at /moments. Captures require Twitch to report that channel live and require the selected channel's Twitch connection.",
                         "Set the Merge window from 15 to 300 seconds; 90 seconds is the default. Calls inside that window join the same stream moment and keep each contributor and suggestion.",
-                        "Choose no point reward, First requester or All contributors, set the amount, and decide whether a confirmed clip failure may fall back to a stream marker.",
+                        "Choose No reward, First viewer to request or All contributing viewers, set the amount, and decide whether a confirmed clip failure may fall back to a stream marker.",
                         "Save settings and check that the page shows Live stream with a stream identity before inviting viewers to capture.",
                     ],
                 },
@@ -679,7 +896,7 @@ internal static class SiteGuideCatalog
                     [
                         "A viewer uses !moment <suggested title> | category=<suggested category>. !clip accepts the same form.",
                         "A moderator can use Capture now. BlokeBot first requests a Twitch clip; marker fallback is used only after a confirmed clip failure and only when enabled.",
-                        "Each call returns a public moment ID. Repeated or concurrent calls for the same live moment converge instead of creating duplicate provider actions or duplicate rewards.",
+                        "Each call returns a public moment number. Repeated or concurrent calls for the same live moment converge instead of creating duplicate Twitch actions or duplicate rewards.",
                     ],
                     Note =
                         "BlokeBot links to Twitch media; it does not copy or host the clip or VOD.",
@@ -689,13 +906,13 @@ internal static class SiteGuideCatalog
                     Heading = "Moderate public metadata",
                     Steps =
                     [
-                        "Review the provider state, contributor count and viewer suggestions in Candidates.",
-                        "Set Public title and Category, then Approve. Save metadata updates an existing candidate; Reject keeps its reason private; Merge uses another moment's public ID.",
+                        "Review Creating clip, Clip ready, Marker ready or Could not create clip, together with the contributor count and viewer suggestions in Candidates.",
+                        "Set Public title and Category, select Save details, then Approve. Reject keeps its reason private; Merge uses another moment number.",
                         "Use Open on Twitch to verify available media. Only approved moments appear in public recaps.",
                     ],
                     Paragraphs =
                     [
-                        "Private moderator note, rejection reason, audit text and provider failure details stay on the moderator view. Public recaps show only approved title, category, counts and the Twitch link.",
+                        "Moderator note, rejection reason, audit text and Twitch failure details stay on the moderator view. Public recaps show only approved title, category, counts and the Twitch link.",
                     ],
                 },
                 new SiteGuideSection
@@ -712,13 +929,13 @@ internal static class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Read provider states before retrying",
+                    Heading = "Read Twitch states before retrying",
                     Bullets =
                     [
-                        "Provider pending means Twitch has not finished the clip. Reload the same candidate later; do not capture again just to force an answer.",
+                        "Creating clip means Twitch has not finished the clip. Reload the same candidate later; do not capture again just to force an answer.",
                         "An ambiguous outcome means Twitch did not confirm whether its request completed. BlokeBot preserves that uncertainty and does not create a fallback marker from it.",
                         "Offline means wait for a live stream. If Twitch reports clips or VODs disabled, correct that Twitch setting or continue without marker fallback. If access is unauthorized, reconnect the selected channel account.",
-                        "For a continuing failure, keep the candidate and send the selected channel, public moment ID, stream identity, approximate time and visible provider message to the server owner. Never send tokens or private moderation text.",
+                        "For a continuing failure, keep the candidate and send the selected channel, moment number, stream identity, approximate time and visible Twitch message to the server owner. Never send tokens or private moderation text.",
                     ],
                 },
             ],
@@ -815,7 +1032,7 @@ internal static class SiteGuideCatalog
                     [
                         "Automatic raid shoutouts are off by default. Open the section and turn them on when you are ready.",
                         "Set the minimum viewer count, then choose either a Native Twitch shoutout or a Chat message.",
-                        "For a chat message, choose Regular, Pinned or Announcement. A pinned message can use a duration from 30 to 1,800 seconds or stay pinned until stream end; an announcement also needs a colour.",
+                        "For a chat message, choose Regular, Pinned or Announcement. A pinned message can use a duration from 30 to 1,800 seconds or stay pinned until stream end; an announcement colour is Default, Blue, Green, Orange or Purple.",
                         "Write the message, check its preview and readiness note, then select Save automatic shoutouts.",
                     ],
                     Bullets =
@@ -1124,7 +1341,7 @@ internal static class SiteGuideCatalog
             Eyebrow = "Chat commands · Viewer discovery",
             Title = "Publish the commands viewers can use now",
             Summary =
-                "Choose one global Commands trigger and let viewers discover a canonical, viewer-safe list that follows the selected channel's current state.",
+                "Choose one global Commands trigger and let viewers discover a viewer-safe list of main command names that follows the selected channel's current state.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/phone-dark-viewer-command-catalog.png",
                 LightPhoneSource: "media/phone-light-viewer-command-catalog.png",
@@ -1132,7 +1349,7 @@ internal static class SiteGuideCatalog
                 LightLaptopSource: "media/laptop-light-viewer-command-catalog.png",
                 PhoneAlt: "Channel setup on a phone showing the global Commands trigger and expanded Available viewer commands list.",
                 LaptopAlt: "Channel setup showing the global Commands trigger, expanded Available viewer commands list and a command-name conflict.",
-                "Channel setup shows the same canonical, viewer-safe command catalog that the global chat trigger publishes."
+                "Channel setup shows the same viewer-safe list of main command names that the global chat trigger publishes."
             ),
             Sections =
             [
@@ -1157,7 +1374,7 @@ internal static class SiteGuideCatalog
                     Steps =
                     [
                         "Open Available viewer commands inside the Commands section. It starts collapsed so the setup page stays compact.",
-                        "Review the current canonical command names and any conflict or availability explanation.",
+                        "Review the current main command names and any conflict or availability explanation.",
                         "In chat, send the saved trigger such as !commands to publish the same ordered list.",
                     ],
                     Bullets =
@@ -1169,15 +1386,15 @@ internal static class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Understand canonical names",
+                    Heading = "Understand main names",
                     Paragraphs =
                     [
-                        "Each Custom Command contributes only the first command word in its saved alias list. That canonical-first rule keeps the catalog short and predictable; secondary aliases still work in chat but are not advertised.",
+                        "Each Custom Command contributes only the first command word in its saved alias list. That main-name rule keeps the catalog short and predictable; secondary aliases still work in chat but are not advertised.",
                     ],
                     Bullets =
                     [
-                        "Built-in commands use their supported public canonical names.",
-                        "A Custom Command that is moderator-only is omitted even when its canonical name works for moderators.",
+                        "Built-in commands use their supported public main names.",
+                        "A Custom Command that is moderator-only is omitted even when its main name works for moderators.",
                         "When two routes claim the same word, the catalog reports which entry is shadowed instead of pretending both are available.",
                     ],
                 },
@@ -1202,7 +1419,7 @@ internal static class SiteGuideCatalog
                     Heading = "Long lists and live changes",
                     Paragraphs =
                     [
-                        "BlokeBot keeps the canonical ordering stable. When the chat response is longer than Twitch permits in one message, it splits the list across multiple ordinary replies without dropping or duplicating command names.",
+                        "BlokeBot keeps the command ordering stable. When the chat response is longer than Twitch permits in one message, it splits the list across multiple ordinary replies without dropping or duplicating command names.",
                         "A game opening, giveaway ending, board or queue changing, feature switch, or stream-liveness change can alter membership. Reopen Available viewer commands for a fresh check when you are preparing an announcement or stream instructions.",
                     ],
                 },
@@ -1250,7 +1467,7 @@ internal static class SiteGuideCatalog
                     Steps =
                     [
                         "Turn on Guessing game and open its Settings page.",
-                        "Create a round type, add every accepted answer, put comma-separated aliases after its canonical name, and choose any winner point reward.",
+                        "Create a round type, add every accepted answer, put comma-separated aliases after its main answer, and choose any winner point reward.",
                         "Review the chat commands and bot replies, then save.",
                     ],
                 },

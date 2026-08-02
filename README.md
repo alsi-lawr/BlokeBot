@@ -9,9 +9,9 @@
 
 **A self-hosted Twitch bot and dashboard for running channel tools on your own terms.**
 
-[Help site](src/BlokeBot.Site) |
-[User guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide) |
-[Server owner guide](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide)
+[Help site](https://www.blokebot.com/) |
+[Open BlokeBot](https://bot.blokebot.com/) |
+[Server owner guide](https://www.blokebot.com/server-owners)
 
 </div>
 
@@ -33,7 +33,7 @@ If someone has already set up BlokeBot for your channel, you do not need Docker 
 3. Choose your channel.
 4. Follow the dashboard prompts to connect the bot and turn on the tools you want.
 
-The **[User guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide)** walks through each step in plain language.
+The **[BlokeBot help site](https://www.blokebot.com/guide)** walks through each step in plain language.
 
 ## Run your own copy
 
@@ -50,7 +50,9 @@ docker run --rm --init --publish 8080:8080 --volume blokebot-data:/data blokebot
 nix run github:alsi-lawr/BlokeBot#blokebot -- serve
 ```
 
-Run the separate [BlokeBot.Site help site](src/BlokeBot.Site) for approachable setup guidance, and use
-the [server owner wiki](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide) for technical detail.
+Run the separate [BlokeBot.Site help site](src/BlokeBot.Site) for approachable setup guidance. The
+public [help site](https://www.blokebot.com/) includes the
+[server owner guide](https://www.blokebot.com/server-owners) for technical detail.
 
-For everyday help, start with the **[BlokeBot User Guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide)**.
+For everyday help, start with the **[BlokeBot user guide](https://www.blokebot.com/guide)**. The
+hosted bot is available at **[bot.blokebot.com](https://bot.blokebot.com/)**.

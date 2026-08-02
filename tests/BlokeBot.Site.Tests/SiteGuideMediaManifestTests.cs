@@ -28,10 +28,53 @@ public sealed class SiteGuideMediaManifestTests
     {
         var manifest = LoadManifest();
         manifest.Version.ShouldBe(1);
-        manifest.Assets.Count.ShouldBe(80);
-        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(72);
+        manifest.Assets.Count.ShouldBe(104);
+        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(96);
         manifest.Assets.Count(asset => asset.Format == "webp").ShouldBe(8);
         manifest.Assets.Select(asset => asset.File).ShouldBeUnique();
+        var expectedCaptureCounts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["capture/screenshots.lua"] = 44,
+            ["capture/home-scroll.lua"] = 4,
+            ["capture/guessing-workflow.lua"] = 4,
+            ["capture/v0.5-guides.lua"] = 12,
+            ["capture/community-guides.lua"] = 12,
+            ["capture/v0.6-overlay-guides.lua"] = 28,
+        };
+        var captureCounts = manifest
+            .Assets.GroupBy(asset => asset.Capture, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        captureCounts.Count.ShouldBe(expectedCaptureCounts.Count);
+        foreach (var expected in expectedCaptureCounts)
+        {
+            captureCounts.ShouldContainKey(expected.Key);
+            captureCounts[expected.Key].ShouldBe(expected.Value);
+        }
+
+        var overlayFiles = manifest
+            .Assets.Where(asset => asset.Capture == "capture/v0.6-overlay-guides.lua")
+            .Select(asset => asset.File)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var expectedOverlayFiles = (
+            from device in new[] { "laptop", "phone" }
+            from theme in new[] { "dark", "light" }
+            from view in new[]
+            {
+                "cues",
+                "event-feed",
+                "giveaway",
+                "guessing",
+                "media",
+                "sources",
+                "viewer-queue",
+            }
+            select $"{device}-{theme}-overlay-{view}.png"
+        )
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        overlayFiles.ShouldBe(expectedOverlayFiles);
+        manifest.Assets.ShouldNotContain(asset => asset.Capture == "capture/twitch-operations.lua");
 
         var mediaInventory = Directory
             .EnumerateFiles(_mediaRoot, "*", SearchOption.AllDirectories)
@@ -81,7 +124,7 @@ public sealed class SiteGuideMediaManifestTests
     }
 
     [Test]
-    public async Task GuideRoutes_RenderUsableFeatureSidebarAndCurrentNativeGuidance()
+    public async Task GuideRoutes_RenderUsableFeatureSidebarAndCurrentGuidance()
     {
         await using var app = SiteApplication.Build(["--urls=http://127.0.0.1:0"]);
 
@@ -105,22 +148,65 @@ public sealed class SiteGuideMediaManifestTests
                 content.ShouldContain("All help topics");
                 content.ShouldContain("Community interaction");
                 content.ShouldContain("Native Twitch");
-                content.ShouldContain("Overlays and Browser Sources");
+                content.ShouldContain("Browser Sources");
+                content.ShouldContain("Cues");
+                content.ShouldContain("Media library");
                 content.ShouldContain("Available viewer commands");
             }
 
             var overlays = await client.GetStringAsync("/overlays");
-            overlays.ShouldContain("Current topic: <strong>Overlays and Browser Sources</strong>");
+            overlays.ShouldContain("Current topic: <strong>Browser Sources</strong>");
             overlays.ShouldContain("private Browser Source URL");
             overlays.ShouldContain("set Width to 1920 and Height to 1080");
-            overlays.ShouldContain("A blank canvas is the normal resting state for Empty V1");
-            overlays.ShouldContain(
-                "Temporary network loss triggers bounded automatic reconnection"
-            );
-            overlays.ShouldContain("Rotate private URL immediately revokes the old URL");
-            overlays.ShouldContain("No live client detected");
-            overlays.ShouldContain("media/laptop-dark-overlays.png");
+            overlays.ShouldContain("Preview is above configuration");
+            overlays.ShouldContain("Shift plus an arrow for ten pixels");
+            overlays.ShouldContain("Available selectors are .overlay, .card, .accent");
+            overlays.ShouldContain("When there is no active giveaway");
+            overlays.ShouldContain("renders nothing");
+            overlays.ShouldContain("Joining its viewer page requires Twitch sign-in");
+            overlays.ShouldContain("every configured field is optional and public");
+            overlays.ShouldContain("does not show a wait estimate");
+            overlays.ShouldContain("media/laptop-dark-overlay-sources.png");
+            overlays.ShouldContain("media/phone-light-overlay-viewer-queue.png");
             overlays.ShouldNotContain("simulation-overlay-access-key");
+            overlays.ShouldNotContain("Production preview");
+            overlays.ShouldNotContain("Empty V1");
+            overlays.ShouldNotContain("Cue-V1");
+            overlays.ShouldNotContain("diagnostic presence");
+            overlays.ShouldNotContain("live client");
+
+            var cues = await client.GetStringAsync("/overlays/cues");
+            cues.ShouldContain("Current topic: <strong>Cues</strong>");
+            cues.ShouldContain("uploaded media, online media and web pages");
+            cues.ShouldContain("Play after the current cue");
+            cues.ShouldContain("Play an overlay cue");
+            cues.ShouldContain("main command word");
+            cues.ShouldContain("media/laptop-dark-overlay-cues.png");
+            cues.ShouldNotContain("Cue-V1");
+
+            var media = await client.GetStringAsync("/overlays/media");
+            media.ShouldContain("Current topic: <strong>Media library</strong>");
+            media.ShouldContain("image, audio or video file");
+            media.ShouldContain("private channel storage");
+            media.ShouldContain("Replace file");
+            media.ShouldContain("media/phone-light-overlay-media.png");
+
+            foreach (
+                var source in SiteGuideCatalog
+                    .All.Where(page => page.Route.StartsWith("/overlays", StringComparison.Ordinal))
+                    .SelectMany(page =>
+                        OptionalSources(page.Media)
+                            .Concat(
+                                page.Sections.SelectMany(section => OptionalSources(section.Media))
+                            )
+                    )
+                    .Distinct(StringComparer.Ordinal)
+            )
+            {
+                var response = await client.GetAsync($"/{source}");
+                response.StatusCode.ShouldBe(HttpStatusCode.OK, source);
+                response.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
+            }
 
             var tools = await client.GetStringAsync("/tools");
             tools.ShouldContain("all twelve Chat Tools features disabled");
@@ -148,21 +234,38 @@ public sealed class SiteGuideMediaManifestTests
             requestBoards.ShouldContain(
                 "!request &lt;board&gt; &lt;title&gt; | field=value | category=value | tags=a,b"
             );
-            requestBoards.ShouldContain("Private moderator note");
+            requestBoards.ShouldContain(
+                "Text, Link, Choose from a list, Number or Twitch clip link"
+            );
+            requestBoards.ShouldContain("Awaiting review");
+            requestBoards.ShouldContain("Merged into another request");
+            requestBoards.ShouldContain("Never refund");
+            requestBoards.ShouldContain("Points held");
+            requestBoards.ShouldContain("request number");
             requestBoards.ShouldContain("media/community/laptop-dark-request-boards.png");
 
             var playWithViewers = await client.GetStringAsync("/community/play-with-viewers");
             playWithViewers.ShouldContain("Current topic: <strong>Play with viewers</strong>");
             playWithViewers.ShouldContain("/queues/{channel}/{queue-name}");
             playWithViewers.ShouldContain("!ready [queue]");
-            playWithViewers.ShouldContain("Private lobby message");
+            playWithViewers.ShouldContain("there is no unsigned typed-login fallback");
+            playWithViewers.ShouldContain("First to join");
+            playWithViewers.ShouldContain("Viewers who played least recently");
+            playWithViewers.ShouldContain("Every configured field is optional and public");
+            playWithViewers.ShouldContain("Did not respond");
+            playWithViewers.ShouldContain("Lobby messages and moderator notes remain private");
             playWithViewers.ShouldContain("media/community/phone-light-play-with-viewers.png");
 
             var moments = await client.GetStringAsync("/community/moments");
             moments.ShouldContain("Current topic: <strong>Moments</strong>");
             moments.ShouldContain("/moments/{channel}/streams/{stream-id}");
             moments.ShouldContain("!moment &lt;suggested title&gt;");
-            moments.ShouldContain("Provider pending");
+            moments.ShouldContain("No reward, First viewer to request or All contributing viewers");
+            moments.ShouldContain(
+                "Creating clip, Clip ready, Marker ready or Could not create clip"
+            );
+            moments.ShouldContain("Save details");
+            moments.ShouldContain("moment number");
             moments.ShouldContain("does not copy or host the clip or VOD");
             moments.ShouldContain("media/community/phone-light-moments.png");
 
@@ -189,6 +292,7 @@ public sealed class SiteGuideMediaManifestTests
             var shoutouts = await client.GetStringAsync("/twitch-operations/shoutouts");
             shoutouts.ShouldContain("Automatic raid shoutouts are off by default");
             shoutouts.ShouldContain("Regular, Pinned or Announcement");
+            shoutouts.ShouldContain("Default, Blue, Green, Orange or Purple");
             shoutouts.ShouldContain("{twitch_handle}");
             shoutouts.ShouldContain("There is no retry or fallback action for an earlier raid.");
             shoutouts.ShouldContain("Current topic: <strong>Shoutouts</strong>");
@@ -216,6 +320,7 @@ public sealed class SiteGuideMediaManifestTests
             commandCatalog.ShouldContain("The default is commands");
             commandCatalog.ShouldContain("starts collapsed");
             commandCatalog.ShouldContain("only the first command word");
+            commandCatalog.ShouldContain("main command names");
             commandCatalog.ShouldContain("Moderator-only commands");
             commandCatalog.ShouldContain("Moment and clip commands depend on live-stream identity");
             commandCatalog.ShouldContain("splits the list across multiple ordinary replies");

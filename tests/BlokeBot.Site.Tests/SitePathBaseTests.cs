@@ -53,8 +53,18 @@ public sealed class SitePathBaseTests
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var overlays = await client.GetStringAsync("/blokebot/overlays");
-            overlays.ShouldContain("data-theme-light-source=\"media/laptop-light-overlays.png\"");
-            overlays.ShouldContain("Current topic: <strong>Overlays and Browser Sources</strong>");
+            overlays.ShouldContain(
+                "data-theme-light-source=\"media/laptop-light-overlay-sources.png\""
+            );
+            overlays.ShouldContain("Current topic: <strong>Browser Sources</strong>");
+
+            var cues = await client.GetStringAsync("/blokebot/overlays/cues");
+            cues.ShouldContain("data-theme-dark-source=\"media/phone-dark-overlay-cues.png\"");
+            cues.ShouldContain("Current topic: <strong>Cues</strong>");
+
+            var media = await client.GetStringAsync("/blokebot/overlays/media");
+            media.ShouldContain("data-theme-light-source=\"media/laptop-light-overlay-media.png\"");
+            media.ShouldContain("Current topic: <strong>Media library</strong>");
 
             var tools = await client.GetStringAsync("/blokebot/tools");
             tools.ShouldContain(
@@ -116,9 +126,17 @@ public sealed class SitePathBaseTests
             nativeShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var overlayShowcase = await client.GetAsync(
-                "/blokebot/media/laptop-light-overlays.png"
+                "/blokebot/media/laptop-light-overlay-sources.png"
             );
             overlayShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var cueShowcase = await client.GetAsync("/blokebot/media/phone-dark-overlay-cues.png");
+            cueShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var mediaShowcase = await client.GetAsync(
+                "/blokebot/media/laptop-light-overlay-media.png"
+            );
+            mediaShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var chatToolsShowcase = await client.GetAsync(
                 "/blokebot/media/phone-light-chat-tools-enabled.png"
