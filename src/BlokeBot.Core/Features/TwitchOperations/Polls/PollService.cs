@@ -123,7 +123,7 @@ public sealed class PollService(
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
-                "Reconnect the selected broadcaster with Twitch operations permissions."
+                "Reconnect the selected channel's Twitch integration."
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -197,7 +197,7 @@ public sealed class PollService(
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
-                "Reconnect the selected broadcaster with Twitch operations permissions."
+                "Reconnect the selected channel's Twitch integration."
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -428,7 +428,7 @@ public sealed class PollService(
 
         await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
         return new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
-            "Reconnect the selected broadcaster with Twitch operations permissions."
+            "Reconnect the selected channel's Twitch integration."
         );
     }
 
@@ -456,8 +456,8 @@ public sealed class PollService(
                 DurableAlertSeverity.Warning,
                 "twitch-broadcaster-authorization",
                 "reauthorize-v1",
-                "Reconnect broadcaster for Twitch operations",
-                "Twitch operations needs the selected broadcaster to reconnect and approve all requested permissions.",
+                "Reconnect Twitch integration",
+                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);

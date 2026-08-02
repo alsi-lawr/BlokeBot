@@ -40,73 +40,317 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostConfigFaultRoutingTests
 {
     [Test]
-    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat()
+    public async Task TwitchIntegrationReadiness_Ready_OffersOwnerReconnectAndDisconnect()
     {
         await AssertTwitchOperationsPresentationAsync(
             ReadyBroadcasterStatus(),
             owner: true,
             page =>
             {
-                page.Markup.ShouldContain("Twitch chat");
-                page.Markup.ShouldContain("Twitch operations");
-                page.Markup.ShouldContain(
-                    "Polls, clips and markers, Channel Points and Predictions are connected."
-                );
-                BroadcasterActions(page).ShouldBeEmpty();
+                page.Markup.ShouldContain("Chat access");
+                page.Markup.ShouldContain("Twitch integration");
+                page.Markup.ShouldNotContain(">Twitch chat<");
+                page.Markup.ShouldNotContain(">Twitch operations<");
+                page.Find("[data-twitch-integration]")
+                    .TextContent.ShouldContain("Connected for this channel.");
+                var action = BroadcasterActions(page).ShouldHaveSingleItem();
+                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
+                action.Markup.ShouldContain("Reconnect");
+                TwitchIntegrationDisconnectActions(page).Count.ShouldBe(1);
             }
         );
     }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect()
+    public async Task TwitchIntegrationReadiness_Missing_OffersOwnerConnect()
     {
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: true,
             page =>
             {
-                page.Markup.ShouldContain(
-                    "The channel owner must connect and approve every Twitch operations permission."
-                );
+                page.Markup.ShouldContain("The channel owner must connect this integration.");
                 var action = BroadcasterActions(page).ShouldHaveSingleItem();
                 action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
-                action.Markup.ShouldContain("Connect operations");
+                action.Markup.ShouldContain("Connect");
+                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
             }
         );
     }
 
     [Test]
-    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect()
+    public async Task TwitchIntegrationReadiness_Stale_OffersOwnerReconnectAndDisconnect()
     {
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Invalid([]),
             owner: true,
             page =>
             {
-                page.Markup.ShouldContain(
-                    "The channel owner must reconnect and approve every Twitch operations permission."
-                );
+                page.Markup.ShouldContain("The channel owner must reconnect this integration.");
                 var action = BroadcasterActions(page).ShouldHaveSingleItem();
                 action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
-                action.Markup.ShouldContain("Reconnect operations");
+                action.Markup.ShouldContain("Reconnect");
+                TwitchIntegrationDisconnectActions(page).Count.ShouldBe(1);
             }
         );
     }
 
     [Test]
-    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction()
+    public async Task TwitchIntegrationReadiness_MissingNonOwner_ShowsOwnerGuidanceWithoutAction()
     {
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: false,
             page =>
             {
-                page.Markup.ShouldContain(
-                    "The channel owner must connect and approve every Twitch operations permission."
-                );
+                page.Markup.ShouldContain("The channel owner must connect this integration.");
                 BroadcasterActions(page).ShouldBeEmpty();
+                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
             }
         );
+    }
+
+    [Test]
+    public async Task TwitchIntegrationReadiness_ReadyNonOwner_ShowsOwnerGuidanceWithoutAction()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            ReadyBroadcasterStatus(),
+            owner: false,
+            page =>
+            {
+                page.Find("[data-twitch-integration]")
+                    .TextContent.ShouldContain(
+                        "Only the channel owner can change this connection."
+                    );
+                BroadcasterActions(page).ShouldBeEmpty();
+                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
+            }
+        );
+    }
+
+    [Test]
+    public async Task TwitchIntegrationReadiness_StaleNonOwner_ShowsOwnerGuidanceWithoutAction()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            new TokenStatus.Invalid([]),
+            owner: false,
+            page =>
+            {
+                page.Markup.ShouldContain("The channel owner must reconnect this integration.");
+                BroadcasterActions(page).ShouldBeEmpty();
+                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
+            }
+        );
+    }
+
+    [Test]
+    [Arguments(AuthRole.Admin)]
+    [Arguments(AuthRole.Moderator)]
+    public async Task TwitchIntegrationDisconnect_AuthorityChangedToNonOwner_DoesNotMutateOrNotify(
+        AuthRole role
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await SeedBroadcasterAuthorizationAsync(dbFactory, hostId);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new FixedBroadcasterTokenStatusProvider(ReadyBroadcasterStatus())
+        );
+        var notificationCount = 0;
+        using var subscription = context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named($"Test.HostConfig.Disconnect.{role}"),
+                (_, _) =>
+                {
+                    notificationCount++;
+                    return ValueTask.CompletedTask;
+                }
+            );
+        var page = RenderHostConfigPage(context);
+        var disconnect = page.Find("[data-twitch-integration-disconnect]");
+        if (role == AuthRole.Admin)
+        {
+            SetAdminClaims(testContext.Authorization, hostId);
+        }
+        else
+        {
+            SetModeratorClaims(testContext.Authorization, hostId);
+        }
+
+        await page.InvokeAsync(() => disconnect.ClickAsync(new()));
+
+        await AssertBroadcasterAuthorizationPresentAsync(dbFactory, hostId);
+        notificationCount.ShouldBe(0);
+        context
+            .Services.GetRequiredService<ToastService>()
+            .Current.ShouldHaveSingleItem()
+            .Message.ShouldBe("Only the channel owner can disconnect the Twitch integration.");
+    }
+
+    [Test]
+    public async Task TwitchIntegrationDisconnect_SelectedChannelChanged_DoesNotMutateOrNotify()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await SeedBroadcasterAuthorizationAsync(dbFactory, hostId);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new FixedBroadcasterTokenStatusProvider(ReadyBroadcasterStatus())
+        );
+        var notificationCount = 0;
+        using var subscription = context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostConfig.Disconnect.SelectionChanged"),
+                (_, _) =>
+                {
+                    notificationCount++;
+                    return ValueTask.CompletedTask;
+                }
+            );
+        var page = RenderHostConfigPage(context);
+        var disconnect = page.Find("[data-twitch-integration-disconnect]");
+        SetOwnerClaims(testContext.Authorization, hostId + 1);
+
+        await page.InvokeAsync(() => disconnect.ClickAsync(new()));
+
+        await AssertBroadcasterAuthorizationPresentAsync(dbFactory, hostId);
+        notificationCount.ShouldBe(0);
+        context
+            .Services.GetRequiredService<ToastService>()
+            .Current.ShouldHaveSingleItem()
+            .Message.ShouldBe("Your selected channel changed. Choose the channel and try again.");
+    }
+
+    [Test]
+    public async Task TwitchIntegrationDisconnect_NotificationEscalation_ReloadsDisconnectedState()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await SeedBroadcasterAuthorizationAsync(dbFactory, hostId);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new DatabaseBroadcasterTokenStatusProvider(dbFactory)
+        );
+        using var failingSubscription = context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostConfig.Disconnect.Escalation"),
+                (_, _) =>
+                    ValueTask.FromException(new InvalidOperationException("runtime unavailable"))
+            );
+        var page = RenderHostConfigPage(context);
+
+        await page.InvokeAsync(() =>
+            page.Find("[data-twitch-integration-disconnect]").ClickAsync(new())
+        );
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("[data-twitch-integration]")
+                .TextContent.ShouldContain("The channel owner must connect this integration.");
+            TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
+            BroadcasterActions(page).ShouldHaveSingleItem().Markup.ShouldContain("Connect");
+        });
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (
+            await verify.HostBroadcasterAuthorizations.AnyAsync(value => value.HostId == hostId)
+        ).ShouldBeFalse();
+        var toast = context
+            .Services.GetRequiredService<ToastService>()
+            .Current.ShouldHaveSingleItem();
+        toast.Kind.ShouldBe(ToastKind.Warning);
+        toast.Message.ShouldContain("disconnected, but the running bot may need attention");
+    }
+
+    [Test]
+    public async Task TwitchIntegrationReadiness_BeforeHostConfigLoads_ShowsOnlyPageLoadingState()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        var pending = new PendingBroadcasterTokenStatusProvider();
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(pending);
+
+        var page = RenderHostConfigPage(context);
+
+        page.Markup.ShouldContain("Loading channel setup...");
+        page.FindAll("[data-twitch-integration]").ShouldBeEmpty();
+        BroadcasterActions(page).ShouldBeEmpty();
+        TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
+
+        pending.Completion.SetResult(ReadyBroadcasterStatus());
+        page.WaitForAssertion(() =>
+            page.Find("[data-twitch-integration]")
+                .TextContent.ShouldContain("Connected for this channel.")
+        );
+    }
+
+    [Test]
+    public async Task TwitchIntegrationReadiness_LoadFault_UsesExistingPageFaultBoundaryWithoutActions()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new FaultingBroadcasterTokenStatusProvider()
+        );
+        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<HostConfigPage>(0);
+            builder.CloseComponent();
+        };
+
+        var boundary = context.Render<CapturingErrorBoundary>(parameters =>
+            parameters.Add(value => value.ChildContent, content)
+        );
+
+        boundary.WaitForAssertion(() =>
+            boundary.Instance.CapturedException.ShouldBeOfType<InvalidOperationException>()
+        );
+        boundary.FindAll("[data-twitch-integration]").ShouldBeEmpty();
+        boundary.FindAll("[data-twitch-integration-disconnect]").ShouldBeEmpty();
+        boundary.FindAll("a[href='/oauth/broadcaster/start']").ShouldBeEmpty();
     }
 
     [Test]
@@ -572,6 +816,13 @@ public sealed class HostConfigFaultRoutingTests
             .ToArray();
     }
 
+    private static IReadOnlyList<IElement> TwitchIntegrationDisconnectActions(
+        IRenderedComponent<HostConfigPage> page
+    )
+    {
+        return page.FindAll("[data-twitch-integration-disconnect]");
+    }
+
     private static TokenStatus ReadyBroadcasterStatus()
     {
         return new TokenStatus.Ready(
@@ -614,6 +865,21 @@ public sealed class HostConfigFaultRoutingTests
                 )
                 .Claims.Append(new Claim(BotHostClaims.AdminEditingLogin, "administrator"))
                 .ToArray()
+        );
+    }
+
+    private static void SetOwnerClaims(BunitAuthorizationContext authorization, int hostId)
+    {
+        var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
+        authorization.SetClaims(
+            TestPrincipals
+                .BlokeBotUser(
+                    "streamer",
+                    role: AuthRole.Streamer,
+                    availableHosts: [host],
+                    selectedHost: host
+                )
+                .Claims.ToArray()
         );
     }
 
@@ -798,6 +1064,41 @@ public sealed class HostConfigFaultRoutingTests
         return host.Id;
     }
 
+    private static async Task SeedBroadcasterAuthorizationAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.HostBroadcasterAuthorizations.Add(
+            new HostBroadcasterAuthorization
+            {
+                HostId = hostId,
+                TwitchUserId = "streamer-id",
+                Login = "streamer",
+                ProtectedTokenPayload = [1, 2, 3],
+                AuthorizedScopes = string.Join(
+                    ' ',
+                    HostBroadcasterAuthorizationService.MilestoneScopes
+                ),
+                AuthorizedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task AssertBroadcasterAuthorizationPresentAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (
+            await db.HostBroadcasterAuthorizations.AnyAsync(value => value.HostId == hostId)
+        ).ShouldBeTrue();
+    }
+
     private sealed class FaultingDbContextFactory(IDbContextFactory<BlokeBotDbContext> innerFactory)
         : IDbContextFactory<BlokeBotDbContext>
     {
@@ -872,6 +1173,77 @@ public sealed class HostConfigFaultRoutingTests
         )
         {
             return Task.FromResult(status);
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class DatabaseBroadcasterTokenStatusProvider(
+        IDbContextFactory<BlokeBotDbContext> dbFactory
+    ) : IHostBroadcasterTokenStatusProvider
+    {
+        public async Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            return await db.HostBroadcasterAuthorizations.AnyAsync(
+                value => value.HostId == hostId,
+                ct
+            )
+                ? ReadyBroadcasterStatus()
+                : new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []);
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class PendingBroadcasterTokenStatusProvider : IHostBroadcasterTokenStatusProvider
+    {
+        public TaskCompletionSource<TokenStatus> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            return Completion.Task.WaitAsync(ct);
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FaultingBroadcasterTokenStatusProvider
+        : IHostBroadcasterTokenStatusProvider
+    {
+        public Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            return Task.FromException<TokenStatus>(
+                new InvalidOperationException("broadcaster status unavailable")
+            );
         }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(

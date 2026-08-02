@@ -24,8 +24,7 @@ public sealed class PredictionService(
 ) : IPredictionEventObserver, IPredictionDashboardOperations
 {
     private const int _resultsToKeep = 100;
-    private const string _notReadyMessage =
-        "Reconnect the selected broadcaster with Twitch operations permissions.";
+    private const string _notReadyMessage = "Reconnect the selected channel's Twitch integration.";
     private const string _ineligibleMessage =
         "Twitch Predictions are available only to Affiliate or Partner broadcasters.";
     private readonly ConcurrentDictionary<int, PendingProgress> _pendingProgress = new();
@@ -745,8 +744,8 @@ public sealed class PredictionService(
                 DurableAlertSeverity.Warning,
                 "twitch-broadcaster-authorization",
                 "reauthorize-v1",
-                "Reconnect broadcaster for Twitch operations",
-                "Twitch operations needs the selected broadcaster to reconnect and approve all requested permissions.",
+                "Reconnect Twitch integration",
+                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);

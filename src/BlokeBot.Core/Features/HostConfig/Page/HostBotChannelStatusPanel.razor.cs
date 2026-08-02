@@ -98,29 +98,4 @@ public partial class HostBotChannelStatusPanel
         IsBackgroundLoading ? "Checking whether the bot is a channel mod."
         : BackgroundError is { } error ? error.ModeratorStatusMessage
         : _status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
-
-    private string _followerReadStatusBadgeClass =>
-        _status?.CanReadFollowers == true
-            ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-        : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
-            ? "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-        : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
-
-    private string _followerReadStatusDotClass =>
-        _status?.CanReadFollowers == true ? "status-pill__dot bg-emerald-500"
-        : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
-            ? "status-pill__dot bg-slate-400"
-        : "status-pill__dot bg-amber-500";
-
-    private string _followerReadStatusText =>
-        IsBackgroundLoading ? "checking"
-        : _status?.CanReadFollowers == true ? "ready"
-        : _status?.ModeratorCheckCompleted != true ? "unknown"
-        : "not ready";
-
-    private string _followerReadStatusMessage =>
-        IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
-        : BackgroundError is { } error ? error.FollowerReadStatusMessage
-        : _status?.FollowerReadStatusMessage
-            ?? "BlokeBot has not checked follower-only giveaways yet.";
 }

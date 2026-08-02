@@ -23,6 +23,7 @@
 @inject AccessListProfileResolver _accessListProfiles
 @inject HostedChannelRuntimeControlService _runtime
 @inject ChannelBotAuthorizationService _channelBotAuthorization
+@inject HostBroadcasterAuthorizationService _hostBroadcasterAuthorization
 @inject HostBotAccountAuthorizationService _hostBotAccounts
 @inject EventBus<AppEventKind> _events
 @inject NavigationManager _navigation
@@ -92,7 +93,7 @@
             <div class="grid gap-3 p-4 lg:grid-cols-5">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch chat</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat access</p>
                         <span class="@_authorizationBadgeClass">
                             <span class="@_authorizationDotClass"></span>
                             <span class="status-pill__label">@_authorizationText</span>
@@ -100,7 +101,7 @@
                     </div>
                     @if (_state.IsChannelBotAuthorized && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">Channel chat access is connected. Check follower-only chat below for the active bot account.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel has approved BlokeBot for chat.</p>
                         @if (PageContext.Session.CanAuthorizeSelectedHost)
                         {
                             <div class="mt-2 flex flex-wrap gap-2">
@@ -154,9 +155,9 @@
                         }
                     }
                 </div>
-                <div class="surface-muted rounded-lg px-3 py-2.5">
+                <div class="surface-muted rounded-lg px-3 py-2.5" data-twitch-integration>
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch operations</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch integration</p>
                         <span class="@_operationsAuthorizationBadgeClass">
                             <span class="@_operationsAuthorizationDotClass"></span>
                             <span class="status-pill__label">@_operationsAuthorizationText</span>
@@ -164,25 +165,51 @@
                     </div>
                     @if (_state.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">Polls, clips and markers, Channel Points and Predictions are connected.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">Connected for this channel.</p>
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/broadcaster/start"
+                                                 PopupName="blokebot-broadcaster-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="LoadAsync">
+                                    Reconnect
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+                                        type="button"
+                                        data-twitch-integration-disconnect
+                                        @onclick="() => DisconnectTwitchIntegrationAsync(hostId)">Disconnect</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">Only the channel owner can change this connection.</p>
+                        }
                     }
                     else if (_state.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Stale)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect and approve every Twitch operations permission.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect this integration.</p>
                         @if (PageContext.Session.CanAuthorizeSelectedHost)
                         {
-                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                             Url="/oauth/broadcaster/start"
-                                             PopupName="blokebot-broadcaster-oauth"
-                                             OpeningText="Opening..."
-                                             OnClosed="LoadAsync">
-                                Reconnect operations
-                            </AuthPopupButton>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/broadcaster/start"
+                                                 PopupName="blokebot-broadcaster-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="LoadAsync">
+                                    Reconnect
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+                                        type="button"
+                                        data-twitch-integration-disconnect
+                                        @onclick="() => DisconnectTwitchIntegrationAsync(hostId)">Disconnect</button>
+                            </div>
                         }
                     }
                     else
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect and approve every Twitch operations permission.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this integration.</p>
                         @if (PageContext.Session.CanAuthorizeSelectedHost)
                         {
                             <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
@@ -190,7 +217,7 @@
                                              PopupName="blokebot-broadcaster-oauth"
                                              OpeningText="Opening..."
                                              OnClosed="LoadAsync">
-                                Connect operations
+                                Connect
                             </AuthPopupButton>
                         }
                     }

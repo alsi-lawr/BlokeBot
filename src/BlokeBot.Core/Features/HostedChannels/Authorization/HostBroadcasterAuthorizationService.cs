@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -123,6 +125,46 @@ public sealed class HostBroadcasterAuthorizationService(
         );
     }
 
+    public async Task<HostBroadcasterAuthorizationClearOutcome> ClearAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var authorization = await db.HostBroadcasterAuthorizations.SingleOrDefaultAsync(
+            value => value.HostId == hostId,
+            ct
+        );
+        if (authorization is null)
+        {
+            return new HostBroadcasterAuthorizationClearOutcome.AlreadyDisconnected();
+        }
+
+        db.HostBroadcasterAuthorizations.Remove(authorization);
+        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            return await changes.NotifyChangedAsync(ct) switch
+            {
+                ObserverFanOutOutcome.AllSucceeded =>
+                    new HostBroadcasterAuthorizationClearOutcome.Cleared(),
+                ObserverFanOutOutcome.CompletedWithFailures failed =>
+                    new HostBroadcasterAuthorizationClearOutcome.ClearedWithNotificationFailures(
+                        failed.Failures.Count
+                    ),
+                _ => throw new InvalidOperationException("Unknown observer fan-out outcome."),
+            };
+        }
+        catch (ObserverFanOutEscalationException escalation)
+        {
+            return new HostBroadcasterAuthorizationClearOutcome.ClearedWithNotificationEscalation(
+                escalation.Failures.Count,
+                escalation.HandlingFailures.Count
+            );
+        }
+    }
+
     public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(string channelLogin)
     {
         return IO<BotAccount, AccessTokenUnavailableReason>.Create(async ct =>
@@ -240,4 +282,38 @@ public abstract record HostBroadcasterAuthorizationOutcome
         : HostBroadcasterAuthorizationOutcome;
 
     public sealed record ProtectionUnavailable : HostBroadcasterAuthorizationOutcome;
+}
+
+public abstract record HostBroadcasterAuthorizationClearOutcome
+{
+    private HostBroadcasterAuthorizationClearOutcome() { }
+
+    public TResult Match<TResult>(
+        Func<AlreadyDisconnected, TResult> alreadyDisconnected,
+        Func<Cleared, TResult> cleared,
+        Func<ClearedWithNotificationFailures, TResult> failed,
+        Func<ClearedWithNotificationEscalation, TResult> escalated
+    )
+    {
+        return this switch
+        {
+            AlreadyDisconnected value => alreadyDisconnected(value),
+            Cleared value => cleared(value),
+            ClearedWithNotificationFailures value => failed(value),
+            ClearedWithNotificationEscalation value => escalated(value),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public sealed record AlreadyDisconnected : HostBroadcasterAuthorizationClearOutcome;
+
+    public sealed record Cleared : HostBroadcasterAuthorizationClearOutcome;
+
+    public sealed record ClearedWithNotificationFailures(int FailureCount)
+        : HostBroadcasterAuthorizationClearOutcome;
+
+    public sealed record ClearedWithNotificationEscalation(
+        int ObserverFailureCount,
+        int HandlingFailureCount
+    ) : HostBroadcasterAuthorizationClearOutcome;
 }
