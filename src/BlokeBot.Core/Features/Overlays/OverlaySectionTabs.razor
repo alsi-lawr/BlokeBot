@@ -1,0 +1,12 @@
+<SegmentedTabs AriaLabel="Overlays sections"
+               Items="_tabs"
+               data-overlay-tabs />
+
+@code {
+    private static readonly IReadOnlyList<SegmentedTabItem> _tabs =
+    [
+        new("sources", "Sources", "/overlays/sources"),
+        new("cues", "Cues", "/overlays/cues"),
+        new("media", "Media", "/overlays/media"),
+    ];
+}

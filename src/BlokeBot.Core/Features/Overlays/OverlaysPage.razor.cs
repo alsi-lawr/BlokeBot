@@ -1,7 +1,6 @@
 using System.Globalization;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -10,18 +9,6 @@ public partial class OverlaysPage
 {
     private readonly CancellationTokenSource _lifetime = new();
     private IReadOnlyList<OverlayInstanceView> _instances = [];
-    private IReadOnlyList<OverlayCueView> _cuesList = [];
-    private IReadOnlyList<OverlayMediaAssetView> _assets = [];
-    private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
-    private OverlayCueView? _selectedCue;
-    private Guid? _selectedCueId;
-    private Guid? _cueTargetId;
-    private string _cueDraftName = "Raid celebration";
-    private int _cueDraftDuration = 8000;
-    private bool _cueDraftEnabled = true;
-    private OverlayCueQueuePolicy _cueDraftPolicy = OverlayCueQueuePolicy.Enqueue;
-    private string _cueDraftJson = DefaultCueJson();
-    private string _mediaDraftName = "Stream media";
     private OverlayInstanceView? _selected;
     private Guid? _selectedId;
     private string _draftName = "Main stream overlay";
@@ -48,6 +35,11 @@ public partial class OverlaysPage
     private string _giveawayEventTemplate = "{winners} won {prizes}";
     private OverlayEventFeedPriority _giveawayEventPriority = OverlayEventFeedPriority.High;
     private int _giveawayEventDuration = 8;
+    private int _appearanceX = OverlayAppearance.GuessingDefault.X;
+    private int _appearanceY = OverlayAppearance.GuessingDefault.Y;
+    private int _appearanceWidth = OverlayAppearance.GuessingDefault.Width;
+    private int _appearanceHeight = OverlayAppearance.GuessingDefault.Height;
+    private string _appearanceCss = string.Empty;
     private string? _revealedBrowserSourceUrl;
     private string _feedback = string.Empty;
     private bool _operationFailed;
@@ -57,9 +49,9 @@ public partial class OverlaysPage
     private bool _isCreating = true;
     private bool _isLoading = true;
     private bool _isBusy;
-    private long _previewKey;
     private OverlayPreviewMode _previewMode = OverlayPreviewMode.Live;
     private IJSObjectReference? _module;
+    private DotNetObjectReference<OverlaysPage>? _selfReference;
 
     private string _previewUrl
     {
@@ -142,17 +134,20 @@ public partial class OverlaysPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
-        {
-            return;
-        }
-
         try
         {
-            _module = await _js.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./Features/Overlays/OverlaysPage.razor.js"
-            );
+            if (firstRender)
+            {
+                _module = await _js.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./Features/Overlays/OverlaysPage.razor.js"
+                );
+                _selfReference = DotNetObjectReference.Create(this);
+            }
+            if (_module is not null && _selfReference is not null)
+            {
+                await _module.InvokeVoidAsync("initializeAppearance", _selfReference);
+            }
         }
         catch (JSException) { }
         catch (JSDisconnectedException) { }
@@ -215,7 +210,6 @@ public partial class OverlaysPage
                     return false;
                 }
             );
-            await LoadCueDataAsync();
         }
         catch (Exception exception)
         {
@@ -227,256 +221,6 @@ public partial class OverlaysPage
             _isLoading = false;
         }
     }
-
-    private async Task LoadCueDataAsync()
-    {
-        if (Host is null || !_featureEnabled)
-        {
-            _cuesList = [];
-            _assets = [];
-            _cueCatalog = new([], []);
-            return;
-        }
-        var cues = await _cues.ListCuesAsync(PageContext.Session, CancellationToken.None);
-        if (cues is OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded cueValues)
-        {
-            _cuesList = cueValues.Value;
-            if (_selectedCueId is { } cueId)
-            {
-                var selected = _cuesList.FirstOrDefault(value => value.Id == cueId);
-                if (selected is not null)
-                {
-                    SelectCue(selected);
-                }
-                else
-                {
-                    NewCue();
-                }
-            }
-        }
-        var assets = await _cues.ListAssetsAsync(PageContext.Session, CancellationToken.None);
-        if (assets is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded assetValues)
-        {
-            _assets = assetValues.Value;
-        }
-        _cueCatalog = await _cuePlayback.QueryCatalogAsync(HostId, CancellationToken.None);
-        if (_cueTargetId is null || !_cueCatalog.Targets.Any(value => value.Id == _cueTargetId))
-        {
-            _cueTargetId = _cueCatalog.Targets.FirstOrDefault()?.Id;
-        }
-    }
-
-    private void NewCue()
-    {
-        _selectedCue = null;
-        _selectedCueId = null;
-        _cueDraftName = "Raid celebration";
-        _cueDraftDuration = 8000;
-        _cueDraftEnabled = true;
-        _cueDraftPolicy = OverlayCueQueuePolicy.Enqueue;
-        _cueDraftJson = DefaultCueJson();
-    }
-
-    private void SelectCue(OverlayCueView cue)
-    {
-        _selectedCue = cue;
-        _selectedCueId = cue.Id;
-        _cueDraftName = cue.Name;
-        _cueDraftDuration = cue.DurationMilliseconds;
-        _cueDraftEnabled = cue.IsEnabled;
-        _cueDraftPolicy = cue.QueuePolicy;
-        _cueDraftJson = cue.Configuration.ToPersistenceJson();
-    }
-
-    private Task SaveCueAsync() =>
-        RunOperationAsync(async () =>
-        {
-            var result = await _cues.SaveCueAsync(
-                PageContext.Session,
-                new SaveOverlayCueCommand(
-                    _selectedCue?.Id,
-                    _selectedCue?.Revision ?? new OverlayCueRevision(0),
-                    _cueDraftName,
-                    _cueDraftEnabled,
-                    _cueDraftDuration,
-                    _cueDraftPolicy,
-                    _cueDraftJson
-                ),
-                CancellationToken.None
-            );
-            if (result is OverlayCueResult<OverlayCueView>.Rejected rejected)
-            {
-                SetFailure(rejected.Reason.Message);
-                return;
-            }
-            var saved = ((OverlayCueResult<OverlayCueView>.Succeeded)result).Value;
-            _selectedCueId = saved.Id;
-            SetSuccess("Cue saved.");
-            await LoadCueDataAsync();
-        });
-
-    private Task DeleteCueAsync() =>
-        RunOperationAsync(async () =>
-        {
-            if (_selectedCue is null)
-            {
-                return;
-            }
-            var result = await _cues.DeleteCueAsync(
-                PageContext.Session,
-                _selectedCue.Id,
-                _selectedCue.Revision,
-                CancellationToken.None
-            );
-            if (result is OverlayCueResult<Guid>.Rejected rejected)
-            {
-                SetFailure(rejected.Reason.Message);
-                return;
-            }
-            NewCue();
-            SetSuccess("Cue deleted. Any transient playback was cancelled.");
-            await LoadCueDataAsync();
-        });
-
-    private Task PlayCueTestAsync() =>
-        RunOperationAsync(async () =>
-        {
-            if (Host is null || _selectedCue is null || _cueTargetId is null)
-            {
-                SetFailure("Choose a saved cue and Cue player target.");
-                return;
-            }
-            var outcome = await _cuePlayback.AdmitAsync(
-                new OverlayCueAdmissionRequest(
-                    HostId,
-                    _cueTargetId.Value,
-                    _selectedCue.Id,
-                    _selectedCue.QueuePolicy,
-                    OverlayCueAdmissionOrigin.OwnerPreview,
-                    OverlayCueSafeContext.Empty
-                ),
-                CancellationToken.None
-            );
-            switch (outcome)
-            {
-                case OverlayCueAdmissionOutcome.Running:
-                    SetSuccess("Test cue is playing through the live overlay transport.");
-                    break;
-                case OverlayCueAdmissionOutcome.Queued:
-                case OverlayCueAdmissionOutcome.Disconnected:
-                    SetSuccess(
-                        "Test cue is queued briefly while the target is busy or disconnected."
-                    );
-                    break;
-                case OverlayCueAdmissionOutcome.QueueRejected:
-                    SetFailure("The cue queue policy rejected this test while the target is busy.");
-                    break;
-                case OverlayCueAdmissionOutcome.ParentDisabledOrCancelled:
-                    SetFailure("Overlays were turned off before the cue could play.");
-                    break;
-                default:
-                    SetFailure("The cue or target is unavailable or disabled.");
-                    break;
-            }
-        });
-
-    private Task UploadAssetAsync(InputFileChangeEventArgs args) =>
-        RunOperationAsync(async () =>
-        {
-            var file = args.File;
-            await using var stream = file.OpenReadStream(file.Size);
-            var result = await _cues.UploadAssetAsync(
-                PageContext.Session,
-                _mediaDraftName,
-                file.ContentType,
-                stream,
-                CancellationToken.None
-            );
-            if (result is OverlayCueResult<OverlayMediaAssetView>.Rejected rejected)
-            {
-                SetFailure(rejected.Reason.Message);
-                return;
-            }
-            SetSuccess("Media uploaded and validated.");
-            await LoadCueDataAsync();
-        });
-
-    private Task ReplaceAssetAsync(OverlayMediaAssetView asset, InputFileChangeEventArgs args) =>
-        RunOperationAsync(async () =>
-        {
-            var file = args.File;
-            await using var stream = file.OpenReadStream(file.Size);
-            var result = await _cues.ReplaceAssetAsync(
-                PageContext.Session,
-                new ReplaceOverlayMediaAssetCommand(
-                    asset.Id,
-                    asset.ContentRevision,
-                    file.ContentType,
-                    stream
-                ),
-                CancellationToken.None
-            );
-            if (result is OverlayCueResult<OverlayMediaAssetView>.Rejected rejected)
-            {
-                SetFailure(rejected.Reason.Message);
-                return;
-            }
-            SetSuccess("Media replaced. New playback uses the new content revision.");
-            await LoadCueDataAsync();
-        });
-
-    private Task DeleteAssetAsync(OverlayMediaAssetView asset) =>
-        RunOperationAsync(async () =>
-        {
-            var result = await _cues.DeleteAssetAsync(
-                PageContext.Session,
-                asset.Id,
-                asset.ContentRevision,
-                CancellationToken.None
-            );
-            if (result is OverlayCueResult<Guid>.Rejected rejected)
-            {
-                SetFailure(rejected.Reason.Message);
-                return;
-            }
-            SetSuccess("Media deleted.");
-            await LoadCueDataAsync();
-        });
-
-    private static string DefaultCueJson() =>
-        """
-            {
-              "schemaVersion": 1,
-              "layers": [
-                {
-                  "type": "externalWeb",
-                  "url": "https://example.com/",
-                  "startOffsetMilliseconds": 0,
-                  "durationMilliseconds": 8000,
-                  "zIndex": 0,
-                  "rectangle": {
-                    "xPercent": 10,
-                    "yPercent": 10,
-                    "widthPercent": 80,
-                    "heightPercent": 80
-                  }
-                }
-              ]
-            }
-            """;
-
-    private static string QueuePolicyLabel(OverlayCueQueuePolicy policy) =>
-        policy switch
-        {
-            OverlayCueQueuePolicy.Enqueue => "Enqueue",
-            OverlayCueQueuePolicy.Replace => "Replace current",
-            OverlayCueQueuePolicy.Ignore => "Ignore while busy",
-            OverlayCueQueuePolicy.Concurrent => "Allow concurrent",
-            _ => policy.ToString(),
-        };
-
-    private static string ByteLabel(long value) =>
-        value >= 1024 * 1024 ? $"{value / (1024m * 1024m):0.##} MB" : $"{value / 1024m:0.##} KB";
 
     private void NewOverlay() => NewOverlay(setFeedback: true);
 
@@ -493,6 +237,7 @@ public partial class OverlaysPage
         _draftShowEntrantCount = true;
         _draftShowCountdown = true;
         _draftShowJoinCommand = true;
+        LoadAppearance(DefaultAppearance(_draftType));
         _revealedBrowserSourceUrl = null;
         if (setFeedback)
         {
@@ -515,6 +260,7 @@ public partial class OverlaysPage
         {
             _draftShowGuessCount = guessing.ShowGuessCount;
             _draftResultDurationSeconds = guessing.ResultDurationSeconds;
+            LoadAppearance(guessing.Appearance);
         }
         if (overlay.Configuration is OverlayConfiguration.GiveawayV1 giveaway)
         {
@@ -522,11 +268,13 @@ public partial class OverlaysPage
             _draftShowEntrantCount = giveaway.ShowEntrantCount;
             _draftShowCountdown = giveaway.ShowCountdown;
             _draftShowJoinCommand = giveaway.ShowJoinCommand;
+            LoadAppearance(giveaway.Appearance);
         }
         if (overlay.Configuration is OverlayConfiguration.EventFeedV1 feed)
         {
             _eventFeedCapacity = feed.Capacity;
             _eventFeedOverflow = feed.OverflowPolicy;
+            LoadAppearance(feed.Appearance);
             LoadEventKind(
                 feed.Kinds[OverlayEventFeedKind.PointAward],
                 ref _pointEventEnabled,
@@ -551,7 +299,6 @@ public partial class OverlaysPage
         }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
-        _previewKey++;
         if (clearFeedback)
         {
             _feedback = string.Empty;
@@ -562,11 +309,22 @@ public partial class OverlaysPage
     private Task SaveAsync() =>
         RunOperationAsync(async () =>
         {
+            OverlayConfiguration configuration;
+            try
+            {
+                configuration = DraftConfiguration();
+            }
+            catch (ArgumentException exception)
+            {
+                SetFailure(exception.Message);
+                return;
+            }
+
             if (_isCreating)
             {
                 var creationResult = await _overlays.CreateAsync(
                     PageContext.Session,
-                    new CreateOverlayInstanceCommand(_draftName, _draftType, DraftConfiguration()),
+                    new CreateOverlayInstanceCommand(_draftName, _draftType, configuration),
                     CancellationToken.None
                 );
                 await creationResult.Match(
@@ -618,7 +376,6 @@ public partial class OverlaysPage
                 current = ((OverlayInstanceResult<OverlayInstanceView>.Succeeded)renamed).Value;
             }
 
-            var configuration = DraftConfiguration();
             if (configuration != current.Configuration)
             {
                 var configured = await _overlays.ConfigureAsync(
@@ -813,7 +570,7 @@ public partial class OverlaysPage
                     if (_presence.Read(HostId, succeeded.Value.Id).ActiveConnectionCount == 0)
                     {
                         SetFailure(
-                            "No live client is connected. Select Live preview or connect the Browser Source in OBS, then try again."
+                            "No Browser Source is connected. Select Live preview or connect the Browser Source in OBS, then try again."
                         );
                         return false;
                     }
@@ -903,7 +660,6 @@ public partial class OverlaysPage
     private void SetPreviewMode(OverlayPreviewMode mode)
     {
         _previewMode = mode;
-        _previewKey++;
         SetSuccess(
             mode is OverlayPreviewMode.Live
                 ? "Live preview selected."
@@ -915,7 +671,6 @@ public partial class OverlaysPage
     {
         _previewSample = sample;
         _previewMode = OverlayPreviewMode.Representative;
-        _previewKey++;
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
@@ -923,7 +678,6 @@ public partial class OverlaysPage
     {
         _giveawayPreviewSample = sample;
         _previewMode = OverlayPreviewMode.Representative;
-        _previewKey++;
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
@@ -931,7 +685,6 @@ public partial class OverlaysPage
     {
         _eventFeedPreviewSample = sample;
         _previewMode = OverlayPreviewMode.Representative;
-        _previewKey++;
         SetSuccess($"{EventKindLabel(sample)} sample selected.");
     }
 
@@ -941,14 +694,16 @@ public partial class OverlaysPage
             OverlayType.Empty => new OverlayConfiguration.EmptyV1(),
             OverlayType.Guessing => new OverlayConfiguration.GuessingV1(
                 _draftShowGuessCount,
-                _draftResultDurationSeconds
+                _draftResultDurationSeconds,
+                DraftAppearance()
             ),
             OverlayType.CuePlayer => new OverlayConfiguration.CuePlayerV1(),
             OverlayType.Giveaway => new OverlayConfiguration.GiveawayV1(
                 _draftGiveawayTitle,
                 _draftShowEntrantCount,
                 _draftShowCountdown,
-                _draftShowJoinCommand
+                _draftShowJoinCommand,
+                DraftAppearance()
             ),
             OverlayType.EventFeed => new OverlayConfiguration.EventFeedV1(
                 _eventFeedCapacity,
@@ -973,10 +728,61 @@ public partial class OverlaysPage
                         _giveawayEventPriority,
                         _giveawayEventDuration
                     ),
-                }
+                },
+                DraftAppearance()
             ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
+
+    private OverlayAppearance DraftAppearance() =>
+        new(_appearanceX, _appearanceY, _appearanceWidth, _appearanceHeight, _appearanceCss);
+
+    private void LoadAppearance(OverlayAppearance appearance)
+    {
+        _appearanceX = appearance.X;
+        _appearanceY = appearance.Y;
+        _appearanceWidth = appearance.Width;
+        _appearanceHeight = appearance.Height;
+        _appearanceCss = appearance.Css;
+    }
+
+    private static OverlayAppearance DefaultAppearance(OverlayType type) =>
+        type switch
+        {
+            OverlayType.Guessing => OverlayAppearance.GuessingDefault,
+            OverlayType.Giveaway => OverlayAppearance.GiveawayDefault,
+            OverlayType.EventFeed => OverlayAppearance.EventFeedDefault,
+            _ => OverlayAppearance.GuessingDefault,
+        };
+
+    private void ResetAppearance() => LoadAppearance(DefaultAppearance(_draftType));
+
+    [JSInvokable]
+    public string? ScopeDraftCss(string css)
+    {
+        if (OverlayAppearance.ValidateCss(css) is not null)
+        {
+            return null;
+        }
+        return new OverlayAppearance(
+            _appearanceX,
+            _appearanceY,
+            _appearanceWidth,
+            _appearanceHeight,
+            css
+        ).ToScopedCss();
+    }
+
+    [JSInvokable]
+    public void UpdateAppearance(int x, int y, int width, int height)
+    {
+        try
+        {
+            var appearance = new OverlayAppearance(x, y, width, height, _appearanceCss);
+            LoadAppearance(appearance);
+        }
+        catch (ArgumentOutOfRangeException) { }
+    }
 
     private string AbsoluteUrl(string relativeUrl) =>
         _navigation.ToAbsoluteUri(relativeUrl).AbsoluteUri;
@@ -1068,7 +874,7 @@ public partial class OverlaysPage
     private static string SampleLabel(GiveawayOverlaySampleState sample) =>
         sample switch
         {
-            GiveawayOverlaySampleState.Idle => "Idle",
+            GiveawayOverlaySampleState.Idle => "No current giveaway",
             GiveawayOverlaySampleState.Open => "Open",
             GiveawayOverlaySampleState.Ending => "Ending",
             GiveawayOverlaySampleState.Completed => "Winners",
@@ -1089,8 +895,8 @@ public partial class OverlaysPage
 
     private string InventoryPresenceLabel(OverlayInstanceView overlay) =>
         OtherConnectionCount(overlay) > 0
-            ? "Diagnostic: connected"
-            : "Diagnostic: no other connection";
+            ? "Browser Source connected"
+            : "No other Browser Source connected";
 
     private int OtherConnectionCount(OverlayInstanceView overlay)
     {
@@ -1119,6 +925,7 @@ public partial class OverlaysPage
         {
             _lifetime.Cancel();
             _lifetime.Dispose();
+            _selfReference?.Dispose();
         }
 
         base.Dispose(disposing);

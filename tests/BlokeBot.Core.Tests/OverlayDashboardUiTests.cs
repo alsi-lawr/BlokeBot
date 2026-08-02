@@ -35,21 +35,30 @@ public sealed class OverlayDashboardUiTests
             page.Find("iframe")
                 .GetAttribute("src")
                 .ShouldBe($"/overlays/preview/{seed.OverlayId:D}");
+            page.Find("iframe").HasAttribute("sandbox").ShouldBeFalse();
             page.Find("iframe").ClassList.ShouldContain("overlay-preview-frame");
-            page.FindAll(".segmented-motion__tab").Count.ShouldBe(2);
-            page.Find(".segmented-motion__tab--active").TextContent.Trim().ShouldBe("Live");
+            var previewTabs = page.Find("[aria-label='Preview state']");
+            previewTabs.QuerySelectorAll(".segmented-motion__tab").Length.ShouldBe(2);
+            previewTabs
+                .QuerySelector(".segmented-motion__tab--active")
+                .ShouldNotBeNull()
+                .TextContent.Trim()
+                .ShouldBe("Live");
             page.FindAll("[data-private-url-reveal]").ShouldBeEmpty();
             page.Markup.ShouldNotContain(seed.PrivateAccessKey);
-            page.Markup.ShouldContain("Approximate diagnostic presence excludes");
+            page.Markup.ShouldContain("Open OBS Browser Sources appear here when connected.");
         });
 
-        page.FindAll(".segmented-motion__tab")
+        page.Find("[aria-label='Preview state']")
+            .QuerySelectorAll(".segmented-motion__tab")
             .Single(value => value.TextContent.Trim() == "Representative")
             .Click();
 
         page.WaitForAssertion(() =>
         {
-            page.Find(".segmented-motion__tab--active")
+            page.Find("[aria-label='Preview state']")
+                .QuerySelector(".segmented-motion__tab--active")
+                .ShouldNotBeNull()
                 .TextContent.Trim()
                 .ShouldBe("Representative");
             page.FindAll(".segmented-motion__button").ShouldBeEmpty();
@@ -124,9 +133,9 @@ public sealed class OverlayDashboardUiTests
         source.ShouldContain("New overlay — not saved");
         source.ShouldContain("1920");
         source.ShouldContain("1080");
-        source.ShouldContain("Approximate diagnostic presence excludes");
+        source.ShouldContain("Open OBS Browser Sources appear here when connected.");
         source.ShouldContain("Visual configuration");
-        source.ShouldContain("has no visual fields");
+        source.ShouldContain("Empty overlays have no visual settings");
         source.ShouldContain("Rotate private URL");
         source.ShouldContain("Send test pulse");
         source.ShouldContain("data-private-url-reveal");
@@ -145,7 +154,7 @@ public sealed class OverlayDashboardUiTests
         code.ShouldNotContain("PrivateAccess.AccessKey");
         code.ShouldContain("RunSelectedHostMutationAsync");
         code.ShouldContain("_publisher.PublishTest");
-        code.ShouldContain("No live client is connected");
+        code.ShouldContain("No Browser Source is connected");
         code.ShouldContain("SetFailure(rejected.Reason.Message)");
     }
 
@@ -268,6 +277,18 @@ public sealed class OverlayDashboardUiTests
                 .ShouldAllBe(value => value == "false");
         });
 
+        page.FindAll("button")
+            .Single(button => button.TextContent.Trim() == "Save overlay")
+            .Click();
+        page.WaitForAssertion(() =>
+        {
+            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
+            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
+            page.Find("iframe")
+                .GetAttribute("src")
+                .ShouldEndWith("?mode=representative&sample=completed");
+        });
+
         FindButton(page, "Preview state", "Live").Click();
 
         page.WaitForAssertion(() =>
@@ -277,6 +298,84 @@ public sealed class OverlayDashboardUiTests
             page.FindAll("[aria-label='Guessing overlay sample state'] button")
                 .Select(button => button.GetAttribute("aria-pressed"))
                 .ShouldAllBe(value => value == "false");
+        });
+    }
+
+    [Test]
+    public async Task SelectingAndResettingAVisualOverlay_RendersTheCurrentCssAndIdentity()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedGuessingAsync(database);
+        var styledId = Guid.Parse("1fd78bd8-044d-432f-b231-b38691fb626a");
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    PublicId = styledId,
+                    HostId = seed.HostId,
+                    Name = "Styled guessing",
+                    Type = OverlayType.Guessing,
+                    IsEnabled = true,
+                    ConfigurationJson =
+                        """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8,"appearance":{"x":200,"y":680,"width":1500,"height":280,"css":".accent { fill: #f472b6; }"}}""",
+                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(
+                        "styled-component-test-key-000000000000000"
+                    ),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        await using var context = UiTestContextFactory.Create(database, seed.HostId);
+        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
+        context.Services.AddBlokeBotOverlays();
+        var page = context.Render<OverlaysPage>();
+
+        page.WaitForAssertion(() =>
+            page.FindAll("[aria-label='Saved overlays'] button").Count.ShouldBe(2)
+        );
+        page.FindAll("[aria-label='Saved overlays'] button")
+            .Single(button =>
+                button.TextContent.Contains("Styled guessing", StringComparison.Ordinal)
+            )
+            .Click();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("[data-appearance-preview]")
+                .GetAttribute("data-overlay-id")
+                .ShouldBe(styledId.ToString());
+            page.Find("[data-appearance-css]")
+                .GetAttribute("value")
+                .ShouldBe(".accent { fill: #f472b6; }");
+            page.Find("[data-appearance-editor]")
+                .GetAttribute("data-rendered-css")
+                .ShouldBe(".accent { fill: #f472b6; }");
+        });
+
+        page.FindAll("button").Single(button => button.TextContent.Trim() == "Reset").Click();
+        page.WaitForAssertion(() =>
+        {
+            page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty);
+            page.Find("[data-appearance-editor]")
+                .GetAttribute("data-rendered-css")
+                .ShouldBe(string.Empty);
+        });
+
+        FindButton(page, "Guessing overlay sample state", "Result").Click();
+        page.WaitForAssertion(() =>
+        {
+            page.Find("[data-appearance-preview]")
+                .GetAttribute("data-overlay-id")
+                .ShouldBe(styledId.ToString());
+            page.Find("[data-appearance-preview]")
+                .GetAttribute("src")
+                .ShouldEndWith("?mode=representative&sample=completed");
         });
     }
 
@@ -297,10 +396,10 @@ public sealed class OverlayDashboardUiTests
             {
                 page.FindAll("[aria-label='Giveaway overlay sample state'] button")
                     .Select(button => button.TextContent.Trim())
-                    .ShouldBe(["Idle", "Open", "Ending", "Winners", "Cancelled"]);
-                page.Markup.ShouldContain("Show entrant count");
-                page.Markup.ShouldContain("Show close-time countdown");
-                page.Markup.ShouldContain("Show current join command");
+                    .ShouldBe(["Open", "Ending", "Winners", "Cancelled"]);
+                page.Markup.ShouldContain("Entrant count");
+                page.Markup.ShouldContain("Close-time countdown");
+                page.Markup.ShouldContain("Current join command");
             });
             FindButton(page, "Giveaway overlay sample state", "Winners").Click();
             page.WaitForAssertion(() =>

@@ -1,0 +1,35 @@
+@implements IDisposable
+
+<nav class="segmented-motion segmented-motion--shared"
+     style="@_style"
+     role="tablist"
+     aria-label="@AriaLabel"
+     @attributes="AdditionalAttributes">
+    <span class="segmented-motion__indicator" aria-hidden="true"></span>
+    @foreach (var item in Items)
+    {
+        var active = IsActive(item);
+        if (item.Href is null)
+        {
+            <button @key="item.Key"
+                    class="@TabClass(active)"
+                    type="button"
+                    role="tab"
+                    aria-selected="@(active ? "true" : "false")"
+                    @onclick="() => SelectAsync(item)">
+                @item.Label
+            </button>
+        }
+        else
+        {
+            <NavLink @key="item.Key"
+                     class="@TabClass(active)"
+                     href="@item.Href"
+                     Match="NavLinkMatch.All"
+                     role="tab"
+                     aria-selected="@(active ? "true" : "false")">
+                @item.Label
+            </NavLink>
+        }
+    }
+</nav>

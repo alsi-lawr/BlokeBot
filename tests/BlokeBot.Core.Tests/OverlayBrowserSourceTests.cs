@@ -150,6 +150,50 @@ public sealed class OverlayBrowserSourceTests
     }
 
     [Test]
+    public async Task ConnectedConfigurationChange_ResyncsTheVersionedAppearanceStylesheet()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var seed = await host.SeedGuessingAsync("appearance-resync");
+        await using var stream = await host.OpenLiveAsync(seed.AccessKey);
+        await stream.ReadEnvelopeAsync();
+
+        using var documentResponse = await host.Client.GetAsync($"/overlay/{seed.AccessKey}");
+        var document = await documentResponse.Content.ReadAsStringAsync();
+        document.ShouldContain(
+            $"id=\"overlay-appearance-style\" rel=\"stylesheet\" href=\"/overlay/{seed.AccessKey}/appearance.css\""
+        );
+        using var initialStylesheet = await host.Client.GetAsync(
+            $"/overlay/{seed.AccessKey}/appearance.css"
+        );
+        var initialCss = await initialStylesheet.Content.ReadAsStringAsync();
+        initialCss.ShouldNotContain("#123456");
+
+        await host.SetConfigurationAsync(
+            seed.OverlayId,
+            new OverlayConfiguration.GuessingV1(
+                true,
+                8,
+                new OverlayAppearance(160, 690, 1600, 270, ".card { fill: #123456; }")
+            ),
+            revision: 2
+        );
+        await host.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
+
+        var invalidation = await stream.ReadEnvelopeAsync();
+        invalidation.GetProperty("eventType").GetString().ShouldBe("reauthenticate");
+        var refreshedState = await host.GetStateAsync(seed.AccessKey);
+        var refreshedRevision = refreshedState.GetProperty("sequence").GetInt64();
+        refreshedRevision.ShouldBe(2);
+        using var refreshedStylesheet = await host.Client.GetAsync(
+            $"/overlay/{seed.AccessKey}/appearance.css?revision={refreshedRevision}"
+        );
+        var refreshedCss = await refreshedStylesheet.Content.ReadAsStringAsync();
+        refreshedCss.ShouldContain("#overlay-root .card");
+        refreshedCss.ShouldContain("#123456");
+        refreshedStylesheet.Headers.CacheControl?.NoStore.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task InvalidDisabledRotatedAndDeletedKeys_ReturnUniformNonSensitiveFailure()
     {
         await using var host = await BrowserSourceHost.StartAsync();
@@ -254,6 +298,11 @@ public sealed class OverlayBrowserSourceTests
         response.Headers.CacheControl?.MaxAge.ShouldBe(TimeSpan.FromDays(365));
         response.Headers.CacheControl?.Extensions.ShouldContain(value => value.Name == "immutable");
         response.Headers.GetValues("X-Content-Type-Options").Single().ShouldBe("nosniff");
+        response
+            .Headers.GetValues("Content-Security-Policy")
+            .Single()
+            .ShouldBe("sandbox; default-src 'none'");
+        response.Headers.GetValues("Referrer-Policy").Single().ShouldBe("no-referrer");
         crossHost.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         disabled.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
@@ -479,6 +528,7 @@ public sealed class OverlayBrowserSourceTests
         css.ShouldContain("overflow: hidden");
         css.ShouldContain("background: transparent");
         javascript.ShouldContain("await loadCurrentState(pageLifetime.signal)");
+        javascript.ShouldContain("refreshAppearanceStylesheet(snapshot.sequence)");
         javascript.ShouldContain("fetch(root.dataset.stateUrl");
         javascript.ShouldContain("fetch(root.dataset.liveUrl");
         javascript.ShouldContain("headers: { Accept: \"text/event-stream\" }");
@@ -504,6 +554,31 @@ public sealed class OverlayBrowserSourceTests
     {
         await using var host = await BrowserSourceHost.StartAsync();
         var seed = await host.SeedGuessingAsync("preview");
+
+        using (
+            var previewDocument = await host.Client.GetAsync(
+                $"/overlays/preview/{seed.OverlayId:D}"
+            )
+        )
+        using (var privateDocument = await host.Client.GetAsync($"/overlay/{seed.AccessKey}"))
+        {
+            previewDocument
+                .Headers.GetValues("Content-Security-Policy")
+                .Single()
+                .ShouldContain("sandbox allow-scripts allow-same-origin;");
+            previewDocument
+                .Headers.GetValues("Content-Security-Policy")
+                .Single()
+                .ShouldContain("frame-ancestors 'self'");
+            previewDocument
+                .Headers.GetValues("Content-Security-Policy")
+                .Single()
+                .ShouldContain("script-src 'self'");
+            privateDocument
+                .Headers.GetValues("Content-Security-Policy")
+                .Single()
+                .ShouldNotContain("sandbox");
+        }
 
         foreach (var sample in new[] { "no-round", "open", "closed", "completed" })
         {
@@ -1287,6 +1362,25 @@ public sealed class OverlayBrowserSourceTests
                 .OverlayInstances.Where(value => value.PublicId == overlayId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(value => value.Revision, revision)
+                );
+        }
+
+        internal async Task SetConfigurationAsync(
+            Guid overlayId,
+            OverlayConfiguration configuration,
+            long revision
+        )
+        {
+            await using var db = await database.CreateDbContextAsync();
+            await db
+                .OverlayInstances.Where(value => value.PublicId == overlayId)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(
+                            value => value.ConfigurationJson,
+                            configuration.ToPersistenceJson()
+                        )
+                        .SetProperty(value => value.Revision, revision)
                 );
         }
 

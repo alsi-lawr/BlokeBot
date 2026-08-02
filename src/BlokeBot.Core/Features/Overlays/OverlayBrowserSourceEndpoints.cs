@@ -16,7 +16,7 @@ internal static class OverlayBrowserSourceEndpoints
         + "img-src 'self' data: https:; media-src 'self' https:; frame-src https:; font-src 'self'; base-uri 'none'; form-action 'none'; "
         + "frame-ancestors 'none'";
     private const string _previewContentSecurityPolicy =
-        "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+        "sandbox allow-scripts allow-same-origin; default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
         + "img-src 'self' data: https:; media-src 'self' https:; frame-src https:; font-src 'self'; base-uri 'none'; form-action 'none'; "
         + "frame-ancestors 'self'";
     private const string _unavailableMessage = "Overlay unavailable.";
@@ -80,11 +80,34 @@ internal static class OverlayBrowserSourceEndpoints
                                 $"/overlay/{Uri.EscapeDataString(accessKey)}/events",
                                 $"/overlay/{Uri.EscapeDataString(accessKey)}/media",
                                 $"/overlay/{Uri.EscapeDataString(accessKey)}/cue-complete",
+                                $"/overlay/{Uri.EscapeDataString(accessKey)}/appearance.css",
                                 OverlayBrowserSourceCredentials.Omit,
                                 liveEnabled: true
                             ),
                             "text/html"
                         )
+                        : Unavailable();
+                }
+            )
+            .AllowAnonymous();
+        app.MapGet(
+                "/overlay/{accessKey}/appearance.css",
+                async (
+                    HttpContext context,
+                    string accessKey,
+                    OverlayInstanceResolver resolver,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPrivateBrowserSourceHeaders(context.Response);
+                    var resolution = await ResolveSafelyAsync(
+                        resolver,
+                        accessKey,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    return resolution is OverlayResolutionResult.Resolved resolved
+                        ? Results.Text(AppearanceCss(resolved.Instance.Configuration), "text/css")
                         : Unavailable();
                 }
             )
@@ -302,11 +325,36 @@ internal static class OverlayBrowserSourceEndpoints
                             $"/overlays/preview/{encodedId}/events",
                             $"/overlays/preview/{encodedId}/media",
                             $"/overlays/preview/{encodedId}/cue-complete",
+                            $"/overlays/preview/{encodedId}/appearance.css",
                             OverlayBrowserSourceCredentials.SameOrigin,
                             liveEnabled: !representative
                         ),
                         "text/html"
                     );
+                }
+            )
+            .RequireAuthorization("HostSelected");
+        app.MapGet(
+                "/overlays/preview/{overlayId:guid}/appearance.css",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPreviewHeaders(context.Response);
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    return resolution is OverlayPreviewResolution.Resolved resolved
+                        ? Results.Text(AppearanceCss(resolved.Instance.Configuration), "text/css")
+                        : Unavailable();
                 }
             )
             .RequireAuthorization("HostSelected");
@@ -612,6 +660,18 @@ internal static class OverlayBrowserSourceEndpoints
         }
     }
 
+    private static string AppearanceCss(OverlayConfiguration configuration)
+    {
+        var appearance = configuration switch
+        {
+            OverlayConfiguration.GuessingV1 guessing => guessing.Appearance,
+            OverlayConfiguration.GiveawayV1 giveaway => giveaway.Appearance,
+            OverlayConfiguration.EventFeedV1 feed => feed.Appearance,
+            _ => null,
+        };
+        return appearance?.ToScopedCss() ?? string.Empty;
+    }
+
     private static async Task<OverlayLiveOpenResult> OpenLiveSafelyAsync(
         OverlayLiveCoordinator live,
         ResolvedOverlayInstance instance,
@@ -818,6 +878,7 @@ internal static class OverlayBrowserSourceEndpoints
     private static IResult MediaFile(HttpContext context, OverlayMediaContent content)
     {
         context.Response.Headers[HeaderNames.CacheControl] = "private, max-age=31536000, immutable";
+        context.Response.Headers[HeaderNames.ContentSecurityPolicy] = "sandbox; default-src 'none'";
         context.Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
         context.Response.Headers["Referrer-Policy"] = "no-referrer";
         return Results.File(

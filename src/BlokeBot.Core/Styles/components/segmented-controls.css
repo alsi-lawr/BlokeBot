@@ -47,6 +47,25 @@
         transform: translateX(200%);
     }
 
+    .segmented-motion--shared {
+        grid-template-columns: repeat(var(--segmented-count), minmax(5.5rem, 7.5rem));
+        justify-self: start;
+        max-width: 100%;
+        width: max-content;
+    }
+
+    .segmented-motion--shared .segmented-motion__indicator {
+        transform: translateX(calc(var(--segmented-active-index) * 100%));
+        width: calc((100% - 0.5rem) / var(--segmented-count));
+    }
+
+    .segmented-motion--shared .segmented-motion__tab {
+        align-items: center;
+        display: flex;
+        justify-content: center;
+        text-align: center;
+    }
+
     .segmented-motion__tab {
         background: transparent;
         border-radius: 0.375rem;
@@ -73,5 +92,19 @@
 
     .segmented-motion__tab--active:hover {
         color: var(--app-primary-button-fg);
+    }
+
+    @media (max-width: 30rem) {
+        .segmented-motion--shared {
+            display: grid;
+            grid-template-columns: repeat(var(--segmented-count), minmax(0, 1fr));
+            justify-self: stretch;
+            width: 100%;
+        }
+
+        .segmented-motion--shared .segmented-motion__tab {
+            min-width: 0;
+            padding-inline: 0.5rem;
+        }
     }
 }

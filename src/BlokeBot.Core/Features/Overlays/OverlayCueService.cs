@@ -162,16 +162,7 @@ internal sealed class OverlayCueService(
             foreach (var layer in configuration.Layers.OfType<OverlayCueLayer.UploadedMedia>())
             {
                 var asset = assets.Single(value => value.PublicId == layer.AssetId);
-                if (
-                    (
-                        layer.MediaKind == OverlayCueMediaKind.Video
-                        && asset.ContentType != "video/mp4"
-                    )
-                    || (
-                        layer.MediaKind == OverlayCueMediaKind.Audio
-                        && asset.ContentType != "audio/mpeg"
-                    )
-                )
+                if (layer.MediaKind != OverlayMediaTypes.Kind(asset.ContentType))
                 {
                     return Reject<OverlayCueView>(
                         new OverlayCueRejection.Invalid(
@@ -483,6 +474,14 @@ internal sealed class OverlayCueService(
         CancellationToken cancellationToken
     )
     {
+        var declaredContentType = OverlayMediaTypes.NormalizeDeclaration(claimedContentType);
+        if (declaredContentType is null)
+        {
+            return Reject<OverlayMediaAssetView>(
+                new OverlayCueRejection.Invalid("Unsupported file type")
+            );
+        }
+
         var root = HostContentDirectory(hostId);
         Directory.CreateDirectory(root);
         var tempPath = Path.Combine(root, $".upload-{Guid.NewGuid():N}");
@@ -515,23 +514,6 @@ internal sealed class OverlayCueService(
                     new OverlayCueRejection.Invalid("The uploaded media file is empty.")
                 );
             }
-            var detected = await DetectContentTypeAsync(tempPath, cancellationToken);
-            if (
-                detected is null
-                || !string.Equals(
-                    detected,
-                    claimedContentType.Trim(),
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return Reject<OverlayMediaAssetView>(
-                    new OverlayCueRejection.Invalid(
-                        "The upload must be a valid MP4 or MP3 whose detected type matches its MIME type."
-                    )
-                );
-            }
-
             var gate = _hostGates.GetOrAdd(hostId, _ => new SemaphoreSlim(1, 1));
             await gate.WaitAsync(cancellationToken);
             try
@@ -558,7 +540,8 @@ internal sealed class OverlayCueService(
                         return Reject<OverlayMediaAssetView>(new OverlayCueRejection.Conflict());
                     }
                     if (
-                        !string.Equals(asset.ContentType, detected, StringComparison.Ordinal)
+                        OverlayMediaTypes.Kind(asset.ContentType)
+                            != OverlayMediaTypes.Kind(declaredContentType)
                         && await db.OverlayCueMediaAssetReferences.AnyAsync(
                             value => value.HostId == hostId && value.AssetId == asset.Id,
                             cancellationToken
@@ -619,7 +602,7 @@ internal sealed class OverlayCueService(
                     ? await db.Database.BeginTransactionAsync(cancellationToken)
                     : null;
                 File.Move(tempPath, finalPath);
-                asset.ContentType = detected;
+                asset.ContentType = declaredContentType;
                 asset.ByteLength = length;
                 asset.StorageKey = storageKey;
                 asset.UpdatedAtUtc = Now();
@@ -746,60 +729,6 @@ internal sealed class OverlayCueService(
             }
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
-    }
-
-    private static async Task<string?> DetectContentTypeAsync(
-        string path,
-        CancellationToken cancellationToken
-    )
-    {
-        var header = new byte[16];
-        await using var stream = File.OpenRead(path);
-        var read = await stream.ReadAsync(header, cancellationToken);
-        var length = stream.Length;
-        if (
-            read >= 12
-            && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header) >= 12
-            && System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header) <= length
-            && header[4] == (byte)'f'
-            && header[5] == (byte)'t'
-            && header[6] == (byte)'y'
-            && header[7] == (byte)'p'
-            && header[8] is >= 0x20 and <= 0x7e
-            && header[9] is >= 0x20 and <= 0x7e
-            && header[10] is >= 0x20 and <= 0x7e
-            && header[11] is >= 0x20 and <= 0x7e
-        )
-        {
-            return "video/mp4";
-        }
-        if (
-            (
-                read >= 10
-                && header[0] == (byte)'I'
-                && header[1] == (byte)'D'
-                && header[2] == (byte)'3'
-                && header[6] < 0x80
-                && header[7] < 0x80
-                && header[8] < 0x80
-                && header[9] < 0x80
-                && 10L + ((header[6] << 21) | (header[7] << 14) | (header[8] << 7) | header[9])
-                    <= length
-            )
-            || (
-                read >= 4
-                && header[0] == 0xff
-                && (header[1] & 0xe0) == 0xe0
-                && (header[1] & 0x18) != 0x08
-                && (header[1] & 0x06) != 0
-                && (header[2] & 0xf0) is not (0 or 0xf0)
-                && (header[2] & 0x0c) != 0x0c
-            )
-        )
-        {
-            return "audio/mpeg";
-        }
-        return null;
     }
 
     private static OverlayCueView ToView(OverlayCue value)

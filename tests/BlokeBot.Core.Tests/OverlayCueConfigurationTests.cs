@@ -36,6 +36,31 @@ public sealed class OverlayCueConfigurationTests
     }
 
     [Test]
+    public void TypedFactory_RoundTripsEveryEditableContentKindInOrder()
+    {
+        var parsed = OverlayCueConfiguration
+            .Parse(_valid)
+            .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
+            .Value;
+
+        var created = OverlayCueConfiguration
+            .Create(parsed.Layers.Reverse().ToArray())
+            .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
+            .Value;
+
+        created
+            .Layers.Select(layer => layer.GetType())
+            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.GetType()));
+        created
+            .Layers.Select(layer => layer.ZIndex)
+            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.ZIndex));
+        OverlayCueConfiguration
+            .Parse(created.ToPersistenceJson())
+            .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
+            .Value.Layers.ShouldBe(created.Layers);
+    }
+
+    [Test]
     [Arguments(
         """{"schemaVersion":1,"layers":[{"type":"externalWeb","url":"javascript:alert(1)","startOffsetMilliseconds":0,"durationMilliseconds":1000,"zIndex":0,"rectangle":{"xPercent":0,"yPercent":0,"widthPercent":100,"heightPercent":100}}]}"""
     )]
@@ -85,8 +110,40 @@ public sealed class OverlayCueConfigurationTests
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("allow-popups");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("root.dataset.mediaUrl");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain(
+            "layer.mediaKind === \"image\" ? \"img\" : layer.mediaKind"
+        );
+        OverlayBrowserSourceAssets.JavaScript.ShouldContain("() => element.remove()");
+        OverlayBrowserSourceAssets.JavaScript.ShouldContain("layer.durationMilliseconds");
+        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
             "Server-side expiry still advances the transient queue."
         );
+    }
+
+    [Test]
+    [Arguments("image/png", "image")]
+    [Arguments("video/webm", "video")]
+    public void UploadedBrowserMedia_ReachesTheCueRendererWithItsMediaKind(
+        string contentType,
+        string expectedKind
+    )
+    {
+        var payload = OverlayLiveCoordinator.ToPayload(
+            new OverlayCuePlaybackLayer.UploadedMedia
+            {
+                AssetId = Guid.NewGuid(),
+                ContentRevision = 1,
+                ContentType = contentType,
+                Volume = 1,
+                Fit = OverlayCueFitMode.Contain,
+                Rectangle = new(0, 0, 100, 100),
+                StartOffsetMilliseconds = 0,
+                DurationMilliseconds = 1000,
+                ZIndex = 0,
+            }
+        );
+
+        payload.MediaKind.ShouldBe(expectedKind);
+        payload.DurationMilliseconds.ShouldBe(1000);
     }
 
     private sealed class FixedDnsResolver(params IPAddress[] addresses) : IOverlayDnsResolver

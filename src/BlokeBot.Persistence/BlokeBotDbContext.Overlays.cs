@@ -36,7 +36,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     t.HasCheckConstraint(
                         "CK_overlay_instances_ConfigurationJson",
-                        "length(ConfigurationJson) BETWEEN 1 AND 4096 "
+                        "length(ConfigurationJson) BETWEEN 1 AND 8192 "
                             + "AND json_valid(ConfigurationJson) "
                             + "AND json_type(ConfigurationJson, '$.schemaVersion') = 'integer' "
                             + "AND json_extract(ConfigurationJson, '$.schemaVersion') = 1"
@@ -60,7 +60,7 @@ public sealed partial class BlokeBotDbContext
                     value => PersistedEnumTokens<OverlayType>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.ConfigurationJson).HasMaxLength(4096);
+            b.Property(x => x.ConfigurationJson).HasMaxLength(8192);
             b.Property(x => x.AccessKeyDigest).HasMaxLength(32);
             b.Property(x => x.Revision).IsConcurrencyToken();
             b.HasIndex(x => x.PublicId).IsUnique();
@@ -171,7 +171,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     t.HasCheckConstraint(
                         "CK_overlay_media_assets_ContentType",
-                        "ContentType IN ('video/mp4', 'audio/mpeg')"
+                        "ContentType LIKE 'image/%' OR ContentType LIKE 'audio/%' OR ContentType LIKE 'video/%'"
                     );
                     t.HasCheckConstraint(
                         "CK_overlay_media_assets_Length",

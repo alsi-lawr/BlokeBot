@@ -1,0 +1,69 @@
+@page "/overlays/media"
+@using BlokeBot.Core.Features.HostedChannels
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject OverlayCueService _media
+@inject OverlayCuePlaybackService _playback
+@inject HostFeatureService _features
+@inject Microsoft.Extensions.Options.IOptions<BlokeBotOptions> _options
+
+<PageTitle>BlokeBot | Media library</PageTitle>
+
+<DashboardPage Kicker="Stream presentation"
+               Title="Media library"
+               Description="Upload and manage the media used by cues."
+               Width="DashboardPageWidth.Wide">
+    <ChildContent>
+        <OverlaySectionTabs />
+        <ApplicationCardCollection Owner="dashboard-page-cards">
+            @if (_loading)
+            {
+                <div class="card p-8 text-sm text-muted-foreground" role="status">Loading media...</div>
+            }
+            else if (!_enabled)
+            {
+                <div class="card p-8 text-sm text-muted-foreground" data-overlay-disabled-recovery>
+                    Media management is paused because Overlays is off.
+                    <a class="font-semibold text-blue-700 underline" href="host">Turn Overlays on in Channel setup.</a>
+                    Saved media remains in place.
+                </div>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(_feedback))
+                {
+                    <section class="@(_failed ? "card bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card bg-blue-50 p-4 text-sm font-semibold text-slate-950")"
+                             role="@(_failed ? "alert" : "status")">@_feedback</section>
+                }
+                <section class="card p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold text-slate-950">Upload media</h2><p class="mt-1 text-sm text-muted-foreground">Uploads stay in private channel storage. @ByteLabel(_items.Sum(value => value.ByteLength)) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used.</p></div><a class="btn-secondary" href="overlays/cues">Back to Cues</a></div>
+                    <div class="mt-4 grid gap-3"><Field Id="media-name" Label="Media name" @bind-Value="_name" /><FileDropInput Label="Media file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="_busy" OnChange="UploadAsync" /></div>
+                </section>
+                <section class="card p-5">
+                    <h2 class="text-lg font-semibold text-slate-950">Saved media</h2>
+                    @if (_items.Count == 0) { <p class="mt-4 text-sm text-muted-foreground">No media uploaded yet.</p> }
+                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                        @foreach (var asset in _items)
+                        {
+                            <article class="control-surface rounded-lg p-4" @key="asset.Id">
+                                <p class="font-semibold text-slate-950">@asset.Name</p>
+                                <p class="mt-1 text-xs text-muted-foreground">@OverlayMediaTypes.Label(asset.ContentType) · @ByteLabel(asset.ByteLength)</p>
+                                @if (_previewTarget is { } target)
+                                {
+                                    var url = $"/overlays/preview/{target:D}/media/{asset.Id:D}/{asset.ContentRevision}";
+                                    <div class="mt-3 rounded-lg bg-slate-950 p-2">
+                                        @if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Image) { <img class="max-h-64 w-full object-contain" src="@url" alt="@asset.Name" /> }
+                                        else if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Video) { <video class="max-h-64 w-full" controls preload="metadata" src="@url"></video> }
+                                        else { <audio class="w-full" controls preload="metadata" src="@url"></audio> }
+                                    </div>
+                                }
+                                <div class="mt-3 grid gap-2"><FileDropInput Label="Replace file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="_busy" OnChange="@(args => ReplaceAsync(asset, args))" /><button class="btn-secondary justify-self-end" type="button" disabled="_busy" @onclick="() => DeleteAsync(asset)">Delete</button></div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            }
+        </ApplicationCardCollection>
+    </ChildContent>
+</DashboardPage>

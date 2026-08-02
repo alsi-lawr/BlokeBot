@@ -298,12 +298,11 @@
                 {
                     <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
                          data-nav-destination="overlays">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="overlays"
+                        <NavLink class="@(GroupIsCurrent("overlays") ? "nav-menu__link nav-menu__item-active flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition" : "nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition")"
+                                 href="overlays/sources"
                                  aria-label="Overlays"
                                  aria-describedby="@RouteHelpReference("overlays")"
-                                 aria-current="@CurrentRoute("overlays")"
+                                 aria-current="@CurrentGroup("overlays")"
                                  @onclick="NotifyNavigatedAsync">
                             <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">▣</span>
                             <span class="nav-menu__label min-w-0">Overlays</span>

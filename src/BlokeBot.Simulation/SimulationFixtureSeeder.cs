@@ -84,7 +84,7 @@ internal sealed class SimulationFixtureSeeder(
                 Type = OverlayType.EventFeed,
                 IsEnabled = true,
                 ConfigurationJson =
-                    """{"schemaVersion":1,"capacity":10,"overflowPolicy":"dropNewest","kinds":{"pointAward":{"enabled":true,"template":"{recipient} received {amount} {pointLabel}","priority":"normal","durationSeconds":6},"guessingWinner":{"enabled":true,"template":"{winners} won {roundName}: {winningAnswer}","priority":"high","durationSeconds":8},"giveawayWinner":{"enabled":true,"template":"{winners} won {prizes}","priority":"high","durationSeconds":8}}}""",
+                    """{"schemaVersion":1,"capacity":10,"overflowPolicy":"dropNewest","kinds":{"pointAward":{"enabled":true,"template":"{recipient} received {amount} {pointLabel}","priority":"normal","durationSeconds":6},"guessingWinner":{"enabled":false,"template":"{winners} won {roundName}: {winningAnswer}","priority":"high","durationSeconds":8},"giveawayWinner":{"enabled":true,"template":"{winners} won {prizes}","priority":"high","durationSeconds":8}},"appearance":{"x":110,"y":90,"width":1120,"height":720,"css":".accent{fill:#f472b6;}"}}""",
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(EventFeedOverlayAccessKey),
                 KeyVersion = 1,
                 Revision = 1,
@@ -139,7 +139,7 @@ internal sealed class SimulationFixtureSeeder(
                     Type = OverlayType.Giveaway,
                     IsEnabled = true,
                     ConfigurationJson =
-                        """{"schemaVersion":1,"title":"Community points giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
+                        """{"schemaVersion":1,"title":"Community points giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true,"appearance":{"x":160,"y":690,"width":1600,"height":270,"css":""}}""",
                     AccessKeyDigest = OverlayAccessKeyDigest.Compute(GiveawayOverlayAccessKey),
                     KeyVersion = 1,
                     Revision = 1,
@@ -168,7 +168,7 @@ internal sealed class SimulationFixtureSeeder(
                 Type = OverlayType.Guessing,
                 IsEnabled = true,
                 ConfigurationJson =
-                    """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+                    """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8,"appearance":{"x":160,"y":690,"width":1600,"height":270,"css":""}}""",
                 AccessKeyDigest = OverlayAccessKeyDigest.Compute(OverlayAccessKey),
                 KeyVersion = 1,
                 Revision = 1,

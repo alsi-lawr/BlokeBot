@@ -270,9 +270,9 @@ public sealed class GiveawayOverlayTests
 
         var dashboard = File.ReadAllText(SourcePath("OverlaysPage.razor"));
         dashboard.ShouldContain("Enum.GetValues<GiveawayOverlaySampleState>()");
-        dashboard.ShouldContain("Show entrant count");
-        dashboard.ShouldContain("Show close-time countdown");
-        dashboard.ShouldContain("Show current join command");
+        dashboard.ShouldContain("Entrant count");
+        dashboard.ShouldContain("Close-time countdown");
+        dashboard.ShouldContain("Current join command");
         dashboard.ShouldContain("never published");
 
         var help = File.ReadAllText(

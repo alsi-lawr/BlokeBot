@@ -43,33 +43,11 @@
     else
     {
 
-        <div id="live"
-             class="@_segmentedControlClass"
-             role="tablist"
-             aria-label="Guessing dashboard view">
-            <span class="segmented-motion__indicator" aria-hidden="true"></span>
-            <button class="@TabClass(DashboardTab.Live)"
-                    type="button"
-                    role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.Live ? "true" : "false")"
-                    @onclick="() => ActivateTabAsync(DashboardTab.Live)">
-                Live
-            </button>
-            <button class="@TabClass(DashboardTab.History)"
-                    type="button"
-                    role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.History ? "true" : "false")"
-                    @onclick="() => ActivateTabAsync(DashboardTab.History)">
-                History
-            </button>
-            <button class="@TabClass(DashboardTab.Leaderboard)"
-                    type="button"
-                    role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.Leaderboard ? "true" : "false")"
-                    @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
-                Leaderboard
-            </button>
-        </div>
+        <SegmentedTabs id="live"
+                       AriaLabel="Guessing dashboard view"
+                       Items="_dashboardTabs"
+                       ActiveKey="@DashboardTabKey(_activeTab)"
+                       ActiveKeyChanged="ActivateTabAsync" />
 
         @if (_activeTab == DashboardTab.Live)
         {

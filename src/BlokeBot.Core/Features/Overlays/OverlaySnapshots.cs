@@ -117,6 +117,8 @@ public sealed record GuessingV1OverlaySnapshot
 
     public required int ResultDurationMilliseconds { get; init; }
 
+    public OverlayAppearance Appearance { get; init; } = OverlayAppearance.GuessingDefault;
+
     public required GuessingV1OverlayPresentationState State { get; init; }
 }
 
@@ -134,6 +136,8 @@ public sealed record GiveawayV1OverlaySnapshot
 
     public int WinnerAnimationDurationMilliseconds => 5000;
 
+    public OverlayAppearance Appearance { get; init; } = OverlayAppearance.GiveawayDefault;
+
     public required GiveawayV1OverlayPresentationState State { get; init; }
 }
 
@@ -145,6 +149,7 @@ public sealed record EventFeedV1OverlaySnapshot
     public required long Sequence { get; init; }
     public required DateTimeOffset GeneratedAtUtc { get; init; }
     public required string Animation { get; init; }
+    public OverlayAppearance Appearance { get; init; } = OverlayAppearance.EventFeedDefault;
     public required EventFeedStatePresentation State { get; init; }
 }
 
@@ -314,7 +319,10 @@ internal sealed class OverlayStateProvider(
 
         if (
             instance is
-            { Type: OverlayType.EventFeed, Configuration: OverlayConfiguration.EventFeedV1 }
+            {
+                Type: OverlayType.EventFeed,
+                Configuration: OverlayConfiguration.EventFeedV1 eventFeedConfiguration,
+            }
         )
         {
             if (eventFeed is null)
@@ -331,6 +339,7 @@ internal sealed class OverlayStateProvider(
                         Sequence = instance.Revision.Value,
                         GeneratedAtUtc = timeProvider.GetUtcNow(),
                         Animation = "none",
+                        Appearance = eventFeedConfiguration.Appearance,
                         State = state,
                     }
                 );
@@ -558,6 +567,7 @@ internal sealed class OverlayStateProvider(
                 Sequence = instance.Revision.Value,
                 GeneratedAtUtc = now,
                 Animation = "sample",
+                Appearance = configuration.Appearance,
                 State = new EventFeedStatePresentation(
                     new EventFeedCardPresentation(
                         0,
@@ -643,7 +653,7 @@ internal sealed class OverlayStateProvider(
             },
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
-        return Giveaway(instance, state);
+        return Giveaway(instance, configuration, state);
     }
 
     private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance) =>
@@ -668,6 +678,7 @@ internal sealed class OverlayStateProvider(
                 Sequence = instance.Revision.Value,
                 GeneratedAtUtc = timeProvider.GetUtcNow(),
                 ResultDurationMilliseconds = checked(configuration.ResultDurationSeconds * 1000),
+                Appearance = configuration.Appearance,
                 State = state,
             }
         );
@@ -782,11 +793,12 @@ internal sealed class OverlayStateProvider(
             },
             _ => throw new PersistenceDataIntegrityException(typeof(PointsGiveaway)),
         };
-        return Giveaway(instance, state);
+        return Giveaway(instance, configuration, state);
     }
 
     private OverlaySnapshotProjection Giveaway(
         ResolvedOverlayInstance instance,
+        OverlayConfiguration.GiveawayV1 configuration,
         GiveawayV1OverlayPresentationState state
     ) =>
         new OverlaySnapshotProjection.GiveawayV1(
@@ -795,6 +807,7 @@ internal sealed class OverlayStateProvider(
                 ServerEpoch = serverEpoch.Value,
                 Sequence = instance.Revision.Value,
                 GeneratedAtUtc = timeProvider.GetUtcNow(),
+                Appearance = configuration.Appearance,
                 State = state,
             }
         );

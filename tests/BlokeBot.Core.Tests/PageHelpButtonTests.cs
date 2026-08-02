@@ -23,7 +23,7 @@ public sealed class PageHelpButtonTests
     [Arguments("/requests", "Request boards", "public board link becomes available")]
     [Arguments("/queues", "Play with viewers", "viewer-page link becomes available")]
     [Arguments("/moments", "Moments", "shareable recap in a new tab")]
-    [Arguments("/overlays", "Overlays", "require both Overlays and Guessing game")]
+    [Arguments("/overlays/sources", "Overlays", "require both Overlays and Guessing game")]
     public void FeatureRoute_RendersOneButtonAndOpensRouteSpecificHelp(
         string path,
         string title,
@@ -72,7 +72,9 @@ public sealed class PageHelpButtonTests
             "/guessing",
             "/guessing/settings",
             "/moments",
-            "/overlays",
+            "/overlays/cues",
+            "/overlays/media",
+            "/overlays/sources",
             "/points",
             "/points/settings",
             "/queues",
