@@ -114,7 +114,7 @@ public sealed class ClipMarkerService(
         if (token is null)
         {
             return new ClipMarkerOperationOutcome.NotReady(
-                "Reconnect the selected broadcaster with Twitch operations permissions."
+                "Reconnect the selected channel's Twitch integration."
             );
         }
 
@@ -227,7 +227,7 @@ public sealed class ClipMarkerService(
                     "Twitch did not accept the selected broadcaster authorization.",
                     ct,
                     new ClipMarkerOperationOutcome.NotReady(
-                        "Reconnect the selected broadcaster with Twitch operations permissions."
+                        "Reconnect the selected channel's Twitch integration."
                     )
                 );
             case HelixClipCreateOutcome.Ambiguous:
@@ -304,7 +304,7 @@ public sealed class ClipMarkerService(
         if (token is null)
         {
             return new ClipMarkerOperationOutcome.NotReady(
-                "Reconnect the selected broadcaster with Twitch operations permissions."
+                "Reconnect the selected channel's Twitch integration."
             );
         }
 
@@ -424,7 +424,7 @@ public sealed class ClipMarkerService(
                     "Twitch did not accept the selected broadcaster authorization.",
                     ct,
                     new ClipMarkerOperationOutcome.NotReady(
-                        "Reconnect the selected broadcaster with Twitch operations permissions."
+                        "Reconnect the selected channel's Twitch integration."
                     )
                 );
             case HelixStreamMarkerCreateOutcome.Ambiguous:
@@ -894,7 +894,7 @@ public sealed class ClipMarkerService(
 
         await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
         return new ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization(
-            "Reconnect the selected broadcaster with Twitch operations permissions."
+            "Reconnect the selected channel's Twitch integration."
         );
     }
 
@@ -921,8 +921,8 @@ public sealed class ClipMarkerService(
                 DurableAlertSeverity.Warning,
                 "twitch-broadcaster-authorization",
                 "reauthorize-v1",
-                "Reconnect broadcaster for Twitch operations",
-                "Twitch operations needs the selected broadcaster to reconnect and approve all requested permissions.",
+                "Reconnect Twitch integration",
+                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);

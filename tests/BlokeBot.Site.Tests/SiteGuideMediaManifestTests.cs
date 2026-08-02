@@ -133,6 +133,17 @@ public sealed class SiteGuideMediaManifestTests
             tools.ShouldContain("media/laptop-dark-chat-tools-enabled.png");
             tools.ShouldContain("shared 12px");
 
+            var connections = await client.GetStringAsync("/connect");
+            connections.ShouldContain("Connect Chat access");
+            connections.ShouldContain("Connect the Twitch integration");
+            connections.ShouldContain(
+                "Disconnect removes BlokeBot&#x27;s saved authorization for this channel"
+            );
+            connections.ShouldContain(
+                "Chat access, Twitch integration and bot-account connections are different approvals"
+            );
+            connections.ShouldNotContain("Twitch operations");
+
             var requestBoards = await client.GetStringAsync("/community/request-boards");
             requestBoards.ShouldContain("Current topic: <strong>Request boards</strong>");
             requestBoards.ShouldContain("/requests/{channel}/{board-name}");

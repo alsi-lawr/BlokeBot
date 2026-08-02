@@ -194,6 +194,22 @@ public sealed class PageHelpButtonTests
         cut.Markup.ShouldContain("Where to go next");
     }
 
+    [Test]
+    public void ChannelSetupHelp_DistinguishesConnectionsAndExplainsIntegrationControls()
+    {
+        using var context = new BunitContext();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/host");
+        var cut = context.Render<PageHelpButton>();
+
+        cut.Find("button[aria-label='Page help']").Click();
+
+        cut.Markup.ShouldContain("Chat access");
+        cut.Markup.ShouldContain("Twitch integration");
+        cut.Markup.ShouldContain("disconnect it to remove BlokeBot's stored authorization");
+        cut.Markup.ShouldContain("bot account");
+        cut.Markup.ShouldNotContain("Twitch operations");
+    }
+
     private static string OpenHelpFor(string path)
     {
         using var context = new BunitContext();

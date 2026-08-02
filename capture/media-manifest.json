@@ -183,7 +183,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1; Chat access and Twitch integration labels visible"
     },
     {
       "file": "laptop-dark-chat-tools-all-disabled.png",
@@ -404,7 +404,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1; Chat access and Twitch integration labels visible"
     },
     {
       "file": "laptop-light-chat-tools-all-disabled.png",
@@ -625,7 +625,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1; Chat access and Twitch integration labels visible"
     },
     {
       "file": "phone-dark-chat-tools-all-disabled.png",
@@ -846,7 +846,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+      "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1; Chat access and Twitch integration labels visible"
     },
     {
       "file": "phone-light-chat-tools-all-disabled.png",

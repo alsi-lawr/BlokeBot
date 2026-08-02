@@ -184,8 +184,8 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-channel-setup.png",
                 DarkLaptopSource: "media/laptop-dark-channel-setup.png",
                 LightLaptopSource: "media/laptop-light-channel-setup.png",
-                PhoneAlt: "Channel setup for Sample Channel showing separate Twitch chat and Twitch operations readiness.",
-                LaptopAlt: "Channel setup for Sample Channel showing separate Twitch chat and Twitch operations readiness.",
+                PhoneAlt: "Channel setup for Sample Channel showing separate Chat access and Twitch integration readiness.",
+                LaptopAlt: "Channel setup for Sample Channel showing separate Chat access and Twitch integration readiness.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
             ),
             Sections =
@@ -228,34 +228,34 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-channel-setup.png",
                 DarkLaptopSource: "media/laptop-dark-channel-setup.png",
                 LightLaptopSource: "media/laptop-light-channel-setup.png",
-                PhoneAlt: "Channel setup showing separate connection actions for Twitch chat and Twitch operations.",
-                LaptopAlt: "Channel setup showing separate connection actions for Twitch chat and Twitch operations.",
-                "Twitch chat and Twitch operations show their own connection actions and readiness."
+                PhoneAlt: "Channel setup showing separate actions for Chat access and the Twitch integration.",
+                LaptopAlt: "Channel setup showing separate actions for Chat access and the Twitch integration.",
+                "Chat access and Twitch integration show their own connection actions and readiness."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Connect the channel account",
+                    Heading = "Connect Chat access",
                     Steps =
                     [
                         "Select the channel and open Channel setup.",
-                        "Under Twitch chat, select Connect channel.",
-                        "Complete Twitch as the channel owner. This grants the channel-level permission used by the bot.",
-                        "Return to the same selected channel and confirm that the channel connection is ready.",
+                        "Under Chat access, select Connect channel.",
+                        "Complete Twitch as the channel owner. This approves BlokeBot for channel chat.",
+                        "Return to the same selected channel and confirm that Chat access is connected.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Connect Twitch operations",
+                    Heading = "Connect the Twitch integration",
                     Steps =
                     [
-                        "Under Twitch operations, select Connect operations or Reconnect operations.",
+                        "Under Twitch integration, select Connect or Reconnect.",
                         "Complete Twitch as the channel owner and approve every requested permission.",
-                        "Return to the same selected channel and confirm that Twitch operations is connected.",
+                        "Return to the same selected channel and confirm that Twitch integration is connected.",
                     ],
                     Note =
-                        "This separate owner grant enables polls, clips and markers, Channel Points and Predictions. Reconnecting Twitch chat does not repair Twitch operations.",
+                        "This is separate from Chat access. Disconnect removes BlokeBot's saved authorization for this channel; Reconnect replaces it.",
                 },
                 new SiteGuideSection
                 {
@@ -276,7 +276,7 @@ internal static class SiteGuideCatalog
                     Heading = "Reconnect the right identity",
                     Paragraphs =
                     [
-                        "Use the reconnect action beside the connection that is stale. Twitch chat, Twitch operations and bot-account connections are different OAuth grants; reconnecting one does not repair the others.",
+                        "Use the reconnect action beside the connection that is stale. Chat access, Twitch integration and bot-account connections are different approvals; reconnecting one does not repair the others.",
                         "If Twitch used the wrong account, close the result window, sign out of Twitch in that browser context and repeat the account-specific action.",
                     ],
                 },
@@ -722,7 +722,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Use Native Twitch operations", "twitch-operations")],
+            Next = [new SiteLink("Use Native Twitch tools", "twitch-operations")],
         };
 
         yield return new SiteGuidePage
