@@ -10,11 +10,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Auth;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -25,7 +21,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

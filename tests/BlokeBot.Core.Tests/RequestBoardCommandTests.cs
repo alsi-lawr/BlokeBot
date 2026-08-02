@@ -1,12 +1,9 @@
-using BlokeBot.Commands;
 using BlokeBot.Core.Features.RequestBoards;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

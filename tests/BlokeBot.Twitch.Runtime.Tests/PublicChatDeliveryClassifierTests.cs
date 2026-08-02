@@ -1,10 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using BlokeBot.Twitch.Auth;
-using BlokeBot.Twitch.Runtime;
 using Polly.Timeout;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

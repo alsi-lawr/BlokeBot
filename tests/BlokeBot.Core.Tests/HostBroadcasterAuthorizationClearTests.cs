@@ -1,13 +1,10 @@
 using System.Net;
-using BlokeBot.Core;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Auth;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

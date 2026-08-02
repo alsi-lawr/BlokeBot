@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Polly;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

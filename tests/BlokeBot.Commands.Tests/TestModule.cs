@@ -1,5 +1,3 @@
-using BlokeBot.Commands;
-
 namespace BlokeBot.Commands.Tests;
 
 internal sealed class TestModule : IChatCommandModule

@@ -2,7 +2,6 @@ using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.Points.Giveaways;
 

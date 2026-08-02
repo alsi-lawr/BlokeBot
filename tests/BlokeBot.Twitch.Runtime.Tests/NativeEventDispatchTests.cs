@@ -1,9 +1,6 @@
 using BlokeBot.Commands;
-using BlokeBot.Eventing;
-using BlokeBot.Twitch;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

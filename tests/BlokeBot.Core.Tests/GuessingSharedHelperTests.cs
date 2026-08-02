@@ -2,10 +2,8 @@ using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
-using BlokeBot.Core.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

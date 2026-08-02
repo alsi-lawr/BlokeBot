@@ -1,6 +1,5 @@
 using BlokeBot.Core.Features.Toasts;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

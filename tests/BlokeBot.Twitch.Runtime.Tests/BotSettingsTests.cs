@@ -1,7 +1,6 @@
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Options;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

@@ -1,6 +1,5 @@
 using BlokeBot.Core.Auth.Sessions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -1,6 +1,5 @@
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -1,13 +1,6 @@
-using System.Diagnostics;
-using System.Net.Sockets;
-using System.Net.WebSockets;
-using System.Text.Json;
-using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging;
 using Polly;
-using Polly.Timeout;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -261,7 +254,7 @@ public abstract class RuntimeSessionResilienceTestBase
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception, properties));
         }
     }

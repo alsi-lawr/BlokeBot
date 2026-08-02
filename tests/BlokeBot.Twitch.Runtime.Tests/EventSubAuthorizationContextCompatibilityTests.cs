@@ -1,6 +1,5 @@
 using System.Reflection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

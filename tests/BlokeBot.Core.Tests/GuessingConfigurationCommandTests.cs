@@ -1,12 +1,9 @@
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Game;
-using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

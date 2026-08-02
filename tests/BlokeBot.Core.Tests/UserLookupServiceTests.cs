@@ -5,7 +5,6 @@ using BlokeBot.Core.Auth.Users;
 using BlokeBot.Functional;
 using Microsoft.Extensions.Options;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

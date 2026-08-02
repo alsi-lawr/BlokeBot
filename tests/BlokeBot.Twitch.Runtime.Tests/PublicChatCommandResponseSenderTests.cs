@@ -2,7 +2,6 @@ using BlokeBot.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -124,7 +123,7 @@ public sealed class PublicChatCommandResponseSenderTests
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }

@@ -5,10 +5,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Predictions;
 

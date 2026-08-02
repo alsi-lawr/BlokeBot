@@ -3,12 +3,10 @@ using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

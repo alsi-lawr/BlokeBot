@@ -2,7 +2,6 @@ using System.Net;
 using BlokeBot.Core.Features.Overlays;
 using Microsoft.Extensions.Options;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

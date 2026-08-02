@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.Guessing.History;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

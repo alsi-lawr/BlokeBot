@@ -3,7 +3,6 @@ using BlokeBot.Persistence;
 using BlokeBot.Simulation.FakeTwitch;
 using BlokeBot.Twitch;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Configuration;
 using Serilog;
 
 namespace BlokeBot.Simulation;

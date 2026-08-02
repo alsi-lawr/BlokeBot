@@ -3,11 +3,9 @@ using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Core.Tests;

@@ -5,7 +5,6 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Polls;

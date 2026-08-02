@@ -1,7 +1,6 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Overlays;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;

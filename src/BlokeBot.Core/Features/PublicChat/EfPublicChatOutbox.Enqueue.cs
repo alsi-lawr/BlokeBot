@@ -2,7 +2,6 @@ using System.Diagnostics;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.PublicChat;

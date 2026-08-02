@@ -1,5 +1,4 @@
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Commands.Tests;
 

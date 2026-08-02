@@ -1,4 +1,3 @@
-using BlokeBot.Commands;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.Guessing.Configuration;
@@ -9,13 +8,10 @@ using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Guessing.Rounds;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Replies;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

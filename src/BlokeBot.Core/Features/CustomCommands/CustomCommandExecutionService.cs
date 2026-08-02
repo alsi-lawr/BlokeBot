@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using BlokeBot.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
-using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

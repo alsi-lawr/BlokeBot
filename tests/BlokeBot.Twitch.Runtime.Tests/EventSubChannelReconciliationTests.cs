@@ -1,13 +1,5 @@
 using System.Threading.Channels;
-using BlokeBot.Commands;
-using BlokeBot.Eventing;
-using BlokeBot.Functional;
-using BlokeBot.Twitch.Auth;
-using Microsoft.Extensions.Logging.Abstractions;
-using Polly;
-using Polly.Timeout;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

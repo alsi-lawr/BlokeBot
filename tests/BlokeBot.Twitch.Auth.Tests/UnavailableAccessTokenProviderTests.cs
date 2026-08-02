@@ -1,7 +1,4 @@
-using BlokeBot.Functional;
-using BlokeBot.Twitch.Auth;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 

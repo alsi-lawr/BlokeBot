@@ -6,11 +6,9 @@ using BlokeBot.Core.Features.Moments;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Simulation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Simulation.Tests;
 

@@ -2,13 +2,10 @@ using System.Text.Json;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Giveaways;
-using BlokeBot.Eventing;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

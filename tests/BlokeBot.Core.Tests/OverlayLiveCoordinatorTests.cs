@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.Overlays;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

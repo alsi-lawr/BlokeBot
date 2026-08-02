@@ -3,7 +3,6 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

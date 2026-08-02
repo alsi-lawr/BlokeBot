@@ -8,7 +8,6 @@ using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Functional;
 using Microsoft.Extensions.Logging;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -1,7 +1,5 @@
-using BlokeBot.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Commands.Tests;
 

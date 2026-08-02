@@ -11,17 +11,13 @@ using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

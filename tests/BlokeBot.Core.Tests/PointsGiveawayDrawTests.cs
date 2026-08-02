@@ -1,29 +1,10 @@
-using System.Collections.Concurrent;
-using System.Data.Common;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
-using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
-using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Points.Configuration;
-using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Replies;
-using BlokeBot.Eventing;
-using BlokeBot.Functional;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -2,10 +2,7 @@ using System.Diagnostics;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.Alerts;
 

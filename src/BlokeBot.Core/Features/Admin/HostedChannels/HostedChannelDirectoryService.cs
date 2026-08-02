@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Hosts;

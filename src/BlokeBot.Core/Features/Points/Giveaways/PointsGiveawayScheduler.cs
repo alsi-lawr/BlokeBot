@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Threading.Channels;
 using BlokeBot.Functional;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.Points.Giveaways;
 

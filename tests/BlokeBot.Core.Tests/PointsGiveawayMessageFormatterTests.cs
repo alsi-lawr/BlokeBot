@@ -6,7 +6,6 @@ using BlokeBot.Core.Features.Points.Replies;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

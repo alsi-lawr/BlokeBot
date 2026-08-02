@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using BlokeBot.Eventing;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;

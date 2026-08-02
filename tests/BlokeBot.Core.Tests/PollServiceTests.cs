@@ -5,14 +5,10 @@ using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

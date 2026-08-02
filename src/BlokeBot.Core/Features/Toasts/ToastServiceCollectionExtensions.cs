@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Core.Features.Toasts;
 
 public static class ToastServiceCollectionExtensions

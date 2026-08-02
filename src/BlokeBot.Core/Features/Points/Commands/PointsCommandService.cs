@@ -1,7 +1,4 @@
-using BlokeBot.Core.Features.Commands;
-using BlokeBot.Core.Features.Points.Replies;
 using BlokeBot.Core.Features.Replies;
-using BlokeBot.Core.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

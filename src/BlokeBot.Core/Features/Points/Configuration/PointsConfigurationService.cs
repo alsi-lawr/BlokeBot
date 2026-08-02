@@ -1,7 +1,5 @@
 using BlokeBot.Core.Features.Commands;
-using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Commands;
-using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.Replies;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Functional;

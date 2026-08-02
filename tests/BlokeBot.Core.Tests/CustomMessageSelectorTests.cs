@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

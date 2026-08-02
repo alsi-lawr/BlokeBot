@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
-using BlokeBot.Core.Auth;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.HostConfig.Access;

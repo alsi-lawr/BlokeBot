@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using TransportTwitchAnnouncementColor = BlokeBot.Twitch.TwitchAnnouncementColor;
 
 namespace BlokeBot.Core.Features.CustomCommands;

@@ -1,10 +1,7 @@
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Persistence.Tests;
 

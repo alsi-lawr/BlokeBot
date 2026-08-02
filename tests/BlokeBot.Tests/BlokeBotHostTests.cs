@@ -1,13 +1,10 @@
 using BlokeBot.Cli;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Hosting;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Tests;
 

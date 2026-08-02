@@ -9,13 +9,10 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Eventing;
-using BlokeBot.Persistence;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -2,7 +2,6 @@ using System.Globalization;
 using BlokeBot.Cli;
 using Shouldly;
 using Spectre.Console;
-using TUnit.Core;
 
 namespace BlokeBot.Tests;
 

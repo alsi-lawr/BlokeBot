@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 

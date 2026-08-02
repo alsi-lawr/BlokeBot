@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

@@ -1,4 +1,3 @@
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;

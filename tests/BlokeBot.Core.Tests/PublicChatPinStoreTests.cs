@@ -1,11 +1,7 @@
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Testing;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

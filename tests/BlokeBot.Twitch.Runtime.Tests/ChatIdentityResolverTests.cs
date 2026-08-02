@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -6,7 +5,6 @@ using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

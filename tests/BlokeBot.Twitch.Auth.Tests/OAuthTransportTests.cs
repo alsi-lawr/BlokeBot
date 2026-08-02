@@ -1,9 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using BlokeBot.Twitch.Auth;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 

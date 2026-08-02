@@ -1,11 +1,8 @@
 using System.Net;
 using System.Text;
-using BlokeBot.Commands;
-using BlokeBot.Eventing;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

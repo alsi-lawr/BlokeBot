@@ -1,7 +1,6 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -277,7 +276,7 @@ public sealed class IrcConnectionSessionTests
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }

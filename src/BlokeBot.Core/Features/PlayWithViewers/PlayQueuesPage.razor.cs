@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
