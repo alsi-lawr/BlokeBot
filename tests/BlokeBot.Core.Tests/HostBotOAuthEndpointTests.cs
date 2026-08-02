@@ -93,6 +93,103 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
     }
 
     [Test]
+    public async Task BroadcasterOAuth_InvalidState_RetriesOnlyBroadcasterAuthorization()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterAuthorization
+        );
+
+        using var response = await host.Client.GetAsync(
+            "/oauth/callback?code=code&state=broadcaster.invalid"
+        );
+
+        await AssertBroadcasterRetryAsync(response, HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_Denied_RetriesOnlyBroadcasterAuthorization()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterAuthorization
+        );
+        var state = host.IssueBroadcasterState(1);
+
+        using var response = await host.Client.GetAsync(
+            $"/oauth/callback?error=access_denied&state={state}"
+        );
+
+        await AssertBroadcasterRetryAsync(response, HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_MissingCode_RetriesOnlyBroadcasterAuthorization()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterAuthorization
+        );
+        var state = host.IssueBroadcasterState(1);
+
+        using var response = await host.Client.GetAsync($"/oauth/callback?state={state}");
+
+        await AssertBroadcasterRetryAsync(response, HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_WrongAccountOrScope_RetriesOnlyBroadcasterAuthorization()
+    {
+        await AssertBroadcasterCompletionRetryAsync(EndpointScenario.BroadcasterWrongAccount);
+        await AssertBroadcasterCompletionRetryAsync(EndpointScenario.BroadcasterMissingPermission);
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_ProviderFailures_RetryOnlyBroadcasterAuthorization()
+    {
+        await AssertBroadcasterCompletionRetryAsync(
+            EndpointScenario.BroadcasterProviderNotValidated
+        );
+        await AssertBroadcasterCompletionRetryAsync(
+            EndpointScenario.BroadcasterTransportFailure,
+            HttpStatusCode.BadGateway
+        );
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_CompleteOwnerGrant_PersistsProtectedAuthorization()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterAuthorization
+        );
+        var state = host.IssueBroadcasterState(1);
+
+        using var response = await host.Client.GetAsync($"/oauth/callback?code=code&state={state}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Twitch access saved");
+        page.ShouldNotContain(">Try again</a>");
+        await using var db = await host.DbFactory!.CreateDbContextAsync();
+        var authorization = await db.HostBroadcasterAuthorizations.SingleAsync();
+        authorization.TwitchUserId.ShouldBe("123");
+        authorization.ProtectedTokenPayload.ShouldNotBeNull();
+        authorization.AuthorizedScopes.ShouldNotBeNull();
+        HostBroadcasterAuthorizationService.MilestoneScopes.ShouldAllBe(scope =>
+            authorization.AuthorizedScopes.Contains(scope, StringComparison.Ordinal)
+        );
+    }
+
+    [Test]
     public async Task HostBotOAuth_CustomBotDisabledStarting_ReturnsEnableCustomBotGuidance()
     {
         await using var host = await EndpointHost.StartAsync(
@@ -109,5 +206,38 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         page.ShouldContain("Turn on the custom bot first");
         page.ShouldContain("Enable the custom bot in Channel setup");
         page.ShouldContain("Return to Channel setup");
+    }
+
+    private static async Task AssertBroadcasterCompletionRetryAsync(
+        EndpointScenario scenario,
+        HttpStatusCode expectedStatus = HttpStatusCode.BadRequest
+    )
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: scenario
+        );
+        var state = host.IssueBroadcasterState(1);
+
+        using var response = await host.Client.GetAsync($"/oauth/callback?code=code&state={state}");
+
+        await AssertBroadcasterRetryAsync(response, expectedStatus);
+        await using var db = await host.DbFactory!.CreateDbContextAsync();
+        (await db.HostBroadcasterAuthorizations.CountAsync()).ShouldBe(0);
+    }
+
+    private static async Task AssertBroadcasterRetryAsync(
+        HttpResponseMessage response,
+        HttpStatusCode expectedStatus
+    )
+    {
+        response.StatusCode.ShouldBe(expectedStatus);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("href=\"/oauth/broadcaster/start\">Try again</a>");
+        page.ShouldNotContain("href=\"/oauth/host-bot/start\"");
+        page.ShouldNotContain("href=\"/oauth/channel-bot/start\"");
+        page.ShouldNotContain("href=\"/oauth/start\"");
     }
 }

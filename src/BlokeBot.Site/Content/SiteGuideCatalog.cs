@@ -186,8 +186,8 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-channel-setup.png",
                 DarkLaptopSource: "media/laptop-dark-channel-setup.png",
                 LightLaptopSource: "media/laptop-light-channel-setup.png",
-                PhoneAlt: "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
-                LaptopAlt: "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
+                PhoneAlt: "Channel setup for Sample Channel showing separate Twitch chat and Twitch operations readiness.",
+                LaptopAlt: "Channel setup for Sample Channel showing separate Twitch chat and Twitch operations readiness.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
             ),
             Sections =
@@ -230,9 +230,9 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-channel-setup.png",
                 DarkLaptopSource: "media/laptop-dark-channel-setup.png",
                 LightLaptopSource: "media/laptop-light-channel-setup.png",
-                PhoneAlt: "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
-                LaptopAlt: "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
-                "Connection actions and readiness messages appear beside the channel's bot controls."
+                PhoneAlt: "Channel setup showing separate connection actions for Twitch chat and Twitch operations.",
+                LaptopAlt: "Channel setup showing separate connection actions for Twitch chat and Twitch operations.",
+                "Twitch chat and Twitch operations show their own connection actions and readiness."
             ),
             Sections =
             [
@@ -246,6 +246,18 @@ internal static class SiteGuideCatalog
                         "Complete Twitch as the channel owner. This grants the channel-level permission used by the bot.",
                         "Return to the same selected channel and confirm that the channel connection is ready.",
                     ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Connect Twitch operations",
+                    Steps =
+                    [
+                        "Under Twitch operations, select Connect operations or Reconnect operations.",
+                        "Complete Twitch as the channel owner and approve every requested permission.",
+                        "Return to the same selected channel and confirm that Twitch operations is connected.",
+                    ],
+                    Note =
+                        "This separate owner grant enables polls, clips and markers, Channel Points and Predictions. Reconnecting Twitch chat does not repair Twitch operations.",
                 },
                 new SiteGuideSection
                 {
@@ -266,7 +278,7 @@ internal static class SiteGuideCatalog
                     Heading = "Reconnect the right identity",
                     Paragraphs =
                     [
-                        "Use the reconnect action beside the connection that is stale. Channel and bot connections are different OAuth grants; reconnecting one does not repair the other.",
+                        "Use the reconnect action beside the connection that is stale. Twitch chat, Twitch operations and bot-account connections are different OAuth grants; reconnecting one does not repair the others.",
                         "If Twitch used the wrong account, close the result window, sign out of Twitch in that browser context and repeat the account-specific action.",
                     ],
                 },

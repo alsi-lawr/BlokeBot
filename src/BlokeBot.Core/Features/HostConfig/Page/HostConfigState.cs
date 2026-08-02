@@ -16,6 +16,7 @@ public sealed record HostConfigState(
     bool CanCreateHost,
     bool IsHostCreated,
     bool IsChannelBotAuthorized,
+    TwitchOperationsAuthorizationState TwitchOperationsAuthorization,
     HostedChannelRuntimeSummary? RuntimeStatus,
     StartupMessageConfiguration StartupMessage,
     CommandsConfiguration Commands,
@@ -23,6 +24,13 @@ public sealed record HostConfigState(
     IReadOnlyList<HostFeatureCardState> Features,
     HostModAccessState ModAccess
 );
+
+public enum TwitchOperationsAuthorizationState
+{
+    Missing,
+    Stale,
+    Ready,
+}
 
 public sealed record HostBotAccountOverrideState(
     bool Enabled,

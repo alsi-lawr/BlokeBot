@@ -48,6 +48,25 @@ public sealed class BlokeBotAuthResultPageTests
     }
 
     [Test]
+    public async Task BroadcasterRetry_RenderingTargetsOnlyBroadcasterAuthorization()
+    {
+        var (_, page) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.PermissionOrAccount,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.Broadcaster,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null
+            )
+        );
+
+        page.ShouldContain("href=\"/oauth/broadcaster/start\">Try again</a>");
+        page.ShouldNotContain("href=\"/oauth/host-bot/start\"");
+        page.ShouldNotContain("href=\"/oauth/channel-bot/start\"");
+        page.ShouldNotContain("href=\"/oauth/start\"");
+    }
+
+    [Test]
     public async Task Success_RenderingUsesOneStatusWithReturnAndCloseActions()
     {
         var (statusCode, botAccountPage) = await RenderAsync(

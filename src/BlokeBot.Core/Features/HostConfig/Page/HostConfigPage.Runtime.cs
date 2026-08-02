@@ -42,6 +42,24 @@ public partial class HostConfigPage
         : _state?.IsChannelBotAuthorized == true ? "needs update"
         : "not connected";
 
+    private string _operationsAuthorizationBadgeClass =>
+        _state?.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready
+            ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+            : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
+
+    private string _operationsAuthorizationDotClass =>
+        _state?.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready
+            ? "status-pill__dot bg-emerald-500"
+            : "status-pill__dot bg-amber-500";
+
+    private string _operationsAuthorizationText =>
+        _state?.TwitchOperationsAuthorization switch
+        {
+            TwitchOperationsAuthorizationState.Ready => "connected",
+            TwitchOperationsAuthorizationState.Stale => "needs update",
+            _ => "not connected",
+        };
+
     private string _runtimeBadgeClass =>
         _runtimeLifecycle?.Match(
             static _ => "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
