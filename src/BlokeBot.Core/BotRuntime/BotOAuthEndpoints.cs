@@ -495,7 +495,7 @@ internal static class BotOAuthEndpoints
             return Result(
                 BlokeBotAuthOutcome.InvalidOrExpired,
                 BlokeBotAuthStatus.BadRequest,
-                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthRetryAction.Broadcaster,
                 BlokeBotAuthReturnAction.ChannelSetup
             );
         }
@@ -515,7 +515,7 @@ internal static class BotOAuthEndpoints
             return Result(
                 BlokeBotAuthOutcome.InvalidOrExpired,
                 BlokeBotAuthStatus.BadRequest,
-                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthRetryAction.Broadcaster,
                 BlokeBotAuthReturnAction.ChannelSetup
             );
         }
@@ -538,7 +538,7 @@ internal static class BotOAuthEndpoints
                         : Result(
                             BlokeBotAuthOutcome.PermissionOrAccount,
                             BlokeBotAuthStatus.BadRequest,
-                            BlokeBotAuthRetryAction.HostBot,
+                            BlokeBotAuthRetryAction.Broadcaster,
                             BlokeBotAuthReturnAction.ChannelSetup
                         ),
                 _ =>
@@ -555,7 +555,7 @@ internal static class BotOAuthEndpoints
                         Result(
                             BlokeBotAuthOutcome.PermissionOrAccount,
                             BlokeBotAuthStatus.BadRequest,
-                            BlokeBotAuthRetryAction.HostBot,
+                            BlokeBotAuthRetryAction.Broadcaster,
                             BlokeBotAuthReturnAction.ChannelSetup
                         )
                     )
@@ -564,7 +564,7 @@ internal static class BotOAuthEndpoints
         catch (HttpRequestException exception)
         {
             return ProviderFailureResult(
-                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthRetryAction.Broadcaster,
                 context,
                 logger,
                 "TransportFailure",

@@ -196,6 +196,7 @@ internal static class BlokeBotAuthResultPage
             BlokeBotAuthRetryAction.SignIn => new("/auth/login?start=true", "Try again"),
             BlokeBotAuthRetryAction.BotAccount => new("/oauth/start", "Try again"),
             BlokeBotAuthRetryAction.ChannelBot => new("/oauth/channel-bot/start", "Try again"),
+            BlokeBotAuthRetryAction.Broadcaster => new("/oauth/broadcaster/start", "Try again"),
             BlokeBotAuthRetryAction.HostBot => new("/oauth/host-bot/start", "Try again"),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
         };

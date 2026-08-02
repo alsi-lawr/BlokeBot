@@ -105,12 +105,12 @@ disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/GuessOptionsSetting
 disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/ProfileSettingsSection.razor|1|included|guessing-settings-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/ReplySettingsSection.razor|1|included|guessing-settings-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|86|included|channel-setup-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|211|included|channel-setup-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|241|included|channel-setup-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|272|excluded|nested-command-catalog-disclosure
-disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|352|included|channel-setup-disclosure-cards
+disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|252|included|channel-setup-disclosure-cards
+disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|282|included|channel-setup-disclosure-cards
+disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|313|excluded|nested-command-catalog-disclosure
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|393|included|channel-setup-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|458|included|channel-setup-disclosure-cards
+disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|434|included|channel-setup-disclosure-cards
+disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|499|included|channel-setup-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|55|included|points-settings-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|84|included|points-settings-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/Points/Configuration/PointsConfigurationPage.razor|98|included|points-settings-disclosure-cards

@@ -18,6 +18,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
@@ -38,6 +39,76 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostConfigFaultRoutingTests
 {
+    [Test]
+    public async Task TwitchOperationsReadiness_Ready_IsDistinctFromTwitchChat()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            ReadyBroadcasterStatus(),
+            owner: true,
+            page =>
+            {
+                page.Markup.ShouldContain("Twitch chat");
+                page.Markup.ShouldContain("Twitch operations");
+                page.Markup.ShouldContain(
+                    "Polls, clips and markers, Channel Points and Predictions are connected."
+                );
+                BroadcasterActions(page).ShouldBeEmpty();
+            }
+        );
+    }
+
+    [Test]
+    public async Task TwitchOperationsReadiness_Missing_OffersOwnerConnect()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
+            owner: true,
+            page =>
+            {
+                page.Markup.ShouldContain(
+                    "The channel owner must connect and approve every Twitch operations permission."
+                );
+                var action = BroadcasterActions(page).ShouldHaveSingleItem();
+                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
+                action.Markup.ShouldContain("Connect operations");
+            }
+        );
+    }
+
+    [Test]
+    public async Task TwitchOperationsReadiness_Stale_OffersOwnerReconnect()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            new TokenStatus.Invalid([]),
+            owner: true,
+            page =>
+            {
+                page.Markup.ShouldContain(
+                    "The channel owner must reconnect and approve every Twitch operations permission."
+                );
+                var action = BroadcasterActions(page).ShouldHaveSingleItem();
+                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
+                action.Markup.ShouldContain("Reconnect operations");
+            }
+        );
+    }
+
+    [Test]
+    public async Task TwitchOperationsReadiness_NonOwner_ShowsOwnerGuidanceWithoutAction()
+    {
+        await AssertTwitchOperationsPresentationAsync(
+            new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
+            owner: false,
+            page =>
+            {
+                page.Markup.ShouldContain(
+                    "The channel owner must connect and approve every Twitch operations permission."
+                );
+                BroadcasterActions(page).ShouldBeEmpty();
+            }
+        );
+    }
+
     [Test]
     public async Task ViewerCommandsDisclosure_OpeningAndEvents_PreserveDirtyHostDrafts()
     {
@@ -463,6 +534,58 @@ public sealed class HostConfigFaultRoutingTests
         );
     }
 
+    private static async Task AssertTwitchOperationsPresentationAsync(
+        TokenStatus status,
+        bool owner,
+        Action<IRenderedComponent<HostConfigPage>> assertion
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new FixedBroadcasterTokenStatusProvider(status)
+        );
+        if (!owner)
+        {
+            SetAdminClaims(testContext.Authorization, hostId);
+        }
+
+        var page = RenderHostConfigPage(context);
+
+        page.WaitForAssertion(() => assertion(page));
+    }
+
+    private static IReadOnlyList<IRenderedComponent<AuthPopupButton>> BroadcasterActions(
+        IRenderedComponent<HostConfigPage> page
+    )
+    {
+        return page.FindComponents<AuthPopupButton>()
+            .Where(action => action.Instance.Url == "/oauth/broadcaster/start")
+            .ToArray();
+    }
+
+    private static TokenStatus ReadyBroadcasterStatus()
+    {
+        return new TokenStatus.Ready(
+            "broadcaster-token",
+            new TokenValidation(
+                "123",
+                "streamer",
+                OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
+            ),
+            [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+            [.. HostBroadcasterAuthorizationService.MilestoneScopes]
+        );
+    }
+
     private static void SetModeratorClaims(BunitAuthorizationContext authorization, int hostId)
     {
         var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
@@ -737,6 +860,26 @@ public sealed class HostConfigFaultRoutingTests
             Task<string> Completion,
             TaskCompletionSource? Started
         );
+    }
+
+    private sealed class FixedBroadcasterTokenStatusProvider(TokenStatus status)
+        : IHostBroadcasterTokenStatusProvider
+    {
+        public Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            return Task.FromResult(status);
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory

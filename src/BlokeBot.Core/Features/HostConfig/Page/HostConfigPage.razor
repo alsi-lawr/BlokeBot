@@ -89,7 +89,7 @@
                             OpenRequest="@_botStatusFragmentRequest"
                             FocusElementId="bot-status"
                             FocusRequest="@_botStatusFragmentRequest">
-            <div class="grid gap-3 p-4 lg:grid-cols-4">
+            <div class="grid gap-3 p-4 lg:grid-cols-5">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch chat</p>
@@ -151,6 +151,47 @@
                         else
                         {
                             <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this Twitch account.</p>
+                        }
+                    }
+                </div>
+                <div class="surface-muted rounded-lg px-3 py-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch operations</p>
+                        <span class="@_operationsAuthorizationBadgeClass">
+                            <span class="@_operationsAuthorizationDotClass"></span>
+                            <span class="status-pill__label">@_operationsAuthorizationText</span>
+                        </span>
+                    </div>
+                    @if (_state.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">Polls, clips and markers, Channel Points and Predictions are connected.</p>
+                    }
+                    else if (_state.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Stale)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect and approve every Twitch operations permission.</p>
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                             Url="/oauth/broadcaster/start"
+                                             PopupName="blokebot-broadcaster-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="LoadAsync">
+                                Reconnect operations
+                            </AuthPopupButton>
+                        }
+                    }
+                    else
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect and approve every Twitch operations permission.</p>
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                             Url="/oauth/broadcaster/start"
+                                             PopupName="blokebot-broadcaster-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="LoadAsync">
+                                Connect operations
+                            </AuthPopupButton>
                         }
                     }
                 </div>

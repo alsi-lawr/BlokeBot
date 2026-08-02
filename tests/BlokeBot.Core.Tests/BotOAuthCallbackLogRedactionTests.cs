@@ -18,6 +18,7 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
             configured: true,
             selectedRole: AuthRole.Streamer,
             login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterTransportFailure,
             logs: logs
         );
 
@@ -29,10 +30,15 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
         using var hostBot = await host.Client.GetAsync(
             $"/oauth/callback?error={Error}&code={Code}&state={hostState}"
         );
+        var broadcasterState = host.IssueBroadcasterState(1);
+        using var broadcaster = await host.Client.GetAsync(
+            $"/oauth/callback?code={Code}&state={broadcasterState}"
+        );
 
         global.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
         channel.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
         hostBot.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
+        broadcaster.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
         logs.Entries.ShouldNotBeEmpty();
         foreach (var entry in logs.Entries)
         {
@@ -40,6 +46,7 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
             entry.Message.ShouldNotContain(Code);
             entry.Message.ShouldNotContain(State);
             entry.Message.ShouldNotContain(hostState);
+            entry.Message.ShouldNotContain(broadcasterState);
             entry
                 .Properties.Values.Any(value =>
                     value is not null

@@ -20,6 +20,7 @@ public sealed class HostConfigService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostModAccessService modAccess,
     HostBotAccountAuthorizationService botAccounts,
+    IHostBroadcasterTokenStatusProvider broadcasters,
     WhisperQuotaService whisperQuota,
     HostedChannelRuntimeStatusService runtimeStatus,
     SiteAccessService siteAccess,
@@ -77,6 +78,7 @@ public sealed class HostConfigService(
                     canCreateHost,
                     false,
                     false,
+                    TwitchOperationsAuthorizationState.Missing,
                     null,
                     new StartupMessageConfiguration(false, string.Empty),
                     new CommandsConfiguration(string.Empty, null),
@@ -110,6 +112,11 @@ public sealed class HostConfigService(
             _ => throw new UnreachableException()
         );
         var botOverrideStatus = await botAccounts.GetStatusAsync(host.Id, ct);
+        var broadcasterStatus = await broadcasters.GetTokenStatusAsync(
+            host.Id,
+            HostBroadcasterAuthorizationService.MilestoneScopes,
+            ct
+        );
         var botOverrideSettings = await db
             .HostBotAccountSettings.AsNoTracking()
             .Where(x => x.HostId == host.Id)
@@ -133,6 +140,7 @@ public sealed class HostConfigService(
             canCreateHost,
             true,
             host.ChannelBotAuthorizedAtUtc is not null,
+            TwitchOperationsAuthorization(broadcasterStatus),
             status,
             startupMessages.EffectiveConfiguration(host),
             await commands.LoadAsync(host.Id, ct),
@@ -146,6 +154,19 @@ public sealed class HostConfigService(
             HostFeatureCatalog.Cards(host.EnabledFeatures),
             await modAccess.LoadAsync(host.Id, ct)
         );
+    }
+
+    private static TwitchOperationsAuthorizationState TwitchOperationsAuthorization(
+        TokenStatus status
+    )
+    {
+        return status switch
+        {
+            TokenStatus.Ready => TwitchOperationsAuthorizationState.Ready,
+            TokenStatus.Unavailable { Reason: AccessTokenUnavailableReason.MissingRefreshToken } =>
+                TwitchOperationsAuthorizationState.Missing,
+            _ => TwitchOperationsAuthorizationState.Stale,
+        };
     }
 
     private static BotAccountAuthorizationStatus DisabledBotOverrideStatus()

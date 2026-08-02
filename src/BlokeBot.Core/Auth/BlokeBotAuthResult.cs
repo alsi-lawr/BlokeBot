@@ -44,6 +44,7 @@ internal enum BlokeBotAuthRetryAction
     SignIn,
     BotAccount,
     ChannelBot,
+    Broadcaster,
     HostBot,
 }
 

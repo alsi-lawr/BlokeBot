@@ -208,7 +208,47 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     RegisterHostServices(services, dbFactory, changes);
                     break;
                 case EndpointScenario.BroadcasterAuthorization:
-                    RegisterBroadcasterServices(services, dbFactory, changes);
+                    RegisterBroadcasterServices(
+                        services,
+                        dbFactory,
+                        changes,
+                        "123",
+                        HostBroadcasterAuthorizationService.MilestoneScopes,
+                        null
+                    );
+                    break;
+                case EndpointScenario.BroadcasterWrongAccount:
+                    RegisterBroadcasterServices(
+                        services,
+                        dbFactory,
+                        changes,
+                        "999",
+                        HostBroadcasterAuthorizationService.MilestoneScopes,
+                        null
+                    );
+                    break;
+                case EndpointScenario.BroadcasterMissingPermission:
+                    RegisterBroadcasterServices(services, dbFactory, changes, "123", [], null);
+                    break;
+                case EndpointScenario.BroadcasterProviderNotValidated:
+                    RegisterBroadcasterServices(
+                        services,
+                        dbFactory,
+                        changes,
+                        "123",
+                        HostBroadcasterAuthorizationService.MilestoneScopes,
+                        HttpStatusCode.Unauthorized
+                    );
+                    break;
+                case EndpointScenario.BroadcasterTransportFailure:
+                    RegisterBroadcasterServices(
+                        services,
+                        dbFactory,
+                        changes,
+                        "123",
+                        HostBroadcasterAuthorizationService.MilestoneScopes,
+                        HttpStatusCode.InternalServerError
+                    );
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null);
@@ -289,13 +329,17 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         private static void RegisterBroadcasterServices(
             IServiceCollection services,
             SqliteBlokeBotDbFactory dbFactory,
-            HostedChannelChangeNotifier changes
+            HostedChannelChangeNotifier changes,
+            string grantUserId,
+            IReadOnlyList<string> grantedScopes,
+            HttpStatusCode? validationFailureStatus
         )
         {
             var http = new EndpointOAuthHttpClientFactory(
-                "123",
+                grantUserId,
                 "streamer",
-                HostBroadcasterAuthorizationService.MilestoneScopes
+                grantedScopes,
+                validationFailureStatus
             );
             var transport = new OAuthTransport(
                 http,
@@ -401,18 +445,23 @@ public abstract class BotOAuthEndpointIntegrationTestBase
     private protected sealed class EndpointOAuthHttpClientFactory(
         string userId,
         string login,
-        IReadOnlyList<string> scopes
+        IReadOnlyList<string> scopes,
+        HttpStatusCode? validationFailureStatus = null
     ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new(userId, login, scopes);
+        private readonly Handler _handler = new(userId, login, scopes, validationFailureStatus);
 
         public HttpClient CreateClient(string name)
         {
             return new(_handler, disposeHandler: false);
         }
 
-        private sealed class Handler(string userId, string login, IReadOnlyList<string> scopes)
-            : HttpMessageHandler
+        private sealed class Handler(
+            string userId,
+            string login,
+            IReadOnlyList<string> scopes,
+            HttpStatusCode? validationFailureStatus
+        ) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
@@ -427,6 +476,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                             {"access_token":"grant-token","refresh_token":"refresh","expires_in":3600}
                             """
                         ),
+                        "/oauth2/validate" when validationFailureStatus is { } status =>
+                            new HttpResponseMessage(status),
                         "/oauth2/validate" => JsonResponse(
                             JsonSerializer.Serialize(
                                 new
@@ -526,5 +577,9 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         HostMissingPermission,
         HostCustomBotDisabled,
         BroadcasterAuthorization,
+        BroadcasterWrongAccount,
+        BroadcasterMissingPermission,
+        BroadcasterProviderNotValidated,
+        BroadcasterTransportFailure,
     }
 }
