@@ -1,4 +1,3 @@
-using BlokeBot.Commands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

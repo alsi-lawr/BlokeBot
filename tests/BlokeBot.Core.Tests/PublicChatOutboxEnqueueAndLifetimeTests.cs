@@ -1,16 +1,9 @@
-using System.Collections.Immutable;
-using System.Diagnostics;
 using BlokeBot.Core.Features.PublicChat;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Auth;
-using BlokeBot.Twitch.Runtime;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Shouldly;
-using TUnit.Core;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Core.Tests;

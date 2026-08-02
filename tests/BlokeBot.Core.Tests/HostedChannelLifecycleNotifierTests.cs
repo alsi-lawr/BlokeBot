@@ -11,10 +11,8 @@ using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

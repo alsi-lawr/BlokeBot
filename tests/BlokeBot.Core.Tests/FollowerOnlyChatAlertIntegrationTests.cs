@@ -1,10 +1,6 @@
 using BlokeBot.Core.Features.Alerts;
-using BlokeBot.Core.Features.PublicChat;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Core.Tests;

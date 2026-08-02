@@ -1,6 +1,5 @@
 using System.Threading.Channels;
 using BlokeBot.Functional;
-using BlokeBot.Twitch.Auth;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 

@@ -1,14 +1,11 @@
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Game;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Toasts;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

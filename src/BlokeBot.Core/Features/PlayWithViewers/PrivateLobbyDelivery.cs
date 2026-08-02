@@ -1,4 +1,3 @@
-using BlokeBot.Commands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Persistence;
@@ -55,7 +54,7 @@ public sealed class TwitchPrivateLobbyDelivery(
         foreach (var recipient in recipients)
         {
             var tags = string.IsNullOrWhiteSpace(recipient.TwitchUserId)
-                ? new Dictionary<string, string>()
+                ? []
                 : new Dictionary<string, string> { ["user-id"] = recipient.TwitchUserId };
             var source = new ChatMessage(
                 recipient.Login,

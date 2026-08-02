@@ -1,5 +1,3 @@
-using BlokeBot.Twitch.Auth;
-
 namespace BlokeBot.Twitch.Auth.Tests;
 
 internal sealed class FakeOAuthClient : IOAuthClient

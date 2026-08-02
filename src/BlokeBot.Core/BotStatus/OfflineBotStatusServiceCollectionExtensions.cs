@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Core.BotStatus;
 
 internal static class OfflineBotStatusServiceCollectionExtensions

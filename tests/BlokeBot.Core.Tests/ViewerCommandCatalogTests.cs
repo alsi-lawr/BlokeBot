@@ -4,16 +4,13 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Core.Tests;

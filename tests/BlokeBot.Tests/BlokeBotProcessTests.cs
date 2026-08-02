@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Cli;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Tests;
 

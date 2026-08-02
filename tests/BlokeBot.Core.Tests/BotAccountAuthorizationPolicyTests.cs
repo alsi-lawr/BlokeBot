@@ -6,7 +6,6 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

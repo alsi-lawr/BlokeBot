@@ -1,16 +1,6 @@
 using System.Numerics;
-using BlokeBot.Commands;
-using BlokeBot.Core.Features.Commands;
-using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Points.Commands;
-using BlokeBot.Core.Features.Points.Configuration;
-using BlokeBot.Core.Features.Points.Dashboard;
-using BlokeBot.Core.Features.Points.Gambling;
-using BlokeBot.Core.Features.Points.Replies;
-using BlokeBot.Core.Features.Replies;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

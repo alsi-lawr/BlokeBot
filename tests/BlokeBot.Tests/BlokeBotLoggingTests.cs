@@ -3,7 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Tests;
 

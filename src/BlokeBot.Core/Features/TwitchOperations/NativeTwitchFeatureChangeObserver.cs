@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 
 namespace BlokeBot.Core.Features.TwitchOperations;
 

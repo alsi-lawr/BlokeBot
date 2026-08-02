@@ -15,7 +15,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Simulation.Tests;
 

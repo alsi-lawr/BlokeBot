@@ -17,18 +17,13 @@ using BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
 using BlokeBot.Core.Features.TwitchOperations.Shared;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
-using BlokeBot.Twitch.Runtime;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

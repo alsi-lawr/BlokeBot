@@ -1,12 +1,9 @@
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostConfig.StartupMessage;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

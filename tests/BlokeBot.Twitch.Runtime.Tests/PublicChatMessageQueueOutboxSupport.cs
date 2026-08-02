@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using BlokeBot.Twitch.Runtime;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 

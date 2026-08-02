@@ -1,6 +1,4 @@
 using System.Threading.Channels;
-using BlokeBot.Eventing;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
@@ -117,7 +115,7 @@ internal sealed class RecordingPublicChatLogger<TCategory> : ILogger<TCategory>
     {
         var properties = state is IEnumerable<KeyValuePair<string, object?>> values
             ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-            : new Dictionary<string, object?>();
+            : [];
         Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
     }
 }

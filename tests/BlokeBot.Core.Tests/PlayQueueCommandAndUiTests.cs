@@ -1,18 +1,15 @@
 using System.Security.Claims;
 using AngleSharp.Dom;
-using BlokeBot.Commands;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

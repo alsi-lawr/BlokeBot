@@ -2,7 +2,6 @@ using System.Diagnostics;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;

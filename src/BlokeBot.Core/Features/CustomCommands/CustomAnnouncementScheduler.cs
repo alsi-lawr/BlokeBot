@@ -3,10 +3,7 @@ using BlokeBot.Announcements;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Core.Features.CustomCommands;

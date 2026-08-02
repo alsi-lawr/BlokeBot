@@ -1,23 +1,10 @@
-using System.Numerics;
-using BlokeBot.Commands;
-using BlokeBot.Core.Features.Commands;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Commands;
-using BlokeBot.Core.Features.Points.Configuration;
-using BlokeBot.Core.Features.Points.Dashboard;
-using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Replies;
 using BlokeBot.Core.Features.Replies;
-using BlokeBot.Eventing;
-using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

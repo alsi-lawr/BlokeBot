@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 

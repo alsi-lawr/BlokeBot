@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;

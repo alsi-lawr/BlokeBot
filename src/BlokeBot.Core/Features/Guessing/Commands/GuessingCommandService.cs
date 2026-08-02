@@ -1,13 +1,10 @@
 using BlokeBot.Core.Features.Commands;
-using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Guessing.Rounds;
-using BlokeBot.Core.Features.Replies;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
-using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Guessing.Commands;

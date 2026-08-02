@@ -1,13 +1,10 @@
 using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.Guessing.Configuration;
-using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Core.Features.Replies;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

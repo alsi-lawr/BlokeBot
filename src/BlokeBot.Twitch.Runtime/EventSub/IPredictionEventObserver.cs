@@ -1,5 +1,3 @@
-using BlokeBot.Twitch;
-
 namespace BlokeBot.Twitch.Runtime;
 
 public interface IPredictionEventObserver

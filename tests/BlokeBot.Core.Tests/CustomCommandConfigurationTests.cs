@@ -1,10 +1,8 @@
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Overlays;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

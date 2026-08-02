@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using Microsoft.AspNetCore.Components;

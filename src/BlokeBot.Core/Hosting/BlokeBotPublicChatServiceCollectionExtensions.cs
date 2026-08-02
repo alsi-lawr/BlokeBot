@@ -1,9 +1,7 @@
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;

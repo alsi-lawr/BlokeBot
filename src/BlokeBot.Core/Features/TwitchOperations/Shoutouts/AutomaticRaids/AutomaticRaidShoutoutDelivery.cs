@@ -3,8 +3,6 @@ using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Auth;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 using TransportAnnouncementColor = BlokeBot.Twitch.TwitchAnnouncementColor;

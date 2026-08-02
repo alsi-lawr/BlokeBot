@@ -1,10 +1,8 @@
 using BlokeBot.Commands;
-using BlokeBot.Eventing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -209,7 +207,7 @@ public sealed class ChatActivityHookTests
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new LogEntry(formatter(state, exception), properties));
         }
     }

@@ -1,6 +1,5 @@
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

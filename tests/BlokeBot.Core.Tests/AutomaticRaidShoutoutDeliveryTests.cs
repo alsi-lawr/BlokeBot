@@ -2,11 +2,8 @@ using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Testing;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 
 namespace BlokeBot.Core.Tests;

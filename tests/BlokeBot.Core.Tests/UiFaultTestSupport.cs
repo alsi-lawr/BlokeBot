@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Tests;
@@ -47,7 +46,7 @@ internal sealed class RecordingLogger<TCategory> : ILogger<TCategory>
     {
         var properties = state is IEnumerable<KeyValuePair<string, object?>> values
             ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-            : new Dictionary<string, object?>();
+            : [];
         Entries.Add(new(logLevel, exception, formatter(state, exception), properties));
     }
 }

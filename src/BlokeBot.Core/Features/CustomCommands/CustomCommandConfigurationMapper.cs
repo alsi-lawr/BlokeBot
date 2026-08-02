@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using BlokeBot.Announcements;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.CustomCommands;

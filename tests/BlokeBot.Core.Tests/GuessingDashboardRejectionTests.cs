@@ -6,12 +6,10 @@ using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch.Runtime;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

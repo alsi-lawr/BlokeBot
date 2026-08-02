@@ -4,7 +4,6 @@ using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Toasts;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

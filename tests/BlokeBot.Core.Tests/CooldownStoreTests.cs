@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

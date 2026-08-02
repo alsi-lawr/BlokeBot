@@ -1,6 +1,4 @@
-using BlokeBot.Eventing;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Eventing.Tests;
 

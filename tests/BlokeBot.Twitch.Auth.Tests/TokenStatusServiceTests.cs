@@ -1,10 +1,8 @@
 using System.Net;
 using System.Text;
 using BlokeBot.Functional;
-using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 
@@ -439,7 +437,7 @@ public sealed class TokenStatusServiceTests
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }

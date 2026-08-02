@@ -1,19 +1,16 @@
 using System.Security.Claims;
-using BlokeBot.Core;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Admin.Authorization;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

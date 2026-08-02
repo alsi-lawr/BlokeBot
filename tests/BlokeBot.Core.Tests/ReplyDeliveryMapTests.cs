@@ -1,7 +1,5 @@
-using BlokeBot.Commands;
 using BlokeBot.Core.Features.Replies;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

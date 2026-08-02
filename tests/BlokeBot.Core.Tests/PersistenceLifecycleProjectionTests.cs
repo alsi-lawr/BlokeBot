@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

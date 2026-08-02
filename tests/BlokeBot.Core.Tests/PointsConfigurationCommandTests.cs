@@ -1,11 +1,9 @@
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Configuration;
 using BlokeBot.Core.Features.Points.Replies;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

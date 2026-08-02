@@ -1,7 +1,6 @@
 using BlokeBot.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Tests;
 

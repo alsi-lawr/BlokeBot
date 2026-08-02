@@ -3,12 +3,10 @@ using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

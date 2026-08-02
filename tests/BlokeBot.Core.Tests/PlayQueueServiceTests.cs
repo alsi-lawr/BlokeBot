@@ -1,9 +1,7 @@
 using BlokeBot.Core.Features.PlayWithViewers;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

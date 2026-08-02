@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using BlokeBot.Site;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -7,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Site.Tests;
 

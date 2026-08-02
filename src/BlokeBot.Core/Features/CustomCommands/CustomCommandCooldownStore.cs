@@ -1,5 +1,4 @@
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 

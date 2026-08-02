@@ -3,7 +3,7 @@
 card|src/BlokeBot.Core/Components/Pages/Error.razor|7|included|error-page-cards
 card|src/BlokeBot.Core/Components/Pages/NotFound.razor|5|included|not-found-page-cards
 card|src/BlokeBot.Core/Features/Admin/AdminPage.razor|37|included|admin-page-cards
-card|src/BlokeBot.Core/Features/Admin/Authorization/BotAccountAuthorizationSection.razor.cs|105|included|admin-authorization-disclosure-card
+card|src/BlokeBot.Core/Features/Admin/Authorization/BotAccountAuthorizationSection.razor.cs|67|included|admin-authorization-disclosure-card
 card|src/BlokeBot.Core/Features/Alerts/AlertsPage.razor|35|included|alerts-page-cards
 card|src/BlokeBot.Core/Features/Alerts/AlertsPage.razor|41|included|alerts-page-cards
 card|src/BlokeBot.Core/Features/Alerts/AlertsPage.razor|49|included|alerts-page-cards

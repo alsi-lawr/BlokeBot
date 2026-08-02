@@ -1,5 +1,3 @@
-using BlokeBot.Commands;
-
 namespace BlokeBot.Core.Features.CustomCommands;
 
 public sealed class CustomCommandModule(CustomCommandExecutionService execution)

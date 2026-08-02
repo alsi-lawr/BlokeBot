@@ -1,5 +1,4 @@
 using System.Threading.Channels;
-using BlokeBot.Eventing;
 using Shouldly;
 
 namespace BlokeBot.Twitch.Runtime.Tests;

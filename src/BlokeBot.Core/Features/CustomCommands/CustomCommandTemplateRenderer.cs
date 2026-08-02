@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using BlokeBot.Commands;
-using BlokeBot.Twitch;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 

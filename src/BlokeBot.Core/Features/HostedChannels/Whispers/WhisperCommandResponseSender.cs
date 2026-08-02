@@ -5,7 +5,6 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.HostedChannels.Whispers;
 

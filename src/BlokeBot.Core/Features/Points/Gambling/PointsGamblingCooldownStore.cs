@@ -1,5 +1,3 @@
-using BlokeBot.Twitch;
-
 namespace BlokeBot.Core.Features.Points.Gambling;
 
 public sealed class PointsGamblingCooldownStore(TimeProvider clock)

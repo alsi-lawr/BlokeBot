@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Twitch.Runtime;
 
 internal enum EventSubBroadcasterOperationKind

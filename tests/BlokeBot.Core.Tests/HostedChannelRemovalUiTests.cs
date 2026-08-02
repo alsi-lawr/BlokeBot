@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using Bunit;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

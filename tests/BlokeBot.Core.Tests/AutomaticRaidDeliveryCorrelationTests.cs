@@ -2,11 +2,8 @@ using System.Collections.Immutable;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Testing;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 using static BlokeBot.Core.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Core.Tests;

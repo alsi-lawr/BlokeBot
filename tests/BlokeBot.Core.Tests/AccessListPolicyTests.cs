@@ -3,11 +3,9 @@ using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Eventing;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

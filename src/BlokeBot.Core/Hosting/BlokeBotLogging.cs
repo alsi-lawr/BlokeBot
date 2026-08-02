@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace BlokeBot.Core.Hosting;
 
 internal static class BlokeBotLogging

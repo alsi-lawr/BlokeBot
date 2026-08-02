@@ -41,7 +41,6 @@ using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 

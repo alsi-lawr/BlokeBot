@@ -3,12 +3,9 @@ using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
-using BlokeBot.Core.Identity;
-using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Logging;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
@@ -221,7 +218,7 @@ public abstract class WhisperResponseTestBase
         {
             IReadOnlyDictionary<string, string> tags = includeUserId
                 ? new Dictionary<string, string> { ["user-id"] = userId }
-                : new Dictionary<string, string>();
+                : [];
             return new("viewer", "streamer", "!points", "raw", tags);
         }
 
@@ -435,7 +432,7 @@ public abstract class WhisperResponseTestBase
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
+                : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }

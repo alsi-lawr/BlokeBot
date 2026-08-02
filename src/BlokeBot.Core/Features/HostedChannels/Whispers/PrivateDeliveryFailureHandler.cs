@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace BlokeBot.Core.Features.HostedChannels.Whispers;
 
 public sealed record PrivateDeliveryFailureContext

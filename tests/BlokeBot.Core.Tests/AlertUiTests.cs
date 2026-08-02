@@ -1,6 +1,5 @@
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Alerts;
-using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -9,7 +8,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 

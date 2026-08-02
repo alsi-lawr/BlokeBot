@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Core.Features.Guessing.Rounds;
 using BlokeBot.Persistence.Models;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
