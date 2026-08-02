@@ -13,11 +13,11 @@
     <div class="mt-2 text-xs font-medium leading-5 text-slate-500">
         @if (IsBackgroundLoading)
         {
-            <p>Checking whether follower-only chat affects @BotAccountName.</p>
+            <p>Checking follower-only chat.</p>
         }
         else if (BackgroundError is not null || _presentation is null)
         {
-            <p>BlokeBot could not check follower-only chat for @BotAccountName.</p>
+            <p>Status unavailable.</p>
             <button class="control-surface mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="RecheckAsync">Recheck</button>
         }
         else
@@ -25,24 +25,24 @@
             @switch (_presentation.State)
             {
                 case FollowerOnlyChatSetupState.NotRequired:
-                    <p>Follower-only chat is off, so following is not required for @BotAccountName.</p>
+                    <p>Follower-only chat is off.</p>
                     break;
                 case FollowerOnlyChatSetupState.Exempt:
-                    <p>@BotAccountName is the broadcaster or a channel moderator, so Twitch exempts this bot from follower-only chat. Making the bot a moderator is the primary full-capability setup.</p>
+                    <p>@BotAccountName is exempt.</p>
                     break;
                 case FollowerOnlyChatSetupState.Eligible:
-                    <p>@BotAccountName follows this channel and can send under the current follower-only setting.</p>
+                    <p>@BotAccountName can chat.</p>
                     break;
                 case FollowerOnlyChatSetupState.Waiting:
-                    <p>@BotAccountName follows this channel, but Twitch will allow follower-only chat after @_presentation.EligibleAtUtc!.Value.ToLocalTime().ToString("g").</p>
+                    <p>@BotAccountName can chat after @_presentation.EligibleAtUtc!.Value.ToLocalTime().ToString("g").</p>
                     @ManualFollowActions
                     break;
                 case FollowerOnlyChatSetupState.NotFollowing:
-                    <p>@BotAccountName does not follow this channel. A Twitch VIP may also be exempt, but BlokeBot cannot verify VIP status and does not treat this follow result as proof the bot cannot send.</p>
+                    <p>@BotAccountName is not following.</p>
                     @ManualFollowActions
                     break;
                 case FollowerOnlyChatSetupState.ReconnectRequired:
-                    <p>BlokeBot needs permission to check whether @BotAccountName follows this channel. Reconnect this bot account to grant the required Twitch access.</p>
+                    <p>Reconnect @BotAccountName to check this status.</p>
                     <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
                                      Url="@ReconnectUrl"
                                      PopupName="blokebot-follower-only-oauth"
@@ -52,7 +52,7 @@
                     </AuthPopupButton>
                     break;
                 case FollowerOnlyChatSetupState.UnableToVerify:
-                    <p>BlokeBot could not verify whether follower-only chat affects @BotAccountName. Recheck after Twitch is available.</p>
+                    <p>Status unavailable.</p>
                     <button class="control-surface mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="RecheckAsync">Recheck</button>
                     break;
                 default:
@@ -69,6 +69,6 @@
            target="_blank"
            rel="noreferrer">Open Twitch channel</a>
         <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="RecheckAsync">Recheck</button>
-        <span class="basis-full">A person must sign in to Twitch as @BotAccountName and click Follow. BlokeBot cannot follow automatically.</span>
+        <span class="basis-full">Sign in to Twitch as @BotAccountName and follow this channel.</span>
     </div>;
 }

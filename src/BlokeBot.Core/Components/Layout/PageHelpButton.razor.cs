@@ -158,7 +158,11 @@ public partial class PageHelpButton
             new(
                 "Channel setup",
                 "Create your channel setup, let the bot chat in your stream, and start or stop it when you need.",
-                []
+                [
+                    "Chat access is the channel owner's approval for BlokeBot to operate in channel chat.",
+                    "Twitch integration is a separate owner connection. Reconnect it to replace the saved connection, or disconnect it to remove BlokeBot's stored authorization.",
+                    "The bot account is the Twitch identity that sends messages. Connecting one does not connect the other two.",
+                ]
             ),
             new(
                 "Moderator access",

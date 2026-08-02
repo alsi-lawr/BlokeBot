@@ -3,6 +3,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Hosts;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
 
@@ -126,7 +127,7 @@ public partial class HostConfigPage
         {
             _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(
-                    "Only the channel owner can change the Twitch chat connection.",
+                    "Only the channel owner can change Chat access.",
                     "Channel connection not changed"
                 )
             );
@@ -139,14 +140,127 @@ public partial class HostConfigPage
         );
     }
 
+    private Task DisconnectTwitchIntegrationAsync(int hostId) =>
+        ObserveUiOperationAsync(
+            nameof(DisconnectTwitchIntegrationAsync),
+            () => DisconnectTwitchIntegrationCoreAsync(hostId)
+        );
+
+    private async Task DisconnectTwitchIntegrationCoreAsync(int hostId)
+    {
+        var outcome = await AuthorizeAndDisconnectTwitchIntegrationAsync(hostId);
+        if (
+            outcome
+            is TwitchIntegrationDisconnectOutcome.AlreadyDisconnected
+                or TwitchIntegrationDisconnectOutcome.Cleared
+                or TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures
+                or TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation
+        )
+        {
+            await LoadCoreAsync();
+        }
+
+        PublishTwitchIntegrationDisconnectToast(outcome);
+    }
+
+    private async Task<TwitchIntegrationDisconnectOutcome> AuthorizeAndDisconnectTwitchIntegrationAsync(
+        int hostId
+    )
+    {
+        var pageContext = await LoadPageContextAsync();
+        var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (selectedHost?.Id != hostId)
+        {
+            return new TwitchIntegrationDisconnectOutcome.SelectedChannelChanged();
+        }
+        if (
+            !pageContext.Session.CanAuthorizeSelectedHost
+            || selectedHost.Role != AuthRole.Streamer
+            || !string.Equals(
+                selectedHost.Login,
+                pageContext.Session.Login,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return new TwitchIntegrationDisconnectOutcome.OwnerAuthorityRequired();
+        }
+
+        return (
+            await _hostBroadcasterAuthorization.ClearAsync(hostId, CancellationToken.None)
+        ).Match<TwitchIntegrationDisconnectOutcome>(
+            static _ => new TwitchIntegrationDisconnectOutcome.AlreadyDisconnected(),
+            static _ => new TwitchIntegrationDisconnectOutcome.Cleared(),
+            static failed => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures(
+                failed.FailureCount
+            ),
+            static escalation => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation(
+                escalation.ObserverFailureCount,
+                escalation.HandlingFailureCount
+            )
+        );
+    }
+
+    private void PublishTwitchIntegrationDisconnectToast(TwitchIntegrationDisconnectOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case TwitchIntegrationDisconnectOutcome.SelectedChannelChanged:
+                _toasts.Publish(
+                    ToastRequest<ErrorToastStrategy>.WithTitle(
+                        "Your selected channel changed. Choose the channel and try again.",
+                        "Twitch integration not disconnected"
+                    )
+                );
+                return;
+            case TwitchIntegrationDisconnectOutcome.OwnerAuthorityRequired:
+                _toasts.Publish(
+                    ToastRequest<ErrorToastStrategy>.WithTitle(
+                        "Only the channel owner can disconnect the Twitch integration.",
+                        "Twitch integration not disconnected"
+                    )
+                );
+                return;
+            case TwitchIntegrationDisconnectOutcome.AlreadyDisconnected:
+                _toasts.Publish(
+                    ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                        "The Twitch integration was already disconnected.",
+                        "Twitch integration disconnected"
+                    )
+                );
+                return;
+            case TwitchIntegrationDisconnectOutcome.Cleared:
+                _toasts.Publish(
+                    ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                        "The Twitch integration has been disconnected.",
+                        "Twitch integration disconnected"
+                    )
+                );
+                return;
+            case TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures:
+            case TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation:
+                _toasts.Publish(
+                    ToastRequest<WarningToastStrategy>.WithTitle(
+                        "The Twitch integration has been disconnected, but the running bot may need attention before it notices the change.",
+                        "Twitch integration disconnected"
+                    )
+                );
+                return;
+            default:
+                throw new UnreachableException();
+        }
+    }
+
     private async Task ClearChannelAuthorizationCoreAsync(int hostId)
     {
         await _channelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadCoreAsync();
         _toasts.Publish(
-            new ToastRequest<StatusToastStrategy>(
-                "The channel has been disconnected from Twitch chat."
-            )
+            new ToastRequest<StatusToastStrategy>("Chat access has been disconnected.")
         );
     }
 
@@ -239,7 +353,7 @@ public partial class HostConfigPage
         {
             HostedChannelRuntimeControlOutcome.HostNotFound => "Channel setup was not found.",
             HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired =>
-                "Connect the bot to Twitch chat before starting it.",
+                "Connect Chat access before starting the bot.",
             HostedChannelRuntimeControlOutcome.CustomBotNotReady =>
                 "Connect the custom bot account before starting it, or turn custom bot off.",
             HostedChannelRuntimeControlOutcome.Cooldown cooldown =>
@@ -265,4 +379,25 @@ public partial class HostConfigPage
         Starting,
         Stopping,
     }
+}
+
+internal abstract record TwitchIntegrationDisconnectOutcome
+{
+    private TwitchIntegrationDisconnectOutcome() { }
+
+    internal sealed record SelectedChannelChanged : TwitchIntegrationDisconnectOutcome;
+
+    internal sealed record OwnerAuthorityRequired : TwitchIntegrationDisconnectOutcome;
+
+    internal sealed record AlreadyDisconnected : TwitchIntegrationDisconnectOutcome;
+
+    internal sealed record Cleared : TwitchIntegrationDisconnectOutcome;
+
+    internal sealed record ClearedWithNotificationFailures(int FailureCount)
+        : TwitchIntegrationDisconnectOutcome;
+
+    internal sealed record ClearedWithNotificationEscalation(
+        int ObserverFailureCount,
+        int HandlingFailureCount
+    ) : TwitchIntegrationDisconnectOutcome;
 }
