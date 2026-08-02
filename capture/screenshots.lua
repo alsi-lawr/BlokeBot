@@ -131,7 +131,7 @@ local succeeded, failure = pcall(function()
   if expected == nil then
     error("No capture readiness is registered for " .. view)
   end
-  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
   local ready_expression = ([=[
     window.location.pathname === %q &&

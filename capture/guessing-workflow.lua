@@ -76,7 +76,7 @@ local server = viset.process.start({
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
-  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[

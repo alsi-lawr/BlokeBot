@@ -19,7 +19,7 @@ project:
   license: MIT
   inceptionYear: "2026"
   links:
-    homepage: https://blokegeezington.com/blokebot/
+    homepage: https://www.blokebot.com/
     documentation: https://github.com/alsi-lawr/BlokeBot/blob/v{{projectVersion}}/README.md
     license: https://github.com/alsi-lawr/BlokeBot/blob/v{{projectVersion}}/LICENSE
     bugTracker: https://github.com/alsi-lawr/BlokeBot/issues

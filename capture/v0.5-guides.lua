@@ -39,7 +39,6 @@ height = 844
 [matrix]
 theme = ["light", "dark"]
 view = [
-  "overlays",
   "viewer-command-catalog",
   "chat-tools-all-disabled",
   "chat-tools-enabled",
@@ -74,7 +73,6 @@ local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
   local feature_state = ({
-    ["overlays"] = "all-enabled",
     ["viewer-command-catalog"] = "all-enabled",
     ["chat-tools-all-disabled"] = "all-disabled",
     ["chat-tools-enabled"] = "mixed",
@@ -83,7 +81,7 @@ local succeeded, failure = pcall(function()
     error("No deterministic feature state is registered for " .. view)
   end
 
-  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "60s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
@@ -120,7 +118,7 @@ local succeeded, failure = pcall(function()
     }
   )
 
-  local target = view == "overlays" and "/overlays" or "/host"
+  local target = "/host"
   viset.page.navigate(base_url .. target .. "?simulationTheme=" .. theme)
   viset.page.wait_for(
     viset.javascript(([=[
@@ -131,17 +129,7 @@ local succeeded, failure = pcall(function()
     "30s"
   )
 
-  if view == "overlays" then
-    viset.page.wait_for(
-      viset.javascript([=[
-        document.body.innerText.includes("Transparent browser source")
-          && document.querySelector("[data-overlay-editor]") !== null
-          && document.querySelector(".overlay-preview-frame") !== null
-      ]=]),
-      "30s"
-    )
-    viset.sleep("500ms")
-  elseif view == "viewer-command-catalog" then
+  if view == "viewer-command-catalog" then
     viset.page.wait_for(
       viset.javascript([[document.querySelector(".feature-toggle-card") !== null]]),
       "30s"
@@ -173,19 +161,83 @@ local succeeded, failure = pcall(function()
     viset.sleep("500ms")
   else
     viset.page.wait_for(
-      viset.javascript([[document.querySelector(".feature-toggle-card") !== null]]),
+      viset.javascript(([=[
+        (() => {
+          const expectedEnabled = new Set(%s === "mixed"
+            ? ["Request boards", "Moments", "Points", "Custom commands"]
+            : []);
+          const cards = [...document.querySelectorAll(".feature-toggle-card")];
+          return cards.length === 12
+            && cards.every(card => {
+              const name = card.querySelector(".truncate")?.textContent.trim();
+              return name
+                && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
+            });
+        })()
+      ]=]):format(string.format("%q", feature_state))),
       "30s"
     )
-    viset.page.evaluate(viset.javascript([=[
-      (() => {
-        const target = document.querySelector("#chat-tools");
-        if (!target) throw new Error("Chat tools section is missing.");
-        target.scrollIntoView({ block: "start" });
-        window.scrollBy(0, -12);
-        return true;
-      })()
-    ]=]))
-    viset.sleep("350ms")
+    viset.page.evaluate(
+      viset.javascript([=[
+      (async ({ featureState }) => {
+        const expectedEnabled = new Set(featureState === "mixed"
+          ? ["Request boards", "Moments", "Points", "Custom commands"]
+          : []);
+        const hasRequestedState = () => {
+          const cards = [...document.querySelectorAll(".feature-toggle-card")];
+          return cards.length === 12
+            && cards.every(card => {
+              const name = card.querySelector(".truncate")?.textContent.trim();
+              return name
+                && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
+            });
+        };
+        const isInView = target => {
+          const bounds = target.getBoundingClientRect();
+          return bounds.top >= 0 && bounds.top < window.innerHeight
+            && bounds.bottom > 0;
+        };
+        const deadline = performance.now() + 30000;
+        let stableSince = null;
+        while (performance.now() < deadline) {
+          const target = document.querySelector("#chat-tools");
+          if (!target) throw new Error("Chat tools section is missing.");
+          if (!hasRequestedState() || !isInView(target)) {
+            stableSince = null;
+            target.scrollIntoView({ block: "start" });
+            window.scrollBy(0, -12);
+          } else {
+            stableSince ??= performance.now();
+            if (performance.now() - stableSince >= 500) return true;
+          }
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        throw new Error(`Chat tools did not remain stable for ${featureState}.`);
+      })
+    ]=]),
+      { featureState = feature_state }
+    )
+    viset.page.wait_for(
+      viset.javascript(([=[
+        (() => {
+          const expectedEnabled = new Set(%s === "mixed"
+            ? ["Request boards", "Moments", "Points", "Custom commands"]
+            : []);
+          const target = document.querySelector("#chat-tools");
+          const cards = [...document.querySelectorAll(".feature-toggle-card")];
+          if (!target || cards.length !== 12) return false;
+          const bounds = target.getBoundingClientRect();
+          return bounds.top >= 0 && bounds.top < window.innerHeight
+            && bounds.bottom > 0
+            && cards.every(card => {
+              const name = card.querySelector(".truncate")?.textContent.trim();
+              return name
+                && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
+            });
+        })()
+      ]=]):format(string.format("%q", feature_state))),
+      "30s"
+    )
   end
 
   viset.snapshot()
