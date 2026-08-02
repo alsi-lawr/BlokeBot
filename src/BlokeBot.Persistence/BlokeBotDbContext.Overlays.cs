@@ -11,6 +11,12 @@ public sealed partial class BlokeBotDbContext
         PersistedEnumTokens<OverlayInstanceEventKind>.Values.ToArray();
     private static readonly string[] _overlayCueQueuePolicies =
         PersistedEnumTokens<OverlayCueQueuePolicy>.Values.ToArray();
+    private static readonly string[] _overlayEventFeedKinds =
+        PersistedEnumTokens<OverlayEventFeedKind>.Values.ToArray();
+    private static readonly string[] _overlayEventFeedPriorities =
+        PersistedEnumTokens<OverlayEventFeedPriority>.Values.ToArray();
+    private static readonly string[] _overlayEventFeedLifecycles =
+        PersistedEnumTokens<OverlayEventFeedLifecycle>.Values.ToArray();
 
     private static void ConfigureOverlays(ModelBuilder modelBuilder)
     {
@@ -212,6 +218,83 @@ public sealed partial class BlokeBotDbContext
                 .HasForeignKey(x => new { x.AssetId, x.HostId })
                 .HasPrincipalKey(x => new { x.Id, x.HostId })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OverlayEventFeedItem>(b =>
+        {
+            b.ToTable(
+                "overlay_event_feed_items",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Kind",
+                        KindIn("Kind", _overlayEventFeedKinds)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Priority",
+                        KindIn("Priority", _overlayEventFeedPriorities)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Lifecycle",
+                        KindIn("Lifecycle", _overlayEventFeedLifecycles)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_SourceKey",
+                        "length(SourceKey) BETWEEN 1 AND 160"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Text",
+                        "length(Title) BETWEEN 1 AND 160 AND length(Body) >= 1"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_overlay_event_feed_items_Duration",
+                        "DurationSeconds BETWEEN 1 AND 30"
+                    );
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayEventFeedKind>.Format(value),
+                    value => PersistedEnumTokens<OverlayEventFeedKind>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.Priority)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayEventFeedPriority>.Format(value),
+                    value => PersistedEnumTokens<OverlayEventFeedPriority>.Parse(value)
+                )
+                .HasMaxLength(16);
+            b.Property(x => x.Lifecycle)
+                .HasConversion(
+                    value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Format(value),
+                    value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Parse(value)
+                )
+                .HasMaxLength(16);
+            b.Property(x => x.SourceKey).HasMaxLength(160);
+            b.Property(x => x.Title).HasMaxLength(160);
+            b.HasIndex(x => new
+                {
+                    x.OverlayInstanceId,
+                    x.Kind,
+                    x.SourceKey,
+                })
+                .IsUnique();
+            b.HasIndex(x => new
+            {
+                x.HostId,
+                x.OverlayInstanceId,
+                x.Lifecycle,
+                x.EnqueuedAtUtc,
+            });
+            b.HasOne(x => x.OverlayInstance)
+                .WithMany()
+                .HasForeignKey(x => x.OverlayInstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -15,8 +16,14 @@ using PointMutationResult = BlokeBot.Functional.Result<
 
 namespace BlokeBot.Core.Features.Points.Balances;
 
-public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbFactory)
+public sealed class PointBalanceService(
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    IEnumerable<IOverlayEventPresenter> eventPresenters
+)
 {
+    public PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbFactory)
+        : this(dbFactory, []) { }
+
     public async Task<PointBalanceEntry> GetBalanceAsync(
         int hostId,
         string login,
@@ -134,6 +141,33 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        var ledgerId = db
+            .ChangeTracker.Entries<PointLedgerEntry>()
+            .Single(entry => entry.Entity.Kind == PointLedgerKind.Add)
+            .Entity.Id;
+        var pointLabel =
+            await db
+                .PointsSettings.AsNoTracking()
+                .Where(x => x.HostId == hostId)
+                .Select(x => x.PointLabel)
+                .SingleOrDefaultAsync(ct)
+            ?? "points";
+        foreach (var presenter in eventPresenters)
+        {
+            await presenter.PresentAsync(
+                new OverlayEventPresentation.PointAward
+                {
+                    HostId = hostId,
+                    SourceKey = ledgerId.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture
+                    ),
+                    Recipient = target.Login,
+                    Amount = amount.ToDisplayString(),
+                    PointLabel = pointLabel,
+                },
+                ct
+            );
+        }
         return Success(next, amount);
     }
 

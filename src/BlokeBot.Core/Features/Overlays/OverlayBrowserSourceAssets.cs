@@ -56,14 +56,16 @@ internal static class OverlayBrowserSourceAssets
         }
 
         .guessing-card,
-        .giveaway-card {
+        .giveaway-card,
+        .event-feed-card {
           fill: rgba(15, 23, 42, 0.94);
           stroke: rgba(148, 163, 184, 0.72);
           stroke-width: 2;
         }
 
         .guessing-accent,
-        .giveaway-accent {
+        .giveaway-accent,
+        .event-feed-accent {
           fill: #60a5fa;
         }
 
@@ -82,6 +84,30 @@ internal static class OverlayBrowserSourceAssets
           fill: #f8fafc;
           font-family: ui-sans-serif, system-ui, sans-serif;
         }
+
+        .event-feed-kicker,
+        .event-feed-title {
+          fill: #f8fafc;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        .event-feed-kicker { fill: #93c5fd; font-size: 28px; font-weight: 800; letter-spacing: 4px; }
+        .event-feed-title { font-size: 48px; font-weight: 800; }
+        .event-feed-body-host { overflow: visible; }
+        .event-feed-body {
+          box-sizing: border-box;
+          width: 100%;
+          margin: 0;
+          color: #cbd5e1;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+          font-size: 32px;
+          font-weight: 600;
+          line-height: 44px;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+        #overlay-root[data-animation="card"] .event-feed-presentation,
+        #overlay-root[data-animation="sample"] .event-feed-presentation { animation: event-feed-card 520ms cubic-bezier(0.22, 1, 0.36, 1); }
+        @keyframes event-feed-card { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
 
         .giveaway-kicker {
           fill: #93c5fd;
@@ -184,6 +210,7 @@ internal static class OverlayBrowserSourceAssets
         @media (prefers-reduced-motion: reduce) {
           #overlay-root[data-animation] .guessing-presentation,
           #overlay-root[data-animation] .giveaway-presentation,
+          #overlay-root[data-animation] .event-feed-presentation,
           #overlay-root[data-test-pulse="active"] #overlay-canvas {
             animation: none;
           }
@@ -293,6 +320,22 @@ internal static class OverlayBrowserSourceAssets
                 text,
               ),
             );
+          };
+
+          const createEventFeedBody = (text) => {
+            const host = svgElement("foreignObject", {
+              class: "event-feed-body-host",
+              x: "-10000",
+              y: "166",
+              width: "1488",
+              height: "10000",
+              visibility: "hidden",
+            });
+            const body = document.createElement("div");
+            body.setAttribute("class", "event-feed-body");
+            body.textContent = text;
+            host.append(body);
+            return { host, body };
           };
 
           const validGuessingState = (state) => {
@@ -555,6 +598,57 @@ internal static class OverlayBrowserSourceAssets
             }
           };
 
+          const validEventFeedState = (state) => {
+            if (typeof state !== "object" || state === null || !Array.isArray(state.pending)) return false;
+            const validCard = (card) =>
+              typeof card === "object" &&
+              card !== null &&
+              Number.isSafeInteger(card.id) &&
+              card.id >= 0 &&
+              (card.kind === "pointAward" ||
+                card.kind === "guessingWinner" ||
+                card.kind === "giveawayWinner") &&
+              (card.priority === "normal" || card.priority === "high") &&
+              typeof card.title === "string" &&
+              typeof card.body === "string" &&
+              typeof card.enqueuedAtUtc === "string" &&
+              (card.displayDeadlineUtc === null ||
+                typeof card.displayDeadlineUtc === "string");
+            return (
+              (state.active === null || validCard(state.active)) &&
+              state.pending.every(validCard)
+            );
+          };
+
+          const renderEventFeed = (state) => {
+            canvas.replaceChildren();
+            const card = state.active;
+            if (card === null) return;
+            const eventFeedBody = createEventFeedBody(card.body);
+            canvas.append(eventFeedBody.host);
+            const bodyHeight = Math.max(44, Math.ceil(eventFeedBody.body.scrollHeight));
+            eventFeedBody.host.remove();
+            eventFeedBody.host.setAttribute("x", "56");
+            eventFeedBody.host.setAttribute("height", String(bodyHeight));
+            eventFeedBody.host.removeAttribute("visibility");
+            const naturalHeight = Math.max(270, 206 + bodyHeight);
+            const maximumCardHeight = 900;
+            const scale = Math.min(1, maximumCardHeight / naturalHeight);
+            const group = svgElement("g", {
+              class: "event-feed-presentation",
+              transform: `translate(160 960) scale(${scale}) translate(0 ${-naturalHeight})`,
+              "data-source-card-id": String(card.id),
+            });
+            group.append(
+              svgElement("rect", { class: "event-feed-card", x: "0", y: "0", width: "1600", height: String(naturalHeight), rx: "30" }),
+              svgElement("rect", { class: "event-feed-accent", x: "0", y: "0", width: "16", height: String(naturalHeight), rx: "8" }),
+            );
+            appendText(group, "event-feed-kicker", 56, 58, card.kind.replace(/([A-Z])/g, " $1").toUpperCase());
+            appendText(group, "event-feed-title", 56, 128, card.title);
+            group.append(eventFeedBody.host);
+            canvas.append(group);
+          };
+
           const applyAnimation = (animation, durationMilliseconds) => {
             if (presentationAnimationTimer !== null) {
               window.clearTimeout(presentationAnimationTimer);
@@ -565,6 +659,8 @@ internal static class OverlayBrowserSourceAssets
               animation !== "statusChange" &&
               animation !== "result" &&
               animation !== "winner"
+              && animation !== "card"
+              && animation !== "sample"
             ) {
               delete root.dataset.animation;
               return;
@@ -640,6 +736,10 @@ internal static class OverlayBrowserSourceAssets
                   : "none",
                 projection.winnerAnimationDurationMilliseconds,
               );
+            } else if (projection.overlayType === "eventFeed") {
+              if (!validEventFeedState(projection.state)) return false;
+              renderEventFeed(projection.state);
+              applyAnimation(typeof projection.animation === "string" ? projection.animation : "none", 700);
             } else {
               return false;
             }

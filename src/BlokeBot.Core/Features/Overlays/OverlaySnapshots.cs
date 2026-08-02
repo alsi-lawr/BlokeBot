@@ -20,6 +20,12 @@ public interface IOverlayStateProvider
         CancellationToken cancellationToken
     ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
 
+    Task<OverlaySnapshotProjection> ProjectEventFeedSampleAsync(
+        ResolvedOverlayInstance instance,
+        OverlayEventFeedKind kind,
+        CancellationToken cancellationToken
+    ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
+
     Task<OverlaySnapshotProjection> ProjectSampleAsync(
         ResolvedOverlayInstance instance,
         GiveawayOverlaySampleState sample,
@@ -56,6 +62,9 @@ public abstract record OverlaySnapshotProjection
         : OverlaySnapshotProjection;
 
     public sealed record GiveawayV1(GiveawayV1OverlaySnapshot Snapshot) : OverlaySnapshotProjection;
+
+    public sealed record EventFeedV1(EventFeedV1OverlaySnapshot Snapshot)
+        : OverlaySnapshotProjection;
 
     public sealed record Unavailable : OverlaySnapshotProjection;
 }
@@ -126,6 +135,17 @@ public sealed record GiveawayV1OverlaySnapshot
     public int WinnerAnimationDurationMilliseconds => 5000;
 
     public required GiveawayV1OverlayPresentationState State { get; init; }
+}
+
+public sealed record EventFeedV1OverlaySnapshot
+{
+    public string OverlayType => "eventFeed";
+    public int SchemaVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+    public required string Animation { get; init; }
+    public required EventFeedStatePresentation State { get; init; }
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
@@ -276,7 +296,8 @@ internal sealed class OverlayServerEpoch
 internal sealed class OverlayStateProvider(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     OverlayServerEpoch serverEpoch,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    OverlayEventFeedService? eventFeed = null
 ) : IOverlayStateProvider
 {
     public async Task<OverlaySnapshotProjection> ProjectAsync(
@@ -289,6 +310,30 @@ internal sealed class OverlayStateProvider(
         if (instance is { Type: OverlayType.Empty, Configuration: OverlayConfiguration.EmptyV1 })
         {
             return Empty(instance);
+        }
+
+        if (
+            instance is
+            { Type: OverlayType.EventFeed, Configuration: OverlayConfiguration.EventFeedV1 }
+        )
+        {
+            if (eventFeed is null)
+            {
+                return new OverlaySnapshotProjection.Unavailable();
+            }
+            var state = await eventFeed.ReadAsync(instance, cancellationToken);
+            return state is null
+                ? new OverlaySnapshotProjection.Unavailable()
+                : new OverlaySnapshotProjection.EventFeedV1(
+                    new EventFeedV1OverlaySnapshot
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = instance.Revision.Value,
+                        GeneratedAtUtc = timeProvider.GetUtcNow(),
+                        Animation = "none",
+                        State = state,
+                    }
+                );
         }
 
         if (
@@ -451,6 +496,91 @@ internal sealed class OverlayStateProvider(
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
         return Guessing(instance, configuration, state);
+    }
+
+    public async Task<OverlaySnapshotProjection> ProjectEventFeedSampleAsync(
+        ResolvedOverlayInstance instance,
+        OverlayEventFeedKind kind,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            instance
+                is not {
+                    Type: OverlayType.EventFeed,
+                    Configuration: OverlayConfiguration.EventFeedV1 configuration
+                }
+            || !await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.EventFeed,
+                cancellationToken
+            )
+        )
+        {
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+        OverlayEventPresentation sample = kind switch
+        {
+            OverlayEventFeedKind.PointAward => new OverlayEventPresentation.PointAward
+            {
+                HostId = instance.HostId,
+                SourceKey = "sample-point",
+                Recipient = "nightowl",
+                Amount = "250",
+                PointLabel = "points",
+            },
+            OverlayEventFeedKind.GuessingWinner => new OverlayEventPresentation.GuessingWinner
+            {
+                HostId = instance.HostId,
+                SourceKey = "sample-guess",
+                RoundName = "Which team wins?",
+                WinningAnswer = "Blue",
+                Winners = ["nightowl", "newviewer"],
+                Amount = "250",
+                PointLabel = "points",
+            },
+            OverlayEventFeedKind.GiveawayWinner => new OverlayEventPresentation.GiveawayWinner
+            {
+                HostId = instance.HostId,
+                SourceKey = "sample-giveaway",
+                Winners = ["nightowl", "newviewer"],
+                Prizes = ["500 points", "250 points"],
+                PointLabel = "points",
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        var kindConfiguration = configuration.Kinds[kind];
+        var now = timeProvider.GetUtcNow();
+        return new OverlaySnapshotProjection.EventFeedV1(
+            new EventFeedV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = now,
+                Animation = "sample",
+                State = new EventFeedStatePresentation(
+                    new EventFeedCardPresentation(
+                        0,
+                        PersistedEnumTokens<OverlayEventFeedKind>.Format(kind),
+                        PersistedEnumTokens<OverlayEventFeedPriority>.Format(
+                            kindConfiguration.Priority
+                        ),
+                        kind switch
+                        {
+                            OverlayEventFeedKind.PointAward => "Points awarded",
+                            OverlayEventFeedKind.GuessingWinner => "Guessing winner",
+                            _ => "Giveaway winner",
+                        },
+                        EventFeedProjectionText.DecodeOnce(
+                            EventFeedTemplateRenderer.Render(kindConfiguration, sample)
+                        ),
+                        now,
+                        now.AddSeconds(kindConfiguration.DurationSeconds)
+                    ),
+                    []
+                ),
+            }
+        );
     }
 
     public async Task<OverlaySnapshotProjection> ProjectSampleAsync(

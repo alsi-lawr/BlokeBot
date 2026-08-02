@@ -165,6 +165,7 @@ internal static class OverlayBrowserSourceEndpoints
                         OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(
                             giveaway.Snapshot
                         ),
+                        OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
                         _ => Unavailable(),
                     };
                 }
@@ -285,6 +286,14 @@ internal static class OverlayBrowserSourceEndpoints
                             suffix =
                                 $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(giveawaySample))}";
                         }
+                        else if (
+                            resolved.Instance.Type is OverlayType.EventFeed
+                            && TryParseEventFeedSample(sampleValue, out var eventKind)
+                        )
+                        {
+                            suffix =
+                                $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(eventKind))}";
+                        }
                     }
                     return Results.Text(
                         OverlayBrowserSourceDocument.Render(
@@ -342,6 +351,19 @@ internal static class OverlayBrowserSourceEndpoints
                                 cancellationToken
                             )
                         : representative
+                        && resolved.Instance.Type is OverlayType.EventFeed
+                        && TryParseEventFeedSample(
+                            context.Request.Query["sample"],
+                            out var eventKind
+                        )
+                            ? await ProjectSampleSafelyAsync(
+                                stateProvider,
+                                resolved.Instance,
+                                eventKind,
+                                context.RequestServices,
+                                cancellationToken
+                            )
+                        : representative
                         && resolved.Instance.Type is OverlayType.Giveaway
                         && TryParseGiveawaySample(
                             context.Request.Query["sample"],
@@ -372,6 +394,7 @@ internal static class OverlayBrowserSourceEndpoints
                         OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(
                             giveaway.Snapshot
                         ),
+                        OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
                         _ => Unavailable(),
                     };
                 }
@@ -666,6 +689,59 @@ internal static class OverlayBrowserSourceEndpoints
     private static async Task<OverlaySnapshotProjection> ProjectSampleSafelyAsync(
         IOverlayStateProvider stateProvider,
         ResolvedOverlayInstance instance,
+        OverlayEventFeedKind kind,
+        IServiceProvider services,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            return await stateProvider.ProjectEventFeedSampleAsync(
+                instance,
+                kind,
+                cancellationToken
+            );
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            services
+                .GetRequiredService<ILogger<OverlayBrowserSourceLog>>()
+                .LogWarning(
+                    exception,
+                    "An event feed overlay preview sample could not be projected."
+                );
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+    }
+
+    private static bool TryParseEventFeedSample(string? value, out OverlayEventFeedKind kind)
+    {
+        kind = value switch
+        {
+            "point-award" => OverlayEventFeedKind.PointAward,
+            "guessing-winner" => OverlayEventFeedKind.GuessingWinner,
+            "giveaway-winner" => OverlayEventFeedKind.GiveawayWinner,
+            _ => (OverlayEventFeedKind)(-1),
+        };
+        return Enum.IsDefined(kind);
+    }
+
+    private static string SampleToken(OverlayEventFeedKind kind) =>
+        kind switch
+        {
+            OverlayEventFeedKind.PointAward => "point-award",
+            OverlayEventFeedKind.GuessingWinner => "guessing-winner",
+            OverlayEventFeedKind.GiveawayWinner => "giveaway-winner",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+    private static async Task<OverlaySnapshotProjection> ProjectSampleSafelyAsync(
+        IOverlayStateProvider stateProvider,
+        ResolvedOverlayInstance instance,
         GiveawayOverlaySampleState sample,
         IServiceProvider services,
         CancellationToken cancellationToken
@@ -872,6 +948,8 @@ internal static class OverlayBrowserSourceEndpoints
                                     or OverlayLiveTransportMessage.CuePlayerBaseline
                                     or OverlayLiveTransportMessage.GiveawayBaseline
                                     or OverlayLiveTransportMessage.GiveawayEvent
+                                    or OverlayLiveTransportMessage.EventFeedBaseline
+                                    or OverlayLiveTransportMessage.EventFeedEvent
                                     or OverlayLiveTransportMessage.Cue
                                     or OverlayLiveTransportMessage.CueStop
                             && !live.MaySend(connection)
@@ -895,6 +973,10 @@ internal static class OverlayBrowserSourceEndpoints
                             OverlayLiveTransportMessage.GiveawayBaseline baseline =>
                                 JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.GiveawayEvent publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.EventFeedBaseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.EventFeedEvent publication =>
                                 JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.Cue publication => JsonSerializer.Serialize(
                                 publication.Envelope,

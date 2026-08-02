@@ -12,7 +12,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class GiveawayOverlayMigrationTests
 {
     private const string _previousMigration = "20260731064005_v0.6.0_CustomCommandOverlayCues";
-    private const string _latestMigration = "20260731083003_v0.6.0_GiveawayOverlay";
+    private const string _latestMigration = "20260731110140_v0.6.0_EventFeedOverlay";
 
     [Test]
     public async Task Upgrade_PreservesExistingOverlayTypesAndAllowsGiveawayRows()
@@ -42,7 +42,7 @@ public sealed class GiveawayOverlayMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(18);
+        upgraded.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(19);
         (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);
@@ -73,7 +73,7 @@ public sealed class GiveawayOverlayMigrationTests
                 .ToArrayAsync()
         ).ShouldBe([OverlayType.CuePlayer, OverlayType.Giveaway]);
         (await ReadOverlayTableSqlAsync(upgraded.Database.GetDbConnection())).ShouldContain(
-            "Type IN ('cue-player', 'empty', 'giveaway', 'guessing')"
+            "Type IN ('cue-player', 'empty', 'event-feed', 'giveaway', 'guessing')"
         );
     }
 

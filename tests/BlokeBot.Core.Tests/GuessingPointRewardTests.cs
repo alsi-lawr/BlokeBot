@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Guessing.Rounds;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
@@ -92,7 +93,8 @@ public sealed class GuessingPointRewardTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedRoundAsync(dbFactory, "0");
-        var service = RoundService(dbFactory);
+        var presenter = new RecordingEventPresenter();
+        var service = RoundService(dbFactory, presenter);
 
         var outcome = await service
             .DeclareWinner(seed.HostId, "blue")
@@ -104,6 +106,27 @@ public sealed class GuessingPointRewardTests
         result.Message.ShouldBe("blue wins. Correct guesses: one, three.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
+        var presentation = presenter
+            .Presentations.ShouldHaveSingleItem()
+            .ShouldBeOfType<OverlayEventPresentation.GuessingWinner>();
+        presentation.Winners.ShouldBe(["one", "three"]);
+        presentation.Amount.ShouldBe("0");
+    }
+
+    [Test]
+    public async Task NoCorrectGuesses_DeclaringWinnerPublishesNoEventFeedCard()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedRoundAsync(dbFactory, "0");
+        var presenter = new RecordingEventPresenter();
+        var service = RoundService(dbFactory, presenter);
+
+        var outcome = await service
+            .DeclareWinner(seed.HostId, "green")
+            .RunAsync(CancellationToken.None);
+
+        outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>();
+        presenter.Presentations.ShouldBeEmpty();
     }
 
     [Test]
@@ -154,12 +177,16 @@ public sealed class GuessingPointRewardTests
         (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
     }
 
-    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
+    private static GuessingRoundService RoundService(
+        SqliteBlokeBotDbFactory dbFactory,
+        IOverlayEventPresenter? presenter = null
+    ) =>
         new(
             dbFactory,
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
-            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            presenter is null ? [] : [presenter]
         );
 
     private static async Task<RoundSeed> SeedRoundAsync(
@@ -194,6 +221,7 @@ public sealed class GuessingPointRewardTests
             [
                 new GuessOption { Name = "blue", ReplyText = "Blue" },
                 new GuessOption { Name = "red", ReplyText = "Red" },
+                new GuessOption { Name = "green", ReplyText = "Green" },
             ],
         };
         db.Profiles.Add(profile);
@@ -234,4 +262,19 @@ public sealed class GuessingPointRewardTests
     }
 
     private sealed record RoundSeed(int HostId, int ProfileId, int RoundId);
+
+    private sealed class RecordingEventPresenter : IOverlayEventPresenter
+    {
+        internal List<OverlayEventPresentation> Presentations { get; } = [];
+
+        public Task PresentAsync(
+            OverlayEventPresentation presentation,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Presentations.Add(presentation);
+            return Task.CompletedTask;
+        }
+    }
 }

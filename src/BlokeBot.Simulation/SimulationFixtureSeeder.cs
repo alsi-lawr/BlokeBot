@@ -19,6 +19,8 @@ internal sealed class SimulationFixtureSeeder(
     internal const string CuePlayerAccessKey = "simulation-cue-player-access-key-000000000000";
     internal const string GiveawayOverlayAccessKey =
         "simulation-giveaway-overlay-key-0000000000000";
+    internal const string EventFeedOverlayAccessKey =
+        "simulation-event-feed-overlay-key-000000000000";
 
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
@@ -67,6 +69,60 @@ internal sealed class SimulationFixtureSeeder(
         CancellationToken cancellationToken
     )
     {
+        if (
+            !await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("6fd2b259-4308-4ab3-995c-4029c22f7354"),
+                cancellationToken
+            )
+        )
+        {
+            var feed = new OverlayInstance
+            {
+                PublicId = Guid.Parse("6fd2b259-4308-4ab3-995c-4029c22f7354"),
+                HostId = hostId,
+                Name = "Channel event feed",
+                Type = OverlayType.EventFeed,
+                IsEnabled = true,
+                ConfigurationJson =
+                    """{"schemaVersion":1,"capacity":10,"overflowPolicy":"dropNewest","kinds":{"pointAward":{"enabled":true,"template":"{recipient} received {amount} {pointLabel}","priority":"normal","durationSeconds":6},"guessingWinner":{"enabled":true,"template":"{winners} won {roundName}: {winningAnswer}","priority":"high","durationSeconds":8},"giveawayWinner":{"enabled":true,"template":"{winners} won {prizes}","priority":"high","durationSeconds":8}}}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(EventFeedOverlayAccessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+            db.OverlayInstances.Add(feed);
+            db.OverlayEventFeedItems.AddRange(
+                new OverlayEventFeedItem
+                {
+                    OverlayInstance = feed,
+                    HostId = hostId,
+                    Kind = OverlayEventFeedKind.GiveawayWinner,
+                    SourceKey = "simulation-giveaway",
+                    Priority = OverlayEventFeedPriority.High,
+                    Lifecycle = OverlayEventFeedLifecycle.Active,
+                    Title = "Giveaway winner",
+                    Body = "nightowl, newviewer won 500 points, 250 points",
+                    DurationSeconds = 8,
+                    EnqueuedAtUtc = now,
+                    DisplayDeadlineUtc = now.AddHours(1),
+                },
+                new OverlayEventFeedItem
+                {
+                    OverlayInstance = feed,
+                    HostId = hostId,
+                    Kind = OverlayEventFeedKind.PointAward,
+                    SourceKey = "simulation-points",
+                    Priority = OverlayEventFeedPriority.Normal,
+                    Lifecycle = OverlayEventFeedLifecycle.Queued,
+                    Title = "Points awarded",
+                    Body = "helpfulviewer received 100 points",
+                    DurationSeconds = 6,
+                    EnqueuedAtUtc = now.AddSeconds(1),
+                }
+            );
+        }
+
         if (
             !await db.OverlayInstances.AnyAsync(
                 value => value.PublicId == Guid.Parse("0a8b9ee0-500f-4b20-b706-455ff9ef4288"),

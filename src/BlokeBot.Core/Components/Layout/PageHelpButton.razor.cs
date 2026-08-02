@@ -278,6 +278,15 @@ public partial class PageHelpButton
                 ]
             ),
             new(
+                "Unified event feed",
+                "One Event Feed Browser Source presents safe point awards, Guessing winners, and Giveaway winners in a bounded durable queue.",
+                [
+                    "Each kind can be filtered, templated with its listed plain-text placeholders, prioritised, and shown for 1 to 30 seconds.",
+                    "The queue uses fixed 3-high-to-1-normal fairness, 24-hour duplicate protection, and an explicit drop or same-kind replacement policy.",
+                    "Overlays off blocks configuration, preview, admission, publication, and rendering. Points or Guessing off suppresses only its source cards. Saved setup and dedup history remain, and suppressed or consumed cards never replay after re-enable or reconnect.",
+                ]
+            ),
+            new(
                 "Reusable media and web cues",
                 "Create an enabled Cue player Browser Source, upload validated MP4 or MP3 media, then compose reusable Cue-V1 layers in the cue editor.",
                 [

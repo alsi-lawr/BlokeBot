@@ -596,6 +596,112 @@ public sealed class OverlayBrowserSourceTests
         (await restored.Content.ReadAsStringAsync()).ShouldNotContain("\"animation\"");
     }
 
+    [Test]
+    public async Task EventFeedBrowserSource_LiveReconnectAndSamplesExposeOnlyDecodedSafeFields()
+    {
+        await using var host = await BrowserSourceHost.StartAsync();
+        var seed = await host.SeedEventFeedAsync("event-feed");
+        await host.PresentPointEventAsync(seed, "private-ledger-key", "<b>viewer & friend</b>");
+
+        using (var documentResponse = await host.Client.GetAsync($"/overlay/{seed.AccessKey}"))
+        using (
+            var stylesheetResponse = await host.Client.GetAsync(
+                "/overlay/assets/blokebot-overlay.css"
+            )
+        )
+        using (
+            var scriptResponse = await host.Client.GetAsync("/overlay/assets/blokebot-overlay.js")
+        )
+        {
+            var html = await documentResponse.Content.ReadAsStringAsync();
+            html.ShouldContain("viewBox=\"0 0 1920 1080\"");
+            var stylesheet = await stylesheetResponse.Content.ReadAsStringAsync();
+            stylesheet.ShouldContain("white-space: pre-wrap");
+            stylesheet.ShouldContain("overflow-wrap: anywhere");
+            var script = await scriptResponse.Content.ReadAsStringAsync();
+            script.ShouldContain("svgElement(\"foreignObject\"");
+            script.ShouldContain("body.textContent = text");
+            script.ShouldNotContain("Intl.Segmenter");
+            script.ShouldNotContain("\"tspan\"");
+            script.ShouldNotContain("innerHTML");
+            script.ShouldNotContain("outerHTML");
+        }
+
+        using (var response = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state"))
+        {
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = document.RootElement;
+            root.GetProperty("overlayType").GetString().ShouldBe("eventFeed");
+            root.GetProperty("state")
+                .GetProperty("active")
+                .GetProperty("body")
+                .GetString()
+                .ShouldBe("<b>viewer & friend</b> received 5 points");
+            root.GetRawText().ShouldNotContain("private-ledger-key");
+            root.GetRawText().ShouldNotContain("hostId", Case.Insensitive);
+            root.GetRawText().ShouldNotContain("sourceKey", Case.Insensitive);
+        }
+
+        await using (var live = await host.OpenLiveAsync(seed.AccessKey))
+        {
+            var baseline = await live.ReadEnvelopeAsync();
+            baseline.GetProperty("eventType").GetString().ShouldBe("baseline");
+            baseline
+                .GetProperty("payload")
+                .GetProperty("state")
+                .GetProperty("active")
+                .GetProperty("body")
+                .GetString()
+                .ShouldNotBeNull()
+                .ShouldContain("<b>viewer & friend</b>");
+        }
+
+        foreach (var sample in new[] { "point-award", "guessing-winner", "giveaway-winner" })
+        {
+            using var response = await host.Client.GetAsync(
+                $"/overlays/preview/{seed.OverlayId:D}/state?mode=representative&sample={sample}"
+            );
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = document.RootElement;
+            root.GetProperty("overlayType").GetString().ShouldBe("eventFeed");
+            root.GetProperty("animation").GetString().ShouldBe("sample");
+            root.GetProperty("state")
+                .GetProperty("active")
+                .GetProperty("body")
+                .GetString()
+                .ShouldNotBeNull()
+                .ShouldNotContain("&lt;");
+        }
+
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Overlays);
+        using (var pointsOff = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state"))
+        {
+            pointsOff.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using var document = JsonDocument.Parse(await pointsOff.Content.ReadAsStringAsync());
+            document
+                .RootElement.GetProperty("state")
+                .GetProperty("active")
+                .ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+        await host.SetFeaturesAsync(
+            seed.HostId,
+            HostFeatureFlags.Overlays | HostFeatureFlags.Points | HostFeatureFlags.Guessing
+        );
+        using (var restored = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state"))
+        {
+            using var document = JsonDocument.Parse(await restored.Content.ReadAsStringAsync());
+            document
+                .RootElement.GetProperty("state")
+                .GetProperty("active")
+                .ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+        await host.SetFeaturesAsync(seed.HostId, HostFeatureFlags.Points);
+        using var overlaysOff = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state");
+        overlaysOff.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
     private static async Task AssertDelayLifecycleAsync(string javascript)
     {
         const string DelayStart = "const delay =";
@@ -965,6 +1071,60 @@ public sealed class OverlayBrowserSourceTests
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
+
+        internal async Task<OverlaySeed> SeedEventFeedAsync(string login)
+        {
+            var accessKey = AccessKey(login);
+            await using var db = await database.CreateDbContextAsync();
+            var host = new BotHost
+            {
+                EnabledFeatures =
+                    HostFeatureFlags.Overlays | HostFeatureFlags.Points | HostFeatureFlags.Guessing,
+                TwitchUserId = $"{login}-id",
+                Login = login,
+                DisplayName = login,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            var overlay = new OverlayInstance
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = host.Id,
+                Name = login,
+                Type = OverlayType.EventFeed,
+                IsEnabled = true,
+                ConfigurationJson = OverlayConfiguration.EventFeedV1.Default.ToPersistenceJson(),
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(accessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
+                UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
+            };
+            db.OverlayInstances.Add(overlay);
+            await db.SaveChangesAsync();
+            _authentication.SelectedHostId = host.Id;
+            return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
+        }
+
+        internal Task PresentPointEventAsync(
+            OverlaySeed seed,
+            string sourceKey,
+            string recipient
+        ) =>
+            app
+                .Services.GetRequiredService<IOverlayEventPresenter>()
+                .PresentAsync(
+                    new OverlayEventPresentation.PointAward
+                    {
+                        HostId = seed.HostId,
+                        SourceKey = sourceKey,
+                        Recipient = recipient,
+                        Amount = "5",
+                        PointLabel = "points",
+                    },
+                    CancellationToken.None
+                );
 
         internal async Task<OverlaySeed> SeedCuePlayerAsync(string login)
         {

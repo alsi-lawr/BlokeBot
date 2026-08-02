@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Functional;
@@ -11,9 +13,17 @@ namespace BlokeBot.Core.Features.Points.Giveaways;
 public sealed class PointsGiveawayDrawService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
-    IPointsRandom random
+    IPointsRandom random,
+    IEnumerable<IOverlayEventPresenter> eventPresenters
 )
 {
+    public PointsGiveawayDrawService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        PointBalanceService balances,
+        IPointsRandom random
+    )
+        : this(dbFactory, balances, random, []) { }
+
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
         CancellationToken ct
@@ -159,6 +169,24 @@ public sealed class PointsGiveawayDrawService(
             await db.SaveChangesAsync(ct);
             var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
             await CommitAsync(tx, giveawayId, completed, ct);
+            foreach (var presenter in eventPresenters)
+            {
+                await presenter.PresentAsync(
+                    new OverlayEventPresentation.GiveawayWinner
+                    {
+                        HostId = giveaway.HostId,
+                        SourceKey = giveaway.Id.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture
+                        ),
+                        Winners = winnerPayouts.Select(x => x.Login).ToImmutableArray(),
+                        Prizes = winnerPayouts
+                            .Select(x => $"{x.Payout.ToDisplayString()} {settings.PointLabel}")
+                            .ToImmutableArray(),
+                        PointLabel = settings.PointLabel,
+                    },
+                    ct
+                );
+            }
             onCommitted(completed);
             return completed;
         }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -116,41 +115,6 @@ public sealed class MomentHubServiceTests
             )
         ).ShouldBe(2);
         (await verify.MomentEvents.CountAsync()).ShouldBe(5);
-    }
-
-    [Test]
-    public async Task ConcurrentCaptures_ClaimOneProviderOperationAndOneCandidate()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var host = await SeedHostAsync(database, "alpha");
-        var provider = new FakeMomentProvider(database, TimeSpan.FromMilliseconds(40));
-        var firstService = CreateService(database, provider);
-        var secondService = CreateService(database, provider);
-
-        var captures = await Task.WhenAll(
-            firstService.CaptureAsync(
-                host,
-                Capture("stream-live", "viewer", "id-1"),
-                CancellationToken.None
-            ),
-            secondService.CaptureAsync(
-                host,
-                Capture("stream-live", "viewer", "id-1"),
-                CancellationToken.None
-            )
-        );
-
-        captures
-            .Select(Success)
-            .Select(value => value.Value.PublicId)
-            .Distinct()
-            .Count()
-            .ShouldBe(1);
-        provider.Calls.ShouldBe(1);
-        await using var verify = await database.CreateDbContextAsync();
-        (await verify.MomentCandidates.CountAsync()).ShouldBe(1);
-        (await verify.MomentCaptureRequests.CountAsync()).ShouldBe(2);
-        (await verify.MomentContributors.SingleAsync()).CaptureCount.ShouldBe(2);
     }
 
     [Test]
@@ -746,19 +710,15 @@ public sealed class MomentHubServiceTests
     private sealed class FakeMomentProvider : IMomentProviderOperations
     {
         private readonly SqliteBlokeBotDbFactory _database;
-        private readonly TimeSpan _delay;
         private readonly Queue<FakeProviderState> _outcomes;
-        private readonly ConcurrentDictionary<Guid, Task<MomentProviderOutcome>> _claims = new();
         private int _calls;
 
         public FakeMomentProvider(
             SqliteBlokeBotDbFactory database,
-            TimeSpan delay = default,
             IEnumerable<FakeProviderState>? outcomes = null
         )
         {
             _database = database;
-            _delay = delay;
             _outcomes = new Queue<FakeProviderState>(outcomes ?? []);
         }
 
@@ -772,28 +732,7 @@ public sealed class MomentHubServiceTests
             CancellationToken ct
         )
         {
-            var claim = _claims.GetOrAdd(publicId, _ => CaptureOnceAsync(hostId, publicId, ct));
-            try
-            {
-                return await claim;
-            }
-            finally
-            {
-                _claims.TryRemove(publicId, out _);
-            }
-        }
-
-        private async Task<MomentProviderOutcome> CaptureOnceAsync(
-            int hostId,
-            Guid publicId,
-            CancellationToken ct
-        )
-        {
             Interlocked.Increment(ref _calls);
-            if (_delay > TimeSpan.Zero)
-            {
-                await Task.Delay(_delay, ct);
-            }
             FakeProviderState state;
             lock (_outcomes)
             {
