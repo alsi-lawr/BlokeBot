@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
+using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -31,6 +32,12 @@ public interface IOverlayStateProvider
         GiveawayOverlaySampleState sample,
         CancellationToken cancellationToken
     ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
+
+    Task<OverlaySnapshotProjection> ProjectViewerQueueSampleAsync(
+        ResolvedOverlayInstance instance,
+        ViewerQueueOverlaySampleState sample,
+        CancellationToken cancellationToken
+    ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
 }
 
 public enum GuessingOverlaySampleState
@@ -50,6 +57,15 @@ public enum GiveawayOverlaySampleState
     Cancelled,
 }
 
+public enum ViewerQueueOverlaySampleState
+{
+    Open,
+    Closed,
+    PartyChanged,
+    ReadyOutcome,
+    SelectedNext,
+}
+
 public abstract record OverlaySnapshotProjection
 {
     private OverlaySnapshotProjection() { }
@@ -64,6 +80,9 @@ public abstract record OverlaySnapshotProjection
     public sealed record GiveawayV1(GiveawayV1OverlaySnapshot Snapshot) : OverlaySnapshotProjection;
 
     public sealed record EventFeedV1(EventFeedV1OverlaySnapshot Snapshot)
+        : OverlaySnapshotProjection;
+
+    public sealed record ViewerQueueV1(ViewerQueueV1OverlaySnapshot Snapshot)
         : OverlaySnapshotProjection;
 
     public sealed record Unavailable : OverlaySnapshotProjection;
@@ -151,6 +170,25 @@ public sealed record EventFeedV1OverlaySnapshot
     public required string Animation { get; init; }
     public OverlayAppearance Appearance { get; init; } = OverlayAppearance.EventFeedDefault;
     public required EventFeedStatePresentation State { get; init; }
+}
+
+public sealed record ViewerQueueV1OverlaySnapshot
+{
+    public string OverlayType => "viewerQueue";
+
+    public int SchemaVersion => 1;
+
+    public required Guid ServerEpoch { get; init; }
+
+    public required long Sequence { get; init; }
+
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+
+    public required string Animation { get; init; }
+
+    public OverlayAppearance Appearance { get; init; } = OverlayAppearance.ViewerQueueDefault;
+
+    public required PlayQueueOverlayState State { get; init; }
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
@@ -302,7 +340,8 @@ internal sealed class OverlayStateProvider(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     OverlayServerEpoch serverEpoch,
     TimeProvider timeProvider,
-    OverlayEventFeedService? eventFeed = null
+    OverlayEventFeedService? eventFeed = null,
+    IPlayQueueProjectionReader? playQueues = null
 ) : IOverlayStateProvider
 {
     public async Task<OverlaySnapshotProjection> ProjectAsync(
@@ -343,6 +382,32 @@ internal sealed class OverlayStateProvider(
                         State = state,
                     }
                 );
+        }
+
+        if (
+            instance
+                is {
+                    Type: OverlayType.ViewerQueue,
+                    Configuration: OverlayConfiguration.ViewerQueueV1 viewerQueueConfiguration,
+                }
+            && playQueues is not null
+            && await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.ViewerQueue,
+                cancellationToken
+            )
+        )
+        {
+            var state = await playQueues.ReadOverlayStateAsync(
+                instance.HostId,
+                viewerQueueConfiguration.QueueId,
+                viewerQueueConfiguration.CurrentRows,
+                viewerQueueConfiguration.NextRows,
+                cancellationToken
+            );
+            return state is null
+                ? new OverlaySnapshotProjection.Unavailable()
+                : ViewerQueue(instance, viewerQueueConfiguration, state, "none");
         }
 
         if (
@@ -656,6 +721,57 @@ internal sealed class OverlayStateProvider(
         return Giveaway(instance, configuration, state);
     }
 
+    public async Task<OverlaySnapshotProjection> ProjectViewerQueueSampleAsync(
+        ResolvedOverlayInstance instance,
+        ViewerQueueOverlaySampleState sample,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            instance
+                is not {
+                    Type: OverlayType.ViewerQueue,
+                    Configuration: OverlayConfiguration.ViewerQueueV1 configuration,
+                }
+            || !await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.ViewerQueue,
+                cancellationToken
+            )
+        )
+        {
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+
+        var fieldValues = new[]
+        {
+            new PlayQueueEntryFieldView("platform", "Platform", "PC"),
+            new PlayQueueEntryFieldView("preferred-role", "Preferred role", "Support"),
+        };
+        var state = new PlayQueueOverlayState(
+            "Community games",
+            "Co-op night",
+            sample is not ViewerQueueOverlaySampleState.Closed,
+            18,
+            new[]
+            {
+                new PlayQueueOverlayEntry("nightowl", fieldValues),
+                new PlayQueueOverlayEntry("newviewer", fieldValues),
+            }
+                .Take(configuration.CurrentRows)
+                .ToArray(),
+            new[]
+            {
+                new PlayQueueOverlayEntry("playerthree", fieldValues),
+                new PlayQueueOverlayEntry("playerfour", fieldValues),
+                new PlayQueueOverlayEntry("playerfive", fieldValues),
+            }
+                .Take(configuration.NextRows)
+                .ToArray()
+        );
+        return ViewerQueue(instance, configuration, state, "none");
+    }
+
     private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance) =>
         new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
@@ -807,6 +923,24 @@ internal sealed class OverlayStateProvider(
                 ServerEpoch = serverEpoch.Value,
                 Sequence = instance.Revision.Value,
                 GeneratedAtUtc = timeProvider.GetUtcNow(),
+                Appearance = configuration.Appearance,
+                State = state,
+            }
+        );
+
+    private OverlaySnapshotProjection ViewerQueue(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.ViewerQueueV1 configuration,
+        PlayQueueOverlayState state,
+        string animation
+    ) =>
+        new OverlaySnapshotProjection.ViewerQueueV1(
+            new ViewerQueueV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                Animation = animation,
                 Appearance = configuration.Appearance,
                 State = state,
             }

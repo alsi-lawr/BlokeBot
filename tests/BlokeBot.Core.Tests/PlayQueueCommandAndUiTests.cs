@@ -189,7 +189,7 @@ public sealed class PlayQueueCommandAndUiTests
     }
 
     [Test]
-    public async Task PublicPage_AnonymousViewerRetainsNormalizedLoginFallback()
+    public async Task PublicPage_AnonymousViewerMustSignInAndCannotMutateTheQueue()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(database);
@@ -212,29 +212,17 @@ public sealed class PlayQueueCommandAndUiTests
 
         var page = RenderPublicPage(context);
 
-        page.WaitForAssertion(() => page.Markup.ShouldContain("anonymous login fallback"));
-        var login = page.Find("#queue-viewer-login");
-        login.GetAttribute("maxlength").ShouldBe("128");
-        await login.InputAsync(" @Fallback_Viewer ");
+        page.WaitForAssertion(() => page.Markup.ShouldContain("Sign in with Twitch to join"));
+        page.FindAll("#queue-viewer-login").ShouldBeEmpty();
+        page.FindAll("button").ShouldAllBe(button => button.HasAttribute("disabled"));
+        page.Find("a").GetAttribute("href")!.ShouldContain("/auth/login?start=true");
         await page.Find("button.btn-primary").ClickAsync(new());
-
-        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1."));
-        await AssertIdentityAsync(
-            database,
-            "login:fallback_viewer",
-            null,
-            "fallback_viewer",
-            "fallback_viewer",
-            PlayQueueEntryStatus.Waiting
-        );
-        await FindButton(page, "Check position").ClickAsync(new());
-        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1 (Waiting)."));
-        await FindButton(page, "Leave").ClickAsync(new());
-        page.WaitForAssertion(() => page.Markup.ShouldContain("You left the queue."));
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.PlayQueueEntries.CountAsync()).ShouldBe(0);
     }
 
     [Test]
-    public async Task PublicPage_RendersPrivacyRuleAndNoPrivateEntryValues()
+    public async Task PublicPage_RendersPublicFieldsWithoutPrivateIdentityValues()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(database);
@@ -248,7 +236,7 @@ public sealed class PlayQueueCommandAndUiTests
             host,
             "squad",
             new JoinPlayQueueCommand(
-                new("private_viewer"),
+                new("private_viewer", "secret-twitch-id", "Private Viewer"),
                 0,
                 new Dictionary<string, string>
                 {
@@ -267,10 +255,12 @@ public sealed class PlayQueueCommandAndUiTests
                 .Add(value => value.QueueSlug, "squad")
         );
         page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Community squad"));
-        page.Markup.ShouldContain("visible only to moderators");
+        page.Markup.ShouldContain("Entry fields are optional and public");
         page.Markup.ShouldContain("names are hidden");
         page.Markup.ShouldNotContain("private_viewer");
-        page.Markup.ShouldNotContain("SECRET-REGION");
+        page.Markup.ShouldNotContain("secret-twitch-id");
+        page.Markup.ShouldContain("SECRET-REGION");
+        page.Markup.ShouldContain("Tank");
     }
 
     [Test]
@@ -299,8 +289,8 @@ public sealed class PlayQueueCommandAndUiTests
             30,
             15,
             [
-                new("region", "Region", true),
-                new("preferred-role", "Preferred role", true, ["Tank", "Healer", "Damage"]),
+                new("region", "Region"),
+                new("preferred-role", "Preferred role", ["Tank", "Healer", "Damage"]),
             ],
             [new("Tank", 1)]
         );

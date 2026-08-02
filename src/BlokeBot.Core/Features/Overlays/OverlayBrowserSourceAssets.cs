@@ -57,7 +57,8 @@ internal static class OverlayBrowserSourceAssets
 
         .guessing-card,
         .giveaway-card,
-        .event-feed-card {
+        .event-feed-card,
+        .viewer-queue-card {
           fill: rgba(15, 23, 42, 0.94);
           stroke: rgba(148, 163, 184, 0.72);
           stroke-width: 2;
@@ -65,7 +66,8 @@ internal static class OverlayBrowserSourceAssets
 
         .guessing-accent,
         .giveaway-accent,
-        .event-feed-accent {
+        .event-feed-accent,
+        .viewer-queue-accent {
           fill: #60a5fa;
         }
 
@@ -108,6 +110,29 @@ internal static class OverlayBrowserSourceAssets
         #overlay-root[data-animation="card"] .event-feed-presentation,
         #overlay-root[data-animation="sample"] .event-feed-presentation { animation: event-feed-card 520ms cubic-bezier(0.22, 1, 0.36, 1); }
         @keyframes event-feed-card { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
+
+        .viewer-queue-kicker,
+        .viewer-queue-title,
+        .viewer-queue-detail,
+        .viewer-queue-section,
+        .viewer-queue-entry {
+          fill: #f8fafc;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        .viewer-queue-kicker { fill: #93c5fd; font-size: 26px; font-weight: 800; letter-spacing: 4px; }
+        .viewer-queue-title { font-size: 52px; font-weight: 800; }
+        .viewer-queue-detail { fill: #cbd5e1; font-size: 24px; font-weight: 600; }
+        .viewer-queue-section { fill: #93c5fd; font-size: 24px; font-weight: 800; letter-spacing: 2px; }
+        .viewer-queue-entry { font-size: 22px; font-weight: 650; }
+        #overlay-root[data-animation="partyChange"] .viewer-queue-presentation,
+        #overlay-root[data-animation="readyOutcome"] .viewer-queue-presentation,
+        #overlay-root[data-animation="selectedNext"] .viewer-queue-presentation {
+          animation: viewer-queue-change 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes viewer-queue-change {
+          from { opacity: 0.3; transform: translateY(24px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .giveaway-kicker {
           fill: #93c5fd;
@@ -211,6 +236,7 @@ internal static class OverlayBrowserSourceAssets
           #overlay-root[data-animation] .guessing-presentation,
           #overlay-root[data-animation] .giveaway-presentation,
           #overlay-root[data-animation] .event-feed-presentation,
+          #overlay-root[data-animation] .viewer-queue-presentation,
           #overlay-root[data-test-pulse="active"] #overlay-canvas {
             animation: none;
           }
@@ -330,21 +356,120 @@ internal static class OverlayBrowserSourceAssets
             return element;
           };
 
-          const appendText = (group, className, x, y, text) => {
-            const stableClass = className.endsWith("-kicker")
+          const stableTextClass = (className) =>
+            className.endsWith("-kicker")
               ? " kicker"
               : className.endsWith("-title")
                 ? " title"
                 : className.endsWith("-result")
                   ? " result"
                   : " detail";
+
+          const appendText = (group, className, x, y, text) => {
             group.append(
               svgElement(
                 "text",
-                { class: className + stableClass, x: String(x), y: String(y) },
+                {
+                  class: className + stableTextClass(className),
+                  x: String(x),
+                  y: String(y),
+                },
                 text,
               ),
             );
+          };
+
+          const fitSvgText = (element) => {
+            const fullText = element.getAttribute("aria-label");
+            const maximumWidth = Number(element.dataset.fitWidth);
+            if (
+              fullText === null ||
+              !Number.isFinite(maximumWidth) ||
+              maximumWidth <= 0
+            ) {
+              return;
+            }
+
+            element.removeAttribute("textLength");
+            element.removeAttribute("lengthAdjust");
+            element.textContent = fullText;
+            if (element.getComputedTextLength() > maximumWidth) {
+              const characters = Array.from(fullText);
+              let fittingLength = 0;
+              let rejectedLength = characters.length;
+              while (fittingLength < rejectedLength) {
+                const candidateLength = Math.ceil(
+                  (fittingLength + rejectedLength) / 2,
+                );
+                element.textContent =
+                  characters.slice(0, candidateLength).join("") + "…";
+                if (element.getComputedTextLength() <= maximumWidth) {
+                  fittingLength = candidateLength;
+                } else {
+                  rejectedLength = candidateLength - 1;
+                }
+              }
+              element.textContent =
+                characters.slice(0, fittingLength).join("") + "…";
+              if (element.getComputedTextLength() > maximumWidth) {
+                element.setAttribute("textLength", String(maximumWidth));
+                element.setAttribute("lengthAdjust", "spacingAndGlyphs");
+              }
+            }
+            element.prepend(svgElement("title", {}, fullText));
+          };
+
+          const appendFittedText = (
+            group,
+            className,
+            x,
+            y,
+            text,
+            maximumWidth,
+            clipPathId,
+          ) => {
+            const element = svgElement(
+              "text",
+              {
+                class: className + stableTextClass(className),
+                x: String(x),
+                y: String(y),
+                "aria-label": text,
+                "data-fit-width": String(maximumWidth),
+                "clip-path": `url(#${clipPathId})`,
+              },
+              text,
+            );
+            group.append(element);
+            fitSvgText(element);
+          };
+
+          const appendTextClip = (
+            definitions,
+            id,
+            x,
+            y,
+            width,
+            height,
+          ) => {
+            const clipPath = svgElement("clipPath", { id });
+            clipPath.append(
+              svgElement("rect", {
+                x: String(x),
+                y: String(y),
+                width: String(width),
+                height: String(height),
+              }),
+            );
+            definitions.append(clipPath);
+          };
+
+          const refitFittedText = () => {
+            for (const element of canvas.querySelectorAll("text[data-fit-width]")) {
+              if (element instanceof SVGTextElement) {
+                fitSvgText(element);
+              }
+            }
           };
 
           const createEventFeedBody = (text) => {
@@ -709,6 +834,148 @@ internal static class OverlayBrowserSourceAssets
             canvas.append(geometryGroup);
           };
 
+          const validViewerQueueState = (state) => {
+            const validField = (field) =>
+              typeof field === "object" &&
+              field !== null &&
+              typeof field.key === "string" &&
+              typeof field.label === "string" &&
+              typeof field.value === "string";
+            const validEntry = (entry) =>
+              typeof entry === "object" &&
+              entry !== null &&
+              (entry.displayName === null || typeof entry.displayName === "string") &&
+              Array.isArray(entry.fields) &&
+              entry.fields.length <= 12 &&
+              entry.fields.every(validField);
+            return (
+              typeof state === "object" &&
+              state !== null &&
+              typeof state.queueName === "string" &&
+              typeof state.activityName === "string" &&
+              typeof state.isOpen === "boolean" &&
+              Number.isSafeInteger(state.totalQueueSize) &&
+              state.totalQueueSize >= 0 &&
+              Array.isArray(state.currentParty) &&
+              state.currentParty.length <= 12 &&
+              state.currentParty.every(validEntry) &&
+              Array.isArray(state.next) &&
+              state.next.length <= 12 &&
+              state.next.every(validEntry)
+            );
+          };
+
+          const viewerQueueEntryText = (entry, position) => {
+            const name = entry.displayName ?? `Player ${position}`;
+            const fields = entry.fields
+              .filter((field) => field.value.length > 0)
+              .map((field) => `${field.label}: ${field.value}`)
+              .join(" · ");
+            return fields.length === 0 ? name : `${name} — ${fields}`;
+          };
+
+          const renderViewerQueue = (state, appearance) => {
+            canvas.replaceChildren();
+            const definitions = svgElement("defs", {});
+            appendTextClip(
+              definitions,
+              "viewer-queue-title-clip",
+              48,
+              70,
+              1104,
+              66,
+            );
+            appendTextClip(
+              definitions,
+              "viewer-queue-detail-clip",
+              48,
+              138,
+              1104,
+              38,
+            );
+            const geometryGroup = svgElement("g", {
+              class: "overlay",
+              transform: `translate(${appearance.x} ${appearance.y}) scale(${appearance.width / 1200} ${appearance.height / 800})`,
+            });
+            const presentationGroup = svgElement("g", {
+              class: "viewer-queue-presentation",
+            });
+            presentationGroup.append(
+              definitions,
+              svgElement("rect", {
+                class: "viewer-queue-card card",
+                x: "0",
+                y: "0",
+                width: "1200",
+                height: "800",
+                rx: "30",
+              }),
+              svgElement("rect", {
+                class: "viewer-queue-accent accent",
+                x: "0",
+                y: "0",
+                width: "16",
+                height: "800",
+                rx: "8",
+              }),
+            );
+            geometryGroup.append(presentationGroup);
+            canvas.append(geometryGroup);
+            appendText(
+              presentationGroup,
+              "viewer-queue-kicker kicker",
+              48,
+              56,
+              state.isOpen ? "QUEUE OPEN" : "QUEUE CLOSED",
+            );
+            appendFittedText(
+              presentationGroup,
+              "viewer-queue-title title",
+              48,
+              124,
+              state.queueName,
+              1104,
+              "viewer-queue-title-clip",
+            );
+            appendFittedText(
+              presentationGroup,
+              "viewer-queue-detail detail",
+              48,
+              168,
+              `${state.activityName} · ${state.totalQueueSize} waiting`,
+              1104,
+              "viewer-queue-detail-clip",
+            );
+            appendText(presentationGroup, "viewer-queue-section", 48, 224, "CURRENT PARTY");
+            appendText(presentationGroup, "viewer-queue-section", 624, 224, "NEXT");
+            state.currentParty.forEach((entry, index) => {
+              const clipPathId = `viewer-queue-current-entry-${index}-clip`;
+              appendTextClip(definitions, clipPathId, 48, 240 + index * 40, 528, 36);
+              appendFittedText(
+                presentationGroup,
+                "viewer-queue-entry",
+                48,
+                268 + index * 40,
+                viewerQueueEntryText(entry, index + 1),
+                528,
+                clipPathId,
+              );
+            });
+            state.next.forEach((entry, index) => {
+              const clipPathId = `viewer-queue-next-entry-${index}-clip`;
+              appendTextClip(definitions, clipPathId, 624, 240 + index * 40, 528, 36);
+              appendFittedText(
+                presentationGroup,
+                "viewer-queue-entry",
+                624,
+                268 + index * 40,
+                viewerQueueEntryText(entry, index + 1),
+                528,
+                clipPathId,
+              );
+            });
+          };
+
           const clearPresentationAnimation = () => {
             if (presentationAnimationTimer !== null) {
               window.clearTimeout(presentationAnimationTimer);
@@ -726,6 +993,9 @@ internal static class OverlayBrowserSourceAssets
               animation !== "winner"
               && animation !== "card"
               && animation !== "sample"
+              && animation !== "partyChange"
+              && animation !== "readyOutcome"
+              && animation !== "selectedNext"
             ) {
               return;
             }
@@ -806,6 +1076,14 @@ internal static class OverlayBrowserSourceAssets
               if (dashboardDraft.choices?.showEntrantCount === false) state.entrantCount = null;
               if (dashboardDraft.choices?.showCountdown === false) state.closesAtUtc = null;
               if (dashboardDraft.choices?.showJoinCommand === false) state.joinCommand = null;
+            }
+            if (projection.overlayType === "viewerQueue") {
+              if (Number.isSafeInteger(dashboardDraft.choices?.currentRows)) {
+                state.currentParty = state.currentParty.slice(0, dashboardDraft.choices.currentRows);
+              }
+              if (Number.isSafeInteger(dashboardDraft.choices?.nextRows)) {
+                state.next = state.next.slice(0, dashboardDraft.choices.nextRows);
+              }
             }
             return { ...projection, state, appearance: dashboardDraft.appearance };
           };
@@ -888,6 +1166,16 @@ internal static class OverlayBrowserSourceAssets
                 700,
                 fromDraft,
               );
+            } else if (projection.overlayType === "viewerQueue") {
+              if (!validViewerQueueState(projection.state) || !validAppearance(projection.appearance)) return false;
+              renderViewerQueue(projection.state, projection.appearance);
+              applyPresentationAnimation(
+                typeof projection.animation === "string"
+                  ? projection.animation
+                  : "none",
+                700,
+                fromDraft,
+              );
             } else {
               return false;
             }
@@ -899,6 +1187,7 @@ internal static class OverlayBrowserSourceAssets
             root.dataset.generatedAtUtc = occurredAtUtc;
             window.requestAnimationFrame(() => {
               applyDraftCss(dashboardDraft?.css ?? "");
+              refitFittedText();
               acknowledgeDashboardDraft();
             });
             return true;

@@ -102,13 +102,17 @@ public sealed class PlayQueueServiceTests
 
         first.Value.Position.ShouldBe(1);
         retry.WasIdempotent.ShouldBeTrue();
-        retry.Value.Id.ShouldBe(first.Value.Id);
+        retry.Value.InternalEntryId.ShouldBe(first.Value.InternalEntryId);
         position.Value.Position.ShouldBe(1);
         page!.Waiting.ShouldHaveSingleItem();
         page.Waiting[0].DisplayName.ShouldBeNull();
-        page.Waiting[0].Fields.ShouldBeEmpty();
-        page.ToString().ShouldNotContain("Tank");
-        page.ToString().ShouldNotContain("100");
+        page.Waiting[0]
+            .Fields.ShouldBe([
+                new("platform", "Platform", ""),
+                new("region", "Region", "100"),
+                new("rank", "Rank", ""),
+                new("preferred-role", "Preferred role", "Tank"),
+            ]);
         otherHost!.Waiting.ShouldBeEmpty();
         Success(await service.LeaveAsync(alpha, "squad", new("viewer"), CancellationToken.None))
             .Value.Status.ShouldBe(PlayQueueEntryStatus.Left);
@@ -136,7 +140,12 @@ public sealed class PlayQueueServiceTests
             firstService.JoinAsync(host, "squad", sameViewer, CancellationToken.None),
             secondService.JoinAsync(host, "squad", sameViewer, CancellationToken.None)
         );
-        joins.Select(Success).Select(value => value.Value.Id).Distinct().Count().ShouldBe(1);
+        joins
+            .Select(Success)
+            .Select(value => value.Value.InternalEntryId)
+            .Distinct()
+            .Count()
+            .ShouldBe(1);
         foreach (
             var (login, role) in new[]
             {
@@ -164,7 +173,7 @@ public sealed class PlayQueueServiceTests
         selected.ShouldAllBe(value => value.Value.Members.Count == 4);
         selected
             .SelectMany(value => value.Value.Members)
-            .Select(value => value.Public.Id)
+            .Select(value => value.EntryId)
             .Distinct()
             .Count()
             .ShouldBe(4);
@@ -196,7 +205,7 @@ public sealed class PlayQueueServiceTests
             )
         ).Value;
         var check = Success(
-            await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None)
+            await service.StartReadyCheckAsync(host, entry.InternalEntryId, CancellationToken.None)
         );
 
         check.Value.Public.Status.ShouldBe(PlayQueueEntryStatus.AwaitingReady);
@@ -231,13 +240,15 @@ public sealed class PlayQueueServiceTests
                 CancellationToken.None
             )
         ).Value;
-        _ = Success(await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None));
+        _ = Success(
+            await service.StartReadyCheckAsync(host, entry.InternalEntryId, CancellationToken.None)
+        );
 
         clock.Advance(TimeSpan.FromSeconds(120));
         var result = await service.ReadyAsync(host, "squad", new("viewer"), CancellationToken.None);
 
         result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
-        await AssertExpiredReadyCheckPersistedAsync(database, entry.Id);
+        await AssertExpiredReadyCheckPersistedAsync(database, entry.InternalEntryId);
     }
 
     [Test]
@@ -261,7 +272,9 @@ public sealed class PlayQueueServiceTests
                 CancellationToken.None
             )
         ).Value;
-        _ = Success(await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None));
+        _ = Success(
+            await service.StartReadyCheckAsync(host, entry.InternalEntryId, CancellationToken.None)
+        );
         if (mutation == ExpiredQueueMutation.Open)
         {
             _ = Success(await service.SetOpenAsync(host, "squad", false, CancellationToken.None));
@@ -289,7 +302,7 @@ public sealed class PlayQueueServiceTests
             _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null),
         };
 
-        await AssertExpiredReadyCheckPersistedAsync(database, entry.Id);
+        await AssertExpiredReadyCheckPersistedAsync(database, entry.InternalEntryId);
     }
 
     [Test]
@@ -317,7 +330,9 @@ public sealed class PlayQueueServiceTests
                 CancellationToken.None
             )
         ).Value;
-        _ = Success(await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None));
+        _ = Success(
+            await service.StartReadyCheckAsync(host, entry.InternalEntryId, CancellationToken.None)
+        );
         var ready = Success(
             await service.ReadyAsync(host, "solo", new("viewer"), CancellationToken.None)
         );
@@ -394,48 +409,92 @@ public sealed class PlayQueueServiceTests
             .ShouldBe(["tank2", "healer2", "damage3", "damage4"], ignoreOrder: true);
         var replacedId = second
             .Value.Members.Single(value => value.NormalizedLogin == "damage3")
-            .Public.Id;
+            .EntryId;
         var replaced = Success(
             await service.ReplaceOneAsync(host, replacedId, CancellationToken.None)
         );
         replaced.Value.Members.Count.ShouldBe(4);
-        replaced.Value.Members.Select(value => value.Public.Id).ShouldBeUnique();
-        replaced.Value.Members.Select(value => value.Public.Id).ShouldNotContain(replacedId);
+        replaced.Value.Members.Select(value => value.EntryId).ShouldBeUnique();
+        replaced.Value.Members.Select(value => value.EntryId).ShouldNotContain(replacedId);
     }
 
     [Test]
-    public async Task TwitchIdentity_ReconcilesLoginFallbackWithoutDuplicateActiveEntry()
+    public async Task RoleComposition_IsBestEffortAndRolelessViewersFillRemainingSeats()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database);
+        _ = Success(
+            await service.ConfigureAsync(
+                host,
+                Queue("party") with
+                {
+                    Capacity = 3,
+                    RoleRequirements = [new("Tank", 2), new("Healer", 1)],
+                },
+                CancellationToken.None
+            )
+        );
+        _ = Success(
+            await service.JoinAsync(
+                host,
+                "party",
+                Join("tank", "eu", "Tank"),
+                CancellationToken.None
+            )
+        );
+        foreach (var login in new[] { "roleless_one", "roleless_two" })
+        {
+            _ = Success(
+                await service.JoinAsync(
+                    host,
+                    "party",
+                    Join(login, "eu", ""),
+                    CancellationToken.None
+                )
+            );
+        }
+
+        var selected = Success(
+            await service.SelectPartyAsync(host, "party", false, CancellationToken.None)
+        );
+
+        selected
+            .Value.Members.Select(value => value.NormalizedLogin)
+            .ShouldBe(["tank", "roleless_one", "roleless_two"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task JoinWithoutTwitchIdentity_IsRejectedWithoutPersistingAnEntry()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(database, "alpha");
         var service = CreateService(database);
         _ = Success(await service.ConfigureAsync(host, Queue("squad"), CancellationToken.None));
-        var fallback = Success(
-            await service.JoinAsync(
-                host,
-                "squad",
-                Join("viewer", "eu", "Tank"),
-                CancellationToken.None
-            )
-        );
-        var identified = Success(
-            await service.JoinAsync(
-                host,
-                "squad",
-                Join("viewer", "eu", "Tank") with
-                {
-                    Viewer = new("viewer", "1234", "Viewer"),
-                },
-                CancellationToken.None
-            )
+        var rejected = await service.JoinAsync(
+            host,
+            "squad",
+            Join("viewer", "eu", "Tank") with
+            {
+                Viewer = new("viewer"),
+            },
+            CancellationToken.None
         );
 
-        identified.WasIdempotent.ShouldBeTrue();
-        identified.Value.Id.ShouldBe(fallback.Value.Id);
+        rejected
+            .Match(
+                _ => throw new InvalidOperationException("Expected rejection."),
+                value => value.Reason
+            )
+            .ShouldBeOfType<PlayQueueRejection.Invalid>();
+        rejected
+            .Match(
+                _ => throw new InvalidOperationException("Expected rejection."),
+                value => value.Reason.Message
+            )
+            .ShouldContain("Sign in with Twitch");
         await using var verify = await database.CreateDbContextAsync();
-        var entry = await verify.PlayQueueEntries.SingleAsync();
-        entry.IdentityKey.ShouldBe("id:1234");
-        entry.TwitchUserId.ShouldBe("1234");
+        (await verify.PlayQueueEntries.CountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -481,17 +540,17 @@ public sealed class PlayQueueServiceTests
             30,
             15,
             [
-                new("platform", "Platform", false),
-                new("region", "Region", true),
-                new("rank", "Rank", false),
-                new("preferred-role", "Preferred role", true, ["Tank", "Healer", "Damage"]),
+                new("platform", "Platform"),
+                new("region", "Region"),
+                new("rank", "Rank"),
+                new("preferred-role", "Preferred role", ["Tank", "Healer", "Damage"]),
             ],
             [new("Tank", 1), new("Healer", 1), new("Damage", 2)]
         );
 
     private static JoinPlayQueueCommand Join(string login, string region, string role) =>
         new(
-            new(login),
+            new(login, $"twitch-{login}", login),
             0,
             new Dictionary<string, string> { ["region"] = region, ["preferred-role"] = role }
         );

@@ -1,4 +1,5 @@
 using System.Globalization;
+using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -35,6 +36,10 @@ public partial class OverlaysPage
     private string _giveawayEventTemplate = "{winners} won {prizes}";
     private OverlayEventFeedPriority _giveawayEventPriority = OverlayEventFeedPriority.High;
     private int _giveawayEventDuration = 8;
+    private IReadOnlyList<PlayQueueSummary> _queueOptions = [];
+    private int _viewerQueueId;
+    private int _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
+    private int _viewerQueueNextRows = OverlayConfiguration.ViewerQueueV1.DefaultNextRows;
     private int _appearanceX = OverlayAppearance.GuessingDefault.X;
     private int _appearanceY = OverlayAppearance.GuessingDefault.Y;
     private int _appearanceWidth = OverlayAppearance.GuessingDefault.Width;
@@ -46,6 +51,7 @@ public partial class OverlaysPage
     private bool _featureEnabled;
     private bool _guessingFeatureEnabled;
     private bool _pointsFeatureEnabled;
+    private bool _playWithViewersFeatureEnabled;
     private bool _isCreating = true;
     private bool _isLoading = true;
     private bool _isBusy;
@@ -87,6 +93,13 @@ public partial class OverlaysPage
             {
                 mode = $"?mode=representative&sample={SampleToken(_eventFeedPreviewSample)}";
             }
+            if (
+                _previewMode is OverlayPreviewMode.Representative
+                && _selected.Type is OverlayType.ViewerQueue
+            )
+            {
+                mode = $"?mode=representative&sample={SampleToken(_viewerQueuePreviewSample)}";
+            }
             return $"/overlays/preview/{_selected.Id:D}{mode}";
         }
     }
@@ -96,12 +109,15 @@ public partial class OverlaysPage
         {
             OverlayType.Guessing => _guessingFeatureEnabled,
             OverlayType.Giveaway => _pointsFeatureEnabled,
+            OverlayType.ViewerQueue => _playWithViewersFeatureEnabled,
             _ => true,
         };
 
     private GuessingOverlaySampleState _previewSample = GuessingOverlaySampleState.Open;
     private GiveawayOverlaySampleState _giveawayPreviewSample = GiveawayOverlaySampleState.Open;
     private OverlayEventFeedKind _eventFeedPreviewSample = OverlayEventFeedKind.PointAward;
+    private ViewerQueueOverlaySampleState _viewerQueuePreviewSample =
+        ViewerQueueOverlaySampleState.Open;
 
     private string _presenceLabel
     {
@@ -184,6 +200,15 @@ public partial class OverlaysPage
                 HostFeatureFlags.Points,
                 CancellationToken.None
             );
+            _playWithViewersFeatureEnabled = await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.PlayWithViewers,
+                CancellationToken.None
+            );
+            _queueOptions = _playWithViewersFeatureEnabled
+                ? await _queues.GetQueuesForHostAsync(HostId, CancellationToken.None)
+                : [];
+            _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
 
             var result = await _overlays.ListAsync(PageContext.Session, CancellationToken.None);
             result.Match(
@@ -237,6 +262,9 @@ public partial class OverlaysPage
         _draftShowEntrantCount = true;
         _draftShowCountdown = true;
         _draftShowJoinCommand = true;
+        _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
+        _viewerQueueNextRows = OverlayConfiguration.ViewerQueueV1.DefaultNextRows;
+        _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
         LoadAppearance(DefaultAppearance(_draftType));
         _revealedBrowserSourceUrl = null;
         if (setFeedback)
@@ -297,6 +325,13 @@ public partial class OverlaysPage
                 ref _giveawayEventDuration
             );
         }
+        if (overlay.Configuration is OverlayConfiguration.ViewerQueueV1 queue)
+        {
+            _viewerQueueId = queue.QueueId;
+            _viewerQueueCurrentRows = queue.CurrentRows;
+            _viewerQueueNextRows = queue.NextRows;
+            LoadAppearance(queue.Appearance);
+        }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
         if (clearFeedback)
@@ -353,9 +388,15 @@ public partial class OverlaysPage
             if (!_selectedFeatureEnabled)
             {
                 SetFailure(
-                    _selected.Type is OverlayType.Giveaway
-                        ? "This giveaway overlay is paused. Turn Points on in Channel setup before changing it."
-                        : "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it."
+                    _selected.Type switch
+                    {
+                        OverlayType.Giveaway =>
+                            "This giveaway overlay is paused. Turn Points on in Channel setup before changing it.",
+                        OverlayType.ViewerQueue =>
+                            "This Viewer Queue overlay is paused. Turn Play with viewers on in Channel setup before changing it.",
+                        _ =>
+                            "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it.",
+                    }
                 );
                 return;
             }
@@ -688,6 +729,13 @@ public partial class OverlaysPage
         SetSuccess($"{EventKindLabel(sample)} sample selected.");
     }
 
+    private void SetPreviewSample(ViewerQueueOverlaySampleState sample)
+    {
+        _viewerQueuePreviewSample = sample;
+        _previewMode = OverlayPreviewMode.Representative;
+        SetSuccess($"{SampleLabel(sample)} sample selected.");
+    }
+
     private OverlayConfiguration DraftConfiguration() =>
         _draftType switch
         {
@@ -731,6 +779,12 @@ public partial class OverlaysPage
                 },
                 DraftAppearance()
             ),
+            OverlayType.ViewerQueue => new OverlayConfiguration.ViewerQueueV1(
+                _viewerQueueId,
+                _viewerQueueCurrentRows,
+                _viewerQueueNextRows,
+                DraftAppearance()
+            ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
 
@@ -752,6 +806,7 @@ public partial class OverlaysPage
             OverlayType.Guessing => OverlayAppearance.GuessingDefault,
             OverlayType.Giveaway => OverlayAppearance.GiveawayDefault,
             OverlayType.EventFeed => OverlayAppearance.EventFeedDefault,
+            OverlayType.ViewerQueue => OverlayAppearance.ViewerQueueDefault,
             _ => OverlayAppearance.GuessingDefault,
         };
 
@@ -816,6 +871,7 @@ public partial class OverlaysPage
             OverlayType.CuePlayer => "Cue player",
             OverlayType.Giveaway => "Giveaway",
             OverlayType.EventFeed => "Event feed",
+            OverlayType.ViewerQueue => "Viewer Queue",
             _ => "Unsupported",
         };
 
@@ -859,6 +915,28 @@ public partial class OverlaysPage
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+    private static string SampleLabel(ViewerQueueOverlaySampleState sample) =>
+        sample switch
+        {
+            ViewerQueueOverlaySampleState.Open => "Open",
+            ViewerQueueOverlaySampleState.Closed => "Closed",
+            ViewerQueueOverlaySampleState.PartyChanged => "Party changed",
+            ViewerQueueOverlaySampleState.ReadyOutcome => "Ready outcome",
+            ViewerQueueOverlaySampleState.SelectedNext => "Selected next",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
+        };
+
+    private static string SampleToken(ViewerQueueOverlaySampleState sample) =>
+        sample switch
+        {
+            ViewerQueueOverlaySampleState.Open => "open",
+            ViewerQueueOverlaySampleState.Closed => "closed",
+            ViewerQueueOverlaySampleState.PartyChanged => "party-changed",
+            ViewerQueueOverlaySampleState.ReadyOutcome => "ready-outcome",
+            ViewerQueueOverlaySampleState.SelectedNext => "selected-next",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
 
     private static string SampleToken(GuessingOverlaySampleState sample) =>

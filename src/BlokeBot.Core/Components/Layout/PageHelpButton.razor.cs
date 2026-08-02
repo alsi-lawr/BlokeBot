@@ -287,6 +287,15 @@ public partial class PageHelpButton
                     "If Points or Guessing is off, its cards stay hidden. Saved settings remain when you turn a feature back on.",
                 ]
             ),
+            new(
+                "Viewer Queue overlay",
+                "Choose a saved Play with viewers queue, then choose how many current and next players appear.",
+                [
+                    "Viewer Queue requires both Overlays and Play with viewers to be on in Channel setup. Turning either off blocks preview and display while keeping the saved setup and queue.",
+                    "Turning both tools back on shows only the queue as it is now. Party, ready, and selected-next animations missed while either tool was off do not play later.",
+                    "Names follow the queue's public-name setting. Every optional entry field is public. Moderator notes, lobby details, Twitch account details, temporary skips, and queue history never appear.",
+                ]
+            ),
         ]
     );
 

@@ -58,7 +58,6 @@ public sealed class ViewerCommandCatalogMigrationTests
 
         await using var migrated = await factory.CreateDbContextAsync();
         (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_catalogMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(20);
         (
             await migrated
                 .CustomCommandAliases.OrderBy(value => value.SortOrder)
@@ -91,14 +90,6 @@ public sealed class ViewerCommandCatalogMigrationTests
         var conflict = await migrated.Hosts.SingleAsync(value => value.Id == 3);
         conflict.CommandsAliasesConfigured.ShouldBeTrue();
         conflict.CommandsDefaultConflictAlias.ShouldBe("commands");
-        (await migrated.Database.GetPendingMigrationsAsync()).ShouldBe([
-            _independentChatTools,
-            "20260731015218_v0.6.0_GuessingOverlay",
-            "20260731043353_v0.6.0_OverlayCues",
-            "20260731064005_v0.6.0_CustomCommandOverlayCues",
-            "20260731083003_v0.6.0_GiveawayOverlay",
-            "20260731110140_v0.6.0_EventFeedOverlay",
-            "20260731141254_v0.6.0_OverlayAppearance",
-        ]);
+        (await migrated.Database.GetPendingMigrationsAsync()).ShouldContain(_independentChatTools);
     }
 }

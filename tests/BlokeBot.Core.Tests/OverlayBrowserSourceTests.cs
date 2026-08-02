@@ -377,6 +377,9 @@ public sealed class OverlayBrowserSourceTests
         using var state = await client.GetAsync(
             $"/overlay/{SimulationFixtureSeeder.OverlayAccessKey}/state"
         );
+        using var viewerQueueState = await client.GetAsync(
+            $"/overlay/{SimulationFixtureSeeder.ViewerQueueOverlayAccessKey}/state"
+        );
 
         document.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await document.Content.ReadAsStringAsync()).ShouldContain("id=\"overlay-canvas\"");
@@ -387,6 +390,14 @@ public sealed class OverlayBrowserSourceTests
         json.ShouldContain("\"roundName\":\"Default\"");
         json.ShouldContain("\"guessCount\":4");
         json.ShouldContain("\"sequence\":1");
+        viewerQueueState.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var queueJson = await viewerQueueState.Content.ReadAsStringAsync();
+        queueJson.ShouldContain("\"overlayType\":\"viewerQueue\"");
+        queueJson.ShouldContain("\"queueName\":\"Community night\"");
+        queueJson.ShouldContain("\"totalQueueSize\":3");
+        queueJson.ShouldContain("\"displayName\":\"NightOwl\"");
+        queueJson.ShouldContain("\"displayName\":\"PlayerThree\"");
+        queueJson.ShouldNotContain("simulation-player");
     }
 
     [Test]

@@ -118,7 +118,7 @@
                                     aria-describedby="queue-field-limit"
                                     @onclick="AddField">Add field</button>
                         </div>
-                        <p class="mt-1 text-sm text-muted-foreground">Platform, region, rank, preferred-role, and custom fields are private to moderators.</p>
+                        <p class="mt-1 text-sm text-muted-foreground">Every field is optional and visible on the viewer page and Viewer Queue overlays.</p>
                         <div class="management-field-workspace-container mt-3">
                             <div class="management-field-workspace">
                                 <div class="management-field-inventory" aria-label="Entry fields">
@@ -165,16 +165,14 @@
                                                    @bind-Value="field.Key" />
                                             <Field Id="@($"queue-field-label-{field.Identity:N}")" Label="Label" @bind-Value="field.Label" />
                                             <Field Id="@($"queue-field-choices-{field.Identity:N}")" Label="Choices (comma separated)" @bind-Value="field.Choices" />
-                                            <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
-                                                <input type="checkbox" @bind="field.Required" /> Required
-                                            </label>
                                         </div>
                                         <button class="btn-secondary mt-4" type="button" @onclick="() => RemoveField(field)">Remove field</button>
                                     </section>
                                 }
                             </div>
                         </div>
-                        <Field Id="queue-roles" Label="Required roles (role=count, comma separated)" @bind-Value="_draft.RoleRequirements" />
+                        <Field Id="queue-roles" Label="Preferred party roles (role=count, comma separated)" @bind-Value="_draft.RoleRequirements" />
+                        <p class="mt-1 text-sm text-muted-foreground">Role targets are best effort. Viewers who leave the optional role field blank remain eligible for the party.</p>
                     </section>
 
                     @if (_moderatorPage is not null)
@@ -194,8 +192,8 @@
                                         <strong>@@@entry.NormalizedLogin</strong>
                                         <p class="mt-1 text-xs text-muted-foreground">@FieldSummary(entry)</p>
                                         <div class="mt-3 flex gap-2">
-                                            <button class="btn-secondary" type="button" @onclick="() => ReplaceOneAsync(entry.Public.Id)">Replace one</button>
-                                            <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.Public.Id)">No-show</button>
+                                            <button class="btn-secondary" type="button" @onclick="() => ReplaceOneAsync(entry.EntryId)">Replace one</button>
+                                            <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.EntryId)">No-show</button>
                                         </div>
                                     </article>
                                 }
@@ -218,17 +216,17 @@
                                         <div class="flex flex-wrap items-start justify-between gap-3">
                                             <div><strong>#@entry.Public.Position · @@@entry.NormalizedLogin</strong><p class="text-xs text-muted-foreground">@entry.Public.Status · priority @entry.Priority · @FieldSummary(entry)</p></div>
                                             <div class="flex flex-wrap gap-2">
-                                                <button class="btn-secondary" type="button" @onclick="() => ReadyCheckAsync(entry.Public.Id)">Ready check</button>
-                                                <button class="btn-secondary" type="button" @onclick="() => SkipAsync(entry.Public.Id)">Skip</button>
-                                                <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.Public.Id)">No-show</button>
+                                                <button class="btn-secondary" type="button" @onclick="() => ReadyCheckAsync(entry.EntryId)">Ready check</button>
+                                                <button class="btn-secondary" type="button" @onclick="() => SkipAsync(entry.EntryId)">Skip</button>
+                                                <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.EntryId)">No-show</button>
                                             </div>
                                         </div>
-                                        @if (_entryDrafts.TryGetValue(entry.Public.Id, out var entryDraft))
+                                        @if (_entryDrafts.TryGetValue(entry.EntryId, out var entryDraft))
                                         {
                                             <div class="mt-3 grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
-                                                <Field Id="@($"queue-priority-{entry.Public.Id}")" Label="Priority" @bind-Value="entryDraft.Priority" />
-                                                <Field Id="@($"queue-private-note-{entry.Public.Id}")" Label="Private moderator note" @bind-Value="entryDraft.PrivateNote" />
-                                                <button class="btn-secondary self-end" type="button" @onclick="() => SaveEntryAsync(entry.Public.Id)">Save viewer</button>
+                                                <Field Id="@($"queue-priority-{entry.EntryId}")" Label="Priority" @bind-Value="entryDraft.Priority" />
+                                                <Field Id="@($"queue-private-note-{entry.EntryId}")" Label="Private moderator note" @bind-Value="entryDraft.PrivateNote" />
+                                                <button class="btn-secondary self-end" type="button" @onclick="() => SaveEntryAsync(entry.EntryId)">Save viewer</button>
                                             </div>
                                         }
                                     </article>

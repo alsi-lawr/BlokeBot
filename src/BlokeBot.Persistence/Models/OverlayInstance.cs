@@ -16,6 +16,9 @@ public enum OverlayType
 
     [PersistedToken("event-feed")]
     EventFeed,
+
+    [PersistedToken("viewer-queue")]
+    ViewerQueue,
 }
 
 public enum OverlayEventFeedKind

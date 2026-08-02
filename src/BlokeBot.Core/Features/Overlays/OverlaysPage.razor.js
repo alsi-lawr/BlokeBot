@@ -41,6 +41,8 @@ export function initializeAppearance(dotnet) {
     showEntrantCount: activeFrame.dataset.showEntrantCount === "true",
     showCountdown: activeFrame.dataset.showCountdown === "true",
     showJoinCommand: activeFrame.dataset.showJoinCommand === "true",
+    currentRows: Number(activeFrame.dataset.currentRows),
+    nextRows: Number(activeFrame.dataset.nextRows),
   });
   const sendDraft = (requestId) => {
     activeFrame.contentWindow?.postMessage(

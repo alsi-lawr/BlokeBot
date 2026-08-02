@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using BlokeBot.Core.Features.Guessing.Game;
+using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Eventing;
 
@@ -11,7 +12,8 @@ internal sealed class OverlayLiveCoordinator(
     IOverlayStateProvider stateProvider,
     TimeProvider timeProvider,
     EventBus<AppEventKind> events,
-    ILogger<OverlayLiveCoordinator> logger
+    ILogger<OverlayLiveCoordinator> logger,
+    PlayQueueChangeNotifier? playQueueChanges = null
 )
     : IHostedService,
         IOverlayLivePublisher,
@@ -19,7 +21,8 @@ internal sealed class OverlayLiveCoordinator(
         IOverlayCueTransport,
         IAsyncDisposable,
         IGuessingChangeObserver,
-        IPointsGiveawayChangeObserver
+        IPointsGiveawayChangeObserver,
+        IPlayQueueChangeObserver
 {
     private const int _connectionQueueCapacity = 16;
     private readonly CancellationTokenSource _stopping = new();
@@ -31,6 +34,7 @@ internal sealed class OverlayLiveCoordinator(
     private readonly Dictionary<OverlayIdentity, GuessingOverlayPhase> _guessingPhases = [];
     private readonly Dictionary<OverlayIdentity, GiveawayOverlayPhase> _giveawayPhases = [];
     private IDisposable? _overlayChangesSubscription;
+    private IDisposable? _playQueueChangesSubscription;
     private long _generation;
     private int _disposeState;
 
@@ -48,6 +52,7 @@ internal sealed class OverlayLiveCoordinator(
                 return ValueTask.CompletedTask;
             }
         );
+        _playQueueChangesSubscription = playQueueChanges?.Subscribe(this);
         return Task.CompletedTask;
     }
 
@@ -55,6 +60,8 @@ internal sealed class OverlayLiveCoordinator(
     {
         _overlayChangesSubscription?.Dispose();
         _overlayChangesSubscription = null;
+        _playQueueChangesSubscription?.Dispose();
+        _playQueueChangesSubscription = null;
         _stopping.Cancel();
         InvalidateAllConnections();
         return Task.CompletedTask;
@@ -161,6 +168,36 @@ internal sealed class OverlayLiveCoordinator(
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask PlayQueueChangedAsync(
+        PlayQueueCommittedChange change,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ResolvedOverlayInstance[] instances;
+        lock (_connectionsGate)
+        {
+            instances = _connections
+                .Values.Where(connection =>
+                    connection.IsActive
+                    && connection.Instance.HostId == change.HostId
+                    && connection.Instance.Configuration
+                        is OverlayConfiguration.ViewerQueueV1 { QueueId: var queueId }
+                    && queueId == change.QueueId
+                )
+                .Select(connection => connection.Instance)
+                .DistinctBy(instance => instance.OverlayId)
+                .ToArray();
+        }
+
+        foreach (var instance in instances)
+        {
+            QueuePublication(instance, OverlayLivePublicationKind.State, change.Transition);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     internal async Task<OverlayLiveOpenResult> OpenAsync(
         ResolvedOverlayInstance instance,
         long resolvedGeneration,
@@ -176,6 +213,7 @@ internal sealed class OverlayLiveCoordinator(
                 or OverlaySnapshotProjection.CuePlayerV1
                 or OverlaySnapshotProjection.GiveawayV1
                 or OverlaySnapshotProjection.EventFeedV1
+                or OverlaySnapshotProjection.ViewerQueueV1
             )
         )
         {
@@ -221,7 +259,11 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    private void QueuePublication(ResolvedOverlayInstance instance, OverlayLivePublicationKind kind)
+    private void QueuePublication(
+        ResolvedOverlayInstance instance,
+        OverlayLivePublicationKind kind,
+        PlayQueueOverlayTransition queueTransition = PlayQueueOverlayTransition.None
+    )
     {
         if (_stopping.IsCancellationRequested)
         {
@@ -236,7 +278,7 @@ internal sealed class OverlayLiveCoordinator(
                     PublishPendingAsync(publication, _stopping.Token)
                 )
             );
-            slot.Queue(new OverlayPublication(instance, kind));
+            slot.Queue(new OverlayPublication(instance, kind, queueTransition));
         }
         catch (Exception exception)
         {
@@ -272,6 +314,7 @@ internal sealed class OverlayLiveCoordinator(
                     or OverlaySnapshotProjection.CuePlayerV1
                     or OverlaySnapshotProjection.GiveawayV1
                     or OverlaySnapshotProjection.EventFeedV1
+                    or OverlaySnapshotProjection.ViewerQueueV1
                 )
             )
             {
@@ -404,6 +447,21 @@ internal sealed class OverlayLiveCoordinator(
                         },
                     }
                 ),
+            OverlaySnapshotProjection.ViewerQueueV1 queue =>
+                new OverlayLiveTransportMessage.ViewerQueueBaseline(
+                    new ViewerQueueV1OverlayLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        EventType = "baseline",
+                        OccurredAtUtc = occurredAtUtc,
+                        Payload = new ViewerQueueV1OverlayLivePayload
+                        {
+                            Animation = "none",
+                            State = queue.Snapshot.State,
+                        },
+                    }
+                ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required to open a live overlay."
             ),
@@ -507,6 +565,25 @@ internal sealed class OverlayLiveCoordinator(
                         },
                     }
                 ),
+            OverlaySnapshotProjection.ViewerQueueV1 queue =>
+                new OverlayLiveTransportMessage.ViewerQueueEvent(
+                    new ViewerQueueV1OverlayLiveEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = sequence,
+                        EventType =
+                            publication.Kind is OverlayLivePublicationKind.Test ? "test" : "state",
+                        OccurredAtUtc = occurredAtUtc,
+                        Payload = new ViewerQueueV1OverlayLivePayload
+                        {
+                            Animation =
+                                publication.Kind is OverlayLivePublicationKind.Test
+                                    ? "none"
+                                    : QueueAnimation(publication.QueueTransition),
+                            State = queue.Snapshot.State,
+                        },
+                    }
+                ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required for live publication."
             ),
@@ -602,6 +679,15 @@ internal sealed class OverlayLiveCoordinator(
         }
         return current == previous ? "none" : "statusChange";
     }
+
+    private static string QueueAnimation(PlayQueueOverlayTransition transition) =>
+        transition switch
+        {
+            PlayQueueOverlayTransition.PartyChanged => "partyChange",
+            PlayQueueOverlayTransition.ReadyOutcome => "readyOutcome",
+            PlayQueueOverlayTransition.SelectedNext => "selectedNext",
+            _ => "none",
+        };
 
     private void PublishCueMessage(
         ResolvedOverlayInstance target,
@@ -755,6 +841,7 @@ internal sealed class OverlayLiveCoordinator(
         }
 
         _overlayChangesSubscription?.Dispose();
+        _playQueueChangesSubscription?.Dispose();
         _stopping.Cancel();
         foreach (var slot in _publicationSlots.Values)
         {
@@ -765,7 +852,8 @@ internal sealed class OverlayLiveCoordinator(
 
     private sealed record OverlayPublication(
         ResolvedOverlayInstance Instance,
-        OverlayLivePublicationKind Kind
+        OverlayLivePublicationKind Kind,
+        PlayQueueOverlayTransition QueueTransition
     );
 
     private sealed class PresenceState
@@ -937,6 +1025,12 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record EventFeedEvent(EventFeedV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record ViewerQueueBaseline(ViewerQueueV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record ViewerQueueEvent(ViewerQueueV1OverlayLiveEnvelope Envelope)
         : OverlayLiveTransportMessage;
 
     internal sealed record Cue(CuePlaybackLiveEnvelope Envelope) : OverlayLiveTransportMessage;

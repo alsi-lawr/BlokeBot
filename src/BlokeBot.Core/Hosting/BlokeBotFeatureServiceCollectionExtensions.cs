@@ -68,7 +68,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotPlayWithViewers(this IServiceCollection services)
     {
+        services.AddSingleton<PlayQueueChangeNotifier>();
         services.AddSingleton<PlayQueueService>();
+        services.AddSingleton<IPlayQueueProjectionReader>(serviceProvider =>
+            serviceProvider.GetRequiredService<PlayQueueService>()
+        );
         services.AddSingleton<IPrivateLobbyDelivery, TwitchPrivateLobbyDelivery>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;

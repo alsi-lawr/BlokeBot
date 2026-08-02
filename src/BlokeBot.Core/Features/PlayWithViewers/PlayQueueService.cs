@@ -10,13 +10,15 @@ namespace BlokeBot.Core.Features.PlayWithViewers;
 public sealed class PlayQueueService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
-    TimeProvider timeProvider
-)
+    TimeProvider timeProvider,
+    PlayQueueChangeNotifier? changes = null
+) : IPlayQueueProjectionReader
 {
     private const int _eventSchemaVersion = 1;
     private const int _maximumEventPayloadLength = 1024;
     private const int _gateCount = 64;
     private readonly SemaphoreSlim[] _mutationGates = CreateGates();
+    private readonly PlayQueueChangeNotifier _changes = changes ?? new();
 
     public async Task<PlayQueueResult<PlayQueueSummary>> ConfigureAsync(
         int hostId,
@@ -95,7 +97,6 @@ public sealed class PlayQueueService(
                                     Position = position,
                                     Key = PlayQueueInput.NormalizeKey(field.Key),
                                     Label = field.Label.Trim(),
-                                    IsRequired = field.IsRequired,
                                     Choices = string.Join('\n', field.Choices ?? []),
                                 }
                         )
@@ -168,6 +169,15 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
+        if (string.IsNullOrWhiteSpace(command.Viewer.TwitchUserId))
+        {
+            return Task.FromResult<PlayQueueResult<PublicPlayQueueEntryView>>(
+                Rejected<PublicPlayQueueEntryView>(
+                    new PlayQueueRejection.Invalid("Sign in with Twitch to join this queue.")
+                )
+            );
+        }
+
         var login = PlayQueueInput.NormalizeLogin(command.Viewer.Login);
         if (!PlayQueueInput.IsValidLogin(login))
         {
@@ -833,6 +843,28 @@ public sealed class PlayQueueService(
             ct
         );
 
+    public Task<PlayQueueOverlayState?> ReadOverlayStateAsync(
+        int hostId,
+        int queueId,
+        int currentLimit,
+        int nextLimit,
+        CancellationToken cancellationToken
+    )
+    {
+        if (currentLimit is < 0 or > 12 || nextLimit is < 0 or > 12 || queueId <= 0)
+        {
+            return Task.FromResult<PlayQueueOverlayState?>(null);
+        }
+
+        return ReadOverlayStateCoreAsync(
+            hostId,
+            queueId,
+            currentLimit,
+            nextLimit,
+            cancellationToken
+        );
+    }
+
     public async Task<PlayQueueResult<PublicPlayQueueEntryView>> GetPositionAsync(
         int hostId,
         string queueSlug,
@@ -1058,10 +1090,12 @@ public sealed class PlayQueueService(
             }
 
             var value = await project(db, queue);
+            var committedChanges = CommittedChanges(db, hostId);
             await transaction.CommitAsync(ct);
             if (changed)
             {
                 await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                await NotifyOverlayChangesAsync(committedChanges, ct);
             }
 
             return value;
@@ -1101,17 +1135,22 @@ public sealed class PlayQueueService(
             }
 
             var result = await mutate(db, now);
-            if (result is PlayQueueResult<T>.Succeeded)
+            if (result is PlayQueueResult<T>.Succeeded succeeded)
             {
                 await db.SaveChangesAsync(ct);
+                var committedChanges =
+                    succeeded.WasIdempotent && !converged ? [] : CommittedChanges(db, hostId);
                 await transaction.CommitAsync(ct);
                 await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                await NotifyOverlayChangesAsync(committedChanges, ct);
             }
             else if (converged)
             {
+                var committedChanges = CommittedChanges(db, hostId);
                 await transaction.RollbackToSavepointAsync("AfterReadinessConvergence", ct);
                 await transaction.CommitAsync(ct);
                 await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                await NotifyOverlayChangesAsync(committedChanges, ct);
             }
 
             return result;
@@ -1127,6 +1166,14 @@ public sealed class PlayQueueService(
             dbFactory,
             hostId,
             HostFeatureFlags.PlayWithViewers,
+            ct
+        );
+
+    private Task<bool> OverlayFeaturesAreEnabledAsync(int hostId, CancellationToken ct) =>
+        HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            hostId,
+            HostFeatureFlags.Overlays | HostFeatureFlags.PlayWithViewers,
             ct
         );
 
@@ -1254,16 +1301,6 @@ public sealed class PlayQueueService(
                 )
                 .Take(required)
                 .ToList();
-            if (matching.Count != required)
-            {
-                return new CandidateSelection(
-                    [],
-                    new PlayQueueRejection.Composition(
-                        $"The party needs {requirement.MinimumCount} {requirement.Role} role(s)."
-                    )
-                );
-            }
-
             selected.AddRange(matching);
         }
 
@@ -1467,7 +1504,6 @@ public sealed class PlayQueueService(
                     value.Id,
                     value.Key,
                     value.Label,
-                    value.IsRequired,
                     Choices(value.Choices)
                 ))
                 .ToArray(),
@@ -1511,13 +1547,14 @@ public sealed class PlayQueueService(
         long position
     ) =>
         new(
-            entry.Id,
             position,
             queue.ShowParticipantNames ? entry.DisplayName : null,
             entry.Status,
-            entry.ReadyExpiresAtUtc,
-            []
-        );
+            PublicFields(queue, entry)
+        )
+        {
+            InternalEntryId = entry.Id,
+        };
 
     private async Task<ModeratorPlayQueueEntryView> ToModeratorViewAsync(
         BlokeBotDbContext db,
@@ -1540,6 +1577,7 @@ public sealed class PlayQueueService(
             .MaxAsync(value => (DateTime?)value.ExpiresAtUtc, ct);
         var publicView = await ToPublicViewAsync(db, queue, entry, ct);
         return new ModeratorPlayQueueEntryView(
+            entry.Id,
             publicView,
             entry.NormalizedLogin,
             entry.TwitchUserId,
@@ -1548,20 +1586,7 @@ public sealed class PlayQueueService(
             entry.JoinedAtUtc,
             history,
             exclusion
-        ) with
-        {
-            Public = publicView with
-            {
-                Fields = entry
-                    .Values.OrderBy(value => value.Field!.Position)
-                    .Select(value => new PlayQueueEntryFieldView(
-                        value.Field!.Key,
-                        value.Field.Label,
-                        value.Value
-                    ))
-                    .ToArray(),
-            },
-        };
+        );
     }
 
     private async Task<IReadOnlyList<ModeratorPlayQueueEntryView>> ToModeratorViewsAsync(
@@ -1606,14 +1631,6 @@ public sealed class PlayQueueService(
         {
             normalized.TryGetValue(field.Key, out var value);
             value ??= string.Empty;
-            if (field.IsRequired && string.IsNullOrWhiteSpace(value))
-            {
-                return new ConfigurationValues(
-                    [],
-                    new PlayQueueRejection.Invalid($"{field.Label} is required.")
-                );
-            }
-
             if (value.Length > 200)
             {
                 return new ConfigurationValues(
@@ -1778,9 +1795,127 @@ public sealed class PlayQueueService(
             .All(pair =>
                 pair.First.Key == PlayQueueInput.NormalizeKey(pair.Second.Key)
                 && pair.First.Label == pair.Second.Label.Trim()
-                && pair.First.IsRequired == pair.Second.IsRequired
                 && pair.First.Choices == string.Join('\n', pair.Second.Choices ?? [])
             );
+
+    private async Task<PlayQueueOverlayState?> ReadOverlayStateCoreAsync(
+        int hostId,
+        int queueId,
+        int currentLimit,
+        int nextLimit,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!await OverlayFeaturesAreEnabledAsync(hostId, cancellationToken))
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var queue = await LoadQueueAsync(db, hostId, queueId, cancellationToken);
+        if (queue is null)
+        {
+            return null;
+        }
+
+        var current = queue
+            .Entries.Where(value => value.Status == PlayQueueEntryStatus.Selected)
+            .OrderBy(value => value.Id)
+            .Take(currentLimit)
+            .Select(entry => ToOverlayEntry(queue, entry))
+            .ToArray();
+        var waiting = OrderedWaiting(queue.Entries).ToArray();
+        var next = waiting.Take(nextLimit).Select(entry => ToOverlayEntry(queue, entry)).ToArray();
+        return new PlayQueueOverlayState(
+            queue.Name,
+            queue.ActivityName,
+            queue.IsOpen,
+            waiting.Length,
+            current,
+            next
+        );
+    }
+
+    private static PlayQueueOverlayEntry ToOverlayEntry(PlayQueue queue, PlayQueueEntry entry) =>
+        new(queue.ShowParticipantNames ? entry.DisplayName : null, PublicFields(queue, entry));
+
+    private static IReadOnlyList<PlayQueueEntryFieldView> PublicFields(
+        PlayQueue queue,
+        PlayQueueEntry entry
+    ) =>
+        queue
+            .Fields.OrderBy(field => field.Position)
+            .Select(field => new PlayQueueEntryFieldView(
+                field.Key,
+                field.Label,
+                entry.Values.FirstOrDefault(value => value.FieldId == field.Id)?.Value
+                    ?? string.Empty
+            ))
+            .ToArray();
+
+    private static IReadOnlyList<PlayQueueCommittedChange> CommittedChanges(
+        BlokeBotDbContext db,
+        int hostId
+    )
+    {
+        var eventsByQueue = db
+            .ChangeTracker.Entries<PlayQueueDomainEvent>()
+            .Select(entry => entry.Entity)
+            .Where(value => value.HostId == hostId)
+            .GroupBy(value => value.QueueId)
+            .ToDictionary(
+                group => group.Key,
+                group => TransitionFor(group.Select(value => value.Kind))
+            );
+        var queueIds = db
+            .ChangeTracker.Entries<PlayQueue>()
+            .Select(entry => entry.Entity)
+            .Where(value => value.HostId == hostId && value.Id > 0)
+            .Select(value => value.Id)
+            .Concat(
+                db.ChangeTracker.Entries<PlayQueueEntry>()
+                    .Select(entry => entry.Entity)
+                    .Where(value => value.HostId == hostId && value.QueueId > 0)
+                    .Select(value => value.QueueId)
+            )
+            .Concat(eventsByQueue.Keys)
+            .Distinct()
+            .ToArray();
+        return queueIds
+            .Select(queueId => new PlayQueueCommittedChange(
+                hostId,
+                queueId,
+                eventsByQueue.GetValueOrDefault(queueId)
+            ))
+            .ToArray();
+    }
+
+    private static PlayQueueOverlayTransition TransitionFor(IEnumerable<PlayQueueEventKind> events)
+    {
+        var kinds = events.ToArray();
+        if (kinds.Contains(PlayQueueEventKind.PartySelected))
+        {
+            return PlayQueueOverlayTransition.PartyChanged;
+        }
+        if (kinds.Any(kind => kind is PlayQueueEventKind.Ready or PlayQueueEventKind.NoShow))
+        {
+            return PlayQueueOverlayTransition.ReadyOutcome;
+        }
+        return kinds.Contains(PlayQueueEventKind.ReadyCheckStarted)
+            ? PlayQueueOverlayTransition.SelectedNext
+            : PlayQueueOverlayTransition.None;
+    }
+
+    private async ValueTask NotifyOverlayChangesAsync(
+        IReadOnlyList<PlayQueueCommittedChange> committedChanges,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var change in committedChanges)
+        {
+            await _changes.NotifyAsync(change, cancellationToken);
+        }
+    }
 
     private static string PreferredRole(PlayQueueEntry entry) =>
         entry.Values.FirstOrDefault(value => value.Field?.Key == "preferred-role")?.Value
