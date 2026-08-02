@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
@@ -146,7 +147,7 @@ public partial class PlayQueuesPage
                 if (command is null)
                 {
                     Fail(
-                        "Capacity, expiry, retention, exclusion, and roles must contain valid numbers."
+                        "Enter whole numbers for party size, ready-check time, history, no-show wait, and party role targets."
                     );
                     return;
                 }
@@ -222,6 +223,27 @@ public partial class PlayQueuesPage
         var detail = choices.Length == 0 ? "Free text" : $"{choices.Length} choices";
         return $"{key} · Optional · Public · {detail}";
     }
+
+    internal static string SelectionModeLabel(PlayQueueSelectionMode mode) =>
+        mode switch
+        {
+            PlayQueueSelectionMode.JoinOrder => "First to join",
+            PlayQueueSelectionMode.LeastRecentParticipation => "Viewers who played least recently",
+            _ => throw new UnreachableException("Unknown play queue selection mode."),
+        };
+
+    internal static string EntryStatusLabel(PlayQueueEntryStatus status) =>
+        status switch
+        {
+            PlayQueueEntryStatus.Waiting => "Waiting",
+            PlayQueueEntryStatus.AwaitingReady => "Awaiting response",
+            PlayQueueEntryStatus.Ready => "Ready",
+            PlayQueueEntryStatus.Selected => "Selected",
+            PlayQueueEntryStatus.Left => "Left queue",
+            PlayQueueEntryStatus.Skipped => "Skipped",
+            PlayQueueEntryStatus.NoShow => "Did not respond",
+            _ => throw new UnreachableException("Unknown play queue entry status."),
+        };
 
     private Task ToggleOpenAsync() =>
         Run(async () =>
@@ -361,7 +383,7 @@ public partial class PlayQueuesPage
                 _feedback =
                     failures.Length == 0
                         ? $"Lobby message privately delivered to {outcomes.Count} viewer(s)."
-                        : $"Private delivery failed for {string.Join(", ", failures.Select(value => $"@{value.Login}"))}. No public fallback was attempted.";
+                        : $"We couldn’t send the lobby message privately to {string.Join(", ", failures.Select(value => $"@{value.Login}"))}. It was not posted publicly.";
             }
         );
 

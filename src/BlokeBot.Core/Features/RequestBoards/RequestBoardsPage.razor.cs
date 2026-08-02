@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostedChannels;
@@ -230,11 +231,66 @@ public partial class RequestBoardsPage
                 $"Range {OptionalBoundary(field.MinimumNumber)} to {OptionalBoundary(field.MaximumNumber)}",
             _ => $"Maximum {field.MaximumLength} characters",
         };
-        return $"{key} · {field.Kind} · {requirement} · {detail}";
+        return $"{key} · {FieldKindLabel(field.Kind)} · {requirement} · {detail}";
     }
 
     private static string OptionalBoundary(string value) =>
         string.IsNullOrWhiteSpace(value) ? "any" : value;
+
+    internal static string RefundPolicyLabel(RequestBoardRefundPolicy policy) =>
+        policy switch
+        {
+            RequestBoardRefundPolicy.Never => "Never refund",
+            RequestBoardRefundPolicy.RejectedOrWithdrawn => "Refund if rejected or withdrawn",
+            RequestBoardRefundPolicy.AnyUnfulfilledClosure => "Refund if not fulfilled",
+            _ => throw new UnreachableException("Unknown request board refund policy."),
+        };
+
+    internal static string FieldKindLabel(RequestBoardFieldKind kind) =>
+        kind switch
+        {
+            RequestBoardFieldKind.Text => "Text",
+            RequestBoardFieldKind.Url => "Link",
+            RequestBoardFieldKind.Choice => "Choose from a list",
+            RequestBoardFieldKind.Number => "Number",
+            RequestBoardFieldKind.TwitchClip => "Twitch clip link",
+            _ => throw new UnreachableException("Unknown request board field type."),
+        };
+
+    internal static string SubmissionStatusLabel(RequestSubmissionStatus status) =>
+        status switch
+        {
+            RequestSubmissionStatus.Pending => "Awaiting review",
+            RequestSubmissionStatus.Approved => "Approved",
+            RequestSubmissionStatus.Queued => "In queue",
+            RequestSubmissionStatus.Accepted => "Accepted",
+            RequestSubmissionStatus.Completed => "Completed",
+            RequestSubmissionStatus.Rejected => "Rejected",
+            RequestSubmissionStatus.Withdrawn => "Withdrawn",
+            RequestSubmissionStatus.Merged => "Merged into another request",
+            _ => throw new UnreachableException("Unknown request submission status."),
+        };
+
+    internal static string ModerationActionLabel(RequestSubmissionStatus target) =>
+        target switch
+        {
+            RequestSubmissionStatus.Approved => "Approve",
+            RequestSubmissionStatus.Queued => "Add to queue",
+            RequestSubmissionStatus.Accepted => "Mark accepted",
+            RequestSubmissionStatus.Completed => "Mark complete",
+            RequestSubmissionStatus.Rejected => "Reject",
+            _ => throw new UnreachableException("Unknown request moderation target."),
+        };
+
+    internal static string ReservationStateLabel(RequestPointReservationState state) =>
+        state switch
+        {
+            RequestPointReservationState.None => "No points charged",
+            RequestPointReservationState.Reserved => "Points held",
+            RequestPointReservationState.Refunded => "Points refunded",
+            RequestPointReservationState.Consumed => "Points charged",
+            _ => throw new UnreachableException("Unknown request point reservation state."),
+        };
 
     private Task TransitionAsync(long submissionId, RequestSubmissionStatus target) =>
         RunSelectedHostMutationAsync(
@@ -252,7 +308,8 @@ public partial class RequestBoardsPage
 
                 var result = await _boards.ModerateAsync(HostId, command, CancellationToken.None);
                 _feedback = result.Match(
-                    _ => $"Request #{submissionId} is now {target}.",
+                    _ =>
+                        $"Request #{submissionId} is now {SubmissionStatusLabel(target).ToLowerInvariant()}.",
                     rejected => rejected.Reason.Message
                 );
                 _operationFailed =
@@ -277,7 +334,7 @@ public partial class RequestBoardsPage
                 )
                 {
                     _operationFailed = true;
-                    _feedback = "Enter the target request ID before merging.";
+                    _feedback = "Enter the target request number before merging.";
                     return;
                 }
 

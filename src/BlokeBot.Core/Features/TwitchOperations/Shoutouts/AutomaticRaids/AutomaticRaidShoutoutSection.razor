@@ -142,7 +142,7 @@
                                         @onchange="SetAnnouncementColor">
                                     @foreach (var color in _announcementColors)
                                     {
-                                        <option value="@color">@color</option>
+                                        <option value="@color">@AnnouncementColorLabel(color)</option>
                                     }
                                 </select>
                                 @if (ErrorFor(AutomaticRaidShoutoutValidationField.AnnouncementColor) is { } colorError)

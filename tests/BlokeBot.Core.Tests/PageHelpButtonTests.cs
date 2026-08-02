@@ -119,6 +119,40 @@ public sealed class PageHelpButtonTests
     }
 
     [Test]
+    public void SignedInHelp_UsesTaskLanguageAndPreservesPrivacyAndOrderingFacts()
+    {
+        var host = OpenHelpFor("/host");
+        host.ShouldContain("Twitch actions");
+        host.ShouldContain("main command name");
+        host.ShouldContain("first command name");
+        host.ShouldNotContain("provider actions");
+        host.ShouldNotContain("canonical name");
+
+        var guessing = OpenHelpFor("/guessing/settings");
+        guessing.ShouldContain(
+            "Enter the main answer first, then any accepted alternatives, separated by commas."
+        );
+        guessing.ShouldNotContain("canonical name");
+
+        var queues = OpenHelpFor("/queues");
+        queues.ShouldContain("Every configured entry field is optional");
+        queues.ShouldContain("viewer page and Viewer Queue overlay");
+        queues.ShouldContain("Lobby messages and moderator notes stay private");
+        queues.ShouldNotContain("Entry fields are private to moderators");
+
+        var customCommands = OpenHelpFor("/custom-commands/settings");
+        customCommands.ShouldContain("selected cue and Browser Source");
+        customCommands.ShouldContain("without sending chat");
+        customCommands.ShouldContain("consuming a one-time viewer use");
+        customCommands.ShouldNotContain("host-bound playback admission");
+        customCommands.ShouldNotContain("use claims");
+
+        var requests = OpenHelpFor("/requests");
+        requests.ShouldContain("actions on connected services");
+        requests.ShouldNotContain("provider actions");
+    }
+
+    [Test]
     public void OpenHelp_RouteChangeClosesThePanelAndSelectsTheNewRouteContent()
     {
         using var context = new BunitContext();
@@ -158,5 +192,14 @@ public sealed class PageHelpButtonTests
 
         cut.Find("h2").TextContent.ShouldBe("Home");
         cut.Markup.ShouldContain("Where to go next");
+    }
+
+    private static string OpenHelpFor(string path)
+    {
+        using var context = new BunitContext();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
+        var cut = context.Render<PageHelpButton>();
+        cut.Find("button[aria-label='Page help']").Click();
+        return cut.Markup;
     }
 }

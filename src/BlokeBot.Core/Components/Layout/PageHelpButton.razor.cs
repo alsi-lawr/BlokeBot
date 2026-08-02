@@ -123,7 +123,7 @@ public partial class PageHelpButton
         "Turning this tool on or off",
         "Chat tools are opt-in per channel. Use Channel setup to turn this tool on or off.",
         [
-            "Turning it off hides normal navigation and stops commands, automation, public output, and provider actions.",
+            "Turning it off hides normal navigation and stops commands, automation, public output, and actions on connected services.",
             "Saved configuration and history are retained. Turning it back on resumes from the current state without replaying work suppressed while it was off.",
         ]
     );
@@ -151,7 +151,7 @@ public partial class PageHelpButton
                 "Choose your Chat tools",
                 "Every Chat tools feature has its own switch and starts off for a new channel.",
                 [
-                    "Turning a tool off retains its setup and history while stopping its commands, public output, automation, and provider actions.",
+                    "Turning a tool off retains its setup and history while stopping its commands, public output, automation, and Twitch actions.",
                     "Turning a tool back on restores access to saved data without replaying work suppressed while it was off.",
                 ]
             ),
@@ -167,9 +167,9 @@ public partial class PageHelpButton
             ),
             new(
                 "Available viewer commands",
-                "Choose the global chat words that open the viewer command catalog. The catalog publishes one canonical name for each command.",
+                "Choose the global chat words that open the viewer command catalog. The catalog publishes the main command name for each command.",
                 [
-                    "The list shows one canonical name for each viewer-safe command and never includes moderator-only commands.",
+                    "The list shows the first command name for each viewer-safe command and never includes moderator-only commands.",
                     "Commands appear or disappear when games, giveaways, boards, queues, and live-stream availability change.",
                 ]
             ),
@@ -207,7 +207,8 @@ public partial class PageHelpButton
                 "Choose a saved queue to edit it, or select New queue to start a draft. A new queue is not created until you complete its details and select Save queue.",
                 [
                     "The viewer-page link becomes available after the new queue has been saved.",
-                    "Entry fields are private to moderators. Choose a field in the inventory to edit it.",
+                    "Every configured entry field is optional and appears on the viewer page and Viewer Queue overlay. Choose a field in the inventory to edit it.",
+                    "Lobby messages and moderator notes stay private.",
                 ]
             ),
             new(
@@ -488,7 +489,7 @@ public partial class PageHelpButton
                 "Round types",
                 "Create one or more kinds of guessing game. Each one can have its own answer list and chat replies.",
                 [
-                    "For each answer, enter its canonical name first and any accepted aliases after it, separated by commas.",
+                    "Enter the main answer first, then any accepted alternatives, separated by commas.",
                 ]
             ),
             new(
@@ -573,9 +574,9 @@ public partial class PageHelpButton
                     "Use <code>{user}</code> for the viewer's name and <code>{channel}</code> for the channel name.",
                     "Use <code>{args}</code> for everything typed after the command, or <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
                     "Counter commands can use <code>{count}</code> for the new number.",
-                    "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, playback, testing, replies, cooldowns, use claims, and viewer-catalog disclosure are paused.",
+                    "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, cue playback, testing, chat replies, cooldowns, one-time viewer use, and viewer-catalog listing are paused.",
                     "Turning either switch back on restores the saved cue setup without replaying commands that were suppressed while it was off.",
-                    "Test cue uses the same host-bound playback admission as a viewer command, but does not send chat, start a cooldown, or claim a viewer use.",
+                    "Test cue checks the selected cue and Browser Source without sending chat, starting a cooldown, or consuming a one-time viewer use.",
                 ]
             ),
             new(

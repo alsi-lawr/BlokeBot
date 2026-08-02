@@ -56,7 +56,7 @@
                         <select id="moment-reward-policy" class="input" @bind="_rewardPolicy">
                             @foreach (var policy in Enum.GetValues<MomentRewardPolicy>())
                             {
-                                <option value="@policy">@policy</option>
+                                <option value="@policy">@RewardPolicyLabel(policy)</option>
                             }
                         </select>
                     </div>
@@ -96,7 +96,7 @@
                         <article class="card p-5" @key="candidate.Public.PublicId">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@candidate.Public.State · @candidate.Public.StreamIdentity</p>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@CandidateStateLabel(candidate.Public.State) · @candidate.Public.StreamIdentity</p>
                                     <h3 class="mt-1 break-words text-lg font-semibold">@(candidate.Public.PublicTitle.Length == 0 ? "Untitled moment" : candidate.Public.PublicTitle)</h3>
                                     <p class="text-sm text-muted-foreground">@candidate.Public.Contributors.Count contributors · @candidate.Public.VoteCount votes · @candidate.Public.PublicId</p>
                                 </div>
@@ -112,7 +112,7 @@
                                     <TextAreaField Id="@($"moment-private-{candidate.Public.PublicId:N}")" Label="Private moderator note / rejection reason" @bind-Value="draft.PrivateText" />
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <Field Id="@($"moment-merge-{candidate.Public.PublicId:N}")" Label="Merge into moment public ID" @bind-Value="draft.MergeTarget" />
+                                    <Field Id="@($"moment-merge-{candidate.Public.PublicId:N}")" Label="Merge into moment number" @bind-Value="draft.MergeTarget" />
                                 </div>
                             </div>
                             @if (candidate.Suggestions.Count > 0)
@@ -125,7 +125,7 @@
                             }
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <button class="btn-primary" type="button" @onclick="() => ApproveAsync(candidate.Public.PublicId)">Approve</button>
-                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(candidate.Public.PublicId)">Save metadata</button>
+                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(candidate.Public.PublicId)">Save details</button>
                                 <button class="btn-secondary" type="button" @onclick="() => RejectAsync(candidate.Public.PublicId)">Reject</button>
                                 <button class="btn-secondary" type="button" @onclick="() => MergeAsync(candidate.Public.PublicId)">Merge</button>
                             </div>

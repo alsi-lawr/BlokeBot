@@ -199,7 +199,10 @@ public sealed class ManagementPageWorkspaceTests
         FindButton(page, "Save queue").Click();
         page.WaitForAssertion(() =>
         {
-            page.Find("[role='alert']").TextContent.ShouldContain("must contain valid numbers");
+            page.Find("[role='alert']")
+                .TextContent.ShouldBe(
+                    "Enter whole numbers for party size, ready-check time, history, no-show wait, and party role targets."
+                );
             page.Find("#queue-name").GetAttribute("value").ShouldBe("Unsaved queue");
             page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
         });

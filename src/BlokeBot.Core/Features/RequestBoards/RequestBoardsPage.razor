@@ -93,7 +93,7 @@
                             <select id="request-board-refunds" class="input" @bind="_draft.RefundPolicy">
                                 @foreach (var policy in Enum.GetValues<RequestBoardRefundPolicy>())
                                 {
-                                    <option value="@policy">@policy</option>
+                                    <option value="@policy">@RefundPolicyLabel(policy)</option>
                                 }
                             </select>
                         </div>
@@ -168,7 +168,7 @@
                                             <select id="@($"request-field-kind-{index}")" class="input" @bind="field.Kind">
                                                 @foreach (var kind in Enum.GetValues<RequestBoardFieldKind>())
                                                 {
-                                                    <option value="@kind">@kind</option>
+                                                    <option value="@kind">@FieldKindLabel(kind)</option>
                                                 }
                                             </select>
                                         </div>
@@ -224,7 +224,7 @@
                             <article @key="submission.Public.Id" class="card p-5">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">#@submission.Public.Id · @submission.Public.Status · @submission.PointReservationState</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">#@submission.Public.Id · @SubmissionStatusLabel(submission.Public.Status) · @ReservationStateLabel(submission.PointReservationState)</p>
                                         <h3 class="mt-1 text-lg font-semibold text-slate-950">@submission.Public.Title</h3>
                                         <p class="mt-1 text-sm text-muted-foreground">By @submission.Public.SubmitterLogin · @submission.Public.VoteCount votes</p>
                                     </div>
@@ -248,7 +248,7 @@
                                     <Field Id="@($"request-category-{submission.Public.Id}")" Label="Category" @bind-Value="draft.Category" />
                                     <Field Id="@($"request-tags-{submission.Public.Id}")" Label="Tags (comma-separated)" @bind-Value="draft.Tags" />
                                     <Field Id="@($"request-priority-{submission.Public.Id}")" Label="Priority (-1000 to 1000)" @bind-Value="draft.Priority" />
-                                    <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request ID" @bind-Value="draft.MergeTarget" />
+                                    <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request number" @bind-Value="draft.MergeTarget" />
                                     <div class="md:col-span-2">
                                         <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note" @bind-Value="draft.PublicNote" />
                                     </div>
@@ -262,7 +262,7 @@
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     @foreach (var target in AvailableTransitions(submission.Public.Status))
                                     {
-                                        <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(submission.Public.Id, target)">@target</button>
+                                        <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(submission.Public.Id, target)">@ModerationActionLabel(target)</button>
                                     }
                                     <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
                                 </div>

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
 using BlokeBot.Eventing;
@@ -56,6 +57,17 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         );
 
     private bool _pinUntilStreamEnd => _draft.PinDurationSeconds is null;
+
+    internal static string AnnouncementColorLabel(PersistedAnnouncementColor color) =>
+        color switch
+        {
+            PersistedAnnouncementColor.Primary => "Default",
+            PersistedAnnouncementColor.Blue => "Blue",
+            PersistedAnnouncementColor.Green => "Green",
+            PersistedAnnouncementColor.Orange => "Orange",
+            PersistedAnnouncementColor.Purple => "Purple",
+            _ => throw new UnreachableException("Unknown Twitch announcement color."),
+        };
 
     private string _readinessText =>
         !_draft.Enabled

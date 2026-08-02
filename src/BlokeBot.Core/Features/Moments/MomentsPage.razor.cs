@@ -80,12 +80,35 @@ public partial class MomentsPage
                 break;
             default:
                 _streamIdentity = string.Empty;
-                _streamStatus = "Twitch stream identity is temporarily unavailable.";
+                _streamStatus =
+                    "We can’t confirm the live stream right now. Try again in a moment.";
                 break;
         }
     }
 
     private MomentDraft Draft(Guid id) => _drafts[id];
+
+    internal static string RewardPolicyLabel(MomentRewardPolicy policy) =>
+        policy switch
+        {
+            MomentRewardPolicy.None => "No reward",
+            MomentRewardPolicy.FirstRequester => "First viewer to request",
+            MomentRewardPolicy.AllContributors => "All contributing viewers",
+            _ => throw new UnreachableException("Unknown moment reward policy."),
+        };
+
+    internal static string CandidateStateLabel(MomentCandidateState state) =>
+        state switch
+        {
+            MomentCandidateState.ProviderPending => "Creating clip",
+            MomentCandidateState.ClipReady => "Clip ready",
+            MomentCandidateState.MarkerReady => "Marker ready",
+            MomentCandidateState.Failed => "Could not create clip",
+            MomentCandidateState.Approved => "Approved",
+            MomentCandidateState.Rejected => "Rejected",
+            MomentCandidateState.Merged => "Merged into another moment",
+            _ => throw new UnreachableException("Unknown moment candidate state."),
+        };
 
     private Task SaveSettingsAsync() =>
         RunSelectedHostMutationAsync(
@@ -148,8 +171,7 @@ public partial class MomentsPage
     private Task ApproveAsync(Guid id) =>
         MutateAsync(id, _moments.ApproveAsync, "Moment approved.");
 
-    private Task EditAsync(Guid id) =>
-        MutateAsync(id, _moments.EditAsync, "Moment metadata saved.");
+    private Task EditAsync(Guid id) => MutateAsync(id, _moments.EditAsync, "Moment details saved.");
 
     private Task RejectAsync(Guid id) => MutateAsync(id, _moments.RejectAsync, "Moment rejected.");
 
@@ -161,7 +183,7 @@ public partial class MomentsPage
                 var draft = Draft(id);
                 if (!Guid.TryParse(draft.MergeTarget, out var target))
                 {
-                    SetFeedback("Enter the target moment public ID.", true);
+                    SetFeedback("Enter the target moment number.", true);
                     return;
                 }
                 var result = await _moments.MergeAsync(
