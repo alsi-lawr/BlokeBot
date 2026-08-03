@@ -361,5 +361,5 @@ public partial class GuessingSettings
 
     private static string ValidationMessage(
         IReadOnlyList<GuessingConfigurationValidationError> errors
-    ) => string.Join(" ", errors.Select(error => error.Message));
+    ) => string.Join(" ", errors.Select(static error => error.Message));
 }

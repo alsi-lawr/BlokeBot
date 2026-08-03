@@ -164,7 +164,7 @@ public partial class GuessingDashboard
         {
             _selectedProfileId =
                 _state.CurrentRound?.ProfileId
-                ?? _state.Profiles.FirstOrDefault(x => x.IsDefault)?.Id
+                ?? _state.Profiles.FirstOrDefault(static x => x.IsDefault)?.Id
                 ?? _state.Profiles.FirstOrDefault()?.Id
                 ?? 0;
         }
