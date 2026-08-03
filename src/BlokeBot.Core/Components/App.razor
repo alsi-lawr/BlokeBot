@@ -1,4 +1,5 @@
 @inject IWebHostEnvironment Environment
+@inject IHttpContextAccessor HttpContextAccessor
 
 <!DOCTYPE html>
 <html lang="en">
@@ -185,7 +186,7 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="_routesRenderMode" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>
@@ -208,3 +209,10 @@
 </body>
 
 </html>
+
+@code {
+    private IComponentRenderMode _routesRenderMode =>
+        HttpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true
+            ? new InteractiveServerRenderMode(prerender: false)
+            : InteractiveServer;
+}
