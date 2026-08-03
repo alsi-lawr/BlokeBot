@@ -187,9 +187,14 @@ internal sealed class EventSubChannelDiagnosticLogger(ILogger<EventSubChannelDia
                     healthy.Trigger
                 );
                 return;
-            case EventSubChannelDiagnosticReport.Recovering { ChannelStatus: var recovering }:
+            case EventSubChannelDiagnosticReport.Recovering
+            {
+                ChannelStatus: var recovering,
+                Failure: var recoveringContext,
+            }:
+                var recoveringFailure = CreationFailure(recoveringContext);
                 log.LogWarning(
-                    "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
+                    "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}; Twitch status {TwitchStatus}, error {TwitchError}, message {TwitchMessage}, existing subscription {ExistingSubscriptionId}.",
                     recovering.Channel,
                     recovering.Phase,
                     recovering.Attempt,
@@ -197,12 +202,21 @@ internal sealed class EventSubChannelDiagnosticLogger(ILogger<EventSubChannelDia
                     recovering.Trigger,
                     recovering.Failure.Classification,
                     recovering.Failure.FailureType,
-                    recovering.NextAction
+                    recovering.NextAction,
+                    recoveringFailure?.StatusCode,
+                    recoveringFailure?.ProviderError,
+                    recoveringFailure?.ProviderMessage,
+                    recoveringFailure?.ExistingSubscriptionId
                 );
                 return;
-            case EventSubChannelDiagnosticReport.Degraded { ChannelStatus: var degraded }:
+            case EventSubChannelDiagnosticReport.Degraded
+            {
+                ChannelStatus: var degraded,
+                Failure: var degradedContext,
+            }:
+                var degradedFailure = CreationFailure(degradedContext);
                 log.LogError(
-                    "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
+                    "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}; Twitch status {TwitchStatus}, error {TwitchError}, message {TwitchMessage}, existing subscription {ExistingSubscriptionId}.",
                     degraded.Channel,
                     degraded.Phase,
                     degraded.Attempt,
@@ -210,11 +224,26 @@ internal sealed class EventSubChannelDiagnosticLogger(ILogger<EventSubChannelDia
                     degraded.Trigger,
                     degraded.Failure.Classification,
                     degraded.Failure.FailureType,
-                    degraded.NextAction
+                    degraded.NextAction,
+                    degradedFailure?.StatusCode,
+                    degradedFailure?.ProviderError,
+                    degradedFailure?.ProviderMessage,
+                    degradedFailure?.ExistingSubscriptionId
                 );
                 return;
             default:
                 throw new UnreachableException("Unknown EventSub channel diagnostic report.");
         }
     }
+
+    private static EventSubSubscriptionCreationException? CreationFailure(
+        EventSubChannelFailureContext failure
+    ) =>
+        failure
+            is EventSubChannelFailureContext.ClassifiedException
+            {
+                Details.Exception: EventSubSubscriptionCreationException exception,
+            }
+            ? exception
+            : null;
 }

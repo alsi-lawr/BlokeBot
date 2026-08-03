@@ -5,6 +5,68 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRecoveryTestBase
 {
     [Test]
+    public async Task NativeSetupFailure_RetainsEarlierGroupsAndRetriesOnlyFailedGroup()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.Shoutouts,
+            true
+        );
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.Polls,
+            true
+        );
+        operations.EnqueueBroadcasterAccountResult("channel", "channel");
+        operations.EnqueueBroadcasterAccountResult("channel", "channel");
+        operations.EnqueueCreateOutcome("channel", Created("chat-subscription"));
+        operations.EnqueueCreateOutcome("channel", Created("shoutout-subscription"));
+        operations.EnqueueCreateFailure(
+            "channel",
+            new InvalidOperationException("poll setup failed")
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        operations
+            .OperationKinds("channel")
+            .ShouldBe([
+                null,
+                EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Polls,
+            ]);
+
+        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
+        await harness.Session.DrainAsync();
+
+        operations
+            .OperationKinds("channel")
+            .ShouldBe([
+                null,
+                EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.Polls,
+            ]);
+        operations.CreateCount("channel").ShouldBe(4);
+        harness.Session.ActiveChannels.ShouldBe(["channel"]);
+    }
+
+    private static EventSubSubscriptionSetupOutcome Created(string subscriptionId) =>
+        new EventSubSubscriptionSetupOutcome.Created(
+            new ActiveEventSubSubscription
+            {
+                Channel = "channel",
+                SubscriptionId = subscriptionId,
+                BotLogin = "channel-bot",
+                AccessToken = "channel-secret",
+                Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+            }
+        );
+
+    [Test]
     public async Task SelectiveNativeFeatures_CreateOnlyTheirOwnSubscriptions()
     {
         var operations = new ScriptedChannelOperations();
