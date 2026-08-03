@@ -205,10 +205,10 @@ internal sealed class AutomationDefinitionCatalog
 
             var validType = field.FieldType switch
             {
-                AutomationConfigurationFieldType.Text text => text.MaximumLength > 0,
+                AutomationConfigurationFieldType.Text text => text.MaximumLength is null or > 0,
                 AutomationConfigurationFieldType.Duration duration => duration.Minimum
                     > TimeSpan.Zero
-                    && duration.Maximum >= duration.Minimum,
+                    && (duration.Maximum is null || duration.Maximum >= duration.Minimum),
                 AutomationConfigurationFieldType.Reference reference => Enum.IsDefined(
                     reference.ReferenceKind
                 ),

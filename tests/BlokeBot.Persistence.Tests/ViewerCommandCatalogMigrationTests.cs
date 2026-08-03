@@ -86,7 +86,14 @@ public sealed class ViewerCommandCatalogMigrationTests
                 .Select(static value => value.HostId)
                 .ToArrayAsync()
         ).ShouldBe([1, 2]);
-        var conflict = await migrated.Hosts.SingleAsync(static value => value.Id == 3);
+        var conflict = await migrated
+            .Hosts.Where(static value => value.Id == 3)
+            .Select(static value => new
+            {
+                value.CommandsAliasesConfigured,
+                value.CommandsDefaultConflictAlias,
+            })
+            .SingleAsync();
         conflict.CommandsAliasesConfigured.ShouldBeTrue();
         conflict.CommandsDefaultConflictAlias.ShouldBe("commands");
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldContain(_independentChatTools);

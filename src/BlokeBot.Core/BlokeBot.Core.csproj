@@ -22,6 +22,10 @@
     <Content Update="package.json;package-lock.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Cel" />
+  </ItemGroup>
+
   <Target
     Name="RestoreNodePackages"
     Inputs="$(MSBuildProjectDirectory)/package-lock.json"

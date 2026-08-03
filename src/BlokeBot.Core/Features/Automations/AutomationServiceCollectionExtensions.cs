@@ -13,8 +13,22 @@ public static class AutomationServiceCollectionExtensions
             serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),
             serviceProvider.GetRequiredService<HostFeatureService>()
         ));
+        services.TryAddSingleton<AutomationExpressionService>();
+        services.TryAddSingleton<AutomationActionExecutor>();
+        services.TryAddSingleton<AutomationFlowService>();
+        services.TryAddSingleton<AutomationRuntimeService>();
+        services.TryAddSingleton<AutomationRunQueryService>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IHostFeatureChangeObserver,
+                AutomationFeatureDisableObserver
+            >()
+        );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, AutomationCatalogStartupService>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, AutomationRuntimeWorker>()
         );
         return services;
     }

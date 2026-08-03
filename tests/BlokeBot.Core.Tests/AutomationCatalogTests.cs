@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -65,6 +64,12 @@ public sealed class AutomationCatalogTests
         var playCue = Descriptor(catalog, AutomationDefinitionIds.PlayOverlayCueAction);
         playCue.Capabilities.ShouldBe(AutomationActionCapabilities.PlaysOverlays);
         playCue.RetrySafety.ShouldBe(AutomationActionRetrySafety.Unsafe);
+
+        var delay = Descriptor(catalog, AutomationDefinitionIds.DelayControl)
+            .Configuration.Single()
+            .FieldType.ShouldBeOfType<AutomationConfigurationFieldType.Duration>();
+        delay.Minimum.ShouldBe(TimeSpan.FromMilliseconds(1));
+        delay.Maximum.ShouldBeNull();
 
         catalog
             .Descriptors.Where(static definition => definition.Kind != AutomationNodeKind.Action)
@@ -151,7 +156,7 @@ public sealed class AutomationCatalogTests
             (AutomationDefinitionIds.SendChatAction, new SendChatActionConfiguration("Hello")),
             (
                 AutomationDefinitionIds.PlayOverlayCueAction,
-                new PlayOverlayCueActionConfiguration(new(Guid.NewGuid()))
+                new PlayOverlayCueActionConfiguration(new(Guid.NewGuid()), new(Guid.NewGuid()))
             ),
             (
                 AutomationDefinitionIds.ConditionControl,
@@ -159,7 +164,7 @@ public sealed class AutomationCatalogTests
             ),
             (
                 AutomationDefinitionIds.DelayControl,
-                new DelayControlConfiguration(TimeSpan.FromSeconds(1))
+                new DelayControlConfiguration(TimeSpan.FromDays(30))
             ),
         };
         var invalid = new (AutomationDefinitionId Id, AutomationConfiguration Configuration)[]
@@ -171,13 +176,10 @@ public sealed class AutomationCatalogTests
             (AutomationDefinitionIds.SendChatAction, new SendChatActionConfiguration(" ")),
             (
                 AutomationDefinitionIds.PlayOverlayCueAction,
-                new PlayOverlayCueActionConfiguration(new(Guid.Empty))
+                new PlayOverlayCueActionConfiguration(new(Guid.Empty), new(Guid.Empty))
             ),
             (AutomationDefinitionIds.ConditionControl, new ConditionControlConfiguration(" ")),
-            (
-                AutomationDefinitionIds.DelayControl,
-                new DelayControlConfiguration(TimeSpan.FromMilliseconds(999))
-            ),
+            (AutomationDefinitionIds.DelayControl, new DelayControlConfiguration(TimeSpan.Zero)),
         };
 
         foreach (var candidate in valid)
@@ -247,9 +249,13 @@ public sealed class AutomationCatalogTests
         {
             Persisted("custom-command", 1, """{"custom-command-id":4}"""),
             Persisted("send-chat", 1, """{"message":"Hello"}"""),
-            Persisted("play-overlay-cue", 1, $$"""{"cue-id":"{{Guid.NewGuid()}}"}"""),
+            Persisted(
+                "play-overlay-cue",
+                1,
+                $$"""{"target-id":"{{Guid.NewGuid()}}","cue-id":"{{Guid.NewGuid()}}"}"""
+            ),
             Persisted("condition", 1, """{"expression":"actor.login == 'viewer'"}"""),
-            Persisted("delay", 1, """{"duration-milliseconds":1000}"""),
+            Persisted("delay", 1, """{"duration-milliseconds":2592000000}"""),
         };
 
         foreach (var candidate in persisted)
@@ -331,7 +337,7 @@ public sealed class AutomationCatalogTests
             .AddAutomationCatalogModule<DuplicateAutomationModule>();
         await using var provider = services.BuildServiceProvider();
         var startupFailure = Should.Throw<AutomationCatalogRegistrationException>(() =>
-            _ = provider.GetServices<IHostedService>().Single()
+            _ = provider.GetRequiredService<AutomationDefinitionCatalog>()
         );
         startupFailure.Message.ShouldContain("send-chat");
     }

@@ -107,6 +107,11 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<OverlayCueMediaAssetReference> OverlayCueMediaAssetReferences =>
         Set<OverlayCueMediaAssetReference>();
     public DbSet<OverlayEventFeedItem> OverlayEventFeedItems => Set<OverlayEventFeedItem>();
+    public DbSet<AutomationFlow> AutomationFlows => Set<AutomationFlow>();
+    public DbSet<AutomationFlowNode> AutomationFlowNodes => Set<AutomationFlowNode>();
+    public DbSet<AutomationFlowEdge> AutomationFlowEdges => Set<AutomationFlowEdge>();
+    public DbSet<AutomationFlowRun> AutomationFlowRuns => Set<AutomationFlowRun>();
+    public DbSet<AutomationNodeRun> AutomationNodeRuns => Set<AutomationNodeRun>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -127,6 +132,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePlayWithViewers(modelBuilder);
         ConfigureMoments(modelBuilder);
         ConfigureOverlays(modelBuilder);
+        ConfigureAutomations(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>

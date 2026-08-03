@@ -21,6 +21,8 @@ public readonly record struct AutomationCustomCommandId(int Value);
 
 public readonly record struct AutomationOverlayCueId(Guid Value);
 
+public readonly record struct AutomationOverlayTargetId(Guid Value);
+
 public enum AutomationNodeKind
 {
     Source,
@@ -74,6 +76,7 @@ public enum AutomationReferenceKind
 {
     CustomCommand,
     OverlayCue,
+    OverlayTarget,
 }
 
 public enum AutomationSchemaCompatibilityStatus
@@ -98,10 +101,10 @@ public abstract record AutomationConfigurationFieldType
 {
     private AutomationConfigurationFieldType() { }
 
-    public sealed record Text(int MaximumLength, bool Multiline = false)
+    public sealed record Text(int? MaximumLength, bool Multiline = false)
         : AutomationConfigurationFieldType;
 
-    public sealed record Duration(TimeSpan Minimum, TimeSpan Maximum)
+    public sealed record Duration(TimeSpan Minimum, TimeSpan? Maximum)
         : AutomationConfigurationFieldType;
 
     public sealed record Reference(AutomationReferenceKind ReferenceKind)
@@ -180,8 +183,10 @@ public sealed record CustomCommandSourceConfiguration(AutomationCustomCommandId 
 
 public sealed record SendChatActionConfiguration(string Message) : AutomationConfiguration;
 
-public sealed record PlayOverlayCueActionConfiguration(AutomationOverlayCueId CueId)
-    : AutomationConfiguration;
+public sealed record PlayOverlayCueActionConfiguration(
+    AutomationOverlayTargetId TargetId,
+    AutomationOverlayCueId CueId
+) : AutomationConfiguration;
 
 public sealed record ConditionControlConfiguration(string Expression) : AutomationConfiguration;
 
