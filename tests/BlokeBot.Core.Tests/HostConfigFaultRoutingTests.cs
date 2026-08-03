@@ -539,7 +539,7 @@ public sealed class HostConfigFaultRoutingTests
             var shoutouts = FindFeatureButton(page, "Shoutouts");
             shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
             shoutouts.TextContent.ShouldContain("manual and automatic raid shoutouts");
-            page.FindAll(".feature-toggle-card").Count.ShouldBe(12);
+            page.FindAll(".feature-toggle-card").Count.ShouldBe(13);
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
             _ = overlays.QuerySelector("svg").ShouldNotBeNull();

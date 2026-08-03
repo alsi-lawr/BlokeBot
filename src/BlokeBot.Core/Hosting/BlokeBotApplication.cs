@@ -6,6 +6,7 @@ using BlokeBot.Core.BotStatus;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.AccessLists;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
@@ -89,6 +90,7 @@ public static class BlokeBotApplication
             .AddBlokeBotHostedChannels(
                 online ? HostBotAppAccessTokenMode.Twitch : HostBotAppAccessTokenMode.Unavailable
             )
+            .AddBlokeBotAutomations()
             .AddBlokeBotHosts()
             .AddBlokeBotGuessing()
             .AddBlokeBotPoints(

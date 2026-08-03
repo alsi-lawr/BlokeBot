@@ -57,7 +57,7 @@ public sealed class HostFeatureTests
         HostFeatureCatalog
             .Cards(HostFeatureFlags.None)
             .ShouldAllBe(static feature => !feature.Enabled);
-        HostFeatureCatalog.Features.Count.ShouldBe(12);
+        HostFeatureCatalog.Features.Count.ShouldBe(13);
         HostFeatureCatalog.Features.ShouldBeUnique();
         HostFeatureCatalog
             .Cards(HostFeatureFlags.None)

@@ -11,6 +11,19 @@ public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
     private const string _overlayMigration = "20260730084046_v0.5.0_OverlayInstances";
+    private const HostFeatureFlags _preAutomationsEnabledFeatures =
+        HostFeatureFlags.Guessing
+        | HostFeatureFlags.Points
+        | HostFeatureFlags.CustomCommands
+        | HostFeatureFlags.Shoutouts
+        | HostFeatureFlags.Overlays
+        | HostFeatureFlags.RequestBoards
+        | HostFeatureFlags.PlayWithViewers
+        | HostFeatureFlags.Moments
+        | HostFeatureFlags.Polls
+        | HostFeatureFlags.ClipsAndMarkers
+        | HostFeatureFlags.RewardsAndRedemptions
+        | HostFeatureFlags.Predictions;
 
     [Test]
     public async Task Migration_FromV04_AddsOverlaySchemaAndFeatureWithoutLosingHosts()
@@ -34,7 +47,7 @@ public sealed class OverlayInstancePersistenceTests
             "host",
         ]);
         (await migrated.Hosts.Select(static value => value.EnabledFeatures).SingleAsync()).ShouldBe(
-            HostFeatureFlags.All
+            _preAutomationsEnabledFeatures
         );
         (await migrated.Database.GetAppliedMigrationsAsync()).ShouldContain(_overlayMigration);
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
