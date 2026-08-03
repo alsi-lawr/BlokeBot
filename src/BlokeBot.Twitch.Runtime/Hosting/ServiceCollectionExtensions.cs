@@ -18,10 +18,12 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configuration">The configuration section that contains bot settings.</param>
+    /// <param name="online">Whether to enforce Twitch's public HTTPS webhook boundary.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static IChatBotBuilder AddTwitchBot(
         this IServiceCollection services,
-        IConfiguration configuration
+        IConfiguration configuration,
+        bool online = true
     )
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -37,7 +39,7 @@ public static class ServiceCollectionExtensions
         var boundary = configuration is IConfigurationSection configuredSection
             ? configuredSection.Path
             : "TwitchBot";
-        var settings = BotSettings.FromConfiguredOptions(options, boundary);
+        var settings = BotSettings.FromConfiguredOptions(options, boundary, online);
         var policies = BotPolicies.BindRequired(configuration);
 
         return AddBotCore(services, settings, policies);
@@ -69,11 +71,13 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configure">The options configuration callback.</param>
     /// <param name="policyOptions">Every required boundary-specific policy.</param>
+    /// <param name="online">Whether to enforce Twitch's public HTTPS webhook boundary.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static IChatBotBuilder AddTwitchBot(
         this IServiceCollection services,
         Action<BotOptions> configure,
-        BotPolicyOptions policyOptions
+        BotPolicyOptions policyOptions,
+        bool online = true
     )
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -82,7 +86,7 @@ public static class ServiceCollectionExtensions
 
         var options = new BotOptions();
         configure(options);
-        var settings = BotSettings.FromConfiguredOptions(options, "TwitchBot");
+        var settings = BotSettings.FromConfiguredOptions(options, "TwitchBot", online);
         var policies = BotPolicies.FromOptions(policyOptions);
 
         return AddBotCore(services, settings, policies);
@@ -94,6 +98,11 @@ public static class ServiceCollectionExtensions
         BotPolicies policies
     )
     {
+        _ =
+            settings.EventSubWebhook
+            ?? throw new InvalidOperationException(
+                "Validated EventSub webhook settings are required by the online runtime."
+            );
         RegisterSettings(services, settings);
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddSingleton<IRuntimeSessionHealthReporter, RuntimeSessionHealthLogger>();
@@ -162,7 +171,19 @@ public static class ServiceCollectionExtensions
         >();
         services.TryAddSingleton<IEventSubChannelOperations, EventSubChannelOperations>();
         services.TryAddSingleton<EventSubChannelSessionFactory>();
-        services.TryAddSingleton<IEventSubConnectionSession, EventSubConnectionSession>();
+        services.TryAddSingleton<EventSubDeliveryHandler>();
+        services.TryAddSingleton<IEventSubDeliveryHandler>(static services =>
+            services.GetRequiredService<EventSubDeliveryHandler>()
+        );
+        services.TryAddSingleton<EventSubSubscriptionVerification>();
+        services.TryAddSingleton<IEventSubSubscriptionVerification>(static services =>
+            services.GetRequiredService<EventSubSubscriptionVerification>()
+        );
+        services.TryAddSingleton<EventSubWebhookHandler>();
+        services.TryAddSingleton<IEventSubWebhookIngress>(static sp =>
+            sp.GetRequiredService<EventSubWebhookHandler>()
+        );
+        _ = services.AddHostedService(static sp => sp.GetRequiredService<EventSubWebhookHandler>());
         services.TryAddSingleton<EventSubRuntime>();
         services.TryAddSingleton<IIrcConnectionSession, IrcConnectionSession>();
         services.TryAddSingleton<IrcRuntime>();
@@ -175,16 +196,16 @@ public static class ServiceCollectionExtensions
     {
         _ = services.AddSingleton(settings);
         _ = services.AddSingleton(settings.Identity);
+        if (settings.EventSubWebhook is { } webhook)
+        {
+            _ = services.AddSingleton(webhook);
+        }
     }
 
     private static void RegisterPolicies(IServiceCollection services, BotPolicies policies)
     {
         _ = services.AddSingleton(policies);
         _ = services.AddKeyedSingleton(BotResiliencePipeline.IrcSession, policies.IrcSession);
-        _ = services.AddKeyedSingleton(
-            BotResiliencePipeline.EventSubSession,
-            policies.EventSubSession
-        );
         _ = services.AddKeyedSingleton(
             BotResiliencePipeline.EventSubChannelRecovery,
             policies.EventSubChannelRecovery
@@ -207,18 +228,6 @@ public static class ServiceCollectionExtensions
                 );
             }
         );
-        _ = services.AddResiliencePipeline(
-            BotResiliencePipeline.EventSubSession,
-            (builder, context) =>
-            {
-                builder.TimeProvider = context.ServiceProvider.GetRequiredService<TimeProvider>();
-                RuntimeSessionResilience.ConfigureEventSub(
-                    builder,
-                    policies.EventSubSession,
-                    context.ServiceProvider.GetRequiredService<IRuntimeSessionHealthReporter>()
-                );
-            }
-        );
         _ = services.AddResiliencePipeline<
             BotResiliencePipeline,
             EventSubChannelReconciliationOutcome
@@ -237,11 +246,6 @@ public static class ServiceCollectionExtensions
             serviceProvider
                 .GetRequiredService<ResiliencePipelineProvider<BotResiliencePipeline>>()
                 .GetPipeline(BotResiliencePipeline.IrcSession)
-        ));
-        _ = services.AddSingleton(serviceProvider => new EventSubSessionResiliencePipeline(
-            serviceProvider
-                .GetRequiredService<ResiliencePipelineProvider<BotResiliencePipeline>>()
-                .GetPipeline(BotResiliencePipeline.EventSubSession)
         ));
         _ = services.AddSingleton(serviceProvider =>
         {

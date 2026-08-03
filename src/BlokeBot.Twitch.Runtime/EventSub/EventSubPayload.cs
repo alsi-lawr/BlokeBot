@@ -8,6 +8,6 @@ internal sealed record EventSubPayload
     [JsonPropertyName("event")]
     public JsonElement? Event { get; init; }
 
-    [JsonPropertyName("session")]
-    public EventSubSession? Session { get; init; }
+    [JsonPropertyName("challenge")]
+    public string? Challenge { get; init; }
 }

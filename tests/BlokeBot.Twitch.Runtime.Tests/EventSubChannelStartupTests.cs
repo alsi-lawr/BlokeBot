@@ -17,7 +17,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             await initial.Session.DrainAsync();
             initial.Session.TriggerReconciliation(
                 ["channel"],
-                EventSubChannelRecoveryTrigger.Keepalive
+                EventSubChannelRecoveryTrigger.Explicit
             );
             await initial.Session.DrainAsync();
         }
@@ -286,7 +286,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
     }
 
     [Test]
-    public async Task Startup_PublicChatEnqueueRejected_RemainsTerminalAcrossKeepalive()
+    public async Task Startup_PublicChatEnqueueRejected_RemainsTerminalAcrossExplicitReconciliation()
     {
         var operations = new ScriptedChannelOperations();
         operations.EnqueueStartupDeliveryOutcome(
@@ -297,10 +297,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
 
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
-        harness.Session.TriggerReconciliation(
-            ["channel"],
-            EventSubChannelRecoveryTrigger.Keepalive
-        );
+        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -414,7 +411,6 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
                     AdditionalSubscriptionIds = ids.Skip(1).ToArray(),
                     BotLogin = "channel-bot",
                     Authorization = EventSubAuthorizationContext.ConfiguredBotAuthority,
-                    AccessToken = "secret",
                     Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
                 },
                 new HttpRequestException("second subscription failed")
@@ -444,7 +440,6 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
                     AdditionalSubscriptionIds = ["shoutout-create", "shoutout-receive"],
                     BotLogin = "bot",
                     Authorization = EventSubAuthorizationContext.ConfiguredBotAuthority,
-                    AccessToken = "secret",
                     Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
                 }
             )

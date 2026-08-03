@@ -54,5 +54,24 @@ Run the separate [BlokeBot.Site help site](src/BlokeBot.Site) for approachable s
 public [help site](https://www.blokebot.com/) includes the
 [server owner guide](https://www.blokebot.com/server-owners) for technical detail.
 
+### Twitch EventSub webhooks
+
+When running the EventSub chat runtime, expose the webhook route at the public callback URL and
+keep its signing secret in your deployment secret store. The two settings are:
+
+```json
+{
+  "TwitchBot": {
+    "EventSubWebhook": {
+      "CallbackUri": "https://bot.example.com/eventsub/twitch",
+      "Secret": "generate-a-random-printable-secret"
+    }
+  }
+}
+```
+
+The callback must be HTTPS on port 443 in production. The secret must be 10–100 printable ASCII
+characters and must match the value registered with Twitch.
+
 For everyday help, start with the **[BlokeBot user guide](https://www.blokebot.com/guide)**. The
 hosted bot is available at **[bot.blokebot.com](https://bot.blokebot.com/)**.

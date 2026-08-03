@@ -46,7 +46,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
         var diagnostics = new RecordingDiagnostics();
         return new RecoveryHarness(
             new EventSubChannelSession(
-                "session-id",
                 operations,
                 new EventSubChannelRecoveryPipeline(
                     attemptBuilder.Build(),

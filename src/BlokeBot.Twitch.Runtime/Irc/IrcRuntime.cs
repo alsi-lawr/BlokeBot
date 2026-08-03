@@ -11,7 +11,7 @@ internal sealed class IrcRuntime(
     public Task RunAsync(CancellationToken stoppingToken) =>
         RuntimeSessionRunner.RunUntilStoppedAsync(
             ChatRuntime.Irc,
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             EstablishSessionAsync,
             IrcSessionFailureClassifier.Classify,
             health,

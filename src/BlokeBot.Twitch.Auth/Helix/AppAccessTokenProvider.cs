@@ -6,7 +6,7 @@ public sealed class AppAccessTokenProvider(
     IHttpClientFactory factory,
     BotIdentity identity,
     TwitchEndpointPolicy endpointPolicy
-) : IDisposable
+) : IDisposable, IAppAccessTokenProvider
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HttpClient _http = factory.CreateClient("twitch-oauth");

@@ -14,25 +14,8 @@ public sealed class BotRuntimeHostedServiceTests
         await harness.Service.RunSelectedRuntimeAsync(stopping.Token);
 
         harness.IrcSession.CallCount.ShouldBe(1);
-        harness.EventSubSession.CallCount.ShouldBe(0);
         stopping.IsCancellationRequested.ShouldBeTrue();
         harness.IrcSession.ReceivedCancellationToken.IsCancellationRequested.ShouldBeTrue();
-        harness.Health.Reports.ShouldBeEmpty();
-        harness.IdleWait.CallCount.ShouldBe(0);
-    }
-
-    [Test]
-    public async Task EventSubConfigured_RunningSelectedRuntime_RunsOnlyEventSubAndPropagatesCancellation()
-    {
-        using var stopping = new CancellationTokenSource();
-        using var harness = CreateHarness(ChatRuntime.EventSub, stopping);
-
-        await harness.Service.RunSelectedRuntimeAsync(stopping.Token);
-
-        harness.IrcSession.CallCount.ShouldBe(0);
-        harness.EventSubSession.CallCount.ShouldBe(1);
-        stopping.IsCancellationRequested.ShouldBeTrue();
-        harness.EventSubSession.ReceivedCancellationToken.IsCancellationRequested.ShouldBeTrue();
         harness.Health.Reports.ShouldBeEmpty();
         harness.IdleWait.CallCount.ShouldBe(0);
     }
@@ -43,7 +26,6 @@ public sealed class BotRuntimeHostedServiceTests
     )
     {
         var ircSession = new CancelingConnectionSession(stopping);
-        var eventSubSession = new CancelingConnectionSession(stopping);
         var health = new RecordingHealthReporter();
         var status = new BotRuntimeStatusStore();
         var idleWait = new RecordingIdleWait();
@@ -54,13 +36,7 @@ public sealed class BotRuntimeHostedServiceTests
             status,
             idleWait
         );
-        var eventSub = new EventSubRuntime(
-            eventSubSession,
-            new EventSubSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
-            health,
-            status,
-            idleWait
-        );
+        var eventSub = new EventSubRuntime(null!, null!, null!, null!, null!, null!);
         return new RuntimeHarness(
             new BotRuntimeHostedService(
                 BotSettings.FromOptions(new BotOptions { Runtime = runtime }),
@@ -68,7 +44,6 @@ public sealed class BotRuntimeHostedServiceTests
                 eventSub
             ),
             ircSession,
-            eventSubSession,
             health,
             idleWait
         );
@@ -77,7 +52,6 @@ public sealed class BotRuntimeHostedServiceTests
     private sealed class RuntimeHarness(
         BotRuntimeHostedService service,
         CancelingConnectionSession ircSession,
-        CancelingConnectionSession eventSubSession,
         RecordingHealthReporter health,
         RecordingIdleWait idleWait
     ) : IDisposable
@@ -85,8 +59,6 @@ public sealed class BotRuntimeHostedServiceTests
         internal BotRuntimeHostedService Service { get; } = service;
 
         internal CancelingConnectionSession IrcSession { get; } = ircSession;
-
-        internal CancelingConnectionSession EventSubSession { get; } = eventSubSession;
 
         internal RecordingHealthReporter Health { get; } = health;
 
@@ -96,8 +68,7 @@ public sealed class BotRuntimeHostedServiceTests
     }
 
     private sealed class CancelingConnectionSession(CancellationTokenSource stopping)
-        : IIrcConnectionSession,
-            IEventSubConnectionSession
+        : IIrcConnectionSession
     {
         internal int CallCount { get; private set; }
 

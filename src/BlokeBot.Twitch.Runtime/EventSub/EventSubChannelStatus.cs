@@ -20,8 +20,8 @@ public enum EventSubChannelFailureClassification
 public enum EventSubChannelRecoveryTrigger
 {
     Startup,
-    Keepalive,
     Explicit,
+    Periodic,
 }
 
 public enum EventSubChannelNextAction

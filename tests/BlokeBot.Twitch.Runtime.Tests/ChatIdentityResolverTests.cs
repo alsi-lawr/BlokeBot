@@ -87,7 +87,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            CreateEventSubClient(factory),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
@@ -98,7 +98,6 @@ public sealed class ChatIdentityResolverTests
             "private-channel-login",
             EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("bot", "access-token"),
-            "session-id",
             CancellationToken.None
         );
 
@@ -118,7 +117,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            CreateEventSubClient(factory),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
@@ -129,7 +128,6 @@ public sealed class ChatIdentityResolverTests
             "private-channel-login",
             EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("private-bot-login", "access-token"),
-            "session-id",
             CancellationToken.None
         );
 
@@ -238,7 +236,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.BroadcasterAuthority,
             new BotAccount("channel", "broadcaster-token"),
-            "session-id",
             CancellationToken.None
         );
 
@@ -262,11 +259,11 @@ public sealed class ChatIdentityResolverTests
             .EventSubRequests.Where(static request => request.Method == HttpMethod.Delete)
             .Select(static request => request.Authorization)
             .Distinct()
-            .ShouldBe(["Bearer broadcaster-token"]);
+            .ShouldBe(["Bearer app-access-token"]);
     }
 
     [Test]
-    public async Task IncomingRaidSubscription_Creating_UsesConfiguredBotUserTokenWithoutAppToken()
+    public async Task IncomingRaidSubscription_Creating_UsesConfiguredBotUserTokenWithAppToken()
     {
         using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"channel"}]}"""
@@ -280,7 +277,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("bot", "configured-bot-user-token"),
-            "session-id",
             CancellationToken.None,
             EventSubOperationSubscriptionKind.Raids
         );
@@ -288,14 +284,14 @@ public sealed class ChatIdentityResolverTests
         var created = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         _ =
             created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
-        created.Subscription.AccessToken.ShouldBe("configured-bot-user-token");
         factory.AppTokenRequestCount.ShouldBe(0);
         factory
-            .EventSubRequests.ShouldHaveSingleItem()
+            .EventSubRequests.Where(static request => request.Method == HttpMethod.Post)
+            .ShouldHaveSingleItem()
             .ShouldSatisfyAllConditions(
                 static request => request.Method.ShouldBe(HttpMethod.Post),
                 static request => request.Type.ShouldBe("channel.raid"),
-                static request => request.Authorization.ShouldBe("Bearer configured-bot-user-token")
+                static request => request.Authorization.ShouldBe("Bearer app-access-token")
             );
         factory.LastAuthorization.ShouldBe("Bearer configured-bot-user-token");
     }
@@ -326,7 +322,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.ConfiguredBotAuthority,
             configuredBot,
-            "session-id",
             CancellationToken.None
         );
         var botSubscription = botSetup
@@ -336,7 +331,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
             configuredBot,
-            "session-id",
             CancellationToken.None
         );
         _ = shoutoutSetup.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
@@ -357,7 +351,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.BroadcasterAuthority,
             await ResolveBroadcasterAsync(operations),
-            "session-id",
             CancellationToken.None
         );
         var pollSubscription = created
@@ -371,7 +364,6 @@ public sealed class ChatIdentityResolverTests
             "channel",
             EventSubAuthorizationContext.BroadcasterAuthority,
             await ResolveBroadcasterAsync(operations),
-            "replacement-session-id",
             CancellationToken.None
         );
 
@@ -392,12 +384,12 @@ public sealed class ChatIdentityResolverTests
             )
             .Select(static request => request.Authorization)
             .Distinct()
-            .ShouldBe(["Bearer broadcaster-token"]);
+            .ShouldBe(["Bearer app-access-token"]);
         factory
             .EventSubRequests.Where(static request => request.Method == HttpMethod.Delete)
             .Select(static request => request.Authorization)
             .Distinct()
-            .ShouldBe(["Bearer broadcaster-token"]);
+            .ShouldBe(["Bearer app-access-token"]);
     }
 
     [Test]
@@ -474,6 +466,33 @@ public sealed class ChatIdentityResolverTests
         chat.Messages.ShouldBeEmpty();
     }
 
+    private static EventSubClient CreateEventSubClient(IdentityHttpClientFactory factory) =>
+        new(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default,
+            new EventSubWebhookOptions
+            {
+                CallbackUri = new Uri("https://bot.blokebot.com/eventsub/twitch"),
+                Secret = "runtime-test-secret",
+            },
+            new StaticAppAccessTokenProvider(),
+            new ImmediateVerification()
+        );
+
+    private sealed class StaticAppAccessTokenProvider : IAppAccessTokenProvider
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-access-token");
+    }
+
+    private sealed class ImmediateVerification : IEventSubSubscriptionVerification
+    {
+        public Task WaitAsync(string subscriptionId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public void Confirm(string subscriptionId) { }
+    }
+
     private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory) =>
         new(
             Identity(),
@@ -488,7 +507,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            CreateEventSubClient(factory),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
@@ -520,7 +539,7 @@ public sealed class ChatIdentityResolverTests
             Settings("private startup payload"),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            CreateEventSubClient(factory),
             new StaticStartupMessageProvider(
                 startupMessage ?? new StartupChatMessage.Enabled("private startup payload")
             ),

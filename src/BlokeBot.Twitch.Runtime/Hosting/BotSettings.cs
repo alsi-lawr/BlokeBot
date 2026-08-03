@@ -41,6 +41,8 @@ public sealed record BotSettings
 
     public required BotIdentity Identity { get; init; }
 
+    public EventSubWebhookOptions? EventSubWebhook { get; init; }
+
     /// <summary>
     /// Maps a mutable configuration transport into an immutable snapshot for configuration-only use.
     /// </summary>
@@ -54,21 +56,57 @@ public sealed record BotSettings
     /// <summary>
     /// Validates and maps a mutable configuration transport into an immutable snapshot.
     /// </summary>
-    public static BotSettings FromConfiguredOptions(BotOptions options, string boundary)
+    public static BotSettings FromConfiguredOptions(
+        BotOptions options,
+        string boundary,
+        bool online = true
+    )
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
 
-        return !BotOptionsValidation.IsValid(options)
-            ? throw new Microsoft.Extensions.Options.OptionsValidationException(
+        if (!BotOptionsValidation.IsValid(options))
+        {
+            throw new Microsoft.Extensions.Options.OptionsValidationException(
                 boundary,
                 typeof(BotOptions),
                 ["Twitch bot options contain an invalid value."]
-            )
-            : Create(options, BotIdentity.FromConfiguredOptions(options.Identity, boundary));
+            );
+        }
+
+        var webhook =
+            options.EventSubWebhook
+            ?? throw new Microsoft.Extensions.Options.OptionsValidationException(
+                boundary,
+                typeof(BotOptions),
+                ["TwitchBot.EventSubWebhook configuration is required."]
+            );
+        try
+        {
+            webhook.Validate(online);
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or InvalidOperationException)
+        {
+            throw new Microsoft.Extensions.Options.OptionsValidationException(
+                boundary,
+                typeof(BotOptions),
+                ["TwitchBot.EventSubWebhook configuration is invalid."]
+            );
+        }
+
+        return Create(
+            options,
+            BotIdentity.FromConfiguredOptions(options.Identity, boundary),
+            webhook
+        );
     }
 
-    private static BotSettings Create(BotOptions options, BotIdentity identity) =>
+    private static BotSettings Create(
+        BotOptions options,
+        BotIdentity identity,
+        EventSubWebhookOptions? webhook = null
+    ) =>
         new()
         {
             Runtime = options.Runtime,
@@ -87,6 +125,7 @@ public sealed record BotSettings
                 UseTls = options.Connection.UseTls,
             },
             Identity = identity,
+            EventSubWebhook = webhook,
         };
 
     public override string ToString() =>

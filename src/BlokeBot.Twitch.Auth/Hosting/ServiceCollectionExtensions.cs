@@ -35,6 +35,9 @@ public static class ServiceCollectionExtensions
 
         _ = services.AddOAuthTransport();
         services.TryAddSingleton<AppAccessTokenProvider>();
+        services.TryAddSingleton<IAppAccessTokenProvider>(static sp =>
+            sp.GetRequiredService<AppAccessTokenProvider>()
+        );
         services.TryAddSingleton<ITokenStore, JsonTokenStore>();
         services.TryAddSingleton<IOAuthStateStore, InMemoryOAuthStateStore>();
         services.TryAddSingleton<IOAuthClient, OAuthClient>();

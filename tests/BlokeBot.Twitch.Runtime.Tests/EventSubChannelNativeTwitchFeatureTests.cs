@@ -61,7 +61,6 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
                 Channel = "channel",
                 SubscriptionId = subscriptionId,
                 BotLogin = "channel-bot",
-                AccessToken = "channel-secret",
                 Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
             }
         );
@@ -240,10 +239,6 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
             initial.Session.Start(["channel"], CancellationToken.None);
             await initial.Session.DrainAsync();
         }
-
-        EventSubSessionFailureClassifier
-            .Classify(new EventSubSubscriptionRevokedException(), CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Transient);
 
         QueueBroadcasterAccounts(operations);
         await using (var replacement = CreateHarness(operations, attemptLimit: 1))

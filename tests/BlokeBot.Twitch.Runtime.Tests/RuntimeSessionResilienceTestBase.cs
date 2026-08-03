@@ -41,42 +41,6 @@ public abstract class RuntimeSessionResilienceTestBase
         report.Exception.ShouldBeSameAs(exception);
     }
 
-    private protected static RuntimeHarness CreateEventSubProtocolHarness(int attemptLimit)
-    {
-        var session = new ScriptedConnectionSession();
-        var health = new RecordingHealthReporter();
-        var status = new BotRuntimeStatusStore();
-        var idleWait = new RecordingIdleWait();
-        var builder = new ResiliencePipelineBuilder();
-        RuntimeSessionResilience.ConfigureEventSub(
-            builder,
-            new EventSubSessionResiliencePolicy
-            {
-                AttemptLimit = attemptLimit,
-                Delay = TimeSpan.Zero,
-                MaximumDelay = TimeSpan.FromTicks(1),
-                DelayBackoffType = DelayBackoffType.Constant,
-                AttemptTimeout = TimeSpan.FromMinutes(1),
-            },
-            health
-        );
-        var eventSub = new EventSubRuntime(
-            session,
-            new EventSubSessionResiliencePipeline(builder.Build()),
-            health,
-            status,
-            idleWait
-        );
-        return new RuntimeHarness(
-            session,
-            health,
-            status,
-            idleWait,
-            eventSub.EstablishSessionAsync,
-            eventSub.RunAsync
-        );
-    }
-
     private protected static RuntimeHarness CreateRunnerHarness(int attemptLimit)
     {
         var session = new ScriptedConnectionSession();
@@ -115,7 +79,7 @@ public abstract class RuntimeSessionResilienceTestBase
         Task RunAsync(CancellationToken cancellationToken) =>
             RuntimeSessionRunner.RunUntilStoppedAsync(
                 ChatRuntime.Irc,
-                new RuntimeConnectionTarget.Initial(),
+                new RuntimeConnectionTarget(),
                 EstablishAsync,
                 IrcSessionFailureClassifier.Classify,
                 health,
@@ -157,9 +121,7 @@ public abstract class RuntimeSessionResilienceTestBase
             runRuntime(cancellationToken);
     }
 
-    private protected sealed class ScriptedConnectionSession
-        : IIrcConnectionSession,
-            IEventSubConnectionSession
+    private protected sealed class ScriptedConnectionSession : IIrcConnectionSession
     {
         private readonly Queue<
             Func<RuntimeConnectionTarget, CancellationToken, Task<RuntimeSessionEstablishment>>

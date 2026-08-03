@@ -21,6 +21,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(TwitchEndpointPolicy.Default);
         services.TryAddSingleton<HelixClient>();
         services.TryAddSingleton<EventSubClient>();
+        services.TryAddSingleton<IEventSubSubscriptionTransport>(static services =>
+            services.GetRequiredService<EventSubClient>()
+        );
         services.TryAddSingleton<ChatClient>();
         services.TryAddSingleton<ChatAnnouncementClient>();
         services.TryAddSingleton<ChatPinClient>();

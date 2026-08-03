@@ -9,13 +9,8 @@ public sealed class EventSubNotificationTests
 {
     private const string _incomingRaidJson = """
         {
-          "metadata": {
-            "message_id": "raid-message-1",
-            "message_timestamp": "2026-07-29T08:00:00.1234567Z",
-            "subscription_type": "channel.raid",
-            "subscription_version": "1"
-          },
-          "payload": { "event": {
+          "subscription": { "type": "channel.raid", "version": "1" },
+          "event": {
             "from_broadcaster_user_id": "source-id",
             "from_broadcaster_user_login": "source_login",
             "from_broadcaster_user_name": "Source Display",
@@ -23,32 +18,28 @@ public sealed class EventSubNotificationTests
             "to_broadcaster_user_login": "target_login",
             "to_broadcaster_user_name": "Target Display",
             "viewers": 42
-          } }
+          }
         }
         """;
 
     [Test]
     public void ShoutoutReceiveEnvelope_ParsingTypedNotification_MapsProviderCooldowns()
     {
-        var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(
+        var notification = Parse(
             """
             {
-              "metadata": { "message_id": "delivery-1", "subscription_type": "channel.shoutout.receive" },
-              "payload": { "event": {
+              "subscription": { "type": "channel.shoutout.receive", "version": "1" },
+              "event": {
                 "broadcaster_user_id": "host-id", "broadcaster_user_login": "host",
                 "from_broadcaster_user_id": "source-id", "from_broadcaster_user_login": "source",
                 "to_broadcaster_user_id": "target-id", "to_broadcaster_user_login": "target",
                 "viewer_count": 42, "started_at": "2026-07-26T00:00:00Z",
                 "cooldown_ends_at": "2026-07-26T01:00:00Z",
                 "target_cooldown_ends_at": "2026-07-26T02:00:00Z"
-              } }
+              }
             }
-            """
-        )!;
-
-        var notification = EventSubNotification.Parse(
-            envelope,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            """,
+            "delivery-1"
         );
 
         var shoutout = notification.ShouldBeOfType<EventSubNotification.Shoutout>().Event;
@@ -62,7 +53,7 @@ public sealed class EventSubNotificationTests
     [Test]
     public void IncomingRaidEnvelope_ParsingTypedNotification_MapsIdentityTimestampAndPayload()
     {
-        var notification = Parse(_incomingRaidJson);
+        var notification = Parse(_incomingRaidJson, "raid-message-1");
 
         var incomingRaid = notification.ShouldBeOfType<EventSubNotification.IncomingRaid>().Event;
         incomingRaid.MessageId.ShouldBe("raid-message-1");
@@ -82,17 +73,39 @@ public sealed class EventSubNotificationTests
     public void IncomingRaidEnvelope_UnsupportedVersion_IsRejected()
     {
         var wrongVersion = JsonNode.Parse(_incomingRaidJson)!.AsObject();
-        wrongVersion["metadata"]!["subscription_version"] = "2";
+        wrongVersion["subscription"]!["version"] = "2";
 
-        _ = Parse(wrongVersion.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
+        _ = Parse(wrongVersion.ToJsonString(), "raid-message-1")
+            .ShouldBeOfType<EventSubNotification.Unknown>();
     }
 
     internal static EventSubEnvelope IncomingRaidEnvelope() =>
-        JsonSerializer.Deserialize<EventSubEnvelope>(_incomingRaidJson)!;
+        Deserialize(_incomingRaidJson, "raid-message-1");
 
-    private static EventSubNotification Parse(string json) =>
+    private static EventSubNotification Parse(string json, string messageId) =>
         EventSubNotification.Parse(
-            JsonSerializer.Deserialize<EventSubEnvelope>(json)!,
+            Deserialize(json, messageId),
             new JsonSerializerOptions(JsonSerializerDefaults.Web)
         );
+
+    private static EventSubEnvelope Deserialize(string json, string messageId)
+    {
+        var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(json)!;
+        var subscription = envelope.Subscription!.Value;
+        envelope.Metadata = new EventSubMetadata
+        {
+            MessageId = messageId,
+            MessageType = "notification",
+            SubscriptionType = subscription.GetProperty("type").GetString()!,
+            SubscriptionVersion = subscription.GetProperty("version").GetString()!,
+            MessageTimestamp =
+                messageId == "raid-message-1"
+                    ? DateTimeOffset.Parse(
+                        "2026-07-29T08:00:00.1234567Z",
+                        CultureInfo.InvariantCulture
+                    )
+                    : null,
+        };
+        return envelope;
+    }
 }

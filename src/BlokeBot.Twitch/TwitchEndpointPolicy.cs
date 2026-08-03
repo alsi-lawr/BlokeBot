@@ -13,17 +13,6 @@ public sealed class TwitchEndpointPolicy
 
     public Uri HelixOrigin { get; set; } = new("https://api.twitch.tv/helix/");
 
-    public Uri EventSubWebSocketUri { get; set; } = new("wss://eventsub.wss.twitch.tv/ws");
-
-    public Uri InitialEventSubWebSocketEndpoint
-    {
-        get
-        {
-            ValidateWebSocketEndpoint(EventSubWebSocketUri);
-            return EventSubWebSocketUri;
-        }
-    }
-
     public Uri OAuthAuthorizationEndpoint => CreateHttpEndpoint(OAuthOrigin, "authorize");
 
     public Uri OAuthTokenEndpoint => CreateHttpEndpoint(OAuthOrigin, "token");
@@ -38,7 +27,6 @@ public sealed class TwitchEndpointPolicy
         _ = OAuthTokenEndpoint;
         _ = OAuthValidationEndpoint;
         _ = HelixEndpoint("health");
-        _ = InitialEventSubWebSocketEndpoint;
     }
 
     private static Uri CreateHttpEndpoint(Uri origin, string path)
@@ -63,21 +51,5 @@ public sealed class TwitchEndpointPolicy
 
         var baseUri = origin.AbsoluteUri.EndsWith('/') ? origin : new Uri(origin.AbsoluteUri + "/");
         return new Uri(baseUri, path);
-    }
-
-    private static void ValidateWebSocketEndpoint(Uri endpoint)
-    {
-        ArgumentNullException.ThrowIfNull(endpoint);
-        if (
-            !endpoint.IsAbsoluteUri
-            || endpoint.Scheme is not "ws" and not "wss"
-            || !string.IsNullOrEmpty(endpoint.Query)
-            || !string.IsNullOrEmpty(endpoint.Fragment)
-        )
-        {
-            throw new InvalidOperationException(
-                "The EventSub WebSocket endpoint must be an absolute WS or WSS URI without a query or fragment."
-            );
-        }
     }
 }

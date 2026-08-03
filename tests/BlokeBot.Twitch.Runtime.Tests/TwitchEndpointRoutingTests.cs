@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using BlokeBot.Twitch.Auth;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
@@ -18,7 +17,6 @@ public sealed class TwitchEndpointRoutingTests
             {
                 OAuthOrigin = new Uri("http://127.0.0.1:5160/oauth2"),
                 HelixOrigin = new Uri("http://127.0.0.1:5160/helix"),
-                EventSubWebSocketUri = new Uri("ws://127.0.0.1:5160/ws"),
             }
             : TwitchEndpointPolicy.Default;
         policy.Validate();
@@ -137,23 +135,29 @@ public sealed class TwitchEndpointRoutingTests
                 policy.HelixOrigin,
                 ["/helix/eventsub/subscriptions"],
                 () =>
-                    new EventSubClient(factory, policy).CreateChatMessageSubscriptionAsync(
-                        context,
-                        "channel",
-                        "bot",
-                        "session",
+                    new EventSubClient(
+                        factory,
+                        policy,
+                        new EventSubWebhookOptions
+                        {
+                            CallbackUri = new Uri("https://bot.blokebot.com/eventsub/twitch"),
+                            Secret = "eventsub-test-secret",
+                        },
+                        new StaticAppAccessTokenProvider(),
+                        new ImmediateVerification()
+                    ).CreateAsync(
+                        "client",
+                        new EventSubSubscriptionRequest(
+                            "channel.chat.message",
+                            "1",
+                            new Dictionary<string, string>
+                            {
+                                ["broadcaster_user_id"] = "channel",
+                                ["user_id"] = "bot",
+                            }
+                        ),
                         CancellationToken.None
                     )
-            ),
-            new EndpointRoute(
-                "EventSubConnectionSession",
-                policy.EventSubWebSocketUri,
-                ["/ws"],
-                () =>
-                {
-                    observedEndpoints.Add(CreateSession(policy).InitialEndpoint);
-                    return Task.CompletedTask;
-                }
             ),
         };
 
@@ -173,21 +177,6 @@ public sealed class TwitchEndpointRoutingTests
         }
     }
 
-    private static EventSubConnectionSession CreateSession(TwitchEndpointPolicy policy) =>
-        new EventSubConnectionSession(
-            null!,
-            null!,
-            null!,
-            null!,
-            new BotRuntimeStatusStore(),
-            null!,
-            null!,
-            [],
-            null!,
-            NullLogger<EventSubConnectionSession>.Instance,
-            policy
-        );
-
     private static BotIdentity Identity() =>
         new BotIdentity
         {
@@ -205,6 +194,20 @@ public sealed class TwitchEndpointRoutingTests
         string[] Paths,
         Func<Task> RouteAsync
     );
+
+    private sealed class StaticAppAccessTokenProvider : IAppAccessTokenProvider
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-access-token");
+    }
+
+    private sealed class ImmediateVerification : IEventSubSubscriptionVerification
+    {
+        public Task WaitAsync(string subscriptionId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public void Confirm(string subscriptionId) { }
+    }
 
     private sealed class RoutingHttpClientFactory(List<Uri> observedEndpoints) : IHttpClientFactory
     {

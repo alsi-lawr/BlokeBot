@@ -53,6 +53,8 @@ public sealed record BotOptions
     /// </summary>
     [Required]
     public BotIdentityOptions Identity { get; set; } = new();
+
+    public EventSubWebhookOptions? EventSubWebhook { get; set; }
 }
 
 public sealed record PublicChatQueueAlertOptions

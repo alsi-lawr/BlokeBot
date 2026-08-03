@@ -23,23 +23,6 @@ internal static class RuntimeSessionResilience
             health
         );
 
-    internal static void ConfigureEventSub(
-        ResiliencePipelineBuilder builder,
-        EventSubSessionResiliencePolicy policy,
-        IRuntimeSessionHealthReporter health
-    ) =>
-        Configure(
-            builder,
-            ChatRuntime.EventSub,
-            policy.AttemptLimit,
-            policy.Delay,
-            policy.MaximumDelay,
-            policy.DelayBackoffType,
-            policy.AttemptTimeout,
-            EventSubSessionFailureClassifier.Classify,
-            health
-        );
-
     private static void Configure(
         ResiliencePipelineBuilder builder,
         ChatRuntime runtime,
@@ -98,19 +81,6 @@ internal static class RuntimeSessionResilience
 }
 
 internal sealed class IrcSessionResiliencePipeline(ResiliencePipeline pipeline)
-{
-    internal ValueTask<RuntimeSessionEstablishment> ExecuteAsync(
-        Func<CancellationToken, Task<RuntimeSessionEstablishment>> operation,
-        CancellationToken cancellationToken
-    ) =>
-        pipeline.ExecuteAsync(
-            static (callback, token) => new ValueTask<RuntimeSessionEstablishment>(callback(token)),
-            operation,
-            cancellationToken
-        );
-}
-
-internal sealed class EventSubSessionResiliencePipeline(ResiliencePipeline pipeline)
 {
     internal ValueTask<RuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<RuntimeSessionEstablishment>> operation,

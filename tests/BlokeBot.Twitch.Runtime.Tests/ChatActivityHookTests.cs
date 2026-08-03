@@ -51,22 +51,16 @@ public sealed class ChatActivityHookTests
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
-        var session = new EventSubConnectionSession(
-            null!,
-            null!,
+        var session = new EventSubDeliveryHandler(
             dispatcher,
             new RecordingCommandResponseSender(recorder),
-            new BotRuntimeStatusStore(),
             new EnabledNativeTwitchFeatureStateProvider(),
-            new EventSubChannelReconciliationTrigger(null!),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
-            >(BotObserverBoundaries.EventSubMessages),
-            NullLogger<EventSubConnectionSession>.Instance,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            >(BotObserverBoundaries.EventSubMessages)
         );
 
         await session.DispatchChatMessageAsync(

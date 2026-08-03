@@ -27,6 +27,29 @@ internal sealed class EventSubChannelReconciliationTrigger(IBotChannelProvider c
         );
     }
 
+    public async Task ReconcileRevocationAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken
+    )
+    {
+        EventSubChannelSession? session;
+        lock (_gate)
+        {
+            session = _session;
+        }
+
+        if (session is null)
+        {
+            return;
+        }
+
+        await session.RepairRevokedSubscriptionAndDrainAsync(
+            subscriptionId,
+            BotChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken)),
+            cancellationToken
+        );
+    }
+
     internal IDisposable Register(EventSubChannelSession session)
     {
         lock (_gate)

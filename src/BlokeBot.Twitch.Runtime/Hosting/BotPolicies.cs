@@ -10,7 +10,6 @@ namespace BlokeBot.Twitch.Runtime;
 public enum BotResiliencePipeline
 {
     IrcSession,
-    EventSubSession,
     EventSubChannelRecovery,
     PublicChatDelivery,
 }
@@ -22,8 +21,6 @@ public sealed record BotPolicyOptions
 {
     public required IrcSessionResilienceOptions IrcSession { get; init; }
 
-    public required EventSubSessionResilienceOptions EventSubSession { get; init; }
-
     public required EventSubChannelRecoveryOptions EventSubChannelRecovery { get; init; }
 
     public required PublicChatRetryOptions PublicChatRetry { get; init; }
@@ -34,19 +31,6 @@ public sealed record BotPolicyOptions
 }
 
 public sealed record IrcSessionResiliencePolicy
-{
-    public required int AttemptLimit { get; init; }
-
-    public required TimeSpan Delay { get; init; }
-
-    public required TimeSpan MaximumDelay { get; init; }
-
-    public required DelayBackoffType DelayBackoffType { get; init; }
-
-    public required TimeSpan AttemptTimeout { get; init; }
-}
-
-public sealed record EventSubSessionResiliencePolicy
 {
     public required int AttemptLimit { get; init; }
 
@@ -97,8 +81,6 @@ public sealed record BotPolicies
 {
     public required IrcSessionResiliencePolicy IrcSession { get; init; }
 
-    public required EventSubSessionResiliencePolicy EventSubSession { get; init; }
-
     public required EventSubChannelRecoveryPolicy EventSubChannelRecovery { get; init; }
 
     public required PublicChatRetryPolicy PublicChatRetry { get; init; }
@@ -117,9 +99,6 @@ public sealed record BotPolicies
             {
                 IrcSession = BindRequired<IrcSessionResilienceOptions>(
                     policies.GetSection(nameof(IrcSession))
-                ),
-                EventSubSession = BindRequired<EventSubSessionResilienceOptions>(
-                    policies.GetSection(nameof(EventSubSession))
                 ),
                 EventSubChannelRecovery = BindRequired<EventSubChannelRecoveryOptions>(
                     policies.GetSection(nameof(EventSubChannelRecovery))
@@ -151,11 +130,6 @@ public sealed record BotPolicies
             options.IrcSession,
             new IrcSessionResilienceOptionsValidator()
         );
-        var eventSub = Validate(
-            $"{boundary}.{nameof(options.EventSubSession)}",
-            options.EventSubSession,
-            new EventSubSessionResilienceOptionsValidator()
-        );
         var recovery = Validate(
             $"{boundary}.{nameof(options.EventSubChannelRecovery)}",
             options.EventSubChannelRecovery,
@@ -186,14 +160,6 @@ public sealed record BotPolicies
                 MaximumDelay = irc.MaximumDelay!.Value,
                 DelayBackoffType = irc.DelayBackoffType!.Value,
                 AttemptTimeout = irc.AttemptTimeout!.Value,
-            },
-            EventSubSession = new EventSubSessionResiliencePolicy
-            {
-                AttemptLimit = eventSub.AttemptLimit!.Value,
-                Delay = eventSub.Delay!.Value,
-                MaximumDelay = eventSub.MaximumDelay!.Value,
-                DelayBackoffType = eventSub.DelayBackoffType!.Value,
-                AttemptTimeout = eventSub.AttemptTimeout!.Value,
             },
             EventSubChannelRecovery = new EventSubChannelRecoveryPolicy
             {
@@ -267,7 +233,6 @@ internal static class RetryDelayRangeValidator
         options switch
         {
             IrcSessionResilienceOptions value => Validate(value.Delay, value.MaximumDelay),
-            EventSubSessionResilienceOptions value => Validate(value.Delay, value.MaximumDelay),
             EventSubChannelRecoveryOptions value => Validate(value.Delay, value.MaximumDelay),
             PublicChatRetryOptions value => Validate(value.Delay, value.MaximumDelay),
             _ => ValidateOptionsResult.Success,
