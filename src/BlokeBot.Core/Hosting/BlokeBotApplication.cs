@@ -26,6 +26,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Hosting;
@@ -250,7 +251,8 @@ public static class BlokeBotApplication
                 }
             )
             .AllowAnonymous()
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .WithMetadata(new SkipStatusCodePagesAttribute());
 
     private static void AddAuthentication(WebApplicationBuilder builder)
     {
