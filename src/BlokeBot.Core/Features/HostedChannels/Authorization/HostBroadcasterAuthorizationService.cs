@@ -72,7 +72,7 @@ public sealed class HostBroadcasterAuthorizationService(
                 if (authorization is null)
                 {
                     authorization = new HostBroadcasterAuthorization { HostId = hostId };
-                    db.HostBroadcasterAuthorizations.Add(authorization);
+                    _ = db.HostBroadcasterAuthorizations.Add(authorization);
                 }
                 authorization.ProtectedTokenPayload = payload;
                 authorization.TwitchUserId = grant.UserId;
@@ -80,8 +80,8 @@ public sealed class HostBroadcasterAuthorizationService(
                 authorization.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
                 authorization.AuthorizedAtUtc = DateTime.UtcNow;
                 authorization.UpdatedAtUtc = DateTime.UtcNow;
-                await db.SaveChangesAsync(ct);
-                await changes.NotifyChangedAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
+                _ = await changes.NotifyChangedAsync(ct);
                 return (HostBroadcasterAuthorizationOutcome)
                     new HostBroadcasterAuthorizationOutcome.Authorized();
             },
@@ -140,8 +140,8 @@ public sealed class HostBroadcasterAuthorizationService(
             return new HostBroadcasterAuthorizationClearOutcome.AlreadyDisconnected();
         }
 
-        db.HostBroadcasterAuthorizations.Remove(authorization);
-        await db.SaveChangesAsync(ct);
+        _ = db.HostBroadcasterAuthorizations.Remove(authorization);
+        _ = await db.SaveChangesAsync(ct);
 
         try
         {
@@ -231,7 +231,7 @@ public sealed class HostBroadcasterAuthorizationService(
             );
             var protectedPayload = tokenProtector.Protect(host.Id, payload);
             byte[]? storedPayload = null;
-            protectedPayload.Match(value => storedPayload = value, _ => storedPayload = null);
+            _ = protectedPayload.Match(value => storedPayload = value, _ => storedPayload = null);
             if (storedPayload is null)
             {
                 return new TokenStatus.Unavailable(
@@ -255,7 +255,7 @@ public sealed class HostBroadcasterAuthorizationService(
         authorization.Login = valid.Validation.Login;
         authorization.AuthorizedScopes = ScopeSet.Format(granted);
         authorization.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return missing.IsEmpty
             ? new TokenStatus.Ready(payload.AccessToken, valid.Validation, required, granted)
             : new TokenStatus.MissingScopes(

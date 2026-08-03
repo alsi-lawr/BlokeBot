@@ -54,9 +54,9 @@ public partial class PublicMomentRecapPage
             CancellationToken.None
         );
         _feedback = result.Match(
-            succeeded =>
+            static succeeded =>
                 succeeded.WasIdempotent ? "Your vote was already recorded." : "Vote recorded.",
-            rejected => rejected.Reason.Message
+            static rejected => rejected.Reason.Message
         );
         _failed = result is MomentResult<MomentView>.Rejected;
         await ReloadAsync();

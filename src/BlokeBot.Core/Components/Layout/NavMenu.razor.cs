@@ -255,16 +255,11 @@ public partial class NavMenu
         AuthenticatedSession session,
         BotHostSelection? selection,
         HostFeatureFlags feature
-    )
-    {
-        if (!session.CanUseBotFunctions(_existingHostIds) || selection is null)
-        {
-            return false;
-        }
-
-        return _hostedFeatures.TryGetValue(selection.Current.Id, out var features)
-            && features.Contains(feature);
-    }
+    ) =>
+        session.CanUseBotFunctions(_existingHostIds)
+        && selection is not null
+        && _hostedFeatures.TryGetValue(selection.Current.Id, out var features)
+        && features.Contains(feature);
 
     private async Task LoadHostedFeaturesAsync()
     {

@@ -150,7 +150,7 @@ public sealed class BlokeBotHostTests
     private static string TemporaryDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"blokebot-host-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(path);
+        _ = Directory.CreateDirectory(path);
         return path;
     }
 }

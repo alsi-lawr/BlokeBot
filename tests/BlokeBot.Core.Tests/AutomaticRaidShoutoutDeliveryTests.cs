@@ -108,7 +108,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
-        result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
         var call = chat.Calls.ShouldHaveSingleItem();
         call.Message.ShouldBe("@raider|unknown game|untitled");
         call.Correlation.ShouldBe(new PublicChatDeliveryCorrelation(1, "raid-message"));
@@ -176,7 +176,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
-        result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
         var call = chat.Calls.ShouldHaveSingleItem();
         var pin = call.PinIntent.ShouldNotBeNull();
         pin.HostId.ShouldBe(1);
@@ -218,7 +218,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
 
         var result = await delivery.DeliverAsync(Request(configuration), CancellationToken.None);
 
-        result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Delivered>();
         announcement.Calls.ShouldHaveSingleItem().Color.ShouldBe(color);
         chat.Calls.ShouldBeEmpty();
     }
@@ -291,7 +291,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Ambiguous>();
+        _ = result.ShouldBeOfType<AutomaticRaidShoutoutDeliveryResult.Ambiguous>();
         announcement.Calls.Count.ShouldBe(1);
         chat.Calls.ShouldBeEmpty();
     }
@@ -367,7 +367,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
     private static async Task SeedHostAsync(SqliteBlokeBotDbFactory database)
     {
         await using var db = await database.CreateDbContextAsync();
-        db.Hosts.Add(
+        _ = db.Hosts.Add(
             new BotHost
             {
                 EnabledFeatures = HostFeatureFlags.All,
@@ -376,7 +376,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
                 TwitchUserId = "host-id",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static AutomaticRaidAnnouncementSendResult AnnouncementResult(string scenario) =>
@@ -413,7 +413,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
     {
         await SeedHostAsync(database);
         await using var db = await database.CreateDbContextAsync();
-        db.AutomaticRaidShoutoutOutcomes.Add(
+        _ = db.AutomaticRaidShoutoutOutcomes.Add(
             new AutomaticRaidShoutoutOutcome
             {
                 HostId = 1,
@@ -426,7 +426,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
                 ClaimedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private sealed class RecordingNative(AutomaticRaidShoutoutDeliveryResult result)

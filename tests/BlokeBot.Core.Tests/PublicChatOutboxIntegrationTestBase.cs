@@ -52,7 +52,7 @@ public abstract class PublicChatOutboxIntegrationTestBase
         DateTimeOffset deliveredAt
     )
     {
-        (
+        _ = (
             await outbox.BeginSendAsync(
                 message,
                 sendStartedAt,
@@ -60,7 +60,7 @@ public abstract class PublicChatOutboxIntegrationTestBase
                 CancellationToken.None
             )
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 message,
                 new PublicChatDeliveryOutcome.Sent(),
@@ -122,7 +122,7 @@ public abstract class PublicChatOutboxIntegrationTestBase
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         db.PublicChatOutboxMessages.AddRange(rows);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private protected static PublicChatOutboxMessage TerminalRow(

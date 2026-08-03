@@ -79,7 +79,7 @@ internal static class BlokeBotHost
         Configure(builder, options);
 
         var statePaths = ResolveStatePaths(builder.Configuration, options.DataDirectory);
-        builder.Configuration.AddInMemoryCollection(
+        _ = builder.Configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
                 ["BlokeBot:DatabasePath"] = statePaths.DatabasePath,
@@ -87,7 +87,7 @@ internal static class BlokeBotHost
             }
         );
 
-        builder.Host.UseSerilog(
+        _ = builder.Host.UseSerilog(
             (context, services, logging) =>
                 BlokeBotHostLogging.ConfigureProduction(
                     logging,
@@ -96,14 +96,14 @@ internal static class BlokeBotHost
                     statePaths.StateDirectory
                 )
         );
-        builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
+        _ = builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
         ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
-        builder.AddBlokeBotCore(twitch.Mode);
+        _ = builder.AddBlokeBotCore(twitch.Mode);
 
         var app = builder.Build();
-        app.UseSerilogRequestLogging();
-        app.UseBlokeBotCore(twitch.Mode);
+        _ = app.UseSerilogRequestLogging();
+        _ = app.UseBlokeBotCore(twitch.Mode);
         return new BlokeBotHostComposition(app, twitch, statePaths);
     }
 
@@ -111,7 +111,7 @@ internal static class BlokeBotHost
     {
         var environmentName = builder.Environment.EnvironmentName;
         builder.Configuration.Sources.Clear();
-        builder
+        _ = builder
             .Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["urls"] = BlokeBotServerUrlPolicy.DefaultUrl }
             )
@@ -124,21 +124,21 @@ internal static class BlokeBotHost
 
         if (!string.IsNullOrWhiteSpace(options.ConfigurationPath))
         {
-            builder.Configuration.AddJsonFile(
+            _ = builder.Configuration.AddJsonFile(
                 ResolveConfigurationPath(options.ConfigurationPath, Environment.CurrentDirectory),
                 optional: false,
                 reloadOnChange: false
             );
         }
 
-        builder
+        _ = builder
             .Configuration.AddEnvironmentVariables("DOTNET_")
             .AddEnvironmentVariables("ASPNETCORE_")
             .AddEnvironmentVariables();
 
         if (options.Host is not null || options.Port is not null)
         {
-            builder.Configuration.AddInMemoryCollection(
+            _ = builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
                     ["urls"] = BlokeBotServerUrlPolicy.ExplicitUrl(options.Host, options.Port),
@@ -199,7 +199,7 @@ internal static class BlokeBotHost
             .PersistKeysToFileSystem(new DirectoryInfo(statePaths.DataProtectionKeysDirectory));
         if (OperatingSystem.IsWindows())
         {
-            dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+            _ = dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
         }
     }
 }

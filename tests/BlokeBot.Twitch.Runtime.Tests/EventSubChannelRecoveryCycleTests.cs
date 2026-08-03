@@ -131,7 +131,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         );
 
         taskFailure.InnerException.ShouldBeSameAs(reporterFailure);
-        harness
+        _ = harness
             .Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelStatus.Degraded>();
         harness.Diagnostics.DiagnosticReports.ShouldBeEmpty();
@@ -160,7 +160,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
             async cancellationToken =>
             {
                 enteredRecovery.Writer.TryWrite(true).ShouldBeTrue();
-                await releaseRecovery.Reader.ReadAsync(cancellationToken);
+                _ = await releaseRecovery.Reader.ReadAsync(cancellationToken);
                 return new BotAccount("bad-bot", "bad-secret");
             }
         );
@@ -169,10 +169,10 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
             ["bad", "good"],
             EventSubChannelRecoveryTrigger.Explicit
         );
-        await enteredRecovery.Reader.ReadAsync();
+        _ = await enteredRecovery.Reader.ReadAsync();
         var current = harness.Status.Current.Channels.ToDictionary(state => state.Channel);
-        current["good"].ShouldBeOfType<EventSubChannelStatus.Healthy>();
-        current["bad"].ShouldBeOfType<EventSubChannelStatus.Recovering>();
+        _ = current["good"].ShouldBeOfType<EventSubChannelStatus.Healthy>();
+        _ = current["bad"].ShouldBeOfType<EventSubChannelStatus.Recovering>();
         harness.Session.ActiveChannels.ShouldBe(["bad", "good"]);
         operations.DeleteCount("bad").ShouldBe(0);
         operations.CompleteStopCount("bad").ShouldBe(0);

@@ -45,7 +45,7 @@ public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueT
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Rejection>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Rejection>();
         outbox.BeginSendCalls.Count.ShouldBe(1);
         transport.SendCount.ShouldBe(1);
     }
@@ -70,7 +70,7 @@ public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueT
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Ambiguous>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Ambiguous>();
         outbox.BeginSendCalls.Count.ShouldBe(1);
         transport.SendCount.ShouldBe(1);
     }
@@ -142,7 +142,7 @@ public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueT
         outbox.ScriptOutstanding([pending], [pending], [pending]);
         var observer = new RecordingQueueAlertObserver();
         var transport = new ScriptedTransport(
-            (_, cancellationToken) =>
+            static (_, cancellationToken) =>
                 ValueTask.FromResult(
                     PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                         new IOException("preparation failed"),
@@ -171,7 +171,7 @@ public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueT
         var alert = await observer.ReadAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.SafePreSendTransient>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.SafePreSendTransient>();
         alert.Channel.ShouldBe("channel");
         alert.PendingCount.ShouldBe(1);
         alert.OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));

@@ -188,7 +188,7 @@ public sealed class PlayQueueChangeNotifier
     {
         lock (_gate)
         {
-            _observers.Remove(observer);
+            _ = _observers.Remove(observer);
         }
     }
 
@@ -288,27 +288,29 @@ internal static class PlayQueueInput
 
     public static bool IsValidLogin(string value) =>
         value.Length is >= 1 and <= 128
-        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
+        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     public static string NormalizeSlug(string value) => value.Trim().ToLowerInvariant();
 
     public static bool IsValidSlug(string value) =>
         value.Length is >= 1 and <= 48
         && value[0] is >= 'a' and <= 'z'
-        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
+        && value.All(static character =>
+            character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-'
+        );
 
     public static string NormalizeKey(string value)
     {
         var builder = new StringBuilder(value.Length);
         foreach (var character in value.Trim().ToLowerInvariant())
         {
-            if (character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-')
+            if (character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-')
             {
-                builder.Append(character);
+                _ = builder.Append(character);
             }
             else if (builder.Length > 0 && builder[^1] != '-')
             {
-                builder.Append('-');
+                _ = builder.Append('-');
             }
         }
 

@@ -7,10 +7,10 @@ namespace BlokeBot.Core.Features.Admin.SiteAccess;
 public partial class SiteAccessSection
 {
     [Parameter, EditorRequired]
-    public Func<Task> AddBlacklist { get; set; } = () => Task.CompletedTask;
+    public Func<Task> AddBlacklist { get; set; } = static () => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<Task> AddWhitelist { get; set; } = () => Task.CompletedTask;
+    public Func<Task> AddWhitelist { get; set; } = static () => Task.CompletedTask;
 
     [Parameter]
     public IReadOnlyList<AccessListEntryProfile> BlacklistEntries { get; set; } = [];
@@ -28,16 +28,17 @@ public partial class SiteAccessSection
     public EventCallback<string> NewWhitelistLoginChanged { get; set; }
 
     [Parameter, EditorRequired]
-    public Func<string, Task> RemoveBlacklist { get; set; } = _ => Task.CompletedTask;
+    public Func<string, Task> RemoveBlacklist { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<string, Task> RemoveWhitelist { get; set; } = _ => Task.CompletedTask;
+    public Func<string, Task> RemoveWhitelist { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
     public SiteAccessAdminState State { get; set; } = new(false, [], []);
 
     [Parameter, EditorRequired]
-    public Func<ChangeEventArgs, Task> ToggleWhitelist { get; set; } = _ => Task.CompletedTask;
+    public Func<ChangeEventArgs, Task> ToggleWhitelist { get; set; } =
+        static _ => Task.CompletedTask;
 
     [Parameter]
     public IReadOnlyList<AccessListEntryProfile> WhitelistEntries { get; set; } = [];

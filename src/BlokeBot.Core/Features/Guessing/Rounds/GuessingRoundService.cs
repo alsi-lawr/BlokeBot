@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Core.Features.Guessing.Profiles;
@@ -160,12 +161,12 @@ public sealed class GuessingRoundService(
             List<PointBalanceMutation> mutations
         )
         {
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             await changes.NotifyChangedAsync(hostId, ct);
             if (mutations.Count > 0)
             {
-                await pointsChanges.NotifyChangedAsync(ct);
+                _ = await pointsChanges.NotifyChangedAsync(ct);
             }
             if (winners.Count > 0)
             {
@@ -195,7 +196,7 @@ public sealed class GuessingRoundService(
                 {
                     ["name"] = canonicalName,
                     ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
-                    ["count"] = winners.Count.ToString(),
+                    ["count"] = winners.Count.ToString(CultureInfo.InvariantCulture),
                     ["reward"] = rewardAmount.ToDisplayString(),
                     ["label"] = pointLabel,
                     ["reward_text"] =
@@ -285,8 +286,8 @@ public sealed class GuessingRoundService(
             Status = GuessRoundStatus.Open,
             StartedAtUtc = DateTime.UtcNow,
         };
-        db.Rounds.Add(round);
-        await db.SaveChangesAsync(ct);
+        _ = db.Rounds.Add(round);
+        _ = await db.SaveChangesAsync(ct);
         var pinPolicy = await db
             .ReplyPinPolicies.AsNoTracking()
             .SingleOrDefaultAsync(
@@ -343,12 +344,9 @@ public sealed class GuessingRoundService(
             ? await db.Profiles.LoadDefaultProfileIdAsync(hostId.Value, ct)
             : await db.Profiles.LoadProfileIdByNameAsync(hostId.Value, profileName, ct);
 
-        if (profileId is null)
-        {
-            return new GuessingOperationOutcome.Rejected($"Unknown round type: {profileName}.");
-        }
-
-        return await StartRoundCoreAsync(hostId.Value, profileId.Value, ct);
+        return profileId is null
+            ? new GuessingOperationOutcome.Rejected($"Unknown round type: {profileName}.")
+            : await StartRoundCoreAsync(hostId.Value, profileId.Value, ct);
     }
 
     public IO<GuessingOperationOutcome, Never> StopGuessing(int hostId) =>
@@ -387,7 +385,7 @@ public sealed class GuessingRoundService(
 
         round.Status = GuessRoundStatus.Closed;
         round.ClosedAtUtc = DateTime.UtcNow;
-        await db
+        _ = await db
             .PublicChatPinOperations.Where(operation =>
                 operation.HostId == hostId
                 && operation.Feature == "guessing"
@@ -419,7 +417,7 @@ public sealed class GuessingRoundService(
         );
         if (activePin is not null)
         {
-            db.PublicChatPinOperations.Add(
+            _ = db.PublicChatPinOperations.Add(
                 new PublicChatPinOperation
                 {
                     Kind = PublicChatPinOperationKind.Unpin,
@@ -435,7 +433,7 @@ public sealed class GuessingRoundService(
                 }
             );
         }
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(hostId, ct);
         return new GuessingOperationOutcome.Succeeded(settings.GuessingStoppedReply);

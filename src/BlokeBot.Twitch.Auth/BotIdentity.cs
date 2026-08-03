@@ -50,32 +50,29 @@ public sealed record BotIdentity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
         var validation = new BotIdentityOptionsValidator().Validate(boundary, options);
-        if (validation.Failed)
+        return (validation.Failed, options.Scopes) switch
         {
-            throw new OptionsValidationException(
+            (true, _) => throw new OptionsValidationException(
                 boundary,
                 typeof(BotIdentityOptions),
                 validation.Failures
-            );
-        }
-
-        if (
-            options.Scopes is null
-            || options.Scopes.Length == 0
-            || options.Scopes.Any(scope =>
-                string.IsNullOrWhiteSpace(scope)
-                || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
-            )
-        )
-        {
-            throw new OptionsValidationException(
+            ),
+            (_, null or { Length: 0 }) => throw new OptionsValidationException(
                 boundary,
                 typeof(BotIdentityOptions),
                 [$"{nameof(BotIdentityOptions.Scopes)} must contain only valid scopes."]
-            );
-        }
-
-        return FromOptions(options);
+            ),
+            (_, { } scopes)
+                when scopes.Any(static scope =>
+                    string.IsNullOrWhiteSpace(scope)
+                    || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
+                ) => throw new OptionsValidationException(
+                boundary,
+                typeof(BotIdentityOptions),
+                [$"{nameof(BotIdentityOptions.Scopes)} must contain only valid scopes."]
+            ),
+            _ => FromOptions(options),
+        };
     }
 
     /// <inheritdoc />

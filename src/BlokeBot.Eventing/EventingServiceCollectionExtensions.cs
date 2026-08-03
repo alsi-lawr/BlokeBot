@@ -20,9 +20,9 @@ public static class EventingServiceCollectionExtensions
             ObserverFailureDiagnosticLogger
         >();
         services.TryAddSingleton<IObserverCorrelationIdProvider, ObserverCorrelationIdProvider>();
-        services.AddSingleton(policy);
-        services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>(
-            serviceProvider => new ObserverFanOut<TBoundary, TEvent, TDeadLetter>(
+        _ = services.AddSingleton(policy);
+        _ = services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>(
+            static serviceProvider => new ObserverFanOut<TBoundary, TEvent, TDeadLetter>(
                 serviceProvider.GetRequiredService<ObserverFailurePolicy<TBoundary, TDeadLetter>>(),
                 serviceProvider.GetRequiredService<IObserverFailureDiagnosticReporter>(),
                 serviceProvider.GetRequiredService<IObserverCorrelationIdProvider>()
@@ -54,13 +54,13 @@ public static class EventingServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(eventIdentity);
 
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddContinueAndReportObserverFanOut<
             EventBusObserverBoundary<TKey>,
             EventNotification<TKey>,
             EventBusDeadLetter
         >(boundary);
-        services.AddSingleton(new EventBusEventIdentity<TKey> { Project = eventIdentity });
-        services.AddSingleton<EventBus<TKey>>(serviceProvider => new EventBus<TKey>(
+        _ = services.AddSingleton(new EventBusEventIdentity<TKey> { Project = eventIdentity });
+        _ = services.AddSingleton<EventBus<TKey>>(static serviceProvider => new EventBus<TKey>(
             serviceProvider.GetRequiredService<
                 ObserverFanOut<
                     EventBusObserverBoundary<TKey>,

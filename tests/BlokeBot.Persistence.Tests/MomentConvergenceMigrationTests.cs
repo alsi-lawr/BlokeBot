@@ -18,7 +18,7 @@ public sealed class MomentConvergenceMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_momentHubMigration);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, CreatedAtUtc)
@@ -34,11 +34,11 @@ public sealed class MomentConvergenceMigrationTests
                 CapturedAtUtc = DateTime.UtcNow,
                 LastCapturedAtUtc = DateTime.UtcNow,
             };
-            before.MomentCandidates.Add(candidate);
-            await before.SaveChangesAsync();
+            _ = before.MomentCandidates.Add(candidate);
+            _ = await before.SaveChangesAsync();
             candidateId = candidate.Id;
 
-            await before.Database.ExecuteSqlInterpolatedAsync(
+            _ = await before.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO moment_contributors
                     (CandidateId, IdentityKey, TwitchUserId, NormalizedLogin, DisplayName,
@@ -79,12 +79,12 @@ public sealed class MomentConvergenceMigrationTests
         vote.TwitchUserId.ShouldBe("voter-id");
         vote.CreatedAtUtc.ShouldBe(new DateTime(2026, 7, 30, 10, 0, 0, DateTimeKind.Utc));
 
-        verify.MomentEvents.Add(Event(candidateId, "moment:approval", DateTime.UtcNow));
-        await verify.SaveChangesAsync();
-        verify.MomentEvents.Add(
+        _ = verify.MomentEvents.Add(Event(candidateId, "moment:approval", DateTime.UtcNow));
+        _ = await verify.SaveChangesAsync();
+        _ = verify.MomentEvents.Add(
             Event(candidateId, "moment:approval", DateTime.UtcNow.AddSeconds(1))
         );
-        await Should.ThrowAsync<DbUpdateException>(() => verify.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => verify.SaveChangesAsync());
     }
 
     private static MomentDomainEvent Event(long candidateId, string operationKey, DateTime now) =>

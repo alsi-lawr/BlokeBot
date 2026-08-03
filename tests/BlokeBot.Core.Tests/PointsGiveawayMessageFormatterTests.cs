@@ -204,8 +204,8 @@ public sealed class PointsGiveawayMessageFormatterTests
     )
     {
         var succeeded = outcome.Match(
-            value => value,
-            _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
+            static value => value,
+            static _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
         );
         succeeded.Message.ShouldBe(expectedMessage);
         succeeded.Target.ShouldBe(expectedTarget);
@@ -218,8 +218,8 @@ public sealed class PointsGiveawayMessageFormatterTests
     )
     {
         var failed = outcome.Match(
-            _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
-            value => value
+            static _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
+            static value => value
         );
         failed.Message.ShouldBe(expectedMessage);
         failed.Target.ShouldBe(expectedTarget);

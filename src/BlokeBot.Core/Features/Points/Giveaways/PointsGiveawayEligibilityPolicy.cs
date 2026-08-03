@@ -73,17 +73,11 @@ public sealed class PointsGiveawayEligibilityPolicy(
             ValueTask.FromResult(Result<FollowerCheckOutcome, Never>.Success(outcome))
         );
 
-    private static bool HasSubscriberBadge(IReadOnlyDictionary<string, string> tags)
-    {
-        if (!tags.TryGetValue("badges", out var badges))
-        {
-            return false;
-        }
-
-        return badges
+    private static bool HasSubscriberBadge(IReadOnlyDictionary<string, string> tags) =>
+        tags.TryGetValue("badges", out var badges)
+        && badges
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(x => x.StartsWith("subscriber/", StringComparison.OrdinalIgnoreCase));
-    }
+            .Any(static x => x.StartsWith("subscriber/", StringComparison.OrdinalIgnoreCase));
 }
 
 internal sealed class PointsGiveawayStreamLivenessException(

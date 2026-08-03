@@ -55,7 +55,7 @@ public sealed class BotIdentityTests
 
     [Test]
     public void EmptyScopes_MappingPermissiveIdentity_RejectsInvalidSet() =>
-        Should.Throw<ArgumentException>(() =>
+        Should.Throw<ArgumentException>(static () =>
             BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] })
         );
 

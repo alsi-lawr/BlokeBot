@@ -34,26 +34,19 @@ internal sealed class HostBotOAuthStateStore(TimeProvider timeProvider)
         }
     }
 
-    internal HostBotOAuthStateConsumption Consume(string? state, string authenticatedUserId)
-    {
-        if (
-            string.IsNullOrWhiteSpace(state)
-            || string.IsNullOrWhiteSpace(authenticatedUserId)
-            || !_states.TryRemove(state, out var pending)
-            || pending.ExpiresAtUtc <= timeProvider.GetUtcNow()
-            || !string.Equals(
-                pending.AuthenticatedUserId,
-                authenticatedUserId,
-                StringComparison.Ordinal
-            )
-            || pending.Purpose is not HostBotOAuthPurpose.CustomBot
+    internal HostBotOAuthStateConsumption Consume(string? state, string authenticatedUserId) =>
+        string.IsNullOrWhiteSpace(state)
+        || string.IsNullOrWhiteSpace(authenticatedUserId)
+        || !_states.TryRemove(state, out var pending)
+        || pending.ExpiresAtUtc <= timeProvider.GetUtcNow()
+        || !string.Equals(
+            pending.AuthenticatedUserId,
+            authenticatedUserId,
+            StringComparison.Ordinal
         )
-        {
-            return new HostBotOAuthStateConsumption.Rejected();
-        }
-
-        return new HostBotOAuthStateConsumption.Consumed(pending.HostId);
-    }
+        || pending.Purpose is not HostBotOAuthPurpose.CustomBot
+            ? new HostBotOAuthStateConsumption.Rejected()
+            : new HostBotOAuthStateConsumption.Consumed(pending.HostId);
 
     internal static bool IsHostBotState(string? state) =>
         state?.StartsWith(_prefix, StringComparison.Ordinal) == true;
@@ -65,7 +58,7 @@ internal sealed class HostBotOAuthStateStore(TimeProvider timeProvider)
         {
             if (state.Value.ExpiresAtUtc <= now)
             {
-                _states.TryRemove(state.Key, out _);
+                _ = _states.TryRemove(state.Key, out _);
             }
         }
     }

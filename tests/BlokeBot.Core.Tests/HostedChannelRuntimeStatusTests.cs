@@ -47,12 +47,12 @@ public sealed class HostedChannelRuntimeStatusTests
 
         var summary = (
             await service.LoadHostRuntimeSummary(hostId).RunAsync(CancellationToken.None)
-        ).Match<HostedChannelRuntimeSummary?>(value => value, () => null);
+        ).Match<HostedChannelRuntimeSummary?>(static value => value, static () => null);
 
-        summary.ShouldNotBeNull();
+        _ = summary.ShouldNotBeNull();
         summary!.IsChannelBotAuthorized.ShouldBeTrue();
         summary.ChannelBotAuthorizationScopesCurrent.ShouldBeTrue();
-        summary.Lifecycle.ShouldBeOfType<HostedChannelRuntimeLifecycle.Started>();
+        _ = summary.Lifecycle.ShouldBeOfType<HostedChannelRuntimeLifecycle.Started>();
         httpClientFactory.RequestCount.ShouldBe(0);
     }
 
@@ -102,8 +102,8 @@ public sealed class HostedChannelRuntimeStatusTests
             BotRuntimeStateChangedAtUtc = DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -119,13 +119,11 @@ public sealed class HostedChannelRuntimeStatusTests
 
     private sealed class CountingHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        public int RequestCount { get; private set; }
 
-        public int RequestCount => _handler.RequestCount;
+        public HttpClient CreateClient(string name) => new(new Handler(this));
 
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
-
-        private sealed class Handler : HttpMessageHandler
+        private sealed class Handler(CountingHttpClientFactory owner) : HttpMessageHandler
         {
             public int RequestCount { get; private set; }
 
@@ -134,7 +132,7 @@ public sealed class HostedChannelRuntimeStatusTests
                 CancellationToken cancellationToken
             )
             {
-                RequestCount++;
+                owner.RequestCount++;
                 return Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {

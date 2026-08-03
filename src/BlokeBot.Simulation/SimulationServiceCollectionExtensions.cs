@@ -10,51 +10,53 @@ internal static class SimulationServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotSimulation(this IServiceCollection services)
     {
-        services.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider()));
-        services.AddSingleton<SimulationCommandCatalogScenario>();
-        services.Replace(
-            ServiceDescriptor.Singleton<IHostStreamLivenessProvider>(provider =>
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider())
+        );
+        _ = services.AddSingleton<SimulationCommandCatalogScenario>();
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IHostStreamLivenessProvider>(static provider =>
                 provider.GetRequiredService<SimulationCommandCatalogScenario>()
             )
         );
-        services.Replace(
+        _ = services.Replace(
             ServiceDescriptor.Singleton<IPointTargetUserLookup, SimulationPointTargetUserLookup>()
         );
-        services.Replace(
+        _ = services.Replace(
             ServiceDescriptor.Singleton<
                 IAutomaticRaidShoutoutDelivery,
                 SimulationAutomaticRaidShoutoutDelivery
             >()
         );
-        services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
-        services.Replace(
-            ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(provider =>
+        _ = services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
-        services.Replace(
-            ServiceDescriptor.Singleton<IPollDashboardOperations>(provider =>
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IPollDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
-        services.Replace(
-            ServiceDescriptor.Singleton<IClipMarkerDashboardOperations>(provider =>
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IClipMarkerDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
-        services.Replace(
-            ServiceDescriptor.Singleton<IChannelPointsDashboardOperations>(provider =>
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IChannelPointsDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
-        services.Replace(
-            ServiceDescriptor.Singleton<IPredictionDashboardOperations>(provider =>
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IPredictionDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
-        services.AddSingleton<SimulationFixtureSeeder>();
-        services.AddSingleton<SimulationReadiness>();
-        services.AddSingleton<SimulationStartupCoordinator>();
+        _ = services.AddSingleton<SimulationFixtureSeeder>();
+        _ = services.AddSingleton<SimulationReadiness>();
+        _ = services.AddSingleton<SimulationStartupCoordinator>();
         return services;
     }
 

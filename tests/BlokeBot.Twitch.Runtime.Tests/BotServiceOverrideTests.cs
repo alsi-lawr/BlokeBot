@@ -41,7 +41,7 @@ public sealed class BotServiceOverrideTests
         var sent = chat.Messages.ShouldHaveSingleItem();
         sent.Channel.ShouldBe("streamer");
         sent.Message.ShouldBe("default response");
-        sent.Deadline.ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
+        _ = sent.Deadline.ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 
     [Test]
@@ -53,9 +53,9 @@ public sealed class BotServiceOverrideTests
         var responseSender = new FeatureResponseSender();
         var lifecycleNotifier = new FeatureLifecycleNotifier();
         var services = CreateServices(defaultTokens, defaultChat);
-        services.AddSingleton(accountProvider);
-        services.AddSingleton(responseSender);
-        services.AddSingleton(lifecycleNotifier);
+        _ = services.AddSingleton(accountProvider);
+        _ = services.AddSingleton(responseSender);
+        _ = services.AddSingleton(lifecycleNotifier);
         _ = services
             .AddTwitchBot(ConfigureBot, ValidPolicies())
             .OverrideAccountProviderWith<FeatureAccountProvider>()
@@ -101,15 +101,15 @@ public sealed class BotServiceOverrideTests
         var responseSender = new FeatureResponseSender();
         var lifecycleNotifier = new FeatureLifecycleNotifier();
         var services = CreateServices(defaultTokens, defaultChat);
-        services.AddSingleton(firstAccountProvider);
-        services.AddSingleton(firstResponseSender);
-        services.AddSingleton(firstLifecycleNotifier);
-        services.AddSingleton<IBotAccountProvider>(firstAccountProvider);
-        services.AddSingleton<ICommandResponseSender>(firstResponseSender);
-        services.AddSingleton<IBotChannelLifecycleNotifier>(firstLifecycleNotifier);
-        services.AddSingleton(accountProvider);
-        services.AddSingleton(responseSender);
-        services.AddSingleton(lifecycleNotifier);
+        _ = services.AddSingleton(firstAccountProvider);
+        _ = services.AddSingleton(firstResponseSender);
+        _ = services.AddSingleton(firstLifecycleNotifier);
+        _ = services.AddSingleton<IBotAccountProvider>(firstAccountProvider);
+        _ = services.AddSingleton<ICommandResponseSender>(firstResponseSender);
+        _ = services.AddSingleton<IBotChannelLifecycleNotifier>(firstLifecycleNotifier);
+        _ = services.AddSingleton(accountProvider);
+        _ = services.AddSingleton(responseSender);
+        _ = services.AddSingleton(lifecycleNotifier);
         _ = services
             .AddTwitchBot(ValidConfiguration())
             .OverrideAccountProviderWith<FirstFeatureAccountProvider>()
@@ -159,9 +159,9 @@ public sealed class BotServiceOverrideTests
     )
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IAccessTokenProvider>(tokens);
-        services.AddSingleton<IPublicChatMessageSender>(chat);
-        services.AddSingleton<ILogger<PublicChatCommandResponseSender>>(
+        _ = services.AddSingleton<IAccessTokenProvider>(tokens);
+        _ = services.AddSingleton<IPublicChatMessageSender>(chat);
+        _ = services.AddSingleton<ILogger<PublicChatCommandResponseSender>>(
             NullLogger<PublicChatCommandResponseSender>.Instance
         );
         return services;
@@ -269,8 +269,8 @@ public sealed class BotServiceOverrideTests
 
     private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
         result.Match(
-            account => account,
-            reason =>
+            static account => account,
+            static reason =>
                 throw new InvalidOperationException($"Expected a bot account, received {reason}.")
         );
 
@@ -328,7 +328,7 @@ public sealed class BotServiceOverrideTests
     private sealed class FirstFeatureAccountProvider : IBotAccountProvider
     {
         public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(

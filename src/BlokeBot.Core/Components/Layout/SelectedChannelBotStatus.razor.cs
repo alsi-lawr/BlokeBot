@@ -18,9 +18,9 @@ public partial class SelectedChannelBotStatus
 
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
 
     private bool _selectedHostBotAuthorized =>
@@ -71,25 +71,27 @@ public partial class SelectedChannelBotStatus
     }
 
     private string _selectedBotStatusText =>
-        _selectedHostStatus is { } status
-            ? status.Lifecycle.Match(
+        _selectedHostStatus switch
+        {
+            null => "unknown",
+            { } status => status.Lifecycle.Match(
                 _ =>
-                    status.IsChannelBotAuthorized
-                        ? (
-                            status.ChannelBotAuthorizationScopesCurrent ? "chat connected"
-                            : CanAuthorizeSelectedHost() ? "reconnect bot"
-                            : "Channel owner needs to reconnect the bot"
-                        )
-                        : (
-                            CanAuthorizeSelectedHost()
-                                ? "connect bot"
-                                : "Channel owner needs to reconnect the bot"
-                        ),
+                    status.IsChannelBotAuthorized switch
+                    {
+                        true => status.ChannelBotAuthorizationScopesCurrent switch
+                        {
+                            true => "chat connected",
+                            false when CanAuthorizeSelectedHost() => "reconnect bot",
+                            _ => "Channel owner needs to reconnect the bot",
+                        },
+                        false when CanAuthorizeSelectedHost() => "connect bot",
+                        _ => "Channel owner needs to reconnect the bot",
+                    },
                 static _ => "bot starting",
                 static _ => "bot running",
                 static _ => "bot stopping"
-            )
-            : "Channel owner needs to reconnect the bot";
+            ),
+        };
 
     protected override void OnInitialized() =>
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
@@ -124,8 +126,12 @@ public partial class SelectedChannelBotStatus
             .LoadHostRuntimeSummary(_selection.Current.Id)
             .ExecuteAsync(CancellationToken.None);
         _selectedHostStatus = result.Match(
-            option => option.Match<HostedChannelRuntimeSummary?>(value => value, () => null),
-            _ => throw new UnreachableException()
+            static option =>
+                option.Match<HostedChannelRuntimeSummary?>(
+                    static value => value,
+                    static () => null
+                ),
+            static _ => throw new UnreachableException()
         );
     }
 

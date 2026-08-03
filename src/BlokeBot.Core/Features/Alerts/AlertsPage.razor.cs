@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Components;
 using BlokeBot.Persistence.Models;
 
@@ -20,7 +21,7 @@ public partial class AlertsPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.AlertsChanged,
                 InvokeAsync,
@@ -33,7 +34,7 @@ public partial class AlertsPage
 
     private async Task AcknowledgeAsync(DurableAlertItem alert)
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
         if (HostId == 0 || !_canAcknowledge)
         {
@@ -44,7 +45,7 @@ public partial class AlertsPage
             HostId,
             async () =>
             {
-                await _alerts
+                _ = await _alerts
                     .Acknowledge(HostId, alert.Id, ActorLogin)
                     .ExecuteAsync(CancellationToken.None);
                 await LoadAsync();
@@ -59,7 +60,7 @@ public partial class AlertsPage
 
         try
         {
-            await LoadPageContextAsync();
+            _ = await LoadPageContextAsync();
             _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
             _state =
                 HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
@@ -82,7 +83,9 @@ public partial class AlertsPage
     }
 
     private static string FormatTimestamp(DateTime? value) =>
-        value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
+        value is null
+            ? "n/a"
+            : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm", CultureInfo.InvariantCulture);
 
     private static string AlertAreaLabel(string source) =>
         source switch

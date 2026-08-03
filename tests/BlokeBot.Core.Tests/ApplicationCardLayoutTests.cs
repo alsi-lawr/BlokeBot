@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using BlokeBot.Core.Components.Layout;
 using Bunit;
@@ -234,16 +235,16 @@ public sealed class ApplicationCardLayoutTests
         var coreRoot = Path.Combine(repositoryRoot, "src", "BlokeBot.Core");
         return Directory
             .EnumerateFiles(coreRoot, "*.razor", SearchOption.AllDirectories)
-            .SelectMany(path =>
+            .SelectMany(static path =>
                 _cardOwner
                     .Matches(File.ReadAllText(path))
-                    .SelectMany(match =>
+                    .SelectMany(static match =>
                         match
                             .Groups["owners"]
                             .Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
                     )
             )
-            .Where(owner => owner[0] != '@')
+            .Where(static owner => owner[0] != '@')
             .ToHashSet();
     }
 
@@ -292,7 +293,7 @@ public sealed class ApplicationCardLayoutTests
             "ApplicationCardMembership.tsv"
         );
         return File.ReadLines(path)
-            .Where(line => line.Length > 0 && line[0] != '#')
+            .Where(static line => line.Length > 0 && line[0] != '#')
             .Select(ParseMembership)
             .ToArray();
     }
@@ -304,7 +305,7 @@ public sealed class ApplicationCardLayoutTests
         return new(
             Enum.Parse<CardAuthoringKind>(columns[0], ignoreCase: true),
             columns[1],
-            int.Parse(columns[2]),
+            int.Parse(columns[2], CultureInfo.InvariantCulture),
             Enum.Parse<CardMembership>(columns[3], ignoreCase: true),
             columns[4]
         );

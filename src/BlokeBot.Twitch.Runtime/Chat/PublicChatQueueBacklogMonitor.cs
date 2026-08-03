@@ -24,14 +24,14 @@ internal sealed class PublicChatQueueBacklogMonitor
                 continue;
             }
 
-            var oldest = group.Messages.MinBy(x => x.EnqueuedAt);
+            var oldest = group.Messages.MinBy(static x => x.EnqueuedAt);
             var age = now - oldest.EnqueuedAt;
             if (age < threshold)
             {
                 continue;
             }
 
-            _alertedChannels.Add(group.Channel);
+            _ = _alertedChannels.Add(group.Channel);
             alerts ??= [];
             alerts.Add(
                 new PublicChatQueueBacklog(
@@ -66,7 +66,7 @@ internal sealed class PublicChatQueueBacklogMonitor
                 continue;
             }
 
-            var oldest = group.Messages.MinBy(x => x.EnqueuedAt);
+            var oldest = group.Messages.MinBy(static x => x.EnqueuedAt);
             var remaining = threshold - (now - oldest.EnqueuedAt);
             if (remaining <= TimeSpan.Zero)
             {
@@ -96,16 +96,16 @@ internal sealed class PublicChatQueueBacklogMonitor
             .Select(x => NormalizeChannel(x.Channel))
             .Where(channel => !string.IsNullOrWhiteSpace(channel))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        _alertedChannels.RemoveWhere(channel => !activeChannels.Contains(channel));
+        _ = _alertedChannels.RemoveWhere(channel => !activeChannels.Contains(channel));
     }
 
     private static List<PendingChannelGroup> PendingByChannel(
         IReadOnlyList<PublicChatPendingMessage> pending
     ) =>
         pending
-            .GroupBy(x => NormalizeChannel(x.Channel), StringComparer.OrdinalIgnoreCase)
-            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
-            .Select(group => new PendingChannelGroup(group.Key, group.ToList()))
+            .GroupBy(static x => NormalizeChannel(x.Channel), StringComparer.OrdinalIgnoreCase)
+            .Where(static group => !string.IsNullOrWhiteSpace(group.Key))
+            .Select(static group => new PendingChannelGroup(group.Key, group.ToList()))
             .ToList();
 
     private static string NormalizeChannel(string channel) => channel.Trim().ToLowerInvariant();

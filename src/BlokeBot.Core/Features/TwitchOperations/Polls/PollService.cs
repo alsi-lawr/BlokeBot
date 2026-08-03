@@ -21,31 +21,31 @@ public sealed class PollService(
 {
     private const int _resultsToKeep = 100;
 
-    public async Task<PollDashboardState> LoadAsync(int hostId, CancellationToken ct)
+    public async Task<PollDashboardState> LoadAsync(int hostId, CancellationToken cancellationToken)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new(new PollAuthorizationReadiness.Disabled(), null, [], []);
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var readiness = await ReadinessAsync(hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var readiness = await ReadinessAsync(hostId, cancellationToken);
         var active = await db
             .TwitchPolls.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Status == TwitchPollStatus.Active)
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
         var templates = await db
             .TwitchPollTemplates.AsNoTracking()
             .Include(x => x.Choices)
             .Where(x => x.HostId == hostId)
             .OrderBy(x => x.Id)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         var results = await db
             .TwitchPolls.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Status != TwitchPollStatus.Active)
             .OrderByDescending(x => x.EndedAtUtc)
             .Take(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         return new(
             readiness,
             active is null ? null : View(active),
@@ -57,10 +57,10 @@ public sealed class PollService(
     public async Task<PollOperationOutcome> SaveTemplateAsync(
         int hostId,
         PollTemplateDraft draft,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -71,13 +71,13 @@ public sealed class PollService(
             return new PollOperationOutcome.InvalidTemplate(invalid.Message);
         }
         var valid = ((PollTemplateValidationOutcome.Valid)validation).Draft;
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         if (
             !await db.Hosts.AnyAsync(
                 host =>
                     host.Id == hostId
                     && (host.EnabledFeatures & HostFeatureFlags.Polls) == HostFeatureFlags.Polls,
-                ct
+                cancellationToken
             )
         )
         {
@@ -101,35 +101,35 @@ public sealed class PollService(
                 )
                 .ToArray(),
         };
-        db.TwitchPollTemplates.Add(template);
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        _ = db.TwitchPollTemplates.Add(template);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
         return new PollOperationOutcome.TemplateSaved(View(template));
     }
 
     public async Task<PollOperationOutcome> StartAsync(
         int hostId,
         int templateId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
                 "Reconnect the selected channel's Twitch integration."
             );
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         var template = await db
             .TwitchPollTemplates.Include(x => x.Choices)
-            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, ct);
+            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, cancellationToken);
         if (host is null || template is null)
         {
             return new PollOperationOutcome.TemplateNotFound();
@@ -141,13 +141,13 @@ public sealed class PollService(
         if (
             await db.TwitchPolls.AnyAsync(
                 x => x.HostId == hostId && x.Status == TwitchPollStatus.Active,
-                ct
+                cancellationToken
             )
         )
         {
             return new PollOperationOutcome.ActivePollExists();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -162,7 +162,7 @@ public sealed class PollService(
                 template.ChannelPointsVotingEnabled,
                 template.ChannelPointsPerVote
             ),
-            ct
+            cancellationToken
         );
         if (provider is HelixPollCreateOutcome.ActivePollExists)
         {
@@ -176,34 +176,34 @@ public sealed class PollService(
         }
 
         var poll = Upsert(db, hostId, created.Poll, false).Poll;
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
         return new PollOperationOutcome.Started(View(poll));
     }
 
     public async Task<PollOperationOutcome> EndAsync(
         int hostId,
         bool confirmedExternal,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
                 "Reconnect the selected channel's Twitch integration."
             );
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         var active = await db.TwitchPolls.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.Status == TwitchPollStatus.Active,
-            ct
+            cancellationToken
         );
         if (host is null || active is null)
         {
@@ -217,7 +217,7 @@ public sealed class PollService(
         {
             return new PollOperationOutcome.ConfirmationRequired();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -227,7 +227,7 @@ public sealed class PollService(
             host.TwitchUserId!,
             active.ProviderPollId,
             HelixPollEndStatus.Terminated,
-            ct
+            cancellationToken
         );
         if (provider is null)
         {
@@ -236,13 +236,13 @@ public sealed class PollService(
             );
         }
         var poll = Upsert(db, hostId, provider, active.IsExternallyStarted).Poll;
-        await TrimResultsAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        await TrimResultsAsync(db, hostId, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
         return new PollOperationOutcome.Ended(View(poll));
     }
 
-    public async Task ReconcileChannelAsync(string channel, CancellationToken ct)
+    public async Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken)
     {
         var login = Login.Normalize(channel);
         if (login.Length == 0)
@@ -250,33 +250,33 @@ public sealed class PollService(
             return;
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var hostId = await db
             .Hosts.Where(host => host.Login == login)
             .Select(host => (int?)host.Id)
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
         if (hostId is not { } id)
         {
             return;
         }
 
-        await ReconcileAsync(id, ct);
+        await ReconcileAsync(id, cancellationToken);
     }
 
-    public async Task ReconcileAsync(int hostId, CancellationToken ct)
+    public async Task ReconcileAsync(int hostId, CancellationToken cancellationToken)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return;
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return;
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         if (
             host?.TwitchUserId is not { Length: > 0 } broadcasterId
             || !host.EnabledFeatures.Contains(HostFeatureFlags.Polls)
@@ -285,7 +285,7 @@ public sealed class PollService(
             return;
         }
 
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return;
         }
@@ -293,9 +293,9 @@ public sealed class PollService(
         var provider = await helix.GetLatestPollAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
             broadcasterId,
-            ct
+            cancellationToken
         );
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return;
         }
@@ -312,29 +312,33 @@ public sealed class PollService(
             return;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
         if (provider is HelixPollLookupOutcome.NoPoll)
         {
-            await TrimResultsAsync(db, hostId, ct);
-            await db.SaveChangesAsync(ct);
+            await TrimResultsAsync(db, hostId, cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
         }
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
     }
 
-    public async Task RecordProviderUpdateAsync(int hostId, HelixPoll poll, CancellationToken ct)
+    public async Task RecordProviderUpdateAsync(
+        int hostId,
+        HelixPoll poll,
+        CancellationToken cancellationToken
+    )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
         {
             return;
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         if (
             !await db.Hosts.AnyAsync(
                 host =>
                     host.Id == hostId
                     && (host.EnabledFeatures & HostFeatureFlags.Polls) == HostFeatureFlags.Polls,
-                ct
+                cancellationToken
             )
         )
         {
@@ -349,20 +353,20 @@ public sealed class PollService(
 
         if (upsert.Poll.Status is not TwitchPollStatus.Active)
         {
-            await TrimResultsAsync(db, hostId, ct);
+            await TrimResultsAsync(db, hostId, cancellationToken);
         }
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
     }
 
-    public async Task PollReceivedAsync(EventSubPollEvent poll, CancellationToken ct)
+    public async Task PollReceivedAsync(EventSubPollEvent poll, CancellationToken cancellationToken)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db.Hosts.SingleOrDefaultAsync(
             x =>
                 x.TwitchUserId == poll.BroadcasterUserId
                 || x.Login == Login.Normalize(poll.BroadcasterUserLogin),
-            ct
+            cancellationToken
         );
         if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.Polls))
         {
@@ -375,7 +379,7 @@ public sealed class PollService(
             "TERMINATED" => HelixPollStatus.Terminated,
             _ => HelixPollStatus.Archived,
         };
-        if (!await nativeTwitch.IsEnabledAsync(host.Id, HostFeatureFlags.Polls, ct))
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, HostFeatureFlags.Polls, cancellationToken))
         {
             return;
         }
@@ -407,47 +411,53 @@ public sealed class PollService(
 
         if (upsert.Poll.Status is not TwitchPollStatus.Active)
         {
-            await TrimResultsAsync(db, host.Id, ct);
+            await TrimResultsAsync(db, host.Id, cancellationToken);
         }
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
     }
 
-    private async Task<PollAuthorizationReadiness> ReadinessAsync(int hostId, CancellationToken ct)
+    private async Task<PollAuthorizationReadiness> ReadinessAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
     {
         var status = await broadcasters.GetTokenStatusAsync(
             hostId,
             HostBroadcasterAuthorizationService.MilestoneScopes,
-            ct
+            cancellationToken
         );
         if (status is TokenStatus.Ready)
         {
             return new PollAuthorizationReadiness.Ready();
         }
 
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
+        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
         return new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
             "Reconnect the selected channel's Twitch integration."
         );
     }
 
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct)
+    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken)
     {
         var status = await broadcasters.GetTokenStatusAsync(
             hostId,
             HostBroadcasterAuthorizationService.MilestoneScopes,
-            ct
+            cancellationToken
         );
         if (status is TokenStatus.Ready ready)
         {
             return ready.AccessToken;
         }
 
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
+        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
         return null;
     }
 
-    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct) =>
+    private async Task EnsureBroadcasterAuthorizationAlertAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) =>
         await alerts
             .Create(
                 hostId,
@@ -458,7 +468,7 @@ public sealed class PollService(
                 "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
                 "/twitch-operations"
             )
-            .ExecuteAsync(ct);
+            .ExecuteAsync(cancellationToken);
 
     private static bool ArchiveMissingActivePoll(BlokeBotDbContext db, int hostId)
     {
@@ -511,7 +521,7 @@ public sealed class PollService(
                 ProviderPollId = poll.Id,
                 IsExternallyStarted = external,
             };
-            db.TwitchPolls.Add(record);
+            _ = db.TwitchPolls.Add(record);
         }
 
         record.Title = poll.Title;
@@ -554,14 +564,14 @@ public sealed class PollService(
     private static async Task TrimResultsAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var excess = await db
             .TwitchPolls.Where(x => x.HostId == hostId && x.Status != TwitchPollStatus.Active)
             .OrderByDescending(x => x.EndedAtUtc)
             .Skip(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         db.TwitchPolls.RemoveRange(excess);
     }
 
@@ -569,7 +579,7 @@ public sealed class PollService(
         new(
             template.Id,
             template.Title,
-            template.Choices.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
+            template.Choices.OrderBy(static x => x.Position).Select(static x => x.Title).ToArray(),
             template.DurationSeconds,
             template.ChannelPointsVotingEnabled,
             template.ChannelPointsPerVote

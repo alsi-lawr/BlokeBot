@@ -103,7 +103,7 @@ public sealed class GuessingVoteService(
             return new GuessingOperationOutcome.Rejected(string.Empty);
         }
 
-        db.Votes.Add(
+        _ = db.Votes.Add(
             new GuessVote
             {
                 GuessRoundId = round.Id,
@@ -113,7 +113,7 @@ public sealed class GuessingVoteService(
             }
         );
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(hostId.Value, ct);
         var answerReplyTarget = await AnswerReplyTargetAsync(db, round.ProfileId, ct);
         return new GuessingOperationOutcome.Succeeded(

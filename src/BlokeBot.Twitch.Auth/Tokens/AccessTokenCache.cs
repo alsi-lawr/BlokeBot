@@ -2,7 +2,10 @@ using BlokeBot.Functional;
 
 namespace BlokeBot.Twitch.Auth;
 
-internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTransaction
+internal sealed class AccessTokenCache
+    : IAccessTokenCache,
+        IAccessTokenCacheTransaction,
+        IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private Option<TokenSet> _current = Option<TokenSet>.None;
@@ -26,7 +29,7 @@ internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTra
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -40,7 +43,7 @@ internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTra
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -49,4 +52,6 @@ internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTra
         _current = tokenSet;
         _loaded = true;
     }
+
+    public void Dispose() => _gate.Dispose();
 }

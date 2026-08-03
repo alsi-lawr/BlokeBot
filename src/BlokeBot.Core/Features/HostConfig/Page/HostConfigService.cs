@@ -65,9 +65,8 @@ public sealed class HostConfigService(
         var canCreateHost = await siteAccess.CanCreateHostAsync(login, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Login == login, ct);
-        if (host is null)
-        {
-            return Option<HostConfigState>.Some(
+        return host is null
+            ? Option<HostConfigState>.Some(
                 new HostConfigState(
                     null,
                     login,
@@ -89,12 +88,10 @@ public sealed class HostConfigService(
                     [],
                     new HostModAccessState(true, true, [], [])
                 )
+            )
+            : Option<HostConfigState>.Some(
+                await LoadCreatedHostStateAsync(db, host, canCreateHost, ct)
             );
-        }
-
-        return Option<HostConfigState>.Some(
-            await LoadCreatedHostStateAsync(db, host, canCreateHost, ct)
-        );
     }
 
     private async Task<HostConfigState> LoadCreatedHostStateAsync(

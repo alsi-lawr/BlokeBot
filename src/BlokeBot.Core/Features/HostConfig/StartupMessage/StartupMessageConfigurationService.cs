@@ -47,7 +47,7 @@ public sealed class StartupMessageConfigurationService(
 
         host.StartupMessageEnabled = command.Enabled;
         host.StartupMessageText = normalizedText.Length == 0 ? null : normalizedText;
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         return new StartupMessageSaveOutcome.Saved(
             new StartupMessageConfiguration(command.Enabled, normalizedText)
         );
@@ -94,9 +94,9 @@ public sealed class StartupMessageConfigurationService(
     private static bool CanConfigure(AuthenticatedSession session, int hostId)
     {
         var selectedHost = session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         return selectedHost?.Id == hostId && session.CanManageSelectedHostConfig;
     }

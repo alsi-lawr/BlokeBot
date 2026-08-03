@@ -5,7 +5,7 @@ namespace BlokeBot.Core.Features.Admin.HostedChannels;
 public partial class HostedChannelsSection
 {
     [Parameter, EditorRequired]
-    public Func<Task> CreateHost { get; set; } = () => Task.CompletedTask;
+    public Func<Task> CreateHost { get; set; } = static () => Task.CompletedTask;
 
     [Parameter]
     public bool CanEditHosts { get; set; } = true;
@@ -20,13 +20,13 @@ public partial class HostedChannelsSection
     public EventCallback<string> NewHostLoginChanged { get; set; }
 
     [Parameter, EditorRequired]
-    public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> RemoveHost { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<int, Task> StartBot { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> StartBot { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> StopBot { get; set; } = static _ => Task.CompletedTask;
 
     private async Task OnInput(ChangeEventArgs args)
     {

@@ -66,12 +66,16 @@ public sealed class GuessingAliasTests
         editedOption.Name = "later";
         editedOption.ReplyText = "Later";
         editor.Profile.Options.Clear();
-        await service.SaveConfiguration(seed.Host.Id, command).ExecuteAsync(CancellationToken.None);
+        _ = await service
+            .SaveConfiguration(seed.Host.Id, command)
+            .ExecuteAsync(CancellationToken.None);
 
         var afterSave = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         afterSave.Aliases.StartAliases.ShouldBe("updated");
-        afterSave.Profile.Options.Select(option => option.Name).ShouldBe(["green", "amber"]);
-        afterSave.Profile.Options.Select(option => option.ReplyText).ShouldBe(["Green", "Amber"]);
+        afterSave.Profile.Options.Select(static option => option.Name).ShouldBe(["green", "amber"]);
+        afterSave
+            .Profile.Options.Select(static option => option.ReplyText)
+            .ShouldBe(["Green", "Amber"]);
     }
 
     [Test]
@@ -87,8 +91,8 @@ public sealed class GuessingAliasTests
             .SaveConfiguration(seed.Host.Id, ValidCommand(config))
             .ExecuteAsync(CancellationToken.None);
 
-        result
-            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+        _ = result
+            .Match<GuessingConfigurationSaveFailure?>(static _ => null, static failure => failure)
             .ShouldBeOfType<GuessingConfigurationSaveFailure.AliasAlreadyUsed>();
     }
 
@@ -107,12 +111,12 @@ public sealed class GuessingAliasTests
             .ExecuteAsync(CancellationToken.None);
 
         result
-            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+            .Match<GuessingConfigurationSaveFailure?>(static _ => null, static failure => failure)
             .ShouldBe(new GuessingConfigurationSaveFailure.AliasAlreadyUsed("shared"));
         await using var db = await dbFactory.CreateDbContextAsync();
         var aliases = await db
-            .CommandAliases.OrderBy(alias => alias.Alias)
-            .Select(alias => alias.Alias)
+            .CommandAliases.OrderBy(static alias => alias.Alias)
+            .Select(static alias => alias.Alias)
             .ToArrayAsync();
         aliases.ShouldBe(["default", "special"]);
         (await db.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("shared");
@@ -153,7 +157,7 @@ public sealed class GuessingAliasTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Rounds.Add(
+            _ = db.Rounds.Add(
                 new GuessRound
                 {
                     HostId = seed.Host.Id,
@@ -162,7 +166,7 @@ public sealed class GuessingAliasTests
                     StartedAtUtc = DateTime.UtcNow,
                 }
             );
-            db.ReplyDeliverySettings.Add(
+            _ = db.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = seed.Host.Id,
@@ -172,7 +176,7 @@ public sealed class GuessingAliasTests
                     Target = ReplyDeliveryTarget.Whisper,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         List<CommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
@@ -203,7 +207,7 @@ public sealed class GuessingAliasTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.ReplyDeliverySettings.Add(
+            _ = db.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = seed.Host.Id,
@@ -213,7 +217,7 @@ public sealed class GuessingAliasTests
                     Target = ReplyDeliveryTarget.Whisper,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         List<CommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
@@ -254,7 +258,7 @@ public sealed class GuessingAliasTests
             }
         );
 
-        await service
+        _ = await service
             .SaveConfiguration(seed.Host.Id, ValidCommand(config))
             .ExecuteAsync(CancellationToken.None);
 
@@ -274,7 +278,7 @@ public sealed class GuessingAliasTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Rounds.Add(
+            _ = db.Rounds.Add(
                 new GuessRound
                 {
                     HostId = seed.Host.Id,
@@ -283,7 +287,7 @@ public sealed class GuessingAliasTests
                     StartedAtUtc = DateTime.UtcNow,
                 }
             );
-            db.GuessOptions.Add(
+            _ = db.GuessOptions.Add(
                 new GuessOption
                 {
                     GuessRoundProfileId = seed.SpecialProfile.Id,
@@ -292,7 +296,7 @@ public sealed class GuessingAliasTests
                     ReplyTarget = ReplyDeliveryTarget.Whisper,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = new GuessingVoteService(
             dbFactory,
@@ -303,7 +307,7 @@ public sealed class GuessingAliasTests
             .RecordGuess(seed.Host.Login, "viewer", "blue")
             .RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
+        _ = result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Target.ShouldBe(CommandResponseTarget.Whisper);
         result.Message.ShouldBe("Blue");
     }
@@ -322,8 +326,8 @@ public sealed class GuessingAliasTests
             .LoadConfiguration(hostId, new GuessingProfileSelection.Selected(profileId))
             .ExecuteAsync(CancellationToken.None);
         return result.Match(
-            configuration => configuration,
-            failure => throw new InvalidOperationException(failure.Message)
+            static configuration => configuration,
+            static failure => throw new InvalidOperationException(failure.Message)
         );
     }
 
@@ -415,8 +419,8 @@ public sealed class GuessingAliasTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
 
         var defaultProfile = new GuessRoundProfile
         {
@@ -444,7 +448,7 @@ public sealed class GuessingAliasTests
             Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
         };
         db.Profiles.AddRange(defaultProfile, specialProfile);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         db.CommandAliases.AddRange(
             new CommandAlias
@@ -462,7 +466,7 @@ public sealed class GuessingAliasTests
                 Alias = "special",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new ProfileSeed(host, defaultProfile, specialProfile);
     }
 
@@ -474,7 +478,7 @@ public sealed class GuessingAliasTests
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        db.CustomCommands.Add(
+        _ = db.CustomCommands.Add(
             new CustomCommand
             {
                 HostId = hostId,
@@ -484,7 +488,7 @@ public sealed class GuessingAliasTests
                 Aliases = [new CustomCommandAlias { HostId = hostId, Alias = alias }],
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private sealed record ProfileSeed(

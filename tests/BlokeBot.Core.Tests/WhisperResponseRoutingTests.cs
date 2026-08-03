@@ -25,7 +25,7 @@ public sealed class WhisperResponseRoutingTests : WhisperResponseTestBase
 
         var escalation = await action.ShouldThrowAsync<PrivateDeliveryFailureHandlingException>();
         escalation.InnerException.ShouldBeSameAs(handlerFailure);
-        escalation.DeliveryError.ShouldBeOfType<PrivateDeliveryError.Rejected>();
+        _ = escalation.DeliveryError.ShouldBeOfType<PrivateDeliveryError.Rejected>();
         escalation.Context.HostChannel.ShouldBe("streamer");
         harness.FailureHandler.Failures.Count.ShouldBe(1);
         harness.Chat.Messages.ShouldBeEmpty();
@@ -63,7 +63,7 @@ public sealed class WhisperResponseRoutingTests : WhisperResponseTestBase
                 cancellation.Token
             );
 
-        await action.ShouldThrowAsync<OperationCanceledException>();
+        _ = await action.ShouldThrowAsync<OperationCanceledException>();
         harness.FailureHandler.Failures.Count.ShouldBe(1);
         harness.Chat.Messages.ShouldBeEmpty();
     }

@@ -61,14 +61,12 @@ public sealed class WhisperClient(
         }
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(body))
+        return body switch
         {
-            return null;
-        }
-
-        return body.Length <= _maximumResponseBodyLength
-            ? body
-            : body[.._maximumResponseBodyLength];
+            string value when string.IsNullOrWhiteSpace(value) => null,
+            string value when value.Length <= _maximumResponseBodyLength => value,
+            string value => value[.._maximumResponseBodyLength],
+        };
     }
 
     private sealed record SendWhisperRequest

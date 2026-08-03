@@ -38,7 +38,7 @@ public sealed class BotHostProvisioningService(
                     : profileImageUrl.Trim(),
                 TwitchUserId = twitchUserId,
             };
-            db.Hosts.Add(host);
+            _ = db.Hosts.Add(host);
         }
         else
         {
@@ -53,10 +53,10 @@ public sealed class BotHostProvisioningService(
                 : twitchUserId;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         if (!await db.HostModAccessSettings.AnyAsync(x => x.HostId == host.Id, ct))
         {
-            db.HostModAccessSettings.Add(
+            _ = db.HostModAccessSettings.Add(
                 new HostModAccessSettings
                 {
                     HostId = host.Id,
@@ -64,7 +64,7 @@ public sealed class BotHostProvisioningService(
                     AllowModsByDefault = true,
                 }
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
         }
 
         foreach (var seeder in seeders)
@@ -72,7 +72,7 @@ public sealed class BotHostProvisioningService(
             await seeder.SeedAsync(host.Id, ct);
         }
 
-        await changes.NotifyChangedAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
         return host.Id;
     }
 }

@@ -56,12 +56,9 @@ public sealed record PublicChatDeliveryCorrelation(int HostId, string ProviderMe
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(ProviderMessageId);
-        if (ProviderMessageId.Length > 128)
-        {
-            throw new ArgumentOutOfRangeException(nameof(ProviderMessageId));
-        }
-
-        return this;
+        return ProviderMessageId.Length > 128
+            ? throw new ArgumentOutOfRangeException(nameof(ProviderMessageId))
+            : this;
     }
 }
 

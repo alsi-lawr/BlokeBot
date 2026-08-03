@@ -37,7 +37,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
             CancellationToken.None
         );
         var initial = await ClaimAsync(schedulingStore, now, TimeSpan.Zero);
-        (
+        _ = (
             await schedulingStore.RecordDeliveryOutcomeAsync(
                 initial,
                 SafePreSendTransientOutcome(),
@@ -54,7 +54,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
             StandardRetentionPolicy
         );
 
-        (
+        _ = (
             await restartStore.TryClaimNextAsync(
                 retryAt,
                 retryAt.AddMinutes(5),
@@ -139,7 +139,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
         using var restartedStopping = new CancellationTokenSource();
         var restartedWorker = restartedQueue.RunAsync(restartedStopping.Token);
 
-        await clock.WaitForTimerRegistrationAsync();
+        _ = await clock.WaitForTimerRegistrationAsync();
         restartedTransport.DeliveryCount.ShouldBe(0);
         clock.Advance(TimeSpan.FromSeconds(2));
         var delivery = await restartedTransport.ReadAsync();
@@ -150,7 +150,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
         delivery.Attempt.ShouldBe(1);
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.PublicChatOutboxMessages.AsNoTracking().ToArrayAsync()).ShouldBeEmpty();
-        (await db.PublicChatSendReceipts.AsNoTracking().ToArrayAsync()).ShouldHaveSingleItem();
+        _ = (await db.PublicChatSendReceipts.AsNoTracking().ToArrayAsync()).ShouldHaveSingleItem();
     }
 
     [Test]
@@ -196,7 +196,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
         var worker = queue.RunAsync(stopping.Token);
 
         _ = await outbox.ReadOutcomeAsync();
-        await clock.WaitForTimerRegistrationAsync();
+        _ = await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(2));
         _ = await outbox.ReadOutcomeAsync();
         await StopAsync(stopping, worker);
@@ -230,7 +230,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
             TimeSpan.Zero,
             CancellationToken.None
         );
-        afterExhaustion.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        _ = afterExhaustion.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
     }
 
     [Test]
@@ -255,7 +255,7 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
             CancellationToken.None
         );
         var initial = await ClaimAsync(persistedOutbox, clock.GetUtcNow(), TimeSpan.Zero);
-        (
+        _ = (
             await persistedOutbox.RecordDeliveryOutcomeAsync(
                 initial,
                 SafePreSendTransientOutcome(),

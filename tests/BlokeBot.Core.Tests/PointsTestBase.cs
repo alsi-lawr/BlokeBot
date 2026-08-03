@@ -20,22 +20,24 @@ public abstract class PointsTestBase
         PointOperationOutcome outcome
     ) =>
         outcome.Match(
-            succeeded => succeeded,
-            _ => throw new InvalidOperationException("Expected a successful point operation.")
+            static succeeded => succeeded,
+            static _ =>
+                throw new InvalidOperationException("Expected a successful point operation.")
         );
 
     private protected static PointOperationOutcome.Failed Failure(PointOperationOutcome outcome) =>
         outcome.Match(
-            _ => throw new InvalidOperationException("Expected a failed point operation."),
-            failed => failed
+            static _ => throw new InvalidOperationException("Expected a failed point operation."),
+            static failed => failed
         );
 
     private protected static PointBalanceMutation Mutation(
         Result<PointBalanceMutation, PointBalanceMutationFailure> result
     ) =>
         result.Match(
-            mutation => mutation,
-            _ => throw new InvalidOperationException("Expected a successful balance mutation.")
+            static mutation => mutation,
+            static _ =>
+                throw new InvalidOperationException("Expected a successful balance mutation.")
         );
 
     private protected static CommandStrategyContext<
@@ -135,8 +137,8 @@ public abstract class PointsTestBase
         await using var db = await dbFactory.CreateDbContextAsync();
         var settings = new PointsSettings { HostId = hostId };
         configure(settings);
-        db.PointsSettings.Add(settings);
-        await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(settings);
+        _ = await db.SaveChangesAsync();
     }
 
     private protected static CommandStrategyContext<
@@ -185,8 +187,8 @@ public abstract class PointsTestBase
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

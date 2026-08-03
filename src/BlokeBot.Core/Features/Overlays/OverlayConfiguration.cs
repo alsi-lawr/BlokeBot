@@ -46,25 +46,22 @@ public abstract record OverlayConfiguration
                     MaxDepth = 8,
                 }
             );
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return new OverlayConfigurationParseResult.Invalid(
+            return document.RootElement.ValueKind != JsonValueKind.Object
+                ? new OverlayConfigurationParseResult.Invalid(
                     "The overlay configuration must be a JSON object."
-                );
-            }
-
-            return type switch
-            {
-                OverlayType.Empty => ParseEmpty(document.RootElement),
-                OverlayType.Guessing => ParseGuessing(document.RootElement),
-                OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
-                OverlayType.Giveaway => ParseGiveaway(document.RootElement),
-                OverlayType.EventFeed => ParseEventFeed(document.RootElement),
-                OverlayType.ViewerQueue => ParseViewerQueue(document.RootElement),
-                _ => new OverlayConfigurationParseResult.Invalid(
-                    "The overlay type is not supported."
-                ),
-            };
+                )
+                : type switch
+                {
+                    OverlayType.Empty => ParseEmpty(document.RootElement),
+                    OverlayType.Guessing => ParseGuessing(document.RootElement),
+                    OverlayType.CuePlayer => ParseCuePlayer(document.RootElement),
+                    OverlayType.Giveaway => ParseGiveaway(document.RootElement),
+                    OverlayType.EventFeed => ParseEventFeed(document.RootElement),
+                    OverlayType.ViewerQueue => ParseViewerQueue(document.RootElement),
+                    _ => new OverlayConfigurationParseResult.Invalid(
+                        "The overlay type is not supported."
+                    ),
+                };
         }
         catch (JsonException)
         {
@@ -77,8 +74,8 @@ public abstract record OverlayConfiguration
     internal static OverlayConfiguration FromPersistence(OverlayType type, string json) =>
         Parse(type, json)
             .Match(
-                valid => valid.Value,
-                invalid =>
+                static valid => valid.Value,
+                static invalid =>
                     throw new InvalidOperationException(
                         $"Persisted overlay configuration is invalid: {invalid.Message}"
                     )
@@ -89,26 +86,22 @@ public abstract record OverlayConfiguration
     private static OverlayConfigurationParseResult ParseEmpty(JsonElement root)
     {
         var properties = root.EnumerateObject().ToArray();
-        if (
+        return
             properties.Length != 1
             || !string.Equals(properties[0].Name, "schemaVersion", StringComparison.Ordinal)
             || properties[0].Value.ValueKind != JsonValueKind.Number
             || !properties[0].Value.TryGetInt32(out var schemaVersion)
             || schemaVersion != 1
-        )
-        {
-            return new OverlayConfigurationParseResult.Invalid(
+            ? new OverlayConfigurationParseResult.Invalid(
                 "An empty overlay configuration must contain only schemaVersion 1."
-            );
-        }
-
-        return new OverlayConfigurationParseResult.Valid(new EmptyV1());
+            )
+            : new OverlayConfigurationParseResult.Valid(new EmptyV1());
     }
 
     private static OverlayConfigurationParseResult ParseGuessing(JsonElement root)
     {
         var properties = root.EnumerateObject().ToArray();
-        if (
+        return
             properties.Length is not (3 or 4)
             || (properties.Length == 4 && !TryReadProperty(properties, "appearance", out _))
             || !TryReadProperty(properties, "schemaVersion", out var schemaVersion)
@@ -124,16 +117,12 @@ public abstract record OverlayConfiguration
                 is < GuessingV1.MinimumResultDurationSeconds
                     or > GuessingV1.MaximumResultDurationSeconds
             || !TryReadAppearance(properties, GuessingV1.Default.Appearance, out var appearance)
-        )
-        {
-            return new OverlayConfigurationParseResult.Invalid(
+            ? new OverlayConfigurationParseResult.Invalid(
                 "A guessing overlay configuration must contain schemaVersion 1, a showGuessCount boolean, and a resultDurationSeconds value from 1 to 30."
+            )
+            : new OverlayConfigurationParseResult.Valid(
+                new GuessingV1(showGuessCount.Value.GetBoolean(), resultDurationSeconds, appearance)
             );
-        }
-
-        return new OverlayConfigurationParseResult.Valid(
-            new GuessingV1(showGuessCount.Value.GetBoolean(), resultDurationSeconds, appearance)
-        );
     }
 
     private static OverlayConfigurationParseResult ParseCuePlayer(JsonElement root)
@@ -154,7 +143,7 @@ public abstract record OverlayConfiguration
     private static OverlayConfigurationParseResult ParseGiveaway(JsonElement root)
     {
         var properties = root.EnumerateObject().ToArray();
-        if (
+        return
             properties.Length is not (5 or 6)
             || (properties.Length == 6 && !TryReadProperty(properties, "appearance", out _))
             || !TryReadProperty(properties, "schemaVersion", out var schemaVersion)
@@ -169,16 +158,18 @@ public abstract record OverlayConfiguration
             || !TryReadBoolean(properties, "showCountdown", out var showCountdown)
             || !TryReadBoolean(properties, "showJoinCommand", out var showJoinCommand)
             || !TryReadAppearance(properties, GiveawayV1.Default.Appearance, out var appearance)
-        )
-        {
-            return new OverlayConfigurationParseResult.Invalid(
+            ? new OverlayConfigurationParseResult.Invalid(
                 "A giveaway overlay configuration must contain schemaVersion 1, a title from 1 to 80 characters, and showEntrantCount, showCountdown, and showJoinCommand booleans."
+            )
+            : new OverlayConfigurationParseResult.Valid(
+                new GiveawayV1(
+                    titleValue,
+                    showEntrantCount,
+                    showCountdown,
+                    showJoinCommand,
+                    appearance
+                )
             );
-        }
-
-        return new OverlayConfigurationParseResult.Valid(
-            new GiveawayV1(titleValue, showEntrantCount, showCountdown, showJoinCommand, appearance)
-        );
     }
 
     private static OverlayConfigurationParseResult ParseEventFeed(JsonElement root)
@@ -199,7 +190,7 @@ public abstract record OverlayConfiguration
                 || dto.OverflowPolicy is null
                 || dto.Kinds is null
                 || dto.Kinds.Count != 3
-                || dto.Kinds.Any(pair =>
+                || dto.Kinds.Any(static pair =>
                     pair.Value is null || pair.Value.Template is null || pair.Value.Priority is null
                 )
             )
@@ -207,34 +198,32 @@ public abstract record OverlayConfiguration
                 throw new ArgumentException();
             }
             var expected = new[] { "pointAward", "guessingWinner", "giveawayWinner" };
-            if (
-                !dto
-                    .Kinds.Keys.Order(StringComparer.Ordinal)
-                    .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
-            )
-            {
-                throw new ArgumentException();
-            }
-            return new OverlayConfigurationParseResult.Valid(
-                new EventFeedV1(
-                    dto.Capacity,
-                    PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
-                    dto.Kinds.ToDictionary(
-                        pair => PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
-                        pair => new EventFeedKindConfiguration(
-                            pair.Value!.Enabled,
-                            pair.Value.Template!,
-                            PersistedEnumTokens<OverlayEventFeedPriority>.Parse(
-                                pair.Value.Priority!
+            return !dto
+                .Kinds.Keys.Order(StringComparer.Ordinal)
+                .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+                ? throw new ArgumentException()
+                : (OverlayConfigurationParseResult)
+                    new OverlayConfigurationParseResult.Valid(
+                        new EventFeedV1(
+                            dto.Capacity,
+                            PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
+                            dto.Kinds.ToDictionary(
+                                static pair =>
+                                    PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
+                                static pair => new EventFeedKindConfiguration(
+                                    pair.Value!.Enabled,
+                                    pair.Value.Template!,
+                                    PersistedEnumTokens<OverlayEventFeedPriority>.Parse(
+                                        pair.Value.Priority!
+                                    ),
+                                    pair.Value.DurationSeconds
+                                )
                             ),
-                            pair.Value.DurationSeconds
+                            dto.Appearance is null
+                                ? OverlayAppearance.EventFeedDefault
+                                : ParseAppearance(dto.Appearance)
                         )
-                    ),
-                    dto.Appearance is null
-                        ? OverlayAppearance.EventFeedDefault
-                        : ParseAppearance(dto.Appearance)
-                )
-            );
+                    );
         }
         catch (Exception exception)
             when (exception is JsonException or ArgumentException or FormatException)
@@ -538,8 +527,8 @@ public abstract record OverlayConfiguration
                     Capacity,
                     PersistedEnumTokens<EventFeedOverflowPolicy>.Format(OverflowPolicy),
                     Kinds.ToDictionary(
-                        pair => PersistedEnumTokens<OverlayEventFeedKind>.Format(pair.Key),
-                        pair =>
+                        static pair => PersistedEnumTokens<OverlayEventFeedKind>.Format(pair.Key),
+                        static pair =>
                             (EventFeedKindConfigurationDto?)
                                 new EventFeedKindConfigurationDto(
                                     pair.Value.Enabled,
@@ -591,25 +580,25 @@ public abstract record OverlayConfiguration
 
         private static void ValidateTemplate(OverlayEventFeedKind kind, string template)
         {
-            var allowed = kind switch
+            string[] allowed = kind switch
             {
-                OverlayEventFeedKind.PointAward => new[] { "recipient", "amount", "pointLabel" },
-                OverlayEventFeedKind.GuessingWinner => new[]
-                {
+                OverlayEventFeedKind.PointAward => ["recipient", "amount", "pointLabel"],
+                OverlayEventFeedKind.GuessingWinner =>
+                [
                     "roundName",
                     "winningAnswer",
                     "winners",
                     "winnerCount",
                     "amount",
                     "pointLabel",
-                },
-                OverlayEventFeedKind.GiveawayWinner => new[]
-                {
+                ],
+                OverlayEventFeedKind.GiveawayWinner =>
+                [
                     "winners",
                     "winnerCount",
                     "prizes",
                     "pointLabel",
-                },
+                ],
                 _ => throw new ArgumentOutOfRangeException(nameof(kind)),
             };
             var remaining = template;

@@ -123,7 +123,10 @@ public sealed record OverlayAppearance
                     ',',
                     StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
                 );
-            if (selectors.Length == 0 || selectors.Any(selector => !_selectors.Contains(selector)))
+            if (
+                selectors.Length == 0
+                || selectors.Any(static selector => !_selectors.Contains(selector))
+            )
             {
                 return "Use only the documented overlay-local selectors: .overlay, .card, .accent, .kicker, .title, .detail, and .result.";
             }
@@ -158,26 +161,23 @@ public sealed record OverlayAppearance
         return null;
     }
 
-    internal string ToScopedCss()
-    {
-        if (string.IsNullOrEmpty(Css))
-        {
-            return string.Empty;
-        }
-        return Regex.Replace(
-            Css,
-            @"(?<selector>[^{}]+)\{",
-            match =>
-                string.Join(
-                    ",",
-                    match
-                        .Groups["selector"]
-                        .Value.Split(
-                            ',',
-                            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
-                        )
-                        .Select(selector => $"#overlay-root {selector}")
-                ) + "{"
-        );
-    }
+    internal string ToScopedCss() =>
+        string.IsNullOrEmpty(Css)
+            ? string.Empty
+            : Regex.Replace(
+                Css,
+                @"(?<selector>[^{}]+)\{",
+                static match =>
+                    string.Join(
+                        ",",
+                        match
+                            .Groups["selector"]
+                            .Value.Split(
+                                ',',
+                                StringSplitOptions.TrimEntries
+                                    | StringSplitOptions.RemoveEmptyEntries
+                            )
+                            .Select(static selector => $"#overlay-root {selector}")
+                    ) + "{"
+            );
 }

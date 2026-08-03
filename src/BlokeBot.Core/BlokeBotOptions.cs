@@ -24,7 +24,7 @@ public sealed record BlokeBotCustomCommandOptions
 
 public sealed record BlokeBotPointsOptions
 {
-    public int MinimumGamblingCooldownSeconds { get; init; } = 0;
+    public int MinimumGamblingCooldownSeconds { get; init; }
 }
 
 public sealed record BlokeBotOverlayOptions

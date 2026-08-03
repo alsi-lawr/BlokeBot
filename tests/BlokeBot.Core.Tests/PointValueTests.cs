@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using BlokeBot.Core.Features.Points.Balances;
 using Shouldly;
@@ -17,12 +18,14 @@ public sealed class PointValueTests : PointsTestBase
         DescribeParse(PointAmountArgumentParser.ParseAbsolute("0")).ShouldBe("Error:ZeroAmount");
         DescribeParse(
                 PointAmountArgumentParser.ParseAbsolute(
-                    (PointAmount.MaximumValue + BigInteger.One).ToString()
+                    (PointAmount.MaximumValue + BigInteger.One).ToString(
+                        CultureInfo.InvariantCulture
+                    )
                 )
             )
             .ShouldBe("Error:AmountOutOfRange");
-        Should.Throw<ArgumentOutOfRangeException>(() => new PointAmount(-1));
-        Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () => new PointAmount(-1));
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new PointAmount(PointAmount.MaximumValue + 1)
         );
     }

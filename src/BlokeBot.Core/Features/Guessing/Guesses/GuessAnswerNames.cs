@@ -20,7 +20,7 @@ internal sealed class GuessAnswerNames
 
     public bool IsEmpty => _values.Length == 0;
 
-    public string Value => string.Join(", ", _values.Select(name => name.Value));
+    public string Value => string.Join(", ", _values.Select(static name => name.Value));
 
     public bool Contains(GuessName name) => _values.Contains(name);
 
@@ -32,7 +32,7 @@ internal sealed class GuessAnswerNames
         );
         var values = entries
             .Select(GuessName.Parse)
-            .Where(name => !name.IsEmpty)
+            .Where(static name => !name.IsEmpty)
             .ToImmutableArray();
         return new GuessAnswerNames(values, entries.FirstOrDefault() ?? string.Empty);
     }

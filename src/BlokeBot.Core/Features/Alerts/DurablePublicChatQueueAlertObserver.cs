@@ -40,7 +40,7 @@ internal sealed class DurablePublicChatQueueAlertObserver(
             return;
         }
 
-        await alerts
+        _ = await alerts
             .Create(
                 host.Id,
                 DurableAlertSeverity.Warning,
@@ -73,15 +73,10 @@ internal sealed class DurablePublicChatQueueAlertObserver(
     private static string SourceKey(string channel, DateTimeOffset oldestPendingAt) =>
         $"{channel}:{oldestPendingAt.UtcDateTime:O}";
 
-    private static string FormatAge(TimeSpan age)
-    {
-        if (age.TotalMinutes >= 1)
-        {
-            return $"{Math.Round(age.TotalMinutes, 1)} minutes";
-        }
-
-        return $"{Math.Max(1, (int)Math.Round(age.TotalSeconds))} seconds";
-    }
+    private static string FormatAge(TimeSpan age) =>
+        age.TotalMinutes >= 1
+            ? $"{Math.Round(age.TotalMinutes, 1)} minutes"
+            : $"{Math.Max(1, (int)Math.Round(age.TotalSeconds))} seconds";
 
     private sealed record QueueAlertHost(int Id, string Login);
 }

@@ -77,8 +77,8 @@ public sealed class GuessingConfigurationService(
             IsDefault = !await db.Profiles.AnyAsync(x => x.HostId == hostId, ct),
             ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync(ct);
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingProfileCreated, GuessingProfileCreateFailure>.Success(
@@ -147,7 +147,7 @@ public sealed class GuessingConfigurationService(
         if (profile.IsDefault)
         {
             profile.IsDefault = false;
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             var nextDefault = await db
                 .Profiles.Where(x => x.HostId == hostId && x.Id != profile.Id)
                 .OrderBy(x => x.Name)
@@ -162,8 +162,8 @@ public sealed class GuessingConfigurationService(
             )
             .ToListAsync(ct);
         db.ReplyDeliverySettings.RemoveRange(deliverySettings);
-        db.Profiles.Remove(profile);
-        await db.SaveChangesAsync(ct);
+        _ = db.Profiles.Remove(profile);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Success(
@@ -317,7 +317,7 @@ public sealed class GuessingConfigurationService(
 
         if (command.IsDefault)
         {
-            await db
+            _ = await db
                 .Profiles.Where(profile =>
                     profile.HostId == hostId && profile.Id != command.ProfileId && profile.IsDefault
                 )
@@ -361,7 +361,7 @@ public sealed class GuessingConfigurationService(
         );
         if (!command.Pin.Enabled && pinPolicy is not null)
         {
-            db.ReplyPinPolicies.Remove(pinPolicy);
+            _ = db.ReplyPinPolicies.Remove(pinPolicy);
         }
         else if (command.Pin.Enabled)
         {
@@ -375,7 +375,7 @@ public sealed class GuessingConfigurationService(
             pinPolicy.UnpinOnOwnerCompletion = command.Pin.UnpinWhenRoundStops;
             if (pinPolicy.Id == 0)
             {
-                db.ReplyPinPolicies.Add(pinPolicy);
+                _ = db.ReplyPinPolicies.Add(pinPolicy);
             }
         }
 
@@ -383,7 +383,7 @@ public sealed class GuessingConfigurationService(
         for (var index = 0; index < command.Options.Count; index++)
         {
             var option = command.Options[index];
-            db.GuessOptions.Add(
+            _ = db.GuessOptions.Add(
                 new GuessOption
                 {
                     GuessRoundProfile = profile,
@@ -395,7 +395,7 @@ public sealed class GuessingConfigurationService(
             );
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(hostId, ct);
         return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Success(new());

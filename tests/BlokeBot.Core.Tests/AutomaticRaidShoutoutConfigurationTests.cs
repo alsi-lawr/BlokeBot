@@ -42,11 +42,11 @@ public sealed class AutomaticRaidShoutoutConfigurationTests
             PersistedAnnouncementColor.Purple
         );
 
-        (
+        _ = (
             await service.SaveAsync(firstId, configured, CancellationToken.None)
         ).ShouldBeOfType<AutomaticRaidShoutoutSaveOutcome.Saved>();
         var disabled = configured with { Enabled = false };
-        (
+        _ = (
             await service.SaveAsync(firstId, disabled, CancellationToken.None)
         ).ShouldBeOfType<AutomaticRaidShoutoutSaveOutcome.Saved>();
 
@@ -85,7 +85,7 @@ public sealed class AutomaticRaidShoutoutConfigurationTests
         ).ShouldBeOfType<AutomaticRaidShoutoutSaveOutcome.Invalid>();
 
         rejected
-            .Errors.Select(error => error.Field)
+            .Errors.Select(static error => error.Field)
             .ShouldBe(
                 [
                     AutomaticRaidShoutoutValidationField.MinimumViewerCount,
@@ -111,8 +111,8 @@ public sealed class AutomaticRaidShoutoutConfigurationTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

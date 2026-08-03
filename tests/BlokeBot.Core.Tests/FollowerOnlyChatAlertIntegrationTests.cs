@@ -42,8 +42,8 @@ public sealed class FollowerOnlyChatAlertIntegrationTests
             TwitchUserId = "streamer-id",
             CreatedAtUtc = Utc(12, 0, 0).UtcDateTime,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

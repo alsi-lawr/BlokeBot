@@ -113,8 +113,8 @@ public sealed class PointsGiveawayService(
             WinnerCount = settings.GiveawayWinnerCount,
             Eligibility = settings.GiveawayEligibility,
         };
-        db.PointsGiveaways.Add(giveaway);
-        await db.SaveChangesAsync(ct);
+        _ = db.PointsGiveaways.Add(giveaway);
+        _ = await db.SaveChangesAsync(ct);
         scheduler.Schedule(
             new PointsGiveawaySchedule(
                 giveaway.Id,
@@ -131,17 +131,15 @@ public sealed class PointsGiveawayService(
 
     private static PointsConfigurationValidationError? StartConfigurationFailure(
         PointsSettings settings
-    )
-    {
-        if (settings.GiveawayDurationSeconds < 1)
+    ) =>
+        settings switch
         {
-            return new PointsConfigurationValidationError.GiveawayDurationBelowMinimum();
-        }
-
-        return settings.GiveawayWinnerCount < 1
-            ? new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum()
-            : null;
-    }
+            { GiveawayDurationSeconds: < 1 } =>
+                new PointsConfigurationValidationError.GiveawayDurationBelowMinimum(),
+            { GiveawayWinnerCount: < 1 } =>
+                new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum(),
+            _ => null,
+        };
 
     public async Task<PointOperationOutcome> JoinAsync(
         int hostId,
@@ -201,7 +199,7 @@ public sealed class PointsGiveawayService(
             return new PointsGiveawayJoinOutcome.NotEligible(settings, normalized);
         }
 
-        db.PointsGiveawayEntrants.Add(
+        _ = db.PointsGiveawayEntrants.Add(
             new PointsGiveawayEntrant
             {
                 GiveawayId = giveaway.Id,
@@ -209,7 +207,7 @@ public sealed class PointsGiveawayService(
                 JoinedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayJoinOutcome.Joined(settings, normalized);
     }
@@ -250,7 +248,7 @@ public sealed class PointsGiveawayService(
 
         giveaway.Status = PointsGiveawayStatus.Cancelled;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         scheduler.Cancel(giveaway.Id);
         await changes.NotifyChangedAsync(hostId, ct);
         return new PointsGiveawayCancelOutcome.Cancelled(settings);

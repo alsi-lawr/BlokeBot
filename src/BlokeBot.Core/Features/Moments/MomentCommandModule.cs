@@ -14,8 +14,8 @@ public sealed class MomentCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        commands.Map(FixedChatCommandRoutes.Moment, CaptureAsync);
-        commands.Map(FixedChatCommandRoutes.Clip, CaptureAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Moment, CaptureAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Clip, CaptureAsync);
     }
 
     private async ValueTask CaptureAsync(
@@ -58,8 +58,8 @@ public sealed class MomentCommandModule(
             && sections[1].StartsWith("category=", StringComparison.OrdinalIgnoreCase)
                 ? sections[1]["category=".Length..].Trim()
                 : string.Empty;
-        context.Message.Tags.TryGetValue("user-id", out var userId);
-        context.Message.Tags.TryGetValue("display-name", out var displayName);
+        _ = context.Message.Tags.TryGetValue("user-id", out var userId);
+        _ = context.Message.Tags.TryGetValue("display-name", out var displayName);
         var result = await moments.CaptureAsync(
             hostId.Value,
             new CaptureMomentCommand(

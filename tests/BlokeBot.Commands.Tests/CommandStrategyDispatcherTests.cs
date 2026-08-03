@@ -46,22 +46,22 @@ public sealed class CommandStrategyDispatcherTests
     private static ServiceProvider BuildServices(ICommandRouteResolver<TestKind, string> resolver)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(resolver);
-        services.AddSingleton<ICommandStrategy<TestKind, string>>(
+        _ = services.AddSingleton(resolver);
+        _ = services.AddSingleton<ICommandStrategy<TestKind, string>>(
             new TestStrategy(
                 TestKind.Public,
                 new CommandStrategyAccess<TestKind, string>.Everyone()
             )
         );
-        services.AddSingleton<ICommandStrategy<TestKind, string>>(
+        _ = services.AddSingleton<ICommandStrategy<TestKind, string>>(
             new TestStrategy(
                 TestKind.Moderator,
                 new CommandStrategyAccess<TestKind, string>.ModeratorOnly(ModeratorResponse)
             )
         );
-        services.AddSingleton<CommandStrategyCatalog<TestKind, string>>();
-        services.AddSingleton<CommandStrategyDispatcher<TestKind, string>>();
-        services.AddChatCommands().AddCommandModule<CommandStrategyModule<TestKind, string>>();
+        _ = services.AddSingleton<CommandStrategyCatalog<TestKind, string>>();
+        _ = services.AddSingleton<CommandStrategyDispatcher<TestKind, string>>();
+        _ = services.AddChatCommands().AddCommandModule<CommandStrategyModule<TestKind, string>>();
         return services.BuildServiceProvider();
     }
 

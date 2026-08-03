@@ -29,7 +29,7 @@ public sealed class HostModAccessService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await EnsureSettingsAsync(db, hostId, ct);
+        _ = await EnsureSettingsAsync(db, hostId, ct);
         var changed = await AccessListStore.AddNormalizedAsync(
             db.HostModAccessEntries,
             db.HostModAccessEntries.Where(x => x.HostId == hostId),
@@ -49,8 +49,8 @@ public sealed class HostModAccessService(
             return;
         }
 
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
@@ -71,9 +71,12 @@ public sealed class HostModAccessService(
         );
         return accessList.Allows(
             normalized,
-            !settings.ModsEnabled ? new AccessListPolicy.Disabled()
-                : settings.AllowModsByDefault ? new AccessListPolicy.BlacklistByDefault()
-                : new AccessListPolicy.WhitelistRequired()
+            settings.ModsEnabled switch
+            {
+                false => new AccessListPolicy.Disabled(),
+                true when settings.AllowModsByDefault => new AccessListPolicy.BlacklistByDefault(),
+                _ => new AccessListPolicy.WhitelistRequired(),
+            }
         );
     }
 
@@ -110,7 +113,7 @@ public sealed class HostModAccessService(
         );
         if (deleted > 0)
         {
-            await changes.NotifyChangedAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
         }
     }
 
@@ -152,12 +155,12 @@ public sealed class HostModAccessService(
                 ModsEnabled = true,
                 AllowModsByDefault = true,
             };
-            db.HostModAccessSettings.Add(settings);
+            _ = db.HostModAccessSettings.Add(settings);
         }
 
         var previousAllowModsByDefault = settings.AllowModsByDefault;
         settings.AllowModsByDefault = command.Mode.AllowModsByDefault;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
 
         var notification = await changes.NotifyChangedAsync(CancellationToken.None);
         if (notification is ObserverFanOutOutcome.AllSucceeded notified)
@@ -174,10 +177,10 @@ public sealed class HostModAccessService(
         }
         else
         {
-            db.HostModAccessSettings.Remove(settings);
+            _ = db.HostModAccessSettings.Remove(settings);
         }
 
-        await db.SaveChangesAsync(CancellationToken.None);
+        _ = await db.SaveChangesAsync(CancellationToken.None);
         var rollbackNotification = await changes.NotifyChangedAsync(CancellationToken.None);
         var failedRollbackObserverCount = rollbackNotification switch
         {
@@ -202,8 +205,8 @@ public sealed class HostModAccessService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         update(settings);
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public static async Task<HostModAccessSettings> EnsureSettingsAsync(
@@ -227,8 +230,8 @@ public sealed class HostModAccessService(
             ModsEnabled = true,
             AllowModsByDefault = true,
         };
-        db.HostModAccessSettings.Add(settings);
-        await db.SaveChangesAsync(ct);
+        _ = db.HostModAccessSettings.Add(settings);
+        _ = await db.SaveChangesAsync(ct);
         return settings;
     }
 }

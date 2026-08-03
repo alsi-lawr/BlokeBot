@@ -55,8 +55,8 @@ public sealed class HostModAccessSaveSequenceTests
         HostModAccessSaveValidator
             .Validate(1, mode)
             .Match(
-                command => command,
-                errors => throw new InvalidOperationException(errors[0].Message)
+                static command => command,
+                static errors => throw new InvalidOperationException(errors[0].Message)
             );
 
     private static HostModAccessState Access(bool allowModsByDefault) =>

@@ -18,175 +18,175 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureRequestBoards(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<RequestBoard>(b =>
+        _ = modelBuilder.Entity<RequestBoard>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "request_boards",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_request_boards_RefundPolicy",
                         KindIn("RefundPolicy", _requestBoardRefundPolicies)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Slug).HasMaxLength(48);
-            b.Property(x => x.Title).HasMaxLength(100);
-            b.Property(x => x.Description).HasMaxLength(1000);
-            b.Property(x => x.PointCost).HasMaxLength(128);
-            b.Property(x => x.RefundPolicy)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Slug).HasMaxLength(48);
+            _ = b.Property(static x => x.Title).HasMaxLength(100);
+            _ = b.Property(static x => x.Description).HasMaxLength(1000);
+            _ = b.Property(static x => x.PointCost).HasMaxLength(128);
+            _ = b.Property(static x => x.RefundPolicy)
                 .HasConversion(
-                    value => PersistedEnumTokens<RequestBoardRefundPolicy>.Format(value),
-                    value => PersistedEnumTokens<RequestBoardRefundPolicy>.Parse(value)
+                    static value => PersistedEnumTokens<RequestBoardRefundPolicy>.Format(value),
+                    static value => PersistedEnumTokens<RequestBoardRefundPolicy>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.OrderingDescription).HasMaxLength(300);
-            b.HasIndex(x => new { x.HostId, x.Slug }).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.Property(static x => x.OrderingDescription).HasMaxLength(300);
+            _ = b.HasIndex(static x => new { x.HostId, x.Slug }).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Fields)
-                .WithOne(x => x.Board)
-                .HasForeignKey(x => x.BoardId)
+            _ = b.HasMany(static x => x.Fields)
+                .WithOne(static x => x.Board)
+                .HasForeignKey(static x => x.BoardId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Submissions)
-                .WithOne(x => x.Board)
-                .HasForeignKey(x => x.BoardId)
+            _ = b.HasMany(static x => x.Submissions)
+                .WithOne(static x => x.Board)
+                .HasForeignKey(static x => x.BoardId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<RequestBoardField>(b =>
+        _ = modelBuilder.Entity<RequestBoardField>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "request_board_fields",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_request_board_fields_Kind",
                         KindIn("Kind", _requestBoardFieldKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Key).HasMaxLength(48);
-            b.Property(x => x.Label).HasMaxLength(100);
-            b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Key).HasMaxLength(48);
+            _ = b.Property(static x => x.Label).HasMaxLength(100);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<RequestBoardFieldKind>.Format(value),
-                    value => PersistedEnumTokens<RequestBoardFieldKind>.Parse(value)
+                    static value => PersistedEnumTokens<RequestBoardFieldKind>.Format(value),
+                    static value => PersistedEnumTokens<RequestBoardFieldKind>.Parse(value)
                 )
                 .HasMaxLength(16);
-            b.Property(x => x.ChoiceOptions).HasMaxLength(1000);
-            b.HasIndex(x => new { x.BoardId, x.Key }).IsUnique();
-            b.HasIndex(x => new { x.BoardId, x.Position }).IsUnique();
+            _ = b.Property(static x => x.ChoiceOptions).HasMaxLength(1000);
+            _ = b.HasIndex(static x => new { x.BoardId, x.Key }).IsUnique();
+            _ = b.HasIndex(static x => new { x.BoardId, x.Position }).IsUnique();
         });
 
-        modelBuilder.Entity<RequestSubmission>(b =>
+        _ = modelBuilder.Entity<RequestSubmission>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "request_submissions",
-                t =>
+                static t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_request_submissions_Status",
                         KindIn("Status", _requestSubmissionStatuses)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_request_submissions_PointReservationState",
                         KindIn("PointReservationState", _requestPointReservationStates)
                     );
                 }
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.SubmitterLogin).HasMaxLength(128);
-            b.Property(x => x.Title).HasMaxLength(200);
-            b.Property(x => x.NormalizedTitle).HasMaxLength(200);
-            b.Property(x => x.NormalizedUrl).HasMaxLength(2048);
-            b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.SubmitterLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.Title).HasMaxLength(200);
+            _ = b.Property(static x => x.NormalizedTitle).HasMaxLength(200);
+            _ = b.Property(static x => x.NormalizedUrl).HasMaxLength(2048);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    value => PersistedEnumTokens<RequestSubmissionStatus>.Format(value),
-                    value => PersistedEnumTokens<RequestSubmissionStatus>.Parse(value)
+                    static value => PersistedEnumTokens<RequestSubmissionStatus>.Format(value),
+                    static value => PersistedEnumTokens<RequestSubmissionStatus>.Parse(value)
                 )
                 .HasMaxLength(16);
-            b.Property(x => x.Category).HasMaxLength(64);
-            b.Property(x => x.Tags).HasMaxLength(500);
-            b.Property(x => x.PublicNote).HasMaxLength(500);
-            b.Property(x => x.PrivateModeratorNote).HasMaxLength(1000);
-            b.Property(x => x.PrivateRejectionReason).HasMaxLength(1000);
-            b.Property(x => x.PointReservationState)
+            _ = b.Property(static x => x.Category).HasMaxLength(64);
+            _ = b.Property(static x => x.Tags).HasMaxLength(500);
+            _ = b.Property(static x => x.PublicNote).HasMaxLength(500);
+            _ = b.Property(static x => x.PrivateModeratorNote).HasMaxLength(1000);
+            _ = b.Property(static x => x.PrivateRejectionReason).HasMaxLength(1000);
+            _ = b.Property(static x => x.PointReservationState)
                 .HasConversion(
-                    value => PersistedEnumTokens<RequestPointReservationState>.Format(value),
-                    value => PersistedEnumTokens<RequestPointReservationState>.Parse(value)
+                    static value => PersistedEnumTokens<RequestPointReservationState>.Format(value),
+                    static value => PersistedEnumTokens<RequestPointReservationState>.Parse(value)
                 )
                 .HasMaxLength(16);
-            b.HasIndex(x => new { x.HostId, x.OperationId }).IsUnique();
-            b.HasIndex(x => new
+            _ = b.HasIndex(static x => new { x.HostId, x.OperationId }).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.BoardId,
                 x.Status,
                 x.Priority,
                 x.QueuePosition,
             });
-            b.HasIndex(x => new { x.BoardId, x.NormalizedTitle });
-            b.HasIndex(x => new { x.BoardId, x.NormalizedUrl });
-            b.HasOne(x => x.MergedIntoSubmission)
+            _ = b.HasIndex(static x => new { x.BoardId, x.NormalizedTitle });
+            _ = b.HasIndex(static x => new { x.BoardId, x.NormalizedUrl });
+            _ = b.HasOne(static x => x.MergedIntoSubmission)
                 .WithMany()
-                .HasForeignKey(x => x.MergedIntoSubmissionId)
+                .HasForeignKey(static x => x.MergedIntoSubmissionId)
                 .OnDelete(DeleteBehavior.Restrict);
-            b.HasMany(x => x.Values)
-                .WithOne(x => x.Submission)
-                .HasForeignKey(x => x.SubmissionId)
+            _ = b.HasMany(static x => x.Values)
+                .WithOne(static x => x.Submission)
+                .HasForeignKey(static x => x.SubmissionId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Votes)
-                .WithOne(x => x.Submission)
-                .HasForeignKey(x => x.SubmissionId)
+            _ = b.HasMany(static x => x.Votes)
+                .WithOne(static x => x.Submission)
+                .HasForeignKey(static x => x.SubmissionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<RequestSubmissionValue>(b =>
+        _ = modelBuilder.Entity<RequestSubmissionValue>(static b =>
         {
-            b.ToTable("request_submission_values");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Value).HasMaxLength(2048);
-            b.HasIndex(x => new { x.SubmissionId, x.FieldId }).IsUnique();
-            b.HasOne(x => x.Field)
+            _ = b.ToTable("request_submission_values");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Value).HasMaxLength(2048);
+            _ = b.HasIndex(static x => new { x.SubmissionId, x.FieldId }).IsUnique();
+            _ = b.HasOne(static x => x.Field)
                 .WithMany()
-                .HasForeignKey(x => x.FieldId)
+                .HasForeignKey(static x => x.FieldId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<RequestSubmissionVote>(b =>
+        _ = modelBuilder.Entity<RequestSubmissionVote>(static b =>
         {
-            b.ToTable("request_submission_votes");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.VoterLogin).HasMaxLength(128);
-            b.HasIndex(x => new { x.SubmissionId, x.VoterLogin }).IsUnique();
+            _ = b.ToTable("request_submission_votes");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.VoterLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.SubmissionId, x.VoterLogin }).IsUnique();
         });
 
-        modelBuilder.Entity<RequestBoardDomainEvent>(b =>
+        _ = modelBuilder.Entity<RequestBoardDomainEvent>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "request_board_events",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_request_board_events_Kind",
                         KindIn("Kind", _requestBoardEventKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<RequestBoardEventKind>.Format(value),
-                    value => PersistedEnumTokens<RequestBoardEventKind>.Parse(value)
+                    static value => PersistedEnumTokens<RequestBoardEventKind>.Format(value),
+                    static value => PersistedEnumTokens<RequestBoardEventKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.PublicPayload).HasMaxLength(1024);
-            b.HasIndex(x => new { x.HostId, x.Id });
-            b.HasOne<BotHost>()
+            _ = b.Property(static x => x.PublicPayload).HasMaxLength(1024);
+            _ = b.HasIndex(static x => new { x.HostId, x.Id });
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasOne<RequestBoard>()
+            _ = b.HasOne<RequestBoard>()
                 .WithMany()
-                .HasForeignKey(x => x.BoardId)
+                .HasForeignKey(static x => x.BoardId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

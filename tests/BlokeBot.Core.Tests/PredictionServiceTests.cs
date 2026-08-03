@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
@@ -25,12 +25,12 @@ public sealed class PredictionServiceTests
         var first = await SeedHostAsync(database, "first", "first-id");
         var second = await SeedHostAsync(database, "second", "second-id");
 
-        (
+        _ = (
             await service.LoadAsync(first.Id, CancellationToken.None)
         ).Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Ineligible>();
         handler.BroadcasterType = "affiliate";
         await service.ReconcileAsync(first.Id, CancellationToken.None);
-        handler.Requests.ShouldContain(request =>
+        handler.Requests.ShouldContain(static request =>
             request.Method == HttpMethod.Get
             && request.Query.Contains("first=25")
             && request.Query.Contains("broadcaster_id=first-id")
@@ -41,7 +41,7 @@ public sealed class PredictionServiceTests
         var active = (
             await service.LoadAsync(first.Id, CancellationToken.None)
         ).ActivePrediction.ShouldNotBeNull();
-        (
+        _ = (
             await service.ResolveAsync(
                 first.Id,
                 active.Outcomes[0].Id,
@@ -50,7 +50,7 @@ public sealed class PredictionServiceTests
             )
         ).ShouldBeOfType<PredictionOperationOutcome.ConfirmationRequired>();
         handler.PatchBodies.ShouldBeEmpty();
-        (
+        _ = (
             await service.ResolveAsync(
                 first.Id,
                 active.Outcomes[0].Id,
@@ -63,11 +63,11 @@ public sealed class PredictionServiceTests
 
         await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
         await service.PredictionReceivedAsync(Event("locked"), CancellationToken.None);
-        (await service.LoadAsync(first.Id, CancellationToken.None)).Results.ShouldContain(result =>
-            result.Status == "Resolved"
+        (await service.LoadAsync(first.Id, CancellationToken.None)).Results.ShouldContain(
+            static result => result.Status == "Resolved"
         );
         handler.BroadcasterType = "partner";
-        (
+        _ = (
             await service.LoadAsync(first.Id, CancellationToken.None)
         ).Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Ready>();
     }
@@ -90,7 +90,7 @@ public sealed class PredictionServiceTests
         await service.ReconcileAsync(host.Id, CancellationToken.None);
         await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
 
-        state.Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Disabled>();
+        _ = state.Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Disabled>();
         state.ActivePrediction.ShouldBeNull();
         state.Templates.ShouldBeEmpty();
         state.Results.ShouldBeEmpty();
@@ -135,23 +135,23 @@ public sealed class PredictionServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         var handler = new PredictionHandler();
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
-        services.AddSingleton(
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
+        _ = services.AddSingleton(
             new HelixClient(
                 new SingleHandlerFactory(handler),
                 global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
             )
         );
-        services.AddSingleton(
+        _ = services.AddSingleton(
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             )
         );
-        services.AddSingleton(events);
-        services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
-        services.AddBlokeBotTwitchOperations();
+        _ = services.AddSingleton(events);
+        _ = services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
+        _ = services.AddBlokeBotTwitchOperations();
         await using var provider = services.BuildServiceProvider();
 
         var service = provider.GetRequiredService<PredictionService>();
@@ -187,7 +187,7 @@ public sealed class PredictionServiceTests
 
         var outcome = await service.StartAsync(host.Id, templateId, CancellationToken.None);
 
-        outcome.ShouldBeOfType<PredictionOperationOutcome.Started>();
+        _ = outcome.ShouldBeOfType<PredictionOperationOutcome.Started>();
         await using var verify = await database.CreateDbContextAsync();
         (await verify.TwitchPredictions.ToArrayAsync())
             .ShouldHaveSingleItem()
@@ -212,7 +212,7 @@ public sealed class PredictionServiceTests
         {
             for (var index = 0; index < 101; index++)
             {
-                db.TwitchPredictions.Add(
+                _ = db.TwitchPredictions.Add(
                     new TwitchPrediction
                     {
                         HostId = host.Id,
@@ -221,12 +221,16 @@ public sealed class PredictionServiceTests
                         OutcomesJson = "[]",
                         Status = TwitchPredictionStatus.Resolved,
                         CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
-                        EndedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
-                        UpdatedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
+                        EndedAtUtc = DateTime
+                            .Parse("2026-07-25T10:00:00Z", CultureInfo.InvariantCulture)
+                            .AddMinutes(-index),
+                        UpdatedAtUtc = DateTime
+                            .Parse("2026-07-25T10:00:00Z", CultureInfo.InvariantCulture)
+                            .AddMinutes(-index),
                     }
                 );
             }
-            db.TwitchPredictions.Add(
+            _ = db.TwitchPredictions.Add(
                 new TwitchPrediction
                 {
                     HostId = host.Id,
@@ -239,7 +243,7 @@ public sealed class PredictionServiceTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var handler = new PredictionHandler
         {
@@ -252,7 +256,7 @@ public sealed class PredictionServiceTests
 
         var outcome = await service.ResolveAsync(host.Id, "yes", true, CancellationToken.None);
 
-        outcome.ShouldBeOfType<PredictionOperationOutcome.Updated>();
+        _ = outcome.ShouldBeOfType<PredictionOperationOutcome.Updated>();
         await using var verify = await database.CreateDbContextAsync();
         var predictions = await verify.TwitchPredictions.ToArrayAsync();
         predictions.Length.ShouldBe(expectedTotal);
@@ -260,7 +264,9 @@ public sealed class PredictionServiceTests
             .Single(value => value.ProviderPredictionId == "prediction-id")
             .Status.ShouldBe(TwitchPredictionStatus.Resolved);
         predictions
-            .Count(value => value.ProviderPredictionId.StartsWith("history-"))
+            .Count(value =>
+                value.ProviderPredictionId.StartsWith("history-", StringComparison.Ordinal)
+            )
             .ShouldBe(expectedHistory);
     }
 
@@ -276,7 +282,7 @@ public sealed class PredictionServiceTests
         host.EnabledFeatures = enabled
             ? host.EnabledFeatures | HostFeatureFlags.Predictions
             : host.EnabledFeatures & ~HostFeatureFlags.Predictions;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static PredictionService CreateService(
@@ -335,8 +341,8 @@ public sealed class PredictionServiceTests
             DisplayName = login,
             TwitchUserId = twitchId,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host;
     }
 
@@ -348,7 +354,7 @@ public sealed class PredictionServiceTests
             "Question",
             [new("yes", "Yes", "BLUE", 1, 100, [])],
             status,
-            DateTimeOffset.Parse("2026-07-26T10:00:00Z"),
+            DateTimeOffset.Parse("2026-07-26T10:00:00Z", CultureInfo.InvariantCulture),
             null,
             status is "resolved" ? DateTimeOffset.UtcNow : null,
             status is "resolved" ? "yes" : null,
@@ -370,8 +376,8 @@ public sealed class PredictionServiceTests
                         hostId == 1 ? "first" : "second",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
@@ -400,7 +406,7 @@ public sealed class PredictionServiceTests
         )
         {
             Requests.Add((request.Method, request.RequestUri!.Query));
-            if (request.RequestUri!.AbsolutePath.EndsWith("/users"))
+            if (request.RequestUri!.AbsolutePath.EndsWith("/users", StringComparison.Ordinal))
             {
                 return Json(
                     $"{{\"data\":[{{\"id\":\"first-id\",\"broadcaster_type\":\"{BroadcasterType}\"}}]}}"

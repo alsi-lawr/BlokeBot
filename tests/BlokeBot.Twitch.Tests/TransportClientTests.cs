@@ -12,7 +12,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            async (request, cancellationToken) =>
+            static async (request, cancellationToken) =>
             {
                 AssertContext(request, HttpMethod.Post, "/helix/eventsub/subscriptions");
                 using var payload = JsonDocument.Parse(
@@ -53,7 +53,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            async (request, cancellationToken) =>
+            static async (request, cancellationToken) =>
             {
                 AssertContext(request, HttpMethod.Post, "/helix/eventsub/subscriptions");
                 using var payload = JsonDocument.Parse(
@@ -64,7 +64,7 @@ public sealed class TransportClientTests
                 var condition = payload.RootElement.GetProperty("condition");
                 condition
                     .EnumerateObject()
-                    .Select(property => property.Name)
+                    .Select(static property => property.Name)
                     .ShouldBe(["to_broadcaster_user_id"]);
                 condition.GetProperty("to_broadcaster_user_id").GetString().ShouldBe("target-id");
                 var transport = payload.RootElement.GetProperty("transport");
@@ -93,7 +93,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            (request, _) =>
+            static (request, _) =>
             {
                 AssertContext(request, HttpMethod.Delete, "/helix/eventsub/subscriptions");
                 request.RequestUri!.Query.ShouldBe("?id=subscription%2Fid");
@@ -129,7 +129,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            async (request, cancellationToken) =>
+            static async (request, cancellationToken) =>
             {
                 AssertContext(request, HttpMethod.Post, "/helix/chat/messages");
                 using var payload = JsonDocument.Parse(
@@ -179,7 +179,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            async (request, cancellationToken) =>
+            static async (request, cancellationToken) =>
             {
                 AssertContext(request, HttpMethod.Post, "/helix/whispers");
                 request.RequestUri!.Query.ShouldContain("from_user_id=sender-id");
@@ -251,7 +251,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            (_, _) =>
+            static (_, _) =>
                 Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.BadRequest)
                     {
@@ -296,7 +296,7 @@ public sealed class TransportClientTests
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             client.SendAsync(
                 Context(),
                 "sender-id",
@@ -312,7 +312,7 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            async (request, cancellationToken) =>
+            static async (request, cancellationToken) =>
             {
                 AssertContext(request, HttpMethod.Post, "/helix/chat/announcements");
                 request.RequestUri!.Query.ShouldContain("broadcaster_id=channel-id");
@@ -342,7 +342,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Sent>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Sent>();
     }
 
     [Test]
@@ -392,7 +392,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
         factory.RequestCount.ShouldBe(0);
     }
 
@@ -414,7 +414,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
         factory.RequestCount.ShouldBe(0);
     }
 
@@ -422,7 +422,7 @@ public sealed class TransportClientTests
     public async Task NativeAnnouncement_TransportFailure_RemainsAmbiguous()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond((_, _) => throw new HttpRequestException("connection lost"));
+        factory.Respond(static (_, _) => throw new HttpRequestException("connection lost"));
         var client = new ChatAnnouncementClient(
             factory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
@@ -437,7 +437,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
     }
 
     [Test]
@@ -480,7 +480,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
+        _ = result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
     }
 
     [Test]

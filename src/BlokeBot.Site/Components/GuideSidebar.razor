@@ -1,4 +1,4 @@
-@inject NavigationManager Navigation
+@inject NavigationManager _navigation
 
 <aside class="guide-sidebar">
     <nav aria-label="Guide features">
@@ -6,7 +6,7 @@
         <details class="guide-sidebar__disclosure" open>
             <summary>
                 <span>Browse help topics</span>
-                <span class="guide-sidebar__current">Current topic: <strong>@CurrentTopicLabel</strong></span>
+                <span class="guide-sidebar__current">Current topic: <strong>@_currentTopicLabel</strong></span>
             </summary>
             <div class="guide-sidebar__links">
                 <NavLink class="guide-sidebar__index" href="guide" Match="NavLinkMatch.All">
@@ -30,24 +30,3 @@
         </details>
     </nav>
 </aside>
-
-@code {
-    private string CurrentTopicLabel
-    {
-        get
-        {
-            var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
-            var relativePath = relativeUri.Split('?', '#')[0].Trim('/');
-            if (relativePath == "guide")
-            {
-                return "All help topics";
-            }
-
-            return SiteGuideCatalog
-                    .NavigationGroups.SelectMany(group => group.Links)
-                    .FirstOrDefault(link => link.Href == relativePath)
-                    ?.Label
-                ?? "All help topics";
-        }
-    }
-}

@@ -37,11 +37,13 @@ public partial class HostConfigPage
             : "status-pill__dot bg-amber-500";
 
     private string _authorizationText =>
-        _state?.IsChannelBotAuthorized == true
-        && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
-            ? "connected"
-        : _state?.IsChannelBotAuthorized == true ? "needs update"
-        : "not connected";
+        (_state?.IsChannelBotAuthorized == true) switch
+        {
+            true when _state?.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true =>
+                "connected",
+            true => "needs update",
+            _ => "not connected",
+        };
 
     private string _operationsAuthorizationBadgeClass =>
         _state?.TwitchOperationsAuthorization is TwitchOperationsAuthorizationState.Ready
@@ -100,14 +102,18 @@ public partial class HostConfigPage
         _canStop ? "Stop the bot for this channel." : _stopRuntimeDisabledTooltip;
 
     private string _startRuntimeDisabledTooltip =>
-        _state is null ? "Wait for the channel to load before starting the bot."
-        : _state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot."
-        : _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
-            ? "Reconnect the channel before starting the bot."
-        : !_botAccountCanStart ? "Connect the custom bot account before starting the bot."
-        : _state.RuntimeStatus?.Lifecycle is not HostedChannelRuntimeLifecycle.Stopped
-            ? "Wait for the bot to stop before starting it again."
-        : "The bot cannot be started right now.";
+        _state switch
+        {
+            null => "Wait for the channel to load before starting the bot.",
+            { IsChannelBotAuthorized: false } => "Connect the channel before starting the bot.",
+            { RuntimeStatus.ChannelBotAuthorizationScopesCurrent: not true } =>
+                "Reconnect the channel before starting the bot.",
+            _ when !_botAccountCanStart =>
+                "Connect the custom bot account before starting the bot.",
+            { RuntimeStatus.Lifecycle: not HostedChannelRuntimeLifecycle.Stopped } =>
+                "Wait for the bot to stop before starting it again.",
+            _ => "The bot cannot be started right now.",
+        };
 
     private string _stopRuntimeDisabledTooltip =>
         _runtimeLifecycle is HostedChannelRuntimeLifecycle.Stopping
@@ -125,7 +131,7 @@ public partial class HostConfigPage
         var pageContext = await LoadPageContextAsync();
         if (!pageContext.Session.CanAuthorizeSelectedHost)
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(
                     "Only the channel owner can change Chat access.",
                     "Channel connection not changed"
@@ -169,40 +175,40 @@ public partial class HostConfigPage
     {
         var pageContext = await LoadPageContextAsync();
         var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         if (selectedHost?.Id != hostId)
         {
             return new TwitchIntegrationDisconnectOutcome.SelectedChannelChanged();
         }
-        if (
+
+        var ownerAuthorityRequired =
             !pageContext.Session.CanAuthorizeSelectedHost
             || selectedHost.Role != AuthRole.Streamer
             || !string.Equals(
                 selectedHost.Login,
                 pageContext.Session.Login,
                 StringComparison.OrdinalIgnoreCase
-            )
-        )
+            );
+        return ownerAuthorityRequired switch
         {
-            return new TwitchIntegrationDisconnectOutcome.OwnerAuthorityRequired();
-        }
-
-        return (
-            await _hostBroadcasterAuthorization.ClearAsync(hostId, CancellationToken.None)
-        ).Match<TwitchIntegrationDisconnectOutcome>(
-            static _ => new TwitchIntegrationDisconnectOutcome.AlreadyDisconnected(),
-            static _ => new TwitchIntegrationDisconnectOutcome.Cleared(),
-            static failed => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures(
-                failed.FailureCount
+            true => new TwitchIntegrationDisconnectOutcome.OwnerAuthorityRequired(),
+            false => (
+                await _hostBroadcasterAuthorization.ClearAsync(hostId, CancellationToken.None)
+            ).Match<TwitchIntegrationDisconnectOutcome>(
+                static _ => new TwitchIntegrationDisconnectOutcome.AlreadyDisconnected(),
+                static _ => new TwitchIntegrationDisconnectOutcome.Cleared(),
+                static failed => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures(
+                    failed.FailureCount
+                ),
+                static escalation => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation(
+                    escalation.ObserverFailureCount,
+                    escalation.HandlingFailureCount
+                )
             ),
-            static escalation => new TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation(
-                escalation.ObserverFailureCount,
-                escalation.HandlingFailureCount
-            )
-        );
+        };
     }
 
     private void PublishTwitchIntegrationDisconnectToast(TwitchIntegrationDisconnectOutcome outcome)
@@ -210,7 +216,7 @@ public partial class HostConfigPage
         switch (outcome)
         {
             case TwitchIntegrationDisconnectOutcome.SelectedChannelChanged:
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<ErrorToastStrategy>.WithTitle(
                         "Your selected channel changed. Choose the channel and try again.",
                         "Twitch integration not disconnected"
@@ -218,7 +224,7 @@ public partial class HostConfigPage
                 );
                 return;
             case TwitchIntegrationDisconnectOutcome.OwnerAuthorityRequired:
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<ErrorToastStrategy>.WithTitle(
                         "Only the channel owner can disconnect the Twitch integration.",
                         "Twitch integration not disconnected"
@@ -226,7 +232,7 @@ public partial class HostConfigPage
                 );
                 return;
             case TwitchIntegrationDisconnectOutcome.AlreadyDisconnected:
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<CautionStatusToastStrategy>.WithTitle(
                         "The Twitch integration was already disconnected.",
                         "Twitch integration disconnected"
@@ -234,7 +240,7 @@ public partial class HostConfigPage
                 );
                 return;
             case TwitchIntegrationDisconnectOutcome.Cleared:
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<CautionStatusToastStrategy>.WithTitle(
                         "The Twitch integration has been disconnected.",
                         "Twitch integration disconnected"
@@ -243,7 +249,7 @@ public partial class HostConfigPage
                 return;
             case TwitchIntegrationDisconnectOutcome.ClearedWithNotificationFailures:
             case TwitchIntegrationDisconnectOutcome.ClearedWithNotificationEscalation:
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<WarningToastStrategy>.WithTitle(
                         "The Twitch integration has been disconnected, but the running bot may need attention before it notices the change.",
                         "Twitch integration disconnected"
@@ -259,7 +265,7 @@ public partial class HostConfigPage
     {
         await _channelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadCoreAsync();
-        _toasts.Publish(
+        _ = _toasts.Publish(
             new ToastRequest<StatusToastStrategy>("Chat access has been disconnected.")
         );
     }
@@ -287,7 +293,7 @@ public partial class HostConfigPage
         await LoadCoreAsync();
         if (outcome is not HostBotAccountClearOutcome.Cleared)
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(
                     "BlokeBot could not confirm that you can manage this channel. Sign in again and retry.",
                     "Custom bot not disconnected"
@@ -296,7 +302,7 @@ public partial class HostConfigPage
             return;
         }
 
-        _toasts.Publish(
+        _ = _toasts.Publish(
             ToastRequest<CautionStatusToastStrategy>.WithTitle(
                 "The custom bot account has been disconnected.",
                 "Custom bot disconnected"
@@ -313,16 +319,21 @@ public partial class HostConfigPage
     private async Task StartCoreAsync(int hostId)
     {
         var result = await _runtime.Start(hostId).ExecuteAsync(CancellationToken.None);
-        var outcome = result.Match(value => value, _ => throw new UnreachableException());
+        var outcome = result.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
         await LoadCoreAsync();
         if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {
             TrackPendingRuntimeTransition();
-            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+            _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
         else
         {
-            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome)));
+            _ = _toasts.Publish(
+                new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome))
+            );
         }
     }
 
@@ -335,16 +346,21 @@ public partial class HostConfigPage
     private async Task StopCoreAsync(int hostId)
     {
         var result = await _runtime.Stop(hostId).ExecuteAsync(CancellationToken.None);
-        var outcome = result.Match(value => value, _ => throw new UnreachableException());
+        var outcome = result.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
         await LoadCoreAsync();
         if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {
             TrackPendingRuntimeTransition();
-            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+            _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
         else
         {
-            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome)));
+            _ = _toasts.Publish(
+                new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome))
+            );
         }
     }
 

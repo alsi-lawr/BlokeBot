@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Security.Cryptography;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Eventing;
@@ -189,8 +190,8 @@ internal sealed class OverlayCueService(
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now,
                 };
-                db.OverlayCues.Add(cue);
-                await db.SaveChangesAsync(cancellationToken);
+                _ = db.OverlayCues.Add(cue);
+                _ = await db.SaveChangesAsync(cancellationToken);
             }
             else
             {
@@ -224,7 +225,7 @@ internal sealed class OverlayCueService(
 
             foreach (var asset in assets)
             {
-                db.OverlayCueMediaAssetReferences.Add(
+                _ = db.OverlayCueMediaAssetReferences.Add(
                     new OverlayCueMediaAssetReference
                     {
                         CueId = cue.Id,
@@ -233,9 +234,9 @@ internal sealed class OverlayCueService(
                     }
                 );
             }
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
+            _ = await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
             return Success(ToView(cue));
         }
         catch (DbUpdateConcurrencyException)
@@ -244,7 +245,7 @@ internal sealed class OverlayCueService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -283,7 +284,7 @@ internal sealed class OverlayCueService(
         {
             return Reject<Guid>(new OverlayCueRejection.Missing());
         }
-        await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
         return Success(cueId);
     }
 
@@ -406,20 +407,20 @@ internal sealed class OverlayCueService(
             await using var transaction = await db.Database.BeginTransactionAsync(
                 cancellationToken
             );
-            db.OverlayMediaAssets.Remove(asset);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = db.OverlayMediaAssets.Remove(asset);
+            _ = await db.SaveChangesAsync(cancellationToken);
             if (fileDeletion.Delete(path) is OverlayMediaFileDeletionOutcome.Unavailable)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return Reject<Guid>(new OverlayCueRejection.StorageUnavailable());
             }
             await transaction.CommitAsync(cancellationToken);
-            await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
+            _ = await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
             return Success(assetId);
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -483,7 +484,7 @@ internal sealed class OverlayCueService(
         }
 
         var root = HostContentDirectory(hostId);
-        Directory.CreateDirectory(root);
+        _ = Directory.CreateDirectory(root);
         var tempPath = Path.Combine(root, $".upload-{Guid.NewGuid():N}");
         string? finalPath = null;
         try
@@ -566,7 +567,7 @@ internal sealed class OverlayCueService(
                         ContentRevision = 1,
                         CreatedAtUtc = Now(),
                     };
-                    db.OverlayMediaAssets.Add(asset);
+                    _ = db.OverlayMediaAssets.Add(asset);
                 }
 
                 var storage = MeasureStoredBytes(root, tempPath);
@@ -610,7 +611,7 @@ internal sealed class OverlayCueService(
                 {
                     asset.ContentRevision++;
                 }
-                await db.SaveChangesAsync(cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
                 if (replacedPath is not null)
                 {
                     if (
@@ -626,7 +627,7 @@ internal sealed class OverlayCueService(
                     }
                     await transaction!.CommitAsync(cancellationToken);
                 }
-                await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
+                _ = await events.PublishAsync(AppEventKind.OverlaysChanged, cancellationToken);
                 return Success(ToView(asset));
             }
             catch
@@ -639,7 +640,7 @@ internal sealed class OverlayCueService(
             }
             finally
             {
-                gate.Release();
+                _ = gate.Release();
             }
         }
         catch (UploadTooLargeException)
@@ -691,8 +692,12 @@ internal sealed class OverlayCueService(
         var databaseDirectory =
             Path.GetDirectoryName(Path.GetFullPath(_options.DatabasePath))
             ?? throw new InvalidOperationException("The database path has no parent directory.");
-        var directory = Path.Combine(databaseDirectory, "overlay-media", hostId.ToString());
-        Directory.CreateDirectory(directory);
+        var directory = Path.Combine(
+            databaseDirectory,
+            "overlay-media",
+            hostId.ToString(CultureInfo.InvariantCulture)
+        );
+        _ = Directory.CreateDirectory(directory);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(

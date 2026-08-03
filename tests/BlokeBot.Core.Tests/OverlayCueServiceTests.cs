@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using System.Threading.Channels;
 using BlokeBot.Core.Auth.Moderation;
@@ -37,7 +38,9 @@ public sealed class OverlayCueServiceTests
         File.Exists(fixture.ContentPath(uploaded.Id)).ShouldBeTrue();
         fixture
             .ContentPath(uploaded.Id)
-            .ShouldContain(Path.Combine("overlay-media", fixture.HostId.ToString()));
+            .ShouldContain(
+                Path.Combine("overlay-media", fixture.HostId.ToString(CultureInfo.InvariantCulture))
+            );
         fixture.ContentPath(uploaded.Id).ShouldNotContain("wwwroot");
         (await fixture.Cues.ListAssetsAsync(Session(fixture.OtherHostId), CancellationToken.None))
             .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded>()
@@ -49,7 +52,7 @@ public sealed class OverlayCueServiceTests
                 uploaded.Id.ToString("D"),
                 StringComparison.Ordinal
             );
-        (
+        _ = (
             await fixture.Cues.SaveCueAsync(
                 session,
                 new(
@@ -64,7 +67,7 @@ public sealed class OverlayCueServiceTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayCueResult<OverlayCueView>.Succeeded>();
-        (
+        _ = (
             await fixture.Cues.DeleteAssetAsync(
                 session,
                 uploaded.Id,
@@ -77,7 +80,7 @@ public sealed class OverlayCueServiceTests
 
         await fixture.SetFeaturesAsync(HostFeatureFlags.None);
         await using var suppressed = new MemoryStream(Mp4Bytes());
-        (
+        _ = (
             await fixture.Cues.UploadAssetAsync(
                 session,
                 "Suppressed",
@@ -136,7 +139,7 @@ public sealed class OverlayCueServiceTests
             replaced.ContentRevision,
             CancellationToken.None
         );
-        published.ShouldNotBeNull();
+        _ = published.ShouldNotBeNull();
         published.ContentType.ShouldBe("video/webm");
         (await File.ReadAllBytesAsync(published.Path)).ShouldBe(replacementBytes);
         (
@@ -178,7 +181,7 @@ public sealed class OverlayCueServiceTests
         var originalPath = fixture.ContentPath(uploaded.Id);
         await using var replacement = new MemoryStream([1, 2, 3, 4]);
 
-        (
+        _ = (
             await fixture.Cues.ReplaceAssetAsync(
                 session,
                 new(uploaded.Id, uploaded.ContentRevision, "audio/wav", replacement),
@@ -208,7 +211,7 @@ public sealed class OverlayCueServiceTests
             uploaded.ContentRevision,
             CancellationToken.None
         );
-        retainedContent.ShouldNotBeNull();
+        _ = retainedContent.ShouldNotBeNull();
         retainedContent.Path.ShouldBe(originalPath);
         var retainedCue = (await fixture.Cues.ListCuesAsync(session, CancellationToken.None))
             .ShouldBeOfType<OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded>()
@@ -240,7 +243,7 @@ public sealed class OverlayCueServiceTests
         var session = Session(fixture.HostId);
         await using (var empty = new MemoryStream())
         {
-            (
+            _ = (
                 await fixture.Cues.UploadAssetAsync(
                     session,
                     "Empty",
@@ -252,7 +255,7 @@ public sealed class OverlayCueServiceTests
         }
         await using (var oversized = new MemoryStream(new byte[1025]))
         {
-            (
+            _ = (
                 await fixture.Cues.UploadAssetAsync(
                     session,
                     "Oversized",
@@ -379,7 +382,7 @@ public sealed class OverlayCueServiceTests
                 .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
                 .Value;
 
-            (
+            _ = (
                 await fixture.Cues.SaveCueAsync(
                     session,
                     new(
@@ -421,7 +424,7 @@ public sealed class OverlayCueServiceTests
         var originalPath = fixture.ContentPath(uploaded.Id);
         deletion.StorageKeysUnavailable = true;
 
-        (
+        _ = (
             await fixture.Cues.DeleteAssetAsync(
                 session,
                 uploaded.Id,
@@ -438,7 +441,7 @@ public sealed class OverlayCueServiceTests
             .Value.ShouldHaveSingleItem()
             .ShouldBe(uploaded);
         await using var additional = new MemoryStream(Mp4Bytes());
-        (
+        _ = (
             await fixture.Cues.UploadAssetAsync(
                 session,
                 "Additional",
@@ -476,7 +479,7 @@ public sealed class OverlayCueServiceTests
         deletion.StorageKeysUnavailable = true;
         await using var replacement = new MemoryStream(Mp4Bytes());
 
-        (
+        _ = (
             await fixture.Cues.ReplaceAssetAsync(
                 session,
                 new(uploaded.Id, uploaded.ContentRevision, "video/mp4", replacement),
@@ -496,9 +499,9 @@ public sealed class OverlayCueServiceTests
             .ToArray();
         survivingFiles.Length.ShouldBe(2);
         survivingFiles.ShouldContain(originalPath);
-        survivingFiles.Sum(path => new FileInfo(path).Length).ShouldBe(1036);
+        survivingFiles.Sum(static path => new FileInfo(path).Length).ShouldBe(1036);
         await using var additional = new MemoryStream(Mp4Bytes());
-        (
+        _ = (
             await fixture.Cues.UploadAssetAsync(
                 session,
                 "Additional",
@@ -523,7 +526,7 @@ public sealed class OverlayCueServiceTests
         var session = Session(fixture.HostId);
         await using (var rejected = new MemoryStream(new byte[1025]))
         {
-            (
+            _ = (
                 await fixture.Cues.UploadAssetAsync(
                     session,
                     "Rejected",
@@ -571,32 +574,32 @@ public sealed class OverlayCueServiceTests
             Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Enqueue),
             CancellationToken.None
         );
-        disconnected.ShouldBeOfType<OverlayCueAdmissionOutcome.Disconnected>();
+        _ = disconnected.ShouldBeOfType<OverlayCueAdmissionOutcome.Disconnected>();
         fixture.Presence.Connected = true;
         fixture.Clock.Advance(TimeSpan.FromMilliseconds(250));
         _ = await fixture.Transport.ReadStartedAsync();
         fixture.Transport.Started.Count.ShouldBe(1);
 
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Enqueue),
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayCueAdmissionOutcome.Queued>();
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Ignore),
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayCueAdmissionOutcome.QueueRejected>();
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Concurrent),
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayCueAdmissionOutcome.Running>();
         _ = await fixture.Transport.ReadStartedAsync();
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.OtherHostId, target, cue, OverlayCueQueuePolicy.Enqueue),
                 CancellationToken.None
@@ -604,7 +607,7 @@ public sealed class OverlayCueServiceTests
         ).ShouldBeOfType<OverlayCueAdmissionOutcome.Missing>();
 
         await fixture.SetFeaturesAsync(HostFeatureFlags.None);
-        await fixture.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
+        _ = await fixture.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
         _ = await fixture.Transport.ReadStoppedAsync();
         _ = await fixture.Transport.ReadStoppedAsync();
         fixture.Transport.Stopped.Count.ShouldBe(2);
@@ -616,7 +619,7 @@ public sealed class OverlayCueServiceTests
         await using var fixture = await Fixture.CreateAsync();
         var (target, cue) = await fixture.SeedPlaybackAsync();
 
-        (
+        _ = (
             await fixture.Playback.ResolveReferencesAsync(
                 new(fixture.HostId, target, cue),
                 CancellationToken.None
@@ -635,7 +638,7 @@ public sealed class OverlayCueServiceTests
         {
             var storedCue = await db.OverlayCues.SingleAsync(value => value.PublicId == cue);
             storedCue.IsEnabled = false;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         (
             await fixture.Playback.ResolveReferencesAsync(
@@ -665,14 +668,14 @@ public sealed class OverlayCueServiceTests
         fixture.Presence.Connected = true;
         await fixture.Playback.StartAsync(CancellationToken.None);
 
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Enqueue),
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayCueAdmissionOutcome.Running>();
         var firstRun = await fixture.Transport.ReadStartedAsync();
-        (
+        _ = (
             await fixture.Playback.AdmitAsync(
                 Request(fixture.HostId, target, cue, OverlayCueQueuePolicy.Enqueue),
                 CancellationToken.None
@@ -752,10 +755,9 @@ public sealed class OverlayCueServiceTests
     }
 
     private static byte[] PngBytes() =>
-        [(byte)0x89, (byte)'P', (byte)'N', (byte)'G', 0x0d, 0x0a, 0x1a, 0x0a];
+        [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0d, 0x0a, 0x1a, 0x0a];
 
-    private static byte[] WebMBytes() =>
-        [(byte)0x1a, (byte)0x45, (byte)0xdf, (byte)0xa3, 0x42, 0x82, 0x84, .. "webm"u8];
+    private static byte[] WebMBytes() => [0x1a, 0x45, 0xdf, 0xa3, 0x42, 0x82, 0x84, .. "webm"u8];
 
     private static byte[] Mp3Bytes() => [(byte)'I', (byte)'D', (byte)'3', 0, 0, 0, 0, 0, 0, 0];
 
@@ -831,7 +833,7 @@ public sealed class OverlayCueServiceTests
                 var host = Host("host");
                 var other = Host("other");
                 db.Hosts.AddRange(host, other);
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
                 hostId = host.Id;
                 otherHostId = other.Id;
             }
@@ -839,7 +841,7 @@ public sealed class OverlayCueServiceTests
                 Path.GetTempPath(),
                 $"blokebot-overlay-cue-tests-{Guid.NewGuid():N}"
             );
-            Directory.CreateDirectory(root);
+            _ = Directory.CreateDirectory(root);
             var options = Options.Create(
                 new BlokeBotOptions
                 {
@@ -939,14 +941,14 @@ public sealed class OverlayCueServiceTests
                 UpdatedAtUtc = DateTime.UtcNow,
             };
             db.AddRange(target, cue);
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
             return (target.PublicId, cue.PublicId);
         }
 
         internal async Task SetFeaturesAsync(HostFeatureFlags features)
         {
             await using var db = await Database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .Hosts.Where(value => value.Id == HostId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(value => value.EnabledFeatures, features)
@@ -957,7 +959,12 @@ public sealed class OverlayCueServiceTests
         {
             using var db = Database.CreateDbContext();
             var asset = db.OverlayMediaAssets.Single(value => value.PublicId == assetId);
-            return Path.Combine(MediaRoot, "overlay-media", HostId.ToString(), asset.StorageKey);
+            return Path.Combine(
+                MediaRoot,
+                "overlay-media",
+                HostId.ToString(CultureInfo.InvariantCulture),
+                asset.StorageKey
+            );
         }
 
         public async ValueTask DisposeAsync()
@@ -1040,8 +1047,8 @@ public sealed class OverlayCueServiceTests
                 (
                     StorageKeysUnavailable
                     && fileName.Length == 32
-                    && fileName.All(character =>
-                        character is >= '0' and <= '9' or >= 'a' and <= 'f'
+                    && fileName.All(static character =>
+                        character is (>= '0' and <= '9') or (>= 'a' and <= 'f')
                     )
                 )
                 || (
@@ -1083,7 +1090,7 @@ public sealed class OverlayCueServiceTests
         )
         {
             var timer = new ManualTimer(this, callback, state);
-            timer.Change(dueTime, period);
+            _ = timer.Change(dueTime, period);
             return timer;
         }
 
@@ -1124,7 +1131,7 @@ public sealed class OverlayCueServiceTests
                         dueTime == Timeout.InfiniteTimeSpan
                             ? DateTimeOffset.MaxValue
                             : owner._now.Add(dueTime);
-                    owner._timers.Add(this);
+                    _ = owner._timers.Add(this);
                     return true;
                 }
             }
@@ -1138,7 +1145,7 @@ public sealed class OverlayCueServiceTests
                         return;
                     }
                     _disposed = true;
-                    owner._timers.Remove(this);
+                    _ = owner._timers.Remove(this);
                 }
             }
 

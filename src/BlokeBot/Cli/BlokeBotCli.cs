@@ -23,11 +23,11 @@ internal static class BlokeBotCli
         var app = new CommandApp(registrar);
         app.Configure(configuration =>
         {
-            configuration.SetApplicationName("blokebot");
-            configuration.SetApplicationVersion(BlokeBotVersion.Current);
-            configuration.ConfigureConsole(console);
-            configuration.UseStrictParsing();
-            configuration.SetExceptionHandler(
+            _ = configuration.SetApplicationName("blokebot");
+            _ = configuration.SetApplicationVersion(BlokeBotVersion.Current);
+            _ = configuration.ConfigureConsole(console);
+            _ = configuration.UseStrictParsing();
+            _ = configuration.SetExceptionHandler(
                 (exception, _) =>
                 {
                     BlokeBotHostLogging.HostFailure(exception);
@@ -37,13 +37,13 @@ internal static class BlokeBotCli
                     return 1;
                 }
             );
-            configuration
+            _ = configuration
                 .AddCommand<BlokeBotHelpCommand>("help")
                 .WithDescription("Show help and exit.");
-            configuration
+            _ = configuration
                 .AddCommand<BlokeBotVersionCommand>("version")
                 .WithDescription("Show version information and exit.");
-            configuration
+            _ = configuration
                 .AddCommand<BlokeBotServeCommand>("serve")
                 .WithDescription("Start the bot and dashboard.");
         });

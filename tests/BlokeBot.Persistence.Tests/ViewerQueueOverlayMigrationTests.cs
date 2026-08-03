@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Globalization;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -19,7 +20,7 @@ public sealed class ViewerQueueOverlayMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
@@ -57,7 +58,7 @@ public sealed class ViewerQueueOverlayMigrationTests
             )
         ).ShouldBe(0);
         (await upgraded.PlayQueueFields.SingleAsync()).Label.ShouldBe("Platform");
-        upgraded.OverlayInstances.Add(
+        _ = upgraded.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("38a596f8-0f66-4f62-a5b1-967045c147ce"),
@@ -74,14 +75,14 @@ public sealed class ViewerQueueOverlayMigrationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await upgraded.SaveChangesAsync();
+        _ = await upgraded.SaveChangesAsync();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.ViewerQueue);
         (await ReadOverlayTableSqlAsync(upgraded.Database.GetDbConnection())).ShouldContain(
             "'viewer-queue'"
         );
 
-        upgraded.OverlayInstances.Remove(await upgraded.OverlayInstances.SingleAsync());
-        await upgraded.SaveChangesAsync();
+        _ = upgraded.OverlayInstances.Remove(await upgraded.OverlayInstances.SingleAsync());
+        _ = await upgraded.SaveChangesAsync();
         await upgraded.GetService<IMigrator>().MigrateAsync(_previousMigration);
         (
             await ReadScalarAsync(
@@ -99,7 +100,7 @@ public sealed class ViewerQueueOverlayMigrationTests
         }
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
-        return Convert.ToInt64(await command.ExecuteScalarAsync());
+        return Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
     }
 
     private static async Task<string> ReadOverlayTableSqlAsync(DbConnection connection)

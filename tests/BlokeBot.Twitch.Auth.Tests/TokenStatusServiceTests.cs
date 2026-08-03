@@ -34,7 +34,7 @@ public sealed class TokenStatusServiceTests
         var inspection = service.GetUserAccessTokenStatus(["chat:read"]);
 
         provider.CallCount.ShouldBe(0);
-        await inspection.ExecuteAsync(CancellationToken.None);
+        _ = await inspection.ExecuteAsync(CancellationToken.None);
         provider.CallCount.ShouldBe(1);
     }
 
@@ -290,8 +290,8 @@ public sealed class TokenStatusServiceTests
         BlokeBot.Functional.Result<TokenStatus, TokenStatusError> result
     ) =>
         result.Match(
-            status => status,
-            error =>
+            static status => status,
+            static error =>
                 throw new InvalidOperationException(
                     $"Expected token status success, received {error.GetType().Name}."
                 )
@@ -301,11 +301,11 @@ public sealed class TokenStatusServiceTests
         BlokeBot.Functional.Result<TokenStatus, TokenStatusError> result
     ) =>
         result.Match(
-            status =>
+            static status =>
                 throw new InvalidOperationException(
                     $"Expected token status error, received {status.GetType().Name}."
                 ),
-            error => error
+            static error => error
         );
 
     private sealed class RecordingTokenProvider(string accessToken) : IAccessTokenProvider
@@ -346,7 +346,7 @@ public sealed class TokenStatusServiceTests
     private sealed class UnavailableTokenProvider : IAccessTokenProvider
     {
         public IO<string, AccessTokenUnavailableReason> GetAccessToken() =>
-            IO<string, AccessTokenUnavailableReason>.Create(_ =>
+            IO<string, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<string, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.MissingRefreshToken
@@ -373,29 +373,18 @@ public sealed class TokenStatusServiceTests
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                if (exception is not null)
+            ) =>
+                (exception, validationJson) switch
                 {
-                    return Task.FromException<HttpResponseMessage>(exception);
-                }
-
-                if (validationJson is null)
-                {
-                    return Task.FromResult(new HttpResponseMessage(rejectionStatus));
-                }
-
-                return Task.FromResult(
-                    new HttpResponseMessage(HttpStatusCode.OK)
-                    {
-                        Content = new StringContent(
-                            validationJson,
-                            Encoding.UTF8,
-                            "application/json"
-                        ),
-                    }
-                );
-            }
+                    ({ } error, _) => Task.FromException<HttpResponseMessage>(error),
+                    (_, null) => Task.FromResult(new HttpResponseMessage(rejectionStatus)),
+                    (_, var json) => Task.FromResult(
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(json!, Encoding.UTF8, "application/json"),
+                        }
+                    ),
+                };
         }
     }
 
@@ -436,7 +425,7 @@ public sealed class TokenStatusServiceTests
         )
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                ? values.ToDictionary(static pair => pair.Key, static pair => pair.Value)
                 : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }

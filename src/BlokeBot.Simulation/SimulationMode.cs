@@ -24,21 +24,19 @@ internal static class SimulationMode
             .Where(value => value.argument == "--simulation-scenario")
             .Select(value => value.index + 1 < arguments.Length ? arguments[value.index + 1] : null)
             .ToArray();
-        if (
+        return
             names.Length > 1
-            || names.SingleOrDefault() is { } name
+            || (
+                names.SingleOrDefault() is { } name
                 && !string.Equals(
                     name,
                     FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboardName,
                     StringComparison.Ordinal
                 )
-        )
-        {
-            throw new InvalidOperationException(
+            )
+            ? throw new InvalidOperationException(
                 "Simulation requires the allowlisted ready-dashboard scenario."
-            );
-        }
-
-        return FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard;
+            )
+            : FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard;
     }
 }

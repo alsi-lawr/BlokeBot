@@ -31,7 +31,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
         var outcome = await Service(factory, events, http)
             .ClearAsync(hostId, CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostBroadcasterAuthorizationClearOutcome.Cleared>();
+        _ = outcome.ShouldBeOfType<HostBroadcasterAuthorizationClearOutcome.Cleared>();
         notificationCount.ShouldBe(1);
         http.RequestCount.ShouldBe(0);
         await using var verify = await factory.CreateDbContextAsync();
@@ -67,7 +67,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
         var outcome = await Service(factory, events, http)
             .ClearAsync(hostId, CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostBroadcasterAuthorizationClearOutcome.AlreadyDisconnected>();
+        _ = outcome.ShouldBeOfType<HostBroadcasterAuthorizationClearOutcome.AlreadyDisconnected>();
         notificationCount.ShouldBe(0);
         http.RequestCount.ShouldBe(0);
     }
@@ -99,7 +99,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
             outcome.ShouldBeOfType<HostBroadcasterAuthorizationClearOutcome.ClearedWithNotificationFailures>();
         failed.FailureCount.ShouldBe(1);
         invocationCount.ShouldBe(1);
-        recording.Reports.ShouldHaveSingleItem();
+        _ = recording.Reports.ShouldHaveSingleItem();
         http.RequestCount.ShouldBe(0);
         await AssertAuthorizationMissingAsync(factory, hostId);
     }
@@ -143,7 +143,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
         var hostId = await SeedHostAsync(factory, "host", includeAuthorization: true);
         await using (var db = await factory.CreateDbContextAsync())
         {
-            await db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 """
                 CREATE TRIGGER fail_broadcaster_authorization_delete
                 BEFORE DELETE ON host_broadcaster_authorizations
@@ -166,7 +166,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
         );
         var http = new RecordingHttpClientFactory();
 
-        await Should.ThrowAsync<DbUpdateException>(() =>
+        _ = await Should.ThrowAsync<DbUpdateException>(() =>
             Service(factory, events, http).ClearAsync(hostId, CancellationToken.None)
         );
 
@@ -214,11 +214,11 @@ public sealed class HostBroadcasterAuthorizationClearTests
             TwitchUserId = $"{login}-id",
             EnabledFeatures = HostFeatureFlags.All,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         if (includeAuthorization)
         {
-            db.HostBroadcasterAuthorizations.Add(
+            _ = db.HostBroadcasterAuthorizations.Add(
                 new HostBroadcasterAuthorization
                 {
                     HostId = host.Id,
@@ -233,7 +233,7 @@ public sealed class HostBroadcasterAuthorizationClearTests
                     UpdatedAtUtc = DateTime.UtcNow.AddDays(-30),
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         return host.Id;

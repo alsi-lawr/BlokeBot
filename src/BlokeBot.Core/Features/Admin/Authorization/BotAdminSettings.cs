@@ -15,7 +15,7 @@ public sealed record BotAdminSettings
         {
             BotAdmins = (options.BotAdmins ?? [])
                 .Select(LoginName.Parse)
-                .Where(login => !login.IsEmpty)
+                .Where(static login => !login.IsEmpty)
                 .ToImmutableHashSet(),
         };
     }

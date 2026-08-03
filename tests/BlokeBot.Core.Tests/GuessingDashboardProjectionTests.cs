@@ -23,8 +23,8 @@ public sealed class GuessingDashboardProjectionTests
                 DisplayName = "Streamer",
                 CreatedAtUtc = started,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var profile = new GuessRoundProfile
             {
                 HostId = host.Id,
@@ -33,8 +33,8 @@ public sealed class GuessingDashboardProjectionTests
                 IsDefault = true,
                 Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
             };
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
             var round = new GuessRound
             {
                 HostId = host.Id,
@@ -42,8 +42,8 @@ public sealed class GuessingDashboardProjectionTests
                 Status = GuessRoundStatus.Open,
                 StartedAtUtc = started,
             };
-            db.Rounds.Add(round);
-            await db.SaveChangesAsync();
+            _ = db.Rounds.Add(round);
+            _ = await db.SaveChangesAsync();
             hostId = host.Id;
             roundId = round.Id;
         }
@@ -52,7 +52,7 @@ public sealed class GuessingDashboardProjectionTests
 
         var empty = await service.LoadStateAsync(hostId, CancellationToken.None);
 
-        empty.CurrentRound.ShouldNotBeNull();
+        _ = empty.CurrentRound.ShouldNotBeNull();
         empty.Votes.IsDefault.ShouldBeFalse();
         empty.Votes.IsEmpty.ShouldBeTrue();
 
@@ -76,7 +76,7 @@ public sealed class GuessingDashboardProjectionTests
                     GuessedAtUtc = later,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var populated = await service.LoadStateAsync(hostId, CancellationToken.None);

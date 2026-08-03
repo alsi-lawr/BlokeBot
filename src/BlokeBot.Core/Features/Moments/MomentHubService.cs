@@ -67,14 +67,14 @@ public sealed class MomentHubService(
         if (settings is null)
         {
             settings = new MomentHubSettings { HostId = hostId };
-            db.MomentHubSettings.Add(settings);
+            _ = db.MomentHubSettings.Add(settings);
         }
         settings.MergeWindowSeconds = command.MergeWindowSeconds;
         settings.MarkerFallbackEnabled = command.MarkerFallbackEnabled;
         settings.RewardPolicy = command.RewardPolicy;
         settings.RewardAmount = reward.ToString();
         settings.UpdatedAtUtc = Now();
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await NotifyAsync(ct);
         return Succeeded(SettingsView(settings));
     }
@@ -193,7 +193,7 @@ public sealed class MomentHubService(
                 CapturedAtUtc = now,
                 LastCapturedAtUtc = now,
             };
-            db.MomentCandidates.Add(candidate);
+            _ = db.MomentCandidates.Add(candidate);
         }
         else
         {
@@ -222,7 +222,7 @@ public sealed class MomentHubService(
         );
         AddOrUpdateContributor(candidate, command.Requester, login, now);
         AddSuggestion(candidate, command, now);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         AddEvent(
             db,
             candidate,
@@ -230,7 +230,7 @@ public sealed class MomentHubService(
             new { candidate.PublicId, candidate.StreamIdentity },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return Succeeded(
             new CaptureDecision(
@@ -453,7 +453,7 @@ public sealed class MomentHubService(
             }
             else
             {
-                ReconcileIdentity(existing, contributor.TwitchUserId, contributor.IdentityKey);
+                _ = ReconcileIdentity(existing, contributor.TwitchUserId, contributor.IdentityKey);
                 existing.CaptureCount += contributor.CaptureCount;
                 existing.FirstCapturedAtUtc = Earlier(
                     existing.FirstCapturedAtUtc,
@@ -497,13 +497,13 @@ public sealed class MomentHubService(
             }
             else
             {
-                ReconcileIdentity(existing, vote.TwitchUserId, vote.IdentityKey);
+                _ = ReconcileIdentity(existing, vote.TwitchUserId, vote.IdentityKey);
             }
         }
         var mergedAt = Now();
         source.State = MomentCandidateState.Merged;
         source.MergedIntoCandidateId = target.Id;
-        db.MomentMerges.Add(
+        _ = db.MomentMerges.Add(
             new MomentMerge
             {
                 HostId = hostId,
@@ -515,7 +515,7 @@ public sealed class MomentHubService(
             }
         );
         AddAudit(db, source, "Merged", actorLogin, privateText, mergedAt);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await NotifyAsync(ct);
         return Succeeded(await ToModeratorAsync(db, target, ct));
@@ -587,7 +587,7 @@ public sealed class MomentHubService(
         {
             if (changed)
             {
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
             }
             var hostLogin = await HostLoginAsync(db, hostId, ct);
@@ -605,7 +605,7 @@ public sealed class MomentHubService(
                 CreatedAtUtc = Now(),
             }
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new VoteDecision(
             Succeeded(ToPublic(candidate, await HostLoginAsync(db, hostId, ct))),
@@ -793,7 +793,7 @@ public sealed class MomentHubService(
             );
         }
         var now = Now();
-        db.MomentWeeklyFinalizations.Add(
+        _ = db.MomentWeeklyFinalizations.Add(
             new MomentWeeklyFinalization
             {
                 HostId = hostId,
@@ -815,7 +815,7 @@ public sealed class MomentHubService(
             now,
             WinnerEventKey(weekStart)
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new FinalizationDecision(
             Succeeded(ToPublic(winner, await HostLoginAsync(db, hostId, ct))),
@@ -939,7 +939,7 @@ public sealed class MomentHubService(
                 )
             );
         }
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new ModerationResult(Succeeded(await ToModeratorAsync(db, candidate, ct)), true);
     }
@@ -975,7 +975,7 @@ public sealed class MomentHubService(
         }
         if (!string.IsNullOrWhiteSpace(requester.TwitchUserId))
         {
-            ReconcileIdentity(contributor, requester.TwitchUserId, identity);
+            _ = ReconcileIdentity(contributor, requester.TwitchUserId, identity);
         }
         contributor.CaptureCount++;
         contributor.LastCapturedAtUtc = now;
@@ -1063,7 +1063,7 @@ public sealed class MomentHubService(
                 candidate.ProviderFailureReason = failed.Reason;
                 break;
         }
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
     }
 
@@ -1115,7 +1115,7 @@ public sealed class MomentHubService(
                     Login = contributor.NormalizedLogin,
                     Amount = "0",
                 };
-                db.PointBalances.Add(balance);
+                _ = db.PointBalances.Add(balance);
             }
             var current = PointAmount.ParseAbsolute(balance.Amount);
             if (current.Value + amount.Value > PointAmount.MaximumValue)
@@ -1125,7 +1125,7 @@ public sealed class MomentHubService(
             var next = current.Add(amount);
             balance.Amount = next.ToString();
             balance.UpdatedAtUtc = now;
-            db.PointLedgerEntries.Add(
+            _ = db.PointLedgerEntries.Add(
                 new PointLedgerEntry
                 {
                     HostId = candidate.HostId,
@@ -1156,7 +1156,7 @@ public sealed class MomentHubService(
         {
             throw new InvalidOperationException("Moment event payload exceeds its durable bound.");
         }
-        db.MomentEvents.Add(
+        _ = db.MomentEvents.Add(
             new MomentDomainEvent
             {
                 HostId = candidate.HostId,
@@ -1266,10 +1266,10 @@ public sealed class MomentHubService(
             candidate.CapturedAtUtc,
             candidate.ApprovedAtUtc,
             candidate
-                .Contributors.OrderBy(value => value.FirstCapturedAtUtc)
-                .ThenBy(value => value.Id)
+                .Contributors.OrderBy(static value => value.FirstCapturedAtUtc)
+                .ThenBy(static value => value.Id)
                 .Take(MomentLimits.MaximumContributorCount)
-                .Select(value => new MomentContributorView(
+                .Select(static value => new MomentContributorView(
                     value.DisplayName,
                     value.NormalizedLogin,
                     value.CaptureCount,
@@ -1346,18 +1346,18 @@ public sealed class MomentHubService(
     private static string CleanTitle(string requested, MomentCandidate candidate)
     {
         var title = requested.Trim();
-        if (title.Length > 0)
-        {
-            return title;
-        }
-        return
+        return (
+            title,
             candidate
                 .Suggestions.OrderBy(value => value.CreatedAtUtc)
                 .FirstOrDefault()
                 ?.SuggestedTitle
-                is { Length: > 0 } suggestion
-            ? suggestion
-            : $"Moment {candidate.CapturedAtUtc:yyyy-MM-dd HH:mm:ss} UTC";
+        ) switch
+        {
+            ({ Length: > 0 } requestedTitle, _) => requestedTitle,
+            (_, { Length: > 0 } suggestion) => suggestion,
+            _ => $"Moment {candidate.CapturedAtUtc:yyyy-MM-dd HH:mm:ss} UTC",
+        };
     }
 
     private static string? CleanOptional(string? value) =>
@@ -1377,12 +1377,14 @@ public sealed class MomentHubService(
     {
         if (
             string.IsNullOrWhiteSpace(twitchUserId)
-            || !string.IsNullOrWhiteSpace(contributor.TwitchUserId)
+            || (
+                !string.IsNullOrWhiteSpace(contributor.TwitchUserId)
                 && !string.Equals(
                     contributor.TwitchUserId,
                     twitchUserId.Trim(),
                     StringComparison.Ordinal
                 )
+            )
         )
         {
             return false;
@@ -1399,8 +1401,10 @@ public sealed class MomentHubService(
     {
         if (
             string.IsNullOrWhiteSpace(twitchUserId)
-            || !string.IsNullOrWhiteSpace(vote.TwitchUserId)
+            || (
+                !string.IsNullOrWhiteSpace(vote.TwitchUserId)
                 && !string.Equals(vote.TwitchUserId, twitchUserId.Trim(), StringComparison.Ordinal)
+            )
         )
         {
             return false;

@@ -77,8 +77,8 @@ public sealed class PointsCommandTests : PointsTestBase
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.PointsSettings.Add(new PointsSettings { HostId = hostId });
-            db.ReplyDeliverySettings.Add(
+            _ = db.PointsSettings.Add(new PointsSettings { HostId = hostId });
+            _ = db.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = hostId,
@@ -88,7 +88,7 @@ public sealed class PointsCommandTests : PointsTestBase
                     Target = ReplyDeliveryTarget.Whisper,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         List<CommandResponse> responses = [];
         var strategy = new PointsBalanceCommandStrategy(
@@ -125,7 +125,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = 30;
@@ -190,7 +190,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = 1;
@@ -262,7 +262,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = -1;

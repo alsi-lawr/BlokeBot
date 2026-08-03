@@ -94,7 +94,12 @@ internal sealed record HelixPollWire
             BroadcasterId,
             Title,
             Choices
-                .Select(x => new HelixPollChoice(x.Id, x.Title, x.Votes, x.ChannelPointsVotes))
+                .Select(static x => new HelixPollChoice(
+                    x.Id,
+                    x.Title,
+                    x.Votes,
+                    x.ChannelPointsVotes
+                ))
                 .ToArray(),
             Status switch
             {

@@ -144,7 +144,7 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
         }
 
         claims.AddRange(
-            hosts.Select(host => new Claim(
+            hosts.Select(static host => new Claim(
                 BotHostClaims.AvailableHost,
                 BotHostClaimCodec.Encode(host)
             ))
@@ -187,13 +187,18 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
             host.Role == AuthRole.Streamer
             && string.Equals(host.Login, login, StringComparison.OrdinalIgnoreCase)
         );
-        if (ownHost is not null)
-        {
-            return ownHost;
-        }
-
-        return canCreateHost ? null : hosts[0];
+        return ownHost is { } host ? host : SelectFallbackHost(hosts, canCreateHost);
     }
+
+    private static BotHostChoice? SelectFallbackHost(
+        IReadOnlyList<BotHostChoice> hosts,
+        bool canCreateHost
+    ) =>
+        canCreateHost switch
+        {
+            true => null,
+            false => hosts[0],
+        };
 
     private static async Task SignInAsync(HttpContext context, ClaimsPrincipal principal) =>
         await context.SignInAsync(

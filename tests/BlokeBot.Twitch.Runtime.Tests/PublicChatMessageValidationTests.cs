@@ -74,7 +74,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
 
         var outcome = await queue.EnqueueAsync(Command(channel, message), CancellationToken.None);
 
-        outcome.ShouldBeOfType<PublicChatEnqueueOutcome.Rejected>();
+        _ = outcome.ShouldBeOfType<PublicChatEnqueueOutcome.Rejected>();
         outbox.EnqueueCalls.ShouldBeEmpty();
         transport.Deliveries.ShouldBeEmpty();
     }
@@ -96,7 +96,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
+        _ = outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
         var enqueued = outbox.EnqueueCalls.ShouldHaveSingleItem();
         enqueued.Batch.Deadline.ShouldBeSameAs(deadline);
         enqueued.Batch.Items.ShouldHaveSingleItem().Message.ShouldBe("message");
@@ -122,7 +122,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PublicChatSendOutcome.Rejected>();
+        _ = outcome.ShouldBeOfType<PublicChatSendOutcome.Rejected>();
         outbox.EnqueueCalls.ShouldBeEmpty();
         transport.Deliveries.ShouldBeEmpty();
     }
@@ -201,7 +201,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
             cancellation.Token
         );
 
-        outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
+        _ = outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
         cancellation.IsCancellationRequested.ShouldBeTrue();
         outbox.EnqueueCalls.Count.ShouldBe(1);
         transport.Deliveries.ShouldBeEmpty();
@@ -224,7 +224,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
             .Receipt.MessageIds.Length.ShouldBe(2);
         outbox
             .EnqueueCalls.ShouldHaveSingleItem()
-            .Batch.Items.Select(item => item.Message)
+            .Batch.Items.Select(static item => item.Message)
             .ShouldBe(["alpha", "beta gamma"]);
         transport.Deliveries.ShouldBeEmpty();
     }

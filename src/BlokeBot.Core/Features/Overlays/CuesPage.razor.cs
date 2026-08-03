@@ -22,7 +22,7 @@ public partial class CuesPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         await LoadAsync();
     }
 

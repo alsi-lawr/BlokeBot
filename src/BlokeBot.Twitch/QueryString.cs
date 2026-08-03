@@ -6,8 +6,8 @@ public static class QueryString
         string.Join(
             '&',
             values
-                .Where(value => !string.IsNullOrWhiteSpace(value.Value))
-                .Select(value =>
+                .Where(static value => !string.IsNullOrWhiteSpace(value.Value))
+                .Select(static value =>
                     $"{Uri.EscapeDataString(value.Key)}={Uri.EscapeDataString(value.Value!)}"
                 )
         );

@@ -651,7 +651,7 @@ public sealed class OverlayAppearanceTests
     {
         var sources = Source("OverlaysPage.razor");
         var cues = Source("CuesPage.razor");
-        var tabs = Source("OverlaySectionTabs.razor");
+        var tabs = Source("OverlaySectionTabs.razor.cs");
 
         sources.ShouldNotContain("allow-scripts allow-same-origin");
         cues.ShouldNotContain("allow-scripts allow-same-origin");

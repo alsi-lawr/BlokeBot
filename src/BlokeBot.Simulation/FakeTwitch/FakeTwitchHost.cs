@@ -26,17 +26,19 @@ internal sealed class FakeTwitchHost : IAsyncDisposable
     )
     {
         var builder = WebApplication.CreateSlimBuilder();
-        builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
-        builder.Services.AddFakeTwitch(scenario);
+        _ = builder.WebHost.ConfigureKestrel(static options =>
+            options.Listen(IPAddress.Loopback, 0)
+        );
+        _ = builder.Services.AddFakeTwitch(scenario);
         var app = builder.Build();
-        app.MapFakeTwitch();
+        _ = app.MapFakeTwitch();
         await app.StartAsync(cancellationToken);
 
         var addresses = app
             .Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()
             ?.Addresses;
-        var address = addresses?.SingleOrDefault(value =>
+        var address = addresses?.SingleOrDefault(static value =>
             value.StartsWith("http://127.0.0.1:", StringComparison.Ordinal)
         );
         if (address is null)

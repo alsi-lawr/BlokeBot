@@ -41,7 +41,7 @@ public sealed class PageHelpButtonTests
         helpButtons.Single().Click();
 
         cut.Find("button[aria-label='Page help']").HasAttribute("aria-expanded").ShouldBeTrue();
-        cut.Find("button[aria-label='Close help']").ShouldNotBeNull();
+        _ = cut.Find("button[aria-label='Close help']").ShouldNotBeNull();
         cut.Find("h2").TextContent.ShouldBe(title);
         cut.Markup.ShouldContain(distinctiveContent);
     }
@@ -52,17 +52,17 @@ public sealed class PageHelpButtonTests
         const string RedirectOnlyRoute = "/twitch-operations";
         var routes = typeof(PageHelpButton)
             .Assembly.GetTypes()
-            .Where(type =>
+            .Where(static type =>
                 type.GetCustomAttributes(typeof(AuthorizeAttribute), true)
                     .Cast<AuthorizeAttribute>()
-                    .Any(attribute => attribute.Policy == "HostSelected")
+                    .Any(static attribute => attribute.Policy == "HostSelected")
             )
-            .SelectMany(type =>
+            .SelectMany(static type =>
                 type.GetCustomAttributes(typeof(RouteAttribute), true)
                     .Cast<RouteAttribute>()
-                    .Select(route => route.Template)
+                    .Select(static route => route.Template)
             )
-            .Where(route => route != RedirectOnlyRoute)
+            .Where(static route => route != RedirectOnlyRoute)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
@@ -84,7 +84,7 @@ public sealed class PageHelpButtonTests
             "/twitch-operations/predictions",
             "/twitch-operations/shoutouts",
         ]);
-        routes.ShouldAllBe(route => PageHelpButton.HasUsefulHelpForPath(route));
+        routes.ShouldAllBe(static route => PageHelpButton.HasUsefulHelpForPath(route));
     }
 
     [Test]

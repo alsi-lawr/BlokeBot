@@ -163,7 +163,7 @@ internal sealed record HelixPredictionWire
             Id,
             BroadcasterId,
             Title,
-            Outcomes.Select(x => x.ToDomain()).ToArray(),
+            Outcomes.Select(static x => x.ToDomain()).ToArray(),
             Status switch
             {
                 "ACTIVE" => HelixPredictionStatus.Active,
@@ -206,7 +206,7 @@ internal sealed record HelixPredictionOutcomeWire
             Color,
             Users,
             ChannelPoints,
-            (TopPredictors ?? []).Select(x => x.ToDomain()).ToArray()
+            (TopPredictors ?? []).Select(static x => x.ToDomain()).ToArray()
         );
 }
 

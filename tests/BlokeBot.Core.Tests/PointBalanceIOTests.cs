@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence;
@@ -41,8 +42,10 @@ public sealed class PointBalanceIOTests
         var hostId = await SeedHostAsync(dbFactory);
         await using (var seed = await dbFactory.CreateDbContextAsync())
         {
-            seed.PointsSettings.Add(new PointsSettings { HostId = hostId, PointLabel = "beans" });
-            await seed.SaveChangesAsync();
+            _ = seed.PointsSettings.Add(
+                new PointsSettings { HostId = hostId, PointLabel = "beans" }
+            );
+            _ = await seed.SaveChangesAsync();
         }
         var presenter = new RecordingEventPresenter();
 
@@ -58,7 +61,7 @@ public sealed class PointBalanceIOTests
         presentation.Recipient.ShouldBe("viewer");
         presentation.Amount.ShouldBe("10");
         presentation.PointLabel.ShouldBe("beans");
-        long.Parse(presentation.SourceKey).ShouldBeGreaterThan(0);
+        long.Parse(presentation.SourceKey, CultureInfo.InvariantCulture).ShouldBeGreaterThan(0);
     }
 
     [Test]
@@ -76,7 +79,7 @@ public sealed class PointBalanceIOTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             operation.ExecuteAsync(cancellation.Token).AsTask()
         );
 
@@ -110,30 +113,33 @@ public sealed class PointBalanceIOTests
         var hostId = await SeedHostAsync(dbFactory);
         await using (var seed = await dbFactory.CreateDbContextAsync())
         {
-            seed.PointBalances.Add(
+            _ = seed.PointBalances.Add(
                 new PointBalance
                 {
                     HostId = hostId,
                     Login = "viewer",
-                    Amount = PointAmount.MaximumValue.ToString(),
+                    Amount = PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture),
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
 
         var result = await new PointBalanceService(dbFactory)
             .Add(hostId, "viewer", PointAmount.ParseAbsolute("1"), "streamer", "test")
             .ExecuteAsync(CancellationToken.None);
 
-        result
+        _ = result
             .Match(
-                _ => throw new InvalidOperationException("Expected the point cap to reject add."),
-                failure => failure
+                static _ =>
+                    throw new InvalidOperationException("Expected the point cap to reject add."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
         await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.PointBalances.SingleAsync()).Amount.ShouldBe(PointAmount.MaximumValue.ToString());
+        (await db.PointBalances.SingleAsync()).Amount.ShouldBe(
+            PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture)
+        );
         (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
     }
 
@@ -147,10 +153,11 @@ public sealed class PointBalanceIOTests
             .DeleteBalance(hostId, "missing", "streamer", "test")
             .ExecuteAsync(CancellationToken.None);
 
-        result
+        _ = result
             .Match(
-                _ => throw new InvalidOperationException("Expected an unknown-user failure."),
-                failure => failure
+                static _ =>
+                    throw new InvalidOperationException("Expected an unknown-user failure."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.UnknownUser>();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -168,8 +175,8 @@ public sealed class PointBalanceIOTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

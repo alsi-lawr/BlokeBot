@@ -19,9 +19,9 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(dbFactory, hostId, "hello", ["Hello {channel} {command}"]);
+        _ = await SeedCommandAsync(dbFactory, hostId, "hello", ["Hello {channel} {command}"]);
         var disabledHostId = await SeedHostAsync(dbFactory, "disabled", HostFeatureFlags.Points);
-        await SeedCommandAsync(dbFactory, disabledHostId, "hello", ["Hidden"]);
+        _ = await SeedCommandAsync(dbFactory, disabledHostId, "hello", ["Hidden"]);
         await using var services = BuildServices(dbFactory);
         var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
@@ -45,7 +45,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(dbFactory, hostId, "secret", ["Hi {user}"], moderatorOnly: true);
+        _ = await SeedCommandAsync(dbFactory, hostId, "secret", ["Hi {user}"], moderatorOnly: true);
         await using var services = BuildServices(dbFactory);
         var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
@@ -79,7 +79,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "echo",
@@ -106,7 +106,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "first",
@@ -120,7 +120,7 @@ public sealed class CustomCommandExecutionTests
             ["Seq A", "Seq B"],
             CustomMessageSelectionMode.Sequential
         );
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "random",
@@ -186,14 +186,14 @@ public sealed class CustomCommandExecutionTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "global",
             ["global {user}"],
             cooldownScope: CustomCommandCooldownScope.Global
         );
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "usercd",
@@ -225,7 +225,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "stream",
@@ -239,7 +239,7 @@ public sealed class CustomCommandExecutionTests
             ["user {user}"],
             invocationLimit: CustomCommandInvocationLimit.OncePerUser
         );
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "both",
@@ -301,7 +301,7 @@ public sealed class CustomCommandExecutionTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "cooldown",
@@ -309,7 +309,7 @@ public sealed class CustomCommandExecutionTests
             cooldownSeconds: 10,
             invocationLimit: CustomCommandInvocationLimit.OncePerUser
         );
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "mod-only",
@@ -325,10 +325,10 @@ public sealed class CustomCommandExecutionTests
 
         await DispatchMessageAsync(dispatcher, "alice", "streamer", "!cooldown", replies);
         await DispatchMessageAsync(dispatcher, "bob", "streamer", "!cooldown", replies);
-        (
+        _ = (
             await execution.ExecuteAsync(Context("alice", "!mod-only"), [], CancellationToken.None)
         ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
-        (
+        _ = (
             await execution.ExecuteAsync(
                 Context(
                     "alice",
@@ -343,7 +343,7 @@ public sealed class CustomCommandExecutionTests
         {
             (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(2);
             (
-                await db.CustomCommandInvocationClaims.AnyAsync(claim =>
+                await db.CustomCommandInvocationClaims.AnyAsync(static claim =>
                     claim.TwitchUserId == "bob-id"
                 )
             ).ShouldBeFalse();
@@ -360,7 +360,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "limited",
@@ -375,11 +375,11 @@ public sealed class CustomCommandExecutionTests
             (_, _) => ValueTask.FromException(new IOException("delivery failed"))
         );
 
-        await Should.ThrowAsync<IOException>(() =>
+        _ = await Should.ThrowAsync<IOException>(() =>
             execution.ExecuteAsync(context, [], CancellationToken.None).AsTask()
         );
 
-        (
+        _ = (
             await execution.ExecuteAsync(context, [], CancellationToken.None)
         ).ShouldBeOfType<CustomCommandExecutionOutcome.AlreadyUsed>();
     }
@@ -389,7 +389,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "limited",
@@ -401,11 +401,11 @@ public sealed class CustomCommandExecutionTests
         var execution = services.GetRequiredService<CustomCommandExecutionService>();
         var context = Context("alice", "!limited");
 
-        (
+        _ = (
             await execution.ExecuteAsync(context, [], CancellationToken.None)
         ).ShouldBeOfType<CustomCommandExecutionOutcome.StreamOffline>();
         streams.Unavailable = true;
-        (
+        _ = (
             await execution.ExecuteAsync(context, [], CancellationToken.None)
         ).ShouldBeOfType<CustomCommandExecutionOutcome.StreamUnavailable>();
 
@@ -418,7 +418,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "limited",
@@ -428,10 +428,10 @@ public sealed class CustomCommandExecutionTests
         await using var services = BuildServices(dbFactory);
         var execution = services.GetRequiredService<CustomCommandExecutionService>();
 
-        (
+        _ = (
             await execution.ExecuteAsync(Context("mod", "!limited"), [], CancellationToken.None)
         ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
-        (
+        _ = (
             await execution.ExecuteAsync(
                 Context(
                     "mod",
@@ -449,7 +449,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
+        _ = await SeedCommandAsync(
             dbFactory,
             hostId,
             "limited",
@@ -486,10 +486,15 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCueCommandAsync(dbFactory, hostId, "before", OverlayCueReplyOrder.Before);
-        await SeedCueCommandAsync(dbFactory, hostId, "after", OverlayCueReplyOrder.After);
-        await SeedCueCommandAsync(dbFactory, hostId, "disconnected", OverlayCueReplyOrder.After);
-        await SeedCueCommandAsync(dbFactory, hostId, "rejected", OverlayCueReplyOrder.After);
+        _ = await SeedCueCommandAsync(dbFactory, hostId, "before", OverlayCueReplyOrder.Before);
+        _ = await SeedCueCommandAsync(dbFactory, hostId, "after", OverlayCueReplyOrder.After);
+        _ = await SeedCueCommandAsync(
+            dbFactory,
+            hostId,
+            "disconnected",
+            OverlayCueReplyOrder.After
+        );
+        _ = await SeedCueCommandAsync(dbFactory, hostId, "rejected", OverlayCueReplyOrder.After);
         List<string> events = [];
         var admissions = new RecordingCueAdmissions(events);
         admissions.Outcomes.Enqueue(new OverlayCueAdmissionOutcome.Running(Guid.NewGuid()));
@@ -571,7 +576,7 @@ public sealed class CustomCommandExecutionTests
         List<string> replies = [];
 
         await SetFeaturesAsync(dbFactory, hostId, HostFeatureFlags.Overlays);
-        (
+        _ = (
             await execution.ExecuteAsync(
                 Context("viewer", "!cue", RecordMessages(replies)),
                 [],
@@ -588,12 +593,12 @@ public sealed class CustomCommandExecutionTests
             [],
             CancellationToken.None
         );
-        disabled
+        _ = disabled
             .ShouldBeOfType<CustomCommandExecutionOutcome.OverlayCue>()
             .Admission.ShouldBeOfType<OverlayCueAdmissionOutcome.ParentDisabledOrCancelled>();
 
         await SetFeaturesAsync(dbFactory, hostId, HostFeatureFlags.All);
-        (
+        _ = (
             await execution.ExecuteAsync(
                 Context("viewer", "!cue", RecordMessages(replies)),
                 [],
@@ -608,7 +613,7 @@ public sealed class CustomCommandExecutionTests
                 .SingleAsync(value => value.CustomCommandId == seed.CommandId);
             action.TargetOverlayPublicId = other.TargetOverlayId;
             action.CuePublicId = other.CueId;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var crossHost = await execution.ExecuteAsync(
             Context("second", "!cue", RecordMessages(replies)),
@@ -616,7 +621,7 @@ public sealed class CustomCommandExecutionTests
             CancellationToken.None
         );
 
-        crossHost
+        _ = crossHost
             .ShouldBeOfType<CustomCommandExecutionOutcome.OverlayCue>()
             .Admission.ShouldBeOfType<OverlayCueAdmissionOutcome.Missing>();
 
@@ -629,14 +634,14 @@ public sealed class CustomCommandExecutionTests
             action.CuePublicId = seed.CueId;
             var cue = await db.OverlayCues.SingleAsync(value => value.PublicId == seed.CueId);
             cue.IsEnabled = false;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var disabledReference = await execution.ExecuteAsync(
             Context("third", "!cue", RecordMessages(replies)),
             [],
             CancellationToken.None
         );
-        disabledReference
+        _ = disabledReference
             .ShouldBeOfType<CustomCommandExecutionOutcome.OverlayCue>()
             .Admission.ShouldBeOfType<OverlayCueAdmissionOutcome.Disabled>();
         admissions.Requests.Count.ShouldBe(1);
@@ -676,8 +681,8 @@ public sealed class CustomCommandExecutionTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<OverlayCueAdmissionOutcome.Running>();
-        admissions.ReferenceRequests.ShouldHaveSingleItem();
+        _ = outcome.ShouldBeOfType<OverlayCueAdmissionOutcome.Running>();
+        _ = admissions.ReferenceRequests.ShouldHaveSingleItem();
         admissions.Requests.Single().Origin.ShouldBe(OverlayCueAdmissionOrigin.OwnerTest);
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
@@ -692,8 +697,8 @@ public sealed class CustomCommandExecutionTests
     )
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
-        services.AddSingleton(
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
+        _ = services.AddSingleton(
             Options.Create(
                 new BlokeBotOptions
                 {
@@ -706,20 +711,20 @@ public sealed class CustomCommandExecutionTests
         );
         if (clock is not null)
         {
-            services.AddSingleton(clock);
+            _ = services.AddSingleton(clock);
         }
 
         if (streams is not null)
         {
-            services.AddSingleton(streams);
+            _ = services.AddSingleton(streams);
         }
         if (overlayCues is not null)
         {
-            services.AddSingleton(overlayCues);
+            _ = services.AddSingleton(overlayCues);
         }
 
-        services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
-        services.AddChatCommands().AddCommandModule<CustomCommandModule>();
+        _ = services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
+        _ = services.AddChatCommands().AddCommandModule<CustomCommandModule>();
         return services.BuildServiceProvider();
     }
 
@@ -743,7 +748,7 @@ public sealed class CustomCommandExecutionTests
         var targetId = Guid.NewGuid();
         var cueId = Guid.NewGuid();
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             new OverlayInstance
             {
                 HostId = hostId,
@@ -761,7 +766,7 @@ public sealed class CustomCommandExecutionTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.OverlayCues.Add(
+        _ = db.OverlayCues.Add(
             new OverlayCue
             {
                 HostId = hostId,
@@ -779,8 +784,8 @@ public sealed class CustomCommandExecutionTests
         var stored = await db
             .CustomCommands.Include(value => value.Action)
             .SingleAsync(value => value.Id == command.CommandId);
-        db.CustomCommandActions.Remove(stored.Action);
-        await db.SaveChangesAsync();
+        _ = db.CustomCommandActions.Remove(stored.Action);
+        _ = await db.SaveChangesAsync();
         stored.Action = new OverlayCueCustomCommandAction
         {
             HostId = hostId,
@@ -790,7 +795,7 @@ public sealed class CustomCommandExecutionTests
             ReplyOrder = replyOrder,
             ZeroArgumentMessageLibraryEntryId = command.MessageLibraryEntryId,
         };
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new(command.CommandId, targetId, cueId);
     }
 
@@ -803,7 +808,7 @@ public sealed class CustomCommandExecutionTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
         host.EnabledFeatures = features;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static CommandResponder RecordEvents(ICollection<string> events) =>
@@ -827,8 +832,8 @@ public sealed class CustomCommandExecutionTests
             EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -857,11 +862,12 @@ public sealed class CustomCommandExecutionTests
             UpdatedAtUtc = now,
             Variants = variants
                 .Select(
-                    (text, index) => new CustomMessageVariant { SortOrder = index, Text = text }
+                    static (text, index) =>
+                        new CustomMessageVariant { SortOrder = index, Text = text }
                 )
                 .ToList(),
         };
-        db.CustomMessageLibraryEntries.Add(entry);
+        _ = db.CustomMessageLibraryEntries.Add(entry);
 
         CustomCounter? counter = null;
         if (counterCommand)
@@ -874,10 +880,10 @@ public sealed class CustomCommandExecutionTests
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             };
-            db.CustomCounters.Add(counter);
+            _ = db.CustomCounters.Add(counter);
         }
 
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var command = new CustomCommand
         {
             HostId = hostId,
@@ -906,9 +912,9 @@ public sealed class CustomCommandExecutionTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-        db.CustomCommands.Add(command);
-        await db.SaveChangesAsync();
-        db.CustomCommandAliases.Add(
+        _ = db.CustomCommands.Add(command);
+        _ = await db.SaveChangesAsync();
+        _ = db.CustomCommandAliases.Add(
             new CustomCommandAlias
             {
                 HostId = hostId,
@@ -916,7 +922,7 @@ public sealed class CustomCommandExecutionTests
                 Alias = CommandAliasNormalizer.Normalize(alias),
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new CommandSeed(command.Id, entry.Id, counter?.Id);
     }
 
@@ -945,7 +951,7 @@ public sealed class CustomCommandExecutionTests
         {
             Message = Message(login, "streamer", text, tags),
             CommandName = text.TrimStart('!'),
-            Responder = responder ?? ((_, _) => ValueTask.CompletedTask),
+            Responder = responder ?? (static (_, _) => ValueTask.CompletedTask),
         };
 
     private static async Task SetLimitAsync(
@@ -957,7 +963,7 @@ public sealed class CustomCommandExecutionTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var command = await db.CustomCommands.SingleAsync(stored => stored.Id == commandId);
         command.InvocationLimit = limit;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task DispatchMessageAsync(
@@ -1042,14 +1048,18 @@ public sealed class CustomCommandExecutionTests
 
         public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
         {
-            HostStreamLivenessOutcome outcome =
-                Unavailable
-                    ? new HostStreamLivenessOutcome.Unavailable(
-                        HostStreamLivenessUnavailableReason.ProviderRequestFailed,
-                        new HttpRequestException("unavailable")
-                    )
-                : StreamId is { } current ? new HostStreamLivenessOutcome.Live(current)
-                : new HostStreamLivenessOutcome.Offline();
+            HostStreamLivenessOutcome outcome = Unavailable switch
+            {
+                true => new HostStreamLivenessOutcome.Unavailable(
+                    HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                    new HttpRequestException("unavailable")
+                ),
+                false => StreamId switch
+                {
+                    { } current => new HostStreamLivenessOutcome.Live(current),
+                    _ => new HostStreamLivenessOutcome.Offline(),
+                },
+            };
             return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
                 ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
             );

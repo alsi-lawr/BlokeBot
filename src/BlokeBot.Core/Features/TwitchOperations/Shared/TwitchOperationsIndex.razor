@@ -2,10 +2,3 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inject NavigationManager _navigation
-
-@code {
-    protected override void OnInitialized()
-    {
-        _navigation.NavigateTo("/twitch-operations/shoutouts", replace: true);
-    }
-}

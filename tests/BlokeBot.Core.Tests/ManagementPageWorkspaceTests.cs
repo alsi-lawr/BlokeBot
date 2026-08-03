@@ -23,7 +23,7 @@ public sealed class ManagementPageWorkspaceTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = context.Render<RequestBoardsPage>();
 
@@ -73,7 +73,7 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("[role='status']").TextContent.ShouldContain("Board created.");
             page.Find("#request-board-configuration").TextContent.ShouldBe("Edit board");
-            page.Find("a[href='/requests/streamer/clips']").ShouldNotBeNull();
+            _ = page.Find("a[href='/requests/streamer/clips']").ShouldNotBeNull();
         });
         (await CountAsync(database, board: true)).ShouldBe(1);
 
@@ -131,8 +131,8 @@ public sealed class ManagementPageWorkspaceTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
 
         var page = context.Render<PlayQueuesPage>();
 
@@ -175,7 +175,7 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("[role='status']").TextContent.ShouldContain("Queue created.");
             page.Find("#queue-config-heading").TextContent.ShouldBe("Edit queue");
-            page.Find("a[href='/queues/streamer/community']").ShouldNotBeNull();
+            _ = page.Find("a[href='/queues/streamer/community']").ShouldNotBeNull();
             page.FindAll("[data-selected-field-editor]").ShouldBeEmpty();
         });
         (await CountAsync(database, board: false)).ShouldBe(1);
@@ -234,7 +234,7 @@ public sealed class ManagementPageWorkspaceTests
 
         await using (var boardContext = UiTestContextFactory.Create(database, hostId))
         {
-            boardContext.Services.AddSingleton(
+            _ = boardContext.Services.AddSingleton(
                 new RequestBoardService(
                     database,
                     TestEventBus.Create<AppEventKind>(),
@@ -257,14 +257,14 @@ public sealed class ManagementPageWorkspaceTests
 
         await using (var queueContext = UiTestContextFactory.Create(database, hostId))
         {
-            queueContext.Services.AddSingleton(
+            _ = queueContext.Services.AddSingleton(
                 new PlayQueueService(
                     database,
                     TestEventBus.Create<AppEventKind>(),
                     TimeProvider.System
                 )
             );
-            queueContext.Services.AddSingleton<IPrivateLobbyDelivery>(
+            _ = queueContext.Services.AddSingleton<IPrivateLobbyDelivery>(
                 new NoopPrivateLobbyDelivery()
             );
             var page = queueContext.Render<PlayQueuesPage>();
@@ -295,11 +295,11 @@ public sealed class ManagementPageWorkspaceTests
         var row = page.Find(".management-field-inventory-row[data-current='true']");
         var editor = page.Find("[data-selected-field-editor]");
         var label = row.QuerySelector("p[id]");
-        label.ShouldNotBeNull();
+        _ = label.ShouldNotBeNull();
         editor.GetAttribute("aria-labelledby").ShouldBe(label!.Id);
         editor.Id.ShouldNotBeNullOrWhiteSpace();
         var editButton = row.QuerySelector("button");
-        editButton.ShouldNotBeNull();
+        _ = editButton.ShouldNotBeNull();
         editButton!.GetAttribute("aria-pressed").ShouldBe("true");
         editButton.GetAttribute("aria-controls").ShouldBe(editor.Id);
     }
@@ -314,8 +314,8 @@ public sealed class ManagementPageWorkspaceTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

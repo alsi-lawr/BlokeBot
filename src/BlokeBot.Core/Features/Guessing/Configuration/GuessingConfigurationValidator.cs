@@ -121,7 +121,7 @@ public static class GuessingConfigurationValidator
     > ValidateDelete(GuessingConfiguration draft)
     {
         var errors = new List<GuessingConfigurationValidationError>();
-        ValidateProfileGraph(draft, errors);
+        _ = ValidateProfileGraph(draft, errors);
         return errors.Count > 0
             ? Validation<
                 GuessingProfileDeleteCommand,
@@ -215,9 +215,9 @@ public static class GuessingConfigurationValidator
         }
 
         var duplicate = values
-            .SelectMany(option => GuessAnswerNames.Parse(option.Name).Values)
-            .GroupBy(name => name.Value, StringComparer.Ordinal)
-            .FirstOrDefault(group => group.Count() > 1)
+            .SelectMany(static option => GuessAnswerNames.Parse(option.Name).Values)
+            .GroupBy(static name => name.Value, StringComparer.Ordinal)
+            .FirstOrDefault(static group => group.Count() > 1)
             ?.Key;
         if (duplicate is not null)
         {

@@ -16,11 +16,11 @@ public sealed class MainLayoutInteractionTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.ComponentFactories.AddStub<NavMenu>();
-        context.ComponentFactories.AddStub<TopBarControls>();
-        context.ComponentFactories.AddStub<ThemeToggle>();
-        context.ComponentFactories.AddStub<PageHelpButton>();
-        context.ComponentFactories.AddStub<ToastHost>();
+        _ = context.ComponentFactories.AddStub<NavMenu>();
+        _ = context.ComponentFactories.AddStub<TopBarControls>();
+        _ = context.ComponentFactories.AddStub<ThemeToggle>();
+        _ = context.ComponentFactories.AddStub<PageHelpButton>();
+        _ = context.ComponentFactories.AddStub<ToastHost>();
         var cut = context.Render<MainLayout>();
         var menuButton = cut.Find("#mobile-navigation-menu-button");
         var background = cut.Find("[data-mobile-navigation-background]");
@@ -31,7 +31,7 @@ public sealed class MainLayoutInteractionTests
 
         background.HasAttribute("inert").ShouldBeTrue();
         menuButton.GetAttribute("aria-expanded").ShouldBe("true");
-        var activate = context.JSInterop.Invocations.Single(invocation =>
+        var activate = context.JSInterop.Invocations.Single(static invocation =>
             invocation.Identifier == "blokeBotNavigation.activateMobileDrawer"
         );
         activate.Arguments[0].ShouldBe("mobile-navigation-drawer");
@@ -40,7 +40,7 @@ public sealed class MainLayoutInteractionTests
 
         background.HasAttribute("inert").ShouldBeFalse();
         menuButton.GetAttribute("aria-expanded").ShouldBe("false");
-        var restoreFocus = context.JSInterop.Invocations.Single(invocation =>
+        var restoreFocus = context.JSInterop.Invocations.Single(static invocation =>
             invocation.Identifier == "blokeBotNavigation.focus"
         );
         restoreFocus.Arguments[0].ShouldBe("mobile-navigation-menu-button");
@@ -61,12 +61,12 @@ public sealed class DesktopRailInteractionTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./Components/Layout/MainLayout.razor.js");
-        module.Setup<bool>("readRailPresentation").SetResult(true);
-        context.ComponentFactories.AddStub<NavMenu>();
-        context.ComponentFactories.AddStub<TopBarControls>();
-        context.ComponentFactories.AddStub<ThemeToggle>();
-        context.ComponentFactories.AddStub<PageHelpButton>();
-        context.ComponentFactories.AddStub<ToastHost>();
+        _ = module.Setup<bool>("readRailPresentation").SetResult(true);
+        _ = context.ComponentFactories.AddStub<NavMenu>();
+        _ = context.ComponentFactories.AddStub<TopBarControls>();
+        _ = context.ComponentFactories.AddStub<ThemeToggle>();
+        _ = context.ComponentFactories.AddStub<PageHelpButton>();
+        _ = context.ComponentFactories.AddStub<ToastHost>();
 
         var cut = context.Render<MainLayout>();
         var railToggle = cut.Find("button[aria-controls='desktop-navigation-rail']");
@@ -82,7 +82,9 @@ public sealed class DesktopRailInteractionTests
 
         cut.Find(".app-shell").GetAttribute("data-rail-presentation").ShouldBe("expanded");
         module
-            .Invocations.Single(invocation => invocation.Identifier == "writeRailPresentation")
+            .Invocations.Single(static invocation =>
+                invocation.Identifier == "writeRailPresentation"
+            )
             .Arguments[0]
             .ShouldBe(false);
     }
@@ -102,19 +104,22 @@ public sealed class NavMenuInventoryTests
             .Services.GetRequiredService<NavigationManager>()
             .NavigateTo("/twitch-operations/polls");
 
-        var cut = context.Render<NavMenu>(parameters =>
-            parameters.Add(parameter => parameter.Presentation, NavigationPresentation.IconRail)
+        var cut = context.Render<NavMenu>(static parameters =>
+            parameters.Add(
+                static parameter => parameter.Presentation,
+                NavigationPresentation.IconRail
+            )
         );
 
         cut.Find(".nav-menu").GetAttribute("data-navigation-mode").ShouldBe("icon");
         cut.FindAll("[data-nav-destination]")
-            .Select(element => element.GetAttribute("data-nav-destination"))
+            .Select(static element => element.GetAttribute("data-nav-destination"))
             .ShouldBe(["home", "alerts", "host", "requests", "queues", "moments", "overlays"]);
         cut.FindAll("[data-nav-section]")
-            .Select(element => element.GetAttribute("data-nav-section"))
+            .Select(static element => element.GetAttribute("data-nav-section"))
             .ShouldBe(["twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
-            .ShouldAllBe(button => button.GetAttribute("aria-expanded") == "false");
+            .ShouldAllBe(static button => button.GetAttribute("aria-expanded") == "false");
 
         var nativeButton = cut.Find("[data-nav-section='twitch-operations'] button");
         var nativeBodyId = nativeButton.GetAttribute("aria-controls");
@@ -127,7 +132,7 @@ public sealed class NavMenuInventoryTests
         nativeButton.GetAttribute("aria-expanded").ShouldBe("true");
         nativeButton.GetAttribute("aria-current").ShouldBe("page");
         var childDestinations = cut.FindAll("[data-nav-section] a")
-            .Select(link => link.GetAttribute("href"))
+            .Select(static link => link.GetAttribute("href"))
             .ToArray();
         childDestinations.ShouldBe([
             "twitch-operations/shoutouts",
@@ -143,8 +148,10 @@ public sealed class NavMenuInventoryTests
         ]);
         cut.Find("a[href='twitch-operations/polls']").GetAttribute("aria-current").ShouldBe("page");
         cut.FindAll("nav a[href]")
-            .Where(link => !link.ClassList.Contains("nav-menu__brand-link"))
-            .ShouldAllBe(link => !string.IsNullOrWhiteSpace(link.GetAttribute("aria-label")));
+            .Where(static link => !link.ClassList.Contains("nav-menu__brand-link"))
+            .ShouldAllBe(static link =>
+                !string.IsNullOrWhiteSpace(link.GetAttribute("aria-label"))
+            );
 
         foreach (var describedControl in cut.FindAll("[aria-describedby]"))
         {
@@ -174,17 +181,17 @@ public sealed class NavMenuInventoryTests
 
         cut.Find(".nav-menu").GetAttribute("data-navigation-mode").ShouldBe("labelled");
         cut.FindAll(".nav-menu__label")
-            .Select(element => element.TextContent.Trim())
+            .Select(static element => element.TextContent.Trim())
             .ShouldContain("Channel setup");
         cut.FindAll(".nav-menu__section-label, [data-nav-section]")
-            .Select(element =>
+            .Select(static element =>
                 element.ClassList.Contains("nav-menu__section-label")
                     ? element.TextContent.Trim()
                     : element.GetAttribute("data-nav-section")
             )
             .ShouldBe(["Chat tools", "twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
-            .ShouldAllBe(button => button.GetAttribute("aria-expanded") == "true");
+            .ShouldAllBe(static button => button.GetAttribute("aria-expanded") == "true");
         cut.FindAll("[aria-describedby]").ShouldBeEmpty();
         cut.Find(".nav-menu__active-channel").TextContent.ShouldContain("#streamer");
         cut.Find(".nav-menu__build").TextContent.ShouldContain("Build");
@@ -202,7 +209,7 @@ public sealed class NavMenuInventoryTests
         var cut = context.Render<NavMenu>();
 
         cut.FindAll(".nav-menu__section-label, [data-nav-section]")
-            .Select(element =>
+            .Select(static element =>
                 element.ClassList.Contains("nav-menu__section-label")
                     ? element.TextContent.Trim()
                     : element.GetAttribute("data-nav-section")
@@ -212,7 +219,7 @@ public sealed class NavMenuInventoryTests
         native.QuerySelector(".nav-menu__badge")!.TextContent.ShouldBe("1");
         native
             .QuerySelectorAll("a")
-            .Select(link => link.TextContent.Trim())
+            .Select(static link => link.TextContent.Trim())
             .ShouldBe(["Shoutouts"]);
     }
 
@@ -228,7 +235,7 @@ public sealed class NavMenuInventoryTests
         var cut = context.Render<NavMenu>();
 
         cut.FindAll(".nav-menu__section-label")
-            .Select(element => element.TextContent.Trim())
+            .Select(static element => element.TextContent.Trim())
             .ShouldNotContain("Chat tools");
         cut.FindAll("[data-nav-section]").ShouldBeEmpty();
     }
@@ -246,19 +253,21 @@ public sealed class NavMenuInventoryTests
             EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
     private static void SetupExpandedGroups(BunitJSModuleInterop module)
     {
-        module.Setup<bool>("readBoolean", "blokebot.sidebar.guessing.open", true).SetResult(true);
-        module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
-        module
+        _ = module
+            .Setup<bool>("readBoolean", "blokebot.sidebar.guessing.open", true)
+            .SetResult(true);
+        _ = module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
+        _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.customcommands.open", true)
             .SetResult(true);
-        module
+        _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.nativetwitch.open", true)
             .SetResult(true);
     }
@@ -292,7 +301,7 @@ public sealed class SharedDisclosureTests
         cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
         cut.Find($"#{targetId}").HasAttribute("hidden").ShouldBeFalse();
         cut.Find($"#{targetId}").GetAttribute("aria-hidden").ShouldBe("false");
-        cut.Find("input[aria-label='Configuration value']").ShouldNotBeNull();
+        _ = cut.Find("input[aria-label='Configuration value']").ShouldNotBeNull();
     }
 
     [Test]
@@ -300,7 +309,7 @@ public sealed class SharedDisclosureTests
     {
         using var context = new BunitContext();
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
-        module.SetupVoid("focusElement", "validation-target").SetVoidResult();
+        _ = module.SetupVoid("focusElement", "validation-target").SetVoidResult();
         RenderFragment content = builder =>
             builder.AddMarkupContent(0, "<input id='validation-target' value='unsaved value' />");
 
@@ -383,7 +392,7 @@ public sealed class SharedPageContractTests
         cut.Find(".dashboard-page").ClassList.ShouldContain("dashboard-page--wide");
         var actionsRegion = cut.Find("[data-persistent-page-actions]");
         actionsRegion.TextContent.ShouldContain("Save changes");
-        actionsRegion.ParentElement.ShouldNotBeNull();
+        _ = actionsRegion.ParentElement.ShouldNotBeNull();
         actionsRegion.ParentElement!.ClassList.ShouldContain("page-header__actions");
         cut.FindAll(".dashboard-page__action-bar").ShouldBeEmpty();
         var feedback = cut.Find("[data-save-feedback]");
@@ -439,7 +448,7 @@ public sealed class SharedPageContractTests
     public void MobileFieldRow_WithAdjacentAction_ExposesFullRowFieldContract()
     {
         using var context = new BunitContext();
-        RenderFragment fieldRow = builder =>
+        RenderFragment fieldRow = static builder =>
         {
             builder.OpenElement(0, "div");
             builder.AddAttribute(1, "class", "field-row");
@@ -477,7 +486,7 @@ public sealed class SharedPageContractTests
     public void SettingsDisclosureStack_WithAdjacentPanels_UsesTwelvePixelGapContract()
     {
         using var context = new BunitContext();
-        RenderFragment stack = builder =>
+        RenderFragment stack = static builder =>
             builder.AddMarkupContent(
                 0,
                 """

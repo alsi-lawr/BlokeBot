@@ -18,7 +18,7 @@ public partial class HostConfigPage
     {
         _navigation.LocationChanged += OnLocationChanged;
         RequestFragmentReveal(_navigation.Uri);
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 InvokeAsync,
@@ -26,7 +26,7 @@ public partial class HostConfigPage
                 StateHasChanged
             )
         );
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [
                     AppEventKind.CommandsChanged,
@@ -52,9 +52,9 @@ public partial class HostConfigPage
         var pageContext = await LoadPageContextAsync();
         var session = pageContext.Session;
         var selection = session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
         if (pageContext.IsBotAccount)
         {
@@ -66,8 +66,9 @@ public partial class HostConfigPage
 
         var result = await _hostConfig.Load(session).ExecuteAsync(CancellationToken.None);
         _state = result.Match(
-            option => option.Match<HostConfigState?>(value => value, () => null),
-            _ => throw new UnreachableException()
+            static option =>
+                option.Match<HostConfigState?>(static value => value, static () => null),
+            static _ => throw new UnreachableException()
         );
 
         _blockedByMode =
@@ -122,7 +123,7 @@ public partial class HostConfigPage
         TrackPendingRuntimeTransition();
         if (_runtimeLifecycle is not null)
         {
-            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+            _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
     }
 

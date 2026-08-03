@@ -69,7 +69,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     )
     {
         var result = await operation.ExecuteAsync(cancellationToken);
-        return result.Match(value => value, _ => throw new UnreachableException());
+        return result.Match(static value => value, static _ => throw new UnreachableException());
     }
 }
 

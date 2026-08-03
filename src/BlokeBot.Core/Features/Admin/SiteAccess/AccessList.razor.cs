@@ -9,7 +9,7 @@ public partial class AccessList
     private readonly HashSet<string> _pendingRemovals = new(StringComparer.OrdinalIgnoreCase);
 
     [Parameter]
-    public Func<Task> Add { get; set; } = () => Task.CompletedTask;
+    public Func<Task> Add { get; set; } = static () => Task.CompletedTask;
 
     [Parameter]
     public bool Disabled { get; set; }
@@ -27,7 +27,7 @@ public partial class AccessList
     public string Placeholder { get; set; } = string.Empty;
 
     [Parameter]
-    public Func<string, Task> Remove { get; set; } = _ => Task.CompletedTask;
+    public Func<string, Task> Remove { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter]
     public string Title { get; set; } = string.Empty;
@@ -65,7 +65,7 @@ public partial class AccessList
         }
         finally
         {
-            _pendingRemovals.Remove(entry);
+            _ = _pendingRemovals.Remove(entry);
         }
     }
 }

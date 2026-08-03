@@ -31,7 +31,7 @@ public partial class GuessingSettings
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 InvokeAsync,
@@ -46,7 +46,7 @@ public partial class GuessingSettings
 
     private async Task LoadCoreAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -95,7 +95,7 @@ public partial class GuessingSettings
                 CreateProfileAsync,
                 errors =>
                 {
-                    _toasts.Publish(
+                    _ = _toasts.Publish(
                         new ToastRequest<WarningToastStrategy>(ValidationMessage(errors))
                     );
                     return Task.CompletedTask;
@@ -114,7 +114,9 @@ public partial class GuessingSettings
                 await result.Match(
                     async created =>
                     {
-                        _toasts.Publish(new ToastRequest<SuccessToastStrategy>(created.Message));
+                        _ = _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>(created.Message)
+                        );
                         _newProfileName = string.Empty;
                         await LoadConfigurationAsync(
                             selectedId is { } id
@@ -124,7 +126,9 @@ public partial class GuessingSettings
                     },
                     failure =>
                     {
-                        _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
+                        _ = _toasts.Publish(
+                            new ToastRequest<WarningToastStrategy>(failure.Message)
+                        );
                         return Task.CompletedTask;
                     }
                 );
@@ -134,26 +138,21 @@ public partial class GuessingSettings
     private Task DeleteProfileAsync() =>
         ObserveUiOperationAsync(nameof(DeleteProfileAsync), DeleteProfileCoreAsync);
 
-    private Task DeleteProfileCoreAsync()
-    {
-        if (_config is null)
-        {
-            return Task.CompletedTask;
-        }
-
-        return GuessingConfigurationValidator
-            .ValidateDelete(_config)
-            .Match(
-                DeleteProfileAsync,
-                errors =>
-                {
-                    _toasts.Publish(
-                        new ToastRequest<WarningToastStrategy>(ValidationMessage(errors))
-                    );
-                    return Task.CompletedTask;
-                }
-            );
-    }
+    private Task DeleteProfileCoreAsync() =>
+        _config is null
+            ? Task.CompletedTask
+            : GuessingConfigurationValidator
+                .ValidateDelete(_config)
+                .Match(
+                    DeleteProfileAsync,
+                    errors =>
+                    {
+                        _ = _toasts.Publish(
+                            new ToastRequest<WarningToastStrategy>(ValidationMessage(errors))
+                        );
+                        return Task.CompletedTask;
+                    }
+                );
 
     private async Task DeleteProfileAsync(GuessingProfileDeleteCommand command) =>
         await RunSelectedHostMutationAsync(
@@ -166,12 +165,16 @@ public partial class GuessingSettings
                 await result.Match(
                     async deleted =>
                     {
-                        _toasts.Publish(new ToastRequest<SuccessToastStrategy>(deleted.Message));
+                        _ = _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>(deleted.Message)
+                        );
                         await LoadConfigurationAsync(new GuessingProfileSelection.Default());
                     },
                     async failure =>
                     {
-                        _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
+                        _ = _toasts.Publish(
+                            new ToastRequest<WarningToastStrategy>(failure.Message)
+                        );
                         if (
                             failure
                             is GuessingProfileDeleteFailure.ProfileNotFound
@@ -190,26 +193,23 @@ public partial class GuessingSettings
     private async Task SaveCoreAsync() =>
         _ = await TrySaveAsync(reloadAfterConcurrentFailure: true);
 
-    private async Task<bool> TrySaveAsync(bool reloadAfterConcurrentFailure)
-    {
-        if (_config is null)
+    private async Task<bool> TrySaveAsync(bool reloadAfterConcurrentFailure) =>
+        _config switch
         {
-            return false;
-        }
-
-        return await GuessingConfigurationValidator
-            .Validate(_config)
-            .Match(
-                command => SaveConfigurationAsync(command, reloadAfterConcurrentFailure),
-                errors =>
-                {
-                    _toasts.Publish(
-                        new ToastRequest<ErrorToastStrategy>(ValidationMessage(errors))
-                    );
-                    return Task.FromResult(false);
-                }
-            );
-    }
+            null => false,
+            { } config => await GuessingConfigurationValidator
+                .Validate(config)
+                .Match(
+                    command => SaveConfigurationAsync(command, reloadAfterConcurrentFailure),
+                    errors =>
+                    {
+                        _ = _toasts.Publish(
+                            new ToastRequest<ErrorToastStrategy>(ValidationMessage(errors))
+                        );
+                        return Task.FromResult(false);
+                    }
+                ),
+        };
 
     private async Task<bool> SaveConfigurationAsync(
         GuessingConfigurationSaveCommand command,
@@ -225,19 +225,19 @@ public partial class GuessingSettings
                     .SaveConfiguration(HostId, command)
                     .ExecuteAsync(CancellationToken.None);
                 saved = await result.Match(
-                    async _ =>
+                    async completed =>
                     {
                         await LoadConfigurationAsync(
                             new GuessingProfileSelection.Selected(command.ProfileId)
                         );
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>("Guessing settings saved.")
                         );
                         return true;
                     },
                     async failure =>
                     {
-                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                         if (
                             reloadAfterConcurrentFailure
                             && failure
@@ -334,11 +334,11 @@ public partial class GuessingSettings
             },
             async failure =>
             {
-                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
+                _ = _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
                 var fallback = await _configuration
                     .LoadConfiguration(HostId, new GuessingProfileSelection.Default())
                     .ExecuteAsync(CancellationToken.None);
-                fallback.Match(
+                _ = fallback.Match(
                     draft =>
                     {
                         _config = draft;
@@ -349,7 +349,7 @@ public partial class GuessingSettings
                     {
                         _config = null;
                         _loadedDraft = null;
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<ErrorToastStrategy>(fallbackFailure.Message)
                         );
                         return false;
@@ -361,5 +361,5 @@ public partial class GuessingSettings
 
     private static string ValidationMessage(
         IReadOnlyList<GuessingConfigurationValidationError> errors
-    ) => string.Join(" ", errors.Select(error => error.Message));
+    ) => string.Join(" ", errors.Select(static error => error.Message));
 }

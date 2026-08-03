@@ -17,7 +17,7 @@ public sealed class PublicChatOutboxPersistenceTests
         var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
         await using (var writeDb = await dbFactory.CreateDbContextAsync())
         {
-            writeDb.PublicChatOutboxMessages.Add(
+            _ = writeDb.PublicChatOutboxMessages.Add(
                 new PublicChatOutboxMessage
                 {
                     Channel = "streamer",
@@ -28,7 +28,7 @@ public sealed class PublicChatOutboxPersistenceTests
                     NextAttemptAtUtc = now.AddSeconds(5),
                 }
             );
-            await writeDb.SaveChangesAsync();
+            _ = await writeDb.SaveChangesAsync();
         }
 
         await using var readDb = await dbFactory.CreateDbContextAsync();
@@ -73,7 +73,7 @@ public sealed class PublicChatOutboxPersistenceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -86,7 +86,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -100,7 +100,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -115,7 +115,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -129,7 +129,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -143,7 +143,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
@@ -164,9 +164,9 @@ public sealed class PublicChatOutboxPersistenceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
         var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
-        await InsertClaimedAsync(db, "first", Guid.NewGuid(), now);
+        _ = await InsertClaimedAsync(db, "first", Guid.NewGuid(), now);
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             InsertClaimedAsync(db, "second", Guid.NewGuid(), now)
         );
     }

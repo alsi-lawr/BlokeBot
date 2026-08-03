@@ -17,14 +17,14 @@ internal static class EventSubChannelRecoveryResilience
     {
         if (policy.AttemptLimit > 1)
         {
-            builder.AddRetry(
+            _ = builder.AddRetry(
                 new RetryStrategyOptions<EventSubChannelReconciliationOutcome>
                 {
                     MaxRetryAttempts = policy.AttemptLimit - 1,
                     Delay = policy.Delay,
                     MaxDelay = policy.MaximumDelay,
                     BackoffType = policy.DelayBackoffType,
-                    ShouldHandle = args =>
+                    ShouldHandle = static args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
                                 ? EventSubChannelFailureClassifier.IsRecoverable(
@@ -46,7 +46,7 @@ internal static class EventSubChannelRecoveryResilience
             );
         }
 
-        builder.AddTimeout(policy.AttemptTimeout);
+        _ = builder.AddTimeout(policy.AttemptTimeout);
     }
 
     internal static void ConfigureAttempt(

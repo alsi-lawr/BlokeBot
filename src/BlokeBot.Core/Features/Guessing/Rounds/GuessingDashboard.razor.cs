@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Guessing.Game;
@@ -43,7 +44,9 @@ public partial class GuessingDashboard
     private string _roundStartedText =>
         _state?.CurrentRound is null
             ? "Start a round when you're ready"
-            : _state.CurrentRound.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
+            : _state
+                .CurrentRound.Lifecycle.StartedAtUtc.ToLocalTime()
+                .ToString("MMM d, HH:mm", CultureInfo.InvariantCulture);
 
     private string _roundStatusText =>
         _state?.CurrentRound is null
@@ -59,7 +62,7 @@ public partial class GuessingDashboard
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.GuessingChanged, AppEventKind.HostedChannelsChanged],
                 InvokeAsync,
@@ -67,7 +70,7 @@ public partial class GuessingDashboard
                 StateHasChanged
             )
         );
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         await LoadFeatureStateAsync();
         await LoadAsync();
     }
@@ -118,7 +121,7 @@ public partial class GuessingDashboard
     {
         if (string.IsNullOrWhiteSpace(_winnerName))
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 new ToastRequest<WarningToastStrategy>(
                     "Choose one of the saved winner names first."
                 )
@@ -161,7 +164,7 @@ public partial class GuessingDashboard
         {
             _selectedProfileId =
                 _state.CurrentRound?.ProfileId
-                ?? _state.Profiles.FirstOrDefault(x => x.IsDefault)?.Id
+                ?? _state.Profiles.FirstOrDefault(static x => x.IsDefault)?.Id
                 ?? _state.Profiles.FirstOrDefault()?.Id
                 ?? 0;
         }
@@ -275,7 +278,9 @@ public partial class GuessingDashboard
             : null;
 
     private static string FormatEndedAt(GuessRoundHistoryEntry round) =>
-        round.Lifecycle.ClosedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
+        round
+            .Lifecycle.ClosedAtUtc.ToLocalTime()
+            .ToString("MMM d, HH:mm", CultureInfo.InvariantCulture);
 
     private Task StopGuessingAsync() => RunAsync(() => _rounds.StopGuessing(HostId));
 
@@ -367,11 +372,11 @@ public partial class GuessingDashboard
 
         if (result is GuessingOperationOutcome.Succeeded)
         {
-            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(result.Message));
+            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(result.Message));
         }
         else
         {
-            _toasts.Publish(new ToastRequest<WarningToastStrategy>(result.Message));
+            _ = _toasts.Publish(new ToastRequest<WarningToastStrategy>(result.Message));
         }
     }
 }

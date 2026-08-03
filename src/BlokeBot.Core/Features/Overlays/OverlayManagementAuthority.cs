@@ -63,20 +63,17 @@ internal sealed class OverlayManagementAuthority(
             .Where(host => host.Id == selectedHost.Id)
             .Select(host => (HostFeatureFlags?)host.EnabledFeatures)
             .SingleOrDefaultAsync(cancellationToken);
-        if (enabled is null)
+        return enabled switch
         {
-            return new OverlayManagementAuthorization.Rejected(OverlayManagementRejection.Missing);
-        }
-        if ((enabled.Value & HostFeatureFlags.Overlays) != HostFeatureFlags.Overlays)
-        {
-            return new OverlayManagementAuthorization.Rejected(
-                OverlayManagementRejection.ParentDisabled
-            );
-        }
-
-        return new OverlayManagementAuthorization.Granted(
-            new OverlayManagementActor(selectedHost.Id, session.UserId, session.Login.Trim())
-        );
+            null => new OverlayManagementAuthorization.Rejected(OverlayManagementRejection.Missing),
+            { } value when (value & HostFeatureFlags.Overlays) != HostFeatureFlags.Overlays =>
+                new OverlayManagementAuthorization.Rejected(
+                    OverlayManagementRejection.ParentDisabled
+                ),
+            _ => new OverlayManagementAuthorization.Granted(
+                new OverlayManagementActor(selectedHost.Id, session.UserId, session.Login.Trim())
+            ),
+        };
     }
 }
 

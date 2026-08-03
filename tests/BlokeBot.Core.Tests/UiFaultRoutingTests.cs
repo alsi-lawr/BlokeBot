@@ -18,9 +18,12 @@ public sealed class UiFaultRoutingTests
             new HostBotReadinessOutcome.Unknown(new(true, false, false, false))
         );
 
-        var failure = result.Match<HostBotChannelStatusLoadFailure?>(_ => null, error => error);
+        var failure = result.Match<HostBotChannelStatusLoadFailure?>(
+            static _ => null,
+            static error => error
+        );
 
-        failure.ShouldNotBeNull();
+        _ = failure.ShouldNotBeNull();
         failure.ModeratorStatusMessage.ShouldBe(
             "BlokeBot could not check whether the bot is a mod."
         );
@@ -50,7 +53,7 @@ public sealed class UiFaultRoutingTests
         entry.Properties["HostId"].ShouldBe(42);
         entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
         entry.Message.ShouldNotContain(SensitiveMessage);
-        entry.Properties.Values.ShouldAllBe(value =>
+        entry.Properties.Values.ShouldAllBe(static value =>
             value == null || !value.ToString()!.Contains(SensitiveMessage, StringComparison.Ordinal)
         );
     }
@@ -60,7 +63,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var expected = new TestExpectedFailure("not available");
 
         var component = context.Render<TestBackgroundComponent>(parameters =>
@@ -86,7 +89,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var exception = new InvalidOperationException("unexpected");
         RenderFragment content = builder =>
         {
@@ -124,7 +127,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var cancellationObserved = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -177,7 +180,7 @@ public sealed class UiFaultRoutingTests
             CancellationToken,
             Task<Result<string, TestExpectedFailure>>
         > Loader { get; set; } =
-            _ => Task.FromResult(Result<string, TestExpectedFailure>.Success(string.Empty));
+            static _ => Task.FromResult(Result<string, TestExpectedFailure>.Success(string.Empty));
 
         public TestExpectedFailure? Error => BackgroundError;
 

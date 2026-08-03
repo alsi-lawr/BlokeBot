@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Giveaways;
@@ -15,7 +16,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedGiveawayAsync(
+        _ = await SeedGiveawayAsync(
             dbFactory,
             hostId,
             DateTime.UtcNow,
@@ -32,7 +33,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.DuplicateJoin>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.DuplicateJoin>();
     }
 
     [Test]
@@ -43,9 +44,14 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         await SeedSettingsAsync(
             dbFactory,
             hostId,
-            settings => settings.GiveawayEligibility = PointsEligibilityMode.Subscribers
+            static settings => settings.GiveawayEligibility = PointsEligibilityMode.Subscribers
         );
-        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _ = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5)
+        );
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
         var outcome = await service.JoinOutcomeAsync(
@@ -56,7 +62,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.NotEligible>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.NotEligible>();
     }
 
     [Test]
@@ -75,7 +81,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
 
         var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
-        outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.NoEntrants>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.NoEntrants>();
     }
 
     [Test]
@@ -108,7 +114,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
             .Presentations.ShouldHaveSingleItem()
             .ShouldBeOfType<OverlayEventPresentation.GiveawayWinner>();
         presentation.HostId.ShouldBe(hostId);
-        presentation.SourceKey.ShouldBe(giveawayId.ToString());
+        presentation.SourceKey.ShouldBe(giveawayId.ToString(CultureInfo.InvariantCulture));
         presentation.Winners.ShouldBe(["entrant"]);
         presentation.Prizes.ShouldBe(["10 points"]);
     }
@@ -133,23 +139,23 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
             giveaway.Entrants.Add(
                 new PointsGiveawayEntrant { Login = "capped", JoinedAtUtc = DateTime.UtcNow }
             );
-            seed.PointBalances.Add(
+            _ = seed.PointBalances.Add(
                 new PointBalance
                 {
                     HostId = hostId,
                     Login = "capped",
-                    Amount = PointAmount.MaximumValue.ToString(),
+                    Amount = PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture),
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
         var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
         var failure = outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.PayoutFailed>();
-        failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        _ = failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
         var reply = Failed(
             new PointsGiveawayMessageFormatter().Reply(outcome, new ReplyDeliveryMap())
         );
@@ -164,7 +170,9 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         var balances = await db.PointBalances.OrderBy(x => x.Login).ToListAsync();
         balances
             .Select(balance => (balance.Login, balance.Amount))
-            .ShouldBe([("capped", PointAmount.MaximumValue.ToString())]);
+            .ShouldBe([
+                ("capped", PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture)),
+            ]);
     }
 
     [Test]
@@ -185,8 +193,8 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         var first = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
         var second = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
-        first.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
-        second.ShouldBeOfType<PointsGiveawayDrawOutcome.NotActive>();
+        _ = first.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
+        _ = second.ShouldBeOfType<PointsGiveawayDrawOutcome.NotActive>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Completed);

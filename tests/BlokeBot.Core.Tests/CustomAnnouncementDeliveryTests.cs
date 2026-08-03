@@ -35,7 +35,7 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
                 .Models
                 .TwitchAnnouncementColor
                 .Green;
-            await configure.SaveChangesAsync();
+            _ = await configure.SaveChangesAsync();
         }
         var sender = new ScriptedAnnouncementSender(
             new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
@@ -209,7 +209,7 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
             "streamer",
             changedAtUtc: now.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementWithPolicyAsync(
+        _ = await SeedAnnouncementWithPolicyAsync(
             dbFactory,
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },

@@ -59,16 +59,13 @@ public sealed record BotSettings
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
 
-        if (!BotOptionsValidation.IsValid(options))
-        {
-            throw new Microsoft.Extensions.Options.OptionsValidationException(
+        return !BotOptionsValidation.IsValid(options)
+            ? throw new Microsoft.Extensions.Options.OptionsValidationException(
                 boundary,
                 typeof(BotOptions),
                 ["Twitch bot options contain an invalid value."]
-            );
-        }
-
-        return Create(options, BotIdentity.FromConfiguredOptions(options.Identity, boundary));
+            )
+            : Create(options, BotIdentity.FromConfiguredOptions(options.Identity, boundary));
     }
 
     private static BotSettings Create(BotOptions options, BotIdentity identity) =>

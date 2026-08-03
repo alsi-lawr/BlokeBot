@@ -10,90 +10,94 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureGuessing(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<GuessOption>(b =>
+        _ = modelBuilder.Entity<GuessOption>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "guess_options",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_guess_options_ReplyTarget",
                         KindIn("ReplyTarget", ReplyDeliveryTargetPersistence.Tokens)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.SortOrder).HasDefaultValue(0);
-            b.Property(x => x.ReplyTarget)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.SortOrder).HasDefaultValue(0);
+            _ = b.Property(static x => x.ReplyTarget)
                 .HasConversion(
-                    target => ReplyDeliveryTargetPersistence.ToToken(target),
-                    token => ReplyDeliveryTargetPersistence.FromToken(token)
+                    static target => ReplyDeliveryTargetPersistence.ToToken(target),
+                    static token => ReplyDeliveryTargetPersistence.FromToken(token)
                 )
                 .HasMaxLength(32)
                 .HasDefaultValue(ReplyDeliveryTarget.Chat);
-            b.HasIndex(x => new { x.GuessRoundProfileId, x.Name }).IsUnique();
-            b.HasOne(x => x.GuessRoundProfile)
-                .WithMany(x => x.Options)
-                .HasForeignKey(x => x.GuessRoundProfileId)
+            _ = b.HasIndex(static x => new { x.GuessRoundProfileId, x.Name }).IsUnique();
+            _ = b.HasOne(static x => x.GuessRoundProfile)
+                .WithMany(static x => x.Options)
+                .HasForeignKey(static x => x.GuessRoundProfileId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<GuessRoundProfile>(b =>
+        _ = modelBuilder.Entity<GuessRoundProfile>(static b =>
         {
-            b.ToTable("guess_round_profiles");
-            b.HasKey(x => x.Id);
-            b.HasAlternateKey(x => new { x.HostId, x.Id });
-            b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.Slug).HasMaxLength(128);
-            b.Property(x => x.Revision).HasDefaultValue(0L);
-            b.Property(x => x.WinningGuessPointReward).HasMaxLength(128).HasDefaultValue("0");
-            b.HasIndex(x => new { x.HostId, x.Slug }).IsUnique();
-            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");
-            b.HasOne<BotHost>()
+            _ = b.ToTable("guess_round_profiles");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasAlternateKey(static x => new { x.HostId, x.Id });
+            _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.Slug).HasMaxLength(128);
+            _ = b.Property(static x => x.Revision).HasDefaultValue(0L);
+            _ = b.Property(static x => x.WinningGuessPointReward)
+                .HasMaxLength(128)
+                .HasDefaultValue("0");
+            _ = b.HasIndex(static x => new { x.HostId, x.Slug }).IsUnique();
+            _ = b.HasIndex(static x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<GuessRound>(b =>
+        _ = modelBuilder.Entity<GuessRound>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "guess_rounds",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_guess_rounds_Status",
                         KindIn("Status", _guessRoundStatusKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<GuessRoundStatus>.Format(status),
-                    value => PersistedEnumTokens<GuessRoundStatus>.Parse(value)
+                    static status => PersistedEnumTokens<GuessRoundStatus>.Format(status),
+                    static value => PersistedEnumTokens<GuessRoundStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.WinningName).HasMaxLength(128);
-            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" IN ('Open', 'Closed')");
-            b.HasOne<BotHost>()
+            _ = b.Property(static x => x.WinningName).HasMaxLength(128);
+            _ = b.HasIndex(static x => x.HostId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Open', 'Closed')");
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasOne(x => x.GuessRoundProfile)
-                .WithMany(x => x.Rounds)
-                .HasForeignKey(x => x.GuessRoundProfileId)
+            _ = b.HasOne(static x => x.GuessRoundProfile)
+                .WithMany(static x => x.Rounds)
+                .HasForeignKey(static x => x.GuessRoundProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
-            b.HasMany(x => x.Votes)
-                .WithOne(x => x.GuessRound)
-                .HasForeignKey(x => x.GuessRoundId)
+            _ = b.HasMany(static x => x.Votes)
+                .WithOne(static x => x.GuessRound)
+                .HasForeignKey(static x => x.GuessRoundId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<GuessVote>(b =>
+        _ = modelBuilder.Entity<GuessVote>(static b =>
         {
-            b.ToTable("guess_votes");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.GuessName).HasMaxLength(128);
-            b.HasIndex(x => new { x.GuessRoundId, x.Login }).IsUnique();
+            _ = b.ToTable("guess_votes");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.GuessName).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.GuessRoundId, x.Login }).IsUnique();
         });
     }
 }

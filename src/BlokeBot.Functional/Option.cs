@@ -20,7 +20,7 @@ public sealed record Option<T>
         Match(value => Option<TMapped>.FromNullable(map(value)), () => Option<TMapped>.None);
 
     public Option<TMapped> Bind<TMapped>(Func<T, Option<TMapped>> bind) =>
-        Match(bind, () => Option<TMapped>.None);
+        Match(bind, static () => Option<TMapped>.None);
 
     private abstract record OptionState
     {

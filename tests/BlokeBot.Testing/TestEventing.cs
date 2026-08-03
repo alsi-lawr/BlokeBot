@@ -6,7 +6,7 @@ public static class TestEventBus
 {
     public static EventBus<TKey> Create<TKey>()
         where TKey : notnull =>
-        Create<TKey>(key =>
+        Create<TKey>(static key =>
             ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
         );
 
@@ -26,7 +26,7 @@ public static class TestEventBus
 
     public static TestEventBusRecording<TKey> CreateContinueAndRecord<TKey>()
         where TKey : notnull =>
-        CreateContinueAndRecord<TKey>(key =>
+        CreateContinueAndRecord<TKey>(static key =>
             ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
         );
 

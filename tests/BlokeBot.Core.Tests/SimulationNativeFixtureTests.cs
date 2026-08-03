@@ -26,7 +26,7 @@ public sealed class SimulationNativeFixtureTests
             ["native-clips-markers"] = "/twitch-operations/clips-markers",
             ["native-channel-points"] = "/twitch-operations/channel-points",
             ["native-predictions"] = "/twitch-operations/predictions",
-        }.ShouldAllBe(pair => SimulationViewCatalog.PathFor(pair.Key) == pair.Value);
+        }.ShouldAllBe(static pair => SimulationViewCatalog.PathFor(pair.Key) == pair.Value);
 
     [Test]
     public void OverlayAliasResolvesToTheDeterministicDashboardRoute() =>
@@ -91,7 +91,7 @@ public sealed class SimulationNativeFixtureTests
             value => value.GetType().Assembly == typeof(SimulationApplication).Assembly
         );
 
-        (
+        _ = (
             await shoutouts.SendAsync(hostId, "friendlychannel", CancellationToken.None)
         ).ShouldBeOfType<ShoutoutOperationOutcome.Sent>();
         (await shoutouts.LoadAsync(hostId, "friendlychannel", CancellationToken.None))
@@ -105,10 +105,10 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PollOperationOutcome.TemplateSaved>();
-        (
+        _ = (
             await polls.StartAsync(hostId, savedPoll.Template.Id, CancellationToken.None)
         ).ShouldBeOfType<PollOperationOutcome.Started>();
-        (
+        _ = (
             await polls.EndAsync(hostId, true, CancellationToken.None)
         ).ShouldBeOfType<PollOperationOutcome.Ended>();
         var pollState = await polls.LoadAsync(hostId, CancellationToken.None);
@@ -118,10 +118,10 @@ public sealed class SimulationNativeFixtureTests
         var clip = (
             await clipsMarkers.CreateClipAsync(hostId, false, CancellationToken.None)
         ).ShouldBeOfType<ClipMarkerOperationOutcome.ClipPending>();
-        (
+        _ = (
             await clipsMarkers.RetryClipAsync(hostId, clip.Clip.Attempt, CancellationToken.None)
         ).ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
-        (
+        _ = (
             await clipsMarkers.CreateMarkerAsync(hostId, "Boss defeated", CancellationToken.None)
         ).ShouldBeOfType<ClipMarkerOperationOutcome.MarkerCreated>();
         var clipState = await clipsMarkers.LoadAsync(hostId, CancellationToken.None);
@@ -157,7 +157,7 @@ public sealed class SimulationNativeFixtureTests
         var createdReward = (
             await channelPoints.CreateRewardAsync(hostId, rewardDraft, CancellationToken.None)
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
-        (
+        _ = (
             await channelPoints.UpdateRewardAsync(
                 hostId,
                 createdReward.Reward.ProviderRewardId,
@@ -170,7 +170,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RewardUpdated>();
-        (
+        _ = (
             await channelPoints.UpdateRewardAsync(
                 hostId,
                 createdReward.Reward.ProviderRewardId,
@@ -180,7 +180,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RewardUpdated>();
-        (
+        _ = (
             await channelPoints.UpdateRedemptionAsync(
                 hostId,
                 "simulation-redemption-1",
@@ -188,7 +188,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
-        (
+        _ = (
             await channelPoints.UpdateRedemptionAsync(
                 hostId,
                 "simulation-redemption-2",
@@ -196,7 +196,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
-        (
+        _ = (
             await channelPoints.UpdateRedemptionAsync(
                 hostId,
                 "simulation-redemption-3",
@@ -204,7 +204,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
-        (
+        _ = (
             await channelPoints.DeleteRewardAsync(
                 hostId,
                 createdReward.Reward.ProviderRewardId,
@@ -225,7 +225,7 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PredictionOperationOutcome.TemplateSaved>();
-        (
+        _ = (
             await predictions.StartAsync(
                 hostId,
                 savedPrediction.Template.Id,
@@ -235,7 +235,7 @@ public sealed class SimulationNativeFixtureTests
         var locked = (
             await predictions.LockAsync(hostId, true, CancellationToken.None)
         ).ShouldBeOfType<PredictionOperationOutcome.Updated>();
-        (
+        _ = (
             await predictions.ResolveAsync(
                 hostId,
                 locked.Prediction.Outcomes[0].Id,
@@ -243,10 +243,10 @@ public sealed class SimulationNativeFixtureTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PredictionOperationOutcome.Updated>();
-        (
+        _ = (
             await predictions.StartAsync(hostId, 1, CancellationToken.None)
         ).ShouldBeOfType<PredictionOperationOutcome.Started>();
-        (
+        _ = (
             await predictions.CancelAsync(hostId, true, CancellationToken.None)
         ).ShouldBeOfType<PredictionOperationOutcome.Updated>();
         (await predictions.LoadAsync(hostId, CancellationToken.None)).Results.Count.ShouldBe(2);

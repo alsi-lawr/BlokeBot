@@ -59,7 +59,7 @@ public partial class HostConfigPage
                 case StartupMessageSaveOutcome.Saved:
                     _startupMessageDirty = false;
                     await LoadCoreAsync();
-                    _toasts.Publish(
+                    _ = _toasts.Publish(
                         ToastRequest<PositiveStatusToastStrategy>.WithTitle(
                             "The change will apply the next time the bot joins or reconnects. The active bot was not restarted.",
                             "Startup message saved"

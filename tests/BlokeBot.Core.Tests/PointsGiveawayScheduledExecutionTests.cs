@@ -35,8 +35,8 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
         commitCancellation.CommitAttempts.ShouldBe(1);
         commitCancellation.ObservedCancellationToken.CanBeCanceled.ShouldBeFalse();
         thrown.GiveawayId.ShouldBe(giveawayId);
-        thrown.IntendedOutcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
-        thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
+        _ = thrown.IntendedOutcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
+        _ = thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
         PointsGiveawaySchedulerFailureClassifier.IsTransient(thrown).ShouldBeFalse();
         PointsGiveawaySchedulerFailureClassifier
             .ClassifyUnhealthy(thrown)
@@ -84,7 +84,7 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
         operations.ExpirationAttempts.ShouldBe(1);
         operations.ChangeNotificationAttempts.ShouldBe(1);
         operations.NotifiedHostIds.ShouldBe([7]);
-        var failure = logger.Entries.Single(entry => entry.Level == LogLevel.Error);
+        var failure = logger.Entries.Single(static entry => entry.Level == LogLevel.Error);
         failure.Exception.ShouldBeNull();
         failure.Message.ShouldContain("StateChanged notification failed");
         failure.Message.ShouldContain("delivery is not retried");
@@ -113,7 +113,7 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
 
         operations.DrawAttempts.ShouldBe(1);
         operations.DrawNotificationAttempts.ShouldBe(1);
-        var failure = logger.Entries.Single(entry => entry.Level == LogLevel.Error);
+        var failure = logger.Entries.Single(static entry => entry.Level == LogLevel.Error);
         failure.Exception.ShouldBeNull();
         failure.Message.ShouldContain("DrawResult notification failed");
         failure.Message.ShouldContain("delivery is not retried");

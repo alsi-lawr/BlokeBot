@@ -157,27 +157,26 @@ public partial class HostConfigPage
         var title = $"{featureName} {stateText}";
         if (enabled)
         {
-            _toasts.Publish(ToastRequest<PositiveStatusToastStrategy>.WithTitle(message, title));
+            _ = _toasts.Publish(
+                ToastRequest<PositiveStatusToastStrategy>.WithTitle(message, title)
+            );
         }
         else
         {
-            _toasts.Publish(ToastRequest<CautionStatusToastStrategy>.WithTitle(message, title));
+            _ = _toasts.Publish(ToastRequest<CautionStatusToastStrategy>.WithTitle(message, title));
         }
     }
 
-    private static string FeatureImpact(HostFeatureFlags feature, bool enabled)
-    {
-        if (feature is HostFeatureFlags.Overlays)
+    private static string FeatureImpact(HostFeatureFlags feature, bool enabled) =>
+        feature switch
         {
-            return enabled
-                ? "Its dashboard and Browser Sources are available again."
-                : "Its dashboard and Browser Sources are unavailable until you enable it again.";
-        }
-
-        return enabled
-            ? "Its chat commands and pages are available again."
-            : "Its chat commands and pages are unavailable until you enable it again.";
-    }
+            HostFeatureFlags.Overlays when enabled =>
+                "Its dashboard and Browser Sources are available again.",
+            HostFeatureFlags.Overlays =>
+                "Its dashboard and Browser Sources are unavailable until you enable it again.",
+            _ when enabled => "Its chat commands and pages are available again.",
+            _ => "Its chat commands and pages are unavailable until you enable it again.",
+        };
 
     private static string FeatureName(HostFeatureFlags feature) =>
         feature switch

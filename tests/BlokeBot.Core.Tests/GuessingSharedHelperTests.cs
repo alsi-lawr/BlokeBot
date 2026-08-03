@@ -63,11 +63,11 @@ public sealed class GuessingSharedHelperTests
             CancellationToken.None
         );
 
-        basic.ShouldNotBeNull();
+        _ = basic.ShouldNotBeNull();
         basic.Id.ShouldBe(seed.SpecialProfileId);
         basic.Name.ShouldBe("Special");
         basic.Settings.NoOpenRoundReply.ShouldBe("special");
-        withOptions.ShouldNotBeNull();
+        _ = withOptions.ShouldNotBeNull();
         withOptions.OptionNames.ShouldBe(["alpha", "zulu"]);
         defaultBasic.Id.ShouldBe(seed.DefaultProfileId);
         defaultWithOptions.Id.ShouldBe(seed.DefaultProfileId);
@@ -88,17 +88,17 @@ public sealed class GuessingSharedHelperTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             db.Profiles.LoadProfileAsync(seed.HostId, seed.SpecialProfileId, cancellation.Token)
         );
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             db.Profiles.LoadProfileWithOptionsAsync(
                 seed.HostId,
                 seed.SpecialProfileId,
                 cancellation.Token
             )
         );
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             GuessingReplySettingsQueries.LoadForProfileAsync(
                 db,
                 seed.HostId,
@@ -171,7 +171,7 @@ public sealed class GuessingSharedHelperTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Rounds.Add(
+            _ = db.Rounds.Add(
                 new GuessRound
                 {
                     HostId = seed.HostId,
@@ -180,7 +180,7 @@ public sealed class GuessingSharedHelperTests
                     StartedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var response = await new GuessingCommandService(dbFactory).ModeratorOnlyResponseAsync(
@@ -202,8 +202,8 @@ public sealed class GuessingSharedHelperTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
 
         var defaultProfile = new GuessRoundProfile
         {
@@ -241,9 +241,9 @@ public sealed class GuessingSharedHelperTests
             Slug = "fallback",
         };
         db.Profiles.AddRange(defaultProfile, specialProfile, missingSettingsProfile);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        db.ReplyDeliverySettings.Add(
+        _ = db.ReplyDeliverySettings.Add(
             new ReplyDeliverySetting
             {
                 HostId = host.Id,
@@ -253,7 +253,7 @@ public sealed class GuessingSharedHelperTests
                 Target = ReplyDeliveryTarget.Whisper,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         return new ProfileSeed(
             host.Id,

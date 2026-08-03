@@ -99,7 +99,7 @@ public sealed class HostBotAccountAuthorizationTests
 
         var outcome = oauth.CreateAuthorizationUriForDefaultScopes("state");
 
-        outcome.ShouldBeOfType<OAuthAuthorizationStartOutcome.ConfigurationUnavailable>();
+        _ = outcome.ShouldBeOfType<OAuthAuthorizationStartOutcome.ConfigurationUnavailable>();
     }
 
     [Test]
@@ -117,7 +117,8 @@ public sealed class HostBotAccountAuthorizationTests
 
         var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
 
-        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ConfigurationUnavailable>();
+        _ =
+            outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ConfigurationUnavailable>();
     }
 
     [Test]
@@ -145,14 +146,15 @@ public sealed class HostBotAccountAuthorizationTests
 
         var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
 
-        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated>();
+        _ =
+            outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated>();
     }
 
     [Test]
     public async Task OverrideDisabled_ResolvingBotAccount_ReturnsGlobalAccount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
 
         var account = Success(
@@ -233,7 +235,7 @@ public sealed class HostBotAccountAuthorizationTests
         );
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
-        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        _ = result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
         account.Login.ShouldBe("custombot");
         account.AccessToken.ShouldBe("override-token");
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
@@ -273,7 +275,7 @@ public sealed class HostBotAccountAuthorizationTests
             var tamperedPayload = stored.ProtectedTokenPayload!.ToArray();
             tamperedPayload[^1] ^= 0x01;
             stored.ProtectedTokenPayload = tamperedPayload;
-            await tamper.SaveChangesAsync();
+            _ = await tamper.SaveChangesAsync();
         }
 
         var reason = Error(
@@ -339,7 +341,7 @@ public sealed class HostBotAccountAuthorizationTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var customHostId = await SeedHostAsync(dbFactory, "custom-channel");
-        await SeedHostAsync(dbFactory, "global-channel");
+        _ = await SeedHostAsync(dbFactory, "global-channel");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(customHostId, CancellationToken.None);
         await AuthorizeCustomBotAsync(
@@ -383,7 +385,7 @@ public sealed class HostBotAccountAuthorizationTests
         var outcome = await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.CustomBotRequired>();
+        _ = outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.CustomBotRequired>();
         (
             await db.HostBotAccountSettings.SingleOrDefaultAsync(
                 x => x.HostId == hostId,
@@ -401,8 +403,8 @@ public sealed class HostBotAccountAuthorizationTests
         var enabling = await service.EnableWhisperResponsesAsync(42, CancellationToken.None);
         var disabling = await service.DisableWhisperResponsesAsync(42, CancellationToken.None);
 
-        enabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
-        disabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
+        _ = enabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
+        _ = disabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
     }
 
     [Test]
@@ -412,14 +414,14 @@ public sealed class HostBotAccountAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(hostId, CancellationToken.None);
-        (
+        _ = (
             await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
         ).ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
 
         var outcome = await service.DisableWhisperResponsesAsync(hostId, CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
+        _ = outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
         (
             await db.HostBotAccountSettings.SingleAsync(
                 x => x.HostId == hostId,
@@ -435,7 +437,7 @@ public sealed class HostBotAccountAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(hostId, CancellationToken.None);
-        (
+        _ = (
             await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
         ).ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
 
@@ -475,7 +477,7 @@ public sealed class HostBotAccountAuthorizationTests
         missing
             .ShouldBeOfType<HostBotAccountAuthorizationOutcome.MissingScopes>()
             .Scopes.ShouldContain(Scopes.UserManageWhispers);
-        authorized.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        _ = authorized.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
         status.RequiredScopes.ShouldContain(Scopes.UserManageWhispers);
     }
@@ -570,8 +572,8 @@ public sealed class HostBotAccountAuthorizationTests
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
         canAuthorize.ShouldBeTrue();
-        authorization.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
-        clearing.ShouldBeOfType<HostBotAccountClearOutcome.Cleared>();
+        _ = authorization.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        _ = clearing.ShouldBeOfType<HostBotAccountClearOutcome.Cleared>();
         status.State.ShouldBe(BotAccountAuthorizationState.NotAuthorized);
     }
 
@@ -643,16 +645,10 @@ public sealed class HostBotAccountAuthorizationTests
                         "chat:read",
                         "chat:edit",
                         Scopes.UserReadModeratedChannels,
-                        .. (
-                            includeFollowRead
-                                ? new[] { Scopes.UserReadFollows }
-                                : Array.Empty<string>()
-                        ),
-                        .. (
-                            includeAnnouncementManagement
-                                ? new[] { Scopes.ModeratorManageAnnouncements }
-                                : Array.Empty<string>()
-                        ),
+                        .. includeFollowRead ? [Scopes.UserReadFollows] : Array.Empty<string>(),
+                        .. includeAnnouncementManagement
+                            ? [Scopes.ModeratorManageAnnouncements]
+                            : Array.Empty<string>(),
                     ],
                 },
             }
@@ -685,8 +681,8 @@ public sealed class HostBotAccountAuthorizationTests
 
     private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
         result.Match(
-            account => account,
-            reason =>
+            static account => account,
+            static reason =>
                 throw new InvalidOperationException(
                     $"Expected an authorized bot account, received {reason}."
                 )
@@ -696,8 +692,8 @@ public sealed class HostBotAccountAuthorizationTests
         Result<BotAccount, AccessTokenUnavailableReason> result
     ) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected token unavailability."),
-            reason => reason
+            static _ => throw new InvalidOperationException("Expected token unavailability."),
+            static reason => reason
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
@@ -710,8 +706,8 @@ public sealed class HostBotAccountAuthorizationTests
             DisplayName = login,
             Login = login,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -737,7 +733,7 @@ public sealed class HostBotAccountAuthorizationTests
             )
             .RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        _ = result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
     }
 
     private static async Task AuthorizeExpiredCustomBotAsync(
@@ -762,7 +758,7 @@ public sealed class HostBotAccountAuthorizationTests
             )
             .RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        _ = result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
     }
 
     private static HostBotAccountAuthorizationGrant CreateCustomBotGrant(
@@ -793,7 +789,7 @@ public sealed class HostBotAccountAuthorizationTests
         var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);
         host!.BotRuntimeState = state;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private sealed class StaticTokenProvider(string accessToken) : IAccessTokenProvider
@@ -809,9 +805,7 @@ public sealed class HostBotAccountAuthorizationTests
     private sealed class HostBotAccountHttpClientFactory(HttpStatusCode? tokenStatusCode = null)
         : IHttpClientFactory
     {
-        private readonly Handler _handler = new(tokenStatusCode);
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) => new(new Handler(tokenStatusCode));
 
         private sealed class Handler(HttpStatusCode? tokenStatusCode) : HttpMessageHandler
         {

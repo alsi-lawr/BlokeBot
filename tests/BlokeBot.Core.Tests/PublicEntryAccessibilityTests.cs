@@ -33,18 +33,18 @@ public sealed class PublicEntryAccessibilityTests
     public void DisabledWhisperControls_OfferChannelSetupRecovery()
     {
         using var context = new BunitContext();
-        var delivery = context.Render<ReplyDeliverySettingsSection>(parameters =>
+        var delivery = context.Render<ReplyDeliverySettingsSection>(static parameters =>
             parameters
-                .Add(component => component.Delivery, new ReplyDeliveryEditor())
+                .Add(static component => component.Delivery, new ReplyDeliveryEditor())
                 .Add(
-                    component => component.Options,
+                    static component => component.Options,
                     [new ReplyDeliveryOption("Balance", "balance")]
                 )
-                .Add(component => component.WhisperResponsesEnabled, false)
+                .Add(static component => component.WhisperResponsesEnabled, false)
         );
 
         delivery.Find("button.disclosure-trigger").Click();
         delivery.Find("input[type='checkbox']").HasAttribute("disabled").ShouldBeTrue();
-        delivery.Find("a[href='/host#custom-bot']").ShouldNotBeNull();
+        _ = delivery.Find("a[href='/host#custom-bot']").ShouldNotBeNull();
     }
 }

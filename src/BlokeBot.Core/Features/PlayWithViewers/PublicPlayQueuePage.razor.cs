@@ -58,8 +58,8 @@ public partial class PublicPlayQueuePage
             CancellationToken.None
         );
         _feedback = result.Match(
-            succeeded => $"You are position {succeeded.Value.Position}.",
-            rejected => rejected.Reason.Message
+            static succeeded => $"You are position {succeeded.Value.Position}.",
+            static rejected => rejected.Reason.Message
         );
         _failed = result is PlayQueueResult<PublicPlayQueueEntryView>.Rejected;
         await ReloadAsync();
@@ -84,7 +84,7 @@ public partial class PublicPlayQueuePage
             (hostId, slug, viewer) =>
                 _queues.GetPositionAsync(hostId, slug, viewer, CancellationToken.None),
             "Position checked.",
-            value =>
+            static value =>
                 value.Status == BlokeBot.Persistence.Models.PlayQueueEntryStatus.Selected
                     ? "You are in the current party."
                     : $"You are position {value.Position} ({value.Status})."

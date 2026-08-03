@@ -114,7 +114,7 @@ internal sealed class RecordingPublicChatLogger<TCategory> : ILogger<TCategory>
     )
     {
         var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-            ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+            ? values.ToDictionary(static pair => pair.Key, static pair => pair.Value)
             : [];
         Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
     }
@@ -155,15 +155,12 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Interlocked.Increment(ref _deliveryCount);
-        if (!_deliveries.Writer.TryWrite(prepared.Message))
-        {
-            throw new InvalidOperationException("The public chat delivery could not be observed.");
-        }
-
-        return ValueTask.FromResult<PublicChatTransportSendResult>(
-            new PublicChatTransportSendResult.Sent()
-        );
+        _ = Interlocked.Increment(ref _deliveryCount);
+        return !_deliveries.Writer.TryWrite(prepared.Message)
+            ? throw new InvalidOperationException("The public chat delivery could not be observed.")
+            : ValueTask.FromResult<PublicChatTransportSendResult>(
+                new PublicChatTransportSendResult.Sent()
+            );
     }
 
     public ValueTask<PublicChatClaimedMessage> ReadAsync() => _deliveries.Reader.ReadAsync();
@@ -190,7 +187,7 @@ internal sealed class ScriptedPublicChatTransport(
         CancellationToken cancellationToken
     )
     {
-        Interlocked.Increment(ref _prepareCount);
+        _ = Interlocked.Increment(ref _prepareCount);
         return prepare(message, cancellationToken);
     }
 
@@ -199,7 +196,7 @@ internal sealed class ScriptedPublicChatTransport(
         CancellationToken cancellationToken
     )
     {
-        Interlocked.Increment(ref _sendCount);
+        _ = Interlocked.Increment(ref _sendCount);
         return send(prepared, cancellationToken);
     }
 }
@@ -234,12 +231,9 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
             duplicateCooldown,
             cancellationToken
         );
-        if (!_claims.Writer.TryWrite(outcome))
-        {
-            throw new InvalidOperationException("The public chat claim could not be observed.");
-        }
-
-        return outcome;
+        return !_claims.Writer.TryWrite(outcome)
+            ? throw new InvalidOperationException("The public chat claim could not be observed.")
+            : outcome;
     }
 
     public ValueTask<PublicChatClaimUpdate> BeginSendAsync(
@@ -439,7 +433,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     )
     {
         var timer = new ManualTimer(this, callback, state);
-        timer.Change(dueTime, period);
+        _ = timer.Change(dueTime, period);
         return timer;
     }
 
@@ -505,7 +499,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     {
         lock (_gate)
         {
-            _timers.Remove(timer);
+            _ = _timers.Remove(timer);
         }
     }
 

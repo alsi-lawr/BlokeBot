@@ -10,22 +10,19 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
     public OAuthAuthorizationStartOutcome CreateAuthorization(HttpRequest request, string state)
     {
         var clientId = AuthorizationClientId();
-        if (string.IsNullOrWhiteSpace(clientId))
-        {
-            return new OAuthAuthorizationStartOutcome.ConfigurationUnavailable();
-        }
-
-        return new OAuthAuthorizationStartOutcome.Ready(
-            transport.CreateAuthorizationUri(
-                new AuthorizationUriRequest(
-                    clientId,
-                    OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
-                    RequestedScopes(),
-                    state,
-                    AuthorizationVerificationPolicy.ForceAccountVerification
+        return string.IsNullOrWhiteSpace(clientId)
+            ? new OAuthAuthorizationStartOutcome.ConfigurationUnavailable()
+            : new OAuthAuthorizationStartOutcome.Ready(
+                transport.CreateAuthorizationUri(
+                    new AuthorizationUriRequest(
+                        clientId,
+                        OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
+                        RequestedScopes(),
+                        state,
+                        AuthorizationVerificationPolicy.ForceAccountVerification
+                    )
                 )
-            )
-        );
+            );
     }
 
     public async Task<

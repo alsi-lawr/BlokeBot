@@ -117,11 +117,12 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             GuessCommandKind.Start => "Usage: !{command} [round]",
             _ => resolution.Settings.GuessUsageReply,
         };
-        var target =
-            kind == GuessCommandKind.Win
-                ? resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.WinUsage)
-            : kind == GuessCommandKind.Start ? CommandResponseTarget.Chat
-            : resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.GuessUsage);
+        var target = kind switch
+        {
+            GuessCommandKind.Win => resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.WinUsage),
+            GuessCommandKind.Start => CommandResponseTarget.Chat,
+            _ => resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.GuessUsage),
+        };
         return new CommandResponse(
             target,
             MessageTemplateFormatter.Format(

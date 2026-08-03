@@ -26,7 +26,7 @@ public partial class AdminPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
                 InvokeAsync,
@@ -155,15 +155,15 @@ public partial class AdminPage
         switch (outcome)
         {
             case AdminHostOperationOutcome.Completed completed:
-                _toasts.Publish(new ToastRequest<StatusToastStrategy>(completed.Message));
+                _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(completed.Message));
                 _pendingRuntimeHostId = null;
                 break;
             case AdminHostOperationOutcome.PendingRuntime pending:
-                _toasts.Publish(new ToastRequest<StatusToastStrategy>(pending.Message));
+                _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(pending.Message));
                 _pendingRuntimeHostId = pending.HostId;
                 break;
             case AdminHostOperationOutcome.Rejected rejected:
-                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(rejected.Message));
+                _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(rejected.Message));
                 _pendingRuntimeHostId = null;
                 break;
             default:
@@ -181,7 +181,7 @@ public partial class AdminPage
                 "Connect the bot account before adding channels.",
             _ => throw new UnreachableException(),
         };
-        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(message));
+        _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(message));
         _pendingRuntimeHostId = null;
     }
 

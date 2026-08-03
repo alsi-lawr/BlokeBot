@@ -17,7 +17,7 @@ public sealed class CommandCatalogTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -25,17 +25,17 @@ public sealed class CommandCatalogTests
                     Alias = "points",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var resolver = new AppCommandAliasResolver(dbFactory);
 
         var known = await resolver.ResolveAsync("streamer", "points", CancellationToken.None);
         var unknown = await resolver.ResolveAsync("streamer", "missing", CancellationToken.None);
 
-        known.ShouldNotBeNull();
+        _ = known.ShouldNotBeNull();
         known.HostId.ShouldBe(hostId);
         known.Kind.ShouldBe(AppCommandKind.Points);
-        known.Scope.ShouldBeOfType<CommandAliasScope.Global>();
+        _ = known.Scope.ShouldBeOfType<CommandAliasScope.Global>();
         unknown.ShouldBeNull();
     }
 
@@ -54,9 +54,9 @@ public sealed class CommandCatalogTests
                 IsDefault = true,
                 ReplySettings = new BotReplySettings(),
             };
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
-            db.CommandAliases.Add(
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -65,15 +65,17 @@ public sealed class CommandCatalogTests
                     Alias = "score",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var resolver = new AppCommandAliasResolver(dbFactory);
 
         var resolution = await resolver.ResolveAsync("streamer", "score", CancellationToken.None);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
-        resolution.ShouldNotBeNull();
+        var profileId = await verify
+            .Profiles.Select(static x => x.Id)
+            .SingleAsync(CancellationToken.None);
+        _ = resolution.ShouldNotBeNull();
         resolution.Kind.ShouldBe(AppCommandKind.Start);
         resolution.Scope.ShouldBeOfType<CommandAliasScope.Profile>().ProfileId.ShouldBe(profileId);
     }
@@ -86,7 +88,7 @@ public sealed class CommandCatalogTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var registry = new CommandAliasRegistry();
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
             registry.ReplaceAliasesAsync(
                 db,
                 hostId,
@@ -107,7 +109,7 @@ public sealed class CommandCatalogTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.CommandAliases.Add(
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = hostId,
@@ -115,10 +117,10 @@ public sealed class CommandCatalogTests
                 Alias = "play",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var registry = new CommandAliasRegistry();
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
             registry.ReplaceAliasesAsync(
                 db,
                 hostId,
@@ -152,8 +154,8 @@ public sealed class CommandCatalogTests
             ReplySettings = new BotReplySettings(),
         };
         db.Profiles.AddRange(defaultProfile, specialProfile);
-        await db.SaveChangesAsync();
-        db.CommandAliases.Add(
+        _ = await db.SaveChangesAsync();
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = hostId,
@@ -162,10 +164,10 @@ public sealed class CommandCatalogTests
                 Alias = "play",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var registry = new CommandAliasRegistry();
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
             registry.ReplaceAliasesAsync(
                 db,
                 hostId,
@@ -191,8 +193,8 @@ public sealed class CommandCatalogTests
             IsDefault = true,
             ReplySettings = new BotReplySettings(),
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
         var registry = new CommandAliasRegistry();
 
         await registry.ReplaceAliasesAsync(
@@ -211,15 +213,17 @@ public sealed class CommandCatalogTests
             new CommandAliasScope.Profile(profile.Id),
             CancellationToken.None
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         var aliases = await db
             .CommandAliases.AsNoTracking()
-            .OrderBy(alias => alias.Alias)
+            .OrderBy(static alias => alias.Alias)
             .ToListAsync(CancellationToken.None);
-        aliases.Select(alias => alias.Alias).ShouldBe(["balance", "score"]);
-        aliases.Single(alias => alias.Alias == "balance").GuessRoundProfileId.ShouldBeNull();
-        aliases.Single(alias => alias.Alias == "score").GuessRoundProfileId.ShouldBe(profile.Id);
+        aliases.Select(static alias => alias.Alias).ShouldBe(["balance", "score"]);
+        aliases.Single(static alias => alias.Alias == "balance").GuessRoundProfileId.ShouldBeNull();
+        aliases
+            .Single(static alias => alias.Alias == "score")
+            .GuessRoundProfileId.ShouldBe(profile.Id);
     }
 
     [Test]
@@ -229,16 +233,16 @@ public sealed class CommandCatalogTests
         var points = PointsCatalog();
 
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Start)
+            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Start)
             .DefaultAliases.ShouldBe(["startguessing"]);
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Guess)
+            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Guess)
             .DefaultAliases.ShouldBe(["guess"]);
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.Points)
+            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Points)
             .DefaultAliases.ShouldBe(["points"]);
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.Giveaway)
+            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Giveaway)
             .DefaultAliases.ShouldBe(["giveaway"]);
     }
 
@@ -248,30 +252,42 @@ public sealed class CommandCatalogTests
         var guessing = GuessingCatalog();
         var points = PointsCatalog();
 
-        guessing
+        _ = guessing
             .Find(GuessCommandKind.Start)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
-        points
+        _ = points
             .Find(PointsCommandKind.AddPoints)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
-        points
+        _ = points
             .Find(PointsCommandKind.Points)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.Everyone>();
-        guessing
+        _ = guessing
             .Find(GuessCommandKind.Guess)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
@@ -286,19 +302,19 @@ public sealed class CommandCatalogTests
 
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match(kind => kind, () => throw new InvalidOperationException())
+            .Match(static kind => kind, static () => throw new InvalidOperationException())
             .ShouldBe(GuessCommandKind.Win);
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match(kind => kind, () => throw new InvalidOperationException())
+            .Match(static kind => kind, static () => throw new InvalidOperationException())
             .ShouldBe(PointsCommandKind.Giveaway);
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match(_ => false, () => true)
+            .Match(static _ => false, static () => true)
             .ShouldBeTrue();
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match(_ => false, () => true)
+            .Match(static _ => false, static () => true)
             .ShouldBeTrue();
 
         var guessingKinds = GuessingAppCommandKindMap.AppKinds;
@@ -320,16 +336,16 @@ public sealed class CommandCatalogTests
             .Add(hostId, "viewer", PointAmount.Zero, "admin", "test")
             .ExecuteAsync(CancellationToken.None);
 
-        insufficient
+        _ = insufficient
             .Match<PointBalanceMutationFailure>(
-                _ => throw new InvalidOperationException("Expected insufficient balance."),
-                failure => failure
+                static _ => throw new InvalidOperationException("Expected insufficient balance."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.InsufficientBalance>();
-        invalid
+        _ = invalid
             .Match<PointBalanceMutationFailure>(
-                _ => throw new InvalidOperationException("Expected invalid amount."),
-                failure => failure
+                static _ => throw new InvalidOperationException("Expected invalid amount."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.InvalidAmount>();
     }
@@ -344,8 +360,8 @@ public sealed class CommandCatalogTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

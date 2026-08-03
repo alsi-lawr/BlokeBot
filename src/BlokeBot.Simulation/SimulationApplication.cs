@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
 using BlokeBot.Simulation.FakeTwitch;
@@ -15,7 +16,10 @@ internal static class SimulationApplication
     internal static void ConfigureBootstrapLogging() =>
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
-            .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
+            .WriteTo.Console(
+                formatProvider: CultureInfo.InvariantCulture,
+                outputTemplate: ConsoleOutputTemplate
+            )
             .CreateBootstrapLogger();
 
     internal static async Task<SimulationApplicationHost> BuildAsync(
@@ -37,7 +41,7 @@ internal static class SimulationApplication
                     EnvironmentName = SimulationMode.EnvironmentName,
                 }
             );
-            builder.Configuration.AddInMemoryCollection(
+            _ = builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
                     [$"{TwitchEndpointPolicy.ConfigurationSectionName}:OAuthOrigin"] = new Uri(
@@ -61,34 +65,37 @@ internal static class SimulationApplication
                     ).AbsoluteUri,
                 }
             );
-            builder.WebHost.UseStaticWebAssets();
-            builder.Host.UseSerilog(
-                (context, services, logging) =>
+            _ = builder.WebHost.UseStaticWebAssets();
+            _ = builder.Host.UseSerilog(
+                static (context, services, logging) =>
                 {
-                    logging
+                    _ = logging
                         .ReadFrom.Configuration(context.Configuration)
                         .ReadFrom.Services(services);
                     if (!context.Configuration.GetSection("Serilog:WriteTo").Exists())
                     {
-                        logging
+                        _ = logging
                             .Enrich.FromLogContext()
-                            .WriteTo.Console(outputTemplate: ConsoleOutputTemplate);
+                            .WriteTo.Console(
+                                formatProvider: CultureInfo.InvariantCulture,
+                                outputTemplate: ConsoleOutputTemplate
+                            );
                     }
                 }
             );
 
-            builder.Services.AddSingleton<SimulationDatabaseKeeper>();
-            builder.Services.AddBlokeBotPersistence(services =>
+            _ = builder.Services.AddSingleton<SimulationDatabaseKeeper>();
+            _ = builder.Services.AddBlokeBotPersistence(static services =>
                 services.GetRequiredService<SimulationDatabaseKeeper>().ConnectionString
             );
-            builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
-            builder.Services.AddFakeTwitch(fakeTwitch.Authority);
-            builder.AddBlokeBotCore(BlokeBotRuntimeMode.Online);
-            builder.Services.AddBlokeBotSimulation();
+            _ = builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            _ = builder.Services.AddFakeTwitch(fakeTwitch.Authority);
+            _ = builder.AddBlokeBotCore(BlokeBotRuntimeMode.Online);
+            _ = builder.Services.AddBlokeBotSimulation();
 
             var app = builder.Build();
-            app.UseSerilogRequestLogging();
-            app.UseBlokeBotCore(BlokeBotRuntimeMode.Online);
+            _ = app.UseSerilogRequestLogging();
+            _ = app.UseBlokeBotCore(BlokeBotRuntimeMode.Online);
             app.MapSimulationEndpoints();
             return new SimulationApplicationHost(app, fakeTwitch, scenario);
         }
@@ -105,10 +112,13 @@ internal static class SimulationApplication
             arguments
                 .Select(
                     (argument, index) =>
-                        argument == "--urls" && index + 1 < arguments.Length ? arguments[index + 1]
-                        : argument.StartsWith("--urls=", StringComparison.Ordinal)
-                            ? argument["--urls=".Length..]
-                        : null
+                        argument switch
+                        {
+                            "--urls" when index + 1 < arguments.Length => arguments[index + 1],
+                            _ when argument.StartsWith("--urls=", StringComparison.Ordinal) =>
+                                argument["--urls=".Length..],
+                            _ => null,
+                        }
                 )
                 .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
             ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
@@ -130,7 +140,7 @@ internal static class SimulationApplication
     )
     {
         await app.InitializeBlokeBotPersistenceAsync(cancellationToken);
-        await app
+        _ = await app
             .Services.GetRequiredService<SimulationFixtureSeeder>()
             .SeedAsync(cancellationToken);
         app.Services.GetRequiredService<SimulationReadiness>().MarkPersistenceReady();

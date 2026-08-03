@@ -35,7 +35,12 @@ internal sealed record EventSubPollWireEvent
             Id,
             Title,
             Choices
-                .Select(x => new EventSubPollChoice(x.Id, x.Title, x.Votes, x.ChannelPointsVotes))
+                .Select(static x => new EventSubPollChoice(
+                    x.Id,
+                    x.Title,
+                    x.Votes,
+                    x.ChannelPointsVotes
+                ))
                 .ToArray(),
             Status,
             StartedAt,

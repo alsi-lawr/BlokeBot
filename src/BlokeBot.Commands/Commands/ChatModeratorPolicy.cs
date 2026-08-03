@@ -2,28 +2,16 @@ namespace BlokeBot.Commands;
 
 public static class ChatModeratorPolicy
 {
-    public static bool IsModerator(ChatMessage message)
-    {
-        if (string.Equals(message.Login, message.Channel, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (message.Tags.TryGetValue("mod", out var mod) && mod == "1")
-        {
-            return true;
-        }
-
-        if (!message.Tags.TryGetValue("badges", out var badges))
-        {
-            return false;
-        }
-
-        return badges
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(x =>
-                x.StartsWith("broadcaster/", StringComparison.OrdinalIgnoreCase)
-                || x.StartsWith("moderator/", StringComparison.OrdinalIgnoreCase)
-            );
-    }
+    public static bool IsModerator(ChatMessage message) =>
+        string.Equals(message.Login, message.Channel, StringComparison.OrdinalIgnoreCase)
+        || (message.Tags.TryGetValue("mod", out var mod) && mod == "1")
+        || (
+            message.Tags.TryGetValue("badges", out var badges)
+            && badges
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(static x =>
+                    x.StartsWith("broadcaster/", StringComparison.OrdinalIgnoreCase)
+                    || x.StartsWith("moderator/", StringComparison.OrdinalIgnoreCase)
+                )
+        );
 }

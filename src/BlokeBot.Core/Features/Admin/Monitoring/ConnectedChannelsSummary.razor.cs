@@ -6,8 +6,8 @@ public partial class ConnectedChannelsSummary
         _botStatus.Current.Match(
             static _ => "No channels connected.",
             static _ => "No channels connected.",
-            connected =>
-                $"Connected: {string.Join(", ", connected.Channels.Select(channel => $"#{channel}"))}"
+            static connected =>
+                $"Connected: {string.Join(", ", connected.Channels.Select(static channel => $"#{channel}"))}"
         );
 
     protected override void OnInitialized() => _botStatus.Changed += OnBotStatusChanged;

@@ -54,7 +54,7 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Expired);
-        giveaway.CompletedAtUtc.ShouldNotBeNull();
+        _ = giveaway.CompletedAtUtc.ShouldNotBeNull();
         (await db.PointsGiveawayWinners.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
         (await db.PointBalances.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
@@ -186,12 +186,12 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
         PointsGiveawaySchedulerFailureClassifier.IsTransient(transient).ShouldBeTrue();
         flakyFactory.Attempts.ShouldBe(2);
         scheduler.IsScheduled(giveawayId).ShouldBeTrue();
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Error
             && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
             && entry.Exception == null
         );
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Information
             && entry.Message.Contains("recovered on attempt 2", StringComparison.Ordinal)
         );
@@ -311,13 +311,13 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
 
         operations.ExpirationAttempts.ShouldBe(2);
         scheduler.IsScheduled(schedule.GiveawayId).ShouldBeFalse();
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Error
             && entry.Message.Contains("Expire failed", StringComparison.Ordinal)
             && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
             && entry.Exception == null
         );
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Information
             && entry.Message.Contains("Expire recovered", StringComparison.Ordinal)
         );
@@ -345,13 +345,13 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
         await scheduler.ExecuteScheduleAsync(ScheduleEndingAfter(now), CancellationToken.None);
 
         operations.DrawAttempts.ShouldBe(2);
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Error
             && entry.Message.Contains("Draw failed", StringComparison.Ordinal)
             && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
             && entry.Exception == null
         );
-        logger.Entries.ShouldContain(entry =>
+        logger.Entries.ShouldContain(static entry =>
             entry.Level == LogLevel.Information
             && entry.Message.Contains("Draw recovered", StringComparison.Ordinal)
         );

@@ -104,7 +104,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             announcementEntityByEditor,
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return null;
     }
@@ -190,7 +190,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomMessageLibraryEntry>();
         foreach (var editor in editors)
         {
@@ -200,7 +200,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     : new CustomMessageLibraryEntry { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
             {
-                db.CustomMessageLibraryEntries.Add(entry);
+                _ = db.CustomMessageLibraryEntries.Add(entry);
             }
 
             entry.Name = TemporaryName("message", editor.Id);
@@ -210,7 +210,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             result[editor.Id] = entry;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return result;
     }
 
@@ -223,7 +223,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomCounter>();
         foreach (var editor in editors)
         {
@@ -233,7 +233,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     : new CustomCounter { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
             {
-                db.CustomCounters.Add(counter);
+                _ = db.CustomCounters.Add(counter);
             }
 
             counter.Name = TemporaryName("counter", editor.Id);
@@ -242,7 +242,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             result[editor.Id] = counter;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return result;
     }
 
@@ -257,7 +257,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomCommand>();
         foreach (var editor in editors)
         {
@@ -267,7 +267,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     : new CustomCommand { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
             {
-                db.CustomCommands.Add(command);
+                _ = db.CustomCommands.Add(command);
             }
 
             command.Name = TemporaryName("command", editor.Id);
@@ -297,7 +297,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             result[editor.Id] = command;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return result;
     }
 
@@ -311,7 +311,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomAnnouncement>();
         foreach (var editor in editors)
         {
@@ -329,7 +329,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     };
             if (editor.Id <= 0)
             {
-                db.CustomAnnouncements.Add(announcement);
+                _ = db.CustomAnnouncements.Add(announcement);
             }
 
             announcement.Name = TemporaryName("announcement", editor.Id);
@@ -352,7 +352,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             result[editor.Id] = announcement;
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return result;
     }
 
@@ -364,7 +364,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var configuredCommands = command.Commands.Where(x => x.Id > 0).ToDictionary(x => x.Id);
+        var configuredCommands = command
+            .Commands.Where(static x => x.Id > 0)
+            .ToDictionary(static x => x.Id);
         foreach (var storedCommand in existingCommands)
         {
             if (
@@ -375,13 +377,13 @@ public sealed class CustomCommandConfigurationGraphWriter(
                 )
             )
             {
-                db.CustomCommandActions.Remove(storedCommand.Action);
+                _ = db.CustomCommandActions.Remove(storedCommand.Action);
             }
         }
 
         var configuredAnnouncements = command
-            .Announcements.Where(x => x.Id > 0)
-            .ToDictionary(x => x.Id);
+            .Announcements.Where(static x => x.Id > 0)
+            .ToDictionary(static x => x.Id);
         foreach (var announcement in existingAnnouncements)
         {
             if (
@@ -392,11 +394,11 @@ public sealed class CustomCommandConfigurationGraphWriter(
                 )
             )
             {
-                db.CustomAnnouncementSchedules.Remove(announcement.Schedule);
+                _ = db.CustomAnnouncementSchedules.Remove(announcement.Schedule);
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 
     private static async Task DeleteRemovedDependentsAsync(
@@ -424,9 +426,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .ToArray();
         var removedDeliveryPolicies = removedAnnouncements.Select(x => x.DeliveryPolicy).ToArray();
         db.CustomAnnouncements.RemoveRange(removedAnnouncements);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         db.CustomAnnouncementDeliveryPolicies.RemoveRange(removedDeliveryPolicies);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 
     private static async Task DeleteRemovedPrincipalsAsync(
@@ -452,7 +454,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         db.CustomMessageLibraryEntries.RemoveRange(
             existingMessageEntries.Where(x => !retainedMessageEntryIds.Contains(x.Id))
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 
     private static async Task ReplaceVariantsAsync(
@@ -467,14 +469,14 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .CustomMessageVariants.Where(x => entryIds.Contains(x.CustomMessageLibraryEntryId))
             .ToListAsync(ct);
         db.CustomMessageVariants.RemoveRange(existingVariants);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
 
         foreach (var editor in editors)
         {
             var entry = entries[editor.Id];
             for (var i = 0; i < editor.Variants.Count; i++)
             {
-                db.CustomMessageVariants.Add(
+                _ = db.CustomMessageVariants.Add(
                     new CustomMessageVariant
                     {
                         CustomMessageLibraryEntryId = entry.Id,
@@ -498,13 +500,13 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .CustomCommandAliases.Where(x => x.HostId == hostId)
             .ToListAsync(ct);
         db.CustomCommandAliases.RemoveRange(existingAliases);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
 
         foreach (var configured in configuredCommands)
         {
             for (var sortOrder = 0; sortOrder < configured.Aliases.Count; sortOrder++)
             {
-                db.CustomCommandAliases.Add(
+                _ = db.CustomCommandAliases.Add(
                     new CustomCommandAlias
                     {
                         HostId = hostId,
@@ -570,8 +572,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
             HasMissingPositiveId(
                 command.MessageEntries,
                 messageEntries,
-                configured => configured.Id,
-                stored => stored.Id
+                static configured => configured.Id,
+                static stored => stored.Id
             )
         )
         {
@@ -582,34 +584,34 @@ public sealed class CustomCommandConfigurationGraphWriter(
             HasMissingPositiveId(
                 command.Counters,
                 counters,
-                configured => configured.Id,
-                stored => stored.Id
+                static configured => configured.Id,
+                static stored => stored.Id
             )
         )
         {
             return new CustomCommandConfigurationSaveFailure.StaleEntity("counter");
         }
 
-        if (
-            HasMissingPositiveId(
-                command.Commands,
-                commands,
-                configured => configured.Id,
-                stored => stored.Id
-            )
-        )
-        {
-            return new CustomCommandConfigurationSaveFailure.StaleEntity("command");
-        }
-
-        return HasMissingPositiveId(
+        var commandMissing = HasMissingPositiveId(
+            command.Commands,
+            commands,
+            static configured => configured.Id,
+            static stored => stored.Id
+        );
+        var announcementMissing = HasMissingPositiveId(
             command.Announcements,
             announcements,
-            configured => configured.Id,
-            stored => stored.Id
-        )
-            ? new CustomCommandConfigurationSaveFailure.StaleEntity("announcement")
-            : null;
+            static configured => configured.Id,
+            static stored => stored.Id
+        );
+        return commandMissing switch
+        {
+            true => new CustomCommandConfigurationSaveFailure.StaleEntity("command"),
+            false when announcementMissing => new CustomCommandConfigurationSaveFailure.StaleEntity(
+                "announcement"
+            ),
+            false => null,
+        };
     }
 
     private static bool HasMissingPositiveId<TConfigured, TStored>(

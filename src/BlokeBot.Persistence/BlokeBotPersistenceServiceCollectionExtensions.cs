@@ -15,7 +15,7 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
-            Directory.CreateDirectory(directory);
+            _ = Directory.CreateDirectory(directory);
         }
 
         var connectionString = new SqliteConnectionStringBuilder
@@ -32,10 +32,10 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(connectionString);
 
-        services.AddDbContextFactory<BlokeBotDbContext>(
+        _ = services.AddDbContextFactory<BlokeBotDbContext>(
             (provider, db) => db.UseSqlite(connectionString(provider))
         );
-        services.AddSingleton<BlokeBotDatabaseInitializer>();
+        _ = services.AddSingleton<BlokeBotDatabaseInitializer>();
 
         return services;
     }

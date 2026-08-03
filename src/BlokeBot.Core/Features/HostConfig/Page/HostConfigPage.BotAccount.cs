@@ -93,7 +93,7 @@ public partial class HostConfigPage
 
         if (enabled)
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 ToastRequest<PositiveStatusToastStrategy>.WithTitle(
                     "Custom bot is turned on for this channel. Connect the account before starting the bot.",
                     "Custom bot on"
@@ -102,7 +102,7 @@ public partial class HostConfigPage
         }
         else
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 ToastRequest<CautionStatusToastStrategy>.WithTitle(
                     "Custom bot is turned off. This channel will use the main bot account.",
                     "Custom bot off"
@@ -144,7 +144,7 @@ public partial class HostConfigPage
         {
             if (enabled)
             {
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<PositiveStatusToastStrategy>.WithTitle(
                         "Command replies will use custom-bot whispers when available.",
                         "Whisper responses on"
@@ -153,7 +153,7 @@ public partial class HostConfigPage
             }
             else
             {
-                _toasts.Publish(
+                _ = _toasts.Publish(
                     ToastRequest<CautionStatusToastStrategy>.WithTitle(
                         "Command replies will use public chat.",
                         "Whisper responses off"
@@ -183,10 +183,12 @@ internal sealed record WhisperQuotaPresentation(string Text, WhisperQuotaPresent
         var displayedRecipientCount = atLimit
             ? WhisperQuotaService.UniqueRecipientLimit
             : recipientCount;
-        var state =
-            atLimit ? WhisperQuotaPresentationState.Limit
-            : recipientCount >= _cautionRecipientCount ? WhisperQuotaPresentationState.Caution
-            : WhisperQuotaPresentationState.Healthy;
+        var state = recipientCount switch
+        {
+            _ when atLimit => WhisperQuotaPresentationState.Limit,
+            >= _cautionRecipientCount => WhisperQuotaPresentationState.Caution,
+            _ => WhisperQuotaPresentationState.Healthy,
+        };
         return new($"{displayedRecipientCount}/{WhisperQuotaService.UniqueRecipientLimit}", state);
     }
 }

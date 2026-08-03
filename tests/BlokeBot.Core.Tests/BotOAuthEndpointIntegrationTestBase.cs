@@ -78,8 +78,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             BlokeBotLogging.Configure(builder.Logging);
             if (logs is not null)
             {
-                builder.Logging.ClearProviders();
-                builder.Logging.AddProvider(logs);
+                _ = builder.Logging.ClearProviders();
+                _ = builder.Logging.AddProvider(logs);
             }
             var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
             RegisterUnselectedEndpointServices(builder.Services, changes);
@@ -88,7 +88,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 changes,
                 endpointScenario
             );
-            builder.Services.AddSingleton(
+            _ = builder.Services.AddSingleton(
                 new TestAuthenticationSettings(
                     isBotAdmin,
                     selectedRole,
@@ -96,16 +96,16 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     selectedHostId ?? configuredServices?.HostId ?? 1
                 )
             );
-            builder
+            _ = builder
                 .Services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                     TestAuthenticationHandler.SchemeName,
                     static _ => { }
                 );
-            builder.Services.AddAuthorization(options =>
+            _ = builder.Services.AddAuthorization(static options =>
                 options.AddPolicy(
                     "BotAdmin",
-                    policy =>
+                    static policy =>
                         policy
                             .RequireAuthenticatedUser()
                             .AddRequirements(
@@ -113,13 +113,18 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                             )
                 )
             );
-            builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-            builder.Services.AddSingleton<IOAuthFlow>(flow ?? new StubOAuthFlow(AuthorizationUri));
+            _ = builder.Services.AddSingleton<
+                IAuthorizationHandler,
+                AuthSessionCapabilityHandler
+            >();
+            _ = builder.Services.AddSingleton<IOAuthFlow>(
+                flow ?? new StubOAuthFlow(AuthorizationUri)
+            );
 
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");
-            app.UseAuthentication();
-            app.UseAuthorization();
+            _ = app.UseAuthentication();
+            _ = app.UseAuthorization();
             if (configured)
             {
                 app.MapBotOAuthEndpoints();
@@ -158,13 +163,13 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             HostedChannelChangeNotifier changes
         )
         {
-            services.AddSingleton(Uninitialized<HostBotAccountOAuthService>());
-            services.AddSingleton(Uninitialized<HostBotAccountAuthorizationService>());
-            services.AddSingleton(changes);
-            services.AddSingleton(Uninitialized<ChannelBotOAuthService>());
-            services.AddSingleton(Uninitialized<ChannelBotAuthorizationService>());
-            services.AddSingleton(TimeProvider.System);
-            services.AddSingleton<HostBotOAuthStateStore>();
+            _ = services.AddSingleton(Uninitialized<HostBotAccountOAuthService>());
+            _ = services.AddSingleton(Uninitialized<HostBotAccountAuthorizationService>());
+            _ = services.AddSingleton(changes);
+            _ = services.AddSingleton(Uninitialized<ChannelBotOAuthService>());
+            _ = services.AddSingleton(Uninitialized<ChannelBotAuthorizationService>());
+            _ = services.AddSingleton(TimeProvider.System);
+            _ = services.AddSingleton<HostBotOAuthStateStore>();
         }
 
         private static async Task<ConfiguredEndpointServices?> ConfigureEndpointScenarioAsync(
@@ -276,8 +281,10 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 )
                 .Build();
             var oauth = new ChannelBotOAuthService(configuration, transport);
-            services.AddSingleton(oauth);
-            services.AddSingleton(new ChannelBotAuthorizationService(dbFactory, changes, oauth));
+            _ = services.AddSingleton(oauth);
+            _ = services.AddSingleton(
+                new ChannelBotAuthorizationService(dbFactory, changes, oauth)
+            );
         }
 
         private static void RegisterHostServices(
@@ -306,8 +313,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 }
             );
             var oauth = new HostBotAccountOAuthService(settings, transport, helix);
-            services.AddSingleton(oauth);
-            services.AddSingleton(
+            _ = services.AddSingleton(oauth);
+            _ = services.AddSingleton(
                 new HostBotAccountAuthorizationService(
                     dbFactory,
                     oauth,
@@ -358,8 +365,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 transport,
                 new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
             );
-            services.AddSingleton(oauth);
-            services.AddSingleton(
+            _ = services.AddSingleton(oauth);
+            _ = services.AddSingleton(
                 new HostBroadcasterAuthorizationService(
                     dbFactory,
                     HostBotAccountTokenProtectionTestSupport.CreateProtector(),
@@ -368,7 +375,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     changes
                 )
             );
-            services.AddSingleton<HostBroadcasterOAuthStateStore>();
+            _ = services.AddSingleton<HostBroadcasterOAuthStateStore>();
         }
 
         private static async Task<int> SeedEndpointHostAsync(
@@ -385,11 +392,11 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 DisplayName = "Streamer",
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             if (includeCustomBot)
             {
-                db.HostBotAccountSettings.Add(
+                _ = db.HostBotAccountSettings.Add(
                     new HostBotAccountSettings
                     {
                         HostId = host.Id,
@@ -397,7 +404,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                         UpdatedAtUtc = DateTime.UtcNow,
                     }
                 );
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
             }
 
             return host.Id;
@@ -436,9 +443,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         HttpStatusCode? validationFailureStatus = null
     ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new(userId, login, scopes, validationFailureStatus);
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) =>
+            new(new Handler(userId, login, scopes, validationFailureStatus));
 
         private sealed class Handler(
             string userId,

@@ -45,19 +45,19 @@ internal sealed class EventSubConnectionSession(
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private Uri _initialEndpoint { get; } = endpointPolicy.InitialEventSubWebSocketEndpoint;
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
-    private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
-    private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
+    private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. shoutoutObservers ?? []];
+    private readonly IPollEventObserver[] _pollObservers = [.. pollObservers ?? []];
     private readonly IChannelPointsEventObserver[] _channelPointsObservers =
     [
-        .. (channelPointsObservers ?? []),
+        .. channelPointsObservers ?? [],
     ];
     private readonly IPredictionEventObserver[] _predictionObservers =
     [
-        .. (predictionObservers ?? []),
+        .. predictionObservers ?? [],
     ];
     private readonly IIncomingRaidEventObserver[] _incomingRaidObservers =
     [
-        .. (incomingRaidObservers ?? []),
+        .. incomingRaidObservers ?? [],
     ];
     private readonly EventSubChannelReconciliationTrigger _reconciliation = reconciliation;
     private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
@@ -210,7 +210,7 @@ internal sealed class EventSubConnectionSession(
             _deliveredMessageIdOrder.Enqueue(messageId);
             if (_deliveredMessageIdOrder.Count > _deliveredMessageCapacity)
             {
-                _deliveredMessageIds.Remove(_deliveredMessageIdOrder.Dequeue());
+                _ = _deliveredMessageIds.Remove(_deliveredMessageIdOrder.Dequeue());
             }
             return true;
         }
@@ -278,12 +278,12 @@ internal sealed class EventSubConnectionSession(
             ["user-id"] = chatEvent.ChatterUserId,
             ["badges"] = string.Join(
                 ',',
-                chatEvent.Badges.Select(badge => $"{badge.SetId}/{badge.Id}")
+                chatEvent.Badges.Select(static badge => $"{badge.SetId}/{badge.Id}")
             ),
         };
 
         if (
-            chatEvent.Badges.Any(badge =>
+            chatEvent.Badges.Any(static badge =>
                 badge.SetId.Equals("moderator", StringComparison.OrdinalIgnoreCase)
             )
         )
@@ -320,23 +320,16 @@ internal sealed class EventSubConnectionSession(
         return Encoding.UTF8.GetString(message.ToArray());
     }
 
-    private static Uri RequireReconnectEndpoint(string? reconnectUrl)
-    {
-        if (
-            !Uri.TryCreate(reconnectUrl, UriKind.Absolute, out var endpoint)
-            || (
-                !endpoint.Scheme.Equals(Uri.UriSchemeWs, StringComparison.OrdinalIgnoreCase)
-                && !endpoint.Scheme.Equals(Uri.UriSchemeWss, StringComparison.OrdinalIgnoreCase)
-            )
+    private static Uri RequireReconnectEndpoint(string? reconnectUrl) =>
+        !Uri.TryCreate(reconnectUrl, UriKind.Absolute, out var endpoint)
+        || (
+            !endpoint.Scheme.Equals(Uri.UriSchemeWs, StringComparison.OrdinalIgnoreCase)
+            && !endpoint.Scheme.Equals(Uri.UriSchemeWss, StringComparison.OrdinalIgnoreCase)
         )
-        {
-            throw new InvalidOperationException(
+            ? throw new InvalidOperationException(
                 "EventSub reconnect message did not include a valid WebSocket URL."
-            );
-        }
-
-        return endpoint;
-    }
+            )
+            : endpoint;
 
     private static async ValueTask<Exception?> DisposeResourcesAsync(
         EventSubChannelSession? channelSession,

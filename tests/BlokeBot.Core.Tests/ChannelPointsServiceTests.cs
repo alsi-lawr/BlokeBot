@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -38,7 +38,7 @@ public sealed class ChannelPointsServiceTests
                     TwitchUserId = "two-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ChannelPointsHttpClientFactory();
         var events = TestEventBus.Create<AppEventKind>();
@@ -84,7 +84,7 @@ public sealed class ChannelPointsServiceTests
                 "viewer",
                 "hello",
                 HelixRewardRedemptionStatus.Unfulfilled,
-                DateTimeOffset.Parse("2026-07-26T10:00:00Z"),
+                DateTimeOffset.Parse("2026-07-26T10:00:00Z", CultureInfo.InvariantCulture),
                 "message-1"
             ),
             CancellationToken.None
@@ -100,7 +100,7 @@ public sealed class ChannelPointsServiceTests
                 "viewer",
                 "hello",
                 HelixRewardRedemptionStatus.Unfulfilled,
-                DateTimeOffset.Parse("2026-07-26T10:00:00Z"),
+                DateTimeOffset.Parse("2026-07-26T10:00:00Z", CultureInfo.InvariantCulture),
                 "message-1"
             ),
             CancellationToken.None
@@ -118,9 +118,9 @@ public sealed class ChannelPointsServiceTests
             CancellationToken.None
         );
 
-        created.ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
-        fulfilled.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
-        wrongHost.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionNotActionable>();
+        _ = created.ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
+        _ = fulfilled.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
+        _ = wrongHost.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionNotActionable>();
         http.RedemptionPatches.ShouldBe(1);
         http.AllRewardsLists.ShouldBe(1);
         http.ManageableRewardsLists.ShouldBe(1);
@@ -134,7 +134,8 @@ public sealed class ChannelPointsServiceTests
         (await verify.TwitchCustomRewards.SingleAsync()).IsManageable.ShouldBeTrue();
         http.ReturnIneligibleCustomRewards = true;
         var ineligible = await service.LoadAsync(1, CancellationToken.None);
-        ineligible.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ineligible>();
+        _ =
+            ineligible.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ineligible>();
     }
 
     [Test]
@@ -143,7 +144,7 @@ public sealed class ChannelPointsServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     Login = "one",
@@ -152,7 +153,7 @@ public sealed class ChannelPointsServiceTests
                     EnabledFeatures = HostFeatureFlags.Guessing,
                 }
             );
-            db.TwitchCustomRewards.Add(
+            _ = db.TwitchCustomRewards.Add(
                 new TwitchCustomReward
                 {
                     HostId = 1,
@@ -162,7 +163,7 @@ public sealed class ChannelPointsServiceTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ChannelPointsHttpClientFactory();
         var service = CreateService(dbFactory, http);
@@ -175,7 +176,7 @@ public sealed class ChannelPointsServiceTests
             CancellationToken.None
         );
 
-        disabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Disabled>();
+        _ = disabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Disabled>();
         disabled.Rewards.ShouldBeEmpty();
         mutation
             .ShouldBeOfType<ChannelPointsOperationOutcome.NotReady>()
@@ -192,7 +193,7 @@ public sealed class ChannelPointsServiceTests
         await SetNativeAsync(dbFactory, true);
         var enabled = await service.LoadAsync(1, CancellationToken.None);
 
-        enabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ready>();
+        _ = enabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ready>();
         enabled.Rewards.ShouldHaveSingleItem().ProviderRewardId.ShouldBe("managed");
         http.Requests.ShouldBeGreaterThan(0);
     }
@@ -203,7 +204,7 @@ public sealed class ChannelPointsServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -212,7 +213,7 @@ public sealed class ChannelPointsServiceTests
                     TwitchUserId = "one-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ChannelPointsHttpClientFactory
         {
@@ -222,7 +223,7 @@ public sealed class ChannelPointsServiceTests
 
         var outcome = await service.CreateRewardAsync(1, ValidDraft(), CancellationToken.None);
 
-        outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
+        _ = outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.TwitchCustomRewards.ToArrayAsync())
             .ShouldHaveSingleItem()
@@ -245,7 +246,7 @@ public sealed class ChannelPointsServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -254,7 +255,7 @@ public sealed class ChannelPointsServiceTests
                     TwitchUserId = "one-id",
                 }
             );
-            db.TwitchCustomRewards.Add(
+            _ = db.TwitchCustomRewards.Add(
                 new TwitchCustomReward
                 {
                     HostId = 1,
@@ -267,7 +268,7 @@ public sealed class ChannelPointsServiceTests
             );
             for (var index = 0; index < 101; index++)
             {
-                db.TwitchRewardRedemptions.Add(
+                _ = db.TwitchRewardRedemptions.Add(
                     new TwitchRewardRedemption
                     {
                         HostId = 1,
@@ -282,7 +283,7 @@ public sealed class ChannelPointsServiceTests
                     }
                 );
             }
-            db.TwitchRewardRedemptions.Add(
+            _ = db.TwitchRewardRedemptions.Add(
                 new TwitchRewardRedemption
                 {
                     HostId = 1,
@@ -296,7 +297,7 @@ public sealed class ChannelPointsServiceTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ChannelPointsHttpClientFactory
         {
@@ -313,7 +314,7 @@ public sealed class ChannelPointsServiceTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
+        _ = outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
         await using var verify = await dbFactory.CreateDbContextAsync();
         var redemptions = await verify.TwitchRewardRedemptions.ToArrayAsync();
         redemptions.Length.ShouldBe(expectedTotal);
@@ -321,7 +322,9 @@ public sealed class ChannelPointsServiceTests
             .Single(value => value.ProviderRedemptionId == "redemption")
             .Status.ShouldBe(TwitchRewardRedemptionStatus.Fulfilled);
         redemptions
-            .Count(value => value.ProviderRedemptionId.StartsWith("history-"))
+            .Count(value =>
+                value.ProviderRedemptionId.StartsWith("history-", StringComparison.Ordinal)
+            )
             .ShouldBe(expectedHistory);
     }
 
@@ -386,7 +389,7 @@ public sealed class ChannelPointsServiceTests
         host.EnabledFeatures = enabled
             ? host.EnabledFeatures | HostFeatureFlags.RewardsAndRedemptions
             : host.EnabledFeatures & ~HostFeatureFlags.RewardsAndRedemptions;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
@@ -404,15 +407,15 @@ public sealed class ChannelPointsServiceTests
                         hostId == 1 ? "one" : "two",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

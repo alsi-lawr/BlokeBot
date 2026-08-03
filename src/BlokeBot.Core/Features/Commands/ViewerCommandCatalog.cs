@@ -23,7 +23,7 @@ public sealed record ViewerCommandCatalogSnapshot(
     IReadOnlyList<string> UnavailableFeatures
 )
 {
-    public IReadOnlyList<string> Names => Entries.Select(entry => entry.Name).ToArray();
+    public IReadOnlyList<string> Names => Entries.Select(static entry => entry.Name).ToArray();
 }
 
 public sealed class ViewerCommandCatalogService(

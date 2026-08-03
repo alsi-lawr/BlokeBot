@@ -84,16 +84,13 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>.Create(_ =>
             {
                 DrawAttempts++;
-                if (DrawException is { } exception)
-                {
-                    return ValueTask.FromException<
+                return DrawException is { } exception
+                    ? ValueTask.FromException<
                         Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>
-                    >(exception);
-                }
-
-                return ValueTask.FromResult(
-                    Next(DrawOutcomes, new PointsGiveawayDrawOutcome.Missing())
-                );
+                    >(exception)
+                    : ValueTask.FromResult(
+                        Next(DrawOutcomes, new PointsGiveawayDrawOutcome.Missing())
+                    );
             });
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(

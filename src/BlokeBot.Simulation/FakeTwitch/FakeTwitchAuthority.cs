@@ -200,25 +200,35 @@ public sealed class FakeTwitchAuthority
     {
         lock (_gate)
         {
-            if (
-                !string.Equals(
-                    request.Headers["Client-Id"],
-                    Definition.ClientId,
-                    StringComparison.Ordinal
+            switch
+                (
+                    string.Equals(
+                        request.Headers["Client-Id"],
+                        Definition.ClientId,
+                        StringComparison.Ordinal
+                    ),
+                    TryGetGrant(ReadBearerToken(request), out var grant),
+                    grant is { User: not null }
                 )
-                || !TryGetGrant(ReadBearerToken(request), out var grant)
-                || grant.User is null
-            )
+
             {
-                throw new FakeTwitchProtocolException(HttpStatusCode.Unauthorized, "invalid_token");
+                case (false, _, _):
+                case (_, false, _):
+                case (_, _, false):
+                    throw new FakeTwitchProtocolException(
+                        HttpStatusCode.Unauthorized,
+                        "invalid_token"
+                    );
             }
 
-            if (scopes.Any(scope => !grant.Scopes.Contains(scope)))
+            return scopes.Any(scope => !grant.Scopes.Contains(scope)) switch
             {
-                throw new FakeTwitchProtocolException(HttpStatusCode.Forbidden, "missing_scope");
-            }
-
-            return grant.User;
+                true => throw new FakeTwitchProtocolException(
+                    HttpStatusCode.Forbidden,
+                    "missing_scope"
+                ),
+                false => grant.User!,
+            };
         }
     }
 
@@ -350,13 +360,14 @@ public sealed class FakeTwitchAuthority
                 or "channel.channel_points_custom_reward_redemption.update";
         if (
             version != "1"
-            || !botSubscription && !raidSubscription && !broadcasterSubscription
+            || (!botSubscription && !raidSubscription && !broadcasterSubscription)
             || !condition.TryGetValue(
                 raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
                 out var broadcasterId
             )
             || broadcasterId != Definition.AuthorizedUser.Id
-            || botSubscription
+            || (
+                botSubscription
                 && (
                     subscriber.Id != Definition.BotUser.Id
                     || !condition.TryGetValue(
@@ -365,8 +376,9 @@ public sealed class FakeTwitchAuthority
                     )
                     || botId != Definition.BotUser.Id
                 )
-            || raidSubscription && subscriber.Id != Definition.BotUser.Id
-            || broadcasterSubscription && subscriber.Id != Definition.AuthorizedUser.Id
+            )
+            || (raidSubscription && subscriber.Id != Definition.BotUser.Id)
+            || (broadcasterSubscription && subscriber.Id != Definition.AuthorizedUser.Id)
         )
         {
             throw new FakeTwitchProtocolException(
@@ -485,42 +497,31 @@ public sealed class FakeTwitchAuthority
 
     public void CloseSession(string id)
     {
+        FakeTwitchSession? session;
         lock (_gate)
         {
-            _sessions.Remove(id);
+            _ = _sessions.Remove(id, out session);
             Record("eventsub.disconnect", id);
         }
+
+        session?.Dispose();
     }
 
-    private FakeTwitchToken ExchangeCode(string? code, string? redirectUri)
-    {
-        if (
-            string.IsNullOrWhiteSpace(code)
-            || !_codes.Remove(code, out var authorization)
-            || !string.Equals(authorization.RedirectUri, redirectUri, StringComparison.Ordinal)
-        )
-        {
-            throw new FakeTwitchProtocolException(HttpStatusCode.BadRequest, "invalid_code");
-        }
+    private FakeTwitchToken ExchangeCode(string? code, string? redirectUri) =>
+        string.IsNullOrWhiteSpace(code)
+        || !_codes.Remove(code, out var authorization)
+        || !string.Equals(authorization.RedirectUri, redirectUri, StringComparison.Ordinal)
+            ? throw new FakeTwitchProtocolException(HttpStatusCode.BadRequest, "invalid_code")
+            : UserToken(authorization.User, authorization.Scopes, "oauth.exchange");
 
-        return UserToken(authorization.User, authorization.Scopes, "oauth.exchange");
-    }
-
-    private FakeTwitchToken Refresh(string? refreshToken)
-    {
-        if (
-            string.IsNullOrWhiteSpace(refreshToken)
-            || !_refreshTokens.Remove(refreshToken, out var grant)
-        )
-        {
-            throw new FakeTwitchProtocolException(
+    private FakeTwitchToken Refresh(string? refreshToken) =>
+        string.IsNullOrWhiteSpace(refreshToken)
+        || !_refreshTokens.Remove(refreshToken, out var grant)
+            ? throw new FakeTwitchProtocolException(
                 HttpStatusCode.BadRequest,
                 "invalid_refresh_token"
-            );
-        }
-
-        return UserToken(grant.User!, grant.Scopes, "oauth.refresh");
-    }
+            )
+            : UserToken(grant.User!, grant.Scopes, "oauth.refresh");
 
     private FakeTwitchToken UserToken(
         FakeTwitchUser user,
@@ -711,7 +712,7 @@ public static class FakeTwitchHostingExtensions
     )
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddSingleton(new FakeTwitchAuthority(scenario));
+        _ = services.AddSingleton(new FakeTwitchAuthority(scenario));
         return services;
     }
 
@@ -722,60 +723,66 @@ public static class FakeTwitchHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(authority);
-        services.AddSingleton(authority);
+        _ = services.AddSingleton(authority);
         return services;
     }
 
     public static WebApplication MapFakeTwitch(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        app.UseWebSockets();
+        _ = app.UseWebSockets();
         var authority = app.Services.GetRequiredService<FakeTwitchAuthority>();
 
-        app.MapGet("/oauth2/authorize", (HttpRequest request) => Authorize(authority, request));
-        app.MapPost("/oauth2/token", (HttpRequest request) => TokenAsync(authority, request));
-        app.MapGet("/oauth2/validate", (HttpRequest request) => Validate(authority, request));
-        app.MapGet("/helix/users", (HttpRequest request) => Users(authority, request));
-        app.MapGet("/helix/streams", (HttpRequest request) => Streams(authority, request));
-        app.MapPost("/helix/clips", (HttpRequest request) => CreateClip(authority, request));
-        app.MapGet("/helix/clips", (HttpRequest request) => Clips(authority, request));
-        app.MapPost(
+        _ = app.MapGet("/oauth2/authorize", (HttpRequest request) => Authorize(authority, request));
+        _ = app.MapPost("/oauth2/token", (HttpRequest request) => TokenAsync(authority, request));
+        _ = app.MapGet("/oauth2/validate", (HttpRequest request) => Validate(authority, request));
+        _ = app.MapGet("/helix/users", (HttpRequest request) => Users(authority, request));
+        _ = app.MapGet("/helix/streams", (HttpRequest request) => Streams(authority, request));
+        _ = app.MapPost("/helix/clips", (HttpRequest request) => CreateClip(authority, request));
+        _ = app.MapGet("/helix/clips", (HttpRequest request) => Clips(authority, request));
+        _ = app.MapPost(
             "/helix/streams/markers",
             (HttpRequest request) => CreateMarkerAsync(authority, request)
         );
-        app.MapGet("/helix/streams/markers", (HttpRequest request) => Markers(authority, request));
-        app.MapGet("/profile-images/{login}.svg", (string login) => ProfileImage(authority, login));
-        app.MapGet(
+        _ = app.MapGet(
+            "/helix/streams/markers",
+            (HttpRequest request) => Markers(authority, request)
+        );
+        _ = app.MapGet(
+            "/profile-images/{login}.svg",
+            (string login) => ProfileImage(authority, login)
+        );
+        _ = app.MapGet(
             "/helix/channels/followers",
             (HttpRequest request) => Followers(authority, request)
         );
-        app.MapGet(
+        _ = app.MapGet(
             "/helix/moderation/channels",
             (HttpRequest request) => ModeratedChannels(authority, request)
         );
-        app.MapGet(
+        _ = app.MapGet(
             "/helix/chat/settings",
             (HttpRequest request) => ChatSettings(authority, request)
         );
-        app.MapPost(
+        _ = app.MapPost(
             "/helix/eventsub/subscriptions",
             (HttpRequest request) => SubscribeAsync(authority, request)
         );
-        app.MapDelete(
+        _ = app.MapDelete(
             "/helix/eventsub/subscriptions",
             (HttpRequest request) => Unsubscribe(authority, request)
         );
-        app.MapPost(
+        _ = app.MapPost(
             "/helix/chat/messages",
             (HttpRequest request) => ChatMessageAsync(authority, request)
         );
-        app.Map("/ws", context => WebSocketAsync(authority, context));
-        app.MapMethods(
+        _ = app.Map("/ws", context => WebSocketAsync(authority, context));
+        _ = app.MapMethods(
             "/oauth2/{**path}",
             ["GET", "POST", "PUT", "PATCH", "DELETE"],
             (HttpRequest request) => Unsupported(request)
         );
-        app.MapMethods(
+        _ = app.MapMethods(
             "/helix/{**path}",
             ["GET", "POST", "PUT", "PATCH", "DELETE"],
             (HttpRequest request) => Unsupported(request)
@@ -1035,7 +1042,7 @@ public static class FakeTwitchHostingExtensions
                                     video_id = "fake-video",
                                     markers = authority
                                         .Markers(request)
-                                        .Select(marker => new
+                                        .Select(static marker => new
                                         {
                                             id = marker.Id,
                                             description = marker.Description,
@@ -1414,13 +1421,19 @@ public sealed record FakeTwitchTokenValidation(
 );
 
 /// <summary>Represents a fake EventSub WebSocket session.</summary>
-public sealed class FakeTwitchSession(string id, WebSocket socket)
+public sealed class FakeTwitchSession(string id, WebSocket socket) : IDisposable
 {
     private readonly SemaphoreSlim _sendGate = new(1, 1);
 
     public string Id { get; } = id;
 
     public WebSocket Socket { get; } = socket;
+
+    public void Dispose()
+    {
+        _sendGate.Wait();
+        _sendGate.Dispose();
+    }
 
     public async Task SendAsync(string payload)
     {
@@ -1436,7 +1449,7 @@ public sealed class FakeTwitchSession(string id, WebSocket socket)
         }
         finally
         {
-            _sendGate.Release();
+            _ = _sendGate.Release();
         }
     }
 }

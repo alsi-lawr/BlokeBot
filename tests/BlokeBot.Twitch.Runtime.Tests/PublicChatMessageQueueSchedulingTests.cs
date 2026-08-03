@@ -29,7 +29,7 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
         clock.GetUtcNow().ShouldBe(now);
         outbox
             .ClaimCalls.Take(2)
-            .Select(call => call.Outcome.GetType())
+            .Select(static call => call.Outcome.GetType())
             .ShouldBe([
                 typeof(PublicChatClaimOutcome.AwaitingAvailability),
                 typeof(PublicChatClaimOutcome.Claimed),
@@ -56,10 +56,10 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
         outbox
             .ClaimCalls.Take(2)
-            .Select(call => call.Outcome.GetType())
+            .Select(static call => call.Outcome.GetType())
             .ShouldBe([
                 typeof(PublicChatClaimOutcome.Contended),
                 typeof(PublicChatClaimOutcome.Claimed),
@@ -88,9 +88,9 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
         outbox
-            .BeginSendCalls.Select(call => call.Update.GetType())
+            .BeginSendCalls.Select(static call => call.Update.GetType())
             .ShouldBe([
                 typeof(PublicChatClaimUpdate.Contended),
                 typeof(PublicChatClaimUpdate.Applied),
@@ -116,7 +116,7 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
             TimeSpan.FromSeconds(5),
             enabled: true
         );
-        firstIncidents.Select(alert => alert.Channel).ShouldBe(["first", "second"]);
+        firstIncidents.Select(static alert => alert.Channel).ShouldBe(["first", "second"]);
         monitor.CaptureAlerts(pending, now, TimeSpan.FromSeconds(5), enabled: true).ShouldBeEmpty();
 
         monitor.ResetDrainedChannels([new("second", now)]);
@@ -126,7 +126,7 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
             TimeSpan.FromSeconds(5),
             enabled: true
         );
-        nextFirstIncident.Select(alert => alert.Channel).ShouldBe(["first"]);
+        nextFirstIncident.Select(static alert => alert.Channel).ShouldBe(["first"]);
     }
 
     [Test]

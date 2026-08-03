@@ -10,7 +10,7 @@ internal sealed class ChatBotBuilder(IServiceCollection services) : IChatBotBuil
     public IChatBotBuilder AddCommands(Action<IChatCommandBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        Services.AddSingleton(new ChatCommandRegistration { Configure = configure });
+        _ = Services.AddSingleton(new ChatCommandRegistration { Configure = configure });
         return this;
     }
 

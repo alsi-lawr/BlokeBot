@@ -25,14 +25,14 @@ public sealed class CustomAnnouncementCandidateTests : CustomAnnouncementSchedul
             enabledFeatures: HostFeatureFlags.Points,
             changedAtUtc: now.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             stoppedHostId,
             new IntervalCustomAnnouncementSchedule(),
             ["Stopped"],
             createdAtUtc: now.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             disabledHostId,
             new IntervalCustomAnnouncementSchedule(),
@@ -164,7 +164,7 @@ public sealed class CustomAnnouncementCandidateTests : CustomAnnouncementSchedul
             timeZoneId: "Europe/London",
             changedAtUtc: now.AddHours(-2).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
             new WeeklyCustomAnnouncementSchedule

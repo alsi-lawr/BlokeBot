@@ -53,7 +53,7 @@ internal sealed class SimulationStartupCoordinator(SimulationFixtureSeeder fixtu
                         $"Simulation OAuth bootstrap failed at {next} with {(int)response.StatusCode}: {body}"
                     );
                 }
-                response.EnsureSuccessStatusCode();
+                _ = response.EnsureSuccessStatusCode();
                 return;
             }
 

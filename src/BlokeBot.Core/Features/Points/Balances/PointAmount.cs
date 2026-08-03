@@ -40,27 +40,32 @@ public readonly record struct PointAmount : IComparable<PointAmount>
 
     public int CompareTo(PointAmount other) => Value.CompareTo(other.Value);
 
+    public static bool operator <(PointAmount left, PointAmount right) => left.Value < right.Value;
+
+    public static bool operator <=(PointAmount left, PointAmount right) =>
+        left.Value <= right.Value;
+
+    public static bool operator >(PointAmount left, PointAmount right) => left.Value > right.Value;
+
+    public static bool operator >=(PointAmount left, PointAmount right) =>
+        left.Value >= right.Value;
+
     public PointAmount Add(PointAmount amount) => new(Value + amount.Value);
 
-    public PointAmount Subtract(PointAmount amount)
-    {
-        if (amount.Value > Value)
-        {
-            throw new InvalidOperationException("Point balance cannot become negative.");
-        }
-
-        return new PointAmount(Value - amount.Value);
-    }
+    public PointAmount Subtract(PointAmount amount) =>
+        amount.Value > Value
+            ? throw new InvalidOperationException("Point balance cannot become negative.")
+            : new PointAmount(Value - amount.Value);
 
     public string ToDisplayString() => FormatForDisplay(Value, _displaySignificantFigures);
 
-    public override string ToString() => Value.ToString();
+    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture);
 
     public static PointAmount ParseAbsolute(string? value) =>
         ParseNonNegativeAbsolute(value)
             .Match(
                 static amount => amount,
-                error =>
+                static error =>
                     throw error switch
                     {
                         PointAmountParseError.InvalidFormat => new FormatException(
@@ -81,28 +86,21 @@ public readonly record struct PointAmount : IComparable<PointAmount>
     )
     {
         var text = (value ?? string.Empty).Trim();
-        if (
-            !BigInteger.TryParse(
-                text,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var parsed
-            )
-        )
+        return BigInteger.TryParse(
+            text,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var parsed
+        ) switch
         {
-            return Result<PointAmount, PointAmountParseError>.Error(
+            false => Result<PointAmount, PointAmountParseError>.Error(
                 PointAmountParseError.InvalidFormat
-            );
-        }
-
-        if (parsed > MaximumValue)
-        {
-            return Result<PointAmount, PointAmountParseError>.Error(
+            ),
+            true when parsed > MaximumValue => Result<PointAmount, PointAmountParseError>.Error(
                 PointAmountParseError.AmountOutOfRange
-            );
-        }
-
-        return Result<PointAmount, PointAmountParseError>.Success(new PointAmount(parsed));
+            ),
+            _ => Result<PointAmount, PointAmountParseError>.Success(new PointAmount(parsed)),
+        };
     }
 
     private static string FormatForDisplay(BigInteger value, int significantFigures)
@@ -113,13 +111,13 @@ public readonly record struct PointAmount : IComparable<PointAmount>
         }
 
         var rounded = RoundToSignificantFigures(value, significantFigures);
-        var digits = rounded.ToString();
+        var digits = rounded.ToString(CultureInfo.InvariantCulture);
         if (digits.Length <= significantFigures)
         {
             return rounded.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        var compactExponent = ((digits.Length - 1) / 3) * 3;
+        var compactExponent = (digits.Length - 1) / 3 * 3;
         var suffixIndex = compactExponent / 3;
         if (suffixIndex < _compactSuffixes.Length)
         {
@@ -156,13 +154,13 @@ public readonly record struct PointAmount : IComparable<PointAmount>
             return BigInteger.Zero;
         }
 
-        var digits = value.ToString();
+        var digits = value.ToString(CultureInfo.InvariantCulture);
         if (digits.Length <= significantFigures)
         {
             return value;
         }
 
-        var kept = BigInteger.Parse(digits[..significantFigures]);
+        var kept = BigInteger.Parse(digits[..significantFigures], CultureInfo.InvariantCulture);
         if (digits[significantFigures] >= '5')
         {
             kept += BigInteger.One;

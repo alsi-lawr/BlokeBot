@@ -28,7 +28,7 @@ internal sealed class AuthorizedHostSelectionService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var selfHost = await LoadSelfHostChoice(db, userLogin).ExecuteAsync(ct);
-        selfHost.Match(
+        _ = selfHost.Match(
             host =>
                 host.Match(
                     value =>
@@ -119,8 +119,8 @@ internal sealed class AuthorizedHostSelectionService(
 
     private static BotHostChoice[] Sort(IEnumerable<BotHostChoice> choices) =>
         choices
-            .DistinctBy(host => host.Id)
-            .OrderByDescending(host => host.Role == AuthRole.Streamer)
-            .ThenBy(host => host.DisplayName)
+            .DistinctBy(static host => host.Id)
+            .OrderByDescending(static host => host.Role == AuthRole.Streamer)
+            .ThenBy(static host => host.DisplayName)
             .ToArray();
 }

@@ -8,7 +8,7 @@ public sealed class BlokeBotDbContextFactory : IDesignTimeDbContextFactory<Bloke
     public BlokeBotDbContext CreateDbContext(string[] args)
     {
         var builder = new DbContextOptionsBuilder<BlokeBotDbContext>();
-        builder.UseSqlite("Data Source=blokebot.db");
+        _ = builder.UseSqlite("Data Source=blokebot.db");
         return new BlokeBotDbContext(builder.Options);
     }
 }

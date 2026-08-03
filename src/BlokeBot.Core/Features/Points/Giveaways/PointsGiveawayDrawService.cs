@@ -166,7 +166,7 @@ public sealed class PointsGiveawayDrawService(
             List<PointsGiveawayWinnerPayout> winnerPayouts
         )
         {
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
             await CommitAsync(tx, giveawayId, completed, ct);
             foreach (var presenter in eventPresenters)

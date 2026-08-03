@@ -36,11 +36,11 @@ internal sealed partial class EfPublicChatOutbox
                 completedAt,
                 cancellationToken
             );
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             if (alertCreated && events is not null)
             {
-                await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+                _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
             }
             return changed;
         }
@@ -52,7 +52,7 @@ internal sealed partial class EfPublicChatOutbox
     }
 
     private static int? HttpStatusCode(PublicChatHttpStatus status) =>
-        status.Match<int?>(known => known.Value, () => null);
+        status.Match<int?>(static known => known.Value, static () => null);
 
     private static bool IsSqliteContention(Exception exception) =>
         exception switch

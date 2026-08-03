@@ -25,7 +25,7 @@ public partial class PlayQueuesPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -407,7 +407,7 @@ public partial class PlayQueuesPage
             ? "No entry details"
             : string.Join(
                 " · ",
-                entry.Public.Fields.Select(value => $"{value.Label}: {value.Value}")
+                entry.Public.Fields.Select(static value => $"{value.Label}: {value.Value}")
             );
 
     private sealed class EntryDraft
@@ -506,7 +506,7 @@ public partial class PlayQueuesPage
                 readiness,
                 history,
                 exclusion,
-                Fields.Select(value => value.ToCommand()).ToArray(),
+                Fields.Select(static value => value.ToCommand()).ToArray(),
                 roles
             );
         }
@@ -543,7 +543,7 @@ public partial class PlayQueuesPage
                 SkipExclusion = queue.SkipExclusionMinutes.ToString(CultureInfo.InvariantCulture),
                 RoleRequirements = string.Join(
                     ", ",
-                    queue.RoleRequirements.Select(role => $"{role.Role}={role.MinimumCount}")
+                    queue.RoleRequirements.Select(static role => $"{role.Role}={role.MinimumCount}")
                 ),
             };
             value.Fields.AddRange(queue.Fields.Select(FieldDraft.From));

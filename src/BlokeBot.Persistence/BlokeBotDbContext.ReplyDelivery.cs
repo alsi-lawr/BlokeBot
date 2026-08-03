@@ -6,37 +6,37 @@ namespace BlokeBot.Persistence;
 public sealed partial class BlokeBotDbContext
 {
     private static void ConfigureReplyDelivery(ModelBuilder modelBuilder) =>
-        modelBuilder.Entity<ReplyDeliverySetting>(b =>
+        modelBuilder.Entity<ReplyDeliverySetting>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "reply_delivery_settings",
-                t =>
+                static t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_reply_delivery_settings_Feature",
                         KindIn("Feature", ReplyFeaturePersistence.Tokens)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_reply_delivery_settings_Target",
                         KindIn("Target", ReplyDeliveryTargetPersistence.Tokens)
                     );
                 }
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Feature)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Feature)
                 .HasConversion(
-                    feature => ReplyFeaturePersistence.ToToken(feature),
-                    token => ReplyFeaturePersistence.FromToken(token)
+                    static feature => ReplyFeaturePersistence.ToToken(feature),
+                    static token => ReplyFeaturePersistence.FromToken(token)
                 )
                 .HasMaxLength(64);
-            b.Property(x => x.ReplyKey).HasMaxLength(128);
-            b.Property(x => x.Target)
+            _ = b.Property(static x => x.ReplyKey).HasMaxLength(128);
+            _ = b.Property(static x => x.Target)
                 .HasConversion(
-                    target => ReplyDeliveryTargetPersistence.ToToken(target),
-                    token => ReplyDeliveryTargetPersistence.FromToken(token)
+                    static target => ReplyDeliveryTargetPersistence.ToToken(target),
+                    static token => ReplyDeliveryTargetPersistence.FromToken(token)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => new
+            _ = b.HasIndex(static x => new
                 {
                     x.HostId,
                     x.Feature,
@@ -44,9 +44,9 @@ public sealed partial class BlokeBotDbContext
                     x.ReplyKey,
                 })
                 .IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 }

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
@@ -21,7 +22,7 @@ public sealed class FollowerOnlyChatReadinessTests
 
         var readiness = await GetReadinessAsync(service);
 
-        readiness.ShouldBeOfType<FollowerOnlyChatReadiness.NotRequired>();
+        _ = readiness.ShouldBeOfType<FollowerOnlyChatReadiness.NotRequired>();
         tokens.RequestCount.ShouldBe(0);
         http.RequestPaths.ShouldBe(["/helix/users", "/helix/chat/settings"]);
         http.ChatSettingsAccessToken.ShouldBe("app-token");
@@ -104,7 +105,7 @@ public sealed class FollowerOnlyChatReadinessTests
 
         var readiness = await GetReadinessAsync(service);
 
-        readiness.ShouldBeOfType<FollowerOnlyChatReadiness.NotFollowing>();
+        _ = readiness.ShouldBeOfType<FollowerOnlyChatReadiness.NotFollowing>();
     }
 
     [Test]
@@ -192,7 +193,7 @@ public sealed class FollowerOnlyChatReadinessTests
                 ),
                 requiredScopes,
                 grantedScopes,
-                ImmutableArray.Create(Scopes.UserReadFollows)
+                [Scopes.UserReadFollows]
             ),
         };
     }
@@ -226,10 +227,6 @@ public sealed class FollowerOnlyChatReadinessTests
 
     private sealed class FollowerOnlyChatHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler _handler;
-
-        public FollowerOnlyChatHttpClientFactory() => _handler = new Handler(this);
-
         public bool FollowerMode { get; init; }
 
         public int? FollowerModeDurationMinutes { get; init; }
@@ -254,7 +251,7 @@ public sealed class FollowerOnlyChatReadinessTests
 
         public string? FollowedRequestModeratorId { get; private set; }
 
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) => new(new Handler(this));
 
         private sealed class Handler(FollowerOnlyChatHttpClientFactory owner) : HttpMessageHandler
         {
@@ -284,7 +281,7 @@ public sealed class FollowerOnlyChatReadinessTests
                 owner.ChatSettingsAccessToken = request.Headers.Authorization?.Parameter;
                 QueryValue(request.RequestUri, "broadcaster_id").ShouldBe("channel-id");
                 return JsonResponse(
-                    $$"""{"data":[{"follower_mode":{{owner.FollowerMode.ToString().ToLowerInvariant()}},"follower_mode_duration":{{owner.FollowerModeDurationMinutes?.ToString() ?? "null"}}}]}"""
+                    $$"""{"data":[{"follower_mode":{{owner.FollowerMode.ToString(CultureInfo.InvariantCulture).ToLowerInvariant()}},"follower_mode_duration":{{owner.FollowerModeDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? "null"}}}]}"""
                 );
             }
 
@@ -321,28 +318,23 @@ public sealed class FollowerOnlyChatReadinessTests
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
 
-            private static string? QueryValue(Uri? uri, string key)
-            {
-                if (string.IsNullOrWhiteSpace(uri?.Query))
-                {
-                    return null;
-                }
-
-                return uri
-                    .Query.TrimStart('?')
-                    .Split('&', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(part => part.Split('=', 2))
-                    .Where(parts => parts.Length == 2)
-                    .Where(parts =>
-                        string.Equals(
-                            Uri.UnescapeDataString(parts[0]),
-                            key,
-                            StringComparison.Ordinal
+            private static string? QueryValue(Uri? uri, string key) =>
+                string.IsNullOrWhiteSpace(uri?.Query)
+                    ? null
+                    : uri
+                        .Query.TrimStart('?')
+                        .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(part => part.Split('=', 2))
+                        .Where(parts => parts.Length == 2)
+                        .Where(parts =>
+                            string.Equals(
+                                Uri.UnescapeDataString(parts[0]),
+                                key,
+                                StringComparison.Ordinal
+                            )
                         )
-                    )
-                    .Select(parts => Uri.UnescapeDataString(parts[1]))
-                    .SingleOrDefault();
-            }
+                        .Select(parts => Uri.UnescapeDataString(parts[1]))
+                        .SingleOrDefault();
         }
     }
 }

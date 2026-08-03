@@ -31,7 +31,7 @@ public sealed class PublicChatPinStoreTests
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         (
-            await verify.PublicChatPinOperations.CountAsync(operation =>
+            await verify.PublicChatPinOperations.CountAsync(static operation =>
                 operation.Kind == PublicChatPinOperationKind.Unpin
             )
         ).ShouldBe(expectedResetCount);
@@ -127,7 +127,7 @@ public sealed class PublicChatPinStoreTests
                 pin.HostId == item.HostId
             );
             newerOwnership.PinnerTwitchUserId = "other-pinner";
-            await replace.SaveChangesAsync();
+            _ = await replace.SaveChangesAsync();
         }
         AssertUnpinTerminal(item, "exact", "unpin-ambiguous-after-restart");
         AssertUnpinTerminal(item, "permission", "permission-denied");
@@ -140,7 +140,7 @@ public sealed class PublicChatPinStoreTests
             "exact",
             "missing-recorded-pinner"
         );
-        PublicChatPinProviderDecision
+        _ = PublicChatPinProviderDecision
             .ClassifyUnpinRead(
                 item,
                 CurrentPin("absent"),
@@ -226,7 +226,7 @@ public sealed class PublicChatPinStoreTests
     {
         var (hostId, roundId) = await SeedHostAndRoundAsync(dbFactory, roundStatus);
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.PublicChatPinOperations.Add(
+        _ = db.PublicChatPinOperations.Add(
             new PublicChatPinOperation
             {
                 Kind = PublicChatPinOperationKind.Pin,
@@ -244,7 +244,7 @@ public sealed class PublicChatPinStoreTests
                     status == PublicChatPinOperationStatus.Attempting ? DateTime.UtcNow : null,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task SeedUnpinOperationAndOwnershipAsync(SqliteBlokeBotDbFactory dbFactory)
@@ -258,9 +258,9 @@ public sealed class PublicChatPinStoreTests
             DisplayName = "Other Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(otherHost);
-        await db.SaveChangesAsync();
-        db.ActivePublicChatPins.Add(
+        _ = db.Hosts.Add(otherHost);
+        _ = await db.SaveChangesAsync();
+        _ = db.ActivePublicChatPins.Add(
             new ActivePublicChatPin
             {
                 HostId = hostId,
@@ -274,7 +274,7 @@ public sealed class PublicChatPinStoreTests
                 PinnedAtUtc = DateTime.UtcNow,
             }
         );
-        db.ActivePublicChatPins.Add(
+        _ = db.ActivePublicChatPins.Add(
             new ActivePublicChatPin
             {
                 HostId = otherHost.Id,
@@ -288,7 +288,7 @@ public sealed class PublicChatPinStoreTests
                 PinnedAtUtc = DateTime.UtcNow,
             }
         );
-        db.PublicChatPinOperations.Add(
+        _ = db.PublicChatPinOperations.Add(
             new PublicChatPinOperation
             {
                 Kind = PublicChatPinOperationKind.Unpin,
@@ -304,7 +304,7 @@ public sealed class PublicChatPinStoreTests
                 AttemptStartedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<(int HostId, int RoundId)> SeedHostAndRoundAsync(
@@ -320,8 +320,8 @@ public sealed class PublicChatPinStoreTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var profile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -329,8 +329,8 @@ public sealed class PublicChatPinStoreTests
             Slug = "default",
             IsDefault = true,
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
         var round = new GuessRound
         {
             HostId = host.Id,
@@ -339,8 +339,8 @@ public sealed class PublicChatPinStoreTests
             StartedAtUtc = DateTime.UtcNow,
             ClosedAtUtc = roundStatus == GuessRoundStatus.Closed ? DateTime.UtcNow : null,
         };
-        db.Rounds.Add(round);
-        await db.SaveChangesAsync();
+        _ = db.Rounds.Add(round);
+        _ = await db.SaveChangesAsync();
         return (host.Id, round.Id);
     }
 

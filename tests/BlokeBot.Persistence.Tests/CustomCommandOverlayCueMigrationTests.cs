@@ -17,7 +17,7 @@ public sealed class CustomCommandOverlayCueMigrationTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using var db = await factory.CreateDbContextAsync();
         await db.GetService<IMigrator>().MigrateAsync(_previous);
-        await db.Database.ExecuteSqlRawAsync(
+        _ = await db.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO hosts
                 (Id, Login, DisplayName, EnabledFeatures, CommandsAliasesConfigured,
@@ -52,7 +52,7 @@ public sealed class CustomCommandOverlayCueMigrationTests
         ).ShouldBe(["Message", "Counter"]);
         var targetId = Guid.NewGuid();
         var cueId = Guid.NewGuid();
-        await db.Database.ExecuteSqlInterpolatedAsync(
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO custom_commands
                 (Id, HostId, Name, Enabled, ModeratorOnly, CooldownSeconds, CooldownScope,
@@ -69,7 +69,7 @@ public sealed class CustomCommandOverlayCueMigrationTests
                  'enqueue', 'after');
             """
         );
-        await db.Database.ExecuteSqlRawAsync(
+        _ = await db.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO custom_commands
                 (Id, HostId, Name, Enabled, ModeratorOnly, CooldownSeconds, CooldownScope,
@@ -79,7 +79,7 @@ public sealed class CustomCommandOverlayCueMigrationTests
                  '2026-07-31T00:00:00Z', '2026-07-31T00:00:00Z');
             """
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO custom_command_actions

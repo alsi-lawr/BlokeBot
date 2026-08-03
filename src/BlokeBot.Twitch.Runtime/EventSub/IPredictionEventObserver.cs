@@ -28,13 +28,13 @@ public sealed record EventSubPredictionEvent(
             BroadcasterUserId,
             Title,
             Outcomes
-                .Select(x => new HelixPredictionOutcome(
+                .Select(static x => new HelixPredictionOutcome(
                     x.Id,
                     x.Title,
                     x.Color,
                     x.Users,
                     x.ChannelPoints,
-                    x.TopPredictors.Select(p => new HelixPredictionTopPredictor(
+                    x.TopPredictors.Select(static p => new HelixPredictionTopPredictor(
                             p.UserId,
                             p.UserLogin,
                             p.UserName,

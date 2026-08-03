@@ -167,7 +167,7 @@ public sealed class PointsGiveawayMessageFormatter
     {
         var winnerText = string.Join(
             ", ",
-            winners.Select(winner => $"{winner.Login} ({winner.Payout.ToDisplayString()})")
+            winners.Select(static winner => $"{winner.Login} ({winner.Payout.ToDisplayString()})")
         );
         return Format(template, settings, string.Empty, winnerText, string.Empty);
     }

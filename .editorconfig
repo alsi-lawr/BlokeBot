@@ -9,6 +9,39 @@ indent_style = space
 indent_size = 2
 
 [*.{cs,razor}]
+# The repository explicitly promotes selected maintainability diagnostics. These are
+# intentionally configured by family rather than by broad analyzer category.
+dotnet_diagnostic.IDE0046.severity = warning
+dotnet_diagnostic.IDE0047.severity = warning
+dotnet_diagnostic.IDE0048.severity = warning
+dotnet_diagnostic.IDE0004.severity = warning
+dotnet_diagnostic.IDE0078.severity = warning
+dotnet_diagnostic.IDE0100.severity = warning
+dotnet_diagnostic.IDE0320.severity = warning
+dotnet_diagnostic.IDE0300.severity = warning
+dotnet_diagnostic.IDE0303.severity = warning
+dotnet_diagnostic.IDE0058.severity = warning
+dotnet_diagnostic.CA1725.severity = warning
+dotnet_diagnostic.CA1036.severity = warning
+dotnet_diagnostic.CA1001.severity = warning
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+dotnet_diagnostic.CA1805.severity = warning
+dotnet_diagnostic.CS8019.severity = warning
+dotnet_diagnostic.IDE0005.severity = warning
+dotnet_diagnostic.CS9335.severity = warning
+
+# Switch completeness and case-label generation remain advisory. Roslyn formatting is
+# disabled because CSharpier is the repository formatter. These API/naming/performance
+# families are intentionally outside this release's cleanup boundary.
+dotnet_diagnostic.IDE0072.severity = silent
+dotnet_diagnostic.IDE0010.severity = silent
+dotnet_diagnostic.IDE0055.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1848.severity = none
+
 # Naming violations must be visible in both the IDE and builds.
 dotnet_diagnostic.IDE1006.severity = warning
 
@@ -133,9 +166,90 @@ indent_size = 2
 [*.razor]
 indent_size = 4
 
+
+# Test names and deliberate exception simulation are not production API policy.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA2201.severity = none
+
+[src/BlokeBot.Core/Features/Guessing/History/GuessingHistoryService.cs]
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1311.severity = none
+
+# Razor components own their lifetime through the generated ComponentBase base class;
+# these files already release their disposable state in the component lifecycle.
+[src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.Access.cs]
+dotnet_diagnostic.CA1001.severity = none
+
+[src/BlokeBot.Core/Features/Overlays/OverlaysPage.razor.cs]
+dotnet_diagnostic.CA1001.severity = none
+
+[src/BlokeBot.Core/Features/Toasts/ToastHost.razor.cs]
+dotnet_diagnostic.CA1001.severity = none
+
+# Razor companion files require these imports for the generated markup partial; Roslyn's
+# code-behind compilation reports them as unused even though the generated component uses them.
+[src/BlokeBot.Core/Components/Layout/{HostSelector,SelectedChannelBotStatus,TopBarControls,MainLayout}.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+[src/BlokeBot.Core/Features/Overlays/OverlaySectionTabs.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+[src/BlokeBot.Core/Features/PublicLeaderboards/PublicLeaderboardPrompt.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+[src/BlokeBot.Core/Features/TwitchOperations/Shared/TwitchOperationsIndex.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+[src/BlokeBot.Site/Components/GuideSidebar.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+[src/BlokeBot.Site/Components/Pages/GuideTopic.razor.cs]
+dotnet_diagnostic.IDE0005.severity = none
+
+# The Razor-generated HomePage type consumes this import from the markup partial.
+[tests/BlokeBot.Core.Tests/TaskPageCompositionTests.cs]
+dotnet_diagnostic.CS8019.severity = none
+dotnet_diagnostic.IDE0005.severity = none
+
+# These standalone code-behind files retain generated Razor instance context; IDE0320's
+# detached analysis incorrectly proposes static lambdas for their generated component members.
+[src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/Points/Dashboard/PointsDashboard.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/TwitchOperations/Predictions/Page/PredictionsPage.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
 [src/BlokeBot.Persistence/Migrations/*.cs]
 charset = utf-8-bom
 # EF migration source is generated from migration identifiers and provider templates.
 dotnet_diagnostic.IDE0053.severity = none
 dotnet_diagnostic.IDE0161.severity = none
 dotnet_diagnostic.IDE1006.severity = none
+dotnet_diagnostic.IDE0046.severity = none
+dotnet_diagnostic.IDE0047.severity = none
+dotnet_diagnostic.IDE0048.severity = none
+dotnet_diagnostic.IDE0004.severity = none
+dotnet_diagnostic.IDE0078.severity = none
+dotnet_diagnostic.IDE0100.severity = none
+dotnet_diagnostic.IDE0320.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.IDE0303.severity = none
+dotnet_diagnostic.IDE0058.severity = none
+dotnet_diagnostic.CA1725.severity = none
+dotnet_diagnostic.CA1036.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1805.severity = none
+dotnet_diagnostic.CS8019.severity = none
+dotnet_diagnostic.IDE0005.severity = none

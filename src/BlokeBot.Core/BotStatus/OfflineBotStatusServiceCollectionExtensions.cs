@@ -6,7 +6,7 @@ internal static class OfflineBotStatusServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<IBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
+        _ = services.AddSingleton<IBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
         return services;
     }
 }

@@ -20,7 +20,7 @@ public sealed class PlayQueueServiceTests
             retainedEventCount = await disable.PlayQueueEvents.CountAsync();
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.PlayWithViewers;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
 
         var rejected = await service.JoinAsync(
@@ -30,10 +30,10 @@ public sealed class PlayQueueServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
-                _ => throw new InvalidOperationException("Expected rejection."),
-                value => value.Reason
+                static _ => throw new InvalidOperationException("Expected rejection."),
+                static value => value.Reason
             )
             .ShouldBeOfType<PlayQueueRejection.FeatureDisabled>();
         (await service.GetPublicPageAsync("alpha", "squad", CancellationToken.None)).ShouldBeNull();
@@ -45,10 +45,10 @@ public sealed class PlayQueueServiceTests
             (await verifyDisabled.PlayQueueEvents.CountAsync()).ShouldBe(retainedEventCount);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.PlayWithViewers;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
-        (
+        _ = (
             await service.GetPublicPageAsync("alpha", "squad", CancellationToken.None)
         ).ShouldNotBeNull();
         await using var verifyEnabled = await database.CreateDbContextAsync();
@@ -102,7 +102,7 @@ public sealed class PlayQueueServiceTests
         retry.WasIdempotent.ShouldBeTrue();
         retry.Value.InternalEntryId.ShouldBe(first.Value.InternalEntryId);
         position.Value.Position.ShouldBe(1);
-        page!.Waiting.ShouldHaveSingleItem();
+        _ = page!.Waiting.ShouldHaveSingleItem();
         page.Waiting[0].DisplayName.ShouldBeNull();
         page.Waiting[0]
             .Fields.ShouldBe([
@@ -140,7 +140,7 @@ public sealed class PlayQueueServiceTests
         );
         joins
             .Select(Success)
-            .Select(value => value.Value.InternalEntryId)
+            .Select(static value => value.Value.InternalEntryId)
             .Distinct()
             .Count()
             .ShouldBe(1);
@@ -168,17 +168,17 @@ public sealed class PlayQueueServiceTests
             secondService.SelectPartyAsync(host, "squad", true, CancellationToken.None)
         );
         var selected = selections.Select(Success).ToArray();
-        selected.ShouldAllBe(value => value.Value.Members.Count == 4);
+        selected.ShouldAllBe(static value => value.Value.Members.Count == 4);
         selected
-            .SelectMany(value => value.Value.Members)
-            .Select(value => value.EntryId)
+            .SelectMany(static value => value.Value.Members)
+            .Select(static value => value.EntryId)
             .Distinct()
             .Count()
             .ShouldBe(4);
         await using var verify = await database.CreateDbContextAsync();
         (await verify.PlayQueueEntries.CountAsync()).ShouldBe(4);
         (
-            await verify.PlayQueueEntries.CountAsync(value =>
+            await verify.PlayQueueEntries.CountAsync(static value =>
                 value.Status == PlayQueueEntryStatus.Selected
             )
         ).ShouldBe(4);
@@ -216,7 +216,7 @@ public sealed class PlayQueueServiceTests
             "Ready check expired"
         );
         (await service.GetEventsAsync(host, 0, 1000, CancellationToken.None))
-            .Count(value => value.Kind == PlayQueueEventKind.NoShow)
+            .Count(static value => value.Kind == PlayQueueEventKind.NoShow)
             .ShouldBe(1);
     }
 
@@ -245,7 +245,7 @@ public sealed class PlayQueueServiceTests
         clock.Advance(TimeSpan.FromSeconds(120));
         var result = await service.ReadyAsync(host, "squad", new("viewer"), CancellationToken.None);
 
-        result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
+        _ = result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
         await AssertExpiredReadyCheckPersistedAsync(database, entry.InternalEntryId);
     }
 
@@ -376,7 +376,7 @@ public sealed class PlayQueueServiceTests
             await service.SelectPartyAsync(host, "party", false, CancellationToken.None)
         );
         first
-            .Value.Members.Select(value => value.NormalizedLogin)
+            .Value.Members.Select(static value => value.NormalizedLogin)
             .ShouldBe(["tank", "healer", "damage1", "damage2"], ignoreOrder: true);
 
         foreach (
@@ -403,17 +403,17 @@ public sealed class PlayQueueServiceTests
             await service.SelectPartyAsync(host, "party", false, CancellationToken.None)
         );
         second
-            .Value.Members.Select(value => value.NormalizedLogin)
+            .Value.Members.Select(static value => value.NormalizedLogin)
             .ShouldBe(["tank2", "healer2", "damage3", "damage4"], ignoreOrder: true);
         var replacedId = second
-            .Value.Members.Single(value => value.NormalizedLogin == "damage3")
+            .Value.Members.Single(static value => value.NormalizedLogin == "damage3")
             .EntryId;
         var replaced = Success(
             await service.ReplaceOneAsync(host, replacedId, CancellationToken.None)
         );
         replaced.Value.Members.Count.ShouldBe(4);
-        replaced.Value.Members.Select(value => value.EntryId).ShouldBeUnique();
-        replaced.Value.Members.Select(value => value.EntryId).ShouldNotContain(replacedId);
+        replaced.Value.Members.Select(static value => value.EntryId).ShouldBeUnique();
+        replaced.Value.Members.Select(static value => value.EntryId).ShouldNotContain(replacedId);
     }
 
     [Test]
@@ -458,7 +458,7 @@ public sealed class PlayQueueServiceTests
         );
 
         selected
-            .Value.Members.Select(value => value.NormalizedLogin)
+            .Value.Members.Select(static value => value.NormalizedLogin)
             .ShouldBe(["tank", "roleless_one", "roleless_two"], ignoreOrder: true);
     }
 
@@ -479,16 +479,16 @@ public sealed class PlayQueueServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
-                _ => throw new InvalidOperationException("Expected rejection."),
-                value => value.Reason
+                static _ => throw new InvalidOperationException("Expected rejection."),
+                static value => value.Reason
             )
             .ShouldBeOfType<PlayQueueRejection.Invalid>();
         rejected
             .Match(
-                _ => throw new InvalidOperationException("Expected rejection."),
-                value => value.Reason.Message
+                static _ => throw new InvalidOperationException("Expected rejection."),
+                static value => value.Reason.Message
             )
             .ShouldContain("Sign in with Twitch");
         await using var verify = await database.CreateDbContextAsync();
@@ -560,8 +560,8 @@ public sealed class PlayQueueServiceTests
 
     private static PlayQueueResult<T>.Succeeded Success<T>(PlayQueueResult<T> result) =>
         result.Match(
-            value => value,
-            rejected => throw new InvalidOperationException(rejected.Reason.Message)
+            static value => value,
+            static rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
 
     private static async Task AssertExpiredReadyCheckPersistedAsync(
@@ -596,8 +596,8 @@ public sealed class PlayQueueServiceTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

@@ -28,8 +28,8 @@ public sealed class ChannelBotAuthorizationService(
 
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public IO<ChannelBotAuthorizationOutcome, Never> Authorize(
@@ -58,8 +58,8 @@ public sealed class ChannelBotAuthorizationService(
 
             host.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
             host.ChannelBotAuthorizedScopes = ScopeSet.Format(grant.Scopes);
-            await db.SaveChangesAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return Success(new ChannelBotAuthorizationOutcome.Authorized());
         });
 
@@ -74,8 +74,8 @@ public sealed class ChannelBotAuthorizationService(
 
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes) =>
@@ -94,15 +94,10 @@ public sealed class ChannelBotAuthorizationService(
         string? hostTwitchUserId,
         string hostLogin,
         ChannelBotAuthorizationGrant grant
-    )
-    {
-        if (!string.IsNullOrWhiteSpace(hostTwitchUserId))
-        {
-            return string.Equals(hostTwitchUserId, grant.UserId, StringComparison.Ordinal);
-        }
-
-        return LoginName.Parse(hostLogin) == grant.Login;
-    }
+    ) =>
+        !string.IsNullOrWhiteSpace(hostTwitchUserId)
+            ? string.Equals(hostTwitchUserId, grant.UserId, StringComparison.Ordinal)
+            : LoginName.Parse(hostLogin) == grant.Login;
 
     private static Result<ChannelBotAuthorizationOutcome, Never> Success(
         ChannelBotAuthorizationOutcome outcome

@@ -19,10 +19,10 @@ public sealed class EventFeedOverlayTests
     {
         var configuration = OverlayConfiguration.EventFeedV1.Default;
         var persisted = configuration.ToPersistenceJson();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.EventFeed, persisted)
             .ShouldBeOfType<OverlayConfigurationParseResult.Valid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.EventFeed,
                 persisted.Replace("\"capacity\":10", "\"capacity\":26", StringComparison.Ordinal)
@@ -43,14 +43,14 @@ public sealed class EventFeedOverlayTests
             }
         )
         {
-            OverlayConfiguration
+            _ = OverlayConfiguration
                 .Parse(OverlayType.EventFeed, malformed)
                 .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
         }
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.EventFeed, persisted[..^1] + ",\"extra\":true}")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.EventFeed,
                 persisted.Replace(
@@ -60,7 +60,7 @@ public sealed class EventFeedOverlayTests
                 )
             )
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.EventFeed,
                 persisted.Replace(
@@ -96,7 +96,7 @@ public sealed class EventFeedOverlayTests
                 }
             )
             .ShouldBe("{viewer} received 5 points");
-        Should.Throw<ArgumentException>(() =>
+        _ = Should.Throw<ArgumentException>(static () =>
             EventFeedTemplateRenderer.Render(
                 new EventFeedKindConfiguration(true, "{actor}", OverlayEventFeedPriority.Normal, 5),
                 new OverlayEventPresentation.PointAward
@@ -175,7 +175,7 @@ public sealed class EventFeedOverlayTests
         var reconnect = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         reconnect!.Active!.Id.ShouldBe(state.Active.Id);
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-1")
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-1")
             .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Consumed);
     }
 
@@ -196,7 +196,8 @@ public sealed class EventFeedOverlayTests
         promoted!.Active!.Body.ShouldContain("two");
         promoted.Active.DisplayDeadlineUtc.ShouldBe(fixture.Clock.GetUtcNow().AddSeconds(6));
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-2").DurationSeconds.ShouldBe(6);
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-2")
+            .DurationSeconds.ShouldBe(6);
     }
 
     [Test]
@@ -218,7 +219,7 @@ public sealed class EventFeedOverlayTests
         var restored = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         restored!.Active!.Kind.ShouldBe("guessingWinner");
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-1")
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-1")
             .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Suppressed);
     }
 
@@ -253,8 +254,8 @@ public sealed class EventFeedOverlayTests
             EventFeedOverflowPolicy.DropNewest
         );
         var kinds = OverlayConfiguration.EventFeedV1.Default.Kinds.ToDictionary(
-            pair => pair.Key,
-            pair =>
+            static pair => pair.Key,
+            static pair =>
                 pair.Key == OverlayEventFeedKind.PointAward
                     ? new EventFeedKindConfiguration(
                         pair.Value.Enabled,
@@ -346,13 +347,13 @@ public sealed class EventFeedOverlayTests
             EventFeedOverflowPolicy.DropNewest
         );
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(fixture.Database);
-        services.AddSingleton<TimeProvider>(fixture.Clock);
-        services.AddSingleton(TestEventBus.Create<AppEventKind>());
-        services.AddSingleton<HostedChannelChangeNotifier>();
-        services.AddSingleton<HostFeatureService>();
-        services.AddBlokeBotOverlays();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(fixture.Database);
+        _ = services.AddSingleton<TimeProvider>(fixture.Clock);
+        _ = services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        _ = services.AddSingleton<HostedChannelChangeNotifier>();
+        _ = services.AddSingleton<HostFeatureService>();
+        _ = services.AddBlokeBotOverlays();
         await using var provider = services.BuildServiceProvider();
         var feed = provider.GetRequiredService<OverlayEventFeedService>();
         provider
@@ -449,11 +450,11 @@ public sealed class EventFeedOverlayTests
         for (var index = 0; index < 3; index++)
         {
             fixture.Clock.Advance(TimeSpan.FromSeconds(9));
-            await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
+            _ = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         }
         var state = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         state!.Active!.Kind.ShouldBe("pointAward");
-        state.Pending.ShouldContain(card => card.Kind == "guessingWinner");
+        state.Pending.ShouldContain(static card => card.Kind == "guessingWinner");
     }
 
     [Test]
@@ -674,10 +675,10 @@ public sealed class EventFeedOverlayTests
                     EnabledFeatures = HostFeatureFlags.All,
                     CreatedAtUtc = DateTime.UtcNow,
                 };
-                db.Hosts.Add(host);
-                await db.SaveChangesAsync();
+                _ = db.Hosts.Add(host);
+                _ = await db.SaveChangesAsync();
                 hostId = host.Id;
-                db.OverlayInstances.Add(
+                _ = db.OverlayInstances.Add(
                     new OverlayInstance
                     {
                         PublicId = publicId,
@@ -693,7 +694,7 @@ public sealed class EventFeedOverlayTests
                         UpdatedAtUtc = DateTime.UtcNow,
                     }
                 );
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
             }
             var clock = new ManualTimeProvider(
                 new DateTimeOffset(2026, 7, 31, 12, 0, 0, TimeSpan.Zero)
@@ -750,7 +751,7 @@ public sealed class EventFeedOverlayTests
         internal async Task SetFeaturesAsync(HostFeatureFlags flags)
         {
             await using var db = await Database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .Hosts.Where(x => x.Id == HostId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.EnabledFeatures, flags));
         }
@@ -766,8 +767,8 @@ public sealed class EventFeedOverlayTests
                 EnabledFeatures = HostFeatureFlags.All,
                 CreatedAtUtc = Clock.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var overlay = new OverlayInstance
             {
                 PublicId = Guid.NewGuid(),
@@ -782,8 +783,8 @@ public sealed class EventFeedOverlayTests
                 CreatedAtUtc = Clock.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Clock.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             return overlay.Id;
         }
 
@@ -807,7 +808,7 @@ public sealed class EventFeedOverlayTests
                 kinds
             );
             await using var db = await Database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .OverlayInstances.Where(x => x.PublicId == Instance.OverlayId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(x => x.ConfigurationJson, changed.ToPersistenceJson())

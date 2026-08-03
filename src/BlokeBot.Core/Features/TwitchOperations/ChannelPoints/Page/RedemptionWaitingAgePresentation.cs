@@ -40,10 +40,13 @@ internal sealed record RedemptionWaitingAgePresentation(
             age = TimeSpan.Zero;
         }
 
-        var band =
-            age >= _needsAttentionThreshold ? RedemptionWaitingAgeBand.NeedsAttention
-            : age >= _waitingThreshold ? RedemptionWaitingAgeBand.Waiting
-            : RedemptionWaitingAgeBand.Fresh;
+        var band = age switch
+        {
+            var value when value >= _needsAttentionThreshold =>
+                RedemptionWaitingAgeBand.NeedsAttention,
+            var value when value >= _waitingThreshold => RedemptionWaitingAgeBand.Waiting,
+            _ => RedemptionWaitingAgeBand.Fresh,
+        };
         var label = band switch
         {
             RedemptionWaitingAgeBand.Fresh => $"New · waiting {ElapsedText(age)}",

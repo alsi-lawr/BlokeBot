@@ -22,30 +22,33 @@ public sealed class GuessingDashboardRejectionTests
         var hostId = await SeedGuessingAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var chat = new RejectingChatSender();
-        context.Services.AddSingleton<IPublicChatMessageSender>(chat);
-        context.Services.AddSingleton<GuessingDashboardService>();
-        context.Services.AddSingleton<GuessingHistoryService>();
-        context.Services.AddSingleton<GuessingChangeNotifier>();
-        context.Services.AddSingleton<PointBalanceService>();
-        context.Services.AddSingleton<PointsChangeNotifier>();
-        context.Services.AddSingleton<GuessingRoundService>();
+        _ = context.Services.AddSingleton<IPublicChatMessageSender>(chat);
+        _ = context.Services.AddSingleton<GuessingDashboardService>();
+        _ = context.Services.AddSingleton<GuessingHistoryService>();
+        _ = context.Services.AddSingleton<GuessingChangeNotifier>();
+        _ = context.Services.AddSingleton<PointBalanceService>();
+        _ = context.Services.AddSingleton<PointsChangeNotifier>();
+        _ = context.Services.AddSingleton<GuessingRoundService>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<GuessingDashboard>();
 
         cut.FindAll("[role='tab']")
-            .Single(tab => tab.TextContent.Trim() == "Live")
+            .Single(static tab => tab.TextContent.Trim() == "Live")
             .GetAttribute("aria-selected")
             .ShouldBe("true");
         cut.FindAll("[role='tab']")
-            .Select(tab => tab.TextContent.Trim())
+            .Select(static tab => tab.TextContent.Trim())
             .ShouldBe(["Live", "History", "Leaderboard"]);
 
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Start round").Click();
+        cut.FindAll("button")
+            .Single(static button => button.TextContent.Trim() == "Start round")
+            .Click();
 
         var sent = chat.Messages.ShouldHaveSingleItem();
         sent.Channel.ShouldBe("streamer");
         sent.Message.ShouldContain("Private round guessing is open.");
-        chat.Deadlines.ShouldHaveSingleItem()
+        _ = chat
+            .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
         var warning = toasts.Current.ShouldHaveSingleItem();
         warning.Kind.ShouldBe(ToastKind.Warning);
@@ -65,9 +68,9 @@ public sealed class GuessingDashboardRejectionTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc),
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        db.Profiles.Add(
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        _ = db.Profiles.Add(
             new GuessRoundProfile
             {
                 HostId = host.Id,
@@ -77,7 +80,7 @@ public sealed class GuessingDashboardRejectionTests
                 ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

@@ -168,23 +168,21 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
             );
         }
 
-        if (failureHandlingFailures.Count > 0)
+        return (failureHandlingFailures.Count, failures.Count) switch
         {
-            throw new ObserverFanOutEscalationException(
+            (> 0, _) => throw new ObserverFanOutEscalationException(
                 failures,
-                failureHandlingFailures.Select(failure => failure.Summary).ToArray(),
+                failureHandlingFailures.Select(static failure => failure.Summary).ToArray(),
                 exactObserverFailures
-                    .Concat(failureHandlingFailures.Select(failure => failure.Exception))
+                    .Concat(failureHandlingFailures.Select(static failure => failure.Exception))
                     .ToArray()
-            );
-        }
-
-        return failures.Count == 0
-            ? new ObserverFanOutOutcome.AllSucceeded { ObserverCount = observers.Count }
-            : new ObserverFanOutOutcome.CompletedWithFailures
+            ),
+            (_, 0) => new ObserverFanOutOutcome.AllSucceeded { ObserverCount = observers.Count },
+            _ => new ObserverFanOutOutcome.CompletedWithFailures
             {
                 Failures = Array.AsReadOnly(failures.ToArray()),
-            };
+            },
+        };
     }
 
     private async ValueTask InvokeObserverAsync<TObserver>(

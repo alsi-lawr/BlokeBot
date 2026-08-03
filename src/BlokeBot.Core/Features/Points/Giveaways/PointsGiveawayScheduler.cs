@@ -29,7 +29,7 @@ internal sealed class PointsGiveawayScheduler(
 
         lock (_scheduleGate)
         {
-            _schedules.Remove(schedule.GiveawayId, out previous);
+            _ = _schedules.Remove(schedule.GiveawayId, out previous);
             _schedules[schedule.GiveawayId] = scheduled;
         }
 
@@ -533,7 +533,7 @@ internal sealed class PointsGiveawayScheduler(
             giveaway.Cancellation.Cancel();
         }
 
-        return scheduled.Select(x => x.Task).ToArray();
+        return scheduled.Select(static x => x.Task).ToArray();
     }
 
     private void RemoveCompleted(int giveawayId, CancellationTokenSource cts)
@@ -545,7 +545,7 @@ internal sealed class PointsGiveawayScheduler(
                 && ReferenceEquals(scheduled.Cancellation, cts)
             )
             {
-                _schedules.Remove(giveawayId);
+                _ = _schedules.Remove(giveawayId);
             }
         }
     }
@@ -610,8 +610,8 @@ internal sealed class PointsGiveawayScheduler(
         Result<TValue, TError> result
     ) =>
         result.Match<OperationAttempt<TValue, TError>>(
-            value => new OperationAttempt<TValue, TError>.Succeeded(value),
-            failure => new OperationAttempt<TValue, TError>.Failed(failure)
+            static value => new OperationAttempt<TValue, TError>.Succeeded(value),
+            static failure => new OperationAttempt<TValue, TError>.Failed(failure)
         );
 
     private static IEnumerable<DateTime> ReminderTimes(PointsGiveawaySchedule schedule)

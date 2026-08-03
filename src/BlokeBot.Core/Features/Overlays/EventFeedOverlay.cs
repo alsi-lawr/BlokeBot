@@ -101,13 +101,11 @@ internal sealed partial class EventFeedTemplateRenderer
                 match =>
                 {
                     var name = match.Groups[1].Value;
-                    if (!values.ContainsKey(name))
-                    {
-                        throw new ArgumentException(
+                    return !values.ContainsKey(name)
+                        ? throw new ArgumentException(
                             $"Placeholder {{{name}}} is not valid for {kind}."
-                        );
-                    }
-                    return string.Empty;
+                        )
+                        : string.Empty;
                 }
             );
         if (
@@ -231,7 +229,7 @@ internal sealed class OverlayEventFeedService(
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            await db
+            _ = await db
                 .OverlayEventFeedItems.Where(x =>
                     x.TombstoneExpiresAtUtc != null && x.TombstoneExpiresAtUtc <= now
                 )
@@ -266,7 +264,7 @@ internal sealed class OverlayEventFeedService(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -303,7 +301,7 @@ internal sealed class OverlayEventFeedService(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -336,7 +334,7 @@ internal sealed class OverlayEventFeedService(
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            await db
+            _ = await db
                 .OverlayEventFeedItems.Where(x =>
                     x.HostId == hostId
                     && (
@@ -358,7 +356,7 @@ internal sealed class OverlayEventFeedService(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -416,7 +414,7 @@ internal sealed class OverlayEventFeedService(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -459,7 +457,7 @@ internal sealed class OverlayEventFeedService(
                 return;
             }
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            await query.ExecuteUpdateAsync(
+            _ = await query.ExecuteUpdateAsync(
                 setters =>
                     setters
                         .SetProperty(x => x.Lifecycle, OverlayEventFeedLifecycle.Suppressed)
@@ -470,7 +468,7 @@ internal sealed class OverlayEventFeedService(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
     }
 
@@ -497,7 +495,7 @@ internal sealed class OverlayEventFeedService(
             {
                 continue;
             }
-            await PruneAndAdvanceAsync(db, overlay, ct);
+            _ = await PruneAndAdvanceAsync(db, overlay, ct);
             if (
                 await db.OverlayEventFeedItems.AnyAsync(
                     x =>
@@ -550,7 +548,7 @@ internal sealed class OverlayEventFeedService(
                     && x.Lifecycle == OverlayEventFeedLifecycle.Active,
                 ct
             );
-            db.OverlayEventFeedItems.Add(
+            _ = db.OverlayEventFeedItems.Add(
                 new OverlayEventFeedItem
                 {
                     OverlayInstanceId = overlay.Id,
@@ -570,7 +568,7 @@ internal sealed class OverlayEventFeedService(
                         : now.AddSeconds(kindConfiguration.DurationSeconds),
                 }
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             services
                 .GetRequiredService<IOverlayLivePublisher>()
                 .PublishState(ToResolved(overlay, configuration));
@@ -587,7 +585,7 @@ internal sealed class OverlayEventFeedService(
             x => x.PublicId == instance.OverlayId && x.HostId == instance.HostId,
             ct
         );
-        await PruneAndAdvanceAsync(db, overlay, ct);
+        _ = await PruneAndAdvanceAsync(db, overlay, ct);
     }
 
     private async Task<bool> PruneAndAdvanceAsync(
@@ -597,7 +595,7 @@ internal sealed class OverlayEventFeedService(
     )
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        await db
+        _ = await db
             .OverlayEventFeedItems.Where(x =>
                 x.OverlayInstanceId == overlay.Id
                 && x.TombstoneExpiresAtUtc != null
@@ -620,7 +618,7 @@ internal sealed class OverlayEventFeedService(
             active.Lifecycle = OverlayEventFeedLifecycle.Consumed;
             active.DisplayDeadlineUtc = null;
             active.TombstoneExpiresAtUtc = now.Add(_tombstoneRetention);
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             changed = true;
         }
         var queued = await db
@@ -632,7 +630,7 @@ internal sealed class OverlayEventFeedService(
             .ToListAsync(ct);
         if (queued.Count == 0)
         {
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             return changed;
         }
         var recent = await db
@@ -657,7 +655,7 @@ internal sealed class OverlayEventFeedService(
             ) ?? queued[0];
         next.Lifecycle = OverlayEventFeedLifecycle.Active;
         next.DisplayDeadlineUtc = now.AddSeconds(next.DurationSeconds);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return true;
     }
 
@@ -746,7 +744,7 @@ internal sealed class OverlayEventFeedService(
         {
             query = query.Where(x => x.Kind == value);
         }
-        await query.ExecuteUpdateAsync(
+        _ = await query.ExecuteUpdateAsync(
             setters =>
                 setters
                     .SetProperty(x => x.Lifecycle, OverlayEventFeedLifecycle.Suppressed)

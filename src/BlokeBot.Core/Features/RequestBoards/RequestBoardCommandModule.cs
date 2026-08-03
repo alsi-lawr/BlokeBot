@@ -14,34 +14,34 @@ public sealed class RequestBoardCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        commands.Map(FixedChatCommandRoutes.Request, SubmitAsync);
-        commands.Map(FixedChatCommandRoutes.Requests, ListAsync);
-        commands.Map(FixedChatCommandRoutes.RequestVote, VoteAsync);
-        commands.Map(
+        _ = commands.Map(FixedChatCommandRoutes.Request, SubmitAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Requests, ListAsync);
+        _ = commands.Map(FixedChatCommandRoutes.RequestVote, VoteAsync);
+        _ = commands.Map(
             FixedChatCommandRoutes.RequestApprove,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Approved, ct)
         );
-        commands.Map(
+        _ = commands.Map(
             FixedChatCommandRoutes.RequestReject,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Rejected, ct)
         );
-        commands.Map(
+        _ = commands.Map(
             FixedChatCommandRoutes.RequestQueue,
             (context, args, ct) => ModerateAsync(context, args, RequestSubmissionStatus.Queued, ct)
         );
-        commands.Map(
+        _ = commands.Map(
             FixedChatCommandRoutes.RequestAccept,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Accepted, ct)
         );
-        commands.Map(
+        _ = commands.Map(
             FixedChatCommandRoutes.RequestComplete,
             (context, args, ct) =>
                 ModerateAsync(context, args, RequestSubmissionStatus.Completed, ct)
         );
-        commands.Map(FixedChatCommandRoutes.RequestMerge, MergeAsync);
+        _ = commands.Map(FixedChatCommandRoutes.RequestMerge, MergeAsync);
     }
 
     private async ValueTask SubmitAsync(

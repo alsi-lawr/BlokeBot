@@ -48,11 +48,11 @@ public sealed class OverlayCueConfigurationTests
             .Value;
 
         created
-            .Layers.Select(layer => layer.GetType())
-            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.GetType()));
+            .Layers.Select(static layer => layer.GetType())
+            .ShouldBe(parsed.Layers.Reverse().Select(static layer => layer.GetType()));
         created
-            .Layers.Select(layer => layer.ZIndex)
-            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.ZIndex));
+            .Layers.Select(static layer => layer.ZIndex)
+            .ShouldBe(parsed.Layers.Reverse().Select(static layer => layer.ZIndex));
         OverlayCueConfiguration
             .Parse(created.ToPersistenceJson())
             .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()
@@ -89,10 +89,10 @@ public sealed class OverlayCueConfigurationTests
         );
         var url = new Uri("https://internal.example.test/widget");
 
-        (
+        _ = (
             await safe.ValidateAsync(url, CancellationToken.None)
         ).ShouldBeOfType<OverlayRemoteUrlDecision.Rejected>();
-        (
+        _ = (
             await optedIn.ValidateAsync(url, CancellationToken.None)
         ).ShouldBeOfType<OverlayRemoteUrlDecision.Allowed>();
         dns.Requests.ShouldBe(["internal.example.test", "internal.example.test"]);

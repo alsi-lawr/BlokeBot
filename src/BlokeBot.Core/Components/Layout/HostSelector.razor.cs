@@ -16,9 +16,9 @@ public partial class HostSelector
     private string? _loadedVisibleHostsKey;
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
 
     private string _refreshIconClass =>
@@ -78,7 +78,7 @@ public partial class HostSelector
     {
         var hosts = string.Join(
             "|",
-            Session.AvailableHosts.Select(host => $"{host.Id}:{host.Login}:{host.Role}")
+            Session.AvailableHosts.Select(static host => $"{host.Id}:{host.Login}:{host.Role}")
         );
 
         return $"{_selection?.Current.Id}:{Session.Login}:{hosts}";
@@ -99,16 +99,10 @@ public partial class HostSelector
 
     private string _myChannelHref => $"/auth/select-own-host?returnUrl={_currentReturnUrl}";
 
-    private bool ShowMyChannelControl()
-    {
-        if (_selection is null)
-        {
-            return false;
-        }
-
-        return !IsOwnHost(_selection.Current)
-            && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
-    }
+    private bool ShowMyChannelControl() =>
+        _selection is not null
+        && !IsOwnHost(_selection.Current)
+        && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
 
     private bool IsOwnHost(BotHostChoice host) =>
         host.Role == AuthRole.Streamer

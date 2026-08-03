@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Shouldly;
@@ -9,7 +10,7 @@ public sealed class HostBotAccountTokenProtectorTests
     private static readonly HostBotAccountTokenPayload _payload = new(
         "access-token",
         "refresh-token",
-        DateTimeOffset.Parse("2026-07-22T12:00:00Z")
+        DateTimeOffset.Parse("2026-07-22T12:00:00Z", CultureInfo.InvariantCulture)
     );
 
     [Test]
@@ -53,15 +54,15 @@ public sealed class HostBotAccountTokenProtectorTests
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
     ) =>
         result.Match(
-            value => value,
-            _ => throw new InvalidOperationException("Expected protection to succeed.")
+            static value => value,
+            static _ => throw new InvalidOperationException("Expected protection to succeed.")
         );
 
     private static HostBotAccountTokenProtectionFailure Error<TValue>(
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
     ) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected protection to fail."),
-            failure => failure
+            static _ => throw new InvalidOperationException("Expected protection to fail."),
+            static failure => failure
         );
 }

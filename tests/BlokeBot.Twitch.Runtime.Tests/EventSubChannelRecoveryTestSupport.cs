@@ -127,9 +127,9 @@ public abstract partial class EventSubChannelRecoveryTestBase
         status.Trigger.ShouldBe(trigger);
         status
             .Match(
-                _ => throw new InvalidOperationException("Expected a failed channel state."),
-                recovering => (recovering.Failure, recovering.NextAction),
-                degraded => (degraded.Failure, degraded.NextAction)
+                static _ => throw new InvalidOperationException("Expected a failed channel state."),
+                static recovering => (recovering.Failure, recovering.NextAction),
+                static degraded => (degraded.Failure, degraded.NextAction)
             )
             .ShouldBe(
                 (

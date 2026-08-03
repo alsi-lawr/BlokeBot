@@ -54,12 +54,14 @@ public sealed class HostFeatureTests
     public void NewHostModel_DefaultsEveryChatToolOff()
     {
         new BotHost().EnabledFeatures.ShouldBe(HostFeatureFlags.None);
-        HostFeatureCatalog.Cards(HostFeatureFlags.None).ShouldAllBe(feature => !feature.Enabled);
+        HostFeatureCatalog
+            .Cards(HostFeatureFlags.None)
+            .ShouldAllBe(static feature => !feature.Enabled);
         HostFeatureCatalog.Features.Count.ShouldBe(12);
         HostFeatureCatalog.Features.ShouldBeUnique();
         HostFeatureCatalog
             .Cards(HostFeatureFlags.None)
-            .Select(card => card.Feature)
+            .Select(static card => card.Feature)
             .ShouldBe(HostFeatureCatalog.Features);
     }
 
@@ -84,7 +86,7 @@ public sealed class HostFeatureTests
             (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
         }
 
-        await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+        _ = await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
             service.EnableAsync(
                 hostId,
                 HostFeatureFlags.NativeTwitchFeatures,
@@ -142,7 +144,7 @@ public sealed class HostFeatureTests
             CancellationToken.None
         );
 
-        disabledGuessing.ShouldBeOfType<CommandRouteResolution<
+        _ = disabledGuessing.ShouldBeOfType<CommandRouteResolution<
             GuessCommandKind,
             AppCommandRouteState
         >.Unresolved>();
@@ -175,7 +177,7 @@ public sealed class HostFeatureTests
             .Route;
         guessingRoute.Kind.ShouldBe(GuessCommandKind.Start);
         guessingRoute.State.ShouldBe(new AppCommandRouteState.Host(hostId));
-        disabledPoints.ShouldBeOfType<CommandRouteResolution<
+        _ = disabledPoints.ShouldBeOfType<CommandRouteResolution<
             PointsCommandKind,
             AppCommandRouteState
         >.Unresolved>();
@@ -196,9 +198,9 @@ public sealed class HostFeatureTests
                 IsDefault = true,
                 ReplySettings = new BotReplySettings(),
             };
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
-            db.CommandAliases.Add(
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -207,7 +209,7 @@ public sealed class HostFeatureTests
                     Alias = "score",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var features = new HostFeatureService(
             dbFactory,
@@ -225,7 +227,9 @@ public sealed class HostFeatureTests
         );
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
+        var profileId = await verify
+            .Profiles.Select(static x => x.Id)
+            .SingleAsync(CancellationToken.None);
         var resolved = route
             .ShouldBeOfType<CommandRouteResolution<
                 GuessCommandKind,
@@ -247,7 +251,7 @@ public sealed class HostFeatureTests
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.CommandAliases.Add(
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = hostId,
@@ -255,7 +259,7 @@ public sealed class HostFeatureTests
                 Alias = alias,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<int> SeedHostAsync(
@@ -272,8 +276,8 @@ public sealed class HostFeatureTests
             EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -283,7 +287,7 @@ public sealed class HostFeatureTests
     )
     {
         var features = await service.Load(hostId).RunAsync(CancellationToken.None);
-        return features.Match<HostFeatureFlags?>(value => value, () => null);
+        return features.Match<HostFeatureFlags?>(static value => value, static () => null);
     }
 
     private sealed class RecordingNativeTwitchFeatureChangeObserver

@@ -46,11 +46,8 @@ public sealed record PublicChatPinIntent(
 
         ArgumentException.ThrowIfNullOrWhiteSpace(Feature);
         ArgumentException.ThrowIfNullOrWhiteSpace(ReplyKey);
-        if (DurationSeconds is { } seconds && seconds is < 30 or > 1800)
-        {
-            throw new ArgumentOutOfRangeException(nameof(DurationSeconds));
-        }
-
-        return this;
+        return DurationSeconds is { } seconds && seconds is < 30 or > 1800
+            ? throw new ArgumentOutOfRangeException(nameof(DurationSeconds))
+            : this;
     }
 }

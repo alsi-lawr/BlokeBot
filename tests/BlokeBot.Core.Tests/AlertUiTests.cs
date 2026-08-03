@@ -20,7 +20,7 @@ public sealed class AlertUiTests
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        await alerts
+        _ = await alerts
             .Create(
                 hostId,
                 DurableAlertSeverity.Warning,
@@ -31,9 +31,9 @@ public sealed class AlertUiTests
                 "/alerts"
             )
             .RunAsync(CancellationToken.None);
-        context.ComponentFactories.AddStub<SelectedChannelBotStatus>();
-        context.ComponentFactories.AddStub<HostSelector>();
-        context.ComponentFactories.AddStub<AccountMenu>();
+        _ = context.ComponentFactories.AddStub<SelectedChannelBotStatus>();
+        _ = context.ComponentFactories.AddStub<HostSelector>();
+        _ = context.ComponentFactories.AddStub<AccountMenu>();
 
         var cut = context.Render<TopBarControls>();
 
@@ -52,7 +52,9 @@ public sealed class AlertUiTests
         var cut = context.Render<NavMenu>();
 
         var alertsLink = cut.FindAll("a")
-            .Single(link => link.TextContent.Trim().Equals("Alerts", StringComparison.Ordinal));
+            .Single(static link =>
+                link.TextContent.Trim().Equals("Alerts", StringComparison.Ordinal)
+            );
         alertsLink.GetAttribute("href").ShouldBe("alerts");
     }
 
@@ -63,7 +65,7 @@ public sealed class AlertUiTests
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        await alerts
+        _ = await alerts
             .Create(
                 hostId,
                 DurableAlertSeverity.Warning,
@@ -91,19 +93,21 @@ public sealed class AlertUiTests
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var failFirstFactory = new FailFirstDbContextFactory(dbFactory);
-        context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(failFirstFactory);
+        _ = context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(failFirstFactory);
 
         var cut = context.Render<AlertsPage>();
 
         cut.Find("[role='alert']").TextContent.ShouldContain("couldn’t load alerts");
-        cut.FindAll("h2").Select(heading => heading.TextContent.Trim()).ShouldNotContain("Active");
+        cut.FindAll("h2")
+            .Select(static heading => heading.TextContent.Trim())
+            .ShouldNotContain("Active");
 
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Retry").Click();
+        cut.FindAll("button").Single(static button => button.TextContent.Trim() == "Retry").Click();
 
         failFirstFactory.AttemptCount.ShouldBe(2);
         cut.FindAll("[role='alert']").ShouldBeEmpty();
         cut.FindAll("h2")
-            .Select(heading => heading.TextContent.Trim())
+            .Select(static heading => heading.TextContent.Trim())
             .ShouldContain("Active alerts");
     }
 
@@ -125,7 +129,7 @@ public sealed class AlertUiTests
                 null
             )
             .RunAsync(CancellationToken.None);
-        await alerts
+        _ = await alerts
             .Acknowledge(hostId, alert.Alert.Id, "streamer")
             .RunAsync(CancellationToken.None);
 
@@ -143,7 +147,7 @@ public sealed class AlertUiTests
         var history = cut.Find(".responsive-data-cards");
         history
             .QuerySelectorAll("td")
-            .Select(cell => cell.GetAttribute("data-label"))
+            .Select(static cell => cell.GetAttribute("data-label"))
             .ShouldBe(["Alert", "Importance", "Handled by", "Handled at"]);
     }
 
@@ -157,8 +161,8 @@ public sealed class AlertUiTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

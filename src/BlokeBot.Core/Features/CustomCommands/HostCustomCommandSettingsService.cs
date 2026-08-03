@@ -39,7 +39,7 @@ public sealed class HostCustomCommandSettingsService(
         }
 
         host.TimeZoneId = timeZone.Id;
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
     }
 }

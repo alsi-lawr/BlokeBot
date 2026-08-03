@@ -7,9 +7,9 @@ internal static class SimulationEndpoints
 {
     public static void MapSimulationEndpoints(this WebApplication app)
     {
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/ready",
-                (SimulationReadiness readiness) =>
+                static (SimulationReadiness readiness) =>
                 {
                     var projection = readiness.Project();
                     return Results.Json(
@@ -22,9 +22,9 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/login",
-                (string? view, string? theme) =>
+                static (string? view, string? theme) =>
                 {
                     var selectedTheme = string.Equals(
                         theme,
@@ -42,9 +42,9 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
 
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/liveness/{state}",
-                async (
+                static async (
                     string state,
                     SimulationCommandCatalogScenario scenario,
                     CancellationToken ct
@@ -55,9 +55,9 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/round/{state}",
-                async (
+                static async (
                     string state,
                     SimulationCommandCatalogScenario scenario,
                     CancellationToken ct
@@ -68,9 +68,9 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/giveaway/{state}",
-                async (
+                static async (
                     string state,
                     SimulationCommandCatalogScenario scenario,
                     CancellationToken ct
@@ -81,9 +81,9 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/features/{state}",
-                async (
+                static async (
                     string state,
                     SimulationCommandCatalogScenario scenario,
                     CancellationToken ct
@@ -94,18 +94,18 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/commands/catalog",
-                async (
+                static async (
                     SimulationCommandCatalogScenario scenario,
                     ViewerCommandCatalogService catalog,
                     CancellationToken ct
                 ) => Results.Json(await scenario.SnapshotAsync(catalog, ct))
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/chat",
-                async (
+                static async (
                     SimulationCommandCatalogScenario scenario,
                     ChatCommandDispatcher dispatcher,
                     CancellationToken ct

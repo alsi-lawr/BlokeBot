@@ -22,7 +22,7 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task ModeratorWithPriorAuthorization_CheckingAuthority_UsesSessionActorAndAppToken()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(request =>
+        fixture.Helix.Respond(static request =>
         {
             request.RequestUri!.Query.ShouldContain("user_id=moderator-id");
             request.Headers.Authorization!.Parameter.ShouldBe("app-token");
@@ -36,7 +36,7 @@ public sealed class ModeratorAuthorityServiceTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
+        _ = outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
         fixture.Tokens.RequestCount.ShouldBe(1);
         fixture.Helix.RequestCount.ShouldBe(1);
     }
@@ -45,11 +45,11 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task DefinitiveAuthority_CheckingBeforeAndAtExpiry_UsesPerUserHostCacheForFifteenMinutes()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(_ => AllowedResponse());
-        fixture.Helix.Respond(_ => AllowedResponse());
-        fixture.Helix.Respond(_ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
 
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -57,14 +57,14 @@ public sealed class ModeratorAuthorityServiceTests
             )
         ).ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
         fixture.Time.Advance(TimeSpan.FromMinutes(14).Add(TimeSpan.FromSeconds(59)));
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId, userId: "another-moderator-id"),
                 fixture.HostId,
@@ -75,7 +75,7 @@ public sealed class ModeratorAuthorityServiceTests
         fixture.Helix.RequestCount.ShouldBe(2);
 
         fixture.Time.Advance(TimeSpan.FromSeconds(1));
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -90,16 +90,16 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task MissingModeratedChannel_CheckingAuthority_ConfirmsRevocationAndCachesTheDenial()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(_ => JsonResponse("""{"data":[],"pagination":{}}"""));
+        fixture.Helix.Respond(static _ => JsonResponse("""{"data":[],"pagination":{}}"""));
 
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<ModeratorAuthorityOutcome.Revoked>();
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -116,14 +116,14 @@ public sealed class ModeratorAuthorityServiceTests
         await using var fixture = await Fixture.CreateAsync();
         fixture.Tokens.Exception = new HttpRequestException("offline");
 
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<ModeratorAuthorityOutcome.Unavailable>();
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -141,14 +141,14 @@ public sealed class ModeratorAuthorityServiceTests
         await using var fixture = await Fixture.CreateAsync();
         fixture.Tokens.Exception = new OperationCanceledException();
 
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<ModeratorAuthorityOutcome.Unavailable>();
-        (
+        _ = (
             await fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -166,7 +166,7 @@ public sealed class ModeratorAuthorityServiceTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             fixture.Service.AuthorizeAsync(
                 Session(AuthRole.Moderator, fixture.HostId),
                 fixture.HostId,
@@ -188,7 +188,7 @@ public sealed class ModeratorAuthorityServiceTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
+        _ = outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Granted>();
         fixture.Tokens.RequestCount.ShouldBe(0);
         fixture.Helix.RequestCount.ShouldBe(0);
     }
@@ -204,7 +204,7 @@ public sealed class ModeratorAuthorityServiceTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ModeratorAuthorityOutcome.HostMismatch>();
+        _ = outcome.ShouldBeOfType<ModeratorAuthorityOutcome.HostMismatch>();
         fixture.Tokens.RequestCount.ShouldBe(0);
         fixture.Helix.RequestCount.ShouldBe(0);
     }
@@ -224,7 +224,7 @@ public sealed class ModeratorAuthorityServiceTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Revoked>();
+        _ = outcome.ShouldBeOfType<ModeratorAuthorityOutcome.Revoked>();
         fixture.Tokens.RequestCount.ShouldBe(0);
         fixture.Helix.RequestCount.ShouldBe(0);
     }
@@ -268,7 +268,7 @@ public sealed class ModeratorAuthorityServiceTests
         );
 
         invoked.ShouldBeFalse();
-        navigation.LastUri.ShouldNotBeNull();
+        _ = navigation.LastUri.ShouldNotBeNull();
         navigation.LastUri!.ShouldContain("/auth/recover-moderator-access?hostId=");
         var revoked = new BotHostChoice(fixture.HostId, "streamer", "Streamer", AuthRole.Moderator);
         var remaining = new BotHostChoice(99, "other", "Other", AuthRole.Moderator);
@@ -369,7 +369,7 @@ public sealed class ModeratorAuthorityServiceTests
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
             await using (var db = await database.CreateDbContextAsync())
             {
-                db.Hosts.Add(
+                _ = db.Hosts.Add(
                     new()
                     {
                         Login = "streamer",
@@ -377,7 +377,7 @@ public sealed class ModeratorAuthorityServiceTests
                         CreatedAtUtc = DateTime.UtcNow,
                     }
                 );
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
             }
 
             await using var lookup = await database.CreateDbContextAsync();
@@ -416,12 +416,9 @@ public sealed class ModeratorAuthorityServiceTests
         {
             RequestCount++;
             cancellationToken.ThrowIfCancellationRequested();
-            if (Exception is { } exception)
-            {
-                return Task.FromException<string>(exception);
-            }
-
-            return Task.FromResult("app-token");
+            return Exception is { } exception
+                ? Task.FromException<string>(exception)
+                : Task.FromResult("app-token");
         }
     }
 

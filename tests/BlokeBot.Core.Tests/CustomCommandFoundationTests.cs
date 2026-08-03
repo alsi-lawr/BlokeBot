@@ -14,7 +14,7 @@ public sealed class CustomCommandFoundationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -23,8 +23,8 @@ public sealed class CustomCommandFoundationTests
                 }
             );
             var entry = MessageEntry(hostId, "hello");
-            db.CustomMessageLibraryEntries.Add(entry);
-            await db.SaveChangesAsync();
+            _ = db.CustomMessageLibraryEntries.Add(entry);
+            _ = await db.SaveChangesAsync();
             var command = new CustomCommand
             {
                 HostId = hostId,
@@ -37,9 +37,9 @@ public sealed class CustomCommandFoundationTests
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             };
-            db.CustomCommands.Add(command);
-            await db.SaveChangesAsync();
-            db.CustomCommandAliases.Add(
+            _ = db.CustomCommands.Add(command);
+            _ = await db.SaveChangesAsync();
+            _ = db.CustomCommandAliases.Add(
                 new CustomCommandAlias
                 {
                     HostId = hostId,
@@ -47,7 +47,7 @@ public sealed class CustomCommandFoundationTests
                     Alias = "hello",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var registry = new CustomCommandAliasRegistry();
@@ -126,8 +126,8 @@ public sealed class CustomCommandFoundationTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

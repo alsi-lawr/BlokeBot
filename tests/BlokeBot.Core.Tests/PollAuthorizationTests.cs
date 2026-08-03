@@ -16,7 +16,7 @@ public sealed class PollAuthorizationTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await factory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -25,13 +25,13 @@ public sealed class PollAuthorizationTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = Service(factory);
         var wrong = await service.AuthorizeAsync(1, Grant("other-id"), CancellationToken.None);
-        wrong.ShouldBeOfType<HostBroadcasterAuthorizationOutcome.GrantMismatch>();
+        _ = wrong.ShouldBeOfType<HostBroadcasterAuthorizationOutcome.GrantMismatch>();
         var correct = await service.AuthorizeAsync(1, Grant("host-id"), CancellationToken.None);
-        correct.ShouldBeOfType<HostBroadcasterAuthorizationOutcome.Authorized>();
+        _ = correct.ShouldBeOfType<HostBroadcasterAuthorizationOutcome.Authorized>();
         await using var verify = await factory.CreateDbContextAsync();
         var stored = await verify.HostBroadcasterAuthorizations.SingleAsync();
         var protectedPayload = stored.ProtectedTokenPayload.ShouldNotBeNull();
@@ -51,7 +51,7 @@ public sealed class PollAuthorizationTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await factory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -60,7 +60,7 @@ public sealed class PollAuthorizationTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var status = await Service(factory)
             .GetTokenStatusAsync(
@@ -68,7 +68,7 @@ public sealed class PollAuthorizationTests
                 HostBroadcasterAuthorizationService.MilestoneScopes,
                 CancellationToken.None
             );
-        status.ShouldBeOfType<TokenStatus.Unavailable>();
+        _ = status.ShouldBeOfType<TokenStatus.Unavailable>();
     }
 
     private static HostBroadcasterAuthorizationService Service(SqliteBlokeBotDbFactory factory) =>

@@ -19,7 +19,7 @@ public sealed class IndependentChatToolsMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_viewerCommandCatalog);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
@@ -36,8 +36,8 @@ public sealed class IndependentChatToolsMigrationTests
         await using var upgraded = await factory.CreateDbContextAsync();
         (
             await upgraded
-                .Hosts.OrderBy(value => value.Id)
-                .Select(value => (long)value.EnabledFeatures)
+                .Hosts.OrderBy(static value => value.Id)
+                .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([224L, 4072L, 247L, 8168L]);
         (await ReadDefaultAsync(upgraded.Database.GetDbConnection())).ShouldBe("0");
@@ -52,8 +52,8 @@ public sealed class IndependentChatToolsMigrationTests
             DisplayName = "fresh",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        upgraded.Hosts.Add(fresh);
-        await upgraded.SaveChangesAsync();
+        _ = upgraded.Hosts.Add(fresh);
+        _ = await upgraded.SaveChangesAsync();
         fresh.EnabledFeatures.ShouldBe(HostFeatureFlags.None);
     }
 
@@ -77,15 +77,15 @@ public sealed class IndependentChatToolsMigrationTests
                 ),
                 Host("unknown", HostFeatureFlags.NativeTwitchFeatures | (HostFeatureFlags)4096UL)
             );
-            await latest.SaveChangesAsync();
+            _ = await latest.SaveChangesAsync();
             await latest.GetService<IMigrator>().MigrateAsync(_viewerCommandCatalog);
         }
 
         await using var downgraded = await factory.CreateDbContextAsync();
         (
             await downgraded
-                .Hosts.OrderBy(value => value.Id)
-                .Select(value => (long)value.EnabledFeatures)
+                .Hosts.OrderBy(static value => value.Id)
+                .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([31L, 0L, 0L, 0L, 4104L]);
         (await ReadDefaultAsync(downgraded.Database.GetDbConnection())).ShouldBe("31");

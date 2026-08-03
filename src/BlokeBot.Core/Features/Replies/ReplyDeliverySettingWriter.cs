@@ -40,7 +40,7 @@ internal static class ReplyDeliverySettingWriter
 
         foreach (var replyKey in delivery.WhisperKeys.Order(StringComparer.OrdinalIgnoreCase))
         {
-            db.ReplyDeliverySettings.Add(
+            _ = db.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = hostId,

@@ -91,8 +91,8 @@ internal sealed partial class EventSubChannelSession
             case EventSubChannelReconciliationTarget.Absent:
                 lock (_gate)
                 {
-                    _states.Remove(channel);
-                    _failures.Remove(channel);
+                    _ = _states.Remove(channel);
+                    _ = _failures.Remove(channel);
                     statusScope.Remove(channel);
                     UpdateRuntimeStatusLocked();
                 }
@@ -137,7 +137,7 @@ internal sealed partial class EventSubChannelSession
         {
             lock (_gate)
             {
-                _authorizedChannels.Remove(channel);
+                _ = _authorizedChannels.Remove(channel);
             }
         }
 
@@ -170,7 +170,7 @@ internal sealed partial class EventSubChannelSession
                 switch (report)
                 {
                     case EventSubChannelDiagnosticReport.Healthy:
-                        _failures.Remove(state.Channel);
+                        _ = _failures.Remove(state.Channel);
                         break;
                     case EventSubChannelDiagnosticReport.Recovering recovering:
                         _failures[state.Channel] = recovering.Failure;
@@ -203,10 +203,12 @@ internal sealed partial class EventSubChannelSession
             .Select(state => state.Channel)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        BotRuntimeStatus status =
-            healthyChannels.Length > 0 ? new BotRuntimeStatus.Connected(healthyChannels)
-            : _authorizedChannels.Count > 0 ? new BotRuntimeStatus.Authorized()
-            : new BotRuntimeStatus.Unauthorized();
+        BotRuntimeStatus status = healthyChannels.Length switch
+        {
+            > 0 => new BotRuntimeStatus.Connected(healthyChannels),
+            _ when _authorizedChannels.Count > 0 => new BotRuntimeStatus.Authorized(),
+            _ => new BotRuntimeStatus.Unauthorized(),
+        };
         runtimeStatus.SetEventSubStatus(statusScope.Id, status);
     }
 

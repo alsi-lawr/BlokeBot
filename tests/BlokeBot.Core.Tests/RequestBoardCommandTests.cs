@@ -42,9 +42,9 @@ public sealed class RequestBoardCommandTests
             CancellationToken.None
         );
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        services.AddSingleton(boardService);
-        services.AddChatCommands().AddCommandModule<RequestBoardCommandModule>();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton(boardService);
+        _ = services.AddChatCommands().AddCommandModule<RequestBoardCommandModule>();
         await using var provider = services.BuildServiceProvider();
         var dispatcher = provider.GetRequiredService<ChatCommandDispatcher>();
         var responses = new List<string>();
@@ -61,8 +61,8 @@ public sealed class RequestBoardCommandTests
         await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
         await DispatchAsync(dispatcher, Message("viewer", "!requestapprove 1"), responses);
 
-        responses.ShouldContain(value => value.Contains("submitted for moderator review"));
-        responses.ShouldContain(value => value.Contains("/requests/streamer/games"));
+        responses.ShouldContain(static value => value.Contains("submitted for moderator review"));
+        responses.ShouldContain(static value => value.Contains("/requests/streamer/games"));
         responses[^1].ShouldContain("moderator-only");
         (
             await boardService.GetModeratorSubmissionAsync(hostId, 1, CancellationToken.None)
@@ -89,7 +89,7 @@ public sealed class RequestBoardCommandTests
         {
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.RequestBoards;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
         var responseCount = responses.Count;
         await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
@@ -146,8 +146,8 @@ public sealed class RequestBoardCommandTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

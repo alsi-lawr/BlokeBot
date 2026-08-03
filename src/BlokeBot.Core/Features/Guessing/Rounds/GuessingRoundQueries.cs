@@ -49,7 +49,7 @@ internal static class GuessingRoundQueries
     {
         var round = await Unresolved(db, hostId)
             .AsNoTracking()
-            .Select(x => new
+            .Select(static x => new
             {
                 x.Id,
                 x.GuessRoundProfileId,
@@ -81,7 +81,7 @@ internal static class GuessingRoundQueries
     {
         var round = await Unresolved(db, hostId)
             .AsNoTracking()
-            .Select(x => new
+            .Select(static x => new
             {
                 x.Id,
                 x.GuessRoundProfileId,

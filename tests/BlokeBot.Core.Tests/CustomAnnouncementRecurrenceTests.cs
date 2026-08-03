@@ -56,7 +56,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             "streamer",
             changedAtUtc: lastSentAt.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
@@ -147,7 +147,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             timeZoneId: "Pacific/Auckland",
             changedAtUtc: now.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
             new WeeklyCustomAnnouncementSchedule
@@ -167,7 +167,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
         sender.Messages.ShouldBe([new SentChatMessage("streamer", "Weekly")]);
         await using var db = await dbFactory.CreateDbContextAsync();
         var lastSent = await db
-            .CustomAnnouncements.Select(x => x.LastSentAtUtc)
+            .CustomAnnouncements.Select(static x => x.LastSentAtUtc)
             .SingleAsync(CancellationToken.None);
         lastSent.ShouldBe(new DateTime(2026, 7, 10, 12, 0, 0, DateTimeKind.Utc));
     }
@@ -183,7 +183,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             "streamer",
             changedAtUtc: lastSentAt.AddHours(-1).UtcDateTime
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
             new WeeklyCustomAnnouncementSchedule
@@ -219,7 +219,7 @@ public sealed class CustomAnnouncementRecurrenceTests : CustomAnnouncementSchedu
             timeZoneId: "Pacific/Auckland",
             changedAtUtc: new DateTime(2026, 7, 10, 12, 30, 0, DateTimeKind.Utc)
         );
-        await SeedAnnouncementAsync(
+        _ = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
             new WeeklyCustomAnnouncementSchedule

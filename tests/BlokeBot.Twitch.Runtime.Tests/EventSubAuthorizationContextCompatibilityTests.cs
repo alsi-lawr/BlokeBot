@@ -10,15 +10,15 @@ public sealed class EventSubAuthorizationContextCompatibilityTests
     {
         EventSubAuthorizationContext
             .ConfiguredBotOperationsAuthority.Match(
-                _ => "configured-bot",
-                _ => "configured-bot-operations",
-                _ => "broadcaster"
+                static _ => "configured-bot",
+                static _ => "configured-bot-operations",
+                static _ => "broadcaster"
             )
             .ShouldBe("configured-bot-operations");
 
         typeof(EventSubAuthorizationContext)
             .GetNestedTypes(BindingFlags.Public)
-            .Select(type => type.Name)
+            .Select(static type => type.Name)
             .Order()
             .ShouldBe([
                 nameof(EventSubAuthorizationContext.Broadcaster),
@@ -27,7 +27,7 @@ public sealed class EventSubAuthorizationContextCompatibilityTests
             ]);
         typeof(EventSubAuthorizationContext)
             .GetProperties(BindingFlags.Public | BindingFlags.Static)
-            .Select(property => property.Name)
+            .Select(static property => property.Name)
             .Order()
             .ShouldBe([
                 nameof(EventSubAuthorizationContext.BroadcasterAuthority),

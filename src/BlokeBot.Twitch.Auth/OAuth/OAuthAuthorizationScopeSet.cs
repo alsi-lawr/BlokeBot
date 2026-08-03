@@ -17,15 +17,12 @@ public sealed class OAuthAuthorizationScopeSet
     public static OAuthAuthorizationScopeSet Create(IEnumerable<string> scopes)
     {
         var normalized = OAuthScopeSet.Create(scopes);
-        if (normalized.Count == 0)
-        {
-            throw new ArgumentException(
+        return normalized.Count == 0
+            ? throw new ArgumentException(
                 "OAuth authorization scopes must contain at least one value.",
                 nameof(scopes)
-            );
-        }
-
-        return new OAuthAuthorizationScopeSet(normalized);
+            )
+            : new OAuthAuthorizationScopeSet(normalized);
     }
 
     public string Serialize() => _scopes.Serialize();

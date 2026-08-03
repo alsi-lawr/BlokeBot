@@ -4,7 +4,7 @@ public static class ToastServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotToasts(this IServiceCollection services)
     {
-        services.AddScoped<ToastService>();
+        _ = services.AddScoped<ToastService>();
         return services;
     }
 }

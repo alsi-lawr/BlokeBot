@@ -49,7 +49,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
             {
                 return _pending
                     .Values.OrderBy(
-                        deletion => deletion.Subscription.Channel,
+                        static deletion => deletion.Subscription.Channel,
                         StringComparer.OrdinalIgnoreCase
                     )
                     .ToArray();
@@ -58,7 +58,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
     }
 
     internal IReadOnlyList<string> PendingDeletionChannels =>
-        PendingDeletions.Select(deletion => deletion.Subscription.Channel).ToArray();
+        PendingDeletions.Select(static deletion => deletion.Subscription.Channel).ToArray();
 
     internal IReadOnlyList<string> ReconciliationChannels
     {
@@ -170,8 +170,8 @@ internal sealed class EventSubSubscriptionReconciliationStore
             }
 
             EnsureSameSubscription(existing.Subscription, subscription);
-            _pending.Remove(subscription.Channel);
-            _pendingStops.Add(subscription.Channel);
+            _ = _pending.Remove(subscription.Channel);
+            _ = _pendingStops.Add(subscription.Channel);
         }
     }
 

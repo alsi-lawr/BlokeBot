@@ -42,7 +42,7 @@ internal static class TestPrincipals
         if (availableHosts is not null)
         {
             claims.AddRange(
-                availableHosts.Select(host => new Claim(
+                availableHosts.Select(static host => new Claim(
                     BotHostClaims.AvailableHost,
                     BotHostClaimCodec.Encode(host)
                 ))
@@ -52,7 +52,10 @@ internal static class TestPrincipals
         if (availableHostClaims is not null)
         {
             claims.AddRange(
-                availableHostClaims.Select(value => new Claim(BotHostClaims.AvailableHost, value))
+                availableHostClaims.Select(static value => new Claim(
+                    BotHostClaims.AvailableHost,
+                    value
+                ))
             );
         }
 

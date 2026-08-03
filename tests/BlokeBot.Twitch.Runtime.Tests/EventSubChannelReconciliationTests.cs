@@ -167,8 +167,8 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.DeleteCount("bad").ShouldBe(1);
         operations.CompleteStopCount("bad").ShouldBe(0);
         harness.Session.ActiveChannels.ShouldBe(["bad", "good"]);
-        var states = harness.Status.Current.Channels.ToDictionary(state => state.Channel);
-        states["good"].ShouldBeOfType<EventSubChannelStatus.Healthy>();
+        var states = harness.Status.Current.Channels.ToDictionary(static state => state.Channel);
+        _ = states["good"].ShouldBeOfType<EventSubChannelStatus.Healthy>();
         var degraded = states["bad"].ShouldBeOfType<EventSubChannelStatus.Degraded>();
         AssertFailure(
             degraded,
@@ -213,7 +213,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         harness.Session.ActiveChannels.ShouldBeEmpty();
         harness.PendingDeletions.PendingDeletions.ShouldBeEmpty();
         harness.Status.Current.Channels.ShouldBeEmpty();
-        harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 
     [Test]
@@ -260,10 +260,10 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.DeleteCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(0);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
-        harness
+        _ = harness
             .PendingDeletions.PendingDeletions.ShouldHaveSingleItem()
             .State.ShouldBeOfType<EventSubPendingDeletionState.Scheduled>();
-        harness
+        _ = harness
             .Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelStatus.Healthy>();
     }
@@ -290,7 +290,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         );
         old.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
         await old.Session.DrainAsync();
-        sharedPendingDeletions.PendingDeletions.ShouldHaveSingleItem();
+        _ = sharedPendingDeletions.PendingDeletions.ShouldHaveSingleItem();
         sharedPendingDeletions.HasPendingReconciliation.ShouldBeTrue();
         await old.DisposeAsync();
 
@@ -314,7 +314,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         sharedPendingDeletions.HasPendingReconciliation.ShouldBeFalse();
         replacement.Session.ActiveChannels.ShouldBeEmpty();
         sharedStatus.Current.Channels.ShouldBeEmpty();
-        sharedRuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = sharedRuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 
     [Test]
@@ -338,12 +338,12 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
             async cancellationToken =>
             {
                 enteredRecovery.Writer.TryWrite(true).ShouldBeTrue();
-                await releaseRecovery.Reader.ReadAsync(cancellationToken);
+                _ = await releaseRecovery.Reader.ReadAsync(cancellationToken);
                 return new BotAccount("old-bot", "old-secret");
             }
         );
         old.Session.TriggerReconciliation(["old"], EventSubChannelRecoveryTrigger.Explicit);
-        await enteredRecovery.Reader.ReadAsync();
+        _ = await enteredRecovery.Reader.ReadAsync();
 
         var replacementOperations = new ScriptedChannelOperations();
         await using var replacement = CreateHarness(

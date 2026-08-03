@@ -106,7 +106,7 @@ public sealed class CustomCommandConfigurationTests
         entry.Name.ShouldBe("Greeting");
         entry.SelectionMode.ShouldBe(CustomMessageSelectionMode.Sequential);
         entry.CurrentVariantIndex.ShouldBe(1);
-        entry.Variants.Select(x => x.Text).ShouldBe(["Hi {user}.", "Hello {channel}."]);
+        entry.Variants.Select(static x => x.Text).ShouldBe(["Hi {user}.", "Hello {channel}."]);
 
         var counter = loaded.Counters.Single();
         counter.Name.ShouldBe("Deaths");
@@ -173,12 +173,12 @@ public sealed class CustomCommandConfigurationTests
 
         action.TargetOverlayPublicId = other.TargetId;
         references.Outcome = new OverlayCueReferenceOutcome.Missing(OverlayCueReferencePart.Target);
-        (
+        _ = (
             await SaveFailureAsync(service, hostId, loaded)
         ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
         action.TargetOverlayPublicId = owned.TargetId;
         references.Outcome = new OverlayCueReferenceOutcome.Disabled(OverlayCueReferencePart.Cue);
-        (
+        _ = (
             await SaveFailureAsync(service, hostId, loaded)
         ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
         references.Requests.Count.ShouldBe(3);
@@ -237,7 +237,7 @@ public sealed class CustomCommandConfigurationTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             service
                 .SaveConfiguration(
                     1,
@@ -258,7 +258,7 @@ public sealed class CustomCommandConfigurationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -266,7 +266,7 @@ public sealed class CustomCommandConfigurationTests
                     Alias = "points",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var service = CreateService(dbFactory);
@@ -283,7 +283,9 @@ public sealed class CustomCommandConfigurationTests
         var draftCollision = ValidationErrors(
             ConfigurationWithCommands(("First", "hello"), ("Second", "!HELLO"))
         );
-        draftCollision.ShouldContain(error => error.Message.Contains("another custom command"));
+        draftCollision.ShouldContain(static error =>
+            error.Message.Contains("another custom command")
+        );
     }
 
     [Test]
@@ -323,7 +325,7 @@ public sealed class CustomCommandConfigurationTests
 
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         loaded.Commands.Single().Aliases.ShouldBe("new-alias");
-        loaded.Commands.Single().Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
+        _ = loaded.Commands.Single().Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
         var loadedSchedule = loaded
             .Announcements.Single()
             .Schedule.ShouldBeOfType<IntervalAfterChatCustomAnnouncementScheduleEditor>();
@@ -331,7 +333,9 @@ public sealed class CustomCommandConfigurationTests
         loadedSchedule.RequiredChatMessages.ShouldBe(4);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            (await db.CustomCommandAliases.AnyAsync(x => x.Alias == "old-alias")).ShouldBeFalse();
+            (
+                await db.CustomCommandAliases.AnyAsync(static x => x.Alias == "old-alias")
+            ).ShouldBeFalse();
         }
 
         loaded.Commands.Single().ActionKind = CustomCommandActionKind.Message;
@@ -344,7 +348,7 @@ public sealed class CustomCommandConfigurationTests
         await SaveValidAsync(service, hostId, loaded);
 
         var final = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
-        final.Commands.Single().Action.ShouldBeOfType<MessageCustomCommandActionEditor>();
+        _ = final.Commands.Single().Action.ShouldBeOfType<MessageCustomCommandActionEditor>();
         var finalSchedule = final
             .Announcements.Single()
             .Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
@@ -407,13 +411,13 @@ public sealed class CustomCommandConfigurationTests
         var missingId = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         missingId.Commands.Single().Id = 999_999;
         var missingError = await SaveFailureAsync(service, firstHostId, missingId);
-        missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
+        _ = missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var invalidMessage = ConfigurationWithCommands(("Invalid", "invalid"));
         invalidMessage.Commands.Single().Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId =
             -999;
         var messageErrors = ValidationErrors(invalidMessage);
-        messageErrors.ShouldContain(error => error.Message.Contains("Choose a saved reply"));
+        messageErrors.ShouldContain(static error => error.Message.Contains("Choose a saved reply"));
 
         var invalidCounter = ConfigurationWithCommands(("Counter", "counter"));
         invalidCounter.Commands.Single().Action = new CounterCustomCommandActionEditor
@@ -422,10 +426,10 @@ public sealed class CustomCommandConfigurationTests
             CounterId = -999,
         };
         var counterErrors = ValidationErrors(invalidCounter);
-        counterErrors.ShouldContain(error => error.Message.Contains("Choose a counter"));
+        counterErrors.ShouldContain(static error => error.Message.Contains("Choose a counter"));
 
         var hostBoundaryError = await SaveFailureAsync(service, secondHostId, stored);
-        hostBoundaryError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
+        _ = hostBoundaryError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var unchanged = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         unchanged.Commands.Single().Name.ShouldBe("Command");
@@ -438,7 +442,8 @@ public sealed class CustomCommandConfigurationTests
         var interval = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 0 }
         );
-        ValidationErrors(interval).ShouldContain(error => error.Message.Contains("at least 1"));
+        ValidationErrors(interval)
+            .ShouldContain(static error => error.Message.Contains("at least 1"));
 
         var afterChat = ConfigurationWithAnnouncement(
             new IntervalAfterChatCustomAnnouncementScheduleEditor
@@ -448,7 +453,7 @@ public sealed class CustomCommandConfigurationTests
             }
         );
         ValidationErrors(afterChat)
-            .ShouldContain(error => error.Message.Contains("at least 1 chat message"));
+            .ShouldContain(static error => error.Message.Contains("at least 1 chat message"));
     }
 
     [Test]
@@ -467,7 +472,7 @@ public sealed class CustomCommandConfigurationTests
             ],
         };
 
-        var targets = ValidationErrors(draft).Select(error => error.Target);
+        var targets = ValidationErrors(draft).Select(static error => error.Target);
 
         targets.ShouldContain(
             new CustomCommandConfigurationValidationTarget(
@@ -518,7 +523,7 @@ public sealed class CustomCommandConfigurationTests
             }
         );
 
-        var targets = ValidationErrors(draft).Select(error => error.Target);
+        var targets = ValidationErrors(draft).Select(static error => error.Target);
 
         targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases));
         targets.ShouldContain(
@@ -573,7 +578,7 @@ public sealed class CustomCommandConfigurationTests
             },
         ];
 
-        var targets = ValidationErrors(draft).Select(error => error.Target);
+        var targets = ValidationErrors(draft).Select(static error => error.Target);
 
         targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.Reply));
         targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.Color));
@@ -604,7 +609,7 @@ public sealed class CustomCommandConfigurationTests
             }
         );
 
-        var targets = ValidationErrors(draft).Select(error => error.Target);
+        var targets = ValidationErrors(draft).Select(static error => error.Target);
 
         targets.ShouldContain(
             new CustomCommandConfigurationValidationTarget(
@@ -631,14 +636,14 @@ public sealed class CustomCommandConfigurationTests
         var missing = ConfigurationWithAnnouncement(new IntervalCustomAnnouncementScheduleEditor());
         missing.Announcements.Single().RetryDelaySeconds = 0;
         ValidationErrors(missing)
-            .ShouldContain(error => error.Message.Contains("retry delay must be positive"));
+            .ShouldContain(static error => error.Message.Contains("retry delay must be positive"));
 
         var excessive = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor()
         );
         excessive.Announcements.Single().OccurrenceLifetimeSeconds = 61;
         ValidationErrors(excessive)
-            .ShouldContain(error => error.Message.Contains("no greater than 60"));
+            .ShouldContain(static error => error.Message.Contains("no greater than 60"));
 
         var inconsistent = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor()
@@ -646,7 +651,9 @@ public sealed class CustomCommandConfigurationTests
         inconsistent.Announcements.Single().RetryDelaySeconds = 30;
         inconsistent.Announcements.Single().OccurrenceLifetimeSeconds = 30;
         ValidationErrors(inconsistent)
-            .ShouldContain(error => error.Message.Contains("less than its occurrence lifetime"));
+            .ShouldContain(static error =>
+                error.Message.Contains("less than its occurrence lifetime")
+            );
 
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
@@ -664,7 +671,7 @@ public sealed class CustomCommandConfigurationTests
         configuration.MessageEntries.Single().Variants.Single().Text = new string('x', 501);
 
         ValidationErrors(configuration)
-            .ShouldContain(error => error.Message.Contains("at most 500 characters"));
+            .ShouldContain(static error => error.Message.Contains("at most 500 characters"));
     }
 
     [Test]
@@ -835,7 +842,10 @@ public sealed class CustomCommandConfigurationTests
     ) =>
         CustomCommandConfigurationValidator
             .Validate(draft)
-            .Match(_ => Array.Empty<CustomCommandConfigurationValidationError>(), errors => errors);
+            .Match(
+                static _ => Array.Empty<CustomCommandConfigurationValidationError>(),
+                static errors => errors
+            );
 
     private static CustomCommandConfigurationValidationTarget CommandTarget(
         int commandId,
@@ -868,9 +878,9 @@ public sealed class CustomCommandConfigurationTests
         var result = await service
             .SaveConfiguration(hostId, ValidCommand(draft))
             .ExecuteAsync(CancellationToken.None);
-        result.Match(
+        _ = result.Match(
             static _ => true,
-            failure => throw new InvalidOperationException(failure.Message)
+            static failure => throw new InvalidOperationException(failure.Message)
         );
     }
 
@@ -884,8 +894,9 @@ public sealed class CustomCommandConfigurationTests
             .SaveConfiguration(hostId, ValidCommand(draft))
             .ExecuteAsync(CancellationToken.None);
         return result.Match(
-            _ => throw new InvalidOperationException("Expected custom-command save failure."),
-            failure => failure
+            static _ =>
+                throw new InvalidOperationException("Expected custom-command save failure."),
+            static failure => failure
         );
     }
 
@@ -899,8 +910,8 @@ public sealed class CustomCommandConfigurationTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -913,7 +924,7 @@ public sealed class CustomCommandConfigurationTests
         var targetId = Guid.NewGuid();
         var cueId = Guid.NewGuid();
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             new OverlayInstance
             {
                 HostId = hostId,
@@ -931,7 +942,7 @@ public sealed class CustomCommandConfigurationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.OverlayCues.Add(
+        _ = db.OverlayCues.Add(
             new OverlayCue
             {
                 HostId = hostId,
@@ -946,7 +957,7 @@ public sealed class CustomCommandConfigurationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return (targetId, cueId);
     }
 }

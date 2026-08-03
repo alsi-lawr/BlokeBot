@@ -50,7 +50,7 @@ public sealed class AutomaticRaidShoutoutConfigurationService(
         if (settings is null)
         {
             settings = new AutomaticRaidShoutoutSettings { HostId = hostId };
-            db.AutomaticRaidShoutoutSettings.Add(settings);
+            _ = db.AutomaticRaidShoutoutSettings.Add(settings);
         }
         settings.Enabled = configuration.Enabled;
         settings.MinimumViewerCount = configuration.MinimumViewerCount;
@@ -60,7 +60,7 @@ public sealed class AutomaticRaidShoutoutConfigurationService(
         settings.PinDurationSeconds = configuration.PinDurationSeconds;
         settings.AnnouncementColor = configuration.AnnouncementColor;
         settings.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         return new AutomaticRaidShoutoutSaveOutcome.Saved(Map(settings));
     }
 

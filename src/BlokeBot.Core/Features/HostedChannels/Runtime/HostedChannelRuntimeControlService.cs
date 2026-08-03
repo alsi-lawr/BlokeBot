@@ -62,8 +62,8 @@ public sealed class HostedChannelRuntimeControlService(
 
             host.BotRuntimeState = BotChannelRuntimeState.Starting;
             host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
 
@@ -95,8 +95,8 @@ public sealed class HostedChannelRuntimeControlService(
             );
             host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
 
-            await db.SaveChangesAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return Success(new HostedChannelRuntimeControlOutcome.Accepted());
         });
 

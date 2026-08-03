@@ -49,12 +49,12 @@ internal sealed class SimulationFixtureSeeder(
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         await SeedMomentAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await SeedOverlayAsync(db, hostId, now, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
         return new BotHostChoice(
             hostId,
@@ -93,7 +93,7 @@ internal sealed class SimulationFixtureSeeder(
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             };
-            db.OverlayInstances.Add(feed);
+            _ = db.OverlayInstances.Add(feed);
             db.OverlayEventFeedItems.AddRange(
                 new OverlayEventFeedItem
                 {
@@ -136,7 +136,7 @@ internal sealed class SimulationFixtureSeeder(
                 .PlayQueues.Where(value => value.HostId == hostId && value.Slug == "main")
                 .Select(value => value.Id)
                 .SingleAsync(cancellationToken);
-            db.OverlayInstances.Add(
+            _ = db.OverlayInstances.Add(
                 new OverlayInstance
                 {
                     PublicId = Guid.Parse("1a10c145-e2d2-4605-9659-7250b191b5a1"),
@@ -162,7 +162,7 @@ internal sealed class SimulationFixtureSeeder(
             )
         )
         {
-            db.OverlayInstances.Add(
+            _ = db.OverlayInstances.Add(
                 new OverlayInstance
                 {
                     PublicId = Guid.Parse("0a8b9ee0-500f-4b20-b706-455ff9ef4288"),
@@ -191,7 +191,7 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("82bd3021-fc60-47fc-8fa7-ed828083e70a"),
@@ -208,7 +208,7 @@ internal sealed class SimulationFixtureSeeder(
                 UpdatedAtUtc = now,
             }
         );
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("a24ea34e-47f7-41f7-bdf7-5de18d90389c"),
@@ -224,7 +224,7 @@ internal sealed class SimulationFixtureSeeder(
                 UpdatedAtUtc = now,
             }
         );
-        db.OverlayCues.Add(
+        _ = db.OverlayCues.Add(
             new OverlayCue
             {
                 PublicId = Guid.Parse("f9c437a7-4df5-45de-bb87-450ca6a40f9b"),
@@ -377,7 +377,7 @@ internal sealed class SimulationFixtureSeeder(
                                 .AuthorizedUser
                                 .Login,
                             Note = "Stream reward",
-                            CreatedAtUtc = now.AddMinutes(-32 + index * 6),
+                            CreatedAtUtc = now.AddMinutes(-32 + (index * 6)),
                         }
                 )
             );
@@ -388,7 +388,7 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.PointsGiveaways.Add(
+        _ = db.PointsGiveaways.Add(
             new PointsGiveaway
             {
                 HostId = hostId,
@@ -487,7 +487,7 @@ internal sealed class SimulationFixtureSeeder(
             UpdatedAtUtc = now,
         };
         db.AddRange(welcome, hydrationReply, counter);
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
         db.CustomCommands.AddRange(
             new CustomCommand
@@ -568,7 +568,7 @@ internal sealed class SimulationFixtureSeeder(
                 UpdatedAtUtc = now,
             }
         );
-        db.CustomCommands.Add(
+        _ = db.CustomCommands.Add(
             new CustomCommand
             {
                 HostId = hostId,
@@ -593,7 +593,7 @@ internal sealed class SimulationFixtureSeeder(
                 UpdatedAtUtc = now,
             }
         );
-        db.CustomCommands.Add(
+        _ = db.CustomCommands.Add(
             new CustomCommand
             {
                 HostId = hostId,
@@ -619,7 +619,7 @@ internal sealed class SimulationFixtureSeeder(
         );
         for (var index = 1; index <= 32; index++)
         {
-            db.CustomCommands.Add(
+            _ = db.CustomCommands.Add(
                 new CustomCommand
                 {
                     HostId = hostId,
@@ -645,7 +645,7 @@ internal sealed class SimulationFixtureSeeder(
             );
         }
 
-        db.CustomAnnouncements.Add(
+        _ = db.CustomAnnouncements.Add(
             new CustomAnnouncement
             {
                 HostId = hostId,
@@ -684,7 +684,7 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.RequestBoards.Add(
+        _ = db.RequestBoards.Add(
             new RequestBoard
             {
                 HostId = hostId,
@@ -771,7 +771,7 @@ internal sealed class SimulationFixtureSeeder(
                 "Support"
             )
         );
-        db.PlayQueues.Add(queue);
+        _ = db.PlayQueues.Add(queue);
         return;
 
         PlayQueueEntry Entry(
@@ -815,7 +815,7 @@ internal sealed class SimulationFixtureSeeder(
         }
 
         var capturedAt = now.AddMinutes(-12);
-        db.MomentCandidates.Add(
+        _ = db.MomentCandidates.Add(
             new MomentCandidate
             {
                 PublicId = Guid.Parse("75a75ee9-cfed-47da-ad88-762f67f8c0a5"),
@@ -866,7 +866,7 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.DurableAlerts.Add(
+        _ = db.DurableAlerts.Add(
             new DurableAlert
             {
                 HostId = hostId,
@@ -900,7 +900,7 @@ internal sealed class SimulationFixtureSeeder(
             )
         )
         {
-            db.AutomaticRaidShoutoutSettings.Add(
+            _ = db.AutomaticRaidShoutoutSettings.Add(
                 new AutomaticRaidShoutoutSettings
                 {
                     HostId = hostId,

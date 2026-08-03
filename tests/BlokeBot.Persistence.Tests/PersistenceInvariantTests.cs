@@ -20,7 +20,7 @@ public sealed class PersistenceInvariantTests
             Giveaway(hostId, PointsGiveawayStatus.Active)
         );
 
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
     [Test]
@@ -36,7 +36,7 @@ public sealed class PersistenceInvariantTests
             Round(hostId, profileId, GuessRoundStatus.Closed)
         );
 
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
     [Test]
@@ -45,9 +45,9 @@ public sealed class PersistenceInvariantTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await SeedHostAsync(db);
-        await SeedProfileAsync(db, hostId);
+        _ = await SeedProfileAsync(db, hostId);
 
-        db.Profiles.Add(
+        _ = db.Profiles.Add(
             new GuessRoundProfile
             {
                 HostId = hostId,
@@ -57,7 +57,7 @@ public sealed class PersistenceInvariantTests
             }
         );
 
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
     [Test]
@@ -67,7 +67,7 @@ public sealed class PersistenceInvariantTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await SeedHostAsync(db);
 
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO points_giveaways
@@ -81,15 +81,15 @@ public sealed class PersistenceInvariantTests
         );
 
         var command = Command(hostId, "command");
-        db.CustomCommands.Add(command);
-        await db.SaveChangesAsync();
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = db.CustomCommands.Add(command);
+        _ = await db.SaveChangesAsync();
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"UPDATE custom_commands SET InvocationLimit = 'Bogus' WHERE Id = {command.Id}"
             )
         );
 
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_invocation_claims
@@ -100,7 +100,7 @@ public sealed class PersistenceInvariantTests
             )
         );
 
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO command_aliases (HostId, Kind, Alias)
@@ -117,7 +117,7 @@ public sealed class PersistenceInvariantTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await SeedHostAsync(db);
 
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_message_library_entries
@@ -128,7 +128,7 @@ public sealed class PersistenceInvariantTests
             )
         );
 
-        await Should.ThrowAsync<SqliteException>(async () =>
+        _ = await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO durable_alerts
@@ -152,9 +152,9 @@ public sealed class PersistenceInvariantTests
         var counterCommand = Command(hostId, "counter-command");
         var announcement = Announcement(hostId, "announcement", entry);
         db.AddRange(entry, counter, messageCommand, counterCommand, announcement);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
@@ -164,7 +164,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
@@ -174,7 +174,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcement_schedules
@@ -215,12 +215,12 @@ public sealed class PersistenceInvariantTests
             firstAnnouncement,
             secondProfile
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var wrongMessagePolicy = DeliveryPolicy(firstHostId);
-        db.Add(wrongMessagePolicy);
-        await db.SaveChangesAsync();
+        _ = db.Add(wrongMessagePolicy);
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
@@ -230,7 +230,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
@@ -240,7 +240,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_aliases (HostId, CustomCommandId, Alias)
@@ -248,7 +248,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcements
@@ -261,7 +261,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcement_schedules
@@ -272,7 +272,7 @@ public sealed class PersistenceInvariantTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO command_aliases (HostId, GuessRoundProfileId, Kind, Alias)
@@ -289,8 +289,8 @@ public sealed class PersistenceInvariantTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await SeedHostAsync(db);
         var entry = MessageEntry(hostId, "message");
-        db.CustomMessageLibraryEntries.Add(entry);
-        await db.SaveChangesAsync();
+        _ = db.CustomMessageLibraryEntries.Add(entry);
+        _ = await db.SaveChangesAsync();
         var command = Command(hostId, "command");
         command.Action = new MessageCustomCommandAction
         {
@@ -306,13 +306,13 @@ public sealed class PersistenceInvariantTests
             Time = new TimeOnly(19, 30),
         };
         db.AddRange(command, announcement);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         var deliveryPolicy = announcement.DeliveryPolicy;
         db.RemoveRange(command, announcement);
-        await db.SaveChangesAsync();
-        db.Remove(deliveryPolicy);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
+        _ = db.Remove(deliveryPolicy);
+        _ = await db.SaveChangesAsync();
 
         (await db.CustomCommandActions.CountAsync()).ShouldBe(0);
         (await db.CustomCommandAliases.CountAsync()).ShouldBe(0);
@@ -474,7 +474,7 @@ public sealed class PersistenceInvariantTests
     private static void AssertTokens<TEnum>(IReadOnlyList<(TEnum Value, string Token)> cases)
         where TEnum : struct, Enum
     {
-        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(item => item.Token));
+        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(static item => item.Token));
         foreach (var (value, token) in cases)
         {
             PersistedEnumTokens<TEnum>.Format(value).ShouldBe(token);
@@ -491,8 +491,8 @@ public sealed class PersistenceInvariantTests
             DisplayName = "Host",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -505,8 +505,8 @@ public sealed class PersistenceInvariantTests
             Slug = "default",
             IsDefault = true,
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
         return profile.Id;
     }
 }

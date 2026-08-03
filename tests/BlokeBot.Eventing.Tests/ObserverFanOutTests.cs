@@ -155,7 +155,7 @@ public sealed class ObserverFanOutTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
+        _ = outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
         sink.Attempts.ShouldBe(1);
         var deadLetter = sink.Entries.ShouldHaveSingleItem();
         deadLetter.Payload.ShouldBe(new TestDeadLetter("event-42"));
@@ -226,7 +226,7 @@ public sealed class ObserverFanOutTests
         reporter.Attempts.ShouldBe(1);
         sink.Attempts.ShouldBe(1);
         exception.Causes.ShouldBe([observerFailure, reporterFailure, sinkFailure]);
-        exception.Failures.ShouldHaveSingleItem();
+        _ = exception.Failures.ShouldHaveSingleItem();
         exception
             .HandlingFailures.Select(failure => failure.Stage)
             .ShouldBe([
@@ -252,7 +252,7 @@ public sealed class ObserverFanOutTests
             }
         );
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             DispatchAsync(
                     fanOut,
                     [cancelling, Observer("later", () => laterCalled = true)],
@@ -268,7 +268,7 @@ public sealed class ObserverFanOutTests
 
     [Test]
     public void BoundedRetry_WithOneTotalAttempt_RejectsImplicitRetryDefault() =>
-        Should.Throw<ArgumentOutOfRangeException>(() =>
+        Should.Throw<ArgumentOutOfRangeException>(static () =>
             new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
             {
                 Boundary = _boundary,
@@ -278,7 +278,7 @@ public sealed class ObserverFanOutTests
 
     [Test]
     public void CorrelationId_WithWhitespace_RejectsEmptyContext() =>
-        Should.Throw<ArgumentException>(() => ObserverCorrelationId.Named(" "));
+        Should.Throw<ArgumentException>(static () => ObserverCorrelationId.Named(" "));
 
     private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Continue() =>
         new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.ContinueAndReport
@@ -314,13 +314,13 @@ public sealed class ObserverFanOutTests
     ) =>
         fanOut.DispatchAsync(
             observers,
-            _ => new ObserverDispatch<TestEvent, TestDeadLetter>
+            static _ => new ObserverDispatch<TestEvent, TestDeadLetter>
             {
                 Event = new TestEvent("private chat text", "raw oauth payload"),
                 EventIdentity = _eventIdentity,
                 DeadLetter = new TestDeadLetter("event-42"),
             },
-            observer => ObserverIdentity.Named(observer.Name),
+            static observer => ObserverIdentity.Named(observer.Name),
             static (observer, _, token) => observer.InvokeAsync(token),
             cancellationToken
         );

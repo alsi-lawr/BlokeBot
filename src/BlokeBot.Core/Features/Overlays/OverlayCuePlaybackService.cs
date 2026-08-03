@@ -195,17 +195,16 @@ internal sealed class OverlayCuePlaybackService(
                 return new OverlayCueAdmissionOutcome.Running(runId);
             }
             var pending = state.Pending.FirstOrDefault(value => value.Plan.RunId == runId);
-            if (pending is not null)
+            var queued = pending is not null;
+            return queued switch
             {
-                return new OverlayCueAdmissionOutcome.Queued(runId);
-            }
-            if (state.Expired.Contains(runId))
-            {
-                return new OverlayCueAdmissionOutcome.Expired();
-            }
-            return state.Cancelled.Contains(runId)
-                ? new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled()
-                : new OverlayCueAdmissionOutcome.Missing();
+                true => new OverlayCueAdmissionOutcome.Queued(runId),
+                false when state.Expired.Contains(runId) =>
+                    new OverlayCueAdmissionOutcome.Expired(),
+                false when state.Cancelled.Contains(runId) =>
+                    new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled(),
+                _ => new OverlayCueAdmissionOutcome.Missing(),
+            };
         }
     }
 
@@ -401,13 +400,12 @@ internal sealed class OverlayCuePlaybackService(
                 value => value.HostId == request.HostId && value.PublicId == request.CueId,
                 cancellationToken
             );
-        if (cue is null)
+        return cue switch
         {
-            return new ReferenceResolution.Missing(OverlayCueReferencePart.Cue);
-        }
-        return cue.IsEnabled
-            ? new ReferenceResolution.Available(target, cue)
-            : new ReferenceResolution.Disabled(OverlayCueReferencePart.Cue);
+            null => new ReferenceResolution.Missing(OverlayCueReferencePart.Cue),
+            { IsEnabled: true } => new ReferenceResolution.Available(target, cue),
+            _ => new ReferenceResolution.Disabled(OverlayCueReferencePart.Cue),
+        };
     }
 
     private static OverlayCuePlaybackLayer ResolveLayer(
@@ -624,14 +622,14 @@ internal sealed class OverlayCuePlaybackService(
                 .ToArray()
         )
         {
-            state.Active.Remove(expired.Plan.RunId);
-            state.Expired.Add(expired.Plan.RunId);
+            _ = state.Active.Remove(expired.Plan.RunId);
+            _ = state.Expired.Add(expired.Plan.RunId);
             transport.Stop(expired.Target, expired.Plan.RunId);
         }
         while (state.Pending.TryPeek(out var pending) && pending.ExpiresAtUtc <= now)
         {
-            state.Pending.Dequeue();
-            state.Expired.Add(pending.Plan.RunId);
+            _ = state.Pending.Dequeue();
+            _ = state.Expired.Add(pending.Plan.RunId);
         }
         Advance(identity, state);
         PruneTerminal(state);
@@ -649,7 +647,7 @@ internal sealed class OverlayCuePlaybackService(
             {
                 return;
             }
-            state.Pending.Dequeue();
+            _ = state.Pending.Dequeue();
             Start(identity, state, next);
             if (next.QueuePolicy != OverlayCueQueuePolicy.Concurrent)
             {
@@ -669,12 +667,12 @@ internal sealed class OverlayCuePlaybackService(
     {
         foreach (var active in state.Active.Values)
         {
-            state.Cancelled.Add(active.Plan.RunId);
+            _ = state.Cancelled.Add(active.Plan.RunId);
             transport.Stop(active.Target, active.Plan.RunId);
         }
         foreach (var pending in state.Pending)
         {
-            state.Cancelled.Add(pending.Plan.RunId);
+            _ = state.Cancelled.Add(pending.Plan.RunId);
         }
         state.Active.Clear();
         state.Pending.Clear();

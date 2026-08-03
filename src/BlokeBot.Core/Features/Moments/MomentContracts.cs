@@ -178,7 +178,7 @@ internal static class MomentInput
 
     public static bool IsValidLogin(string value) =>
         value.Length is >= 1 and <= 128
-        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
+        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     public static string IdentityKey(MomentViewerIdentity viewer)
     {

@@ -33,7 +33,7 @@ public sealed class AuthSessionTests
         session.IsBotAdmin.ShouldBeTrue();
         session.HasCapability(AuthSessionCapability.BotAdmin).ShouldBeTrue();
         session.HasCapability(AuthSessionCapability.Operator).ShouldBeFalse();
-        session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
     }
 
     [Test]
@@ -54,7 +54,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.Invalid>();
         session.HasCapability(AuthSessionCapability.Operator).ShouldBeFalse();
         session.HasCapability(AuthSessionCapability.HostSelected).ShouldBeFalse();
     }
@@ -66,7 +66,7 @@ public sealed class AuthSessionTests
             TestPrincipals.BlokeBotUser(login: "streamer", roleClaim: "owner")
         );
 
-        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.Invalid>();
         session.Role.ShouldBeNull();
     }
 
@@ -81,7 +81,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.Invalid>();
     }
 
     [Test]
@@ -99,7 +99,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.Invalid>();
     }
 
     [Test]
@@ -170,7 +170,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
+        _ = session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
         session.AvailableHosts.Single().ShouldBe(alternateHost);
         session.CanOpenHostConfig(new HashSet<int> { alternateHost.Id }).ShouldBeTrue();
         session.CanUseBotFunctions(new HashSet<int> { alternateHost.Id }).ShouldBeFalse();
@@ -191,14 +191,14 @@ public sealed class AuthSessionTests
 
         await validator.ValidateAsync(context);
 
-        context.Principal.ShouldNotBeNull();
+        _ = context.Principal.ShouldNotBeNull();
     }
 
     [Test]
     public async Task InvalidSelectedHostClaim_ValidatingCookie_RejectsPrincipalWithoutFallback()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedHostAsync(dbFactory, "streamer");
         var validator = CreateValidator(dbFactory);
         var context = CookieContext(
             TestPrincipals.BlokeBotUser(
@@ -285,8 +285,8 @@ public sealed class AuthSessionTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

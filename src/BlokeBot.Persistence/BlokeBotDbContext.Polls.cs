@@ -10,70 +10,70 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePolls(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<HostBroadcasterAuthorization>(b =>
+        _ = modelBuilder.Entity<HostBroadcasterAuthorization>(static b =>
         {
-            b.ToTable("host_broadcaster_authorizations");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.TwitchUserId).HasMaxLength(64);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.AuthorizedScopes).HasMaxLength(512);
-            b.HasIndex(x => x.HostId).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.ToTable("host_broadcaster_authorizations");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.TwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.AuthorizedScopes).HasMaxLength(512);
+            _ = b.HasIndex(static x => x.HostId).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<TwitchPollTemplate>(b =>
+        _ = modelBuilder.Entity<TwitchPollTemplate>(static b =>
         {
-            b.ToTable("twitch_poll_templates");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Title).HasMaxLength(60);
-            b.HasIndex(x => x.HostId);
-            b.HasOne<BotHost>()
+            _ = b.ToTable("twitch_poll_templates");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Title).HasMaxLength(60);
+            _ = b.HasIndex(static x => x.HostId);
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Choices)
-                .WithOne(x => x.Template)
-                .HasForeignKey(x => x.TwitchPollTemplateId)
+            _ = b.HasMany(static x => x.Choices)
+                .WithOne(static x => x.Template)
+                .HasForeignKey(static x => x.TwitchPollTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<TwitchPollTemplateChoice>(b =>
+        _ = modelBuilder.Entity<TwitchPollTemplateChoice>(static b =>
         {
-            b.ToTable("twitch_poll_template_choices");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Title).HasMaxLength(25);
-            b.HasIndex(x => new { x.TwitchPollTemplateId, x.Position }).IsUnique();
+            _ = b.ToTable("twitch_poll_template_choices");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Title).HasMaxLength(25);
+            _ = b.HasIndex(static x => new { x.TwitchPollTemplateId, x.Position }).IsUnique();
         });
 
-        modelBuilder.Entity<TwitchPoll>(b =>
+        _ = modelBuilder.Entity<TwitchPoll>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "twitch_polls",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_twitch_polls_Status",
                         KindIn("Status", _twitchPollStatusKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.ProviderPollId).HasMaxLength(128);
-            b.Property(x => x.Title).HasMaxLength(60);
-            b.Property(x => x.ChoicesJson).HasMaxLength(4096);
-            b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ProviderPollId).HasMaxLength(128);
+            _ = b.Property(static x => x.Title).HasMaxLength(60);
+            _ = b.Property(static x => x.ChoicesJson).HasMaxLength(4096);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<TwitchPollStatus>.Format(status),
-                    token => PersistedEnumTokens<TwitchPollStatus>.Parse(token)
+                    static status => PersistedEnumTokens<TwitchPollStatus>.Format(status),
+                    static token => PersistedEnumTokens<TwitchPollStatus>.Parse(token)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => new { x.HostId, x.ProviderPollId }).IsUnique();
-            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
-            b.HasIndex(x => new { x.HostId, x.EndedAtUtc });
-            b.HasOne<BotHost>()
+            _ = b.HasIndex(static x => new { x.HostId, x.ProviderPollId }).IsUnique();
+            _ = b.HasIndex(static x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
+            _ = b.HasIndex(static x => new { x.HostId, x.EndedAtUtc });
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

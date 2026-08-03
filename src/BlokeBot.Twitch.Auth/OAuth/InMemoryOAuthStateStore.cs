@@ -12,7 +12,7 @@ internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
         var state = Guid.NewGuid().ToString("N");
         lock (_gate)
         {
-            _states.Add(state);
+            _ = _states.Add(state);
         }
 
         return state;

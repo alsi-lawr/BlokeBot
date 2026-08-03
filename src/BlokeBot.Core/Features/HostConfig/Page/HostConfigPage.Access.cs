@@ -86,30 +86,27 @@ public partial class HostConfigPage
     private Task SetAllowModsByDefaultAsync(int hostId, bool allowByDefault)
     {
         var intent = ++_allowModsByDefaultIntent;
-        if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
-        {
-            return Task.CompletedTask;
-        }
-
-        return HostModAccessSaveValidator
-            .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowByDefault))
-            .Match(
-                command =>
-                    RunSelectedHostMutationAsync(
-                        hostId,
-                        () => BeginAllowModsByDefaultSaveAsync(command, allowByDefault, intent)
-                    ),
-                errors =>
-                {
-                    _toasts.Publish(
-                        ToastRequest<ErrorToastStrategy>.WithTitle(
-                            errors[0].Message,
-                            "Mod help not saved"
-                        )
-                    );
-                    return Task.CompletedTask;
-                }
-            );
+        return _state is null || _state.ModAccess.AllowModsByDefault == allowByDefault
+            ? Task.CompletedTask
+            : HostModAccessSaveValidator
+                .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowByDefault))
+                .Match(
+                    command =>
+                        RunSelectedHostMutationAsync(
+                            hostId,
+                            () => BeginAllowModsByDefaultSaveAsync(command, allowByDefault, intent)
+                        ),
+                    errors =>
+                    {
+                        _ = _toasts.Publish(
+                            ToastRequest<ErrorToastStrategy>.WithTitle(
+                                errors[0].Message,
+                                "Mod help not saved"
+                            )
+                        );
+                        return Task.CompletedTask;
+                    }
+                );
     }
 
     private Task BeginAllowModsByDefaultSaveAsync(
@@ -156,7 +153,7 @@ public partial class HostConfigPage
             }
             finally
             {
-                _allowModsByDefaultSaveGate.Release();
+                _ = _allowModsByDefaultSaveGate.Release();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -187,7 +184,7 @@ public partial class HostConfigPage
                 _state = _state with { ModAccess = submission.PreviousAccess };
             }
 
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(failure.Message, "Mod help not saved")
             );
             StateHasChanged();

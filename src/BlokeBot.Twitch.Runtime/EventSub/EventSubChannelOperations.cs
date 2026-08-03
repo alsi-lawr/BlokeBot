@@ -40,68 +40,63 @@ internal sealed class EventSubChannelOperations(
         string sessionId,
         CancellationToken cancellationToken,
         EventSubOperationSubscriptionKind? operationKind = null
-    )
-    {
-        if (operationKind is EventSubOperationSubscriptionKind.Raids)
-        {
-            return CreateConfiguredBotRaidSubscriptionAsync(
+    ) =>
+        operationKind is EventSubOperationSubscriptionKind.Raids
+            ? CreateConfiguredBotRaidSubscriptionAsync(
                 channel,
                 authorization,
                 account,
                 sessionId,
                 cancellationToken
-            );
-        }
-
-        return authorization.Match(
-            _ =>
-                CreateConfiguredBotSubscriptionsAsync(
-                    channel,
-                    authorization,
-                    account,
-                    sessionId,
-                    cancellationToken
-                ),
-            _ =>
-                CreateConfiguredBotOperationSubscriptionsAsync(
-                    channel,
-                    authorization,
-                    account,
-                    sessionId,
-                    cancellationToken
-                ),
-            broadcaster =>
-                broadcaster.Operation switch
-                {
-                    EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
+            )
+            : authorization.Match(
+                _ =>
+                    CreateConfiguredBotSubscriptionsAsync(
                         channel,
                         authorization,
                         account,
                         sessionId,
                         cancellationToken
                     ),
-                    EventSubBroadcasterOperationKind.RewardRedemptions =>
-                        CreateRewardRedemptionSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            sessionId,
-                            cancellationToken
-                        ),
-                    EventSubBroadcasterOperationKind.Predictions =>
-                        CreatePredictionSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            sessionId,
-                            cancellationToken
-                        ),
-                    _ => throw new UnreachableException(
-                        "Unknown broadcaster EventSub operation kind."
+                _ =>
+                    CreateConfiguredBotOperationSubscriptionsAsync(
+                        channel,
+                        authorization,
+                        account,
+                        sessionId,
+                        cancellationToken
                     ),
-                }
-        );
-    }
+                broadcaster =>
+                    broadcaster.Operation switch
+                    {
+                        EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            sessionId,
+                            cancellationToken
+                        ),
+                        EventSubBroadcasterOperationKind.RewardRedemptions =>
+                            CreateRewardRedemptionSubscriptionsAsync(
+                                channel,
+                                authorization,
+                                account,
+                                sessionId,
+                                cancellationToken
+                            ),
+                        EventSubBroadcasterOperationKind.Predictions =>
+                            CreatePredictionSubscriptionsAsync(
+                                channel,
+                                authorization,
+                                account,
+                                sessionId,
+                                cancellationToken
+                            ),
+                        _ => throw new UnreachableException(
+                            "Unknown broadcaster EventSub operation kind."
+                        ),
+                    }
+            );
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
         string channel,

@@ -37,7 +37,7 @@ public partial class PointsConfigurationPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 InvokeAsync,
@@ -52,7 +52,7 @@ public partial class PointsConfigurationPage
 
     private async Task LoadCoreAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -105,7 +105,7 @@ public partial class PointsConfigurationPage
                             _giveawaysFocusRequest++;
                             break;
                     }
-                    _toasts.Publish(
+                    _ = _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(
                             string.Join(" ", errors.Select(error => error.Message))
                         )
@@ -124,20 +124,20 @@ public partial class PointsConfigurationPage
                     .SaveConfiguration(HostId, command)
                     .ExecuteAsync(CancellationToken.None);
                 await result.Match(
-                    async _ =>
+                    async completed =>
                     {
                         _config = await _configuration.LoadConfigurationAsync(
                             HostId,
                             CancellationToken.None
                         );
                         _validationErrors = [];
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>("Points settings saved.")
                         );
                     },
                     failure =>
                     {
-                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                         return Task.CompletedTask;
                     }
                 );

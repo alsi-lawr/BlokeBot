@@ -1,3 +1,4 @@
+using System.Globalization;
 using Shouldly;
 
 namespace BlokeBot.Functional.Tests;
@@ -51,15 +52,15 @@ public sealed class OptionTests
     [Test]
     public void Some_Mapping_TransformsValue()
     {
-        var mapped = Option<int>.Some(21).Map(value => value * 2);
+        var mapped = Option<int>.Some(21).Map(static value => value * 2);
 
-        mapped.Match(value => value, () => 0).ShouldBe(42);
+        mapped.Match(static value => value, static () => 0).ShouldBe(42);
     }
 
     [Test]
     public void Some_MappingToNull_ReturnsNone()
     {
-        var mapped = Option<string>.Some("value").Map<string>(_ => null);
+        var mapped = Option<string>.Some("value").Map<string>(static _ => null);
 
         mapped.ShouldBe(Option<string>.None);
     }
@@ -82,15 +83,19 @@ public sealed class OptionTests
     [Test]
     public void Some_Binding_ComposesOption()
     {
-        var bound = Option<int>.Some(21).Bind(value => Option<string>.Some((value * 2).ToString()));
+        var bound = Option<int>
+            .Some(21)
+            .Bind(static value =>
+                Option<string>.Some((value * 2).ToString(CultureInfo.InvariantCulture))
+            );
 
-        bound.Match(value => value, () => string.Empty).ShouldBe("42");
+        bound.Match(static value => value, static () => string.Empty).ShouldBe("42");
     }
 
     [Test]
     public void Some_BindingToNone_ReturnsNone()
     {
-        var bound = Option<int>.Some(21).Bind(_ => Option<string>.None);
+        var bound = Option<int>.Some(21).Bind(static _ => Option<string>.None);
 
         bound.ShouldBe(Option<string>.None);
     }

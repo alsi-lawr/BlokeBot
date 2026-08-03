@@ -28,7 +28,7 @@ public sealed class MomentHubServiceTests
             retainedEventCount = await disable.MomentEvents.CountAsync();
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.Moments;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
 
         var rejected = await service.CaptureAsync(
@@ -37,10 +37,10 @@ public sealed class MomentHubServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
-                _ => throw new InvalidOperationException("Expected rejection."),
-                value => value.Reason
+                static _ => throw new InvalidOperationException("Expected rejection."),
+                static value => value.Reason
             )
             .ShouldBeOfType<MomentRejection.FeatureDisabled>();
         provider.Calls.ShouldBe(0);
@@ -53,11 +53,11 @@ public sealed class MomentHubServiceTests
             (await verifyDisabled.MomentEvents.CountAsync()).ShouldBe(retainedEventCount);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.Moments;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
         var restored = await service.GetModeratorPageAsync(hostId, CancellationToken.None);
-        restored.ShouldNotBeNull();
+        _ = restored.ShouldNotBeNull();
         restored.Settings.MergeWindowSeconds.ShouldBe(120);
         provider.Calls.ShouldBe(0);
         await using var verifyEnabled = await database.CreateDbContextAsync();
@@ -219,23 +219,25 @@ public sealed class MomentHubServiceTests
 
         firstVote.WasIdempotent.ShouldBeFalse();
         reconciledVote.WasIdempotent.ShouldBeTrue();
-        wrongHost.ShouldBeOfType<MomentResult<MomentView>.Rejected>();
-        recap.ShouldNotBeNull();
+        _ = wrongHost.ShouldBeOfType<MomentResult<MomentView>.Rejected>();
+        _ = recap.ShouldNotBeNull();
         recap.ToString().ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentVotes.CountAsync()).ShouldBe(1);
         (await verify.PointLedgerEntries.CountAsync()).ShouldBe(2);
         (
             await verify
-                .PointLedgerEntries.Select(value => value.OperationKey)
+                .PointLedgerEntries.Select(static value => value.OperationKey)
                 .Distinct()
                 .CountAsync()
         ).ShouldBe(2);
-        (await verify.PointBalances.Select(value => value.Amount).ToArrayAsync())
+        (await verify.PointBalances.Select(static value => value.Amount).ToArrayAsync())
             .Sum(int.Parse)
             .ShouldBe(50);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Approved)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Approved
+            )
         ).ShouldBe(1);
         (await service.GetEventsAsync(alpha, 0, 1000, CancellationToken.None)).Count.ShouldBe(3);
     }
@@ -291,7 +293,7 @@ public sealed class MomentHubServiceTests
         var moderatorPage = await service.GetModeratorPageAsync(host, CancellationToken.None);
 
         merged.Value.Public.Contributors.Count.ShouldBe(2);
-        publicPage.ShouldNotBeNull();
+        _ = publicPage.ShouldNotBeNull();
         publicPage.ToString().ShouldNotContain("PRIVATE-");
         moderatorPage!
             .Candidates.Single(value => value.Public.PublicId == rejected.PublicId)
@@ -355,7 +357,9 @@ public sealed class MomentHubServiceTests
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentWeeklyFinalizations.CountAsync()).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Winner)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Winner
+            )
         ).ShouldBe(1);
     }
 
@@ -482,7 +486,7 @@ public sealed class MomentHubServiceTests
             second.ApproveAsync(host, command, CancellationToken.None)
         );
         var approvalSuccesses = approvals.Select(Success).ToArray();
-        approvalSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        approvalSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         var votes = await Task.WhenAll(
             first.VoteAsync(
@@ -499,7 +503,7 @@ public sealed class MomentHubServiceTests
             )
         );
         var voteSuccesses = votes.Select(Success).ToArray();
-        voteSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        voteSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         var weekStart = clock.GetUtcNow().UtcDateTime;
         clock.Advance(TimeSpan.FromDays(7));
@@ -508,21 +512,25 @@ public sealed class MomentHubServiceTests
             second.FinalizeWeekAsync(host, weekStart, CancellationToken.None)
         );
         var finalizationSuccesses = finalizations.Select(Success).ToArray();
-        finalizationSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        finalizationSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentVotes.CountAsync()).ShouldBe(1);
         (await verify.PointLedgerEntries.CountAsync()).ShouldBe(1);
         (await verify.MomentWeeklyFinalizations.CountAsync()).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Approved)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Approved
+            )
         ).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Winner)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Winner
+            )
         ).ShouldBe(1);
         var operationKeys = await verify
-            .MomentEvents.Where(value => value.OperationKey != null)
-            .Select(value => value.OperationKey)
+            .MomentEvents.Where(static value => value.OperationKey != null)
+            .Select(static value => value.OperationKey)
             .ToArrayAsync();
         operationKeys.Length.ShouldBe(2);
         operationKeys.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
@@ -565,7 +573,7 @@ public sealed class MomentHubServiceTests
                 suggestionCandidates.Source,
                 suggestionCandidates.Target
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = CreateService(database, new FakeMomentProvider(database));
 
@@ -685,8 +693,8 @@ public sealed class MomentHubServiceTests
 
     private static MomentResult<T>.Succeeded Success<T>(MomentResult<T> result) =>
         result.Match(
-            value => value,
-            rejected => throw new InvalidOperationException(rejected.Reason.Message)
+            static value => value,
+            static rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)
@@ -700,8 +708,8 @@ public sealed class MomentHubServiceTests
             TwitchUserId = $"{login}-id",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -730,7 +738,7 @@ public sealed class MomentHubServiceTests
             CancellationToken ct
         )
         {
-            Interlocked.Increment(ref _calls);
+            _ = Interlocked.Increment(ref _calls);
             FakeProviderState state;
             lock (_outcomes)
             {
@@ -786,7 +794,7 @@ public sealed class MomentHubServiceTests
                     IdempotencyKey = key,
                     RequestedAtUtc = DateTime.UtcNow,
                 };
-                db.TwitchClips.Add(row);
+                _ = db.TwitchClips.Add(row);
             }
             row.Status = status;
             row.ResolvedAtUtc = status == TwitchClipStatus.Available ? DateTime.UtcNow : null;
@@ -794,7 +802,7 @@ public sealed class MomentHubServiceTests
                 status == TwitchClipStatus.Available
                     ? $"https://clips.twitch.tv/{publicId:N}"
                     : null;
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             return status == TwitchClipStatus.Available
                 ? new MomentProviderOutcome.ClipReady(row.Id)
                 : new MomentProviderOutcome.Pending(row.Id);
@@ -817,8 +825,8 @@ public sealed class MomentHubServiceTests
                 CreatedAtUtc = DateTime.UtcNow,
                 ResolvedAtUtc = DateTime.UtcNow,
             };
-            db.TwitchStreamMarkers.Add(row);
-            await db.SaveChangesAsync(ct);
+            _ = db.TwitchStreamMarkers.Add(row);
+            _ = await db.SaveChangesAsync(ct);
             return new MomentProviderOutcome.MarkerReady(row.Id);
         }
     }

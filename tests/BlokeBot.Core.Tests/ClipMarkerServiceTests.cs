@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
@@ -28,9 +27,9 @@ public sealed class ClipMarkerServiceTests
                 TwitchUserId = "one-id",
                 EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.ClipsAndMarkers,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
-            db.TwitchClips.Add(
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            _ = db.TwitchClips.Add(
                 new TwitchClip
                 {
                     HostId = host.Id,
@@ -40,7 +39,7 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ClipMarkerHttpClientFactory();
         var service = CreateService(dbFactory, http, now);
@@ -50,12 +49,12 @@ public sealed class ClipMarkerServiceTests
         var marker = await service.CreateMarkerAsync(1, "Disabled marker", CancellationToken.None);
         await service.ReconcileAsync(1, CancellationToken.None);
 
-        state.Authorization.ShouldBeOfType<ClipMarkerAuthorizationReadiness.Disabled>();
+        _ = state.Authorization.ShouldBeOfType<ClipMarkerAuthorizationReadiness.Disabled>();
         state.PendingClips.ShouldBeEmpty();
         state.Results.ShouldBeEmpty();
         state.Markers.ShouldBeEmpty();
-        clip.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
-        marker.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
+        _ = clip.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
+        _ = marker.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
         http.ClipPosts.ShouldBe(0);
         http.MarkerPosts.ShouldBe(0);
         http.ClipGets.ShouldBe(0);
@@ -67,7 +66,7 @@ public sealed class ClipMarkerServiceTests
             );
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.ClipsAndMarkers;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
         await service.ReconcileAsync(1, CancellationToken.None);
@@ -91,8 +90,8 @@ public sealed class ClipMarkerServiceTests
                 TwitchUserId = "one-id",
                 EnabledFeatures = HostFeatureFlags.Moments,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             db.TwitchClips.AddRange(
                 new TwitchClip
                 {
@@ -111,7 +110,7 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new ClipMarkerHttpClientFactory();
         var service = CreateService(dbFactory, http, now);
@@ -122,18 +121,18 @@ public sealed class ClipMarkerServiceTests
         await using (var verifyMoments = await dbFactory.CreateDbContextAsync())
         {
             (
-                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                await verifyMoments.TwitchClips.SingleAsync(static clip =>
                     clip.IdempotencyKey == "clip-attempt"
                 )
             ).Status.ShouldBe(TwitchClipStatus.Pending);
             (
-                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                await verifyMoments.TwitchClips.SingleAsync(static clip =>
                     clip.IdempotencyKey == "moment:public-id:clip"
                 )
             ).Status.ShouldBe(TwitchClipStatus.Available);
             var host = await verifyMoments.Hosts.SingleAsync();
             host.EnabledFeatures = HostFeatureFlags.ClipsAndMarkers;
-            await verifyMoments.SaveChangesAsync();
+            _ = await verifyMoments.SaveChangesAsync();
         }
 
         await service.ReconcileAsync(1, CancellationToken.None);
@@ -143,7 +142,7 @@ public sealed class ClipMarkerServiceTests
         {
             var host = await enableBoth.Hosts.SingleAsync();
             host.EnabledFeatures = HostFeatureFlags.ClipsAndMarkers | HostFeatureFlags.Moments;
-            await enableBoth.SaveChangesAsync();
+            _ = await enableBoth.SaveChangesAsync();
         }
         var state = await service.LoadAsync(1, CancellationToken.None);
         state.Results.Count.ShouldBe(1);
@@ -171,7 +170,7 @@ public sealed class ClipMarkerServiceTests
                     TwitchUserId = "two-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero));
@@ -214,7 +213,7 @@ public sealed class ClipMarkerServiceTests
         now.Advance(TimeSpan.FromSeconds(61));
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.TwitchClips.Add(
+            _ = db.TwitchClips.Add(
                 new TwitchClip
                 {
                     HostId = 2,
@@ -224,7 +223,7 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
                 }
             );
-            db.TwitchClips.Add(
+            _ = db.TwitchClips.Add(
                 new TwitchClip
                 {
                     HostId = 2,
@@ -233,7 +232,7 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         await service.ReconcileAsync(2, CancellationToken.None);
         var ambiguousMarker = await service.CreateMarkerAsync(
@@ -266,12 +265,12 @@ public sealed class ClipMarkerServiceTests
         var marker = await service.CreateMarkerAsync(2, "Important moment", CancellationToken.None);
         await service.ReconcileAsync(2, CancellationToken.None);
 
-        retriedAmbiguous.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
-        wrongHost.ShouldBeOfType<ClipMarkerOperationOutcome.InvalidRequest>();
-        retriedAvailable.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
-        retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
-        wrongMarkerHost.ShouldBeOfType<ClipMarkerOperationOutcome.InvalidRequest>();
-        marker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerCreated>();
+        _ = retriedAmbiguous.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        _ = wrongHost.ShouldBeOfType<ClipMarkerOperationOutcome.InvalidRequest>();
+        _ = retriedAvailable.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
+        _ = retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        _ = wrongMarkerHost.ShouldBeOfType<ClipMarkerOperationOutcome.InvalidRequest>();
+        _ = marker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerCreated>();
         http.ClipPosts.ShouldBe(2);
         http.MarkerPosts.ShouldBe(2);
 
@@ -285,7 +284,7 @@ public sealed class ClipMarkerServiceTests
         clips
             .Single(clip => clip.HostId == 1 && clip.Id == ambiguousReference.Value)
             .IdempotencyKey.ShouldBe(retainedClipKey);
-        clips.Single(clip => clip.HostId == 2 && clip.Status == TwitchClipStatus.Available);
+        _ = clips.Single(clip => clip.HostId == 2 && clip.Status == TwitchClipStatus.Available);
         clips
             .Single(clip => clip.IdempotencyKey == "expires")
             .Status.ShouldBe(TwitchClipStatus.Expired);
@@ -327,7 +326,7 @@ public sealed class ClipMarkerServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -336,7 +335,7 @@ public sealed class ClipMarkerServiceTests
                     TwitchUserId = "one-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
         var http = new ClipMarkerHttpClientFactory();
@@ -367,10 +366,10 @@ public sealed class ClipMarkerServiceTests
             CancellationToken.None
         );
 
-        firstClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
-        retriedClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
-        firstMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
-        retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        _ = firstClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        _ = retriedClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        _ = firstMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        _ = retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
         http.ClipPosts.ShouldBe(1);
         http.MarkerPosts.ShouldBe(1);
         await using var verify = await dbFactory.CreateDbContextAsync();
@@ -384,7 +383,7 @@ public sealed class ClipMarkerServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -393,7 +392,7 @@ public sealed class ClipMarkerServiceTests
                     TwitchUserId = "one-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
         var http = new ClipMarkerHttpClientFactory();
@@ -406,7 +405,7 @@ public sealed class ClipMarkerServiceTests
         );
 
         outcomes
-            .All(value =>
+            .All(static value =>
                 value
                     is ClipMarkerOperationOutcome.ClipPending
                         or ClipMarkerOperationOutcome.ClipAmbiguous
@@ -462,15 +461,15 @@ public sealed class ClipMarkerServiceTests
                         hostId == 1 ? "one" : "two",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

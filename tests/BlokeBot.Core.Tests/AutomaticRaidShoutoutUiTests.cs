@@ -55,7 +55,7 @@ public sealed class AutomaticRaidShoutoutUiTests
 
         section.WaitForAssertion(() =>
         {
-            section.Find("#automatic-raid-pin-duration");
+            _ = section.Find("#automatic-raid-pin-duration");
             section.FindAll("#automatic-raid-announcement-color").ShouldBeEmpty();
             section.Markup.ShouldContain("{twitch_handle}");
             section.Markup.ShouldContain("{display_name}");
@@ -121,7 +121,7 @@ public sealed class AutomaticRaidShoutoutUiTests
         section.Find("button.btn-primary").Click();
         section.WaitForAssertion(() =>
         {
-            section.Find("[data-automatic-raid-validation]");
+            _ = section.Find("[data-automatic-raid-validation]");
             section.Markup.ShouldContain("Settings were not saved.");
         });
 
@@ -188,8 +188,8 @@ public sealed class AutomaticRaidShoutoutUiTests
 
         section.Render(parameters =>
         {
-            parameters.Add(component => component.HostId, hostB);
-            parameters.Add(component => component.RunHostMutationAsync, GuardAsync);
+            _ = parameters.Add(component => component.HostId, hostB);
+            _ = parameters.Add(component => component.RunHostMutationAsync, GuardAsync);
         });
         section.WaitForAssertion(() =>
             section.Find("#automatic-raid-minimum-viewers").GetAttribute("value").ShouldBe("20")
@@ -223,7 +223,7 @@ public sealed class AutomaticRaidShoutoutUiTests
         );
 
         await SeedOutcomesAsync(factory, hostId, count: 1);
-        await context
+        _ = await context
             .Services.GetRequiredService<EventBus<AppEventKind>>()
             .PublishAsync(AppEventKind.AlertsChanged, CancellationToken.None);
 
@@ -238,8 +238,8 @@ public sealed class AutomaticRaidShoutoutUiTests
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        _ = context.Services.AddSingleton(
             new AutomaticRaidShoutoutConfigurationService(factory, TimeProvider.System)
         );
         return context;
@@ -254,8 +254,8 @@ public sealed class AutomaticRaidShoutoutUiTests
         guard ??= static (_, mutation) => mutation();
         return context.Render<AutomaticRaidShoutoutSection>(parameters =>
         {
-            parameters.Add(component => component.HostId, hostId);
-            parameters.Add(component => component.RunHostMutationAsync, guard);
+            _ = parameters.Add(component => component.HostId, hostId);
+            _ = parameters.Add(component => component.RunHostMutationAsync, guard);
         });
     }
 
@@ -282,8 +282,8 @@ public sealed class AutomaticRaidShoutoutUiTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -294,7 +294,7 @@ public sealed class AutomaticRaidShoutoutUiTests
     )
     {
         var service = new AutomaticRaidShoutoutConfigurationService(factory, TimeProvider.System);
-        (
+        _ = (
             await service.SaveAsync(hostId, configuration, CancellationToken.None)
         ).ShouldBeOfType<AutomaticRaidShoutoutSaveOutcome.Saved>();
     }
@@ -315,7 +315,7 @@ public sealed class AutomaticRaidShoutoutUiTests
                 1 => AutomaticRaidShoutoutResultCode.Cooldown,
                 _ => AutomaticRaidShoutoutResultCode.Delivered,
             };
-            db.AutomaticRaidShoutoutOutcomes.Add(
+            _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 new AutomaticRaidShoutoutOutcome
                 {
                     HostId = hostId,
@@ -335,6 +335,6 @@ public sealed class AutomaticRaidShoutoutUiTests
                 }
             );
         }
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 }

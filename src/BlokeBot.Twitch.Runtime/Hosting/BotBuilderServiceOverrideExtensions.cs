@@ -20,8 +20,8 @@ public static class BotBuilderServiceOverrideExtensions
         where TProvider : class, IBotAccountProvider
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.RemoveAll<IBotAccountProvider>();
-        builder.Services.AddSingleton<IBotAccountProvider>(serviceProvider =>
+        _ = builder.Services.RemoveAll<IBotAccountProvider>();
+        _ = builder.Services.AddSingleton<IBotAccountProvider>(static serviceProvider =>
             serviceProvider.GetRequiredService<TProvider>()
         );
         return builder;
@@ -39,8 +39,8 @@ public static class BotBuilderServiceOverrideExtensions
         where TSender : class, ICommandResponseSender
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.RemoveAll<ICommandResponseSender>();
-        builder.Services.AddSingleton<ICommandResponseSender>(serviceProvider =>
+        _ = builder.Services.RemoveAll<ICommandResponseSender>();
+        _ = builder.Services.AddSingleton<ICommandResponseSender>(static serviceProvider =>
             serviceProvider.GetRequiredService<TSender>()
         );
         return builder;
@@ -58,8 +58,8 @@ public static class BotBuilderServiceOverrideExtensions
         where TNotifier : class, IBotChannelLifecycleNotifier
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.RemoveAll<IBotChannelLifecycleNotifier>();
-        builder.Services.AddSingleton<IBotChannelLifecycleNotifier>(serviceProvider =>
+        _ = builder.Services.RemoveAll<IBotChannelLifecycleNotifier>();
+        _ = builder.Services.AddSingleton<IBotChannelLifecycleNotifier>(static serviceProvider =>
             serviceProvider.GetRequiredService<TNotifier>()
         );
         return builder;

@@ -52,7 +52,7 @@ internal sealed partial class EventSubChannelSession
         ActiveEventSubSubscription? current;
         lock (_gate)
         {
-            _subscriptions.TryGetValue(channel, out current);
+            _ = _subscriptions.TryGetValue(channel, out current);
         }
         var authorization =
             current?.Authorization ?? EventSubAuthorizationContext.ConfiguredBotAuthority;
@@ -65,13 +65,13 @@ internal sealed partial class EventSubChannelSession
             {
                 lock (_gate)
                 {
-                    _authorizedChannels.Add(channel);
+                    _ = _authorizedChannels.Add(channel);
                 }
 
                 ActiveEventSubSubscription? active;
                 lock (_gate)
                 {
-                    _subscriptions.TryGetValue(channel, out active);
+                    _ = _subscriptions.TryGetValue(channel, out active);
                 }
 
                 if (
@@ -430,7 +430,7 @@ internal sealed partial class EventSubChannelSession
         ActiveEventSubSubscription? active;
         lock (_gate)
         {
-            _subscriptions.TryGetValue(channel, out active);
+            _ = _subscriptions.TryGetValue(channel, out active);
         }
 
         if (active is not null)
@@ -457,7 +457,7 @@ internal sealed partial class EventSubChannelSession
 
         lock (_gate)
         {
-            _authorizedChannels.Remove(channel);
+            _ = _authorizedChannels.Remove(channel);
         }
 
         context.Phase = EventSubChannelPhase.Reconciliation;
@@ -468,19 +468,14 @@ internal sealed partial class EventSubChannelSession
         string channel,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
-    )
-    {
-        if (!pendingDeletions.TryGet(channel, out var pending))
-        {
-            return new EventSubChannelReconciliationOutcome.Completed();
-        }
-
-        return await ReconcileSubscriptionDeletionAsync(
-            pending.Subscription,
-            context,
-            cancellationToken
-        );
-    }
+    ) =>
+        !pendingDeletions.TryGet(channel, out var pending)
+            ? new EventSubChannelReconciliationOutcome.Completed()
+            : await ReconcileSubscriptionDeletionAsync(
+                pending.Subscription,
+                context,
+                cancellationToken
+            );
 
     private async ValueTask<EventSubChannelReconciliationOutcome> ReconcileSubscriptionDeletionAsync(
         ActiveEventSubSubscription subscription,
@@ -539,7 +534,7 @@ internal sealed partial class EventSubChannelSession
                     }
 
                     pendingDeletions.ConfirmDeleted(subscription);
-                    _subscriptions.Remove(subscription.Channel);
+                    _ = _subscriptions.Remove(subscription.Channel);
                 }
                 return new EventSubChannelReconciliationOutcome.Completed();
             case EventSubSubscriptionDeletionOutcome.Unresolved unresolved:

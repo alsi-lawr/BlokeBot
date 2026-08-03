@@ -11,9 +11,9 @@ public partial class AccountMenu
 
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
 
     private string _currentPath => "/" + _navigation.ToBaseRelativePath(_navigation.Uri);
@@ -27,18 +27,11 @@ public partial class AccountMenu
             ? _selection.Current.ProfileImageUrl
             : Session.ProfileImageUrl;
 
-    private string IdentityText()
-    {
-        if (
-            _selection?.Current.Role == AuthRole.Admin
-            && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
-        )
-        {
-            return $"#{_selection.Current.DisplayName} ({Session.AdminEditingLogin})";
-        }
-
-        return Session.DisplayText;
-    }
+    private string IdentityText() =>
+        _selection?.Current.Role == AuthRole.Admin
+        && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
+            ? $"#{_selection.Current.DisplayName} ({Session.AdminEditingLogin})"
+            : Session.DisplayText;
 
     private string AccountInitial()
     {

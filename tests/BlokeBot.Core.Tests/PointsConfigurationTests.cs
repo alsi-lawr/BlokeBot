@@ -18,9 +18,9 @@ public sealed class PointsConfigurationTests : PointsTestBase
         var result = await service
             .SaveConfiguration(hostId, command)
             .ExecuteAsync(CancellationToken.None);
-        result.Match(
+        _ = result.Match(
             static _ => true,
-            failure => throw new InvalidOperationException(failure.Message)
+            static failure => throw new InvalidOperationException(failure.Message)
         );
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
 

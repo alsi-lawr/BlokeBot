@@ -33,8 +33,9 @@ public sealed class UserLookupServiceTests
         );
 
         var identity = result.Match(
-            user => user,
-            () => throw new InvalidOperationException("Expected a mapped Twitch user identity.")
+            static user => user,
+            static () =>
+                throw new InvalidOperationException("Expected a mapped Twitch user identity.")
         );
         identity.Id.ShouldBe("user-id");
         identity.Login.ShouldBe("viewer");
@@ -51,7 +52,7 @@ public sealed class UserLookupServiceTests
             await service.FindByLogin("missing").ExecuteAsync(CancellationToken.None)
         );
 
-        result.Match(_ => false, () => true).ShouldBeTrue();
+        result.Match(static _ => false, static () => true).ShouldBeTrue();
     }
 
     [Test]
@@ -67,7 +68,7 @@ public sealed class UserLookupServiceTests
             await service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None)
         );
 
-        result.Match(_ => false, () => true).ShouldBeTrue();
+        result.Match(static _ => false, static () => true).ShouldBeTrue();
     }
 
     [Test]
@@ -83,7 +84,7 @@ public sealed class UserLookupServiceTests
             await service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None)
         );
 
-        result.Match(_ => false, () => true).ShouldBeTrue();
+        result.Match(static _ => false, static () => true).ShouldBeTrue();
     }
 
     [Test]
@@ -107,8 +108,9 @@ public sealed class UserLookupServiceTests
         var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
         var identity = result.Match(
-            user => user,
-            () => throw new InvalidOperationException("Expected a mapped Twitch user identity.")
+            static user => user,
+            static () =>
+                throw new InvalidOperationException("Expected a mapped Twitch user identity.")
         );
         identity.Id.ShouldBe("current-id");
         identity.Login.ShouldBe("current");
@@ -135,7 +137,7 @@ public sealed class UserLookupServiceTests
 
         var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
-        result.Match(_ => false, () => true).ShouldBeTrue();
+        result.Match(static _ => false, static () => true).ShouldBeTrue();
     }
 
     [Test]
@@ -158,7 +160,7 @@ public sealed class UserLookupServiceTests
 
         var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
-        result.Match(_ => false, () => true).ShouldBeTrue();
+        result.Match(static _ => false, static () => true).ShouldBeTrue();
     }
 
     [Test]
@@ -166,7 +168,7 @@ public sealed class UserLookupServiceTests
     {
         var service = CreateService("""{"data":[]}""", HttpStatusCode.BadGateway);
 
-        await Should.ThrowAsync<HttpRequestException>(() =>
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
             service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None).AsTask()
         );
     }
@@ -178,7 +180,7 @@ public sealed class UserLookupServiceTests
         cancellation.Cancel();
         var service = CreateService("""{"data":[]}""");
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             service.FindByLogin("viewer").ExecuteAsync(cancellation.Token).AsTask()
         );
     }
@@ -208,8 +210,8 @@ public sealed class UserLookupServiceTests
         Result<Option<UserIdentity>, AccessTokenUnavailableReason> result
     ) =>
         result.Match(
-            users => users,
-            reason =>
+            static users => users,
+            static reason =>
                 throw new InvalidOperationException(
                     $"Expected a user lookup result, received {reason}."
                 )

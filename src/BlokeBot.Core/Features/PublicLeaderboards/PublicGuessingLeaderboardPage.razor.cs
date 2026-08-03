@@ -31,8 +31,9 @@ public partial class PublicGuessingLeaderboardPage
         _leaderboard = null;
         var host = await _hosts.Find(Channel).ExecuteAsync(CancellationToken.None);
         _host = host.Match(
-            option => option.Match<PublicLeaderboardHost?>(value => value, () => null),
-            _ => throw new UnreachableException()
+            static option =>
+                option.Match<PublicLeaderboardHost?>(static value => value, static () => null),
+            static _ => throw new UnreachableException()
         );
 
         if (_featureEnabled)

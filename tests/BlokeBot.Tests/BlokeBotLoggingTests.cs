@@ -49,7 +49,7 @@ public sealed class BlokeBotLoggingTests
     private static string TemporaryDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"blokebot-log-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(path);
+        _ = Directory.CreateDirectory(path);
         return path;
     }
 }

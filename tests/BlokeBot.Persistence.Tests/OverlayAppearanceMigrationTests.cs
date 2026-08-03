@@ -16,7 +16,7 @@ public sealed class OverlayAppearanceMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_previous);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
@@ -44,8 +44,8 @@ public sealed class OverlayAppearanceMigrationTests
 
         await using var upgraded = await factory.CreateDbContextAsync();
         var json = await upgraded
-            .OverlayInstances.OrderBy(value => value.Name)
-            .Select(value => value.ConfigurationJson)
+            .OverlayInstances.OrderBy(static value => value.Name)
+            .Select(static value => value.ConfigurationJson)
             .ToArrayAsync();
 
         json[0].ShouldNotContain("\"appearance\"");

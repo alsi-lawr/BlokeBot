@@ -18,7 +18,7 @@ public sealed class GiveawayOverlayMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
@@ -43,7 +43,7 @@ public sealed class GiveawayOverlayMigrationTests
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);
 
-        upgraded.OverlayInstances.Add(
+        _ = upgraded.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("805f4686-d192-4b9d-8481-790fef956a98"),
@@ -53,19 +53,22 @@ public sealed class GiveawayOverlayMigrationTests
                 IsEnabled = true,
                 ConfigurationJson =
                     """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
-                AccessKeyDigest = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                AccessKeyDigest = Enumerable
+                    .Range(1, 32)
+                    .Select(static value => (byte)value)
+                    .ToArray(),
                 KeyVersion = 1,
                 Revision = 1,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await upgraded.SaveChangesAsync();
+        _ = await upgraded.SaveChangesAsync();
 
         (
             await upgraded
-                .OverlayInstances.OrderBy(value => value.Id)
-                .Select(value => value.Type)
+                .OverlayInstances.OrderBy(static value => value.Id)
+                .Select(static value => value.Type)
                 .ToArrayAsync()
         ).ShouldBe([OverlayType.CuePlayer, OverlayType.Giveaway]);
     }

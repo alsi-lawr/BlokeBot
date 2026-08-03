@@ -14,12 +14,12 @@ public sealed class TaskPageCompositionTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        context.ComponentFactories.AddStub<PublicLeaderboardPrompt>();
+        _ = context.ComponentFactories.AddStub<PublicLeaderboardPrompt>();
 
         var page = context.Render<HomePage>();
 
         page.FindAll("a.home-info-card")
-            .Select(link =>
+            .Select(static link =>
                 (link.QuerySelector("h2")?.TextContent.Trim(), link.GetAttribute("href"))
             )
             .ShouldBe([
@@ -41,8 +41,8 @@ public sealed class TaskPageCompositionTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

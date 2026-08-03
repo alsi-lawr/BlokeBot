@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.BotRuntime;
@@ -25,7 +24,7 @@ public sealed class HostedChannelLifecycleNotifierTests
         await SeedStartingHostAsync(dbFactory);
         var events = TestEventBus.Create<AppEventKind>();
         var operationsChanges = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.TwitchOperationsChanged,
             ObserverIdentity.Named("Test.HostedChannelPollReconciliation"),
             (_, _) =>
@@ -52,7 +51,7 @@ public sealed class HostedChannelLifecycleNotifierTests
         await notifier.ChannelStartedAsync("streamer", CancellationToken.None);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.TwitchPolls.Add(
+            _ = db.TwitchPolls.Add(
                 new TwitchPoll
                 {
                     HostId = 1,
@@ -66,7 +65,7 @@ public sealed class HostedChannelLifecycleNotifierTests
             );
             for (var index = 0; index < 99; index++)
             {
-                db.TwitchPolls.Add(
+                _ = db.TwitchPolls.Add(
                     new TwitchPoll
                     {
                         HostId = 1,
@@ -80,7 +79,7 @@ public sealed class HostedChannelLifecycleNotifierTests
                     }
                 );
             }
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         await notifier.ChannelStartedAsync("streamer", CancellationToken.None);
@@ -94,10 +93,10 @@ public sealed class HostedChannelLifecycleNotifierTests
         polls.Length.ShouldBe(100);
         var external = polls.Single(poll => poll.ProviderPollId == "external-poll");
         external.Status.ShouldBe(TwitchPollStatus.Terminated);
-        external.EndedAtUtc.ShouldNotBeNull();
+        _ = external.EndedAtUtc.ShouldNotBeNull();
         var missing = polls.Single(poll => poll.ProviderPollId == "missing-poll");
         missing.Status.ShouldBe(TwitchPollStatus.Archived);
-        missing.EndedAtUtc.ShouldNotBeNull();
+        _ = missing.EndedAtUtc.ShouldNotBeNull();
         polls
             .Count(poll => poll.ProviderPollId.StartsWith("history-", StringComparison.Ordinal))
             .ShouldBe(98);
@@ -145,7 +144,7 @@ public sealed class HostedChannelLifecycleNotifierTests
     private static async Task SeedStartingHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.Hosts.Add(
+        _ = db.Hosts.Add(
             new BotHost
             {
                 EnabledFeatures = HostFeatureFlags.All,
@@ -157,7 +156,7 @@ public sealed class HostedChannelLifecycleNotifierTests
                 CreatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static HttpResponseMessage PollResponse(string id, string status, int votes) =>
@@ -193,15 +192,15 @@ public sealed class HostedChannelLifecycleNotifierTests
                         "streamer",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

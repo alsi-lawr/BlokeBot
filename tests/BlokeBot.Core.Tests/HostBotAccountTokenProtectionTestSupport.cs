@@ -19,7 +19,7 @@ internal static class HostBotAccountTokenProtectionTestSupport
         settings.ProtectedTokenPayload = CreateProtector()
             .Protect(settings.HostId, payload)
             .Match(
-                value => value,
-                _ => throw new InvalidOperationException("Test token protection failed.")
+                static value => value,
+                static _ => throw new InvalidOperationException("Test token protection failed.")
             );
 }

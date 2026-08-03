@@ -98,10 +98,10 @@ public sealed class EventBus<TKey>
                 return;
             }
 
-            handlers.Remove(observer);
+            _ = handlers.Remove(observer);
             if (handlers.Count == 0)
             {
-                _subscriptions.Remove(key);
+                _ = _subscriptions.Remove(key);
             }
         }
     }

@@ -56,15 +56,17 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
 
     public static AccessListSnapshot From(IEnumerable<AccessListEntryValue> entries)
     {
-        var ordered = entries.OrderBy(x => x.Login, StringComparer.OrdinalIgnoreCase).ToArray();
+        var ordered = entries
+            .OrderBy(static x => x.Login, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         return new AccessListSnapshot(
             ordered
-                .Where(x => x.Kind == AccessListEntryKind.Whitelist)
-                .Select(x => x.Login)
+                .Where(static x => x.Kind == AccessListEntryKind.Whitelist)
+                .Select(static x => x.Login)
                 .ToArray(),
             ordered
-                .Where(x => x.Kind == AccessListEntryKind.Blacklist)
-                .Select(x => x.Login)
+                .Where(static x => x.Kind == AccessListEntryKind.Blacklist)
+                .Select(static x => x.Login)
                 .ToArray()
         );
     }
@@ -87,7 +89,7 @@ internal static class AccessListStore
             return false;
         }
 
-        entries.Add(createEntry(normalizedLogin));
+        _ = entries.Add(createEntry(normalizedLogin));
         return true;
     }
 
@@ -99,8 +101,8 @@ internal static class AccessListStore
     {
         var entries = await scopedEntries
             .AsNoTracking()
-            .OrderBy(x => x.Login)
-            .Select(x => new AccessListEntryValue(x.Kind, x.Login))
+            .OrderBy(static x => x.Login)
+            .Select(static x => new AccessListEntryValue(x.Kind, x.Login))
             .ToListAsync(ct);
 
         return AccessListSnapshot.From(entries);
@@ -115,14 +117,11 @@ internal static class AccessListStore
         where TEntry : class, IAccessListEntry
     {
         var normalized = NormalizeLogin(login).Match<string?>(value => value, _ => null);
-        if (normalized is null)
-        {
-            return 0;
-        }
-
-        return await scopedEntries
-            .Where(x => x.Kind == kind && x.Login == normalized)
-            .ExecuteDeleteAsync(ct);
+        return normalized is null
+            ? 0
+            : await scopedEntries
+                .Where(x => x.Kind == kind && x.Login == normalized)
+                .ExecuteDeleteAsync(ct);
     }
 
     public static Result<string, AccessListLoginNormalizationFailure> NormalizeLogin(string login)

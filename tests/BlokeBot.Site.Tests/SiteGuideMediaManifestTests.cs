@@ -29,9 +29,9 @@ public sealed class SiteGuideMediaManifestTests
         var manifest = LoadManifest();
         manifest.Version.ShouldBe(1);
         manifest.Assets.Count.ShouldBe(104);
-        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(96);
-        manifest.Assets.Count(asset => asset.Format == "webp").ShouldBe(8);
-        manifest.Assets.Select(asset => asset.File).ShouldBeUnique();
+        manifest.Assets.Count(static asset => asset.Format == "png").ShouldBe(96);
+        manifest.Assets.Count(static asset => asset.Format == "webp").ShouldBe(8);
+        manifest.Assets.Select(static asset => asset.File).ShouldBeUnique();
         var expectedCaptureCounts = new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["capture/screenshots.lua"] = 44,
@@ -42,8 +42,12 @@ public sealed class SiteGuideMediaManifestTests
             ["capture/v0.6-overlay-guides.lua"] = 28,
         };
         var captureCounts = manifest
-            .Assets.GroupBy(asset => asset.Capture, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+            .Assets.GroupBy(static asset => asset.Capture, StringComparer.Ordinal)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Count(),
+                StringComparer.Ordinal
+            );
         captureCounts.Count.ShouldBe(expectedCaptureCounts.Count);
         foreach (var expected in expectedCaptureCounts)
         {
@@ -52,8 +56,8 @@ public sealed class SiteGuideMediaManifestTests
         }
 
         var overlayFiles = manifest
-            .Assets.Where(asset => asset.Capture == "capture/v0.6-overlay-guides.lua")
-            .Select(asset => asset.File)
+            .Assets.Where(static asset => asset.Capture == "capture/v0.6-overlay-guides.lua")
+            .Select(static asset => asset.File)
             .Order(StringComparer.Ordinal)
             .ToArray();
         var expectedOverlayFiles = (
@@ -74,31 +78,35 @@ public sealed class SiteGuideMediaManifestTests
             .Order(StringComparer.Ordinal)
             .ToArray();
         overlayFiles.ShouldBe(expectedOverlayFiles);
-        manifest.Assets.ShouldNotContain(asset => asset.Capture == "capture/twitch-operations.lua");
+        manifest.Assets.ShouldNotContain(static asset =>
+            asset.Capture == "capture/twitch-operations.lua"
+        );
 
         var mediaInventory = Directory
             .EnumerateFiles(_mediaRoot, "*", SearchOption.AllDirectories)
-            .Where(path => Path.GetExtension(path) is ".png" or ".webp")
-            .Select(path =>
+            .Where(static path => Path.GetExtension(path) is ".png" or ".webp")
+            .Select(static path =>
                 Path.GetRelativePath(_mediaRoot, path).Replace(Path.DirectorySeparatorChar, '/')
             )
             .Order(StringComparer.Ordinal)
             .ToArray();
         manifest
-            .Assets.Select(asset => asset.File)
+            .Assets.Select(static asset => asset.File)
             .Order(StringComparer.Ordinal)
             .ShouldBe(mediaInventory);
 
         var generatedSiteReferences = SiteGuideCatalog
-            .All.SelectMany(page =>
+            .All.SelectMany(static page =>
                 OptionalSources(page.Media)
-                    .Concat(page.Sections.SelectMany(section => OptionalSources(section.Media)))
+                    .Concat(
+                        page.Sections.SelectMany(static section => OptionalSources(section.Media))
+                    )
             )
             .Append("media/phone-light-home-scroll.webp")
             .Append("media/phone-dark-home-scroll.webp")
             .Append("media/laptop-light-home-scroll.webp")
             .Append("media/laptop-dark-home-scroll.webp")
-            .Select(source => source["media/".Length..])
+            .Select(static source => source["media/".Length..])
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -193,11 +201,15 @@ public sealed class SiteGuideMediaManifestTests
 
             foreach (
                 var source in SiteGuideCatalog
-                    .All.Where(page => page.Route.StartsWith("/overlays", StringComparison.Ordinal))
-                    .SelectMany(page =>
+                    .All.Where(static page =>
+                        page.Route.StartsWith("/overlays", StringComparison.Ordinal)
+                    )
+                    .SelectMany(static page =>
                         OptionalSources(page.Media)
                             .Concat(
-                                page.Sections.SelectMany(section => OptionalSources(section.Media))
+                                page.Sections.SelectMany(static section =>
+                                    OptionalSources(section.Media)
+                                )
                             )
                     )
                     .Distinct(StringComparer.Ordinal)
@@ -271,10 +283,10 @@ public sealed class SiteGuideMediaManifestTests
 
             foreach (
                 var source in SiteGuideCatalog
-                    .All.Where(page =>
+                    .All.Where(static page =>
                         page.Route.StartsWith("/community/", StringComparison.Ordinal)
                     )
-                    .SelectMany(page => Sources(page.Media!))
+                    .SelectMany(static page => Sources(page.Media!))
                     .Distinct(StringComparer.Ordinal)
             )
             {
@@ -338,13 +350,15 @@ public sealed class SiteGuideMediaManifestTests
     {
         var registered = SiteRoutes.All.ToHashSet(StringComparer.Ordinal);
         var links = SiteGuideCatalog
-            .All.SelectMany(page =>
-                page.Sections.SelectMany(section => section.Links).Concat(page.Next)
+            .All.SelectMany(static page =>
+                page.Sections.SelectMany(static section => section.Links).Concat(page.Next)
             )
-            .Concat(SiteGuideCatalog.NavigationGroups.SelectMany(group => group.Links));
+            .Concat(SiteGuideCatalog.NavigationGroups.SelectMany(static group => group.Links));
 
         foreach (
-            var link in links.Where(link => !Uri.IsWellFormedUriString(link.Href, UriKind.Absolute))
+            var link in links.Where(static link =>
+                !Uri.IsWellFormedUriString(link.Href, UriKind.Absolute)
+            )
         )
         {
             registered.ShouldContain($"/{link.Href.TrimStart('/')}", link.Label);

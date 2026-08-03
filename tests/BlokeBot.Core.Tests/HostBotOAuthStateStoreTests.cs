@@ -17,7 +17,7 @@ public sealed class HostBotOAuthStateStoreTests
 
         HostBotOAuthStateStore.IsHostBotState(state).ShouldBeTrue();
         consumed.ShouldBe(new HostBotOAuthStateConsumption.Consumed(42));
-        replay.ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
+        _ = replay.ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
     }
 
     [Test]
@@ -26,10 +26,12 @@ public sealed class HostBotOAuthStateStoreTests
         var states = new HostBotOAuthStateStore(TimeProvider.System);
         var state = states.Issue("owner-id", 42);
 
-        states
+        _ = states
             .Consume(state, "other-user-id")
             .ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
-        states.Consume(state, "owner-id").ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
+        _ = states
+            .Consume(state, "owner-id")
+            .ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
     }
 
     [Test]
@@ -40,7 +42,9 @@ public sealed class HostBotOAuthStateStoreTests
         var state = states.Issue("owner-id", 42);
         time.Advance(HostBotOAuthStateStore.Lifetime);
 
-        states.Consume(state, "owner-id").ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
+        _ = states
+            .Consume(state, "owner-id")
+            .ShouldBeOfType<HostBotOAuthStateConsumption.Rejected>();
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider

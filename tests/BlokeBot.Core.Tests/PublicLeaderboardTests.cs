@@ -13,7 +13,7 @@ public sealed class PublicLeaderboardTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     Login = "streamer",
@@ -22,15 +22,15 @@ public sealed class PublicLeaderboardTests
                     EnabledFeatures = HostFeatureFlags.Points,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var lookup = new PublicLeaderboardHostLookup(dbFactory);
 
         var host = (
             await lookup.Find("@Streamer").RunAsync(CancellationToken.None)
-        ).Match<PublicLeaderboardHost?>(value => value, () => null);
+        ).Match<PublicLeaderboardHost?>(static value => value, static () => null);
 
-        host.ShouldNotBeNull();
+        _ = host.ShouldNotBeNull();
         host.Login.ShouldBe("streamer");
         host.DisplayName.ShouldBe("Streamer");
         host.EnabledFeatures.ShouldBe(HostFeatureFlags.Points);
@@ -44,7 +44,7 @@ public sealed class PublicLeaderboardTests
 
         var host = (
             await lookup.Find("missing").RunAsync(CancellationToken.None)
-        ).Match<PublicLeaderboardHost?>(value => value, () => null);
+        ).Match<PublicLeaderboardHost?>(static value => value, static () => null);
 
         host.ShouldBeNull();
     }

@@ -17,7 +17,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         var transport = new RecordingTransport();
         var queue = CreateQueue(new BotOptions(), outbox, transport);
 
-        await Should.ThrowAsync<IOException>(() =>
+        _ = await Should.ThrowAsync<IOException>(() =>
             queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None).AsTask()
         );
 
@@ -53,7 +53,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         (await transport.ReadAsync()).Message.ShouldBe("message");
         await StopAsync(stopping, worker);
 
-        outbox
+        _ = outbox
             .RecordDeliveryCalls.ShouldHaveSingleItem()
             .Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
     }
@@ -72,7 +72,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
         recorded.CancellationToken.ShouldBe(CancellationToken.None);
         outbox.BeginSendCalls.Count.ShouldBe(1);
         transport.PrepareCount.ShouldBe(1);
@@ -104,7 +104,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.SafePreSendTransient>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.SafePreSendTransient>();
         recorded.CancellationToken.ShouldBe(CancellationToken.None);
         outbox.BeginSendCalls.ShouldBeEmpty();
         transport.PrepareCount.ShouldBe(1);
@@ -136,7 +136,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Unexpected>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Unexpected>();
         outbox.BeginSendCalls.ShouldBeEmpty();
         transport.SendCount.ShouldBe(0);
     }
@@ -148,7 +148,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         outbox.ScriptClaims(new PublicChatClaimOutcome.Claimed(Claimed("secret chat payload")));
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var transport = new ScriptedTransport(
-            (_, cancellationToken) =>
+            static (_, cancellationToken) =>
                 ValueTask.FromResult(
                     PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                         new InvalidOperationException("secret provider response"),

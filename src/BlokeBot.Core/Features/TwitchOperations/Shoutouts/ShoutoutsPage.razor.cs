@@ -30,7 +30,7 @@ public partial class ShoutoutsPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
                 InvokeAsync,
@@ -47,7 +47,7 @@ public partial class ShoutoutsPage
         _loadFailed = false;
         try
         {
-            await LoadPageContextAsync();
+            _ = await LoadPageContextAsync();
             _nativeTwitchEnabled =
                 HostId != 0
                 && await _nativeTwitch.IsEnabledAsync(
@@ -130,11 +130,11 @@ public partial class ShoutoutsPage
                 };
                 if (success)
                 {
-                    _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
+                    _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
                 }
                 else
                 {
-                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
+                    _ = _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
                 }
                 await LoadAsync();
             }

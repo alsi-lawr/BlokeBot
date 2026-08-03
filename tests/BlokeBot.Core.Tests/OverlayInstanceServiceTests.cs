@@ -15,23 +15,23 @@ public sealed class OverlayInstanceServiceTests
     [Test]
     public void ConfigurationParser_AcceptsOnlyBoundedVersionedTypedJson()
     {
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.Empty, """{"schemaVersion":1}""")
             .ShouldBeOfType<OverlayConfigurationParseResult.Valid>()
             .Value.ShouldBeOfType<OverlayConfiguration.EmptyV1>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.Empty, "not-json")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.Empty, """{"schemaVersion":2}""")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.Empty, """{"schemaVersion":1,"unbounded":"future-shape"}""")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(OverlayType.Empty, new string('x', 4097))
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse((OverlayType)999, """{"schemaVersion":1}""")
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
         var guessing = OverlayConfiguration
@@ -43,13 +43,13 @@ public sealed class OverlayInstanceServiceTests
             .Value.ShouldBeOfType<OverlayConfiguration.GuessingV1>();
         guessing.ShowGuessCount.ShouldBeTrue();
         guessing.ResultDurationSeconds.ShouldBe(8);
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.Guessing,
                 """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":31}"""
             )
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.Guessing,
                 """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8,"extra":1}"""
@@ -161,7 +161,7 @@ public sealed class OverlayInstanceServiceTests
         fixture.Authority.RequestedHostIds.ShouldBe([fixture.HostId]);
 
         fixture.Authority.Outcome = new ModeratorAuthorityOutcome.Revoked();
-        (
+        _ = (
             await fixture.Service.RotateKeyAsync(
                 moderator,
                 new(created.Instance.Id, new OverlayRevision(2)),
@@ -171,7 +171,7 @@ public sealed class OverlayInstanceServiceTests
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceKeyRotation>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.Unauthorized>();
 
-        (
+        _ = (
             await fixture.Service.DeleteAsync(
                 Session(AuthRole.Bot, fixture.HostId, isBot: true),
                 new(created.Instance.Id, new OverlayRevision(2)),
@@ -180,7 +180,7 @@ public sealed class OverlayInstanceServiceTests
         )
             .ShouldBeOfType<OverlayInstanceResult<Guid>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.Unauthorized>();
-        (
+        _ = (
             await fixture.Service.CreateAsync(
                 AuthenticatedSession.Anonymous,
                 Create("Denied create"),
@@ -190,7 +190,7 @@ public sealed class OverlayInstanceServiceTests
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.Unauthorized>();
 
-        (
+        _ = (
             await fixture.Service.RenameAsync(
                 Session(AuthRole.Streamer, fixture.OtherHostId),
                 new(created.Instance.Id, new OverlayRevision(2), "Cross-host rename"),
@@ -199,7 +199,7 @@ public sealed class OverlayInstanceServiceTests
         )
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.NotFound>();
-        (
+        _ = (
             await fixture.Service.GetAsync(
                 Session(AuthRole.Streamer, fixture.OtherHostId),
                 created.Instance.Id,
@@ -228,7 +228,7 @@ public sealed class OverlayInstanceServiceTests
         ).SucceededValue();
         renamed.Name.ShouldBe("Renamed");
         renamed.Revision.ShouldBe(new OverlayRevision(2));
-        (
+        _ = (
             await fixture.Service.RenameAsync(
                 session,
                 new(created.Instance.Id, created.Instance.Revision, "Stale"),
@@ -245,7 +245,7 @@ public sealed class OverlayInstanceServiceTests
                 CancellationToken.None
             )
         ).SucceededValue();
-        configured.Configuration.ShouldBeOfType<OverlayConfiguration.EmptyV1>();
+        _ = configured.Configuration.ShouldBeOfType<OverlayConfiguration.EmptyV1>();
         configured.Revision.ShouldBe(new OverlayRevision(3));
     }
 
@@ -267,10 +267,10 @@ public sealed class OverlayInstanceServiceTests
             )
         ).SucceededValue();
         rotated.PrivateAccess.AccessKey.ShouldNotBe(originalKey);
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(originalKey, CancellationToken.None)
         ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 rotated.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -284,7 +284,7 @@ public sealed class OverlayInstanceServiceTests
                 CancellationToken.None
             )
         ).SucceededValue();
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 rotated.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -297,7 +297,7 @@ public sealed class OverlayInstanceServiceTests
                 CancellationToken.None
             )
         ).SucceededValue();
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 rotated.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -313,21 +313,21 @@ public sealed class OverlayInstanceServiceTests
         )
             .SucceededValue()
             .ShouldBe(enabled.Id);
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 rotated.PrivateAccess.AccessKey,
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
-        (await fixture.Service.GetAsync(session, enabled.Id, CancellationToken.None))
+        _ = (await fixture.Service.GetAsync(session, enabled.Id, CancellationToken.None))
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.NotFound>();
 
         await using var db = await fixture.Database.CreateDbContextAsync();
         (
             await db
-                .OverlayInstanceEvents.OrderBy(value => value.Id)
-                .Select(value => value.Kind)
+                .OverlayInstanceEvents.OrderBy(static value => value.Id)
+                .Select(static value => value.Kind)
                 .ToArrayAsync()
         ).ShouldBe([
             OverlayInstanceEventKind.Created,
@@ -360,17 +360,17 @@ public sealed class OverlayInstanceServiceTests
             .OfType<OverlayInstanceResult<OverlayInstanceKeyRotation>.Succeeded>()
             .ShouldHaveSingleItem()
             .Value;
-        outcomes
+        _ = outcomes
             .OfType<OverlayInstanceResult<OverlayInstanceKeyRotation>.Rejected>()
             .ShouldHaveSingleItem()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.Conflict>();
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 created.PrivateAccess.AccessKey,
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 succeeded.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -415,7 +415,7 @@ public sealed class OverlayInstanceServiceTests
         current.Revision.ShouldBe(new OverlayRevision(2));
         if (rotate.Result is OverlayInstanceResult<OverlayInstanceKeyRotation>.Succeeded rotated)
         {
-            (
+            _ = (
                 await fixture.Resolver.ResolveAsync(
                     rotated.Value.PrivateAccess.AccessKey,
                     CancellationToken.None
@@ -425,7 +425,7 @@ public sealed class OverlayInstanceServiceTests
         else
         {
             current.IsEnabled.ShouldBeFalse();
-            (
+            _ = (
                 await fixture.Resolver.ResolveAsync(
                     created.PrivateAccess.AccessKey,
                     CancellationToken.None
@@ -450,13 +450,13 @@ public sealed class OverlayInstanceServiceTests
 
         await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays);
 
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 created.PrivateAccess.AccessKey,
                 CancellationToken.None
             )
         ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
-        (
+        _ = (
             await fixture.Service.RenameAsync(
                 session,
                 new(created.Instance.Id, created.Instance.Revision, "Suppressed rename"),
@@ -465,12 +465,12 @@ public sealed class OverlayInstanceServiceTests
         )
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
-        (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
+        _ = (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
             .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
             .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
 
         await fixture.SetFeaturesAsync(HostFeatureFlags.Guessing);
-        (
+        _ = (
             await fixture.Service.ConfigureAsync(
                 session,
                 new(
@@ -491,7 +491,7 @@ public sealed class OverlayInstanceServiceTests
         restored.Name.ShouldBe("Guessing");
         restored.Revision.ShouldBe(created.Instance.Revision);
         restored.Configuration.ShouldBe(new OverlayConfiguration.GuessingV1(true, 9));
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 created.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -525,13 +525,13 @@ public sealed class OverlayInstanceServiceTests
         foreach (var incomplete in new[] { HostFeatureFlags.Overlays, HostFeatureFlags.Points })
         {
             await fixture.SetFeaturesAsync(incomplete);
-            (
+            _ = (
                 await fixture.Resolver.ResolveAsync(
                     created.PrivateAccess.AccessKey,
                     CancellationToken.None
                 )
             ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
-            (
+            _ = (
                 await fixture.Service.ConfigureAsync(
                     session,
                     new(created.Instance.Id, created.Instance.Revision, configuration),
@@ -540,7 +540,7 @@ public sealed class OverlayInstanceServiceTests
             )
                 .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
                 .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
-            (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
+            _ = (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
                 .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
                 .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
         }
@@ -552,7 +552,7 @@ public sealed class OverlayInstanceServiceTests
         restored.Name.ShouldBe("Giveaway");
         restored.Revision.ShouldBe(created.Instance.Revision);
         restored.Configuration.ShouldBe(configuration);
-        (
+        _ = (
             await fixture.Resolver.ResolveAsync(
                 created.PrivateAccess.AccessKey,
                 CancellationToken.None
@@ -610,7 +610,7 @@ public sealed class OverlayInstanceServiceTests
         internal async Task SetFeaturesAsync(HostFeatureFlags features)
         {
             await using var db = await Database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .Hosts.Where(host => host.Id == HostId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(host => host.EnabledFeatures, features)
@@ -627,7 +627,7 @@ public sealed class OverlayInstanceServiceTests
                 var host = Host("host");
                 var other = Host("other");
                 db.Hosts.AddRange(host, other);
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
                 hostId = host.Id;
                 otherHostId = other.Id;
             }

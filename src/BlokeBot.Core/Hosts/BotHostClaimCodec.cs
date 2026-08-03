@@ -26,30 +26,26 @@ internal static class BotHostClaimCodec
         try
         {
             var payload = JsonSerializer.Deserialize<Payload>(value, _jsonOptions);
-            if (
+            return
                 payload is null
                 || payload.Id <= 0
                 || string.IsNullOrWhiteSpace(payload.Login)
                 || string.IsNullOrWhiteSpace(payload.DisplayName)
-            )
-            {
-                return null;
-            }
-
-            return AuthRoleCodec
-                .Decode(payload.Role)
-                .Match<BotHostChoice?>(
-                    role => new BotHostChoice(
-                        payload.Id,
-                        payload.Login,
-                        payload.DisplayName,
-                        role,
-                        string.IsNullOrWhiteSpace(payload.ProfileImageUrl)
-                            ? null
-                            : payload.ProfileImageUrl
-                    ),
-                    _ => null
-                );
+                ? null
+                : AuthRoleCodec
+                    .Decode(payload.Role)
+                    .Match<BotHostChoice?>(
+                        role => new BotHostChoice(
+                            payload.Id,
+                            payload.Login,
+                            payload.DisplayName,
+                            role,
+                            string.IsNullOrWhiteSpace(payload.ProfileImageUrl)
+                                ? null
+                                : payload.ProfileImageUrl
+                        ),
+                        _ => null
+                    );
         }
         catch (JsonException)
         {

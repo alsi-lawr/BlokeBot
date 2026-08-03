@@ -11,7 +11,7 @@ internal static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this WebApplication app)
     {
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/login",
                 (HttpContext context, WebAuthService auth, bool? start, string? returnUrl) =>
                 {
@@ -20,21 +20,17 @@ internal static class AuthEndpoints
                             ? (LoginAction)new LoginAction.StartOAuth()
                             : new LoginAction.ShowLoginPage();
                     var currentOptions = auth.CurrentOptions;
-                    if (!auth.IsConfigured(currentOptions))
-                    {
-                        return Result(
+                    return !auth.IsConfigured(currentOptions)
+                        ? Result(
                             BlokeBotAuthOutcome.Unavailable,
                             BlokeBotAuthStatus.ServiceUnavailable,
                             BlokeBotAuthRetryAction.None,
                             BlokeBotAuthReturnAction.SignIn
+                        )
+                        : action.Match<IResult>(
+                            _ => Results.Content(LoginPage.Render(), "text/html"),
+                            _ => StartLogin()
                         );
-                    }
-
-                    return action.Match<IResult>(
-                        _ => Results.Content(LoginPage.Render(), "text/html"),
-                        _ => StartLogin()
-                    );
-
                     IResult StartLogin()
                     {
                         var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -78,7 +74,7 @@ internal static class AuthEndpoints
             )
             .AllowAnonymous();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/twitch/callback",
                 async (
                     HttpContext context,
@@ -193,7 +189,7 @@ internal static class AuthEndpoints
             return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
         }
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/select-host",
                 async (
                     HttpContext context,
@@ -241,7 +237,7 @@ internal static class AuthEndpoints
             )
             .RequireAuthorization();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/select-own-host",
                 async (HttpContext context, string? returnUrl, AuthSessionService session) =>
                 {
@@ -291,7 +287,7 @@ internal static class AuthEndpoints
             )
             .RequireAuthorization();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/recover-moderator-access",
                 async (
                     HttpContext context,
@@ -316,7 +312,7 @@ internal static class AuthEndpoints
             )
             .RequireAuthorization();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/admin/select-host",
                 async (
                     HttpContext context,
@@ -366,7 +362,7 @@ internal static class AuthEndpoints
             )
             .RequireAuthorization("BotAdmin");
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/exit-admin",
                 async (HttpContext context, string? returnUrl, AuthSessionService session) =>
                 {
@@ -417,7 +413,7 @@ internal static class AuthEndpoints
             )
             .RequireAuthorization("BotAdmin");
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/auth/logout",
                 async (HttpContext context, AuthSessionService session) =>
                 {

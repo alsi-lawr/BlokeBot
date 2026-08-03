@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -19,20 +20,15 @@ public sealed class ChatPinClient(
         string messageId,
         int? durationSeconds,
         CancellationToken cancellationToken
-    )
-    {
-        if (durationSeconds is { } seconds && seconds is < 30 or > 1800)
-        {
-            return Task.FromResult<ChatPinMutationResult>(new ChatPinMutationResult.Invalid());
-        }
-
-        return MutateAsync(
-            HttpMethod.Put,
-            Uri(broadcasterId, moderatorId, messageId, durationSeconds),
-            context,
-            cancellationToken
-        );
-    }
+    ) =>
+        durationSeconds is { } seconds && seconds is < 30 or > 1800
+            ? Task.FromResult<ChatPinMutationResult>(new ChatPinMutationResult.Invalid())
+            : MutateAsync(
+                HttpMethod.Put,
+                Uri(broadcasterId, moderatorId, messageId, durationSeconds),
+                context,
+                cancellationToken
+            );
 
     public Task<ChatPinMutationResult> UnpinAsync(
         HelixRequestContext context,
@@ -140,7 +136,7 @@ public sealed class ChatPinClient(
                 ["broadcaster_id"] = broadcasterId,
                 ["moderator_id"] = moderatorId,
                 ["message_id"] = messageId,
-                ["duration_seconds"] = durationSeconds?.ToString(),
+                ["duration_seconds"] = durationSeconds?.ToString(CultureInfo.InvariantCulture),
             }
         );
 

@@ -19,13 +19,13 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             .ReserveRecipient(hostId, "bot-id", "viewer-id", "Viewer")
             .ExecuteAsync(CancellationToken.None);
 
-        first.Match(
-            success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
-            _ => throw new InvalidOperationException("Expected a successful reservation.")
+        _ = first.Match(
+            static success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+            static _ => throw new InvalidOperationException("Expected a successful reservation.")
         );
         var existing = second.Match(
-            success => success.ShouldBeOfType<WhisperQuotaReservation.ExistingRecipient>(),
-            _ => throw new InvalidOperationException("Expected a successful reservation.")
+            static success => success.ShouldBeOfType<WhisperQuotaReservation.ExistingRecipient>(),
+            static _ => throw new InvalidOperationException("Expected a successful reservation.")
         );
         existing.Status.RecipientCount.ShouldBe(1);
     }
@@ -42,9 +42,9 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
         var result = await reservation.ExecuteAsync(CancellationToken.None);
 
         beforeExecution.RecipientCount.ShouldBe(0);
-        result.Match(
-            success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
-            _ => throw new InvalidOperationException("Expected a successful reservation.")
+        _ = result.Match(
+            static success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+            static _ => throw new InvalidOperationException("Expected a successful reservation.")
         );
     }
 
@@ -59,9 +59,9 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             .ReserveRecipient(hostId, " ", "viewer-id", "viewer")
             .ExecuteAsync(CancellationToken.None);
 
-        result.Match(
-            _ => throw new InvalidOperationException("Expected an invalid identity error."),
-            error => error.ShouldBeOfType<WhisperQuotaReservationError.InvalidIdentity>()
+        _ = result.Match(
+            static _ => throw new InvalidOperationException("Expected an invalid identity error."),
+            static error => error.ShouldBeOfType<WhisperQuotaReservationError.InvalidIdentity>()
         );
         (
             await quota.GetStatusAsync(hostId, "bot-id", CancellationToken.None)
@@ -80,9 +80,10 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             var result = await quota
                 .ReserveRecipient(hostId, "bot-id", $"viewer-id-{index}", $"viewer{index}")
                 .ExecuteAsync(CancellationToken.None);
-            result.Match(
-                success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
-                _ => throw new InvalidOperationException("Expected a successful reservation.")
+            _ = result.Match(
+                static success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+                static _ =>
+                    throw new InvalidOperationException("Expected a successful reservation.")
             );
         }
 
@@ -94,15 +95,16 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             .ExecuteAsync(CancellationToken.None);
 
         var limit = blocked.Match(
-            _ => throw new InvalidOperationException("Expected a quota error."),
-            error => error.ShouldBeOfType<WhisperQuotaReservationError.DailyRecipientLimitReached>()
+            static _ => throw new InvalidOperationException("Expected a quota error."),
+            static error =>
+                error.ShouldBeOfType<WhisperQuotaReservationError.DailyRecipientLimitReached>()
         );
         limit.Status.RecipientCount.ShouldBe(WhisperQuotaService.UniqueRecipientLimit);
         limit.Status.Exhausted.ShouldBeTrue();
         existing
             .Match(
-                success => success,
-                _ => throw new InvalidOperationException("Expected an existing recipient.")
+                static success => success,
+                static _ => throw new InvalidOperationException("Expected an existing recipient.")
             )
             .ShouldBeOfType<WhisperQuotaReservation.ExistingRecipient>()
             .Status.Exhausted.ShouldBeTrue();

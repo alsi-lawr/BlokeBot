@@ -105,8 +105,8 @@ public sealed class HostFeatureService(
         }
 
         host.EnabledFeatures = updated;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
         foreach (var observer in featureObservers)
         {
             await observer.FeatureChangedAsync(hostId, feature, updated.Contains(feature), ct);

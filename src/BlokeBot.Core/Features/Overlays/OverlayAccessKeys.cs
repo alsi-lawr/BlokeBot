@@ -29,7 +29,7 @@ internal static class OverlayAccessKeyDigest
 
     internal static bool HasCanonicalShape(string accessKey) =>
         accessKey.Length == 43
-        && accessKey.All(character =>
+        && accessKey.All(static character =>
             char.IsAsciiLetterOrDigit(character) || character is '-' or '_'
         );
 }

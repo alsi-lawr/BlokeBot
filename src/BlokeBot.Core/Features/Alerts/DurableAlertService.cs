@@ -53,9 +53,9 @@ public sealed class DurableAlertService(
                 LinkPath = string.IsNullOrWhiteSpace(linkPath) ? null : linkPath.Trim(),
                 CreatedAtUtc = UtcNow(),
             };
-            db.DurableAlerts.Add(alert);
-            await db.SaveChangesAsync(ct);
-            await events.PublishAsync(AppEventKind.AlertsChanged, ct);
+            _ = db.DurableAlerts.Add(alert);
+            _ = await db.SaveChangesAsync(ct);
+            _ = await events.PublishAsync(AppEventKind.AlertsChanged, ct);
             return Result<DurableAlertCreateOutcome, Never>.Success(
                 new DurableAlertCreateOutcome.Created(alert)
             );
@@ -90,8 +90,8 @@ public sealed class DurableAlertService(
 
             alert.AcknowledgedAtUtc = UtcNow();
             alert.AcknowledgedByLogin = actor;
-            await db.SaveChangesAsync(ct);
-            await events.PublishAsync(AppEventKind.AlertsChanged, ct);
+            _ = await db.SaveChangesAsync(ct);
+            _ = await events.PublishAsync(AppEventKind.AlertsChanged, ct);
             return Result<DurableAlertAcknowledgement, Never>.Success(
                 new DurableAlertAcknowledgement.Acknowledged()
             );
@@ -135,15 +135,10 @@ public sealed class DurableAlertService(
 
     private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
-    private static string NormalizeRequired(string value, string parameterName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("Value is required.", parameterName);
-        }
-
-        return value.Trim();
-    }
+    private static string NormalizeRequired(string value, string parameterName) =>
+        string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Value is required.", parameterName)
+            : value.Trim();
 }
 
 public abstract record DurableAlertCreateOutcome

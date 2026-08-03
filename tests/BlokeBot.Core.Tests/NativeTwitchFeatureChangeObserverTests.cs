@@ -29,25 +29,25 @@ public sealed class NativeTwitchFeatureChangeObserverTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = TestEventBus.Create<AppEventKind>();
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
-        services.AddSingleton<IHostBotAccountTokenStatusProvider>(new ReadyBotAccount());
-        services.AddSingleton(
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
+        _ = services.AddSingleton<IHostBotAccountTokenStatusProvider>(new ReadyBotAccount());
+        _ = services.AddSingleton(
             new HelixClient(
                 new SingleHandlerFactory(new NativeReconciliationHandler()),
                 global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
             )
         );
-        services.AddSingleton(
+        _ = services.AddSingleton(
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             )
         );
-        services.AddSingleton(events);
-        services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
-        services.AddSingleton(TimeProvider.System);
-        services.AddBlokeBotTwitchOperations();
+        _ = services.AddSingleton(events);
+        _ = services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
+        _ = services.AddSingleton(TimeProvider.System);
+        _ = services.AddBlokeBotTwitchOperations();
         await using var provider = services.BuildServiceProvider();
 
         var shoutouts = provider.GetRequiredService<ShoutoutService>();
@@ -72,19 +72,19 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             .GetRequiredService<IAutomaticRaidNativeShoutoutOperation>()
             .ShouldBeSameAs(shoutouts);
 
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(AutomaticRaidShoutoutConfigurationService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(AutomaticRaidShoutoutObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IAutomaticRaidShoutoutDelivery)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IIncomingRaidEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
@@ -96,7 +96,7 @@ public sealed class NativeTwitchFeatureChangeObserverTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await database.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -105,7 +105,7 @@ public sealed class NativeTwitchFeatureChangeObserverTests
                     TwitchUserId = "channel-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var events = TestEventBus.Create<AppEventKind>();
         var handler = new NativeReconciliationHandler();
@@ -173,27 +173,33 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             CancellationToken.None
         );
 
-        handler.Paths.ShouldContain(path => path.EndsWith("/helix/polls"));
+        handler.Paths.ShouldContain(static path =>
+            path.EndsWith("/helix/polls", StringComparison.Ordinal)
+        );
         handler
-            .Paths.Count(path => path.EndsWith("/helix/channel_points/custom_rewards"))
+            .Paths.Count(static path =>
+                path.EndsWith("/helix/channel_points/custom_rewards", StringComparison.Ordinal)
+            )
             .ShouldBe(2);
-        handler.Paths.ShouldContain(path => path.EndsWith("/helix/predictions"));
+        handler.Paths.ShouldContain(static path =>
+            path.EndsWith("/helix/predictions", StringComparison.Ordinal)
+        );
 
         var services = new ServiceCollection();
-        services.AddBlokeBotTwitchOperations();
-        services.ShouldContain(descriptor =>
+        _ = services.AddBlokeBotTwitchOperations();
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(ChannelPointsService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(PredictionService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IChannelPointsEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IPredictionEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
@@ -214,15 +220,15 @@ public sealed class NativeTwitchFeatureChangeObserverTests
                         "channel",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("channel", "token")
@@ -270,7 +276,10 @@ public sealed class NativeTwitchFeatureChangeObserverTests
         )
         {
             Paths.Add(request.RequestUri!.AbsolutePath);
-            var body = request.RequestUri.AbsolutePath.EndsWith("/predictions")
+            var body = request.RequestUri.AbsolutePath.EndsWith(
+                "/predictions",
+                StringComparison.Ordinal
+            )
                 ? """{"data":[],"pagination":{}}"""
                 : """{"data":[]}""";
             return Task.FromResult(

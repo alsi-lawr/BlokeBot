@@ -25,7 +25,7 @@ public partial class HostBotChannelStatusPanel
         var result = await _hostBotStatus.GetReadiness(HostLogin).ExecuteAsync(ct);
         return result.Match(
             HostBotChannelStatusLoadFailure.FromReadiness,
-            _ => throw new UnreachableException()
+            static _ => throw new UnreachableException()
         );
     }
 
@@ -58,7 +58,14 @@ public partial class HostBotChannelStatusPanel
             };
 
     private string _moderatorStatusMessage =>
-        IsBackgroundLoading ? "Checking whether the bot is a channel mod."
-        : BackgroundError is { } error ? error.ModeratorStatusMessage
-        : _status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
+        IsBackgroundLoading switch
+        {
+            true => "Checking whether the bot is a channel mod.",
+            false => BackgroundError switch
+            {
+                { } error => error.ModeratorStatusMessage,
+                _ => _status?.ModeratorStatusMessage
+                    ?? "BlokeBot has not checked the bot account yet.",
+            },
+        };
 }

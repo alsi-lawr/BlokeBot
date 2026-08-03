@@ -74,12 +74,9 @@ public abstract partial class PublicChatMessageQueueTestBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             EnqueueCalls.Enqueue(new(NextSequence(), batch, cancellationToken));
-            if (Enqueue is { } enqueue)
-            {
-                return await enqueue(batch, cancellationToken);
-            }
-
-            return Accepted(batch.Items.Length);
+            return Enqueue is { } enqueue
+                ? await enqueue(batch, cancellationToken)
+                : Accepted(batch.Items.Length);
         }
 
         public ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(

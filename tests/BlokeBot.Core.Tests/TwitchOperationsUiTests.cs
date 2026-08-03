@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Features.Alerts;
@@ -35,7 +34,7 @@ public sealed class TwitchOperationsUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     TwitchUserId = "host-id",
@@ -48,11 +47,11 @@ public sealed class TwitchOperationsUiTests
                     CreatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         using var context = new BunitContext();
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(
             new HostFeatureService(
                 dbFactory,
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
@@ -141,10 +140,10 @@ public sealed class TwitchOperationsUiTests
             var path in new[]
             {
                 new[] { "Shoutouts", "ShoutoutsPage.razor" },
-                new[] { "Polls", "Page", "PollsPage.razor" },
-                new[] { "ClipsMarkers", "Page", "ClipsMarkersPage.razor" },
-                new[] { "ChannelPoints", "Page", "ChannelPointsPage.razor" },
-                new[] { "Predictions", "Page", "PredictionsPage.razor" },
+                ["Polls", "Page", "PollsPage.razor"],
+                ["ClipsMarkers", "Page", "ClipsMarkersPage.razor"],
+                ["ChannelPoints", "Page", "ChannelPointsPage.razor"],
+                ["Predictions", "Page", "PredictionsPage.razor"],
             }
         )
         {
@@ -178,7 +177,7 @@ public sealed class TwitchOperationsUiTests
         };
 
         presentations
-            .Select(value => value.Band)
+            .Select(static value => value.Band)
             .ShouldBe([
                 RedemptionWaitingAgeBand.Fresh,
                 RedemptionWaitingAgeBand.Fresh,
@@ -187,7 +186,7 @@ public sealed class TwitchOperationsUiTests
                 RedemptionWaitingAgeBand.NeedsAttention,
             ]);
         presentations
-            .Select(value => value.SemanticValue)
+            .Select(static value => value.SemanticValue)
             .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
         presentations[0].Age.ShouldBe(TimeSpan.Zero);
         presentations[0].Label.ShouldBe("New · waiting less than a minute");
@@ -226,7 +225,7 @@ public sealed class TwitchOperationsUiTests
                 []
             )
         );
-        context.Services.AddSingleton<IChannelPointsDashboardOperations>(operations);
+        _ = context.Services.AddSingleton<IChannelPointsDashboardOperations>(operations);
 
         var page = context.Render<ChannelPointsPage>();
 
@@ -247,7 +246,7 @@ public sealed class TwitchOperationsUiTests
             foreach (var card in cards)
             {
                 var status = card.QuerySelector("[data-waiting-age-band][role='status']");
-                status.ShouldNotBeNull();
+                _ = status.ShouldNotBeNull();
                 status!.TextContent.ShouldContain("minute");
                 status.GetAttribute("aria-label").ShouldStartWith("Redemption ");
             }
@@ -262,7 +261,7 @@ public sealed class TwitchOperationsUiTests
 
         page.WaitForAssertion(() =>
         {
-            operations.UpdatedDraft.ShouldNotBeNull();
+            _ = operations.UpdatedDraft.ShouldNotBeNull();
             operations.UpdatedDraft!.Title.ShouldBe("Choose a celebration");
             SectionTitles(page)
                 .ShouldBe([
@@ -291,10 +290,10 @@ public sealed class TwitchOperationsUiTests
 
         page.WaitForAssertion(() =>
         {
-            page.Find("[data-native-route='shoutouts']");
+            _ = page.Find("[data-native-route='shoutouts']");
             page.Find("[data-native-route='shoutouts']")
                 .ClassList.ShouldContain("dashboard-page--wide");
-            page.Find("#shoutout-target");
+            _ = page.Find("#shoutout-target");
             var sections = page.FindAll(".disclosure-title")
                 .Select(element => element.TextContent.Trim())
                 .ToArray();
@@ -327,7 +326,7 @@ public sealed class TwitchOperationsUiTests
 
             page.WaitForAssertion(() =>
             {
-                page.Find("[data-native-route='clips-markers']");
+                _ = page.Find("[data-native-route='clips-markers']");
                 var switcher = page.Find("nav[aria-label='Native Twitch tools']");
                 switcher.QuerySelectorAll("a").Length.ShouldBe(5);
                 var currentLink = switcher.QuerySelector(
@@ -347,7 +346,7 @@ public sealed class TwitchOperationsUiTests
 
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.TwitchClips.Add(
+            _ = db.TwitchClips.Add(
                 new TwitchClip
                 {
                     HostId = host.Id,
@@ -359,7 +358,7 @@ public sealed class TwitchOperationsUiTests
             );
             var persistedHost = await db.Hosts.SingleAsync();
             persistedHost.EnabledFeatures &= ~HostFeatureFlags.NativeTwitchFeatures;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var unavailableTestContext = UiTestContextFactory.CreateWithAuthorization(
@@ -414,11 +413,11 @@ public sealed class TwitchOperationsUiTests
             new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
         );
         var nativeTwitch = new NativeTwitchFeatureGate(dbFactory);
-        context.Services.AddSingleton(events);
-        context.Services.AddSingleton(changes);
-        context.Services.AddSingleton(alerts);
-        context.Services.AddSingleton(nativeTwitch);
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(events);
+        _ = context.Services.AddSingleton(changes);
+        _ = context.Services.AddSingleton(alerts);
+        _ = context.Services.AddSingleton(nativeTwitch);
+        _ = context.Services.AddSingleton(
             new ShoutoutService(
                 dbFactory,
                 null!,
@@ -429,13 +428,13 @@ public sealed class TwitchOperationsUiTests
                 nativeTwitch
             )
         );
-        context.Services.AddSingleton<IShoutoutDashboardOperations>(provider =>
+        _ = context.Services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(
             new AutomaticRaidShoutoutConfigurationService(dbFactory, TimeProvider.System)
         );
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(
             new ClipMarkerService(
                 dbFactory,
                 new ReadyBroadcasterProvider(),
@@ -450,10 +449,10 @@ public sealed class TwitchOperationsUiTests
                 nativeTwitch
             )
         );
-        context.Services.AddSingleton<IClipMarkerDashboardOperations>(provider =>
+        _ = context.Services.AddSingleton<IClipMarkerDashboardOperations>(static provider =>
             provider.GetRequiredService<ClipMarkerService>()
         );
-        context.Services.AddSingleton(
+        _ = context.Services.AddSingleton(
             new ModeratorAuthorityService(
                 null!,
                 new HelixClient(
@@ -465,7 +464,7 @@ public sealed class TwitchOperationsUiTests
                 TimeProvider.System
             )
         );
-        context.Services.AddSingleton<ToastService>();
+        _ = context.Services.AddSingleton<ToastService>();
     }
 
     private static async Task<BotHost> SeedHostAsync(
@@ -481,14 +480,14 @@ public sealed class TwitchOperationsUiTests
             TwitchUserId = "streamer-id",
             EnabledFeatures = enabledFeatures,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host;
     }
 
     private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page) =>
         page.FindAll(".disclosure-title, .task-panel__title")
-            .Select(element => element.TextContent.Trim())
+            .Select(static element => element.TextContent.Trim())
             .ToArray();
 
     private static ChannelPointsRewardView Reward() =>
@@ -602,15 +601,15 @@ public sealed class TwitchOperationsUiTests
                         "streamer",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

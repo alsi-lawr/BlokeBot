@@ -1,3 +1,4 @@
+using System.Globalization;
 using Serilog;
 using Serilog.Formatting.Compact;
 
@@ -16,7 +17,10 @@ internal static class BlokeBotHostLogging
     internal static void ConfigureBootstrap() =>
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
-            .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
+            .WriteTo.Console(
+                formatProvider: CultureInfo.InvariantCulture,
+                outputTemplate: ConsoleOutputTemplate
+            )
             .CreateBootstrapLogger();
 
     internal static void ConfigureProduction(
@@ -26,16 +30,19 @@ internal static class BlokeBotHostLogging
         string stateDirectory
     )
     {
-        loggerConfiguration.ReadFrom.Configuration(configuration).ReadFrom.Services(services);
+        _ = loggerConfiguration.ReadFrom.Configuration(configuration).ReadFrom.Services(services);
 
         if (configuration.GetSection("Serilog:WriteTo").Exists())
         {
             return;
         }
 
-        loggerConfiguration
+        _ = loggerConfiguration
             .Enrich.FromLogContext()
-            .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
+            .WriteTo.Console(
+                formatProvider: CultureInfo.InvariantCulture,
+                outputTemplate: ConsoleOutputTemplate
+            )
             .WriteTo.File(
                 new CompactJsonFormatter(),
                 DefaultLogPath(stateDirectory),

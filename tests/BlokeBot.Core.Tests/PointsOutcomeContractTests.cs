@@ -7,5 +7,7 @@ public sealed class PointsOutcomeContractTests
 {
     [Test]
     public void EmptyWinnerCollection_ConstructingWinnersOutcome_Rejects() =>
-        Should.Throw<ArgumentException>(() => new PointsGiveawayDrawOutcome.Winners(new(), []));
+        Should.Throw<ArgumentException>(static () =>
+            new PointsGiveawayDrawOutcome.Winners(new(), [])
+        );
 }

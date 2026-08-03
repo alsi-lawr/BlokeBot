@@ -40,14 +40,14 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         PointOperationOutcome outcome
     ) =>
         outcome.Match(
-            succeeded => succeeded,
-            _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
+            static succeeded => succeeded,
+            static _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
         );
 
     private protected static PointOperationOutcome.Failed Failed(PointOperationOutcome outcome) =>
         outcome.Match(
-            _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
-            failed => failed
+            static _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
+            static failed => failed
         );
 
     private protected static PointsGiveawayScheduler CreateScheduler(
@@ -128,8 +128,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -148,8 +148,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             GiveawayWinnerCount = 1,
         };
         configure?.Invoke(settings);
-        db.PointsSettings.Add(settings);
-        await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(settings);
+        _ = await db.SaveChangesAsync();
     }
 
     private protected static async Task<int> SeedGiveawayAsync(
@@ -180,8 +180,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             );
         }
 
-        db.PointsGiveaways.Add(giveaway);
-        await db.SaveChangesAsync();
+        _ = db.PointsGiveaways.Add(giveaway);
+        _ = await db.SaveChangesAsync();
         return giveaway.Id;
     }
 }

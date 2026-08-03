@@ -19,8 +19,8 @@ public sealed class EventFeedOverlayMigrationTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.NewGuid(),
@@ -36,9 +36,9 @@ public sealed class EventFeedOverlayMigrationTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.OverlayInstances.Add(overlay);
-        await db.SaveChangesAsync();
-        db.OverlayEventFeedItems.Add(
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
+        _ = db.OverlayEventFeedItems.Add(
             new OverlayEventFeedItem
             {
                 OverlayInstanceId = overlay.Id,
@@ -53,13 +53,13 @@ public sealed class EventFeedOverlayMigrationTests
                 EnqueuedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var persisted = await db.OverlayEventFeedItems.SingleAsync();
         persisted.SourceKey.ShouldBe("ledger-1");
         persisted.Body.Length.ShouldBeGreaterThan(500);
         persisted.DurationSeconds.ShouldBe(6);
 
-        db.OverlayEventFeedItems.Add(
+        _ = db.OverlayEventFeedItems.Add(
             new OverlayEventFeedItem
             {
                 OverlayInstanceId = overlay.Id,
@@ -74,6 +74,6 @@ public sealed class EventFeedOverlayMigrationTests
                 EnqueuedAtUtc = DateTime.UtcNow,
             }
         );
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 }

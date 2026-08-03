@@ -46,7 +46,7 @@ public sealed class TwitchEndpointRoutingTests
                             )
                         )
                     );
-                    await client.ExchangeCodeAsync(
+                    _ = await client.ExchangeCodeAsync(
                         new AuthorizationCodeExchange(
                             "client",
                             "secret",
@@ -55,7 +55,7 @@ public sealed class TwitchEndpointRoutingTests
                         ),
                         CancellationToken.None
                     );
-                    await client.ValidateTokenAsync("access", CancellationToken.None);
+                    _ = await client.ValidateTokenAsync("access", CancellationToken.None);
                 }
             ),
             new EndpointRoute(
@@ -64,8 +64,8 @@ public sealed class TwitchEndpointRoutingTests
                 ["/oauth2/token"],
                 async () =>
                 {
-                    var provider = new AppAccessTokenProvider(factory, Identity(), policy);
-                    await provider.GetAccessTokenAsync(CancellationToken.None);
+                    using var provider = new AppAccessTokenProvider(factory, Identity(), policy);
+                    _ = await provider.GetAccessTokenAsync(CancellationToken.None);
                 }
             ),
             new EndpointRoute(

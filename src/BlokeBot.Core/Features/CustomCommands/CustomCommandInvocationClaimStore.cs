@@ -52,7 +52,7 @@ public sealed class CustomCommandInvocationClaimStore(TimeProvider clock)
     )
     {
         var cutoff = clock.GetUtcNow().Subtract(StreamClaimRetention).UtcDateTime;
-        await db.Database.ExecuteSqlInterpolatedAsync(
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             DELETE FROM custom_command_invocation_claims
             WHERE Id IN (

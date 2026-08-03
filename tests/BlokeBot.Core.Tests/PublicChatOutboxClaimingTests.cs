@@ -80,7 +80,7 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
                         CompletedAtUtc = now.AddSeconds(-5).UtcDateTime,
                     })
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
         var outbox = new EfPublicChatOutbox(
             dbFactory,
@@ -105,7 +105,7 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
             (await afterFirstBatch.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
         }
 
-        (
+        _ = (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -175,10 +175,10 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
             CancellationToken.None
         );
         var first = await ClaimAsync(outbox, now, TimeSpan.FromSeconds(10));
-        (
+        _ = (
             await outbox.BeginSendAsync(first, now, now.AddMinutes(5), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 first,
                 new PublicChatDeliveryOutcome.Sent(),
@@ -302,7 +302,7 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
         delivery.Attempt.ShouldBe(1);
         await using var completedDb = await dbFactory.CreateDbContextAsync();
         (await completedDb.PublicChatOutboxMessages.AsNoTracking().ToArrayAsync()).ShouldBeEmpty();
-        (
+        _ = (
             await completedDb.PublicChatSendReceipts.AsNoTracking().ToArrayAsync()
         ).ShouldHaveSingleItem();
     }
@@ -372,7 +372,7 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
             CancellationToken.None
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await outbox.BeginSendAsync(claimed, now, now.AddSeconds(1), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
@@ -389,7 +389,7 @@ public sealed class PublicChatOutboxClaimingTests : PublicChatOutboxIntegrationT
             CancellationToken.None
         );
 
-        afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        _ = afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
         row.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);

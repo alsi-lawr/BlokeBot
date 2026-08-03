@@ -109,11 +109,11 @@ internal sealed class EfPublicChatPinStore(
                 throw new InvalidOperationException("Unknown public chat pin outcome.");
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         if (outcome is PublicChatPinExecutionOutcome.Terminal)
         {
-            await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+            _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
         }
     }
 
@@ -142,7 +142,7 @@ internal sealed class EfPublicChatPinStore(
                 UnpinOnOwnerCompletion = item.UnpinOnOwnerCompletion,
                 PinnedAtUtc = UtcNow(),
             };
-            db.ActivePublicChatPins.Add(active);
+            _ = db.ActivePublicChatPins.Add(active);
         }
         else
         {
@@ -166,7 +166,7 @@ internal sealed class EfPublicChatPinStore(
             );
         if (!ownerStillOpen && item.UnpinOnOwnerCompletion)
         {
-            db.PublicChatPinOperations.Add(
+            _ = db.PublicChatPinOperations.Add(
                 new PublicChatPinOperation
                 {
                     Kind = PublicChatPinOperationKind.Unpin,
@@ -226,17 +226,19 @@ internal sealed class EfPublicChatPinStore(
             return;
         }
 
-        db.DurableAlerts.Add(
+        _ = db.DurableAlerts.Add(
             new DurableAlert
             {
                 HostId = item.HostId,
                 Severity = DurableAlertSeverity.Warning,
                 Source = source,
                 SourceKey = sourceKey,
-                Title =
-                    automaticRaid ? "Automatic raid shoutout pin failed"
-                    : item.IsUnpin ? "Chat pin reset failed"
-                    : "Chat reply pin failed",
+                Title = automaticRaid switch
+                {
+                    true => "Automatic raid shoutout pin failed",
+                    false when item.IsUnpin => "Chat pin reset failed",
+                    _ => "Chat reply pin failed",
+                },
                 Message =
                     $"Twitch could not complete the chat pin operation ({reason}). Check the bot moderator role and reconnect its account if the required scope is missing.",
                 LinkPath = "/channel/setup",

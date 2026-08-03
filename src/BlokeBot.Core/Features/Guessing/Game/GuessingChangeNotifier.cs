@@ -17,7 +17,7 @@ public sealed class GuessingChangeNotifier(
 
     public async ValueTask NotifyChangedAsync(int hostId, CancellationToken cancellationToken)
     {
-        await events.PublishAsync(AppEventKind.GuessingChanged, cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.GuessingChanged, cancellationToken);
         foreach (var observer in observers)
         {
             await observer.GuessingChangedAsync(hostId, cancellationToken);

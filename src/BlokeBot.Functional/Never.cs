@@ -15,6 +15,6 @@ public static class NeverIO
     )
     {
         var result = await operation.ExecuteAsync(cancellationToken).ConfigureAwait(false);
-        return result.Match(value => value, _ => throw new UnreachableException());
+        return result.Match(static value => value, static _ => throw new UnreachableException());
     }
 }

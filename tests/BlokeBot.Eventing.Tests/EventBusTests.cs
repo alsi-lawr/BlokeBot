@@ -13,7 +13,7 @@ public sealed class EventBusTests
         var received = new List<string>();
         var correlations = new List<ObserverCorrelationId>();
 
-        events.Subscribe(
+        _ = events.Subscribe(
             "changed",
             ObserverIdentity.Named("first"),
             (notification, _) =>
@@ -23,7 +23,7 @@ public sealed class EventBusTests
                 return ValueTask.CompletedTask;
             }
         );
-        events.Subscribe(
+        _ = events.Subscribe(
             "changed",
             ObserverIdentity.Named("failing"),
             (notification, _) =>
@@ -33,7 +33,7 @@ public sealed class EventBusTests
                 return ValueTask.FromException(failure);
             }
         );
-        events.Subscribe(
+        _ = events.Subscribe(
             "changed",
             ObserverIdentity.Named("third"),
             (notification, _) =>
@@ -77,9 +77,9 @@ public sealed class EventBusTests
             }
         );
 
-        await events.PublishAsync("changed", CancellationToken.None);
+        _ = await events.PublishAsync("changed", CancellationToken.None);
         subscription.Dispose();
-        await events.PublishAsync("changed", CancellationToken.None);
+        _ = await events.PublishAsync("changed", CancellationToken.None);
 
         received.ShouldBe(1);
     }
@@ -111,7 +111,7 @@ public sealed class EventBusTests
         ]);
 
         subscriptions.Dispose();
-        await events.PublishAsync("changed", CancellationToken.None);
+        _ = await events.PublishAsync("changed", CancellationToken.None);
 
         received.ShouldBe(0);
     }
@@ -131,11 +131,11 @@ public sealed class EventBusTests
             }
         );
 
-        await events.PublishAsync("first", CancellationToken.None);
-        await events.PublishAsync("second", CancellationToken.None);
-        await events.PublishAsync("third", CancellationToken.None);
+        _ = await events.PublishAsync("first", CancellationToken.None);
+        _ = await events.PublishAsync("second", CancellationToken.None);
+        _ = await events.PublishAsync("third", CancellationToken.None);
         subscription.Dispose();
-        await events.PublishAsync("first", CancellationToken.None);
+        _ = await events.PublishAsync("first", CancellationToken.None);
 
         received.ShouldBe(["first", "second"]);
     }
@@ -161,7 +161,7 @@ public sealed class EventBusTests
             fanOut,
             new EventBusEventIdentity<string>
             {
-                Project = key => ObserverEventIdentity.Named($"Event.{key}"),
+                Project = static key => ObserverEventIdentity.Named($"Event.{key}"),
             }
         );
     }

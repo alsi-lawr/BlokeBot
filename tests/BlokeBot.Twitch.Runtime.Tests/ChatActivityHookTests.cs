@@ -130,8 +130,8 @@ public sealed class ChatActivityHookTests
     internal static ChatCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(recorder);
-        services.AddChatCommands().AddCommandModule<RecordingCommandModule>();
+        _ = services.AddSingleton(recorder);
+        _ = services.AddChatCommands().AddCommandModule<RecordingCommandModule>();
         return services.BuildServiceProvider().GetRequiredService<ChatCommandDispatcher>();
     }
 
@@ -206,7 +206,7 @@ public sealed class ChatActivityHookTests
         )
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                ? values.ToDictionary(static pair => pair.Key, static pair => pair.Value)
                 : [];
             Entries.Add(new LogEntry(formatter(state, exception), properties));
         }

@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddHttpClient("twitch-oauth");
+        _ = services.AddHttpClient("twitch-oauth");
         services.TryAddSingleton(TwitchEndpointPolicy.Default);
         services.TryAddSingleton<OAuthTransport>();
 
@@ -33,7 +33,7 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddOAuthTransport();
+        _ = services.AddOAuthTransport();
         services.TryAddSingleton<AppAccessTokenProvider>();
         services.TryAddSingleton<ITokenStore, JsonTokenStore>();
         services.TryAddSingleton<IOAuthStateStore, InMemoryOAuthStateStore>();

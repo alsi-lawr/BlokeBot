@@ -59,17 +59,17 @@ public sealed class WebAuthCallbackEndpointTests
         public static async Task<CallbackHost> StartAsync(CallbackLogCapture? logs = null)
         {
             var builder = WebApplication.CreateBuilder();
-            builder.Services.AddLogging();
+            _ = builder.Services.AddLogging();
             BlokeBotLogging.Configure(builder.Logging);
             if (logs is not null)
             {
-                builder.Logging.ClearProviders();
-                builder.Logging.AddProvider(logs);
+                _ = builder.Logging.ClearProviders();
+                _ = builder.Logging.AddProvider(logs);
             }
-            builder.Services.AddSingleton(Uninitialized<WebAuthService>());
-            builder.Services.AddSingleton(Uninitialized<AuthSessionService>());
-            builder.Services.AddSingleton(Uninitialized<HostModAccessService>());
-            builder.Services.AddSingleton(Uninitialized<HostedChannelDirectoryService>());
+            _ = builder.Services.AddSingleton(Uninitialized<WebAuthService>());
+            _ = builder.Services.AddSingleton(Uninitialized<AuthSessionService>());
+            _ = builder.Services.AddSingleton(Uninitialized<HostModAccessService>());
+            _ = builder.Services.AddSingleton(Uninitialized<HostedChannelDirectoryService>());
 
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");

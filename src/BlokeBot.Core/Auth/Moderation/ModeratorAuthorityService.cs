@@ -57,7 +57,7 @@ public sealed class ModeratorAuthorityService(
             return cached.Outcome;
         }
 
-        _cache.TryRemove(key, out _);
+        _ = _cache.TryRemove(key, out _);
         return await ConfirmModeratorAuthorityAsync(key, selectedHost, ct);
     }
 
@@ -126,9 +126,9 @@ public sealed class ModeratorAuthorityService(
 
     private static BotHostChoice? SelectedHost(AuthenticatedSession session) =>
         session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
 
     private sealed record AuthorityCacheKey(string UserId, int HostId);

@@ -117,7 +117,7 @@ public sealed class WhisperQuotaService(
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             };
-            db.WhisperQuotaBuckets.Add(bucket);
+            _ = db.WhisperQuotaBuckets.Add(bucket);
         }
 
         var existing = bucket.Recipients.Any(x =>
@@ -132,7 +132,7 @@ public sealed class WhisperQuotaService(
         {
             bucket.Exhausted = true;
             bucket.UpdatedAtUtc = now;
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             return Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Error(
                 new WhisperQuotaReservationError.DailyRecipientLimitReached(Status(bucket))
             );
@@ -147,7 +147,7 @@ public sealed class WhisperQuotaService(
             }
         );
         bucket.UpdatedAtUtc = now;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         return Success(new WhisperQuotaReservation.NewRecipient(Status(bucket)));
     }
 
@@ -175,12 +175,12 @@ public sealed class WhisperQuotaService(
                 DayUtc = day,
                 CreatedAtUtc = now,
             };
-            db.WhisperQuotaBuckets.Add(bucket);
+            _ = db.WhisperQuotaBuckets.Add(bucket);
         }
 
         bucket.Exhausted = true;
         bucket.UpdatedAtUtc = now;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 
     private DateTime CurrentDayUtc() => clock.GetUtcNow().UtcDateTime.Date;

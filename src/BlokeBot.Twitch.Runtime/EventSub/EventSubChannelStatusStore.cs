@@ -110,7 +110,7 @@ internal sealed class EventSubChannelStatusStore : IEventSubChannelStatusAccesso
         {
             Channels = Array.AsReadOnly(
                 states
-                    .Values.OrderBy(state => state.Channel, StringComparer.OrdinalIgnoreCase)
+                    .Values.OrderBy(static state => state.Channel, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
             ),
         };

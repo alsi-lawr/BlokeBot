@@ -20,7 +20,7 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
 
-        await alerts
+        _ = await alerts
             .Create(
                 hostId,
                 DurableAlertSeverity.Warning,
@@ -42,7 +42,7 @@ public sealed class DurableAlertTests
                 null
             )
             .RunAsync(CancellationToken.None);
-        await alerts
+        _ = await alerts
             .Acknowledge(hostId, acknowledged.Alert.Id, "moderator")
             .RunAsync(CancellationToken.None);
 
@@ -136,7 +136,7 @@ public sealed class DurableAlertTests
     public async Task LaterPublicChatQueueIncident_Observing_CreatesNewAlertAndNotification()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedHostAsync(dbFactory, "streamer");
         var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var events = TestEventBus.Create<AppEventKind>();
         var notificationCount = 0;
@@ -188,8 +188,8 @@ public sealed class DurableAlertTests
             TwitchUserId = $"{login}-id",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

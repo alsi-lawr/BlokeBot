@@ -22,7 +22,7 @@ public sealed class PointsHostSeeder(
 
         if (!await db.PointsSettings.AnyAsync(x => x.HostId == hostId, ct))
         {
-            db.PointsSettings.Add(new PointsSettings { HostId = hostId });
+            _ = db.PointsSettings.Add(new PointsSettings { HostId = hostId });
         }
 
         foreach (var command in commands.Descriptors)
@@ -35,7 +35,7 @@ public sealed class PointsHostSeeder(
 
             foreach (var alias in command.DefaultAliases)
             {
-                db.CommandAliases.Add(
+                _ = db.CommandAliases.Add(
                     new CommandAlias
                     {
                         HostId = hostId,
@@ -46,6 +46,6 @@ public sealed class PointsHostSeeder(
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 }

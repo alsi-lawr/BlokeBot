@@ -68,8 +68,8 @@ public partial class PublicRequestBoardPage
             CancellationToken.None
         );
         _feedback = result.Match(
-            succeeded => $"Request #{succeeded.Value.Id} submitted.",
-            rejected => rejected.Reason.Message
+            static succeeded => $"Request #{succeeded.Value.Id} submitted.",
+            static rejected => rejected.Reason.Message
         );
         _operationFailed = result is RequestBoardResult<PublicRequestSubmissionView>.Rejected;
         if (!_operationFailed)
@@ -95,11 +95,11 @@ public partial class PublicRequestBoardPage
             CancellationToken.None
         );
         _feedback = result.Match(
-            succeeded =>
+            static succeeded =>
                 succeeded.WasIdempotent
                     ? "Your vote was already recorded."
                     : "Your vote was recorded.",
-            rejected => rejected.Reason.Message
+            static rejected => rejected.Reason.Message
         );
         _operationFailed = result is RequestBoardResult<PublicRequestSubmissionView>.Rejected;
         await LoadAsync();
@@ -119,8 +119,8 @@ public partial class PublicRequestBoardPage
             CancellationToken.None
         );
         _feedback = result.Match(
-            _ => "Your request was withdrawn.",
-            rejected => rejected.Reason.Message
+            static _ => "Your request was withdrawn.",
+            static rejected => rejected.Reason.Message
         );
         _operationFailed = result is RequestBoardResult<PublicRequestSubmissionView>.Rejected;
         await LoadAsync();

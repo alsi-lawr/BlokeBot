@@ -89,7 +89,7 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
             row.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
             row.Message.ShouldBeNull();
             row.AttemptCount.ShouldBe(1);
-            row.SendStartedAtUtc.ShouldNotBeNull();
+            _ = row.SendStartedAtUtc.ShouldNotBeNull();
             row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Send);
             row.FailureType.ShouldBe(typeof(OperationCanceledException).FullName);
             row.RejectionCode.ShouldBeNull();
@@ -107,7 +107,7 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
             TimeSpan.Zero,
             CancellationToken.None
         );
-        afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        _ = afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
     }
 
     [Test]
@@ -126,10 +126,10 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
             CancellationToken.None
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed with
                 {
@@ -142,7 +142,7 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
         ).ShouldBeOfType<PublicChatClaimUpdate.OwnershipLost>();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            await db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 """
                 CREATE TRIGGER fail_public_chat_receipt_update
                 BEFORE UPDATE ON public_chat_send_receipts
@@ -153,7 +153,7 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
             );
         }
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             outbox
                 .RecordDeliveryOutcomeAsync(
                     claimed,
@@ -171,10 +171,12 @@ public sealed class PublicChatOutboxInterruptionTests : PublicChatOutboxIntegrat
             var sendReceipt = await db.PublicChatSendReceipts.AsNoTracking().SingleAsync();
             sendReceipt.DeliveredDeduplicationKey.ShouldBeNull();
             sendReceipt.DeliveredAtUtc.ShouldBeNull();
-            await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_public_chat_receipt_update;");
+            _ = await db.Database.ExecuteSqlRawAsync(
+                "DROP TRIGGER fail_public_chat_receipt_update;"
+            );
         }
 
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 new PublicChatDeliveryOutcome.Sent(),

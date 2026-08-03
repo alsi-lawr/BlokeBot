@@ -64,18 +64,18 @@ public sealed class NativeEventDispatchTests
         channelPoints.Deliveries.ShouldBe(0);
         predictions.Deliveries.ShouldBe(0);
 
-        gate.EnabledFeatures.Add(NativeTwitchFeature.RewardsAndRedemptions);
+        _ = gate.EnabledFeatures.Add(NativeTwitchFeature.RewardsAndRedemptions);
         await session.DispatchRewardRedemptionAsync(redemption, CancellationToken.None);
         await session.DispatchPredictionAsync(prediction, CancellationToken.None);
 
         channelPoints.Deliveries.ShouldBe(1);
         predictions.Deliveries.ShouldBe(0);
 
-        gate.EnabledFeatures.Add(NativeTwitchFeature.Predictions);
+        _ = gate.EnabledFeatures.Add(NativeTwitchFeature.Predictions);
         await session.DispatchPredictionAsync(prediction, CancellationToken.None);
 
         predictions.Deliveries.ShouldBe(1);
-        gate.Requests.Select(request => request.Feature)
+        gate.Requests.Select(static request => request.Feature)
             .ShouldBe([
                 NativeTwitchFeature.RewardsAndRedemptions,
                 NativeTwitchFeature.Predictions,
@@ -111,7 +111,7 @@ public sealed class NativeEventDispatchTests
 
         await secondSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
 
-        secondObserver.Events.ShouldHaveSingleItem();
+        _ = secondObserver.Events.ShouldHaveSingleItem();
     }
 
     [Test]

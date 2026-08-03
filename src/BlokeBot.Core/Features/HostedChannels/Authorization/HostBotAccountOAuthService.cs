@@ -18,22 +18,19 @@ public sealed class HostBotAccountOAuthService(
     {
         ArgumentNullException.ThrowIfNull(scopes);
         var identity = settings.Identity;
-        if (!IsConfiguredForAuthorization(identity))
-        {
-            return new OAuthAuthorizationStartOutcome.ConfigurationUnavailable();
-        }
-
-        return new OAuthAuthorizationStartOutcome.Ready(
-            transport.CreateAuthorizationUri(
-                new AuthorizationUriRequest(
-                    identity.ClientId,
-                    identity.RedirectUri,
-                    scopes,
-                    state,
-                    AuthorizationVerificationPolicy.ForceAccountVerification
+        return !IsConfiguredForAuthorization(identity)
+            ? new OAuthAuthorizationStartOutcome.ConfigurationUnavailable()
+            : new OAuthAuthorizationStartOutcome.Ready(
+                transport.CreateAuthorizationUri(
+                    new AuthorizationUriRequest(
+                        identity.ClientId,
+                        identity.RedirectUri,
+                        scopes,
+                        state,
+                        AuthorizationVerificationPolicy.ForceAccountVerification
+                    )
                 )
-            )
-        );
+            );
     }
 
     public async Task<
@@ -81,7 +78,7 @@ public sealed class HostBotAccountOAuthService(
             new HelixRequestContext(identity.ClientId, token.AccessToken),
             ct
         );
-        if (
+        return
             user is null
             || !string.Equals(user.Id, validation.UserId, StringComparison.Ordinal)
             || !string.Equals(
@@ -89,25 +86,23 @@ public sealed class HostBotAccountOAuthService(
                 validation.Login,
                 StringComparison.Ordinal
             )
-        )
-        {
-            return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated();
-        }
-
-        return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.Completed(
-            new HostBotAccountAuthorizationGrant(
-                new HostBotAccountTokenPayload(
-                    token.AccessToken,
-                    token.RefreshToken,
-                    DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
-                ),
-                validation.UserId,
-                LoginName.Parse(validation.Login),
-                string.IsNullOrWhiteSpace(user.DisplayName) ? validation.Login : user.DisplayName,
-                string.IsNullOrWhiteSpace(user.ProfileImageUrl) ? null : user.ProfileImageUrl,
-                validation.Scopes
-            )
-        );
+            ? new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated()
+            : new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.Completed(
+                new HostBotAccountAuthorizationGrant(
+                    new HostBotAccountTokenPayload(
+                        token.AccessToken,
+                        token.RefreshToken,
+                        DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
+                    ),
+                    validation.UserId,
+                    LoginName.Parse(validation.Login),
+                    string.IsNullOrWhiteSpace(user.DisplayName)
+                        ? validation.Login
+                        : user.DisplayName,
+                    string.IsNullOrWhiteSpace(user.ProfileImageUrl) ? null : user.ProfileImageUrl,
+                    validation.Scopes
+                )
+            );
     }
 
     private static bool IsConfiguredForAuthorization(BotIdentity identity) =>

@@ -32,15 +32,12 @@ internal sealed class MemoryTokenStore : ITokenStore
 
         if (ContinueLoad is not null)
         {
-            await ContinueLoad.Reader.ReadAsync(cancellationToken);
+            _ = await ContinueLoad.Reader.ReadAsync(cancellationToken);
         }
 
-        if (LoadException is not null)
-        {
-            throw LoadException;
-        }
-
-        return Option<TokenSet>.FromNullable(Loaded);
+        return LoadException is not null
+            ? throw LoadException
+            : Option<TokenSet>.FromNullable(Loaded);
     }
 
     public async Task SaveAsync(string path, TokenSet tokenSet, CancellationToken cancellationToken)

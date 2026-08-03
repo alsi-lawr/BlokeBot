@@ -11,8 +11,8 @@ internal sealed partial class EfPublicChatOutbox
         PublicChatHttpStatus httpStatus
     ) =>
         httpStatus.Match(
-            known => SafePreSendExhaustionResult(known.Value),
-            () => AutomaticRaidShoutoutResultCode.Unexpected
+            static known => SafePreSendExhaustionResult(known.Value),
+            static () => AutomaticRaidShoutoutResultCode.Unexpected
         );
 
     private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(
@@ -71,7 +71,7 @@ internal sealed partial class EfPublicChatOutbox
                 : AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
         outcome.ResultCode = resultCode;
         outcome.CompletedAtUtc = completedAt.UtcDateTime;
-        await db
+        _ = await db
             .PublicChatPinOperations.Where(operation =>
                 operation.OutboxMessageId == outboxMessageId
                 && operation.Status == PublicChatPinOperationStatus.AwaitingDelivery
@@ -106,7 +106,7 @@ internal sealed partial class EfPublicChatOutbox
             return false;
         }
 
-        db.DurableAlerts.Add(
+        _ = db.DurableAlerts.Add(
             new DurableAlert
             {
                 HostId = outcome.HostId,

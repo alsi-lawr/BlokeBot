@@ -19,18 +19,13 @@ public readonly record struct ToastDismissal
 
     public static ToastDismissal Manual => new(null);
 
-    public static ToastDismissal Automatic(TimeSpan after)
-    {
-        if (after <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
+    public static ToastDismissal Automatic(TimeSpan after) =>
+        after <= TimeSpan.Zero
+            ? throw new ArgumentOutOfRangeException(
                 nameof(after),
                 "Dismissal time must be positive."
-            );
-        }
-
-        return new(after);
-    }
+            )
+            : new(after);
 }
 
 public readonly struct StatusToastStrategy : IToastStrategy

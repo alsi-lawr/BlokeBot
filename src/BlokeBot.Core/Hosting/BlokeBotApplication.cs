@@ -38,18 +38,18 @@ public static class BlokeBotApplication
     )
     {
         BlokeBotLogging.Configure(builder.Logging);
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-        builder.Services.AddCascadingAuthenticationState();
-        builder.Services.AddHttpContextAccessor();
-        builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);
-        builder.Services.AddSingleton<UiFaultTelemetry>();
+        _ = builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        _ = builder.Services.AddCascadingAuthenticationState();
+        _ = builder.Services.AddHttpContextAccessor();
+        _ = builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);
+        _ = builder.Services.AddSingleton<UiFaultTelemetry>();
 
-        builder
+        _ = builder
             .Services.AddOptions<BlokeBotOptions>()
             .BindConfiguration("BlokeBot")
             .Validate(BlokeBotOptionsValidation.IsValid, "BlokeBot options are invalid.")
             .ValidateOnStart();
-        builder
+        _ = builder
             .Services.AddOptions<WebAuthOptions>()
             .BindConfiguration("TwitchWebAuth")
             .ValidateOnStart();
@@ -61,14 +61,14 @@ public static class BlokeBotApplication
                 .Get<TwitchEndpointPolicy>()
             ?? new TwitchEndpointPolicy();
         twitchEndpoints.Validate();
-        builder.Services.AddSingleton(twitchEndpoints);
+        _ = builder.Services.AddSingleton(twitchEndpoints);
 
         var online = runtime == BlokeBotRuntimeMode.Online;
-        builder.Services.AddEventBus<AppEventKind>(
+        _ = builder.Services.AddEventBus<AppEventKind>(
             ObserverBoundary.Named("BlokeBot.ApplicationEvents"),
-            eventKind => ObserverEventIdentity.Named($"BlokeBot.{eventKind}")
+            static eventKind => ObserverEventIdentity.Named($"BlokeBot.{eventKind}")
         );
-        builder
+        _ = builder
             .Services.AddBlokeBotAppCommands()
             .AddBlokeBotPublicChat()
             .AddBlokeBotAlerts()
@@ -102,15 +102,15 @@ public static class BlokeBotApplication
             .AddBlokeBotToasts()
             .AddBlokeBotTwitchOperations()
             .AddBlokeBotAuth();
-        builder.Services.AddOAuthTransport();
-        builder.Services.AddHelix();
-        builder.Services.AddHttpClient();
+        _ = builder.Services.AddOAuthTransport();
+        _ = builder.Services.AddHelix();
+        _ = builder.Services.AddHttpClient();
         AddAuthentication(builder);
 
         var botSection = builder.Configuration.GetSection("TwitchBot");
         if (online)
         {
-            builder
+            _ = builder
                 .Services.AddTwitchBot(botSection)
                 .UseBlokeBotHostedChannelProvider()
                 .UseWhisperCommandResponseSender()
@@ -125,13 +125,13 @@ public static class BlokeBotApplication
         }
         else
         {
-            builder.Services.AddTwitchBotSettings(botSection);
-            builder.Services.AddUnavailableAccessTokenProvider();
-            builder.Services.AddOfflineBotRuntimeStatus();
-            builder.Services.Replace(
+            _ = builder.Services.AddTwitchBotSettings(botSection);
+            _ = builder.Services.AddUnavailableAccessTokenProvider();
+            _ = builder.Services.AddOfflineBotRuntimeStatus();
+            _ = builder.Services.Replace(
                 ServiceDescriptor.Singleton<IPointTargetUserLookup, OfflinePointTargetUserLookup>()
             );
-            builder.Services.Replace(
+            _ = builder.Services.Replace(
                 ServiceDescriptor.Singleton<
                     IPublicChatMessageSender,
                     OfflinePublicChatMessageSender
@@ -159,25 +159,25 @@ public static class BlokeBotApplication
 
         if (!app.Environment.IsDevelopment())
         {
-            app.UseExceptionHandler("/Error", createScopeForErrors: true);
-            app.UseHsts();
+            _ = app.UseExceptionHandler("/Error", createScopeForErrors: true);
+            _ = app.UseHsts();
         }
 
-        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-        app.UseHttpsRedirection();
-        app.UseAntiforgery();
-        app.UseAuthentication();
-        app.UseAuthorization();
+        _ = app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+        _ = app.UseHttpsRedirection();
+        _ = app.UseAntiforgery();
+        _ = app.UseAuthentication();
+        _ = app.UseAuthorization();
 
         app.MapOverlayBrowserSourceEndpoints();
-        app.MapMethods(
+        _ = app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],
-            () => Results.Redirect("/blokebot-mark.svg")
+            static () => Results.Redirect("/blokebot-mark.svg")
         );
-        app.UseStaticFiles();
-        app.MapStaticAssets();
-        app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
+        _ = app.UseStaticFiles();
+        _ = app.MapStaticAssets();
+        _ = app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
         app.MapAuthEndpoints();
         if (runtime == BlokeBotRuntimeMode.Online)
         {
@@ -194,7 +194,7 @@ public static class BlokeBotApplication
 
     private static void AddAuthentication(WebApplicationBuilder builder)
     {
-        builder
+        _ = builder
             .Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
@@ -220,7 +220,7 @@ public static class BlokeBotApplication
                             .ValidateAsync(context),
                 };
             });
-        builder.Services.AddAuthorization(options =>
+        _ = builder.Services.AddAuthorization(options =>
         {
             AddPolicy(options, "Operator", AuthSessionCapability.Operator);
             AddPolicy(options, "HostSelected", AuthSessionCapability.HostSelected);

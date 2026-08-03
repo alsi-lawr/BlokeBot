@@ -319,7 +319,7 @@ internal sealed class SimulationNativeTwitchDashboardOperations
                 );
             }
 
-            host.PendingClips.Remove(pending);
+            _ = host.PendingClips.Remove(pending);
             var available = pending with
             {
                 Status = "Succeeded",
@@ -460,7 +460,7 @@ internal sealed class SimulationNativeTwitchDashboardOperations
                     new ChannelPointsOperationOutcome.ExternalReadOnly()
                 );
             }
-            host.Rewards.Remove(reward);
+            _ = host.Rewards.Remove(reward);
             return Task.FromResult<ChannelPointsOperationOutcome>(
                 new ChannelPointsOperationOutcome.RewardDeleted()
             );
@@ -487,7 +487,7 @@ internal sealed class SimulationNativeTwitchDashboardOperations
                     new ChannelPointsOperationOutcome.RedemptionNotActionable()
                 );
             }
-            host.ActiveRedemptions.Remove(redemption);
+            _ = host.ActiveRedemptions.Remove(redemption);
             host.RedemptionHistory.Insert(
                 0,
                 redemption with

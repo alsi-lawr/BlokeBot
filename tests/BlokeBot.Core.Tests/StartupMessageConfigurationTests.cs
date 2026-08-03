@@ -13,9 +13,9 @@ public sealed class StartupMessageConfigurationTests
     public async Task LegacyAndPerHostOverrides_LoadingEffectiveMessages_UseFallbackInIsolation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "legacy", null, null);
-        await SeedHostAsync(dbFactory, "custom", true, "Custom hello");
-        await SeedHostAsync(dbFactory, "quiet", false, "Retained text");
+        _ = await SeedHostAsync(dbFactory, "legacy", null, null);
+        _ = await SeedHostAsync(dbFactory, "custom", true, "Custom hello");
+        _ = await SeedHostAsync(dbFactory, "quiet", false, "Retained text");
         var service = Service(dbFactory);
 
         var legacy = await service.GetAsync("legacy", CancellationToken.None);
@@ -24,7 +24,7 @@ public sealed class StartupMessageConfigurationTests
 
         legacy.ShouldBe(new StartupChatMessage.Enabled("Beep boop."));
         custom.ShouldBe(new StartupChatMessage.Enabled("Custom hello"));
-        quiet.ShouldBeOfType<StartupChatMessage.Disabled>();
+        _ = quiet.ShouldBeOfType<StartupChatMessage.Disabled>();
     }
 
     [Test]
@@ -68,7 +68,7 @@ public sealed class StartupMessageConfigurationTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<StartupMessageSaveOutcome.Unauthorized>();
+        _ = outcome.ShouldBeOfType<StartupMessageSaveOutcome.Unauthorized>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var stored = await db.Hosts.SingleAsync(x => x.Id == hostId);
         stored.StartupMessageEnabled.ShouldBeNull();
@@ -96,7 +96,7 @@ public sealed class StartupMessageConfigurationTests
             CancellationToken.None
         );
 
-        blank.ShouldBeOfType<StartupMessageSaveOutcome.TextRequired>();
+        _ = blank.ShouldBeOfType<StartupMessageSaveOutcome.TextRequired>();
         tooLong.ShouldBeOfType<StartupMessageSaveOutcome.TextTooLong>().MaximumLength.ShouldBe(10);
         await using var db = await dbFactory.CreateDbContextAsync();
         var stored = await db.Hosts.SingleAsync(x => x.Id == hostId);
@@ -128,7 +128,7 @@ public sealed class StartupMessageConfigurationTests
             CancellationToken.None
         );
 
-        (
+        _ = (
             await service.GetAsync("streamer", CancellationToken.None)
         ).ShouldBeOfType<StartupChatMessage.Disabled>();
     }
@@ -154,7 +154,7 @@ public sealed class StartupMessageConfigurationTests
         var stored = await db.Hosts.SingleAsync(x => x.Id == hostId);
         stored.StartupMessageEnabled.ShouldBe(false);
         stored.StartupMessageText.ShouldBe("12345678901");
-        (
+        _ = (
             await service.GetAsync("streamer", CancellationToken.None)
         ).ShouldBeOfType<StartupChatMessage.Disabled>();
     }
@@ -168,12 +168,12 @@ public sealed class StartupMessageConfigurationTests
     )
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "incomplete", true, storedText);
+        _ = await SeedHostAsync(dbFactory, "incomplete", true, storedText);
         var service = Service(dbFactory);
 
         var effective = await service.GetAsync("incomplete", CancellationToken.None);
 
-        effective.ShouldBeOfType<StartupChatMessage.Disabled>();
+        _ = effective.ShouldBeOfType<StartupChatMessage.Disabled>();
     }
 
     private static StartupMessageConfigurationService Service(
@@ -221,8 +221,8 @@ public sealed class StartupMessageConfigurationTests
             StartupMessageText = text,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

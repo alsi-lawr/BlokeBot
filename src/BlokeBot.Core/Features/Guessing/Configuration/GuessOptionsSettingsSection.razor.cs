@@ -83,7 +83,7 @@ public partial class GuessOptionsSettingsSection
         }
         finally
         {
-            _pendingRemovals.Remove(option);
+            _ = _pendingRemovals.Remove(option);
         }
     }
 }

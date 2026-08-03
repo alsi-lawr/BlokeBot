@@ -32,10 +32,10 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             };
             host.Id = 41;
             profile.HostId = host.Id;
-            seed.Hosts.Add(host);
-            seed.Profiles.Add(profile);
-            await seed.SaveChangesAsync();
-            seed.Rounds.Add(
+            _ = seed.Hosts.Add(host);
+            _ = seed.Profiles.Add(profile);
+            _ = await seed.SaveChangesAsync();
+            _ = seed.Rounds.Add(
                 new GuessRound
                 {
                     Id = 73,
@@ -45,7 +45,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
                     StartedAtUtc = DateTime.UtcNow,
                 }
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
 
         var now = Utc(12, 0, 0);
@@ -81,11 +81,11 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             await outbox.EnqueueAsync(batch, CancellationToken.None)
         ).ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>();
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 new PublicChatDeliveryOutcome.Sent("exact-twitch-message-id"),
@@ -212,7 +212,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             TimeSpan.Zero,
             CancellationToken.None
         );
-        next.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        _ = next.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
     }
 
     [Test]
@@ -229,13 +229,13 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             )
         );
         var transport = new ScriptedPublicChatTransport(
-            (_, _) =>
+            static (_, _) =>
                 ValueTask.FromResult<PublicChatPreparationOutcome>(
                     new PublicChatPreparationOutcome.TokenUnavailable(
                         AccessTokenUnavailableReason.MissingRefreshToken
                     )
                 ),
-            (_, _) =>
+            static (_, _) =>
                 ValueTask.FromException<PublicChatTransportSendResult>(
                     new InvalidOperationException("A token-unavailable message must not be sent.")
                 )
@@ -277,7 +277,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         persisted.SafePreSendFailureCount.ShouldBe(0);
         persisted.NextAttemptAtUtc.ShouldBeNull();
         persisted.ClaimToken.ShouldBeNull();
-        persisted.CompletedAtUtc.ShouldNotBeNull();
+        _ = persisted.CompletedAtUtc.ShouldNotBeNull();
         persisted.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
         persisted.FailureType.ShouldBe(nameof(AccessTokenUnavailableReason.MissingRefreshToken));
         persisted.HttpStatusCode.ShouldBeNull();
@@ -339,7 +339,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         await using var db = await dbFactory.CreateDbContextAsync();
         var rows = await db
             .PublicChatOutboxMessages.AsNoTracking()
-            .OrderBy(x => x.Id)
+            .OrderBy(static x => x.Id)
             .ToArrayAsync();
         rows[0].CreatedAtUtc.ShouldBe(now.UtcDateTime);
         rows[0].ExpiresAtUtc.ShouldBe(producerExpiry.UtcDateTime);
@@ -364,7 +364,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
 
-        (
+        _ = (
             await outbox.BeginSendAsync(
                 claimed,
                 expiry,
@@ -428,7 +428,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
 
-        (
+        _ = (
             await outbox.BeginSendAsync(
                 claimed,
                 expiry.AddTicks(-1),
@@ -443,7 +443,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             TimeSpan.Zero,
             CancellationToken.None
         );
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 new PublicChatDeliveryOutcome.Sent(),
@@ -481,7 +481,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
 
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 SafePreSendTransientOutcome(),
@@ -536,7 +536,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
 
-        (
+        _ = (
             await outbox.ReleaseClaimAsync(claimed, expiry, CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Expired>();
 
@@ -551,7 +551,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         var now = Utc(12, 0, 0);
         await using (var seed = await dbFactory.CreateDbContextAsync())
         {
-            seed.PublicChatSendReceipts.Add(
+            _ = seed.PublicChatSendReceipts.Add(
                 new PublicChatSendReceipt
                 {
                     OutboxMessageId = 999,
@@ -559,7 +559,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
                     CompletedAtUtc = now.UtcDateTime,
                 }
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
         var clock = new ManualTestTimeProvider(now);
         var persisted = new EfPublicChatOutbox(

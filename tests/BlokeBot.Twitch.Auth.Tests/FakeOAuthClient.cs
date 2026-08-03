@@ -30,30 +30,22 @@ internal sealed class FakeOAuthClient : IOAuthClient
     public Task<TokenSet> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
         RefreshCalls++;
-        if (RefreshException is not null)
-        {
-            return Task.FromException<TokenSet>(RefreshException);
-        }
-
-        return Task.FromResult(RefreshResult);
+        return RefreshException is not null
+            ? Task.FromException<TokenSet>(RefreshException)
+            : Task.FromResult(RefreshResult);
     }
 
     public Task<TokenValidationOutcome> ValidateAsync(
         string accessToken,
         CancellationToken cancellationToken
-    )
-    {
-        if (ValidateException is not null)
-        {
-            return Task.FromException<TokenValidationOutcome>(ValidateException);
-        }
-
-        return Task.FromResult<TokenValidationOutcome>(
-            ValidateResult
-                ? new TokenValidationOutcome.Validated(
-                    new TokenValidation("bot-id", "bot", OAuthScopeSet.Create(["chat:read"]))
-                )
-                : new TokenValidationOutcome.NotValidated()
-        );
-    }
+    ) =>
+        ValidateException is not null
+            ? Task.FromException<TokenValidationOutcome>(ValidateException)
+            : Task.FromResult<TokenValidationOutcome>(
+                ValidateResult
+                    ? new TokenValidationOutcome.Validated(
+                        new TokenValidation("bot-id", "bot", OAuthScopeSet.Create(["chat:read"]))
+                    )
+                    : new TokenValidationOutcome.NotValidated()
+            );
 }

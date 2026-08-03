@@ -20,10 +20,12 @@ internal sealed record BlokeBotPlatformEnvironment(
         BlokeBotPlatformEnvironment Environment
     ) Current()
     {
-        var operatingSystem =
-            OperatingSystem.IsWindows() ? BlokeBotOperatingSystem.Windows
-            : OperatingSystem.IsMacOS() ? BlokeBotOperatingSystem.MacOS
-            : BlokeBotOperatingSystem.Linux;
+        var operatingSystem = OperatingSystem.IsWindows() switch
+        {
+            true => BlokeBotOperatingSystem.Windows,
+            false when OperatingSystem.IsMacOS() => BlokeBotOperatingSystem.MacOS,
+            _ => BlokeBotOperatingSystem.Linux,
+        };
         var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (string.IsNullOrWhiteSpace(homeDirectory))
         {
@@ -146,23 +148,18 @@ internal static class BlokeBotStatePathResolver
 
     private static BlokeBotDefaultStateDirectory LinuxStateDirectory(
         BlokeBotPlatformEnvironment environment
-    )
-    {
-        if (!string.IsNullOrWhiteSpace(environment.XdgStateHome))
-        {
-            return new BlokeBotDefaultStateDirectory.Resolved(
+    ) =>
+        !string.IsNullOrWhiteSpace(environment.XdgStateHome)
+            ? new BlokeBotDefaultStateDirectory.Resolved(
                 Combine(BlokeBotOperatingSystem.Linux, environment.XdgStateHome, "blokebot")
+            )
+            : HomeStateDirectory(
+                BlokeBotOperatingSystem.Linux,
+                environment.HomeDirectory,
+                ".local",
+                "state",
+                "blokebot"
             );
-        }
-
-        return HomeStateDirectory(
-            BlokeBotOperatingSystem.Linux,
-            environment.HomeDirectory,
-            ".local",
-            "state",
-            "blokebot"
-        );
-    }
 
     private static BlokeBotDefaultStateDirectory HomeStateDirectory(
         BlokeBotOperatingSystem operatingSystem,
@@ -270,7 +267,7 @@ internal static class BlokeBotStatePathPreparer
 
     private static void EnsureDirectoryWritable(string directory)
     {
-        Directory.CreateDirectory(directory);
+        _ = Directory.CreateDirectory(directory);
         var probePath = Path.Combine(directory, $".blokebot-write-test-{Guid.NewGuid():N}");
         try
         {

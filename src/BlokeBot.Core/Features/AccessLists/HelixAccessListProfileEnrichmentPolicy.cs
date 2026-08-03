@@ -27,7 +27,7 @@ internal sealed class HelixAccessListProfileEnrichmentPolicy(
         [
             .. logins.Select(login =>
             {
-                profileImages.TryGetValue(Login.Normalize(login), out var profileImageUrl);
+                _ = profileImages.TryGetValue(Login.Normalize(login), out var profileImageUrl);
                 return new AccessListEntryProfile(
                     login,
                     string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl

@@ -13,140 +13,140 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePoints(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<PointsSettings>(b =>
+        _ = modelBuilder.Entity<PointsSettings>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "points_settings",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_points_settings_GiveawayEligibility",
                         KindIn("GiveawayEligibility", _pointsEligibilityKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.PointLabel).HasMaxLength(64);
-            b.Property(x => x.GiveawayMinimumPayout).HasMaxLength(128);
-            b.Property(x => x.GiveawayMaximumPayout).HasMaxLength(128);
-            b.Property(x => x.GiveawayEligibility)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.PointLabel).HasMaxLength(64);
+            _ = b.Property(static x => x.GiveawayMinimumPayout).HasMaxLength(128);
+            _ = b.Property(static x => x.GiveawayMaximumPayout).HasMaxLength(128);
+            _ = b.Property(static x => x.GiveawayEligibility)
                 .HasConversion(
-                    mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
-                    value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
+                    static mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
+                    static value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.FollowerEligibilityUnavailableReply)
+            _ = b.Property(static x => x.FollowerEligibilityUnavailableReply)
                 .HasColumnName("FollowerChecksUnavailableReply");
-            b.HasIndex(x => x.HostId).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.HasIndex(static x => x.HostId).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<PointBalance>(b =>
+        _ = modelBuilder.Entity<PointBalance>(static b =>
         {
-            b.ToTable("point_balances");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Amount).HasMaxLength(128);
-            b.HasIndex(x => new { x.HostId, x.Login }).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.ToTable("point_balances");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.Amount).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.Login }).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<PointLedgerEntry>(b =>
+        _ = modelBuilder.Entity<PointLedgerEntry>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "point_ledger_entries",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_point_ledger_entries_Kind",
                         KindIn("Kind", PointLedgerKindPersistence.Tokens)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    kind => PointLedgerKindPersistence.ToToken(kind),
-                    token => PointLedgerKindPersistence.FromToken(token)
+                    static kind => PointLedgerKindPersistence.ToToken(kind),
+                    static token => PointLedgerKindPersistence.FromToken(token)
                 )
                 .HasMaxLength(64);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Delta).HasMaxLength(128);
-            b.Property(x => x.BalanceAfter).HasMaxLength(128);
-            b.Property(x => x.ActorLogin).HasMaxLength(128);
-            b.Property(x => x.CounterpartyLogin).HasMaxLength(128);
-            b.Property(x => x.OperationKey).HasMaxLength(200);
-            b.HasIndex(x => new { x.HostId, x.CreatedAtUtc });
-            b.HasIndex(x => new { x.HostId, x.OperationKey }).IsUnique();
-            b.HasIndex(x => x.RequestSubmissionId);
-            b.HasOne<BotHost>()
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.Delta).HasMaxLength(128);
+            _ = b.Property(static x => x.BalanceAfter).HasMaxLength(128);
+            _ = b.Property(static x => x.ActorLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.CounterpartyLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.OperationKey).HasMaxLength(200);
+            _ = b.HasIndex(static x => new { x.HostId, x.CreatedAtUtc });
+            _ = b.HasIndex(static x => new { x.HostId, x.OperationKey }).IsUnique();
+            _ = b.HasIndex(static x => x.RequestSubmissionId);
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<PointsGiveaway>(b =>
+        _ = modelBuilder.Entity<PointsGiveaway>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "points_giveaways",
-                t =>
+                static t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_points_giveaways_Status",
                         KindIn("Status", _pointsGiveawayStatusKinds)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_points_giveaways_Eligibility",
                         KindIn("Eligibility", _pointsEligibilityKinds)
                     );
                 }
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<PointsGiveawayStatus>.Format(status),
-                    value => PersistedEnumTokens<PointsGiveawayStatus>.Parse(value)
+                    static status => PersistedEnumTokens<PointsGiveawayStatus>.Format(status),
+                    static value => PersistedEnumTokens<PointsGiveawayStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.Property(x => x.MinimumPayout).HasMaxLength(128);
-            b.Property(x => x.MaximumPayout).HasMaxLength(128);
-            b.Property(x => x.Eligibility)
+            _ = b.Property(static x => x.MinimumPayout).HasMaxLength(128);
+            _ = b.Property(static x => x.MaximumPayout).HasMaxLength(128);
+            _ = b.Property(static x => x.Eligibility)
                 .HasConversion(
-                    mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
-                    value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
+                    static mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
+                    static value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
-            b.HasOne<BotHost>()
+            _ = b.HasIndex(static x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Entrants)
-                .WithOne(x => x.Giveaway)
-                .HasForeignKey(x => x.GiveawayId)
+            _ = b.HasMany(static x => x.Entrants)
+                .WithOne(static x => x.Giveaway)
+                .HasForeignKey(static x => x.GiveawayId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Winners)
-                .WithOne(x => x.Giveaway)
-                .HasForeignKey(x => x.GiveawayId)
+            _ = b.HasMany(static x => x.Winners)
+                .WithOne(static x => x.Giveaway)
+                .HasForeignKey(static x => x.GiveawayId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<PointsGiveawayEntrant>(b =>
+        _ = modelBuilder.Entity<PointsGiveawayEntrant>(static b =>
         {
-            b.ToTable("points_giveaway_entrants");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.HasIndex(x => new { x.GiveawayId, x.Login }).IsUnique();
+            _ = b.ToTable("points_giveaway_entrants");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.GiveawayId, x.Login }).IsUnique();
         });
 
-        modelBuilder.Entity<PointsGiveawayWinner>(b =>
+        _ = modelBuilder.Entity<PointsGiveawayWinner>(static b =>
         {
-            b.ToTable("points_giveaway_winners");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Payout).HasMaxLength(128);
+            _ = b.ToTable("points_giveaway_winners");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.Payout).HasMaxLength(128);
         });
     }
 }

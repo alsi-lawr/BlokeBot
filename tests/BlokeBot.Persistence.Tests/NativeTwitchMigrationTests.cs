@@ -21,7 +21,7 @@ public sealed class NativeTwitchMigrationTests
         await using (var published = await upgradedFactory.CreateDbContextAsync())
         {
             await published.GetService<IMigrator>().MigrateAsync(_nativeTwitchFeatureSwitch);
-            await published.Database.ExecuteSqlRawAsync(
+            _ = await published.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
@@ -30,7 +30,7 @@ public sealed class NativeTwitchMigrationTests
                     (2, 'other-bits-id', 'other-bits', 'other-bits', 0, 23, '2026-07-30T00:00:00Z');
                 """
             );
-            published.TwitchCustomRewards.Add(
+            _ = published.TwitchCustomRewards.Add(
                 new TwitchCustomReward
                 {
                     HostId = 1,
@@ -40,7 +40,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            published.TwitchRewardRedemptions.Add(
+            _ = published.TwitchRewardRedemptions.Add(
                 new TwitchRewardRedemption
                 {
                     HostId = 1,
@@ -54,7 +54,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            published.TwitchPredictionTemplates.Add(
+            _ = published.TwitchPredictionTemplates.Add(
                 new TwitchPredictionTemplate
                 {
                     HostId = 1,
@@ -68,7 +68,7 @@ public sealed class NativeTwitchMigrationTests
                     ],
                 }
             );
-            published.TwitchPredictions.Add(
+            _ = published.TwitchPredictions.Add(
                 new TwitchPrediction
                 {
                     HostId = 1,
@@ -80,7 +80,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await published.SaveChangesAsync();
+            _ = await published.SaveChangesAsync();
             await published.Database.MigrateAsync();
         }
 
@@ -89,32 +89,34 @@ public sealed class NativeTwitchMigrationTests
         {
             (
                 await upgraded
-                    .Hosts.OrderBy(host => host.Id)
-                    .Select(host => (long)host.EnabledFeatures)
+                    .Hosts.OrderBy(static host => host.Id)
+                    .Select(static host => (long)host.EnabledFeatures)
                     .ToArrayAsync()
             ).ShouldBe([247L, 247L]);
             (
                 await upgraded
-                    .TwitchCustomRewards.Select(value => value.ProviderRewardId)
+                    .TwitchCustomRewards.Select(static value => value.ProviderRewardId)
                     .ToArrayAsync()
             ).ShouldBe(["reward"]);
             (
                 await upgraded
-                    .TwitchRewardRedemptions.Select(value => value.ProviderRedemptionId)
+                    .TwitchRewardRedemptions.Select(static value => value.ProviderRedemptionId)
                     .ToArrayAsync()
             ).ShouldBe(["redemption"]);
             (
-                await upgraded.TwitchPredictionTemplates.Select(value => value.Title).ToArrayAsync()
+                await upgraded
+                    .TwitchPredictionTemplates.Select(static value => value.Title)
+                    .ToArrayAsync()
             ).ShouldBe(["Template"]);
             (
                 await upgraded
-                    .TwitchPredictionTemplateOutcomes.OrderBy(value => value.Position)
-                    .Select(value => value.Title)
+                    .TwitchPredictionTemplateOutcomes.OrderBy(static value => value.Position)
+                    .Select(static value => value.Title)
                     .ToArrayAsync()
             ).ShouldBe(["Yes", "No"]);
             (
                 await upgraded
-                    .TwitchPredictions.Select(value => value.ProviderPredictionId)
+                    .TwitchPredictions.Select(static value => value.ProviderPredictionId)
                     .ToArrayAsync()
             ).ShouldBe(["prediction"]);
 

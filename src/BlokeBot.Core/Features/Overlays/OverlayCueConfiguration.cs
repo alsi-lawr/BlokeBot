@@ -83,7 +83,7 @@ public sealed record OverlayCueConfiguration
     public ImmutableArray<Guid> ReferencedAssetIds =>
         Layers
             .OfType<OverlayCueLayer.UploadedMedia>()
-            .Select(layer => layer.AssetId)
+            .Select(static layer => layer.AssetId)
             .Distinct()
             .Order()
             .ToImmutableArray();
@@ -136,12 +136,9 @@ public sealed record OverlayCueConfiguration
                 parsed.Add(((LayerParseResult.Valid)result).Layer);
             }
 
-            if (parsed.Count == 0)
-            {
-                return Invalid("Cue-V1 requires at least one layer.");
-            }
-
-            return new OverlayCueConfigurationResult.Valid(new(parsed.ToImmutable()));
+            return parsed.Count == 0
+                ? Invalid("Cue-V1 requires at least one layer.")
+                : new OverlayCueConfigurationResult.Valid(new(parsed.ToImmutable()));
         }
         catch (JsonException)
         {
@@ -199,135 +196,117 @@ public sealed record OverlayCueConfiguration
         };
     }
 
-    private static LayerParseResult ParseUploaded(JsonElement element)
-    {
-        if (
-            !HasOnly(
-                element,
-                "type",
-                "assetId",
-                "mediaKind",
-                "startOffsetMilliseconds",
-                "durationMilliseconds",
-                "zIndex",
-                "volume",
-                "fit",
-                "rectangle"
-            )
-            || !element.TryGetProperty("assetId", out var assetValue)
-            || assetValue.ValueKind != JsonValueKind.String
-            || !Guid.TryParse(assetValue.GetString(), out var assetId)
-            || assetId == Guid.Empty
-            || !TryCommonMedia(
-                element,
-                out var mediaKind,
-                out var start,
-                out var duration,
-                out var zIndex,
-                out var volume,
-                out var fit,
-                out var rectangle
-            )
+    private static LayerParseResult ParseUploaded(JsonElement element) =>
+        !HasOnly(
+            element,
+            "type",
+            "assetId",
+            "mediaKind",
+            "startOffsetMilliseconds",
+            "durationMilliseconds",
+            "zIndex",
+            "volume",
+            "fit",
+            "rectangle"
         )
-        {
-            return LayerInvalid(
+        || !element.TryGetProperty("assetId", out var assetValue)
+        || assetValue.ValueKind != JsonValueKind.String
+        || !Guid.TryParse(assetValue.GetString(), out var assetId)
+        || assetId == Guid.Empty
+        || !TryCommonMedia(
+            element,
+            out var mediaKind,
+            out var start,
+            out var duration,
+            out var zIndex,
+            out var volume,
+            out var fit,
+            out var rectangle
+        )
+            ? LayerInvalid(
                 "An uploadedMedia layer requires a valid assetId, mediaKind, timing, volume, fit, zIndex, and rectangle."
+            )
+            : new LayerParseResult.Valid(
+                new OverlayCueLayer.UploadedMedia
+                {
+                    AssetId = assetId,
+                    MediaKind = mediaKind,
+                    StartOffsetMilliseconds = start,
+                    DurationMilliseconds = duration,
+                    ZIndex = zIndex,
+                    Volume = volume,
+                    Fit = fit,
+                    Rectangle = rectangle,
+                }
             );
-        }
-        return new LayerParseResult.Valid(
-            new OverlayCueLayer.UploadedMedia
-            {
-                AssetId = assetId,
-                MediaKind = mediaKind,
-                StartOffsetMilliseconds = start,
-                DurationMilliseconds = duration,
-                ZIndex = zIndex,
-                Volume = volume,
-                Fit = fit,
-                Rectangle = rectangle,
-            }
-        );
-    }
 
-    private static LayerParseResult ParseRemote(JsonElement element)
-    {
-        if (
-            !HasOnly(
-                element,
-                "type",
-                "url",
-                "mediaKind",
-                "startOffsetMilliseconds",
-                "durationMilliseconds",
-                "zIndex",
-                "volume",
-                "fit",
-                "rectangle"
-            )
-            || !TryHttpsUrl(element, out var url)
-            || !TryCommonMedia(
-                element,
-                out var mediaKind,
-                out var start,
-                out var duration,
-                out var zIndex,
-                out var volume,
-                out var fit,
-                out var rectangle
-            )
+    private static LayerParseResult ParseRemote(JsonElement element) =>
+        !HasOnly(
+            element,
+            "type",
+            "url",
+            "mediaKind",
+            "startOffsetMilliseconds",
+            "durationMilliseconds",
+            "zIndex",
+            "volume",
+            "fit",
+            "rectangle"
         )
-        {
-            return LayerInvalid(
+        || !TryHttpsUrl(element, out var url)
+        || !TryCommonMedia(
+            element,
+            out var mediaKind,
+            out var start,
+            out var duration,
+            out var zIndex,
+            out var volume,
+            out var fit,
+            out var rectangle
+        )
+            ? LayerInvalid(
                 "A remoteMedia layer requires an absolute HTTPS URL without credentials plus valid media, timing, volume, fit, zIndex, and rectangle fields."
-            );
-        }
-        return new LayerParseResult.Valid(
-            new OverlayCueLayer.RemoteMedia
-            {
-                Url = url,
-                MediaKind = mediaKind,
-                StartOffsetMilliseconds = start,
-                DurationMilliseconds = duration,
-                ZIndex = zIndex,
-                Volume = volume,
-                Fit = fit,
-                Rectangle = rectangle,
-            }
-        );
-    }
-
-    private static LayerParseResult ParseWeb(JsonElement element)
-    {
-        if (
-            !HasOnly(
-                element,
-                "type",
-                "url",
-                "startOffsetMilliseconds",
-                "durationMilliseconds",
-                "zIndex",
-                "rectangle"
             )
-            || !TryHttpsUrl(element, out var url)
-            || !TryTiming(element, out var start, out var duration, out var zIndex)
-            || !TryRectangle(element, out var rectangle)
-        )
-        {
-            return LayerInvalid(
-                "An externalWeb layer requires an absolute HTTPS URL without credentials plus valid timing, zIndex, and rectangle fields."
+            : new LayerParseResult.Valid(
+                new OverlayCueLayer.RemoteMedia
+                {
+                    Url = url,
+                    MediaKind = mediaKind,
+                    StartOffsetMilliseconds = start,
+                    DurationMilliseconds = duration,
+                    ZIndex = zIndex,
+                    Volume = volume,
+                    Fit = fit,
+                    Rectangle = rectangle,
+                }
             );
-        }
-        return new LayerParseResult.Valid(
-            new OverlayCueLayer.ExternalWeb
-            {
-                Url = url,
-                StartOffsetMilliseconds = start,
-                DurationMilliseconds = duration,
-                ZIndex = zIndex,
-                Rectangle = rectangle,
-            }
-        );
-    }
+
+    private static LayerParseResult ParseWeb(JsonElement element) =>
+        !HasOnly(
+            element,
+            "type",
+            "url",
+            "startOffsetMilliseconds",
+            "durationMilliseconds",
+            "zIndex",
+            "rectangle"
+        )
+        || !TryHttpsUrl(element, out var url)
+        || !TryTiming(element, out var start, out var duration, out var zIndex)
+        || !TryRectangle(element, out var rectangle)
+            ? LayerInvalid(
+                "An externalWeb layer requires an absolute HTTPS URL without credentials plus valid timing, zIndex, and rectangle fields."
+            )
+            : new LayerParseResult.Valid(
+                new OverlayCueLayer.ExternalWeb
+                {
+                    Url = url,
+                    StartOffsetMilliseconds = start,
+                    DurationMilliseconds = duration,
+                    ZIndex = zIndex,
+                    Rectangle = rectangle,
+                }
+            );
 
     private static bool TryCommonMedia(
         JsonElement element,

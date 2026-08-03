@@ -87,7 +87,7 @@ public sealed class PointsConfigurationService(
         if (settings is null)
         {
             settings = new PointsSettings { HostId = hostId };
-            db.PointsSettings.Add(settings);
+            _ = db.PointsSettings.Add(settings);
         }
 
         Apply(settings, command);
@@ -99,8 +99,8 @@ public sealed class PointsConfigurationService(
             command.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
             ct
         );
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
         return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Success(new());
     }
 

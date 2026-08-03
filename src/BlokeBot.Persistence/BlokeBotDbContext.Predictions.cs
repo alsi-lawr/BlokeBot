@@ -10,54 +10,56 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigurePredictions(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<TwitchPredictionTemplate>(b =>
+        _ = modelBuilder.Entity<TwitchPredictionTemplate>(static b =>
         {
-            b.ToTable("twitch_prediction_templates");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Title).HasMaxLength(45);
-            b.HasIndex(x => x.HostId);
-            b.HasOne<BotHost>()
+            _ = b.ToTable("twitch_prediction_templates");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Title).HasMaxLength(45);
+            _ = b.HasIndex(static x => x.HostId);
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(x => x.Outcomes)
-                .WithOne(x => x.Template)
-                .HasForeignKey(x => x.TwitchPredictionTemplateId)
+            _ = b.HasMany(static x => x.Outcomes)
+                .WithOne(static x => x.Template)
+                .HasForeignKey(static x => x.TwitchPredictionTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-        modelBuilder.Entity<TwitchPredictionTemplateOutcome>(b =>
+        _ = modelBuilder.Entity<TwitchPredictionTemplateOutcome>(static b =>
         {
-            b.ToTable("twitch_prediction_template_outcomes");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Title).HasMaxLength(25);
-            b.HasIndex(x => new { x.TwitchPredictionTemplateId, x.Position }).IsUnique();
+            _ = b.ToTable("twitch_prediction_template_outcomes");
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Title).HasMaxLength(25);
+            _ = b.HasIndex(static x => new { x.TwitchPredictionTemplateId, x.Position }).IsUnique();
         });
-        modelBuilder.Entity<TwitchPrediction>(b =>
+        _ = modelBuilder.Entity<TwitchPrediction>(static b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "twitch_predictions",
-                table =>
+                static table =>
                     table.HasCheckConstraint(
                         "CK_twitch_predictions_Status",
                         KindIn("Status", _twitchPredictionStatusKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.ProviderPredictionId).HasMaxLength(128);
-            b.Property(x => x.Title).HasMaxLength(45);
-            b.Property(x => x.OutcomesJson).HasMaxLength(16384);
-            b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ProviderPredictionId).HasMaxLength(128);
+            _ = b.Property(static x => x.Title).HasMaxLength(45);
+            _ = b.Property(static x => x.OutcomesJson).HasMaxLength(16384);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<TwitchPredictionStatus>.Format(status),
-                    token => PersistedEnumTokens<TwitchPredictionStatus>.Parse(token)
+                    static status => PersistedEnumTokens<TwitchPredictionStatus>.Format(status),
+                    static token => PersistedEnumTokens<TwitchPredictionStatus>.Parse(token)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => new { x.HostId, x.ProviderPredictionId }).IsUnique();
-            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" IN ('Active', 'Locked')");
-            b.HasIndex(x => new { x.HostId, x.EndedAtUtc });
-            b.HasOne<BotHost>()
+            _ = b.HasIndex(static x => new { x.HostId, x.ProviderPredictionId }).IsUnique();
+            _ = b.HasIndex(static x => x.HostId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Active', 'Locked')");
+            _ = b.HasIndex(static x => new { x.HostId, x.EndedAtUtc });
+            _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

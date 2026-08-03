@@ -58,7 +58,7 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
                 .ToArray()
         )
         {
-            _blockedUntil.Remove(key);
+            _ = _blockedUntil.Remove(key);
         }
     }
 
