@@ -296,7 +296,7 @@ public sealed class TransportClientTests
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             client.SendAsync(
                 Context(),
                 "sender-id",
@@ -342,7 +342,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Sent>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Sent>();
     }
 
     [Test]
@@ -392,7 +392,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
         factory.RequestCount.ShouldBe(0);
     }
 
@@ -414,7 +414,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
         factory.RequestCount.ShouldBe(0);
     }
 
@@ -437,7 +437,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
+        _ = result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
     }
 
     [Test]
@@ -480,7 +480,7 @@ public sealed class TransportClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
+        _ = result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
     }
 
     [Test]

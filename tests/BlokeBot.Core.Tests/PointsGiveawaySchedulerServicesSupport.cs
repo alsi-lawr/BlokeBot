@@ -129,9 +129,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     private protected sealed class FakeHttpClientFactory(bool streamIsLive = false)
         : IHttpClientFactory
     {
-        private readonly Handler _handler = new(streamIsLive);
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) => new(new Handler(streamIsLive));
 
         private sealed class Handler(bool streamIsLive) : HttpMessageHandler
         {

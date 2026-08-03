@@ -52,7 +52,7 @@ public abstract partial class PublicChatMessageQueueTestBase
         )
         {
             var timer = new ManualTimer(this, callback, state);
-            timer.Change(dueTime, period);
+            _ = timer.Change(dueTime, period);
             return timer;
         }
 
@@ -125,7 +125,7 @@ public abstract partial class PublicChatMessageQueueTestBase
         {
             lock (_gate)
             {
-                _timers.Remove(timer);
+                _ = _timers.Remove(timer);
             }
         }
 

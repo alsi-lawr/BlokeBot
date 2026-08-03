@@ -170,7 +170,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 row.HttpStatusCode.ShouldBeNull();
                 row.ClaimToken.ShouldBeNull();
                 row.ClaimSlot.ShouldBeNull();
-                row.CompletedAtUtc.ShouldNotBeNull();
+                _ = row.CompletedAtUtc.ShouldNotBeNull();
                 string.Join("|", row.FailureType, row.RejectionCode, row.Status, row.FailurePhase)
                     .ShouldNotContain("secret");
             }
@@ -187,7 +187,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 TimeSpan.Zero,
                 CancellationToken.None
             );
-            afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+            _ = afterRestart.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
 
             var restartedTransport = new RecordingPublicChatTransport();
             var restartedQueue = CreateQueue(

@@ -99,16 +99,10 @@ public partial class HostSelector
 
     private string _myChannelHref => $"/auth/select-own-host?returnUrl={_currentReturnUrl}";
 
-    private bool ShowMyChannelControl()
-    {
-        if (_selection is null)
-        {
-            return false;
-        }
-
-        return !IsOwnHost(_selection.Current)
-            && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
-    }
+    private bool ShowMyChannelControl() =>
+        _selection is not null
+        && !IsOwnHost(_selection.Current)
+        && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
 
     private bool IsOwnHost(BotHostChoice host) =>
         host.Role == AuthRole.Streamer

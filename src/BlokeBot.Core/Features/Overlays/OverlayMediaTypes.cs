@@ -4,25 +4,17 @@ internal static class OverlayMediaTypes
 {
     public const string AcceptedBrowserMedia = "image/*,audio/*,video/*";
 
-    public static OverlayCueMediaKind? Kind(string contentType)
-    {
-        if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+    public static OverlayCueMediaKind? Kind(string contentType) =>
+        contentType switch
         {
-            return OverlayCueMediaKind.Image;
-        }
-
-        if (contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
-        {
-            return OverlayCueMediaKind.Audio;
-        }
-
-        if (contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
-        {
-            return OverlayCueMediaKind.Video;
-        }
-
-        return null;
-    }
+            var value when value.StartsWith("image/", StringComparison.OrdinalIgnoreCase) =>
+                OverlayCueMediaKind.Image,
+            var value when value.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) =>
+                OverlayCueMediaKind.Audio,
+            var value when value.StartsWith("video/", StringComparison.OrdinalIgnoreCase) =>
+                OverlayCueMediaKind.Video,
+            _ => null,
+        };
 
     public static string? NormalizeDeclaration(string? contentType)
     {
@@ -35,16 +27,12 @@ internal static class OverlayMediaTypes
         }
 
         var normalized = parsed.MediaType?.ToLowerInvariant();
-        if (
+        return
             normalized is null
             || normalized.EndsWith("/*", StringComparison.Ordinal)
             || Kind(normalized) is null
-        )
-        {
-            return null;
-        }
-
-        return normalized;
+            ? null
+            : normalized;
     }
 
     public static string Label(string contentType) =>

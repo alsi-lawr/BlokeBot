@@ -34,7 +34,7 @@ public sealed class TokenStatusServiceTests
         var inspection = service.GetUserAccessTokenStatus(["chat:read"]);
 
         provider.CallCount.ShouldBe(0);
-        await inspection.ExecuteAsync(CancellationToken.None);
+        _ = await inspection.ExecuteAsync(CancellationToken.None);
         provider.CallCount.ShouldBe(1);
     }
 
@@ -373,29 +373,18 @@ public sealed class TokenStatusServiceTests
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                if (exception is not null)
+            ) =>
+                (exception, validationJson) switch
                 {
-                    return Task.FromException<HttpResponseMessage>(exception);
-                }
-
-                if (validationJson is null)
-                {
-                    return Task.FromResult(new HttpResponseMessage(rejectionStatus));
-                }
-
-                return Task.FromResult(
-                    new HttpResponseMessage(HttpStatusCode.OK)
-                    {
-                        Content = new StringContent(
-                            validationJson,
-                            Encoding.UTF8,
-                            "application/json"
-                        ),
-                    }
-                );
-            }
+                    ({ } error, _) => Task.FromException<HttpResponseMessage>(error),
+                    (_, null) => Task.FromResult(new HttpResponseMessage(rejectionStatus)),
+                    (_, var json) => Task.FromResult(
+                        new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent(json!, Encoding.UTF8, "application/json"),
+                        }
+                    ),
+                };
         }
     }
 

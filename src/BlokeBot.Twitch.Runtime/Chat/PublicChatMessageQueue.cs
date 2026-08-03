@@ -152,7 +152,7 @@ internal sealed class PublicChatMessageQueue(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
         {
-            Interlocked.Exchange(ref _running, 0);
+            _ = Interlocked.Exchange(ref _running, 0);
         }
     }
 

@@ -20,7 +20,7 @@ public sealed class UiFaultRoutingTests
 
         var failure = result.Match<HostBotChannelStatusLoadFailure?>(_ => null, error => error);
 
-        failure.ShouldNotBeNull();
+        _ = failure.ShouldNotBeNull();
         failure.ModeratorStatusMessage.ShouldBe(
             "BlokeBot could not check whether the bot is a mod."
         );
@@ -60,7 +60,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var expected = new TestExpectedFailure("not available");
 
         var component = context.Render<TestBackgroundComponent>(parameters =>
@@ -86,7 +86,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var exception = new InvalidOperationException("unexpected");
         RenderFragment content = builder =>
         {
@@ -124,7 +124,7 @@ public sealed class UiFaultRoutingTests
     {
         using var context = new BunitContext();
         var logger = new RecordingLogger<UiFaultTelemetry>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
         var cancellationObserved = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );

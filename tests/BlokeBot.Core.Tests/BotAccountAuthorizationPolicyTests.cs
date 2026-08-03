@@ -78,7 +78,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                 Validation(grantedScopes),
                 requiredScopes,
                 grantedScopes,
-                ImmutableArray.Create(Scopes.UserReadFollows)
+                [Scopes.UserReadFollows]
             )
         );
 
@@ -100,7 +100,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                 Validation(grantedScopes),
                 requiredScopes,
                 grantedScopes,
-                ImmutableArray.Create(Scopes.ModeratorManageAnnouncements)
+                [Scopes.ModeratorManageAnnouncements]
             )
         );
 

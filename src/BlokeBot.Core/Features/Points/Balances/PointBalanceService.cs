@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
@@ -139,7 +140,7 @@ public sealed class PointBalanceService(
             note,
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         var ledgerId = db
             .ChangeTracker.Entries<PointLedgerEntry>()
@@ -222,7 +223,7 @@ public sealed class PointBalanceService(
             note,
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Success(next, amount);
     }
@@ -257,7 +258,7 @@ public sealed class PointBalanceService(
 
         var current = PointAmount.ParseAbsolute(row.Amount);
         var now = DateTime.UtcNow;
-        db.PointBalances.Remove(row);
+        _ = db.PointBalances.Remove(row);
         AddLedger(
             db,
             hostId,
@@ -271,7 +272,7 @@ public sealed class PointBalanceService(
             note,
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Success(PointAmount.Zero, current);
     }
@@ -354,7 +355,7 @@ public sealed class PointBalanceService(
             string.Empty,
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Success(sourceNext, amount);
     }
@@ -431,7 +432,7 @@ public sealed class PointBalanceService(
                 string.Empty,
                 now
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             return Success(mutation.Balance, stake);
         }
@@ -570,7 +571,7 @@ public sealed class PointBalanceService(
                 CreatedAtUtc = now,
                 Kind = kind,
                 Login = login,
-                Delta = delta.ToString(),
+                Delta = delta.ToString(CultureInfo.InvariantCulture),
                 BalanceAfter = balanceAfter.ToString(),
                 ActorLogin = actorLogin is null ? null : LoginName.Parse(actorLogin).Value,
                 CounterpartyLogin = counterpartyLogin is null
@@ -606,7 +607,7 @@ public sealed class PointBalanceService(
             Amount = "0",
             UpdatedAtUtc = now,
         };
-        db.PointBalances.Add(row);
+        _ = db.PointBalances.Add(row);
         return row;
     }
 }

@@ -26,16 +26,13 @@ public abstract partial class PublicChatMessageQueueTestBase
         {
             var message = prepared.Message;
             Deliveries.Add(message);
-            if (!_delivered.Writer.TryWrite(message))
-            {
-                throw new InvalidOperationException(
+            return !_delivered.Writer.TryWrite(message)
+                ? throw new InvalidOperationException(
                     "The transport delivery could not be observed."
+                )
+                : ValueTask.FromResult<PublicChatTransportSendResult>(
+                    new PublicChatTransportSendResult.Sent()
                 );
-            }
-
-            return ValueTask.FromResult<PublicChatTransportSendResult>(
-                new PublicChatTransportSendResult.Sent()
-            );
         }
 
         public ValueTask<PublicChatClaimedMessage> ReadAsync() => _delivered.Reader.ReadAsync();
@@ -90,12 +87,9 @@ public abstract partial class PublicChatMessageQueueTestBase
         )
         {
             Alerts.Add(backlog);
-            if (!_alerts.Writer.TryWrite(backlog))
-            {
-                throw new InvalidOperationException("The queue alert could not be observed.");
-            }
-
-            return ValueTask.CompletedTask;
+            return !_alerts.Writer.TryWrite(backlog)
+                ? throw new InvalidOperationException("The queue alert could not be observed.")
+                : ValueTask.CompletedTask;
         }
 
         public ValueTask<PublicChatQueueBacklog> ReadAsync() => _alerts.Reader.ReadAsync();

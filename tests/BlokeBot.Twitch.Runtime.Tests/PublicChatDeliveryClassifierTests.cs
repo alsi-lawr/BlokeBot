@@ -38,7 +38,7 @@ public sealed class PublicChatDeliveryClassifierTests
             var transient =
                 outcome.ShouldBeOfType<PublicChatPreparationOutcome.SafePreSendTransient>();
             transient.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            transient.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
+            _ = transient.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
         }
     }
 
@@ -60,7 +60,7 @@ public sealed class PublicChatDeliveryClassifierTests
 
             unexpected.Cause.ShouldBeSameAs(failure);
             unexpected.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            unexpected.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
+            _ = unexpected.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
         }
     }
 
@@ -81,7 +81,7 @@ public sealed class PublicChatDeliveryClassifierTests
     [Test]
     public void TransportSendResults_Classifying_MapSentAndBothRejectionShapes()
     {
-        PublicChatDeliveryClassifier
+        _ = PublicChatDeliveryClassifier
             .ClassifySendResult(
                 new ChatMessageSendResult { IsSent = true, MessageId = "provider-message-id" }
             )
@@ -122,7 +122,7 @@ public sealed class PublicChatDeliveryClassifierTests
                 }
             )
             .ShouldBeOfType<PublicChatTransportSendResult.Rejected>();
-        unspecified.Reason.ShouldBeOfType<PublicChatRejectionReason.Unspecified>();
+        _ = unspecified.Reason.ShouldBeOfType<PublicChatRejectionReason.Unspecified>();
     }
 
     [Test]
@@ -151,7 +151,7 @@ public sealed class PublicChatDeliveryClassifierTests
                 .ShouldBeOfType<PublicChatDeliveryOutcome.Ambiguous>();
 
             ambiguous.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
-            ambiguous.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Send>();
+            _ = ambiguous.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Send>();
         }
     }
 

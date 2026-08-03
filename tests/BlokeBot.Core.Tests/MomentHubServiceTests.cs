@@ -28,7 +28,7 @@ public sealed class MomentHubServiceTests
             retainedEventCount = await disable.MomentEvents.CountAsync();
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.Moments;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
 
         var rejected = await service.CaptureAsync(
@@ -37,7 +37,7 @@ public sealed class MomentHubServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
                 _ => throw new InvalidOperationException("Expected rejection."),
                 value => value.Reason
@@ -53,11 +53,11 @@ public sealed class MomentHubServiceTests
             (await verifyDisabled.MomentEvents.CountAsync()).ShouldBe(retainedEventCount);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.Moments;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
         var restored = await service.GetModeratorPageAsync(hostId, CancellationToken.None);
-        restored.ShouldNotBeNull();
+        _ = restored.ShouldNotBeNull();
         restored.Settings.MergeWindowSeconds.ShouldBe(120);
         provider.Calls.ShouldBe(0);
         await using var verifyEnabled = await database.CreateDbContextAsync();
@@ -219,8 +219,8 @@ public sealed class MomentHubServiceTests
 
         firstVote.WasIdempotent.ShouldBeFalse();
         reconciledVote.WasIdempotent.ShouldBeTrue();
-        wrongHost.ShouldBeOfType<MomentResult<MomentView>.Rejected>();
-        recap.ShouldNotBeNull();
+        _ = wrongHost.ShouldBeOfType<MomentResult<MomentView>.Rejected>();
+        _ = recap.ShouldNotBeNull();
         recap.ToString().ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentVotes.CountAsync()).ShouldBe(1);
@@ -291,7 +291,7 @@ public sealed class MomentHubServiceTests
         var moderatorPage = await service.GetModeratorPageAsync(host, CancellationToken.None);
 
         merged.Value.Public.Contributors.Count.ShouldBe(2);
-        publicPage.ShouldNotBeNull();
+        _ = publicPage.ShouldNotBeNull();
         publicPage.ToString().ShouldNotContain("PRIVATE-");
         moderatorPage!
             .Candidates.Single(value => value.Public.PublicId == rejected.PublicId)
@@ -565,7 +565,7 @@ public sealed class MomentHubServiceTests
                 suggestionCandidates.Source,
                 suggestionCandidates.Target
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = CreateService(database, new FakeMomentProvider(database));
 
@@ -700,8 +700,8 @@ public sealed class MomentHubServiceTests
             TwitchUserId = $"{login}-id",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -730,7 +730,7 @@ public sealed class MomentHubServiceTests
             CancellationToken ct
         )
         {
-            Interlocked.Increment(ref _calls);
+            _ = Interlocked.Increment(ref _calls);
             FakeProviderState state;
             lock (_outcomes)
             {
@@ -786,7 +786,7 @@ public sealed class MomentHubServiceTests
                     IdempotencyKey = key,
                     RequestedAtUtc = DateTime.UtcNow,
                 };
-                db.TwitchClips.Add(row);
+                _ = db.TwitchClips.Add(row);
             }
             row.Status = status;
             row.ResolvedAtUtc = status == TwitchClipStatus.Available ? DateTime.UtcNow : null;
@@ -794,7 +794,7 @@ public sealed class MomentHubServiceTests
                 status == TwitchClipStatus.Available
                     ? $"https://clips.twitch.tv/{publicId:N}"
                     : null;
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             return status == TwitchClipStatus.Available
                 ? new MomentProviderOutcome.ClipReady(row.Id)
                 : new MomentProviderOutcome.Pending(row.Id);
@@ -817,8 +817,8 @@ public sealed class MomentHubServiceTests
                 CreatedAtUtc = DateTime.UtcNow,
                 ResolvedAtUtc = DateTime.UtcNow,
             };
-            db.TwitchStreamMarkers.Add(row);
-            await db.SaveChangesAsync(ct);
+            _ = db.TwitchStreamMarkers.Add(row);
+            _ = await db.SaveChangesAsync(ct);
             return new MomentProviderOutcome.MarkerReady(row.Id);
         }
     }

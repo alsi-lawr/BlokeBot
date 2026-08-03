@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 
@@ -8,7 +9,9 @@ public partial class MomentsPage
 {
     private MomentModeratorPage? _page;
     private readonly Dictionary<Guid, MomentDraft> _drafts = [];
-    private string _mergeWindow = MomentLimits.DefaultMergeWindowSeconds.ToString();
+    private string _mergeWindow = MomentLimits.DefaultMergeWindowSeconds.ToString(
+        CultureInfo.InvariantCulture
+    );
     private bool _markerFallback = true;
     private MomentRewardPolicy _rewardPolicy;
     private string _rewardAmount = "0";
@@ -22,7 +25,7 @@ public partial class MomentsPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -48,7 +51,7 @@ public partial class MomentsPage
         {
             return;
         }
-        _mergeWindow = _page.Settings.MergeWindowSeconds.ToString();
+        _mergeWindow = _page.Settings.MergeWindowSeconds.ToString(CultureInfo.InvariantCulture);
         _markerFallback = _page.Settings.MarkerFallbackEnabled;
         _rewardPolicy = _page.Settings.RewardPolicy;
         _rewardAmount = _page.Settings.RewardAmount;

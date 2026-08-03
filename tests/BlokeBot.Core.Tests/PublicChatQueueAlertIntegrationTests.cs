@@ -24,16 +24,11 @@ public sealed class PublicChatQueueAlertIntegrationTests
             AppEventKind.AlertsChanged,
             ObserverIdentity.Named("Test.AlertCreated"),
             (_, _) =>
-            {
-                if (!notifications.Writer.TryWrite(true))
-                {
-                    throw new InvalidOperationException(
+                !notifications.Writer.TryWrite(true)
+                    ? throw new InvalidOperationException(
                         "The alert notification could not be observed."
-                    );
-                }
-
-                return ValueTask.CompletedTask;
-            }
+                    )
+                    : ValueTask.CompletedTask
         );
         var alertService = new DurableAlertService(dbFactory, clock, events);
         var durableObserver = new DurablePublicChatQueueAlertObserver(
@@ -69,7 +64,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
         _ = await transport.ReadAsync();
         _ = await outbox.ReadDeliveryAsync();
         _ = await queue.EnqueueAsync(Command("streamer", "second"), CancellationToken.None);
-        await clock.WaitForTimerRegistrationAsync();
+        _ = await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         _ = await notifications.Reader.ReadAsync();
 
@@ -78,7 +73,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
         alert.Source.ShouldBe("twitch-outbound-queue");
         alert.LinkPath.ShouldBe("/alerts");
 
-        await clock.WaitForTimerRegistrationAsync();
+        _ = await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         (await transport.ReadAsync()).Message.ShouldBe("second");
         _ = await outbox.ReadDeliveryAsync();
@@ -93,7 +88,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
         var now = Utc(12, 0, 0);
         await using (var seed = await dbFactory.CreateDbContextAsync())
         {
-            seed.PublicChatOutboxMessages.Add(
+            _ = seed.PublicChatOutboxMessages.Add(
                 new PublicChatOutboxMessage
                 {
                     Channel = "streamer",
@@ -106,7 +101,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
                     NextAttemptAtUtc = now.AddMinutes(-10).UtcDateTime,
                 }
             );
-            await seed.SaveChangesAsync();
+            _ = await seed.SaveChangesAsync();
         }
         var clock = new ManualTestTimeProvider(now);
         var events = TestEventBus.Create<AppEventKind>();
@@ -160,8 +155,8 @@ public sealed class PublicChatQueueAlertIntegrationTests
             TwitchUserId = "streamer-id",
             CreatedAtUtc = Utc(12, 0, 0).UtcDateTime,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

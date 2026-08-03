@@ -18,7 +18,7 @@ public partial class HostConfigPage
     {
         _navigation.LocationChanged += OnLocationChanged;
         RequestFragmentReveal(_navigation.Uri);
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 InvokeAsync,
@@ -26,7 +26,7 @@ public partial class HostConfigPage
                 StateHasChanged
             )
         );
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [
                     AppEventKind.CommandsChanged,
@@ -122,7 +122,7 @@ public partial class HostConfigPage
         TrackPendingRuntimeTransition();
         if (_runtimeLifecycle is not null)
         {
-            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+            _ = _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
     }
 

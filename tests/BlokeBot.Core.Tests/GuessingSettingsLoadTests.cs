@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.HostedChannels;
@@ -23,13 +24,14 @@ public sealed class GuessingSettingsLoadTests
         page.FindAll(".settings-disclosure-stack").Count.ShouldBe(3);
         await DeleteProfilesAsync(dbFactory, seed.SpecialProfileId);
 
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         page.WaitForAssertion(() =>
         {
             page.Find("#profileSelect")
                 .GetAttribute("value")
-                .ShouldBe(seed.DefaultProfileId.ToString());
+                .ShouldBe(seed.DefaultProfileId.ToString(CultureInfo.InvariantCulture));
             page.Find("input[placeholder='Round type name']")
                 .GetAttribute("value")
                 .ShouldBe("Default");
@@ -51,7 +53,8 @@ public sealed class GuessingSettingsLoadTests
         var page = context.Render<GuessingSettings>();
         await DeleteProfilesAsync(dbFactory, seed.DefaultProfileId, seed.SpecialProfileId);
 
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         page.WaitForAssertion(() => page.Markup.ShouldContain("Loading guessing settings..."));
         toasts.Current.Select(toast => toast.Kind).ShouldBe([ToastKind.Warning, ToastKind.Error]);
@@ -64,8 +67,8 @@ public sealed class GuessingSettingsLoadTests
     private static BunitContext CreateContext(SqliteBlokeBotDbFactory dbFactory, int hostId)
     {
         var context = UiTestContextFactory.Create(dbFactory, hostId);
-        context.Services.AddSingleton<GuessingChangeNotifier>();
-        context.Services.AddSingleton<GuessingConfigurationService>();
+        _ = context.Services.AddSingleton<GuessingChangeNotifier>();
+        _ = context.Services.AddSingleton<GuessingConfigurationService>();
         return context;
     }
 
@@ -79,7 +82,7 @@ public sealed class GuessingSettingsLoadTests
             .Profiles.Where(profile => profileIds.Contains(profile.Id))
             .ToListAsync();
         db.Profiles.RemoveRange(profiles);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<ProfileSeed> SeedProfilesAsync(SqliteBlokeBotDbFactory dbFactory)
@@ -92,8 +95,8 @@ public sealed class GuessingSettingsLoadTests
             EnabledFeatures = HostFeatureFlags.Guessing,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var defaultProfile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -112,7 +115,7 @@ public sealed class GuessingSettingsLoadTests
             Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
         };
         db.Profiles.AddRange(defaultProfile, specialProfile);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new(host.Id, defaultProfile.Id, specialProfile.Id);
     }
 

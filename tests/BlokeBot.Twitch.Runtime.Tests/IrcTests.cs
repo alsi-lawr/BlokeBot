@@ -26,28 +26,28 @@ public sealed class IrcTests
     {
         var result = IrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
 
-        result.ShouldBeOfType<IrcPrivMsgParseOutcome.NotPrivMsg>();
+        _ = result.ShouldBeOfType<IrcPrivMsgParseOutcome.NotPrivMsg>();
     }
 
     [Test]
     public void MalformedPrivmsg_Parsing_ReturnsTypedFailureStatus()
     {
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg(":missing-prefix PRIVMSG #channel :hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingUserLogin>();
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg(":a!b@c PRIVMSG channel hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MalformedCommand>();
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg("@ :a!b@c PRIVMSG #channel :hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingTagTerminator>();
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg("a!b@c PRIVMSG #channel :hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingPrefix>();
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg(": PRIVMSG #channel :hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MalformedPrefix>();
-        IrcProtocol
+        _ = IrcProtocol
             .ParsePrivMsg(":a!b@c PRIVMSG #channel")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingChannelOrText>();
     }

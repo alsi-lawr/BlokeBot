@@ -20,7 +20,7 @@ public sealed class RequestBoardServiceTests
             retainedEventCount = await disable.RequestBoardEvents.CountAsync();
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.RequestBoards;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
 
         var rejected = Rejection(
@@ -32,7 +32,7 @@ public sealed class RequestBoardServiceTests
             )
         );
 
-        rejected.ShouldBeOfType<RequestBoardRejection.FeatureDisabled>();
+        _ = rejected.ShouldBeOfType<RequestBoardRejection.FeatureDisabled>();
         (await service.GetPublicPageAsync("alpha", "games", CancellationToken.None)).ShouldBeNull();
         (await service.GetEventsAsync(hostId, 0, 100, CancellationToken.None)).ShouldBeEmpty();
         await using (var verifyDisabled = await database.CreateDbContextAsync())
@@ -42,10 +42,10 @@ public sealed class RequestBoardServiceTests
             (await verifyDisabled.RequestBoardEvents.CountAsync()).ShouldBe(retainedEventCount);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.RequestBoards;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
-        (
+        _ = (
             await service.GetPublicPageAsync("alpha", "games", CancellationToken.None)
         ).ShouldNotBeNull();
         await using var verifyEnabled = await database.CreateDbContextAsync();
@@ -94,7 +94,7 @@ public sealed class RequestBoardServiceTests
         );
 
         configured.Value.Fields.Select(value => value.Key).ShouldBe(["prompt"]);
-        rejected.ShouldBeOfType<RequestBoardRejection.Conflict>();
+        _ = rejected.ShouldBeOfType<RequestBoardRejection.Conflict>();
         (await service.GetPublicPageAsync("alpha", "games", CancellationToken.None))!
             .Board.Fields.Select(value => value.Key)
             .ShouldBe(["prompt"]);
@@ -453,11 +453,11 @@ public sealed class RequestBoardServiceTests
             )
         ).Value;
 
-        Rejection(
+        _ = Rejection(
                 await service.VoteAsync(secondHost, submission.Id, "other", CancellationToken.None)
             )
             .ShouldBeOfType<RequestBoardRejection.NotFound>();
-        Rejection(
+        _ = Rejection(
                 await service.ModerateAsync(
                     secondHost,
                     Moderate(submission.Id, RequestSubmissionStatus.Approved),
@@ -538,11 +538,11 @@ public sealed class RequestBoardServiceTests
             await service.VoteAsync(hostId, second.Id, "voter", CancellationToken.None)
         );
 
-        cooldown.ShouldBeOfType<RequestBoardRejection.Cooldown>();
-        limit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
+        _ = cooldown.ShouldBeOfType<RequestBoardRejection.Cooldown>();
+        _ = limit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
         voteRetry.WasIdempotent.ShouldBeTrue();
         voteRetry.Value.VoteCount.ShouldBe(1);
-        voteLimit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
+        _ = voteLimit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
         var page = await service.GetPublicPageAsync("alpha", "games", CancellationToken.None);
         page!.Submissions.Select(value => value.Id).ShouldBe([second.Id, first.Id]);
         await using var verify = await database.CreateDbContextAsync();
@@ -699,8 +699,8 @@ public sealed class RequestBoardServiceTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -712,7 +712,7 @@ public sealed class RequestBoardServiceTests
     )
     {
         await using var db = await database.CreateDbContextAsync();
-        db.PointBalances.Add(
+        _ = db.PointBalances.Add(
             new PointBalance
             {
                 HostId = hostId,
@@ -721,7 +721,7 @@ public sealed class RequestBoardServiceTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider

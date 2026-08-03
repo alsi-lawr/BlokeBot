@@ -142,7 +142,7 @@ public partial class OverlaysPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         await LoadAsync();
         _ = RefreshPresenceAsync(_lifetime.Token);
     }
@@ -210,7 +210,7 @@ public partial class OverlaysPage
             _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
 
             var result = await _overlays.ListAsync(PageContext.Session, CancellationToken.None);
-            result.Match(
+            _ = result.Match(
                 succeeded =>
                 {
                     _instances = succeeded.Value;
@@ -599,7 +599,7 @@ public partial class OverlaysPage
                 _selected.Id,
                 CancellationToken.None
             );
-            result.Match(
+            _ = result.Match(
                 succeeded =>
                 {
                     if (!succeeded.Value.IsEnabled)
@@ -812,20 +812,16 @@ public partial class OverlaysPage
     private void ResetAppearance() => LoadAppearance(DefaultAppearance(_draftType));
 
     [JSInvokable]
-    public string? ScopeDraftCss(string css)
-    {
-        if (OverlayAppearance.ValidateCss(css) is not null)
-        {
-            return null;
-        }
-        return new OverlayAppearance(
-            _appearanceX,
-            _appearanceY,
-            _appearanceWidth,
-            _appearanceHeight,
-            css
-        ).ToScopedCss();
-    }
+    public string? ScopeDraftCss(string css) =>
+        OverlayAppearance.ValidateCss(css) is not null
+            ? null
+            : new OverlayAppearance(
+                _appearanceX,
+                _appearanceY,
+                _appearanceWidth,
+                _appearanceHeight,
+                css
+            ).ToScopedCss();
 
     [JSInvokable]
     public void UpdateAppearance(int x, int y, int width, int height)

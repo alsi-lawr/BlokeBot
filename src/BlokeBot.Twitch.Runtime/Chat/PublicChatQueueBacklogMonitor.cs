@@ -31,7 +31,7 @@ internal sealed class PublicChatQueueBacklogMonitor
                 continue;
             }
 
-            _alertedChannels.Add(group.Channel);
+            _ = _alertedChannels.Add(group.Channel);
             alerts ??= [];
             alerts.Add(
                 new PublicChatQueueBacklog(
@@ -96,7 +96,7 @@ internal sealed class PublicChatQueueBacklogMonitor
             .Select(x => NormalizeChannel(x.Channel))
             .Where(channel => !string.IsNullOrWhiteSpace(channel))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        _alertedChannels.RemoveWhere(channel => !activeChannels.Contains(channel));
+        _ = _alertedChannels.RemoveWhere(channel => !activeChannels.Contains(channel));
     }
 
     private static List<PendingChannelGroup> PendingByChannel(

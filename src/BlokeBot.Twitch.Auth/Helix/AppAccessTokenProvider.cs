@@ -6,7 +6,7 @@ public sealed class AppAccessTokenProvider(
     IHttpClientFactory factory,
     BotIdentity identity,
     TwitchEndpointPolicy endpointPolicy
-)
+) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HttpClient _http = factory.CreateClient("twitch-oauth");
@@ -38,7 +38,7 @@ public sealed class AppAccessTokenProvider(
                 new FormUrlEncodedContent(form),
                 cancellationToken
             );
-            response.EnsureSuccessStatusCode();
+            _ = response.EnsureSuccessStatusCode();
 
             var payload = await response.Content.ReadFromJsonAsync<AppAccessTokenResponse>(
                 cancellationToken
@@ -55,7 +55,13 @@ public sealed class AppAccessTokenProvider(
         }
         finally
         {
-            _gate.Release();
+            _ = _gate.Release();
         }
+    }
+
+    public void Dispose()
+    {
+        _http.Dispose();
+        _gate.Dispose();
     }
 }

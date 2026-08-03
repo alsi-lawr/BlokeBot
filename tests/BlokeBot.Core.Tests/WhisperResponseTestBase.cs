@@ -62,8 +62,8 @@ public abstract class WhisperResponseTestBase
             DisplayName = login,
             Login = login,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -92,8 +92,8 @@ public abstract class WhisperResponseTestBase
                 DateTimeOffset.UtcNow.AddHours(1)
             )
         );
-        db.HostBotAccountSettings.Add(settings);
-        await db.SaveChangesAsync();
+        _ = db.HostBotAccountSettings.Add(settings);
+        _ = await db.SaveChangesAsync();
     }
 
     private protected sealed class WhisperHarness : IAsyncDisposable
@@ -305,23 +305,25 @@ public abstract class WhisperResponseTestBase
         CancellationTokenSource? cancelOnWhisper
     ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new(
-            whisperStatus,
-            whisperBody,
-            usersJson,
-            usersException,
-            whisperException,
-            validationAccepted,
-            cancelOnWhisper
-        );
+        internal int ValidationRequestCount { get; private set; }
+        internal int WhisperRequestCount { get; private set; }
 
-        internal int ValidationRequestCount => _handler.ValidationRequestCount;
-
-        internal int WhisperRequestCount => _handler.WhisperRequestCount;
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) =>
+            new(
+                new Handler(
+                    this,
+                    whisperStatus,
+                    whisperBody,
+                    usersJson,
+                    usersException,
+                    whisperException,
+                    validationAccepted,
+                    cancelOnWhisper
+                )
+            );
 
         private sealed class Handler(
+            WhisperHttpClientFactory owner,
             HttpStatusCode whisperStatus,
             string? whisperBody,
             string usersJson,
@@ -331,10 +333,6 @@ public abstract class WhisperResponseTestBase
             CancellationTokenSource? cancelOnWhisper
         ) : HttpMessageHandler
         {
-            internal int ValidationRequestCount { get; private set; }
-
-            internal int WhisperRequestCount { get; private set; }
-
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
@@ -361,7 +359,7 @@ public abstract class WhisperResponseTestBase
 
             private HttpResponseMessage WhisperResponse()
             {
-                WhisperRequestCount++;
+                owner.WhisperRequestCount++;
                 var response = new HttpResponseMessage(whisperStatus);
                 if (whisperBody is not null)
                 {
@@ -377,7 +375,7 @@ public abstract class WhisperResponseTestBase
 
             private Task<HttpResponseMessage> FailedWhisper(Exception exception)
             {
-                WhisperRequestCount++;
+                owner.WhisperRequestCount++;
                 return Task.FromException<HttpResponseMessage>(exception);
             }
 
@@ -386,14 +384,14 @@ public abstract class WhisperResponseTestBase
                 CancellationToken cancellationToken
             )
             {
-                WhisperRequestCount++;
+                owner.WhisperRequestCount++;
                 cancellation.Cancel();
                 return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
             }
 
             private HttpResponseMessage ValidationResponse(HttpRequestMessage request)
             {
-                ValidationRequestCount++;
+                owner.ValidationRequestCount++;
                 return
                     validationAccepted
                     && request.Headers.Authorization?.Parameter == "override-whisper-token"

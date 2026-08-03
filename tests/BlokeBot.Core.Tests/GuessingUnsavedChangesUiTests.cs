@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Toasts;
@@ -20,7 +21,8 @@ public sealed class GuessingUnsavedChangesUiTests
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
 
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         page.FindAll("[data-unsaved-profile-dialog] button")
             .Select(button => button.TextContent.Trim())
@@ -41,7 +43,8 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         ChooseDialogAction(page, "Discard and switch");
 
@@ -62,7 +65,8 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         ChooseDialogAction(page, "Save and switch");
 
@@ -86,7 +90,7 @@ public sealed class GuessingUnsavedChangesUiTests
         page.Find("input[placeholder='answer']").Change("green");
         await using (var concurrentDb = await dbFactory.CreateDbContextAsync())
         {
-            await concurrentDb
+            _ = await concurrentDb
                 .Profiles.Where(profile => profile.Id == seed.DefaultProfileId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(
@@ -95,11 +99,12 @@ public sealed class GuessingUnsavedChangesUiTests
                     )
                 );
         }
-        page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
+        page.Find("#profileSelect")
+            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         ChooseDialogAction(page, "Save and switch");
 
-        page.Find("[data-unsaved-profile-dialog]");
+        _ = page.Find("[data-unsaved-profile-dialog]");
         AssertSelectedProfile(page, seed.DefaultProfileId, "green");
         var toast = toasts.Current.ShouldHaveSingleItem();
         toast.Kind.ShouldBe(ToastKind.Error);
@@ -128,15 +133,17 @@ public sealed class GuessingUnsavedChangesUiTests
         string answer
     )
     {
-        page.Find("#profileSelect").GetAttribute("value").ShouldBe(profileId.ToString());
+        page.Find("#profileSelect")
+            .GetAttribute("value")
+            .ShouldBe(profileId.ToString(CultureInfo.InvariantCulture));
         page.Find("input[placeholder='answer']").GetAttribute("value").ShouldBe(answer);
     }
 
     private static BunitContext CreateContext(SqliteBlokeBotDbFactory dbFactory, int hostId)
     {
         var context = UiTestContextFactory.Create(dbFactory, hostId);
-        context.Services.AddSingleton<GuessingChangeNotifier>();
-        context.Services.AddSingleton<GuessingConfigurationService>();
+        _ = context.Services.AddSingleton<GuessingChangeNotifier>();
+        _ = context.Services.AddSingleton<GuessingConfigurationService>();
         return context;
     }
 
@@ -150,8 +157,8 @@ public sealed class GuessingUnsavedChangesUiTests
             EnabledFeatures = HostFeatureFlags.Guessing,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var defaultProfile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -170,7 +177,7 @@ public sealed class GuessingUnsavedChangesUiTests
             Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
         };
         db.Profiles.AddRange(defaultProfile, specialProfile);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new(host.Id, defaultProfile.Id, specialProfile.Id);
     }
 

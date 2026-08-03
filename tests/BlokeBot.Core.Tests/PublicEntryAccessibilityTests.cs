@@ -45,6 +45,6 @@ public sealed class PublicEntryAccessibilityTests
 
         delivery.Find("button.disclosure-trigger").Click();
         delivery.Find("input[type='checkbox']").HasAttribute("disabled").ShouldBeTrue();
-        delivery.Find("a[href='/host#custom-bot']").ShouldNotBeNull();
+        _ = delivery.Find("a[href='/host#custom-bot']").ShouldNotBeNull();
     }
 }

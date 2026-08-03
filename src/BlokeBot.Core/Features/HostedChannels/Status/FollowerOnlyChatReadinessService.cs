@@ -38,12 +38,9 @@ public sealed class FollowerOnlyChatReadinessService(
                 channel.Id,
                 ct
             );
-            if (!chatSettings.FollowerMode)
-            {
-                return new FollowerOnlyChatReadiness.NotRequired();
-            }
-
-            return await EvaluateFollowerModeAsync(channel, channelLogin, chatSettings, ct);
+            return !chatSettings.FollowerMode
+                ? new FollowerOnlyChatReadiness.NotRequired()
+                : await EvaluateFollowerModeAsync(channel, channelLogin, chatSettings, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

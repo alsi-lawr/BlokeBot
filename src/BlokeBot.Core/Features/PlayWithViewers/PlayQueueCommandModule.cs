@@ -11,16 +11,16 @@ public sealed class PlayQueueCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        commands.Map(FixedChatCommandRoutes.Queue, StatusAsync);
-        commands.Map(FixedChatCommandRoutes.Join, JoinAsync);
-        commands.Map(FixedChatCommandRoutes.Leave, LeaveAsync);
-        commands.Map(FixedChatCommandRoutes.Position, PositionAsync);
-        commands.Map(FixedChatCommandRoutes.Ready, ReadyAsync);
-        commands.Map(
+        _ = commands.Map(FixedChatCommandRoutes.Queue, StatusAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Join, JoinAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Leave, LeaveAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Position, PositionAsync);
+        _ = commands.Map(FixedChatCommandRoutes.Ready, ReadyAsync);
+        _ = commands.Map(
             FixedChatCommandRoutes.QueueOpen,
             (context, args, ct) => SetOpenAsync(context, args, true, ct)
         );
-        commands.Map(
+        _ = commands.Map(
             FixedChatCommandRoutes.QueueClose,
             (context, args, ct) => SetOpenAsync(context, args, false, ct)
         );
@@ -262,8 +262,8 @@ public sealed class PlayQueueCommandModule(
 
     private static PlayQueueViewerIdentity Identity(ChatMessage message)
     {
-        message.Tags.TryGetValue("user-id", out var userId);
-        message.Tags.TryGetValue("display-name", out var displayName);
+        _ = message.Tags.TryGetValue("user-id", out var userId);
+        _ = message.Tags.TryGetValue("display-name", out var displayName);
         return new PlayQueueViewerIdentity(message.Login, userId, displayName);
     }
 

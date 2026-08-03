@@ -19,7 +19,7 @@ public sealed class GuessingOverlayTests
         var provider = new OverlayStateProvider(database, epoch, new FixedTimeProvider(_now));
         var instance = Instance(seeded.HostId);
 
-        (await provider.ProjectAsync(instance, CancellationToken.None))
+        _ = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GuessingV1>()
             .Snapshot.State.ShouldBeOfType<GuessingV1OverlayPresentationState.NoRound>();
 
@@ -39,8 +39,8 @@ public sealed class GuessingOverlayTests
                     Vote("other", "Red", -2),
                 ],
             };
-            db.Rounds.Add(round);
-            await db.SaveChangesAsync();
+            _ = db.Rounds.Add(round);
+            _ = await db.SaveChangesAsync();
             roundId = round.Id;
         }
 
@@ -85,11 +85,11 @@ public sealed class GuessingOverlayTests
         completed.PointLabel.ShouldBe("beans");
 
         await SetFeaturesAsync(database, seeded.HostId, HostFeatureFlags.Overlays);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
         await SetFeaturesAsync(database, seeded.HostId, HostFeatureFlags.Guessing);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
 
@@ -142,7 +142,7 @@ public sealed class GuessingOverlayTests
             ]);
 
         await SetFeaturesAsync(database, seeded.HostId, HostFeatureFlags.Overlays);
-        (
+        _ = (
             await provider.ProjectSampleAsync(
                 instance,
                 GuessingOverlaySampleState.Completed,
@@ -171,7 +171,7 @@ public sealed class GuessingOverlayTests
         (await ReadAsync(ownerConnection))
             .ShouldBeOfType<OverlayLiveTransportMessage.GuessingBaseline>()
             .Envelope.Payload.Animation.ShouldBe("none");
-        await ReadAsync(otherConnection);
+        _ = await ReadAsync(otherConnection);
 
         provider.SetPhase(owner.HostId, GuessingOverlayPhase.Closed);
         var blockedProjection = provider.BlockNextProjection();
@@ -201,7 +201,7 @@ public sealed class GuessingOverlayTests
         result.Envelope.Payload.Animation.ShouldBe("result");
         result.Envelope.Payload.ResultDurationMilliseconds.ShouldBe(9000);
 
-        await events.PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
+        _ = await events.PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
         var terminal = await ReadTerminalAsync(ownerConnection);
         terminal.EventType.ShouldBe("reauthenticate");
         await coordinator.GuessingChangedAsync(owner.HostId, CancellationToken.None);
@@ -211,7 +211,8 @@ public sealed class GuessingOverlayTests
         var baseline = (
             await ReadAsync(reconnected)
         ).ShouldBeOfType<OverlayLiveTransportMessage.GuessingBaseline>();
-        baseline.Envelope.Payload.State.ShouldBeOfType<GuessingV1OverlayPresentationState.Completed>();
+        _ =
+            baseline.Envelope.Payload.State.ShouldBeOfType<GuessingV1OverlayPresentationState.Completed>();
         baseline.Envelope.Payload.Animation.ShouldBe("none");
         reconnected.Messages.TryRead(out _).ShouldBeFalse();
         await coordinator.StopAsync(CancellationToken.None);
@@ -293,8 +294,8 @@ public sealed class GuessingOverlayTests
             EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Guessing,
             CreatedAtUtc = _now.UtcDateTime,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var profile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -303,9 +304,9 @@ public sealed class GuessingOverlayTests
             IsDefault = true,
             WinningGuessPointReward = "250",
         };
-        db.Profiles.Add(profile);
-        db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
+        _ = await db.SaveChangesAsync();
         return new ProjectionSeed(host.Id, profile.Id);
     }
 
@@ -326,7 +327,7 @@ public sealed class GuessingOverlayTests
     )
     {
         await using var db = await database.CreateDbContextAsync();
-        await db
+        _ = await db
             .Rounds.Where(round => round.Id == roundId)
             .ExecuteUpdateAsync(setters =>
                 setters
@@ -343,7 +344,7 @@ public sealed class GuessingOverlayTests
     )
     {
         await using var db = await database.CreateDbContextAsync();
-        await db
+        _ = await db
             .Hosts.Where(host => host.Id == hostId)
             .ExecuteUpdateAsync(setters =>
                 setters.SetProperty(host => host.EnabledFeatures, features)
@@ -404,7 +405,7 @@ public sealed class GuessingOverlayTests
             {
                 var release = _blockedProjectionRelease.ShouldNotBeNull();
                 _blockedProjectionEntered = null;
-                entered.TrySetResult();
+                _ = entered.TrySetResult();
                 await release.Task.WaitAsync(cancellationToken);
                 _blockedProjectionRelease = null;
             }

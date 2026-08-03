@@ -32,7 +32,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Cancelled);
-        giveaway.CompletedAtUtc.ShouldNotBeNull();
+        _ = giveaway.CompletedAtUtc.ShouldNotBeNull();
     }
 
     [Test]
@@ -40,12 +40,17 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _ = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5)
+        );
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
         var outcome = await service.CancelOutcomeAsync(hostId, CancellationToken.None);
 
-        outcome.ShouldBeOfType<PointsGiveawayCancelOutcome.Cancelled>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayCancelOutcome.Cancelled>();
     }
 
     [Test]
@@ -69,7 +74,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Completed);
-        giveaway.CompletedAtUtc.ShouldNotBeNull();
+        _ = giveaway.CompletedAtUtc.ShouldNotBeNull();
     }
 
     [Test]
@@ -86,7 +91,12 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
                 settings.GiveawayWinnerCount = 0;
             }
         );
-        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        _ = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5)
+        );
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
         var outcome = await service.StartOutcomeAsync(
@@ -96,7 +106,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PointsGiveawayStartOutcome.AlreadyActive>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.AlreadyActive>();
     }
 
     [Test]
@@ -121,7 +131,8 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
 
         var invalid = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.InvalidConfiguration>();
         invalid.Settings.GiveawayDurationSeconds.ShouldBe(0);
-        invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayDurationBelowMinimum>();
+        _ =
+            invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayDurationBelowMinimum>();
         scheduler.Scheduled.ShouldBeEmpty();
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.PointsGiveaways.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
@@ -145,7 +156,8 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
 
         var invalid = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.InvalidConfiguration>();
         invalid.Settings.GiveawayWinnerCount.ShouldBe(0);
-        invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum>();
+        _ =
+            invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum>();
         scheduler.Scheduled.ShouldBeEmpty();
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.PointsGiveaways.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
@@ -161,7 +173,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
             hostId,
             settings => settings.GiveawayCooldownSeconds = 120
         );
-        await SeedGiveawayAsync(
+        _ = await SeedGiveawayAsync(
             dbFactory,
             hostId,
             DateTime.UtcNow.AddSeconds(-30),
@@ -196,7 +208,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<PointsGiveawayStartOutcome.StreamOffline>();
+        _ = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.StreamOffline>();
     }
 
     [Test]

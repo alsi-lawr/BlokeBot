@@ -20,7 +20,7 @@ public sealed class PlayQueueServiceTests
             retainedEventCount = await disable.PlayQueueEvents.CountAsync();
             var host = await disable.Hosts.SingleAsync();
             host.EnabledFeatures &= ~HostFeatureFlags.PlayWithViewers;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
 
         var rejected = await service.JoinAsync(
@@ -30,7 +30,7 @@ public sealed class PlayQueueServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
                 _ => throw new InvalidOperationException("Expected rejection."),
                 value => value.Reason
@@ -45,10 +45,10 @@ public sealed class PlayQueueServiceTests
             (await verifyDisabled.PlayQueueEvents.CountAsync()).ShouldBe(retainedEventCount);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.PlayWithViewers;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
-        (
+        _ = (
             await service.GetPublicPageAsync("alpha", "squad", CancellationToken.None)
         ).ShouldNotBeNull();
         await using var verifyEnabled = await database.CreateDbContextAsync();
@@ -102,7 +102,7 @@ public sealed class PlayQueueServiceTests
         retry.WasIdempotent.ShouldBeTrue();
         retry.Value.InternalEntryId.ShouldBe(first.Value.InternalEntryId);
         position.Value.Position.ShouldBe(1);
-        page!.Waiting.ShouldHaveSingleItem();
+        _ = page!.Waiting.ShouldHaveSingleItem();
         page.Waiting[0].DisplayName.ShouldBeNull();
         page.Waiting[0]
             .Fields.ShouldBe([
@@ -245,7 +245,7 @@ public sealed class PlayQueueServiceTests
         clock.Advance(TimeSpan.FromSeconds(120));
         var result = await service.ReadyAsync(host, "squad", new("viewer"), CancellationToken.None);
 
-        result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
+        _ = result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
         await AssertExpiredReadyCheckPersistedAsync(database, entry.InternalEntryId);
     }
 
@@ -479,7 +479,7 @@ public sealed class PlayQueueServiceTests
             CancellationToken.None
         );
 
-        rejected
+        _ = rejected
             .Match(
                 _ => throw new InvalidOperationException("Expected rejection."),
                 value => value.Reason
@@ -596,8 +596,8 @@ public sealed class PlayQueueServiceTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

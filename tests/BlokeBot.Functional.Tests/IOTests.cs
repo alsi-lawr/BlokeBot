@@ -29,7 +29,7 @@ public sealed class IOTests
                 );
             });
 
-        io.ShouldNotBeNull();
+        _ = io.ShouldNotBeNull();
         operationInvocations.ShouldBe(0);
         mapInvocations.ShouldBe(0);
         bindInvocations.ShouldBe(0);

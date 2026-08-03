@@ -139,7 +139,7 @@ public sealed class EventSubClient(
         );
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<SubscriptionResponse>(
             _jsonOptions,
             cancellationToken
@@ -166,7 +166,7 @@ public sealed class EventSubClient(
             return;
         }
 
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
     }
 
     private sealed record CreateSubscriptionRequest

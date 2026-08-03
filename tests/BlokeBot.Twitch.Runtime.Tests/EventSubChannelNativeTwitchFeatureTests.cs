@@ -56,7 +56,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         await harness.Session.DrainAsync();
 
         operations.DeleteCount("channel").ShouldBe(2);
-        operations
+        _ = operations
             .DeleteAttempts("channel")
             .Last()
             .Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
@@ -162,7 +162,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         {
             AssertAuthorization(attempts[groupIndex].Authorization, groupIndex);
         }
-        attempts[^1].Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+        _ = attempts[^1].Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
         operations.CompleteStopCount("channel").ShouldBe(1);
         harness.Session.ActiveChannels.ShouldBeEmpty();
     }
@@ -192,7 +192,8 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
 
         operations.CreateCount("channel").ShouldBe(12);
         var replacementAuthorizations = operations.Authorizations("channel").TakeLast(6).ToArray();
-        replacementAuthorizations[0].ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+        _ = replacementAuthorizations[0]
+            .ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
         for (var groupIndex = 0; groupIndex < 5; groupIndex++)
         {
             AssertAuthorization(replacementAuthorizations[groupIndex + 1], groupIndex);
@@ -214,10 +215,11 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         switch (groupIndex)
         {
             case 0:
-                authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotOperations>();
+                _ =
+                    authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotOperations>();
                 break;
             case 1:
-                authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+                _ = authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
                 break;
             case 2:
                 authorization

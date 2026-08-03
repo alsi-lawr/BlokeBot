@@ -44,7 +44,7 @@ public partial class PointsDashboard
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.PointsChanged, AppEventKind.HostedChannelsChanged],
                 InvokeAsync,
@@ -52,7 +52,7 @@ public partial class PointsDashboard
                 StateHasChanged
             )
         );
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         await LoadAsync();
     }
 
@@ -150,7 +150,7 @@ public partial class PointsDashboard
             {
                 if (!string.IsNullOrWhiteSpace(succeeded.Message))
                 {
-                    _toasts.Publish(new ToastRequest<SuccessToastStrategy>(succeeded.Message));
+                    _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(succeeded.Message));
                 }
 
                 return true;
@@ -159,7 +159,7 @@ public partial class PointsDashboard
             {
                 if (!string.IsNullOrWhiteSpace(failed.Message))
                 {
-                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(failed.Message));
+                    _ = _toasts.Publish(new ToastRequest<WarningToastStrategy>(failed.Message));
                 }
 
                 return true;

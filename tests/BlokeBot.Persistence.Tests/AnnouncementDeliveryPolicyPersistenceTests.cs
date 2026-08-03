@@ -18,9 +18,9 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         {
             var hostId = await CreateHostAsync(writeDb);
             var announcement = CreateAnnouncement(hostId);
-            writeDb.Add(announcement);
+            _ = writeDb.Add(announcement);
 
-            await writeDb.SaveChangesAsync();
+            _ = await writeDb.SaveChangesAsync();
 
             announcementId = announcement.Id;
             announcement.DeliveryPolicyId.ShouldBe(announcement.DeliveryPolicy.Id);
@@ -61,8 +61,8 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             announcement.DeliveryType = CustomAnnouncementDeliveryType.TwitchAnnouncement;
             announcement.AnnouncementColor = TwitchAnnouncementColor.Purple;
             announcement.LatestDeliveryResult = CustomAnnouncementLatestDeliveryResult.Ambiguous;
-            writeDb.Add(announcement);
-            await writeDb.SaveChangesAsync();
+            _ = writeDb.Add(announcement);
+            _ = await writeDb.SaveChangesAsync();
             announcementId = announcement.Id;
         }
 
@@ -104,12 +104,12 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await CreateHostAsync(db);
         var first = CreateAnnouncement(hostId);
-        db.Add(first);
-        await db.SaveChangesAsync();
+        _ = db.Add(first);
+        _ = await db.SaveChangesAsync();
         var secondEntryId = await CreateMessageEntryAsync(db, hostId);
         var now = DateTime.UtcNow;
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcements
@@ -131,12 +131,12 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         var firstHostId = await CreateHostAsync(db);
         var secondHostId = await CreateHostAsync(db);
         var first = CreateAnnouncement(firstHostId);
-        db.Add(first);
-        await db.SaveChangesAsync();
+        _ = db.Add(first);
+        _ = await db.SaveChangesAsync();
         var secondEntryId = await CreateMessageEntryAsync(db, secondHostId);
         var now = DateTime.UtcNow;
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcements
@@ -173,7 +173,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             TimeSpan.FromSeconds(30).Ticks
         );
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcement_delivery_policies
@@ -193,10 +193,10 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await CreateHostAsync(db);
         var announcement = CreateAnnouncement(hostId);
-        db.Add(announcement);
-        await db.SaveChangesAsync();
+        _ = db.Add(announcement);
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 UPDATE custom_announcements
@@ -214,8 +214,8 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var hostId = await CreateHostAsync(db);
         var announcement = CreateAnnouncement(hostId);
-        db.Add(announcement);
-        await db.SaveChangesAsync();
+        _ = db.Add(announcement);
+        _ = await db.SaveChangesAsync();
         var dueAt = DateTime.UtcNow;
         var expiresAt = dueAt.AddSeconds(30);
 
@@ -229,7 +229,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             }
         )
         {
-            await Should.ThrowAsync<SqliteException>(() =>
+            _ = await Should.ThrowAsync<SqliteException>(() =>
                 db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
                     UPDATE custom_announcements
@@ -243,7 +243,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             );
         }
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 UPDATE custom_announcements
@@ -255,7 +255,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 UPDATE custom_announcements
@@ -268,7 +268,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 UPDATE custom_announcements
@@ -286,14 +286,16 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
     [Test]
     public void TimingValues_InvalidDurations_AreRejected()
     {
-        Should.Throw<ArgumentOutOfRangeException>(() => new AnnouncementRetryDelay(TimeSpan.Zero));
-        Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+            new AnnouncementRetryDelay(TimeSpan.Zero)
+        );
+        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
             new AnnouncementRetryDelay(TimeSpan.FromTicks(-1))
         );
-        Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
             new AnnouncementOccurrenceLifetime(TimeSpan.Zero)
         );
-        Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
             new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(60).Add(TimeSpan.FromTicks(1)))
         );
         new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(60)).Value.ShouldBe(
@@ -362,8 +364,8 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-        db.Add(entry);
-        await db.SaveChangesAsync();
+        _ = db.Add(entry);
+        _ = await db.SaveChangesAsync();
         return entry.Id;
     }
 
@@ -376,8 +378,8 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             DisplayName = "Host",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

@@ -20,7 +20,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.TokenUnavailable>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.TokenUnavailable>();
     }
 
     [Test]
@@ -30,7 +30,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.InvalidToken>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.InvalidToken>();
     }
 
     [Test]
@@ -40,7 +40,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.Unknown>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.Unknown>();
     }
 
     [Test]
@@ -50,7 +50,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingModeratorCheckScope>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingModeratorCheckScope>();
     }
 
     [Test]
@@ -61,7 +61,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.NotModerator>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.NotModerator>();
     }
 
     [Test]
@@ -71,7 +71,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingFollowerReadScope>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingFollowerReadScope>();
     }
 
     [Test]
@@ -105,7 +105,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await ReadinessAsync(service);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
+        _ = outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
         httpClientFactory.LastModerationUserId.ShouldBe("custom-id");
     }
 
@@ -150,14 +150,13 @@ public sealed class HostBotStatusTests
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory { StreamIsLive = true };
         var settings = Settings();
+        using var appTokens = new AppAccessTokenProvider(
+            httpClientFactory,
+            settings.Identity,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var service = new HostBotStatusService(
-            new OAuthHostBotAppAccessTokenSource(
-                new AppAccessTokenProvider(
-                    httpClientFactory,
-                    settings.Identity,
-                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-                )
-            ),
+            new OAuthHostBotAppAccessTokenSource(appTokens),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
             new HelixClient(
                 httpClientFactory,
@@ -183,7 +182,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostStreamLivenessOutcome.Offline>();
+        _ = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Offline>();
     }
 
     [Test]
@@ -305,7 +304,7 @@ public sealed class HostBotStatusTests
             BotLogin = "bot",
             Status = new TokenStatus.Unavailable(
                 AccessTokenUnavailableReason.MissingRefreshToken,
-                ImmutableArray.CreateRange(RequiredScopes())
+                [.. RequiredScopes()]
             ),
         };
 
@@ -313,7 +312,7 @@ public sealed class HostBotStatusTests
         new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
-            Status = new TokenStatus.Invalid(ImmutableArray.CreateRange(RequiredScopes())),
+            Status = new TokenStatus.Invalid([.. RequiredScopes()]),
         };
 
     private static ActiveBotAccountTokenStatus UnknownTokenStatus() =>
@@ -324,7 +323,7 @@ public sealed class HostBotStatusTests
                 new TokenStatusError.ValidationUnavailable(
                     TokenStatusTransportFailureReason.RequestFailed,
                     typeof(HttpRequestException).FullName!,
-                    ImmutableArray.CreateRange(RequiredScopes())
+                    [.. RequiredScopes()]
                 )
             ),
         };
@@ -387,90 +386,46 @@ public sealed class HostBotStatusTests
 
     private sealed class HostBotStatusHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        public bool BotIsModerator { get; init; } = true;
+        public bool StreamIsLive { get; init; }
+        public Exception? StreamFailure { get; init; }
+        public string? LastModerationUserId { get; internal set; }
+        public string? StreamRequestAccessToken { get; internal set; }
+        public string? StreamRequestClientId { get; internal set; }
+        public int StreamRequestCount { get; internal set; }
+        public int TokenRequestCount { get; internal set; }
 
-        public bool BotIsModerator
+        public HttpClient CreateClient(string name) => new(new Handler(this));
+
+        private sealed class Handler(HostBotStatusHttpClientFactory owner) : HttpMessageHandler
         {
-            get => _handler.BotIsModerator;
-            init => _handler.BotIsModerator = value;
-        }
-
-        public bool StreamIsLive
-        {
-            get => _handler.StreamIsLive;
-            init => _handler.StreamIsLive = value;
-        }
-
-        public Exception? StreamFailure
-        {
-            get => _handler.StreamFailure;
-            init => _handler.StreamFailure = value;
-        }
-
-        public string? LastModerationUserId => _handler.LastModerationUserId;
-
-        public string? StreamRequestAccessToken => _handler.StreamRequestAccessToken;
-
-        public string? StreamRequestClientId => _handler.StreamRequestClientId;
-
-        public int StreamRequestCount => _handler.StreamRequestCount;
-
-        public int TokenRequestCount => _handler.TokenRequestCount;
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
-
-        private sealed class Handler : HttpMessageHandler
-        {
-            public bool BotIsModerator { get; set; } = true;
-
-            public bool StreamIsLive { get; set; }
-
-            public Exception? StreamFailure { get; set; }
-
-            public string? LastModerationUserId { get; private set; }
-
-            public string? StreamRequestAccessToken { get; private set; }
-
-            public string? StreamRequestClientId { get; private set; }
-
-            public int StreamRequestCount { get; private set; }
-
-            public int TokenRequestCount { get; private set; }
-
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                if (
-                    request.RequestUri?.AbsolutePath == "/helix/streams"
-                    && StreamFailure is { } failure
-                )
-                {
-                    return Task.FromException<HttpResponseMessage>(failure);
-                }
-
-                return Task.FromResult(
-                    request.RequestUri?.AbsolutePath switch
-                    {
-                        "/oauth2/token" => TokenResponse(),
-                        "/helix/users" => JsonResponse(
-                            """
-                            {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"}]}
-                            """
-                        ),
-                        "/helix/moderation/channels" => ModerationChannelsResponse(request),
-                        "/helix/streams" => StreamResponse(request),
-                        _ => new HttpResponseMessage(HttpStatusCode.NotFound),
-                    }
-                );
-            }
+            ) =>
+                request.RequestUri?.AbsolutePath == "/helix/streams"
+                && owner.StreamFailure is { } failure
+                    ? Task.FromException<HttpResponseMessage>(failure)
+                    : Task.FromResult(
+                        request.RequestUri?.AbsolutePath switch
+                        {
+                            "/oauth2/token" => TokenResponse(),
+                            "/helix/users" => JsonResponse(
+                                """
+                                {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"}]}
+                                """
+                            ),
+                            "/helix/moderation/channels" => ModerationChannelsResponse(request),
+                            "/helix/streams" => StreamResponse(request),
+                            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+                        }
+                    );
 
             private HttpResponseMessage ModerationChannelsResponse(HttpRequestMessage request)
             {
-                LastModerationUserId = QueryValue(request.RequestUri, "user_id");
+                owner.LastModerationUserId = QueryValue(request.RequestUri, "user_id");
                 return JsonResponse(
-                    BotIsModerator
+                    owner.BotIsModerator
                         ? """
                         {"data":[{"broadcaster_id":"channel-id","broadcaster_login":"streamer","broadcaster_name":"Streamer"}],"pagination":{}}
                         """
@@ -480,11 +435,11 @@ public sealed class HostBotStatusTests
 
             private HttpResponseMessage StreamResponse(HttpRequestMessage request)
             {
-                StreamRequestCount++;
-                StreamRequestAccessToken = request.Headers.Authorization?.Parameter;
-                StreamRequestClientId = request.Headers.GetValues("Client-Id").Single();
+                owner.StreamRequestCount++;
+                owner.StreamRequestAccessToken = request.Headers.Authorization?.Parameter;
+                owner.StreamRequestClientId = request.Headers.GetValues("Client-Id").Single();
                 return JsonResponse(
-                    StreamIsLive
+                    owner.StreamIsLive
                         ? """
                         {
                           "data": [
@@ -513,7 +468,7 @@ public sealed class HostBotStatusTests
 
             private HttpResponseMessage TokenResponse()
             {
-                TokenRequestCount++;
+                owner.TokenRequestCount++;
                 return JsonResponse("""{"access_token":"app-token","expires_in":3600}""");
             }
 

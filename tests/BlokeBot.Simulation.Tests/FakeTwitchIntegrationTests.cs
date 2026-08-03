@@ -66,7 +66,7 @@ public sealed class FakeTwitchIntegrationTests
         refreshed.AccessToken.ShouldNotBe(token.AccessToken);
         refreshed.RefreshToken.ShouldNotBe(token.RefreshToken);
 
-        var appToken = await new AppAccessTokenProvider(
+        using var appProvider = new AppAccessTokenProvider(
             host.HttpClientFactory,
             new BotIdentity
             {
@@ -78,7 +78,8 @@ public sealed class FakeTwitchIntegrationTests
                 TokenCachePath = "unused",
             },
             host.Endpoints
-        ).GetAccessTokenAsync(CancellationToken.None);
+        );
+        var appToken = await appProvider.GetAccessTokenAsync(CancellationToken.None);
         appToken.ShouldBe("fake-app-token");
 
         var context = new HelixRequestContext(
@@ -87,7 +88,7 @@ public sealed class FakeTwitchIntegrationTests
         );
         var helix = new HelixClient(host.HttpClientFactory, host.Endpoints);
         var user = await helix.GetCurrentUserAsync(context, CancellationToken.None);
-        user.ShouldNotBeNull();
+        _ = user.ShouldNotBeNull();
         user.Id.ShouldBe("1000");
         user.BroadcasterType.ShouldBe("affiliate");
         var stream = await helix.GetStreamAsync(
@@ -95,7 +96,7 @@ public sealed class FakeTwitchIntegrationTests
             "samplechannel",
             CancellationToken.None
         );
-        stream.ShouldNotBeNull();
+        _ = stream.ShouldNotBeNull();
         stream.ViewerCount.ShouldBe(42);
         var broadcasterContext = new HelixRequestContext(
             FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
@@ -136,7 +137,15 @@ public sealed class FakeTwitchIntegrationTests
 
         var observedChat = new RecordingChatObserver();
         var observedPolls = new RecordingPollObserver();
-        var commandSender = new ProductChatCommandResponseSender(CreatePublicChatTransport(host));
+        var publicChatIdentity = PublicChatIdentity();
+        using var publicChatAppTokens = new AppAccessTokenProvider(
+            host.HttpClientFactory,
+            publicChatIdentity,
+            host.Endpoints
+        );
+        var commandSender = new ProductChatCommandResponseSender(
+            CreatePublicChatTransport(host, publicChatIdentity, publicChatAppTokens)
+        );
         var session = CreateEventSubSession(host, observedChat, observedPolls, commandSender);
         var established = await session.EstablishAsync(
             new RuntimeConnectionTarget.Initial(),
@@ -175,10 +184,10 @@ public sealed class FakeTwitchIntegrationTests
         );
 
         listeningCancellation.Cancel();
-        await Should.ThrowAsync<OperationCanceledException>(() => listeningTask);
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => listeningTask);
         await listening.DisposeAsync();
 
-        await Should.ThrowAsync<HttpRequestException>(() =>
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
             transport.ExchangeCodeAsync(
                 new AuthorizationCodeExchange(
                     FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
@@ -216,7 +225,7 @@ public sealed class FakeTwitchIntegrationTests
 
         var user = await helix.GetCurrentUserAsync(context, CancellationToken.None);
 
-        user.ShouldNotBeNull();
+        _ = user.ShouldNotBeNull();
         user.ProfileImageUrl.ShouldBe($"{host.HttpAddress}profile-images/{user.Login}.svg");
         using var client = new HttpClient();
         using var first = await client.GetAsync(user.ProfileImageUrl);
@@ -303,13 +312,13 @@ public sealed class FakeTwitchIntegrationTests
             TimeProvider.System
         );
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddLogging();
+        _ = services.AddContinueAndReportObserverFanOut<
             EventSubMessageObserverBoundary,
             ChatMessage,
             ChatObserverDeadLetter
         >(BotObserverBoundaries.EventSubMessages);
-        services.AddChatCommands().AddCommandModule<ReplyCommandModule>();
+        _ = services.AddChatCommands().AddCommandModule<ReplyCommandModule>();
         using var provider = services.BuildServiceProvider();
         return new EventSubConnectionSession(
             new StaticChannelProvider(),
@@ -329,19 +338,13 @@ public sealed class FakeTwitchIntegrationTests
         );
     }
 
-    private static HelixPublicChatTransport CreatePublicChatTransport(FakeTwitchHost host)
-    {
-        var identity = new BotIdentity
-        {
-            BotUsername = "blokebot",
-            ClientId = FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
-            ClientSecret = "fake-secret",
-            RedirectUri = "https://callback.invalid/bot/callback",
-            Scopes = OAuthAuthorizationScopeSet.Create(["user:read:chat"]),
-            TokenCachePath = "unused",
-        };
-        return new(
-            new AppAccessTokenProvider(host.HttpClientFactory, identity, host.Endpoints),
+    private static HelixPublicChatTransport CreatePublicChatTransport(
+        FakeTwitchHost host,
+        BotIdentity identity,
+        AppAccessTokenProvider appTokens
+    ) =>
+        new(
+            appTokens,
             new StaticBotAccountProvider(),
             identity,
             new ChatIdentityResolver(
@@ -351,7 +354,17 @@ public sealed class FakeTwitchIntegrationTests
             new ChatClient(host.HttpClientFactory, host.Endpoints),
             NullLogger<HelixPublicChatTransport>.Instance
         );
-    }
+
+    private static BotIdentity PublicChatIdentity() =>
+        new()
+        {
+            BotUsername = "blokebot",
+            ClientId = FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
+            ClientSecret = "fake-secret",
+            RedirectUri = "https://callback.invalid/bot/callback",
+            Scopes = OAuthAuthorizationScopeSet.Create(["user:read:chat"]),
+            TokenCachePath = "unused",
+        };
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
@@ -669,10 +682,10 @@ public sealed class FakeTwitchIntegrationTests
         public static async Task<FakeTwitchHost> StartAsync()
         {
             var builder = WebApplication.CreateBuilder();
-            builder.Services.AddFakeTwitch(FakeTwitchScenarioDefinition.ReadyDashboard);
+            _ = builder.Services.AddFakeTwitch(FakeTwitchScenarioDefinition.ReadyDashboard);
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");
-            app.MapFakeTwitch();
+            _ = app.MapFakeTwitch();
             await app.StartAsync();
 
             var address =

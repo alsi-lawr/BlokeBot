@@ -85,7 +85,7 @@ public sealed class HelixClient(
             );
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
@@ -666,7 +666,7 @@ public sealed class HelixClient(
             )
             {
                 markers.Add(marker);
-                unmatched.Remove(marker.Id);
+                _ = unmatched.Remove(marker.Id);
             }
 
             cursor = payload?.Pagination?.Cursor;
@@ -679,39 +679,28 @@ public sealed class HelixClient(
         return new HelixStreamMarkerLookupOutcome.Found(markers);
     }
 
-    private static HelixClipCreateOutcome ClassifyClipFailure(string error)
-    {
-        if (Contains(error, "rerun") || Contains(error, "premiere"))
+    private static HelixClipCreateOutcome ClassifyClipFailure(string error) =>
+        error switch
         {
-            return new HelixClipCreateOutcome.RerunOrPremiere();
-        }
-        if (Contains(error, "vod") || Contains(error, "clip"))
-        {
-            return new HelixClipCreateOutcome.VodsDisabled();
-        }
-        if (Contains(error, "live") || Contains(error, "streaming"))
-        {
-            return new HelixClipCreateOutcome.Offline();
-        }
-        return new HelixClipCreateOutcome.ProviderRejected();
-    }
+            _ when Contains(error, "rerun") || Contains(error, "premiere") =>
+                new HelixClipCreateOutcome.RerunOrPremiere(),
+            _ when Contains(error, "vod") || Contains(error, "clip") =>
+                new HelixClipCreateOutcome.VodsDisabled(),
+            _ when Contains(error, "live") || Contains(error, "streaming") =>
+                new HelixClipCreateOutcome.Offline(),
+            _ => new HelixClipCreateOutcome.ProviderRejected(),
+        };
 
-    private static HelixStreamMarkerCreateOutcome ClassifyMarkerFailure(string error)
-    {
-        if (Contains(error, "rerun") || Contains(error, "premiere"))
+    private static HelixStreamMarkerCreateOutcome ClassifyMarkerFailure(string error) =>
+        error switch
         {
-            return new HelixStreamMarkerCreateOutcome.RerunOrPremiere();
-        }
-        if (Contains(error, "vod"))
-        {
-            return new HelixStreamMarkerCreateOutcome.VodsDisabled();
-        }
-        if (Contains(error, "live") || Contains(error, "streaming"))
-        {
-            return new HelixStreamMarkerCreateOutcome.Offline();
-        }
-        return new HelixStreamMarkerCreateOutcome.ProviderRejected();
-    }
+            _ when Contains(error, "rerun") || Contains(error, "premiere") =>
+                new HelixStreamMarkerCreateOutcome.RerunOrPremiere(),
+            _ when Contains(error, "vod") => new HelixStreamMarkerCreateOutcome.VodsDisabled(),
+            _ when Contains(error, "live") || Contains(error, "streaming") =>
+                new HelixStreamMarkerCreateOutcome.Offline(),
+            _ => new HelixStreamMarkerCreateOutcome.ProviderRejected(),
+        };
 
     private static bool Contains(string text, string value) =>
         text.Contains(value, StringComparison.OrdinalIgnoreCase);
@@ -766,7 +755,7 @@ public sealed class HelixClient(
         {
             return null;
         }
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
             _jsonOptions,
             cancellationToken
@@ -790,7 +779,7 @@ public sealed class HelixClient(
                 context
             );
             using var response = await _http.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            _ = response.EnsureSuccessStatusCode();
 
             var payload = await response.Content.ReadFromJsonAsync<ModeratedChannelsResponse>(
                 _jsonOptions,
@@ -876,7 +865,7 @@ public sealed class HelixClient(
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<StreamResponse>(
             _jsonOptions,
@@ -900,7 +889,7 @@ public sealed class HelixClient(
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<ChatSettingsResponse>(
             _jsonOptions,
@@ -941,7 +930,7 @@ public sealed class HelixClient(
             return new FollowerStatus.Unavailable();
         }
 
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<FollowerResponse>(
             _jsonOptions,
             cancellationToken
@@ -974,7 +963,7 @@ public sealed class HelixClient(
             return new ActiveBotFollowStatus.Unavailable();
         }
 
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<FollowerResponse>(
             _jsonOptions,
             cancellationToken

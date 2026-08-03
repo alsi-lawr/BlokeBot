@@ -44,8 +44,8 @@ public partial class ToastHost
 
         await InvokeAsync(StateHasChanged);
         await Task.Delay(_removalAnimationDelayMs);
-        _toasts.Dismiss(toastId);
-        _dismissingToastIds.Remove(toastId);
+        _ = _toasts.Dismiss(toastId);
+        _ = _dismissingToastIds.Remove(toastId);
     }
 
     private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId) =>
@@ -79,7 +79,7 @@ public partial class ToastHost
         {
             _autoDismissTokens[staleId].Cancel();
             _autoDismissTokens[staleId].Dispose();
-            _autoDismissTokens.Remove(staleId);
+            _ = _autoDismissTokens.Remove(staleId);
         }
 
         foreach (var toast in _visibleToasts)

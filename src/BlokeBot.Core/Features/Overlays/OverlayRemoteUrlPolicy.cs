@@ -66,22 +66,15 @@ public sealed class OverlayRemoteUrlPolicy(
             }
         }
 
-        if (addresses.Count == 0)
+        return addresses.Count switch
         {
-            return Rejected("The remote layer host could not be resolved.");
-        }
-
-        if (
-            !options.Value.Overlays.Media.AllowPrivateNetworkTargets
-            && addresses.Any(IsPrivateOrLocal)
-        )
-        {
-            return Rejected(
+            0 => Rejected("The remote layer host could not be resolved."),
+            _ when !options.Value.Overlays.Media.AllowPrivateNetworkTargets
+                    && addresses.Any(IsPrivateOrLocal) => Rejected(
                 "Remote layers cannot target localhost, private, link-local, or unspecified network addresses."
-            );
-        }
-
-        return new OverlayRemoteUrlDecision.Allowed();
+            ),
+            _ => new OverlayRemoteUrlDecision.Allowed(),
+        };
     }
 
     internal static bool IsPrivateOrLocal(IPAddress address)

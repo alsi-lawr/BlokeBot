@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
@@ -95,7 +96,12 @@ public sealed class PointsDashboardTests : PointsTestBase
                 "moderator",
                 "streamer",
                 "addpoints",
-                ["viewer", (PointAmount.MaximumValue + BigInteger.One).ToString()],
+                [
+                    "viewer",
+                    (PointAmount.MaximumValue + BigInteger.One).ToString(
+                        CultureInfo.InvariantCulture
+                    ),
+                ],
                 replies
             ),
             CancellationToken.None

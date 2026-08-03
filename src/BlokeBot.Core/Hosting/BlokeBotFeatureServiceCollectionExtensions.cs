@@ -50,87 +50,90 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotAppCommands(this IServiceCollection services)
     {
-        services.AddSingleton<CommandAliasRegistry>();
-        services.AddSingleton<AppCommandAliasResolver>();
-        services.AddSingleton<CommandsConfigurationService>();
-        services.AddSingleton<ViewerCommandCatalogService>();
-        services.AddSingleton<IBotHostSeeder, CommandsHostSeeder>();
+        _ = services.AddSingleton<CommandAliasRegistry>();
+        _ = services.AddSingleton<AppCommandAliasResolver>();
+        _ = services.AddSingleton<CommandsConfigurationService>();
+        _ = services.AddSingleton<ViewerCommandCatalogService>();
+        _ = services.AddSingleton<IBotHostSeeder, CommandsHostSeeder>();
         return services;
     }
 
     public static IServiceCollection AddBlokeBotRequestBoards(this IServiceCollection services)
     {
-        services.AddSingleton<RequestBoardService>();
+        _ = services.AddSingleton<RequestBoardService>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 
     public static IServiceCollection AddBlokeBotPlayWithViewers(this IServiceCollection services)
     {
-        services.AddSingleton<PlayQueueChangeNotifier>();
-        services.AddSingleton<PlayQueueService>();
-        services.AddSingleton<IPlayQueueProjectionReader>(serviceProvider =>
+        _ = services.AddSingleton<PlayQueueChangeNotifier>();
+        _ = services.AddSingleton<PlayQueueService>();
+        _ = services.AddSingleton<IPlayQueueProjectionReader>(serviceProvider =>
             serviceProvider.GetRequiredService<PlayQueueService>()
         );
-        services.AddSingleton<IPrivateLobbyDelivery, TwitchPrivateLobbyDelivery>();
+        _ = services.AddSingleton<IPrivateLobbyDelivery, TwitchPrivateLobbyDelivery>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 
     public static IServiceCollection AddBlokeBotMoments(this IServiceCollection services)
     {
-        services.AddSingleton<MomentHubService>();
-        services.AddSingleton<IMomentProviderOperations, MomentProviderOperations>();
+        _ = services.AddSingleton<MomentHubService>();
+        _ = services.AddSingleton<IMomentProviderOperations, MomentProviderOperations>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 
     public static IServiceCollection AddBlokeBotOverlays(this IServiceCollection services)
     {
-        services.AddSingleton<IOverlayAccessKeyGenerator, CryptographicOverlayAccessKeyGenerator>();
-        services.AddSingleton<OverlayInstanceService>();
-        services.AddSingleton<OverlayInstanceResolver>();
-        services.AddSingleton<OverlayManagementAuthority>();
-        services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
-        services.AddSingleton<OverlayRemoteUrlPolicy>();
-        services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
-        services.AddSingleton<OverlayCueService>();
-        services.AddSingleton<OverlayServerEpoch>();
-        services.AddSingleton<OverlayEventFeedService>();
-        services.AddSingleton<IOverlayEventPresenter>(serviceProvider =>
+        _ = services.AddSingleton<
+            IOverlayAccessKeyGenerator,
+            CryptographicOverlayAccessKeyGenerator
+        >();
+        _ = services.AddSingleton<OverlayInstanceService>();
+        _ = services.AddSingleton<OverlayInstanceResolver>();
+        _ = services.AddSingleton<OverlayManagementAuthority>();
+        _ = services.AddSingleton<IOverlayDnsResolver, SystemOverlayDnsResolver>();
+        _ = services.AddSingleton<OverlayRemoteUrlPolicy>();
+        _ = services.AddSingleton<IOverlayMediaFileDeletion, SystemOverlayMediaFileDeletion>();
+        _ = services.AddSingleton<OverlayCueService>();
+        _ = services.AddSingleton<OverlayServerEpoch>();
+        _ = services.AddSingleton<OverlayEventFeedService>();
+        _ = services.AddSingleton<IOverlayEventPresenter>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
-        services.AddSingleton<IHostFeatureChangeObserver>(serviceProvider =>
+        _ = services.AddSingleton<IHostFeatureChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
-        services.AddHostedService(serviceProvider =>
+        _ = services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
-        services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
-        services.AddSingleton<OverlayLiveCoordinator>();
-        services.AddSingleton<IOverlayLivePublisher>(serviceProvider =>
+        _ = services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
+        _ = services.AddSingleton<OverlayLiveCoordinator>();
+        _ = services.AddSingleton<IOverlayLivePublisher>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddSingleton<IOverlayLivePresence>(serviceProvider =>
+        _ = services.AddSingleton<IOverlayLivePresence>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddSingleton<IOverlayCueTransport>(serviceProvider =>
+        _ = services.AddSingleton<IOverlayCueTransport>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddSingleton<OverlayCuePlaybackService>();
-        services.AddSingleton<IOverlayCueAdmissionService>(serviceProvider =>
+        _ = services.AddSingleton<OverlayCuePlaybackService>();
+        _ = services.AddSingleton<IOverlayCueAdmissionService>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayCuePlaybackService>()
         );
-        services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
+        _ = services.AddSingleton<IGuessingChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddSingleton<IPointsGiveawayChangeObserver>(serviceProvider =>
+        _ = services.AddSingleton<IPointsGiveawayChangeObserver>(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddHostedService(serviceProvider =>
+        _ = services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
-        services.AddHostedService(serviceProvider =>
+        _ = services.AddHostedService(serviceProvider =>
             serviceProvider.GetRequiredService<OverlayCuePlaybackService>()
         );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
@@ -144,15 +147,15 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<CustomCommandAliasRegistry>();
-        services.AddSingleton<CustomCommandCooldownStore>();
-        services.AddSingleton<CustomCommandExecutionService>();
+        _ = services.AddSingleton<CustomCommandAliasRegistry>();
+        _ = services.AddSingleton<CustomCommandCooldownStore>();
+        _ = services.AddSingleton<CustomCommandExecutionService>();
         services.TryAddSingleton<
             IOverlayCueAdmissionService,
             UnavailableOverlayCueAdmissionService
         >();
-        services.AddSingleton<CustomCommandInvocationClaimStore>();
-        services.AddSingleton<CustomCommandInvocationResetService>();
+        _ = services.AddSingleton<CustomCommandInvocationClaimStore>();
+        _ = services.AddSingleton<CustomCommandInvocationResetService>();
         services.TryAddSingleton<
             ICustomCommandViewerResolver,
             UnavailableCustomCommandViewerResolver
@@ -161,16 +164,16 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             IHostStreamLivenessProvider,
             UnavailableCustomCommandStreamLivenessProvider
         >();
-        services.AddSingleton<CustomMessageSelector>();
-        services.AddSingleton<CustomCommandTemplateRenderer>();
-        services.AddSingleton<CustomCommandConfigurationGraphWriter>();
-        services.AddSingleton<CustomCommandConfigurationService>();
-        services.AddSingleton<HostCustomCommandSettingsService>();
-        services.AddSingleton<TwitchAnnouncementAccessService>();
-        services.AddSingleton<ITwitchAnnouncementAccessService>(serviceProvider =>
+        _ = services.AddSingleton<CustomMessageSelector>();
+        _ = services.AddSingleton<CustomCommandTemplateRenderer>();
+        _ = services.AddSingleton<CustomCommandConfigurationGraphWriter>();
+        _ = services.AddSingleton<CustomCommandConfigurationService>();
+        _ = services.AddSingleton<HostCustomCommandSettingsService>();
+        _ = services.AddSingleton<TwitchAnnouncementAccessService>();
+        _ = services.AddSingleton<ITwitchAnnouncementAccessService>(serviceProvider =>
             serviceProvider.GetRequiredService<TwitchAnnouncementAccessService>()
         );
-        services.AddSingleton<ITwitchAnnouncementReadinessProvider>(serviceProvider =>
+        _ = services.AddSingleton<ITwitchAnnouncementReadinessProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<TwitchAnnouncementAccessService>()
         );
         services.TryAddSingleton<
@@ -180,13 +183,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         switch (announcementDelivery)
         {
             case CustomAnnouncementDeliveryMode.Disabled:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     ICustomAnnouncementSender,
                     DisabledCustomAnnouncementSender
                 >();
                 break;
             case CustomAnnouncementDeliveryMode.PublicChat:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     ICustomAnnouncementSender,
                     TwitchAnnouncementCustomAnnouncementSender
                 >();
@@ -198,9 +201,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     "Unknown custom-announcement delivery mode."
                 );
         }
-        services.AddSingleton<IChatMessageObserver, CustomAnnouncementChatActivity>();
-        services.AddSingleton<CustomAnnouncementScheduler>();
-        services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());
+        _ = services.AddSingleton<IChatMessageObserver, CustomAnnouncementChatActivity>();
+        _ = services.AddSingleton<CustomAnnouncementScheduler>();
+        _ = services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());
         services.TryAddSingleton<DurableAlertService>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
@@ -227,40 +230,42 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotGuessing(this IServiceCollection services)
     {
-        services.AddSingleton<CommandStrategyCatalog<GuessCommandKind, AppCommandRouteState>>();
-        services.AddSingleton<CommandStrategyDispatcher<GuessCommandKind, AppCommandRouteState>>();
-        services.AddSingleton<
+        _ = services.AddSingleton<CommandStrategyCatalog<GuessCommandKind, AppCommandRouteState>>();
+        _ = services.AddSingleton<
+            CommandStrategyDispatcher<GuessCommandKind, AppCommandRouteState>
+        >();
+        _ = services.AddSingleton<
             ICommandRouteResolver<GuessCommandKind, AppCommandRouteState>,
             GuessingCommandRouteResolver
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<GuessCommandKind, AppCommandRouteState>,
             StartGuessingCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<GuessCommandKind, AppCommandRouteState>,
             StopGuessingCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<GuessCommandKind, AppCommandRouteState>,
             WinGuessingCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<GuessCommandKind, AppCommandRouteState>,
             GuessCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<GuessCommandKind, AppCommandRouteState>,
             AvailableGuessesCommandStrategy
         >();
-        services.AddSingleton<GuessingCommandService>();
-        services.AddSingleton<GuessingConfigurationService>();
-        services.AddSingleton<GuessingDashboardService>();
-        services.AddSingleton<GuessingChangeNotifier>();
-        services.AddSingleton<GuessingRoundService>();
-        services.AddSingleton<GuessingVoteService>();
-        services.AddSingleton<GuessingHistoryService>();
-        services.AddSingleton<IBotHostSeeder, GuessingHostSeeder>();
+        _ = services.AddSingleton<GuessingCommandService>();
+        _ = services.AddSingleton<GuessingConfigurationService>();
+        _ = services.AddSingleton<GuessingDashboardService>();
+        _ = services.AddSingleton<GuessingChangeNotifier>();
+        _ = services.AddSingleton<GuessingRoundService>();
+        _ = services.AddSingleton<GuessingVoteService>();
+        _ = services.AddSingleton<GuessingHistoryService>();
+        _ = services.AddSingleton<IBotHostSeeder, GuessingHostSeeder>();
         return services;
     }
 
@@ -269,75 +274,79 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         PointsGiveawayNotificationMode notificationMode
     )
     {
-        services.AddSingleton<CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState>>();
-        services.AddSingleton<CommandStrategyDispatcher<PointsCommandKind, AppCommandRouteState>>();
-        services.AddSingleton<
+        _ = services.AddSingleton<
+            CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState>
+        >();
+        _ = services.AddSingleton<
+            CommandStrategyDispatcher<PointsCommandKind, AppCommandRouteState>
+        >();
+        _ = services.AddSingleton<
             ICommandRouteResolver<PointsCommandKind, AppCommandRouteState>,
             PointsCommandRouteResolver
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             PointsBalanceCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             GivePointsCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             AddPointsCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             RemovePointsCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             GambleCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             StartGiveawayCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             JoinGiveawayCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             EndGiveawayCommandStrategy
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             ICommandStrategy<PointsCommandKind, AppCommandRouteState>,
             CancelGiveawayCommandStrategy
         >();
-        services.AddSingleton<PointsCommandService>();
-        services.AddSingleton<PointBalanceService>();
-        services.AddSingleton<IPointTargetUserLookup, HelixPointTargetUserLookup>();
-        services.AddSingleton<PointsConfigurationService>();
-        services.AddSingleton<PointsDashboardService>();
-        services.AddSingleton<PointsGiveawayChangeNotifier>();
-        services.AddSingleton<
+        _ = services.AddSingleton<PointsCommandService>();
+        _ = services.AddSingleton<PointBalanceService>();
+        _ = services.AddSingleton<IPointTargetUserLookup, HelixPointTargetUserLookup>();
+        _ = services.AddSingleton<PointsConfigurationService>();
+        _ = services.AddSingleton<PointsDashboardService>();
+        _ = services.AddSingleton<PointsGiveawayChangeNotifier>();
+        _ = services.AddSingleton<
             IPointsGiveawayChangeNotification,
             PointsGiveawayChangeNotification
         >();
-        services.AddSingleton<
+        _ = services.AddSingleton<
             IPointsGiveawaySchedulerOperations,
             PointsGiveawaySchedulerOperations
         >();
-        services.AddSingleton(
+        _ = services.AddSingleton(
             new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.FromSeconds(30) }
         );
         switch (notificationMode)
         {
             case PointsGiveawayNotificationMode.ReplyOnly:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IPointsGiveawaySchedulerNotification,
                     ReplyOnlyPointsGiveawaySchedulerNotification
                 >();
                 break;
             case PointsGiveawayNotificationMode.PublicChat:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IPointsGiveawaySchedulerNotification,
                     PublicChatPointsGiveawaySchedulerNotification
                 >();
@@ -350,19 +359,19 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                 );
         }
 
-        services.AddSingleton<PointsGiveawayScheduler>();
-        services.AddSingleton<IPointsGiveawayScheduler>(sp =>
+        _ = services.AddSingleton<PointsGiveawayScheduler>();
+        _ = services.AddSingleton<IPointsGiveawayScheduler>(sp =>
             sp.GetRequiredService<PointsGiveawayScheduler>()
         );
-        services.AddHostedService(sp => sp.GetRequiredService<PointsGiveawayScheduler>());
-        services.AddSingleton<PointsGiveawayDrawService>();
-        services.AddSingleton<PointsGiveawayEligibilityPolicy>();
-        services.AddSingleton<PointsGiveawayMessageFormatter>();
-        services.AddSingleton<PointsGiveawayService>();
-        services.AddSingleton<IPointsRandom, PointsRandom>();
-        services.AddSingleton<PointsGamblingCooldownStore>();
-        services.AddSingleton<PointsChangeNotifier>();
-        services.AddSingleton<IBotHostSeeder, PointsHostSeeder>();
+        _ = services.AddHostedService(sp => sp.GetRequiredService<PointsGiveawayScheduler>());
+        _ = services.AddSingleton<PointsGiveawayDrawService>();
+        _ = services.AddSingleton<PointsGiveawayEligibilityPolicy>();
+        _ = services.AddSingleton<PointsGiveawayMessageFormatter>();
+        _ = services.AddSingleton<PointsGiveawayService>();
+        _ = services.AddSingleton<IPointsRandom, PointsRandom>();
+        _ = services.AddSingleton<PointsGamblingCooldownStore>();
+        _ = services.AddSingleton<PointsChangeNotifier>();
+        _ = services.AddSingleton<IBotHostSeeder, PointsHostSeeder>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
@@ -374,25 +383,25 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton(sp =>
+        _ = services.AddSingleton(sp =>
             BotAdminSettings.FromOptions(sp.GetRequiredService<IOptions<BlokeBotOptions>>().Value)
         );
-        services.AddSingleton<BotAdminService>();
-        services.AddSingleton<AdminHostManagementService>();
-        services.AddSingleton<HostedChannelDirectoryService>();
-        services.AddSingleton<BotAccountAuthorizationService>();
+        _ = services.AddSingleton<BotAdminService>();
+        _ = services.AddSingleton<AdminHostManagementService>();
+        _ = services.AddSingleton<HostedChannelDirectoryService>();
+        _ = services.AddSingleton<BotAccountAuthorizationService>();
         switch (botAccountAuthorization)
         {
             case BotAccountAuthorizationMode.Disabled:
-                services.AddSingleton<ITokenStatusSource, UnavailableTokenStatusSource>();
-                services.AddSingleton<
+                _ = services.AddSingleton<ITokenStatusSource, UnavailableTokenStatusSource>();
+                _ = services.AddSingleton<
                     IBotAccountAuthorizationPolicy,
                     DisabledBotAccountAuthorizationPolicy
                 >();
                 break;
             case BotAccountAuthorizationMode.Twitch:
-                services.AddSingleton<ITokenStatusSource, TokenStatusService>();
-                services.AddSingleton<
+                _ = services.AddSingleton<ITokenStatusSource, TokenStatusService>();
+                _ = services.AddSingleton<
                     IBotAccountAuthorizationPolicy,
                     ConfiguredBotAccountAuthorizationPolicy
                 >();
@@ -414,17 +423,17 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddTransient<AccessListProfileResolver>();
+        _ = services.AddTransient<AccessListProfileResolver>();
         switch (profileEnrichment)
         {
             case AccessListProfileEnrichmentMode.Disabled:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IAccessListProfileEnrichmentPolicy,
                     DisabledAccessListProfileEnrichmentPolicy
                 >();
                 break;
             case AccessListProfileEnrichmentMode.Twitch:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IAccessListProfileEnrichmentPolicy,
                     HelixAccessListProfileEnrichmentPolicy
                 >();
@@ -436,20 +445,20 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     "Unknown access-list profile-enrichment mode."
                 );
         }
-        services.AddSingleton<SiteAccessChangeNotifier>();
-        services.AddScoped<SiteAccessService>();
+        _ = services.AddSingleton<SiteAccessChangeNotifier>();
+        _ = services.AddScoped<SiteAccessService>();
         return services;
     }
 
     public static IServiceCollection AddBlokeBotHosts(this IServiceCollection services)
     {
-        services.AddSingleton<BotHostProvisioningService>();
-        services.AddSingleton<BotHostRemovalService>();
-        services.AddSingleton<PublicLeaderboardHostLookup>();
-        services.AddTransient<AuthorizedHostSelectionService>();
-        services.AddScoped<BotHostSelectionAccessor>();
-        services.AddScoped<HostConfigService>();
-        services.AddSingleton<HostModAccessService>();
+        _ = services.AddSingleton<BotHostProvisioningService>();
+        _ = services.AddSingleton<BotHostRemovalService>();
+        _ = services.AddSingleton<PublicLeaderboardHostLookup>();
+        _ = services.AddTransient<AuthorizedHostSelectionService>();
+        _ = services.AddScoped<BotHostSelectionAccessor>();
+        _ = services.AddScoped<HostConfigService>();
+        _ = services.AddSingleton<HostModAccessService>();
         return services;
     }
 
@@ -460,36 +469,36 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<ChannelBotAuthorizationService>();
-        services.AddSingleton<HostBotAccountOAuthService>();
-        services.AddSingleton<HostBotOAuthStateStore>();
-        services.AddSingleton<HostBroadcasterOAuthStateStore>();
-        services.AddDataProtection();
+        _ = services.AddSingleton<ChannelBotAuthorizationService>();
+        _ = services.AddSingleton<HostBotAccountOAuthService>();
+        _ = services.AddSingleton<HostBotOAuthStateStore>();
+        _ = services.AddSingleton<HostBroadcasterOAuthStateStore>();
+        _ = services.AddDataProtection();
         services.TryAddSingleton<
             IHostBotAccountTokenProtector,
             DataProtectionHostBotAccountTokenProtector
         >();
-        services.AddSingleton<HostBotAccountAuthorizationService>();
-        services.AddSingleton<HostBroadcasterAuthorizationService>();
-        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(serviceProvider =>
+        _ = services.AddSingleton<HostBotAccountAuthorizationService>();
+        _ = services.AddSingleton<HostBroadcasterAuthorizationService>();
+        _ = services.AddSingleton<IHostBroadcasterTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
         );
-        services.AddSingleton<IBroadcasterAccountProvider>(serviceProvider =>
+        _ = services.AddSingleton<IBroadcasterAccountProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
         );
-        services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
+        _ = services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()
         );
         switch (appAccessToken)
         {
             case HostBotAppAccessTokenMode.Unavailable:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IHostBotAppAccessTokenSource,
                     UnavailableHostBotAppAccessTokenSource
                 >();
                 break;
             case HostBotAppAccessTokenMode.Twitch:
-                services.AddSingleton<
+                _ = services.AddSingleton<
                     IHostBotAppAccessTokenSource,
                     OAuthHostBotAppAccessTokenSource
                 >();
@@ -501,48 +510,48 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     "Unknown host-bot app-access-token mode."
                 );
         }
-        services.AddSingleton<HostedChannelChangeNotifier>();
-        services.AddSingleton<HostedChannelRuntimeControlService>();
-        services.AddSingleton<HostedChannelRuntimeLifecycleService>();
-        services.AddSingleton<HostedChannelRuntimeStatusService>();
-        services.AddSingleton<HostFeatureService>();
-        services.AddSingleton<HostBotStatusService>();
-        services.AddSingleton<IHostStreamLivenessProvider>(serviceProvider =>
+        _ = services.AddSingleton<HostedChannelChangeNotifier>();
+        _ = services.AddSingleton<HostedChannelRuntimeControlService>();
+        _ = services.AddSingleton<HostedChannelRuntimeLifecycleService>();
+        _ = services.AddSingleton<HostedChannelRuntimeStatusService>();
+        _ = services.AddSingleton<HostFeatureService>();
+        _ = services.AddSingleton<HostBotStatusService>();
+        _ = services.AddSingleton<IHostStreamLivenessProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBotStatusService>()
         );
-        services.AddSingleton<ICustomCommandViewerResolver, CustomCommandViewerResolver>();
-        services.AddSingleton<FollowerOnlyChatReadinessService>();
-        services.AddSingleton<WhisperQuotaService>();
-        services.AddSingleton<StartupMessageConfigurationService>();
-        services.AddSingleton<IStartupChatMessageProvider>(serviceProvider =>
+        _ = services.AddSingleton<ICustomCommandViewerResolver, CustomCommandViewerResolver>();
+        _ = services.AddSingleton<FollowerOnlyChatReadinessService>();
+        _ = services.AddSingleton<WhisperQuotaService>();
+        _ = services.AddSingleton<StartupMessageConfigurationService>();
+        _ = services.AddSingleton<IStartupChatMessageProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<StartupMessageConfigurationService>()
         );
-        services.AddSingleton<
+        _ = services.AddSingleton<
             IPrivateDeliveryFailureHandler,
             PrivateDeliveryFailureTelemetryHandler
         >();
-        services.AddSingleton<WhisperCommandResponseSender>();
-        services.AddSingleton<IBotChannelProvider, HostedChannelProvider>();
-        services.AddSingleton<HostedChannelLifecycleNotifier>();
+        _ = services.AddSingleton<WhisperCommandResponseSender>();
+        _ = services.AddSingleton<IBotChannelProvider, HostedChannelProvider>();
+        _ = services.AddSingleton<HostedChannelLifecycleNotifier>();
         return services;
     }
 
     public static IServiceCollection AddBlokeBotAuth(this IServiceCollection services)
     {
-        services.AddScoped<BlokeBotPageContextAccessor>();
-        services.AddSingleton<WebAuthConfiguration>();
-        services.AddTransient<ModeratedChannelLookupService>();
-        services.AddSingleton<ModeratorAuthorityService>();
-        services.AddSingleton<IModeratorAuthorityService>(serviceProvider =>
+        _ = services.AddScoped<BlokeBotPageContextAccessor>();
+        _ = services.AddSingleton<WebAuthConfiguration>();
+        _ = services.AddTransient<ModeratedChannelLookupService>();
+        _ = services.AddSingleton<ModeratorAuthorityService>();
+        _ = services.AddSingleton<IModeratorAuthorityService>(serviceProvider =>
             serviceProvider.GetRequiredService<ModeratorAuthorityService>()
         );
-        services.AddTransient<WebAuthService>();
-        services.AddTransient<WebOAuthClient>();
-        services.AddScoped<AuthSessionService>();
-        services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-        services.AddTransient<UserLookupService>();
-        services.AddTransient<ChannelBotOAuthService>();
-        services.AddScoped<AuthCookieValidator>();
+        _ = services.AddTransient<WebAuthService>();
+        _ = services.AddTransient<WebOAuthClient>();
+        _ = services.AddScoped<AuthSessionService>();
+        _ = services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
+        _ = services.AddTransient<UserLookupService>();
+        _ = services.AddTransient<ChannelBotOAuthService>();
+        _ = services.AddScoped<AuthCookieValidator>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }

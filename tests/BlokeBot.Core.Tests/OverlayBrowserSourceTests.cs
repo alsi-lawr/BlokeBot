@@ -57,7 +57,7 @@ public sealed class OverlayBrowserSourceTests
         snapshot.ServerEpoch.ShouldBe(epoch.Value);
         snapshot.Sequence.ShouldBe(12);
         snapshot.GeneratedAtUtc.ShouldBe(time.GetUtcNow());
-        snapshot.State.ShouldBeOfType<EmptyV1OverlayPresentationState>();
+        _ = snapshot.State.ShouldBeOfType<EmptyV1OverlayPresentationState>();
         var json = JsonSerializer.Serialize(
             snapshot,
             new JsonSerializerOptions(JsonSerializerDefaults.Web)
@@ -154,7 +154,7 @@ public sealed class OverlayBrowserSourceTests
         await using var host = await BrowserSourceHost.StartAsync();
         var seed = await host.SeedGuessingAsync("appearance-resync");
         await using var stream = await host.OpenLiveAsync(seed.AccessKey);
-        await stream.ReadEnvelopeAsync();
+        _ = await stream.ReadEnvelopeAsync();
 
         using var documentResponse = await host.Client.GetAsync($"/overlay/{seed.AccessKey}");
         var document = await documentResponse.Content.ReadAsStringAsync();
@@ -176,7 +176,7 @@ public sealed class OverlayBrowserSourceTests
             ),
             revision: 2
         );
-        await host.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
+        _ = await host.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
 
         var invalidation = await stream.ReadEnvelopeAsync();
         invalidation.GetProperty("eventType").GetString().ShouldBe("reauthenticate");
@@ -445,12 +445,12 @@ public sealed class OverlayBrowserSourceTests
         await using var host = await BrowserSourceHost.StartAsync();
         var seed = await host.SeedAsync("revoked-live");
         await using var oldStream = await host.OpenLiveAsync(seed.AccessKey);
-        await oldStream.ReadEnvelopeAsync();
+        _ = await oldStream.ReadEnvelopeAsync();
         host.Presence.Read(seed.HostId, seed.OverlayId).ActiveConnectionCount.ShouldBe(1);
         var replacementKey = BrowserSourceHost.AccessKey('r');
         await host.SetAccessKeyAsync(seed.OverlayId, replacementKey);
 
-        await host.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
+        _ = await host.Events.PublishAsync(AppEventKind.OverlaysChanged, CancellationToken.None);
 
         host.Presence.Read(seed.HostId, seed.OverlayId).ActiveConnectionCount.ShouldBe(0);
         host.Presence.Read(seed.HostId, seed.OverlayId)
@@ -476,7 +476,7 @@ public sealed class OverlayBrowserSourceTests
         var seed = await host.SeedAsync("reconnect-live");
         var instance = await host.ResolveAsync(seed.AccessKey);
         var firstStream = await host.OpenLiveAsync(seed.AccessKey);
-        await firstStream.ReadEnvelopeAsync();
+        _ = await firstStream.ReadEnvelopeAsync();
         host.Live.PublishTest(instance);
         (await firstStream.ReadEnvelopeAsync()).GetProperty("sequence").GetInt64().ShouldBe(1);
 
@@ -959,33 +959,33 @@ public sealed class OverlayBrowserSourceTests
                 new DateTimeOffset(2026, 7, 30, 16, 0, 0, TimeSpan.Zero)
             );
             var builder = WebApplication.CreateBuilder();
-            builder.Services.AddLogging();
-            builder.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-            builder.Services.AddSingleton<TimeProvider>(time);
-            builder.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
-            builder.Services.AddSingleton<HostedChannelChangeNotifier>();
-            builder.Services.AddSingleton<HostFeatureService>();
-            builder.Services.AddSingleton<IModeratorAuthorityService>(
+            _ = builder.Services.AddLogging();
+            _ = builder.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+            _ = builder.Services.AddSingleton<TimeProvider>(time);
+            _ = builder.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+            _ = builder.Services.AddSingleton<HostedChannelChangeNotifier>();
+            _ = builder.Services.AddSingleton<HostFeatureService>();
+            _ = builder.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            builder.Services.AddSingleton(new PreviewAuthenticationSettings());
+            _ = builder.Services.AddSingleton(new PreviewAuthenticationSettings());
             var mediaRoot = Path.Combine(
                 Path.GetTempPath(),
                 $"blokebot-browser-source-media-{Guid.NewGuid():N}"
             );
-            Directory.CreateDirectory(mediaRoot);
-            builder.Services.AddSingleton<IOptions<BlokeBotOptions>>(
+            _ = Directory.CreateDirectory(mediaRoot);
+            _ = builder.Services.AddSingleton<IOptions<BlokeBotOptions>>(
                 Options.Create(
                     new BlokeBotOptions { DatabasePath = Path.Combine(mediaRoot, "state.db") }
                 )
             );
-            builder
+            _ = builder
                 .Services.AddAuthentication(PreviewAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, PreviewAuthenticationHandler>(
                     PreviewAuthenticationHandler.SchemeName,
                     static _ => { }
                 );
-            builder.Services.AddAuthorization(options =>
+            _ = builder.Services.AddAuthorization(options =>
                 options.AddPolicy(
                     "HostSelected",
                     policy =>
@@ -998,20 +998,23 @@ public sealed class OverlayBrowserSourceTests
                             )
                 )
             );
-            builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-            builder.Services.AddBlokeBotOverlays();
-            builder.Services.AddSingleton<IOverlayDnsResolver>(new PublicOverlayDnsResolver());
+            _ = builder.Services.AddSingleton<
+                IAuthorizationHandler,
+                AuthSessionCapabilityHandler
+            >();
+            _ = builder.Services.AddBlokeBotOverlays();
+            _ = builder.Services.AddSingleton<IOverlayDnsResolver>(new PublicOverlayDnsResolver());
 
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");
             if (pathBase is not null)
             {
-                app.UsePathBase(pathBase);
+                _ = app.UsePathBase(pathBase);
             }
-            app.UseAuthentication();
-            app.UseAuthorization();
+            _ = app.UseAuthentication();
+            _ = app.UseAuthorization();
             var observedCompletedPaths = new ConcurrentQueue<string>();
-            app.Use(
+            _ = app.Use(
                 async (context, next) =>
                 {
                     await next(context);
@@ -1056,8 +1059,8 @@ public sealed class OverlayBrowserSourceTests
                 DisplayName = login,
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var overlay = new OverlayInstance
             {
                 PublicId = Guid.NewGuid(),
@@ -1072,8 +1075,8 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
@@ -1090,8 +1093,8 @@ public sealed class OverlayBrowserSourceTests
                 DisplayName = login,
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var overlay = new OverlayInstance
             {
                 PublicId = Guid.NewGuid(),
@@ -1107,8 +1110,8 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
@@ -1125,10 +1128,12 @@ public sealed class OverlayBrowserSourceTests
                 DisplayName = login,
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
-            db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "points" });
-            db.CommandAliases.Add(
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            _ = db.PointsSettings.Add(
+                new PointsSettings { HostId = host.Id, PointLabel = "points" }
+            );
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = host.Id,
@@ -1151,8 +1156,8 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
@@ -1170,8 +1175,8 @@ public sealed class OverlayBrowserSourceTests
                 DisplayName = login,
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var overlay = new OverlayInstance
             {
                 PublicId = Guid.NewGuid(),
@@ -1186,8 +1191,8 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
@@ -1223,8 +1228,8 @@ public sealed class OverlayBrowserSourceTests
                 DisplayName = login,
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             var overlay = new OverlayInstance
             {
                 PublicId = Guid.NewGuid(),
@@ -1239,8 +1244,8 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayInstances.Add(overlay);
-            await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(overlay);
+            _ = await db.SaveChangesAsync();
             _authentication.SelectedHostId = host.Id;
             return new OverlaySeed(host.Id, overlay.PublicId, accessKey);
         }
@@ -1300,15 +1305,15 @@ public sealed class OverlayBrowserSourceTests
                 CreatedAtUtc = Time.GetUtcNow().UtcDateTime,
                 UpdatedAtUtc = Time.GetUtcNow().UtcDateTime,
             };
-            db.OverlayCues.Add(cue);
-            await db.SaveChangesAsync();
+            _ = db.OverlayCues.Add(cue);
+            _ = await db.SaveChangesAsync();
             return cue.PublicId;
         }
 
         internal async Task SetFeaturesAsync(int hostId, HostFeatureFlags features)
         {
             await using var db = await database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .Hosts.Where(host => host.Id == hostId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(host => host.EnabledFeatures, features)
@@ -1318,7 +1323,7 @@ public sealed class OverlayBrowserSourceTests
         internal async Task<LiveStream> OpenLiveAsync(string accessKey, string query = "")
         {
             var response = await GetLiveResponseAsync(accessKey, query);
-            response.EnsureSuccessStatusCode();
+            _ = response.EnsureSuccessStatusCode();
             response.Content.Headers.ContentType?.MediaType.ShouldBe("text/event-stream");
             response.Headers.GetValues("X-Accel-Buffering").Single().ShouldBe("no");
             response.Headers.CacheControl?.NoStore.ShouldBeTrue();
@@ -1368,7 +1373,7 @@ public sealed class OverlayBrowserSourceTests
         internal async Task SetRevisionAsync(Guid overlayId, long revision)
         {
             await using var db = await database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .OverlayInstances.Where(value => value.PublicId == overlayId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(value => value.Revision, revision)
@@ -1382,7 +1387,7 @@ public sealed class OverlayBrowserSourceTests
         )
         {
             await using var db = await database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .OverlayInstances.Where(value => value.PublicId == overlayId)
                 .ExecuteUpdateAsync(setters =>
                     setters
@@ -1398,7 +1403,7 @@ public sealed class OverlayBrowserSourceTests
         {
             var digest = OverlayAccessKeyDigest.Compute(accessKey);
             await using var db = await database.CreateDbContextAsync();
-            await db
+            _ = await db
                 .OverlayInstances.Where(value => value.PublicId == overlayId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(value => value.AccessKeyDigest, digest)
@@ -1408,7 +1413,7 @@ public sealed class OverlayBrowserSourceTests
         internal async Task<JsonElement> GetStateAsync(string accessKey)
         {
             using var response = await Client.GetAsync($"/overlay/{accessKey}/state");
-            response.EnsureSuccessStatusCode();
+            _ = response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             return document.RootElement.Clone();
         }

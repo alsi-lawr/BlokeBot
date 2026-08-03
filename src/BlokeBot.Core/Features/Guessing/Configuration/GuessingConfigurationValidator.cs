@@ -121,7 +121,7 @@ public static class GuessingConfigurationValidator
     > ValidateDelete(GuessingConfiguration draft)
     {
         var errors = new List<GuessingConfigurationValidationError>();
-        ValidateProfileGraph(draft, errors);
+        _ = ValidateProfileGraph(draft, errors);
         return errors.Count > 0
             ? Validation<
                 GuessingProfileDeleteCommand,

@@ -19,7 +19,7 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             .ReserveRecipient(hostId, "bot-id", "viewer-id", "Viewer")
             .ExecuteAsync(CancellationToken.None);
 
-        first.Match(
+        _ = first.Match(
             success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
             _ => throw new InvalidOperationException("Expected a successful reservation.")
         );
@@ -42,7 +42,7 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
         var result = await reservation.ExecuteAsync(CancellationToken.None);
 
         beforeExecution.RecipientCount.ShouldBe(0);
-        result.Match(
+        _ = result.Match(
             success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
             _ => throw new InvalidOperationException("Expected a successful reservation.")
         );
@@ -59,7 +59,7 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             .ReserveRecipient(hostId, " ", "viewer-id", "viewer")
             .ExecuteAsync(CancellationToken.None);
 
-        result.Match(
+        _ = result.Match(
             _ => throw new InvalidOperationException("Expected an invalid identity error."),
             error => error.ShouldBeOfType<WhisperQuotaReservationError.InvalidIdentity>()
         );
@@ -80,7 +80,7 @@ public sealed class WhisperQuotaTests : WhisperResponseTestBase
             var result = await quota
                 .ReserveRecipient(hostId, "bot-id", $"viewer-id-{index}", $"viewer{index}")
                 .ExecuteAsync(CancellationToken.None);
-            result.Match(
+            _ = result.Match(
                 success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
                 _ => throw new InvalidOperationException("Expected a successful reservation.")
             );

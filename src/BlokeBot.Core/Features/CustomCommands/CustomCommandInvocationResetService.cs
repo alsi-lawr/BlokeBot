@@ -68,7 +68,7 @@ public sealed class CustomCommandInvocationResetService(
         }
 
         var affected = await claims.ExecuteDeleteAsync(ct);
-        db.CustomCommandInvocationResetAudits.Add(
+        _ = db.CustomCommandInvocationResetAudits.Add(
             new CustomCommandInvocationResetAudit
             {
                 HostId = hostId,
@@ -90,9 +90,9 @@ public sealed class CustomCommandInvocationResetService(
                 ResetAtUtc = clock.GetUtcNow().UtcDateTime,
             }
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
         return new CustomCommandInvocationResetOutcome.Reset(affected);
     }
 

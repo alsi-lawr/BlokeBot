@@ -18,7 +18,7 @@ public sealed class SimulationLaunchReadinessTests
     [Test]
     public async Task ReadyDashboard_OnlyBecomesReadyAfterNormalStartupPhases()
     {
-        Should.Throw<InvalidOperationException>(() =>
+        _ = Should.Throw<InvalidOperationException>(() =>
             SimulationMode.SelectScenario(["--simulation-scenario", "unknown"])
         );
 
@@ -98,7 +98,7 @@ public sealed class SimulationLaunchReadinessTests
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentCandidates.CountAsync()).ShouldBe(2);
         (await verify.TwitchClips.CountAsync()).ShouldBe(1);
-        (
+        _ = (
             await verify.MomentCandidates.SingleAsync(value => value.PublicId == captured.PublicId)
         ).TwitchClipId.ShouldNotBeNull();
         simulation.FakeTwitch.Authority.Transcript.ShouldContain(value =>

@@ -1,6 +1,6 @@
 @using System.Diagnostics
 
-<div class="@PageClass" @attributes="AdditionalAttributes">
+<div class="@_pageClass" @attributes="AdditionalAttributes">
     @if (Actions is null && SaveFeedback is null)
     {
         <PageHeader Kicker="@Kicker"
@@ -16,7 +16,7 @@
             {
                 <p class="dashboard-page__save-feedback"
                    data-save-feedback="@SaveFeedback.Kind.ToString().ToLowerInvariant()"
-                   role="@SaveFeedbackRole">
+                   role="@_saveFeedbackRole">
                     @SaveFeedback.Message
                 </p>
             }
@@ -54,45 +54,3 @@
             break;
     }
 </div>
-
-@code {
-    [Parameter]
-    public RenderFragment? Actions { get; set; }
-
-    [Parameter(CaptureUnmatchedValues = true)]
-    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
-
-    [Parameter, EditorRequired]
-    public RenderFragment? ChildContent { get; set; }
-
-    [Parameter]
-    public string Description { get; set; } = string.Empty;
-
-    [Parameter]
-    public string Kicker { get; set; } = string.Empty;
-
-    [Parameter]
-    public PageLoadState LoadState { get; set; } = new PageLoadState.Ready();
-
-    [Parameter]
-    public PageSaveFeedback? SaveFeedback { get; set; }
-
-    [Parameter, EditorRequired]
-    public string Title { get; set; } = string.Empty;
-
-    [Parameter]
-    public DashboardPageWidth Width { get; set; } = DashboardPageWidth.Readable;
-
-    private string PageClass =>
-        Width switch
-        {
-            DashboardPageWidth.Readable => "dashboard-page dashboard-page--readable app-motion-stack",
-            DashboardPageWidth.Wide => "dashboard-page dashboard-page--wide app-motion-stack",
-            _ => throw new UnreachableException(),
-        };
-
-    private string SaveFeedbackRole =>
-        SaveFeedback?.Kind is PageSaveFeedbackKind.Validation or PageSaveFeedbackKind.Failure
-            ? "alert"
-            : "status";
-}

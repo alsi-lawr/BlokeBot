@@ -61,11 +61,11 @@ public sealed class OAuthTransportTests
     [Test]
     public void InvalidAuthorizationScopeValues_CreatingScopeSet_RejectsInvalidElements()
     {
-        Should.Throw<ArgumentNullException>(() => OAuthAuthorizationScopeSet.Create(null!));
-        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([]));
-        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([null!]));
-        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([" "]));
-        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create(["chat read"]));
+        _ = Should.Throw<ArgumentNullException>(() => OAuthAuthorizationScopeSet.Create(null!));
+        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([]));
+        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([null!]));
+        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([" "]));
+        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create(["chat read"]));
     }
 
     [Test]
@@ -132,7 +132,7 @@ public sealed class OAuthTransportTests
 
         var outcome = await client.ValidateTokenAsync("invalid", CancellationToken.None);
 
-        outcome.ShouldBeOfType<TokenValidationOutcome.NotValidated>();
+        _ = outcome.ShouldBeOfType<TokenValidationOutcome.NotValidated>();
     }
 
     [Test]
@@ -164,10 +164,10 @@ public sealed class OAuthTransportTests
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
 
-        await Should.ThrowAsync<HttpRequestException>(() =>
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
             client.ValidateTokenAsync("limited", CancellationToken.None)
         );
-        await Should.ThrowAsync<HttpRequestException>(() =>
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
             client.ValidateTokenAsync("failed", CancellationToken.None)
         );
     }
@@ -182,7 +182,7 @@ public sealed class OAuthTransportTests
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
         );
 
-        await Should.ThrowAsync<JsonException>(() =>
+        _ = await Should.ThrowAsync<JsonException>(() =>
             client.ValidateTokenAsync("malformed", CancellationToken.None)
         );
     }

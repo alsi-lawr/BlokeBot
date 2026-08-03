@@ -42,7 +42,7 @@ public sealed class AutomaticRaidShoutoutTemplate
             }
             if (current != '{')
             {
-                literal.Append(current);
+                _ = literal.Append(current);
                 continue;
             }
 
@@ -67,16 +67,13 @@ public sealed class AutomaticRaidShoutoutTemplate
         }
         AddLiteral();
 
-        if (authoredCharacters > MaximumAuthoredCharacters)
-        {
-            return Invalid(
+        return authoredCharacters > MaximumAuthoredCharacters
+            ? Invalid(
                 $"Template text and fallbacks must be {MaximumAuthoredCharacters} characters or fewer."
+            )
+            : new AutomaticRaidTemplateParseOutcome.Valid(
+                new AutomaticRaidShoutoutTemplate(source, segments.ToArray(), authoredCharacters)
             );
-        }
-        return new AutomaticRaidTemplateParseOutcome.Valid(
-            new AutomaticRaidShoutoutTemplate(source, segments.ToArray(), authoredCharacters)
-        );
-
         AutomaticRaidTemplateParseOutcome Invalid(string message) =>
             new AutomaticRaidTemplateParseOutcome.Invalid(message);
 
@@ -89,7 +86,7 @@ public sealed class AutomaticRaidShoutoutTemplate
             var text = literal.ToString();
             segments.Add(new LiteralSegment(text));
             authoredCharacters += text.Length;
-            literal.Clear();
+            _ = literal.Clear();
         }
     }
 
@@ -101,14 +98,12 @@ public sealed class AutomaticRaidShoutoutTemplate
         {
             segment.Append(rendered, values);
         }
-        if (rendered.Length > MaximumRenderedCharacters)
-        {
-            return new AutomaticRaidTemplateRenderOutcome.TooLong(
+        return rendered.Length > MaximumRenderedCharacters
+            ? new AutomaticRaidTemplateRenderOutcome.TooLong(
                 rendered.Length,
                 MaximumRenderedCharacters
-            );
-        }
-        return new AutomaticRaidTemplateRenderOutcome.Rendered(rendered.ToString());
+            )
+            : new AutomaticRaidTemplateRenderOutcome.Rendered(rendered.ToString());
     }
 
     private static bool TryParseToken(string text, out TokenSegment? token, out string? error)
@@ -182,7 +177,7 @@ public sealed class AutomaticRaidShoutoutTemplate
                 TokenKind.StreamTitle => Optional(values.StreamTitle),
                 _ => throw new InvalidOperationException("Unsupported template token."),
             };
-            builder.Append(value);
+            _ = builder.Append(value);
         }
 
         private string Optional(string? value) =>

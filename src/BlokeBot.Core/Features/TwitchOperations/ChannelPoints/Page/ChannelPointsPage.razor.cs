@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -29,7 +30,7 @@ public partial class ChannelPointsPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
                 InvokeAsync,
@@ -46,7 +47,7 @@ public partial class ChannelPointsPage
         _loadFailed = false;
         try
         {
-            await LoadPageContextAsync();
+            _ = await LoadPageContextAsync();
             _nativeTwitchEnabled =
                 HostId != 0
                 && await _nativeTwitch.IsEnabledAsync(
@@ -108,15 +109,18 @@ public partial class ChannelPointsPage
         _editingRewardId = reward.ProviderRewardId;
         _rewardTitle = reward.Title;
         _rewardPrompt = reward.Prompt ?? string.Empty;
-        _rewardCost = reward.Cost.ToString();
+        _rewardCost = reward.Cost.ToString(CultureInfo.InvariantCulture);
         _rewardUserInput = reward.IsUserInputRequired;
         _rewardQueueSkip = reward.ShouldRedemptionsSkipRequestQueue;
         _rewardMaxPerStreamEnabled = reward.IsMaxPerStreamEnabled;
-        _rewardMaxPerStream = reward.MaxPerStream?.ToString() ?? string.Empty;
+        _rewardMaxPerStream =
+            reward.MaxPerStream?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         _rewardMaxPerUserPerStreamEnabled = reward.IsMaxPerUserPerStreamEnabled;
-        _rewardMaxPerUserPerStream = reward.MaxPerUserPerStream?.ToString() ?? string.Empty;
+        _rewardMaxPerUserPerStream =
+            reward.MaxPerUserPerStream?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         _rewardCooldownEnabled = reward.IsGlobalCooldownEnabled;
-        _rewardCooldownSeconds = reward.GlobalCooldownSeconds?.ToString() ?? string.Empty;
+        _rewardCooldownSeconds =
+            reward.GlobalCooldownSeconds?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         _rewardBackgroundColor = reward.BackgroundColor ?? string.Empty;
         _rewardEnabled = reward.IsEnabled;
         _rewardPaused = reward.IsPaused;
@@ -276,7 +280,7 @@ public partial class ChannelPointsPage
         };
         if (success)
         {
-            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
+            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
         }
         else
         {

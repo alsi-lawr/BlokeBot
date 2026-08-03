@@ -21,7 +21,7 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         using var startResponse = await host.Client.GetAsync("/oauth/host-bot/start");
 
         startResponse.StatusCode.ShouldBe(HttpStatusCode.Redirect);
-        startResponse.Headers.Location.ShouldNotBeNull();
+        _ = startResponse.Headers.Location.ShouldNotBeNull();
         startResponse.Headers.Location.Host.ShouldBe("id.twitch.tv");
     }
 
@@ -158,8 +158,8 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         await using var db = await host.DbFactory!.CreateDbContextAsync();
         var authorization = await db.HostBroadcasterAuthorizations.SingleAsync();
         authorization.TwitchUserId.ShouldBe("123");
-        authorization.ProtectedTokenPayload.ShouldNotBeNull();
-        authorization.AuthorizedScopes.ShouldNotBeNull();
+        _ = authorization.ProtectedTokenPayload.ShouldNotBeNull();
+        _ = authorization.AuthorizedScopes.ShouldNotBeNull();
         HostBroadcasterAuthorizationService.MilestoneScopes.ShouldAllBe(scope =>
             authorization.AuthorizedScopes.Contains(scope, StringComparison.Ordinal)
         );

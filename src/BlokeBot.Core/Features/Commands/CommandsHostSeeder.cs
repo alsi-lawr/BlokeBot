@@ -30,7 +30,7 @@ public sealed class CommandsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
         }
         else
         {
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -41,6 +41,6 @@ public sealed class CommandsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
         }
 
         host.CommandsAliasesConfigured = true;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 }

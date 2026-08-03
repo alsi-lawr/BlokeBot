@@ -1,3 +1,4 @@
+using System.Globalization;
 using Shouldly;
 
 namespace BlokeBot.Functional.Tests;
@@ -82,7 +83,9 @@ public sealed class OptionTests
     [Test]
     public void Some_Binding_ComposesOption()
     {
-        var bound = Option<int>.Some(21).Bind(value => Option<string>.Some((value * 2).ToString()));
+        var bound = Option<int>
+            .Some(21)
+            .Bind(value => Option<string>.Some((value * 2).ToString(CultureInfo.InvariantCulture)));
 
         bound.Match(value => value, () => string.Empty).ShouldBe("42");
     }

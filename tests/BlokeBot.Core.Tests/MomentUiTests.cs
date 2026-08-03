@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using AngleSharp.Dom;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Moments;
@@ -46,8 +45,8 @@ public sealed class MomentUiTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
             new OfflineStreamLivenessProvider()
         );
 
@@ -60,8 +59,8 @@ public sealed class MomentUiTests
             recap.GetAttribute("href").ShouldBe("/moments/streamer");
             recap.GetAttribute("target").ShouldBe("_blank");
             recap.GetAttribute("rel").ShouldBe("noopener");
-            recap.Closest(".page-header__actions").ShouldNotBeNull();
-            page.Find("#moment-marker-fallback").ShouldNotBeNull();
+            _ = recap.Closest(".page-header__actions").ShouldNotBeNull();
+            _ = page.Find("#moment-marker-fallback").ShouldNotBeNull();
             page.Find("label[for='moment-marker-fallback']")
                 .TextContent.ShouldContain("Use a stream marker");
             page.Find(".moment-setting-toggle").ClassList.ShouldContain("grid-rows-[auto_1fr]");
@@ -98,8 +97,8 @@ public sealed class MomentUiTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
             new UnavailableStreamLivenessProvider()
         );
 
@@ -133,9 +132,9 @@ public sealed class MomentUiTests
         );
         var testContext = UiTestContextFactory.CreateWithAuthorization(database, hostId);
         await using var context = testContext.Context;
-        testContext.Authorization.SetNotAuthorized();
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+        _ = testContext.Authorization.SetNotAuthorized();
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
             new OfflineStreamLivenessProvider()
         );
 
@@ -164,8 +163,8 @@ public sealed class MomentUiTests
                 TwitchUserId = "streamer-id",
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             hostId = host.Id;
             var clip = new TwitchClip
             {
@@ -176,8 +175,8 @@ public sealed class MomentUiTests
                 RequestedAtUtc = DateTime.UtcNow,
                 ResolvedAtUtc = DateTime.UtcNow,
             };
-            db.TwitchClips.Add(clip);
-            await db.SaveChangesAsync();
+            _ = db.TwitchClips.Add(clip);
+            _ = await db.SaveChangesAsync();
             clipId = clip.Id;
         }
         var service = new MomentHubService(
@@ -208,7 +207,7 @@ public sealed class MomentUiTests
             CancellationToken.None
         );
         using var context = new BunitContext();
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = context.Render<PublicMomentRecapPage>(parameters =>
             parameters.Add(component => component.Channel, "streamer")
@@ -216,7 +215,7 @@ public sealed class MomentUiTests
 
         page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Weekly recap"));
         page.Markup.ShouldContain("Public title");
-        page.Find("a[href='https://clips.twitch.tv/PublicMoment']").ShouldNotBeNull();
+        _ = page.Find("a[href='https://clips.twitch.tv/PublicMoment']").ShouldNotBeNull();
         page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         page.Find("input#moment-voter-login").GetAttribute("maxlength").ShouldBe("128");
     }
@@ -233,7 +232,7 @@ public sealed class MomentUiTests
             .ShouldHaveSingleItem();
 
         moderator.Policy.ShouldBe("HostSelected");
-        publicRoute.ShouldNotBeNull();
+        _ = publicRoute.ShouldNotBeNull();
     }
 
     [Test]
@@ -252,8 +251,8 @@ public sealed class MomentUiTests
                 TwitchUserId = "streamer-id",
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             hostId = host.Id;
             var clip = new TwitchClip
             {
@@ -264,8 +263,8 @@ public sealed class MomentUiTests
                 RequestedAtUtc = DateTime.UtcNow,
                 ResolvedAtUtc = DateTime.UtcNow,
             };
-            db.TwitchClips.Add(clip);
-            await db.SaveChangesAsync();
+            _ = db.TwitchClips.Add(clip);
+            _ = await db.SaveChangesAsync();
             clipId = clip.Id;
         }
         var service = new MomentHubService(
@@ -296,10 +295,10 @@ public sealed class MomentUiTests
 
         using (var authenticated = new BunitContext())
         {
-            authenticated.Services.AddSingleton(service);
+            _ = authenticated.Services.AddSingleton(service);
             var authorization = authenticated.AddAuthorization();
-            authorization.SetAuthorized("OAuth Viewer");
-            authorization.SetClaims(
+            _ = authorization.SetAuthorized("OAuth Viewer");
+            _ = authorization.SetClaims(
                 new Claim(ClaimTypes.NameIdentifier, "oauth-viewer-id"),
                 new Claim(ClaimTypes.Name, "OAuth Viewer"),
                 new Claim(AuthClaims.Login, "oauth_viewer")
@@ -314,7 +313,7 @@ public sealed class MomentUiTests
 
         using (var anonymous = new BunitContext())
         {
-            anonymous.Services.AddSingleton(service);
+            _ = anonymous.Services.AddSingleton(service);
             _ = anonymous.AddAuthorization();
             var page = anonymous.Render<PublicMomentRecapPage>(parameters =>
                 parameters.Add(component => component.Channel, "streamer")
@@ -396,8 +395,8 @@ public sealed class MomentUiTests
             TwitchUserId = "streamer-id",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

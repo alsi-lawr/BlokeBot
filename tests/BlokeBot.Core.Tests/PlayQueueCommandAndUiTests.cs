@@ -26,8 +26,8 @@ public sealed class PlayQueueCommandAndUiTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, host);
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
 
         var page = context.Render<PlayQueuesPage>();
 
@@ -97,8 +97,8 @@ public sealed class PlayQueueCommandAndUiTests
         );
         _ = await service.SelectPartyAsync(host, "squad", false, CancellationToken.None);
         await using var context = UiTestContextFactory.Create(database, host);
-        context.Services.AddSingleton(service);
-        context.Services.AddSingleton<IPrivateLobbyDelivery>(new FailingPrivateLobbyDelivery());
+        _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new FailingPrivateLobbyDelivery());
 
         var page = context.Render<PlayQueuesPage>();
 
@@ -134,9 +134,9 @@ public sealed class PlayQueueCommandAndUiTests
             CancellationToken.None
         );
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        services.AddSingleton(service);
-        services.AddChatCommands().AddCommandModule<PlayQueueCommandModule>();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton(service);
+        _ = services.AddChatCommands().AddCommandModule<PlayQueueCommandModule>();
         await using var provider = services.BuildServiceProvider();
         var dispatcher = provider.GetRequiredService<ChatCommandDispatcher>();
         var responses = new List<string>();
@@ -181,7 +181,7 @@ public sealed class PlayQueueCommandAndUiTests
         {
             var persistedHost = await disable.Hosts.SingleAsync();
             persistedHost.EnabledFeatures &= ~HostFeatureFlags.PlayWithViewers;
-            await disable.SaveChangesAsync();
+            _ = await disable.SaveChangesAsync();
         }
         var responseCount = responses.Count;
         await DispatchAsync(
@@ -217,10 +217,10 @@ public sealed class PlayQueueCommandAndUiTests
             CancellationToken.None
         );
         using var context = new BunitContext();
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
         var authorization = context.AddAuthorization();
-        authorization.SetAuthorized("OAuth Display");
-        authorization.SetClaims(
+        _ = authorization.SetAuthorized("OAuth Display");
+        _ = authorization.SetClaims(
             new Claim(ClaimTypes.NameIdentifier, "oauth-user-id"),
             new Claim(ClaimTypes.Name, "OAuth Display"),
             new Claim(AuthClaims.Login, "oauth_viewer")
@@ -252,7 +252,7 @@ public sealed class PlayQueueCommandAndUiTests
             await EntryIdAsync(database),
             CancellationToken.None
         );
-        readyCheck.ShouldBeOfType<PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded>();
+        _ = readyCheck.ShouldBeOfType<PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded>();
         await FindButton(page, "I'm ready").ClickAsync(new());
         page.WaitForAssertion(() => page.Markup.ShouldContain("You are ready."));
         await AssertIdentityAsync(
@@ -270,7 +270,7 @@ public sealed class PlayQueueCommandAndUiTests
             false,
             CancellationToken.None
         );
-        selection.ShouldBeOfType<PlayQueueResult<PlayQueueSelection>.Succeeded>();
+        _ = selection.ShouldBeOfType<PlayQueueResult<PlayQueueSelection>.Succeeded>();
 
         await FindButton(page, "Leave").ClickAsync(new());
         page.WaitForAssertion(() => page.Markup.ShouldContain("You left the queue."));
@@ -304,7 +304,7 @@ public sealed class PlayQueueCommandAndUiTests
             CancellationToken.None
         );
         using var context = new BunitContext();
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = RenderPublicPage(context);
 
@@ -343,7 +343,7 @@ public sealed class PlayQueueCommandAndUiTests
             CancellationToken.None
         );
         using var context = new BunitContext();
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = context.Render<PublicPlayQueuePage>(parameters =>
             parameters
@@ -367,7 +367,7 @@ public sealed class PlayQueueCommandAndUiTests
             .Cast<AuthorizeAttribute>()
             .ShouldHaveSingleItem()
             .Policy.ShouldBe("HostSelected");
-        typeof(PublicPlayQueuePage)
+        _ = typeof(PublicPlayQueuePage)
             .GetCustomAttributes(typeof(AllowAnonymousAttribute), true)
             .ShouldHaveSingleItem();
     }
@@ -457,8 +457,8 @@ public sealed class PlayQueueCommandAndUiTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

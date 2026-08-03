@@ -18,14 +18,11 @@ public sealed class GuessingCommandRouteResolver(
             context.CommandName,
             cancellationToken
         );
-        if (resolution is null)
-        {
-            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
-        }
-
-        return await GuessingAppCommandKindMap
-            .FromAppKind(resolution.Kind)
-            .Match(ResolveKindAsync, Unresolved);
+        return resolution is null
+            ? new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved()
+            : await GuessingAppCommandKindMap
+                .FromAppKind(resolution.Kind)
+                .Match(ResolveKindAsync, Unresolved);
 
         async ValueTask<
             CommandRouteResolution<GuessCommandKind, AppCommandRouteState>

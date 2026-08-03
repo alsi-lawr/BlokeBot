@@ -146,7 +146,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBeOfType<FollowerStatus.Follows>();
+        _ = status.ShouldBeOfType<FollowerStatus.Follows>();
     }
 
     [Test]
@@ -163,7 +163,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBeOfType<FollowerStatus.DoesNotFollow>();
+        _ = status.ShouldBeOfType<FollowerStatus.DoesNotFollow>();
     }
 
     [Test]
@@ -266,7 +266,7 @@ public sealed class HelixClientTests
         );
         var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
-        await Should.ThrowAsync<JsonException>(() =>
+        _ = await Should.ThrowAsync<JsonException>(() =>
             client.IsStreamLiveAsync(Context(), "streamer", CancellationToken.None)
         );
     }
@@ -289,7 +289,7 @@ public sealed class HelixClientTests
         );
         var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
-        await Should.ThrowAsync<JsonException>(() =>
+        _ = await Should.ThrowAsync<JsonException>(() =>
             client.GetFollowerStatusAsync(
                 Context(),
                 "broadcaster-id",
@@ -323,7 +323,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ShoutoutSendResult.Sent>();
+        _ = result.ShouldBeOfType<ShoutoutSendResult.Sent>();
     }
 
     [Test]

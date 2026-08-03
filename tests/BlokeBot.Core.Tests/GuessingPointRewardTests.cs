@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.Guessing.Rounds;
@@ -40,7 +41,9 @@ public sealed class GuessingPointRewardTests
                     )
             );
 
-        await service.SaveConfiguration(seed.HostId, command).ExecuteAsync(CancellationToken.None);
+        _ = await service
+            .SaveConfiguration(seed.HostId, command)
+            .ExecuteAsync(CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var profile = await db.Profiles.SingleAsync(x => x.Id == seed.ProfileId);
@@ -68,7 +71,7 @@ public sealed class GuessingPointRewardTests
             .ToListAsync(CancellationToken.None);
         var round = await db.Rounds.SingleAsync(x => x.Id == seed.RoundId);
 
-        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
+        _ = result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Message.ShouldBe(
             "blue wins. Correct guesses: one, three. Each winner gets 25 beans."
         );
@@ -97,7 +100,7 @@ public sealed class GuessingPointRewardTests
         var result = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>().Result;
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
+        _ = result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Message.ShouldBe("blue wins. Correct guesses: one, three.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
@@ -120,7 +123,7 @@ public sealed class GuessingPointRewardTests
             .DeclareWinner(seed.HostId, "green")
             .RunAsync(CancellationToken.None);
 
-        outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>();
+        _ = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>();
         presenter.Presentations.ShouldBeEmpty();
     }
 
@@ -143,11 +146,11 @@ public sealed class GuessingPointRewardTests
                 {
                     HostId = seed.HostId,
                     Login = "three",
-                    Amount = PointAmount.MaximumValue.ToString(),
+                    Amount = PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture),
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await balances.SaveChangesAsync();
+            _ = await balances.SaveChangesAsync();
         }
         var service = RoundService(dbFactory);
 
@@ -156,7 +159,7 @@ public sealed class GuessingPointRewardTests
             .RunAsync(CancellationToken.None);
 
         var failure = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.PayoutFailed>();
-        failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        _ = failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
         failure.Message.ShouldBe("Winner rewards could not be awarded.");
         failure.Message.ShouldNotContain("wins");
         failure.Message.ShouldNotContain("Each winner gets");
@@ -168,7 +171,10 @@ public sealed class GuessingPointRewardTests
         var persistedBalances = await db.PointBalances.OrderBy(x => x.Login).ToListAsync();
         persistedBalances
             .Select(balance => (balance.Login, balance.Amount))
-            .ShouldBe([("one", "5"), ("three", PointAmount.MaximumValue.ToString())]);
+            .ShouldBe([
+                ("one", "5"),
+                ("three", PointAmount.MaximumValue.ToString(CultureInfo.InvariantCulture)),
+            ]);
         (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
     }
 
@@ -197,8 +203,8 @@ public sealed class GuessingPointRewardTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
 
         var profile = new GuessRoundProfile
         {
@@ -219,9 +225,9 @@ public sealed class GuessingPointRewardTests
                 new GuessOption { Name = "green", ReplyText = "Green" },
             ],
         };
-        db.Profiles.Add(profile);
-        db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
+        _ = await db.SaveChangesAsync();
 
         var round = new GuessRound
         {
@@ -251,8 +257,8 @@ public sealed class GuessingPointRewardTests
                 },
             ],
         };
-        db.Rounds.Add(round);
-        await db.SaveChangesAsync();
+        _ = db.Rounds.Add(round);
+        _ = await db.SaveChangesAsync();
         return new RoundSeed(host.Id, profile.Id, round.Id);
     }
 

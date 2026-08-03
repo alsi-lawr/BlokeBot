@@ -29,7 +29,7 @@ internal sealed class PointsGiveawayScheduler(
 
         lock (_scheduleGate)
         {
-            _schedules.Remove(schedule.GiveawayId, out previous);
+            _ = _schedules.Remove(schedule.GiveawayId, out previous);
             _schedules[schedule.GiveawayId] = scheduled;
         }
 
@@ -545,7 +545,7 @@ internal sealed class PointsGiveawayScheduler(
                 && ReferenceEquals(scheduled.Cancellation, cts)
             )
             {
-                _schedules.Remove(giveawayId);
+                _ = _schedules.Remove(giveawayId);
             }
         }
     }

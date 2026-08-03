@@ -151,7 +151,7 @@ public sealed class CustomCommandConfigurationService(
         }
 
         await hostSettings.SetTimeZoneAsync(hostId, command.TimeZone, ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
         return Result<
             CustomCommandConfigurationSaved,
             CustomCommandConfigurationSaveFailure
@@ -195,24 +195,21 @@ public sealed class CustomCommandConfigurationService(
                 string.Empty
             )
             : await twitchAnnouncementAccess.GetReadinessAsync(channelLogin, ct);
-        if (readiness.Availability == TwitchAnnouncementAvailability.Available)
-        {
-            return command;
-        }
-
-        return new(
-            command.TimeZone,
-            command.MessageEntries,
-            command.Commands,
-            command.Counters,
-            command.Announcements.Select(announcement =>
-                announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
-                    ? announcement with
-                    {
-                        Enabled = false,
-                    }
-                    : announcement
-            )
-        );
+        return readiness.Availability == TwitchAnnouncementAvailability.Available
+            ? command
+            : new(
+                command.TimeZone,
+                command.MessageEntries,
+                command.Commands,
+                command.Counters,
+                command.Announcements.Select(announcement =>
+                    announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+                        ? announcement with
+                        {
+                            Enabled = false,
+                        }
+                        : announcement
+                )
+            );
     }
 }

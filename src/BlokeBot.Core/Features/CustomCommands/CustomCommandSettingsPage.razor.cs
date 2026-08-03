@@ -77,7 +77,7 @@ public partial class CustomCommandSettingsPage
 
     protected override async Task OnInitializedAsync()
     {
-        TrackSubscription(
+        _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.CustomCommandsChanged],
                 InvokeAsync,
@@ -112,7 +112,7 @@ public partial class CustomCommandSettingsPage
 
     private async Task LoadCoreAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -174,7 +174,7 @@ public partial class CustomCommandSettingsPage
                     {
                         FocusValidationTarget(error.Target);
                     }
-                    _toasts.Publish(
+                    _ = _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>("Custom commands need attention.")
                     );
                     return Task.CompletedTask;
@@ -191,7 +191,7 @@ public partial class CustomCommandSettingsPage
                     .SaveConfiguration(HostId, command)
                     .ExecuteAsync(CancellationToken.None);
                 await result.Match(
-                    async _ =>
+                    async completed =>
                     {
                         _config = await _configuration.LoadConfigurationAsync(
                             HostId,
@@ -206,13 +206,13 @@ public partial class CustomCommandSettingsPage
                         _announcementAdvancedOpenRequest = 0;
                         EnsureEditorSelection();
                         _loadedConfigurationFingerprint = EditableConfigurationFingerprint(_config);
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>("Custom commands saved.")
                         );
                     },
                     failure =>
                     {
-                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                         if (AliasCollisionTarget(failure) is { } target)
                         {
                             _validationErrors = [new(failure.Message, target)];
@@ -325,9 +325,11 @@ public partial class CustomCommandSettingsPage
     {
         if (
             _config is null
-            || _selectedEditor is { } selection
+            || (
+                _selectedEditor is { } selection
                 && EditorExists(selection)
                 && SelectionBelongsToActiveTab(selection)
+            )
         )
         {
             return;
@@ -341,11 +343,7 @@ public partial class CustomCommandSettingsPage
                 : null,
             CustomCommandSettingsTab.Commands => _config.Commands.FirstOrDefault() is { } command
                 ? new(CustomCommandEditorKind.Command, command.Id)
-            : _config.Counters.FirstOrDefault() is { } counter
-                ? new(CustomCommandEditorKind.Counter, counter.Id)
-            : _config.Announcements.FirstOrDefault() is { } announcement
-                ? new(CustomCommandEditorKind.ScheduledMessage, announcement.Id)
-            : null,
+                : FirstCommandTabSelection(),
             _ => null,
         };
     }
@@ -402,10 +400,10 @@ public partial class CustomCommandSettingsPage
         static void Append(StringBuilder builder, object? value)
         {
             var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-            builder.Append(text.Length);
-            builder.Append(':');
-            builder.Append(text);
-            builder.Append('|');
+            _ = builder.Append(text.Length);
+            _ = builder.Append(':');
+            _ = builder.Append(text);
+            _ = builder.Append('|');
         }
 
         Append(result, config.TimeZoneId);
@@ -934,7 +932,7 @@ public partial class CustomCommandSettingsPage
             || _config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 new ToastRequest<WarningToastStrategy>(
                     "This reply is used by a command or announcement. Change that first, then delete it."
                 )
@@ -942,7 +940,7 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.MessageEntries.Remove(entry);
+        _ = _config.MessageEntries.Remove(entry);
         EnsureEditorSelection();
     }
 
@@ -970,13 +968,13 @@ public partial class CustomCommandSettingsPage
     {
         if (entry.Variants.Count <= 1)
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 new ToastRequest<WarningToastStrategy>("A reply needs at least one message.")
             );
             return;
         }
 
-        entry.Variants.Remove(variant);
+        _ = entry.Variants.Remove(variant);
         entry.CurrentVariantIndex = Math.Min(entry.CurrentVariantIndex, entry.Variants.Count - 1);
     }
 
@@ -1022,7 +1020,7 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveCommand(CustomCommandEditor command)
     {
-        _config?.Commands.Remove(command);
+        _ = (_config?.Commands.Remove(command));
         EnsureEditorSelection();
     }
 
@@ -1080,21 +1078,21 @@ public partial class CustomCommandSettingsPage
                 switch (outcome)
                 {
                     case CustomCommandInvocationResetOutcome.Reset reset:
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>(
                                 $"Reset {reset.AffectedClaimCount} lifetime viewer use{(reset.AffectedClaimCount == 1 ? string.Empty : "s")}."
                             )
                         );
                         break;
                     case CustomCommandInvocationResetOutcome.ViewerNotFound:
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<WarningToastStrategy>(
                                 "That Twitch viewer could not be found."
                             )
                         );
                         break;
                     case CustomCommandInvocationResetOutcome.CommandNotFound:
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<ErrorToastStrategy>(
                                 "That command is no longer available. Reload and try again."
                             )
@@ -1138,14 +1136,14 @@ public partial class CustomCommandSettingsPage
                 switch (outcome)
                 {
                     case CustomCommandInvocationResetOutcome.Reset reset:
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>(
                                 $"Reset {reset.AffectedClaimCount} lifetime viewer use{(reset.AffectedClaimCount == 1 ? string.Empty : "s")}."
                             )
                         );
                         break;
                     case CustomCommandInvocationResetOutcome.CommandNotFound:
-                        _toasts.Publish(
+                        _ = _toasts.Publish(
                             new ToastRequest<ErrorToastStrategy>(
                                 "That command is no longer available. Reload and try again."
                             )
@@ -1183,7 +1181,7 @@ public partial class CustomCommandSettingsPage
             )
         )
         {
-            _toasts.Publish(
+            _ = _toasts.Publish(
                 new ToastRequest<WarningToastStrategy>(
                     "This counter is used by a command. Change that command first, then delete it."
                 )
@@ -1191,7 +1189,7 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.Counters.Remove(counter);
+        _ = _config.Counters.Remove(counter);
         EnsureEditorSelection();
     }
 
@@ -1220,17 +1218,29 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
     {
-        _config?.Announcements.Remove(announcement);
+        _ = (_config?.Announcements.Remove(announcement));
         EnsureEditorSelection();
     }
 
     private int NextTemporaryId() => _nextTemporaryId--;
 
+    private CustomCommandEditorSelection? FirstCommandTabSelection() =>
+        (_config?.Counters.FirstOrDefault(), _config?.Announcements.FirstOrDefault()) switch
+        {
+            ({ } counter, _) => new(CustomCommandEditorKind.Counter, counter.Id),
+            (_, { } announcement) => new(CustomCommandEditorKind.ScheduledMessage, announcement.Id),
+            _ => null,
+        };
+
     private string _selectedTimeZoneLabel =>
-        _config is null ? string.Empty
-        : _timeZones.FirstOrDefault(x => x.Id == _config.TimeZoneId) is { } timeZone
-            ? TimeZoneLabel(timeZone)
-        : _config.TimeZoneId;
+        _config switch
+        {
+            null => string.Empty,
+            { } config
+                when _timeZones.FirstOrDefault(x => x.Id == config.TimeZoneId) is { } timeZone =>
+                TimeZoneLabel(timeZone),
+            { } config => config.TimeZoneId,
+        };
 
     private static string CommandAdvancedSummary(CustomCommandEditor command)
     {
@@ -1394,5 +1404,7 @@ public partial class CustomCommandSettingsPage
         };
 
     private static string FormatLastSent(DateTime? value) =>
-        value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");
+        value is null
+            ? "Never"
+            : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
 }

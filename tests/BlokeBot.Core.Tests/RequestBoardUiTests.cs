@@ -20,7 +20,7 @@ public sealed class RequestBoardUiTests
             TimeProvider.System
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = context.Render<RequestBoardsPage>();
 
@@ -198,7 +198,7 @@ public sealed class RequestBoardUiTests
             CancellationToken.None
         );
         using var context = new BunitContext();
-        context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton(service);
 
         var page = context.Render<PublicRequestBoardPage>(parameters =>
             parameters
@@ -234,7 +234,7 @@ public sealed class RequestBoardUiTests
             .ShouldHaveSingleItem();
 
         moderator.Policy.ShouldBe("HostSelected");
-        publicRoute.ShouldNotBeNull();
+        _ = publicRoute.ShouldNotBeNull();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
@@ -247,8 +247,8 @@ public sealed class RequestBoardUiTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

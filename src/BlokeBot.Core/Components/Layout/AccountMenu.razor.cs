@@ -27,18 +27,11 @@ public partial class AccountMenu
             ? _selection.Current.ProfileImageUrl
             : Session.ProfileImageUrl;
 
-    private string IdentityText()
-    {
-        if (
-            _selection?.Current.Role == AuthRole.Admin
-            && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
-        )
-        {
-            return $"#{_selection.Current.DisplayName} ({Session.AdminEditingLogin})";
-        }
-
-        return Session.DisplayText;
-    }
+    private string IdentityText() =>
+        _selection?.Current.Role == AuthRole.Admin
+        && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
+            ? $"#{_selection.Current.DisplayName} ({Session.AdminEditingLogin})"
+            : Session.DisplayText;
 
     private string AccountInitial()
     {

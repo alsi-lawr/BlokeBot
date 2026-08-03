@@ -31,32 +31,43 @@ public sealed class ShoutoutService(
     public async Task<ShoutoutDashboardState> LoadAsync(
         int hostId,
         string? targetLogin,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Shoutouts, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Shoutouts,
+                cancellationToken
+            )
+        )
         {
             return new(null, new ShoutoutTargetCooldownReadiness.Unknown(), []);
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var cooldown = await db
             .ShoutoutCooldowns.AsNoTracking()
             .Where(x => x.HostId == hostId && x.TargetTwitchUserId == null)
             .Select(x => x.GlobalEligibleAtUtc)
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
         var normalizedTarget = Login.Normalize(targetLogin);
-        ShoutoutTargetCooldownReadiness targetCooldown =
-            string.IsNullOrWhiteSpace(normalizedTarget)
-                ? new ShoutoutTargetCooldownReadiness.Unknown()
-            : await db
+        ShoutoutTargetCooldownReadiness targetCooldown;
+        if (string.IsNullOrWhiteSpace(normalizedTarget))
+        {
+            targetCooldown = new ShoutoutTargetCooldownReadiness.Unknown();
+        }
+        else
+        {
+            var eligibleAt = await db
                 .ShoutoutCooldowns.AsNoTracking()
                 .Where(x => x.HostId == hostId && x.TargetLogin == normalizedTarget)
                 .Select(x => x.TargetEligibleAtUtc)
-                .SingleOrDefaultAsync(ct)
-                is { } eligibleAt
-                ? new ShoutoutTargetCooldownReadiness.EligibleAt(eligibleAt)
-            : new ShoutoutTargetCooldownReadiness.Unknown();
+                .SingleOrDefaultAsync(cancellationToken);
+            targetCooldown = eligibleAt is { } value
+                ? new ShoutoutTargetCooldownReadiness.EligibleAt(value)
+                : new ShoutoutTargetCooldownReadiness.Unknown();
+        }
         var history = await db
             .ShoutoutHistory.AsNoTracking()
             .Where(x => x.HostId == hostId)
@@ -73,17 +84,23 @@ public sealed class ShoutoutService(
                 x.CooldownEndsAtUtc,
                 x.TargetCooldownEndsAtUtc
             ))
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         return new(cooldown, targetCooldown, history);
     }
 
     public async Task<ShoutoutOperationOutcome> SendAsync(
         int hostId,
         string targetLogin,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Shoutouts, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Shoutouts,
+                cancellationToken
+            )
+        )
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -94,8 +111,8 @@ public sealed class ShoutoutService(
             return new ShoutoutOperationOutcome.TargetNotFound(targetLogin);
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         var broadcasterId = host?.TwitchUserId;
         if (host is null || string.IsNullOrWhiteSpace(broadcasterId))
         {
@@ -108,7 +125,11 @@ public sealed class ShoutoutService(
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var account = await accounts.GetActiveTokenStatusAsync(host.Login, _requiredScopes, ct);
+        var account = await accounts.GetActiveTokenStatusAsync(
+            host.Login,
+            _requiredScopes,
+            cancellationToken
+        );
         return await account.Status.Match(
             _ =>
                 Task.FromResult<ShoutoutOperationOutcome>(
@@ -137,7 +158,7 @@ public sealed class ShoutoutService(
                     missing.AccessToken,
                     missing.Validation.UserId,
                     missing.GrantedScopes,
-                    ct
+                    cancellationToken
                 ),
             ready =>
                 SendAuthorizedAsync(
@@ -148,19 +169,22 @@ public sealed class ShoutoutService(
                     ready.AccessToken,
                     ready.Validation.UserId,
                     ready.GrantedScopes,
-                    ct
+                    cancellationToken
                 )
         );
     }
 
-    public async Task ShoutoutReceivedAsync(EventSubShoutoutEvent shoutout, CancellationToken ct)
+    public async Task ShoutoutReceivedAsync(
+        EventSubShoutoutEvent shoutout,
+        CancellationToken cancellationToken
+    )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db.Hosts.SingleOrDefaultAsync(
             x =>
                 x.TwitchUserId == shoutout.BroadcasterUserId
                 || x.Login == Login.Normalize(shoutout.BroadcasterUserLogin),
-            ct
+            cancellationToken
         );
         if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts))
         {
@@ -171,7 +195,7 @@ public sealed class ShoutoutService(
             !string.IsNullOrWhiteSpace(shoutout.MessageId)
             && await db.ShoutoutHistory.AnyAsync(
                 x => x.HostId == host.Id && x.ProviderMessageId == shoutout.MessageId,
-                ct
+                cancellationToken
             )
         )
         {
@@ -181,7 +205,7 @@ public sealed class ShoutoutService(
             shoutout.Direction == EventSubShoutoutDirection.Sent
                 ? ShoutoutHistoryDirection.Sent
                 : ShoutoutHistoryDirection.Received;
-        db.ShoutoutHistory.Add(
+        _ = db.ShoutoutHistory.Add(
             new ShoutoutHistoryEntry
             {
                 HostId = host.Id,
@@ -207,7 +231,7 @@ public sealed class ShoutoutService(
                 null,
                 null,
                 shoutout.CooldownEndsAt?.UtcDateTime,
-                ct
+                cancellationToken
             );
             await StoreCooldownAsync(
                 db,
@@ -215,12 +239,12 @@ public sealed class ShoutoutService(
                 shoutout.ToBroadcasterUserId,
                 Login.Normalize(shoutout.ToBroadcasterUserLogin),
                 shoutout.TargetCooldownEndsAt?.UtcDateTime,
-                ct
+                cancellationToken
             );
         }
-        await TrimHistoryAsync(db, host.Id, ct);
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        await TrimHistoryAsync(db, host.Id, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
     }
 
     private async Task<ShoutoutOperationOutcome> SendAuthorizedAsync(
@@ -231,7 +255,7 @@ public sealed class ShoutoutService(
         string accessToken,
         string botId,
         IReadOnlyList<string> grantedScopes,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         if (ScopeSet.Missing(grantedScopes, _requiredScopes).Length > 0)
@@ -241,7 +265,7 @@ public sealed class ShoutoutService(
             );
         }
         var context = new HelixRequestContext(settings.Identity.ClientId, accessToken);
-        var target = await helix.GetShoutoutTargetAsync(context, targetLogin, ct);
+        var target = await helix.GetShoutoutTargetAsync(context, targetLogin, cancellationToken);
         if (target is null)
         {
             return new ShoutoutOperationOutcome.TargetNotFound(targetLogin);
@@ -250,7 +274,7 @@ public sealed class ShoutoutService(
         {
             return new ShoutoutOperationOutcome.SelfTarget();
         }
-        var stream = await helix.GetStreamAsync(context, target.Login, ct);
+        var stream = await helix.GetStreamAsync(context, target.Login, cancellationToken);
         if (stream is null || stream.ViewerCount == 0)
         {
             return new ShoutoutOperationOutcome.TargetOffline(target.Login);
@@ -264,25 +288,38 @@ public sealed class ShoutoutService(
             )
             .OrderByDescending(x => x.TargetTwitchUserId != null)
             .Select(x => x.TargetEligibleAtUtc ?? x.GlobalEligibleAtUtc)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(cancellationToken);
         if (cooldown is { } eligibleAt && eligibleAt > now)
         {
             return new ShoutoutOperationOutcome.CooldownActive(eligibleAt);
         }
         var authority =
-            botId == broadcasterId || await IsModeratorAsync(context, botId, broadcasterId, ct);
+            botId == broadcasterId
+            || await IsModeratorAsync(context, botId, broadcasterId, cancellationToken);
         if (!authority)
         {
             return new ShoutoutOperationOutcome.NotReady(
                 "The configured bot must be this channel's broadcaster or moderator."
             );
         }
-        if (!await nativeTwitch.IsEnabledAsync(host.Id, HostFeatureFlags.Shoutouts, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                host.Id,
+                HostFeatureFlags.Shoutouts,
+                cancellationToken
+            )
+        )
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var result = await helix.SendShoutoutAsync(context, broadcasterId, botId, target.Id, ct);
+        var result = await helix.SendShoutoutAsync(
+            context,
+            broadcasterId,
+            botId,
+            target.Id,
+            cancellationToken
+        );
         return result switch
         {
             ShoutoutSendResult.Sent => new ShoutoutOperationOutcome.Sent(target.Login),
@@ -303,9 +340,9 @@ public sealed class ShoutoutService(
         HelixRequestContext context,
         string botId,
         string broadcasterId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     ) =>
-        await helix.GetModeratedChannelStatusAsync(context, botId, broadcasterId, ct)
+        await helix.GetModeratedChannelStatusAsync(context, botId, broadcasterId, cancellationToken)
         is ModeratedChannelStatus.IsModerator;
 
     private static async Task StoreCooldownAsync(
@@ -314,17 +351,17 @@ public sealed class ShoutoutService(
         string? targetId,
         string? targetLogin,
         DateTime? eligibleAtUtc,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var state = await db.ShoutoutCooldowns.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.TargetTwitchUserId == targetId,
-            ct
+            cancellationToken
         );
         if (state is null)
         {
             state = new ShoutoutCooldownState { HostId = hostId, TargetTwitchUserId = targetId };
-            db.ShoutoutCooldowns.Add(state);
+            _ = db.ShoutoutCooldowns.Add(state);
         }
         state.GlobalEligibleAtUtc = targetId is null ? eligibleAtUtc : null;
         state.TargetLogin = targetId is null ? null : targetLogin;
@@ -335,14 +372,14 @@ public sealed class ShoutoutService(
     private static async Task TrimHistoryAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var excess = await db
             .ShoutoutHistory.Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.OccurredAtUtc)
             .Skip(100)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         db.ShoutoutHistory.RemoveRange(excess);
     }
 }

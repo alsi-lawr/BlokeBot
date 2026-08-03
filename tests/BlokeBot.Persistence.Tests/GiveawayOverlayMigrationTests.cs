@@ -18,7 +18,7 @@ public sealed class GiveawayOverlayMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
@@ -43,7 +43,7 @@ public sealed class GiveawayOverlayMigrationTests
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await upgraded.OverlayInstances.SingleAsync()).Type.ShouldBe(OverlayType.CuePlayer);
 
-        upgraded.OverlayInstances.Add(
+        _ = upgraded.OverlayInstances.Add(
             new OverlayInstance
             {
                 PublicId = Guid.Parse("805f4686-d192-4b9d-8481-790fef956a98"),
@@ -60,7 +60,7 @@ public sealed class GiveawayOverlayMigrationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await upgraded.SaveChangesAsync();
+        _ = await upgraded.SaveChangesAsync();
 
         (
             await upgraded

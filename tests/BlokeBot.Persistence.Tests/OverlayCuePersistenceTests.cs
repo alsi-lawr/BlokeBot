@@ -22,13 +22,13 @@ public sealed class OverlayCuePersistenceTests
         var first = Host("first");
         var second = Host("second");
         db.Hosts.AddRange(first, second);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         var cue = Cue(first.Id);
         var asset = Asset(first.Id);
-        db.OverlayCues.Add(cue);
-        db.OverlayMediaAssets.Add(asset);
-        await db.SaveChangesAsync();
-        db.OverlayCueMediaAssetReferences.Add(
+        _ = db.OverlayCues.Add(cue);
+        _ = db.OverlayMediaAssets.Add(asset);
+        _ = await db.SaveChangesAsync();
+        _ = db.OverlayCueMediaAssetReferences.Add(
             new()
             {
                 CueId = cue.Id,
@@ -36,14 +36,14 @@ public sealed class OverlayCuePersistenceTests
                 HostId = first.Id,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.OverlayMediaAssets.Where(value => value.Id == asset.Id).ExecuteDeleteAsync()
         );
         db.ChangeTracker.Clear();
 
-        db.OverlayCueMediaAssetReferences.Add(
+        _ = db.OverlayCueMediaAssetReferences.Add(
             new()
             {
                 CueId = cue.Id,
@@ -51,7 +51,7 @@ public sealed class OverlayCuePersistenceTests
                 HostId = second.Id,
             }
         );
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
     private static BotHost Host(string login) =>

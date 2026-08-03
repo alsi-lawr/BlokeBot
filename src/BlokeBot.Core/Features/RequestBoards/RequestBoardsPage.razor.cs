@@ -24,7 +24,7 @@ public partial class RequestBoardsPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
             && await _features.IsEnabledAsync(
@@ -495,36 +495,29 @@ public partial class RequestBoardsPage
         public string MaximumNumber { get; set; } = string.Empty;
         public string Choices { get; set; } = string.Empty;
 
-        public RequestBoardFieldCommand? ToCommand()
-        {
-            if (
-                !int.TryParse(
-                    MaximumLength,
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out var maximumLength
-                )
-                || !TryOptionalDecimal(MinimumNumber, out var minimum)
-                || !TryOptionalDecimal(MaximumNumber, out var maximum)
+        public RequestBoardFieldCommand? ToCommand() =>
+            !int.TryParse(
+                MaximumLength,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var maximumLength
             )
-            {
-                return null;
-            }
-
-            return new RequestBoardFieldCommand(
-                Key,
-                Label,
-                Kind,
-                IsRequired,
-                maximumLength,
-                minimum,
-                maximum,
-                Choices.Split(
-                    ',',
-                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-                )
-            );
-        }
+            || !TryOptionalDecimal(MinimumNumber, out var minimum)
+            || !TryOptionalDecimal(MaximumNumber, out var maximum)
+                ? null
+                : new RequestBoardFieldCommand(
+                    Key,
+                    Label,
+                    Kind,
+                    IsRequired,
+                    maximumLength,
+                    minimum,
+                    maximum,
+                    Choices.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                    )
+                );
 
         public static BoardFieldDraft New() => new() { Key = "details", Label = "Details" };
 

@@ -36,11 +36,11 @@ internal sealed partial class EfPublicChatOutbox
                 completedAt,
                 cancellationToken
             );
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             if (alertCreated && events is not null)
             {
-                await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+                _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
             }
             return changed;
         }

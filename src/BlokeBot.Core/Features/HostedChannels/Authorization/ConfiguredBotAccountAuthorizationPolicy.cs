@@ -59,7 +59,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
         }
 
         await tokenCache.ClearAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     private async Task<BotAccountAuthorizationStatus> GetAuthorizedStatusAsync(
@@ -74,9 +74,9 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     {
         var authorizedLogin = LoginName.Parse(validation.Login).Value;
         var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(accessToken, ct);
-        if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
+        return string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal) switch
         {
-            return new(
+            false => new(
                 configuredBotLogin,
                 authorizedLogin,
                 authorizedProfileImageUrl,
@@ -85,11 +85,8 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
                 grantedScopes,
                 missingScopes,
                 "The connected Twitch account is not the expected bot account."
-            );
-        }
-
-        return missingScopes.IsEmpty
-            ? new(
+            ),
+            true when missingScopes.IsEmpty => new(
                 configuredBotLogin,
                 authorizedLogin,
                 authorizedProfileImageUrl,
@@ -98,8 +95,8 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
                 grantedScopes,
                 [],
                 "The bot account is ready."
-            )
-            : new(
+            ),
+            _ => new(
                 configuredBotLogin,
                 authorizedLogin,
                 authorizedProfileImageUrl,
@@ -108,7 +105,8 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
                 grantedScopes,
                 missingScopes,
                 "The bot account needs more Twitch access."
-            );
+            ),
+        };
     }
 
     private async Task<string?> LoadAuthorizedProfileImageUrlAsync(

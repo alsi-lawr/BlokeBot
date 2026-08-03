@@ -24,13 +24,13 @@ public sealed class GiveawayOverlayTests
             .ShouldBeOfType<OverlayConfigurationParseResult.Valid>()
             .Value.ShouldBeOfType<OverlayConfiguration.GiveawayV1>()
             .Title.ShouldBe("Community giveaway");
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.Giveaway,
                 $$"""{"schemaVersion":1,"title":"{{new string('x', 81)}}","showEntrantCount":true,"showCountdown":false,"showJoinCommand":true}"""
             )
             .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
-        OverlayConfiguration
+        _ = OverlayConfiguration
             .Parse(
                 OverlayType.Giveaway,
                 """{"schemaVersion":1,"title":"Giveaway","showEntrantCount":true,"showCountdown":false,"showJoinCommand":true,"joinCommand":"enter"}"""
@@ -74,7 +74,7 @@ public sealed class GiveawayOverlayTests
         );
         var instance = Instance(hostId);
 
-        (await provider.ProjectAsync(instance, CancellationToken.None))
+        _ = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GiveawayV1>()
             .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Idle>();
 
@@ -96,8 +96,8 @@ public sealed class GiveawayOverlayTests
                     },
                 ],
             };
-            db.PointsGiveaways.Add(giveaway);
-            await db.SaveChangesAsync();
+            _ = db.PointsGiveaways.Add(giveaway);
+            _ = await db.SaveChangesAsync();
             giveawayId = giveaway.Id;
         }
 
@@ -118,7 +118,7 @@ public sealed class GiveawayOverlayTests
             _now.UtcDateTime.AddSeconds(-1),
             null
         );
-        (await provider.ProjectAsync(instance, CancellationToken.None))
+        _ = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GiveawayV1>()
             .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Ending>();
 
@@ -131,7 +131,7 @@ public sealed class GiveawayOverlayTests
             giveaway.CompletedAtUtc = _now.UtcDateTime;
             giveaway.Winners.Add(new PointsGiveawayWinner { Login = "winner-one", Payout = "500" });
             giveaway.Winners.Add(new PointsGiveawayWinner { Login = "winner-two", Payout = "250" });
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var completed = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GiveawayV1>()
@@ -165,11 +165,11 @@ public sealed class GiveawayOverlayTests
             .Message.ShouldBe("Giveaway closed without a winner");
 
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.Overlays);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.Points);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
     }
@@ -217,7 +217,7 @@ public sealed class GiveawayOverlayTests
         (await ReadAsync(ownerConnection))
             .ShouldBeOfType<OverlayLiveTransportMessage.GiveawayBaseline>()
             .Envelope.Payload.Animation.ShouldBe("none");
-        await ReadAsync(otherConnection);
+        _ = await ReadAsync(otherConnection);
 
         var blockedProjection = liveProvider.BlockNextProjection();
         await coordinator.GiveawayChangedAsync(81, CancellationToken.None);
@@ -225,10 +225,10 @@ public sealed class GiveawayOverlayTests
         await coordinator.GiveawayChangedAsync(81, CancellationToken.None);
         await coordinator.GiveawayChangedAsync(81, CancellationToken.None);
         blockedProjection.Release();
-        (
+        _ = (
             await ReadAsync(ownerConnection)
         ).ShouldBeOfType<OverlayLiveTransportMessage.GiveawayEvent>();
-        (
+        _ = (
             await ReadAsync(ownerConnection)
         ).ShouldBeOfType<OverlayLiveTransportMessage.GiveawayEvent>();
         ownerConnection.Messages.TryRead(out _).ShouldBeFalse();
@@ -308,9 +308,9 @@ public sealed class GiveawayOverlayTests
             EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Points,
             CreatedAtUtc = _now.UtcDateTime,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(new PointsSettings { HostId = host.Id, PointLabel = "beans" });
         db.CommandAliases.AddRange(
             new CommandAlias
             {
@@ -325,7 +325,7 @@ public sealed class GiveawayOverlayTests
                 Alias = "enter",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -338,7 +338,7 @@ public sealed class GiveawayOverlayTests
     )
     {
         await using var db = await database.CreateDbContextAsync();
-        await db
+        _ = await db
             .PointsGiveaways.Where(value => value.Id == giveawayId)
             .ExecuteUpdateAsync(setters =>
                 setters
@@ -355,7 +355,7 @@ public sealed class GiveawayOverlayTests
     )
     {
         await using var db = await database.CreateDbContextAsync();
-        await db
+        _ = await db
             .Hosts.Where(value => value.Id == hostId)
             .ExecuteUpdateAsync(setters =>
                 setters.SetProperty(value => value.EnabledFeatures, features)
@@ -430,7 +430,7 @@ public sealed class GiveawayOverlayTests
             {
                 var release = _blockedProjectionRelease.ShouldNotBeNull();
                 _blockedProjectionEntered = null;
-                entered.TrySetResult();
+                _ = entered.TrySetResult();
                 await release.Task.WaitAsync(cancellationToken);
                 _blockedProjectionRelease = null;
             }

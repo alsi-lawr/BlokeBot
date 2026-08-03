@@ -107,7 +107,7 @@ public sealed class BlokeBotStatePathTests
     public void UnwritableStateDirectory_Preparing_ReturnsActionableFailure()
     {
         var root = Path.Combine(Path.GetTempPath(), $"blokebot-path-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(root);
+        _ = Directory.CreateDirectory(root);
         var blockingFile = Path.Combine(root, "not-a-directory");
         File.WriteAllText(blockingFile, "blocked");
         try

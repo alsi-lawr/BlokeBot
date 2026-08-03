@@ -100,7 +100,8 @@ public sealed class IrcConnectionSessionTests
         lifecycle.StoppedChannels.ShouldBeEmpty();
         status.Current.ShouldBeOfType<BotRuntimeStatus.Connected>().Channels.ShouldBe(["channel"]);
         chat.Messages.ShouldBe([new SentMessage("channel", PrivateStartupMessage)]);
-        chat.Deadlines.ShouldHaveSingleItem()
+        _ = chat
+            .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
         var warning = logger.Entries.Single(entry => entry.Level == LogLevel.Warning);
         warning.Exception.ShouldBeNull();

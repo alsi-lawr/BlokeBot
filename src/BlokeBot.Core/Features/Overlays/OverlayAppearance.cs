@@ -158,26 +158,23 @@ public sealed record OverlayAppearance
         return null;
     }
 
-    internal string ToScopedCss()
-    {
-        if (string.IsNullOrEmpty(Css))
-        {
-            return string.Empty;
-        }
-        return Regex.Replace(
-            Css,
-            @"(?<selector>[^{}]+)\{",
-            match =>
-                string.Join(
-                    ",",
-                    match
-                        .Groups["selector"]
-                        .Value.Split(
-                            ',',
-                            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
-                        )
-                        .Select(selector => $"#overlay-root {selector}")
-                ) + "{"
-        );
-    }
+    internal string ToScopedCss() =>
+        string.IsNullOrEmpty(Css)
+            ? string.Empty
+            : Regex.Replace(
+                Css,
+                @"(?<selector>[^{}]+)\{",
+                match =>
+                    string.Join(
+                        ",",
+                        match
+                            .Groups["selector"]
+                            .Value.Split(
+                                ',',
+                                StringSplitOptions.TrimEntries
+                                    | StringSplitOptions.RemoveEmptyEntries
+                            )
+                            .Select(selector => $"#overlay-root {selector}")
+                    ) + "{"
+            );
 }

@@ -20,8 +20,8 @@ public sealed class AuthorizedHostSelectionServiceTests
     public async Task SelfAndModeratedHosts_LoadingAuthorizedSelection_ReturnsSelfAndAllowedModeratedHosts()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "streamer", "Streamer");
-        await SeedHostAsync(dbFactory, "allowed", "Allowed");
+        _ = await SeedHostAsync(dbFactory, "streamer", "Streamer");
+        _ = await SeedHostAsync(dbFactory, "allowed", "Allowed");
         var blockedHostId = await SeedHostAsync(dbFactory, "blocked", "Blocked");
         var events = TestEventBus.Create<AppEventKind>();
         var modAccess = new HostModAccessService(
@@ -95,8 +95,8 @@ public sealed class AuthorizedHostSelectionServiceTests
             DisplayName = displayName,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

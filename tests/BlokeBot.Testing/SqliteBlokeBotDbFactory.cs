@@ -21,7 +21,7 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
     {
         var factory = await CreateEmptyAsync();
         await using var db = factory.CreateDbContext();
-        await db.Database.EnsureCreatedAsync();
+        _ = await db.Database.EnsureCreatedAsync();
         return factory;
     }
 

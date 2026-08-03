@@ -34,28 +34,28 @@ internal static class UiTestContextFactory
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var events = TestEventBus.Create<AppEventKind>();
 
-        context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
-        context.Services.AddSingleton(events);
-        context.Services.AddSingleton<TimeProvider>(
+        _ = context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
+        _ = context.Services.AddSingleton(events);
+        _ = context.Services.AddSingleton<TimeProvider>(
             new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero))
         );
-        context.Services.AddSingleton(new BlokeBotPageContextAccessor());
-        context.Services.AddSingleton(BlokeBotBuildIdentity.Current);
-        context.Services.AddSingleton<UiFaultTelemetry>();
-        context.Services.AddSingleton<HostedChannelChangeNotifier>();
-        context.Services.AddSingleton<HostFeatureService>();
-        context.Services.AddBlokeBotAlerts();
-        context.Services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
-        context.Services.AddSingleton<ITwitchAnnouncementReadinessProvider>(
+        _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
+        _ = context.Services.AddSingleton(BlokeBotBuildIdentity.Current);
+        _ = context.Services.AddSingleton<UiFaultTelemetry>();
+        _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
+        _ = context.Services.AddSingleton<HostFeatureService>();
+        _ = context.Services.AddBlokeBotAlerts();
+        _ = context.Services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
+        _ = context.Services.AddSingleton<ITwitchAnnouncementReadinessProvider>(
             new UnavailableTwitchAnnouncementReadinessProvider()
         );
-        context.Services.AddBlokeBotToasts();
+        _ = context.Services.AddBlokeBotToasts();
 
         var host = new BotHostChoice(hostId, hostLogin, "Streamer", AuthRole.Streamer);
         var authorization = context.AddAuthorization();
-        authorization.SetAuthorized(hostLogin);
-        authorization.SetPolicies("HostSelected", "Operator");
-        authorization.SetClaims(
+        _ = authorization.SetAuthorized(hostLogin);
+        _ = authorization.SetPolicies("HostSelected", "Operator");
+        _ = authorization.SetClaims(
             new Claim(ClaimTypes.NameIdentifier, $"{hostLogin}-id"),
             new Claim(ClaimTypes.Name, hostLogin),
             new Claim(AuthClaims.Login, hostLogin),

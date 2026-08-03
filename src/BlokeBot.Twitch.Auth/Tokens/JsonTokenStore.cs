@@ -36,7 +36,7 @@ public sealed class JsonTokenStore : ITokenStore
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrWhiteSpace(directory))
         {
-            Directory.CreateDirectory(directory);
+            _ = Directory.CreateDirectory(directory);
         }
 
         var tempPath = Path.Combine(

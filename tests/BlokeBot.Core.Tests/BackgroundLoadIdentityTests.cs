@@ -12,7 +12,7 @@ public sealed class BackgroundLoadIdentityTests
         var first = HostBotChannelStatusPanelLoadIdentity.From(" Streamer ", null);
         var second = HostBotChannelStatusPanelLoadIdentity.From("streamer", string.Empty);
 
-        first.ShouldNotBeNull();
+        _ = first.ShouldNotBeNull();
         first.ShouldBe(second);
     }
 
@@ -22,8 +22,8 @@ public sealed class BackgroundLoadIdentityTests
         var first = HostBotChannelStatusPanelLoadIdentity.From("streamer", "first");
         var second = HostBotChannelStatusPanelLoadIdentity.From("STREAMER", "second");
 
-        first.ShouldNotBeNull();
-        second.ShouldNotBeNull();
+        _ = first.ShouldNotBeNull();
+        _ = second.ShouldNotBeNull();
         first.ShouldNotBe(second);
     }
 
@@ -33,7 +33,7 @@ public sealed class BackgroundLoadIdentityTests
         var first = PointsEligibilityLoadIdentity.From(" Streamer ");
         var second = PointsEligibilityLoadIdentity.From("streamer");
 
-        first.ShouldNotBeNull();
+        _ = first.ShouldNotBeNull();
         first.ShouldBe(second);
     }
 

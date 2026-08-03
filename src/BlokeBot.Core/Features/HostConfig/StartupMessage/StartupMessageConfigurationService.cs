@@ -47,7 +47,7 @@ public sealed class StartupMessageConfigurationService(
 
         host.StartupMessageEnabled = command.Enabled;
         host.StartupMessageText = normalizedText.Length == 0 ? null : normalizedText;
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         return new StartupMessageSaveOutcome.Saved(
             new StartupMessageConfiguration(command.Enabled, normalizedText)
         );

@@ -99,7 +99,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRuntimeSessionHealthReporter, RuntimeSessionHealthLogger>();
         services.TryAddSingleton<IRuntimeIdleWait, RuntimeIdleWait>();
         RegisterPolicies(services, policies);
-        services.AddSingleton<IBotAccountProvider, DefaultBotAccountProvider>();
+        _ = services.AddSingleton<IBotAccountProvider, DefaultBotAccountProvider>();
         services.TryAddSingleton<
             INativeTwitchFeatureStateProvider,
             EnabledNativeTwitchFeatureStateProvider
@@ -108,26 +108,26 @@ public static class ServiceCollectionExtensions
             IStartupChatMessageProvider,
             ConfiguredStartupChatMessageProvider
         >();
-        services.AddSingleton<ICommandResponseSender, PublicChatCommandResponseSender>();
-        services.AddSingleton<IBotChannelLifecycleNotifier, NoOpBotChannelLifecycleNotifier>();
-        services.AddAuth();
-        services.AddHelix();
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddSingleton<ICommandResponseSender, PublicChatCommandResponseSender>();
+        _ = services.AddSingleton<IBotChannelLifecycleNotifier, NoOpBotChannelLifecycleNotifier>();
+        _ = services.AddAuth();
+        _ = services.AddHelix();
+        _ = services.AddContinueAndReportObserverFanOut<
             IrcMessageObserverBoundary,
             ChatMessage,
             ChatObserverDeadLetter
         >(BotObserverBoundaries.IrcMessages);
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddContinueAndReportObserverFanOut<
             EventSubMessageObserverBoundary,
             ChatMessage,
             ChatObserverDeadLetter
         >(BotObserverBoundaries.EventSubMessages);
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddContinueAndReportObserverFanOut<
             PublicChatQueueAlertObserverBoundary,
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(BotObserverBoundaries.PublicChatQueueAlerts);
-        services.AddContinueAndReportObserverFanOut<
+        _ = services.AddContinueAndReportObserverFanOut<
             PublicChatTerminalRejectionObserverBoundary,
             PublicChatTerminalRejection,
             PublicChatTerminalRejectionDeadLetter
@@ -138,17 +138,17 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IPublicChatTransport, HelixPublicChatTransport>();
         services.TryAddSingleton<ChatIdentityResolver>();
         services.TryAddSingleton<PublicChatMessageQueue>();
-        services.AddHostedService<PublicChatOutboxWorker>();
+        _ = services.AddHostedService<PublicChatOutboxWorker>();
         services.TryAddSingleton<IPublicChatPinStore, UnavailablePublicChatPinStore>();
         services.TryAddSingleton<IPublicChatPinProvider, HelixPublicChatPinProvider>();
-        services.AddHostedService<PublicChatPinWorker>();
+        _ = services.AddHostedService<PublicChatPinWorker>();
         services.TryAddSingleton<IPublicChatMessageSender, PublicChatMessageSender>();
-        services.AddSingleton<BotRuntimeStatusStore>();
-        services.AddSingleton<IBotRuntimeStatusAccessor>(sp =>
+        _ = services.AddSingleton<BotRuntimeStatusStore>();
+        _ = services.AddSingleton<IBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<BotRuntimeStatusStore>()
         );
-        services.AddSingleton<EventSubChannelStatusStore>();
-        services.AddSingleton<IEventSubChannelStatusAccessor>(serviceProvider =>
+        _ = services.AddSingleton<EventSubChannelStatusStore>();
+        _ = services.AddSingleton<IEventSubChannelStatusAccessor>(serviceProvider =>
             serviceProvider.GetRequiredService<EventSubChannelStatusStore>()
         );
         services.TryAddSingleton<EventSubSubscriptionReconciliationStore>();
@@ -166,33 +166,36 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<EventSubRuntime>();
         services.TryAddSingleton<IIrcConnectionSession, IrcConnectionSession>();
         services.TryAddSingleton<IrcRuntime>();
-        services.AddHostedService<BotRuntimeHostedService>();
+        _ = services.AddHostedService<BotRuntimeHostedService>();
 
         return services.AddChatCommands();
     }
 
     private static void RegisterSettings(IServiceCollection services, BotSettings settings)
     {
-        services.AddSingleton(settings);
-        services.AddSingleton(settings.Identity);
+        _ = services.AddSingleton(settings);
+        _ = services.AddSingleton(settings.Identity);
     }
 
     private static void RegisterPolicies(IServiceCollection services, BotPolicies policies)
     {
-        services.AddSingleton(policies);
-        services.AddKeyedSingleton(BotResiliencePipeline.IrcSession, policies.IrcSession);
-        services.AddKeyedSingleton(BotResiliencePipeline.EventSubSession, policies.EventSubSession);
-        services.AddKeyedSingleton(
+        _ = services.AddSingleton(policies);
+        _ = services.AddKeyedSingleton(BotResiliencePipeline.IrcSession, policies.IrcSession);
+        _ = services.AddKeyedSingleton(
+            BotResiliencePipeline.EventSubSession,
+            policies.EventSubSession
+        );
+        _ = services.AddKeyedSingleton(
             BotResiliencePipeline.EventSubChannelRecovery,
             policies.EventSubChannelRecovery
         );
-        services.AddKeyedSingleton(
+        _ = services.AddKeyedSingleton(
             BotResiliencePipeline.PublicChatDelivery,
             policies.PublicChatRetry
         );
-        services.AddSingleton(policies.PublicChatDeliveryLifetime);
-        services.AddSingleton(policies.PublicChatTerminalRetention);
-        services.AddResiliencePipeline(
+        _ = services.AddSingleton(policies.PublicChatDeliveryLifetime);
+        _ = services.AddSingleton(policies.PublicChatTerminalRetention);
+        _ = services.AddResiliencePipeline(
             BotResiliencePipeline.IrcSession,
             (builder, context) =>
             {
@@ -204,7 +207,7 @@ public static class ServiceCollectionExtensions
                 );
             }
         );
-        services.AddResiliencePipeline(
+        _ = services.AddResiliencePipeline(
             BotResiliencePipeline.EventSubSession,
             (builder, context) =>
             {
@@ -216,7 +219,10 @@ public static class ServiceCollectionExtensions
                 );
             }
         );
-        services.AddResiliencePipeline<BotResiliencePipeline, EventSubChannelReconciliationOutcome>(
+        _ = services.AddResiliencePipeline<
+            BotResiliencePipeline,
+            EventSubChannelReconciliationOutcome
+        >(
             BotResiliencePipeline.EventSubChannelRecovery,
             (builder, context) =>
             {
@@ -227,17 +233,17 @@ public static class ServiceCollectionExtensions
                 );
             }
         );
-        services.AddSingleton(serviceProvider => new IrcSessionResiliencePipeline(
+        _ = services.AddSingleton(serviceProvider => new IrcSessionResiliencePipeline(
             serviceProvider
                 .GetRequiredService<ResiliencePipelineProvider<BotResiliencePipeline>>()
                 .GetPipeline(BotResiliencePipeline.IrcSession)
         ));
-        services.AddSingleton(serviceProvider => new EventSubSessionResiliencePipeline(
+        _ = services.AddSingleton(serviceProvider => new EventSubSessionResiliencePipeline(
             serviceProvider
                 .GetRequiredService<ResiliencePipelineProvider<BotResiliencePipeline>>()
                 .GetPipeline(BotResiliencePipeline.EventSubSession)
         ));
-        services.AddSingleton(serviceProvider =>
+        _ = services.AddSingleton(serviceProvider =>
         {
             var attempt = new ResiliencePipelineBuilder
             {

@@ -53,7 +53,7 @@ public partial class HostConfigPage
                         _state = _state with { Commands = saved.Configuration };
                     }
                     await RefreshCommandCatalogAsync();
-                    _toasts.Publish(
+                    _ = _toasts.Publish(
                         ToastRequest<PositiveStatusToastStrategy>.WithTitle(
                             string.IsNullOrWhiteSpace(_commandsAliases)
                                 ? "The viewer command catalog is disabled."

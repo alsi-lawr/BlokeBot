@@ -74,7 +74,7 @@ internal sealed partial class EfPublicChatOutbox(
                 cancellationToken
             );
             db.PublicChatOutboxMessages.AddRange(rows);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             foreach (var pair in rows.Zip(batch.Items))
             {
                 if (pair.Second.PinIntent is not { } intent)
@@ -104,7 +104,7 @@ internal sealed partial class EfPublicChatOutbox(
                     continue;
                 }
 
-                db.PublicChatPinOperations.Add(
+                _ = db.PublicChatPinOperations.Add(
                     new PublicChatPinOperation
                     {
                         Kind = PublicChatPinOperationKind.Pin,
@@ -123,7 +123,7 @@ internal sealed partial class EfPublicChatOutbox(
                 );
             }
 
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new PublicChatEnqueueOutcome.Accepted(
                 new PublicChatOutboxReceipt([.. rows.Select(row => row.Id)])

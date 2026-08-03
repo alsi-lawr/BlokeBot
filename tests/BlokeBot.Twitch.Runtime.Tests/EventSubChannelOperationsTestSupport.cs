@@ -175,11 +175,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
             if (enabled)
             {
-                features.Add(kind);
+                _ = features.Add(kind);
             }
             else
             {
-                features.Remove(kind);
+                _ = features.Remove(kind);
             }
         }
 
@@ -190,31 +190,28 @@ public abstract partial class EventSubChannelRecoveryTestBase
             IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 _accountCounts[channel] = AccountCount(channel) + 1;
-                if (!_authorizations.TryGetValue(channel, out var authorizations))
-                {
-                    authorizations = [];
-                    _authorizations[channel] = authorizations;
-                }
+                var authorizations = _authorizations.GetValueOrDefault(channel) ?? [];
+                _authorizations[channel] = authorizations;
                 authorizations.Add(authorization);
-                if (authorization is EventSubAuthorizationContext.Broadcaster)
+                return (authorization is EventSubAuthorizationContext.Broadcaster) switch
                 {
-                    return
-                        _broadcasterAccountScripts.TryGetValue(channel, out var broadcasters)
-                        && broadcasters.Count > 0
+                    true => _broadcasterAccountScripts.TryGetValue(channel, out var broadcasters)
+                    && broadcasters.Count > 0
                         ? GetBroadcasterAccountAsync(broadcasters.Dequeue(), cancellationToken)
                         : ValueTask.FromResult(
                             Result<BotAccount, AccessTokenUnavailableReason>.Error(
                                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                             )
-                        );
-                }
-                return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
-                    ? scripts.Dequeue()(cancellationToken)
-                    : ValueTask.FromResult(
-                        Result<BotAccount, AccessTokenUnavailableReason>.Success(
-                            new BotAccount($"{channel}-bot", $"{channel}-secret")
-                        )
-                    );
+                        ),
+                    false => _accountScripts.TryGetValue(channel, out var scripts)
+                    && scripts.Count > 0
+                        ? scripts.Dequeue()(cancellationToken)
+                        : ValueTask.FromResult(
+                            Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                                new BotAccount($"{channel}-bot", $"{channel}-secret")
+                            )
+                        ),
+                };
             });
 
         public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
@@ -233,24 +230,21 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 _operationKinds[channel] = operationKinds;
             }
             operationKinds.Add(operationKind);
-            if (_createScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0)
-            {
-                return scripts.Dequeue()(cancellationToken);
-            }
-
-            return ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
-                new EventSubSubscriptionSetupOutcome.Created(
-                    new ActiveEventSubSubscription
-                    {
-                        Channel = channel,
-                        SubscriptionId = $"{sessionId}-{channel}",
-                        BotLogin = account.Login,
-                        Authorization = authorization,
-                        AccessToken = account.AccessToken,
-                        Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
-                    }
-                )
-            );
+            return _createScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
+                ? scripts.Dequeue()(cancellationToken)
+                : ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.Created(
+                        new ActiveEventSubSubscription
+                        {
+                            Channel = channel,
+                            SubscriptionId = $"{sessionId}-{channel}",
+                            BotLogin = account.Login,
+                            Authorization = authorization,
+                            AccessToken = account.AccessToken,
+                            Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+                        }
+                    )
+                );
         }
 
         public ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
@@ -283,15 +277,10 @@ public abstract partial class EventSubChannelRecoveryTestBase
         )
         {
             _channelStartedCounts[channel] = ChannelStartedCount(channel) + 1;
-            if (
-                _channelStartedFailures.TryGetValue(channel, out var failures)
-                && failures.Count > 0
-            )
-            {
-                return ValueTask.FromException(failures.Dequeue());
-            }
-
-            return ValueTask.CompletedTask;
+            return
+                _channelStartedFailures.TryGetValue(channel, out var failures) && failures.Count > 0
+                ? ValueTask.FromException(failures.Dequeue())
+                : ValueTask.CompletedTask;
         }
 
         public ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
@@ -315,35 +304,34 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 actions.Dequeue()();
             }
 
+            Exception? exception = null;
             if (
-                !_deleteOutcomes.TryGetValue(subscription.Channel, out var outcomes)
-                || outcomes.Count == 0
-                || outcomes.Dequeue() is not { } exception
+                _deleteOutcomes.TryGetValue(subscription.Channel, out var outcomes)
+                && outcomes.Count > 0
             )
             {
-                return ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
+                exception = outcomes.Dequeue();
+            }
+
+            return exception switch
+            {
+                null => ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
                     new EventSubSubscriptionDeletionOutcome.Deleted()
-                );
-            }
-
-            if (
-                exception is OperationCanceledException
-                && cancellationToken.IsCancellationRequested
-            )
-            {
-                return ValueTask.FromException<EventSubSubscriptionDeletionOutcome>(exception);
-            }
-
-            return ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
-                new EventSubSubscriptionDeletionOutcome.Unresolved
-                {
-                    Failure = EventSubChannelFailureClassifier.Classify(
-                        exception,
-                        EventSubChannelPhase.SubscriptionDeletion,
-                        cancellationToken
-                    ),
-                }
-            );
+                ),
+                OperationCanceledException canceled
+                    when cancellationToken.IsCancellationRequested =>
+                    ValueTask.FromException<EventSubSubscriptionDeletionOutcome>(canceled),
+                _ => ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
+                    new EventSubSubscriptionDeletionOutcome.Unresolved
+                    {
+                        Failure = EventSubChannelFailureClassifier.Classify(
+                            exception,
+                            EventSubChannelPhase.SubscriptionDeletion,
+                            cancellationToken
+                        ),
+                    }
+                ),
+            };
         }
 
         public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken)

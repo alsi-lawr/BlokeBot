@@ -59,7 +59,7 @@ internal sealed class SimulationCommandCatalogScenario(
             "unavailable" => SimulationStreamLiveness.Unavailable,
             _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown liveness."),
         };
-        await events.PublishAsync(AppEventKind.MomentsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.MomentsChanged, ct);
     }
 
     public async Task SetRoundAsync(string state, CancellationToken ct)
@@ -101,8 +101,8 @@ internal sealed class SimulationCommandCatalogScenario(
                 throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown round state.");
         }
 
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.GuessingChanged, ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await events.PublishAsync(AppEventKind.GuessingChanged, ct);
     }
 
     public async Task SetGiveawayAsync(string state, CancellationToken ct)
@@ -171,7 +171,7 @@ internal sealed class SimulationCommandCatalogScenario(
             );
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await giveawayChanges.NotifyChangedAsync(hostId, ct);
     }
 
@@ -199,8 +199,8 @@ internal sealed class SimulationCommandCatalogScenario(
                 "Unknown feature state."
             ),
         };
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.CommandsChanged, ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await events.PublishAsync(AppEventKind.CommandsChanged, ct);
     }
 
     public async Task<ViewerCommandCatalogSnapshot> SnapshotAsync(

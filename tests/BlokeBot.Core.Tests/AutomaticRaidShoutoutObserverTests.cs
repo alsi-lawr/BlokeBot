@@ -42,7 +42,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task ExactlyTwoMinutesOld_ClaimsBeforeOneTypedDeliveryAndPersistsMappedResult()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(
             new AutomaticRaidShoutoutDeliveryResult.NotDelivered(
                 AutomaticRaidShoutoutResultCode.Rejected
@@ -68,7 +68,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task DeliveryTerminalCallback_IsNotOverwrittenByQueueAdmissionResult()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var observer = Observer(factory, new TerminalCallbackDelivery(factory));
 
         await observer.IncomingRaidReceivedAsync(
@@ -86,7 +86,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task SequentialAndRestartDuplicate_UsesDurableHostScopedClaimOnce()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var raid = Raid("duplicate", _now, 1);
 
@@ -110,7 +110,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using var writer = await factory.CreateDbContextAsync();
         await using var transaction = await writer.Database.BeginTransactionAsync();
-        writer.AutomaticRaidShoutoutOutcomes.Add(
+        _ = writer.AutomaticRaidShoutoutOutcomes.Add(
             Outcome(
                 hostId,
                 "held-writer",
@@ -119,7 +119,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                 null
             )
         );
-        await writer.SaveChangesAsync();
+        _ = await writer.SaveChangesAsync();
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
 
         var observation = Task.Run(() =>
@@ -153,7 +153,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     {
         var contention = new PersistentProcessedEventDeleteContention();
         await using var factory = await InterceptedSqliteDbFactory.CreateAsync(contention);
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var observer = Observer(factory, delivery);
 
@@ -178,10 +178,10 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task CrashOrAmbiguousProcessing_IsVisibleAndNeverReplayed()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var throwing = new ThrowingDelivery();
         var raid = Raid("crash", _now, 1);
-        await Should.ThrowAsync<InvalidOperationException>(() =>
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
             Observer(factory, throwing).IncomingRaidReceivedAsync(raid, CancellationToken.None)
         );
         var replacement = new RecordingDelivery(
@@ -202,7 +202,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task AmbiguousResult_IsVisibleAndSameHostRedeliveryNeverReplays()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Ambiguous());
         var observer = Observer(factory, delivery);
         var raid = Raid("ambiguous-replay", _now, 1);
@@ -304,7 +304,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     )
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1);
+        _ = await SeedAsync(factory, enabled: true, threshold: 1);
         AutomaticRaidShoutoutDeliveryResult result = shape switch
         {
             DeliveryResultShape.Delivered => new AutomaticRaidShoutoutDeliveryResult.Delivered(),
@@ -327,8 +327,8 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task SameProviderIdentity_IsIndependentAcrossHosts()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedAsync(factory, enabled: true, threshold: 1, login: "host");
-        await SeedAsync(factory, enabled: true, threshold: 1, login: "other");
+        _ = await SeedAsync(factory, enabled: true, threshold: 1, login: "host");
+        _ = await SeedAsync(factory, enabled: true, threshold: 1, login: "other");
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Ambiguous());
 
         await Observer(factory, delivery)
@@ -349,7 +349,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
             host.EnabledFeatures &= ~HostFeatureFlags.Shoutouts;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
 
@@ -369,7 +369,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using (var db = await factory.CreateDbContextAsync())
         {
-            db.AutomaticRaidProcessedEvents.Add(
+            _ = db.AutomaticRaidProcessedEvents.Add(
                 new AutomaticRaidProcessedEvent
                 {
                     HostId = hostId,
@@ -378,7 +378,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                     ExpiresAtUtc = _now.AddMinutes(-2).UtcDateTime,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var observer = Observer(factory, delivery);
@@ -413,7 +413,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using (var db = await factory.CreateDbContextAsync())
         {
-            db.AutomaticRaidShoutoutOutcomes.Add(
+            _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 Outcome(
                     hostId,
                     "processing",
@@ -422,7 +422,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                     null
                 )
             );
-            db.AutomaticRaidShoutoutOutcomes.Add(
+            _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 Outcome(
                     hostId,
                     "ambiguous",
@@ -431,7 +431,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                     _now.UtcDateTime
                 )
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var observer = Observer(factory, delivery);
@@ -522,9 +522,9 @@ public sealed class AutomaticRaidShoutoutObserverTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = _now.UtcDateTime,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        db.AutomaticRaidShoutoutSettings.Add(
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        _ = db.AutomaticRaidShoutoutSettings.Add(
             new AutomaticRaidShoutoutSettings
             {
                 HostId = host.Id,
@@ -533,7 +533,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                 UpdatedAtUtc = _now.UtcDateTime,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -548,7 +548,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
             value.HostId == hostId
         );
         settings.Enabled = enabled;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static AutomaticRaidShoutoutOutcome Outcome(
@@ -612,7 +612,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
             outcome.Status = AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
             outcome.ResultCode = AutomaticRaidShoutoutResultCode.Rejected;
             outcome.CompletedAtUtc = _now.UtcDateTime;
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             return new AutomaticRaidShoutoutDeliveryResult.Delivered();
         }
     }
@@ -648,11 +648,11 @@ public sealed class AutomaticRaidShoutoutObserverTests
                     SQLitePCL.raw.SQLITE_BUSY,
                     SQLitePCL.raw.SQLITE_LOCKED
                 );
-                _failure.TrySetResult(exception);
+                _ = _failure.TrySetResult(exception);
             }
             catch (Exception exception)
             {
-                _failure.TrySetException(exception);
+                _ = _failure.TrySetException(exception);
             }
             return Task.CompletedTask;
         }
@@ -684,7 +684,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                 return ValueTask.FromResult(result);
             }
 
-            Interlocked.Increment(ref _matchedDispatches);
+            _ = Interlocked.Increment(ref _matchedDispatches);
             throw new SqliteException(
                 "Injected persistent processed-event cleanup contention.",
                 SQLitePCL.raw.SQLITE_BUSY
@@ -747,7 +747,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                 .Options;
             var factory = new InterceptedSqliteDbFactory(keeper, options);
             await using var db = await factory.CreateDbContextAsync();
-            await db.Database.EnsureCreatedAsync();
+            _ = await db.Database.EnsureCreatedAsync();
             return factory;
         }
 

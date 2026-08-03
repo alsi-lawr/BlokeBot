@@ -236,7 +236,7 @@ internal sealed class OverlayLiveCoordinator(
             _connections.Add(connection.Id, connection);
             var presence = GetOrCreatePresence(connection.Identity);
             presence.Connected(timeProvider.GetUtcNow());
-            connection.TryWrite(Baseline(instance, projection));
+            _ = connection.TryWrite(Baseline(instance, projection));
             return new OverlayLiveOpenResult.Opened(connection);
         }
     }
@@ -599,11 +599,11 @@ internal sealed class OverlayLiveCoordinator(
     )
     {
         var animation =
-            kind is OverlayLivePublicationKind.Test ? "none"
-            : snapshot.State.Phase is GiveawayOverlayPhase.Completed
-            && _giveawayPhases.GetValueOrDefault(identity) is not GiveawayOverlayPhase.Completed
-                ? "winner"
-            : "none";
+            kind is OverlayLivePublicationKind.Test
+            || snapshot.State.Phase is not GiveawayOverlayPhase.Completed
+            || _giveawayPhases.GetValueOrDefault(identity) is GiveawayOverlayPhase.Completed
+                ? "none"
+                : "winner";
         _giveawayPhases[identity] = snapshot.State.Phase;
         return new OverlayLiveTransportMessage.GiveawayEvent(
             new GiveawayV1OverlayLiveEnvelope
@@ -664,21 +664,17 @@ internal sealed class OverlayLiveCoordinator(
             State = snapshot.State,
         };
 
-    private static string AnimationFor(GuessingOverlayPhase previous, GuessingOverlayPhase current)
-    {
-        if (
-            current is GuessingOverlayPhase.Completed
-            && previous is not GuessingOverlayPhase.Completed
-        )
+    private static string AnimationFor(
+        GuessingOverlayPhase previous,
+        GuessingOverlayPhase current
+    ) =>
+        (previous, current) switch
         {
-            return "result";
-        }
-        if (current is GuessingOverlayPhase.Open && previous is GuessingOverlayPhase.NoRound)
-        {
-            return "entrance";
-        }
-        return current == previous ? "none" : "statusChange";
-    }
+            (not GuessingOverlayPhase.Completed, GuessingOverlayPhase.Completed) => "result",
+            (GuessingOverlayPhase.NoRound, GuessingOverlayPhase.Open) => "entrance",
+            var (samePrevious, sameCurrent) when samePrevious == sameCurrent => "none",
+            _ => "statusChange",
+        };
 
     private static string QueueAnimation(PlayQueueOverlayTransition transition) =>
         transition switch
@@ -772,7 +768,7 @@ internal sealed class OverlayLiveCoordinator(
     {
         lock (_connectionsGate)
         {
-            Interlocked.Increment(ref _generation);
+            _ = Interlocked.Increment(ref _generation);
             var disconnectedAtUtc = timeProvider.GetUtcNow();
             foreach (var connection in _connections.Values.ToArray())
             {
@@ -804,7 +800,7 @@ internal sealed class OverlayLiveCoordinator(
             return;
         }
 
-        _connections.Remove(connection.Id);
+        _ = _connections.Remove(connection.Id);
         GetOrCreatePresence(connection.Identity).Disconnected(disconnectedAtUtc);
         if (complete)
         {
@@ -912,7 +908,7 @@ internal sealed class OverlayLiveCoordinator(
 
         public async ValueTask DisposeAsync()
         {
-            _publications.Writer.TryComplete();
+            _ = _publications.Writer.TryComplete();
             await _worker;
         }
     }
@@ -968,7 +964,7 @@ internal sealed class OverlayLiveCoordinator(
             {
                 _terminal = envelope;
             }
-            _messages.Writer.TryComplete();
+            _ = _messages.Writer.TryComplete();
         }
 
         internal bool TryTakeTerminal(out OverlayLiveControlEnvelope? envelope)

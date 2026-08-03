@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
@@ -35,7 +34,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
 
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 RateLimitedPreparationOutcome(),
@@ -71,7 +70,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             new PublicChatDeliveryDeadline.ConfiguredMaximum()
         );
         var claimed = await ClaimAsync(schedulingOutbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await schedulingOutbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 RateLimitedPreparationOutcome(),
@@ -93,7 +92,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             TestEventBus.Create<AppEventKind>()
         );
 
-        (
+        _ = (
             await maintenanceOutbox.TryClaimNextAsync(
                 retryAt,
                 retryAt.AddMinutes(5),
@@ -127,25 +126,26 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 Channel = "first",
                 EnqueuedAt = now,
                 Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-                Items = ImmutableArray.Create(
+                Items =
+                [
                     new PublicChatOutboxItem
                     {
                         Message = "one automatic shoutout",
                         DeduplicationKey = PublicChatMessageDeduplication.CorrelatedKey(
                             correlation
                         ),
-                    }
-                ),
+                    },
+                ],
             },
             CancellationToken.None
         );
-        accepted.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>();
+        _ = accepted.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>();
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
-        (
+        _ = (
             await outbox.RecordDeliveryOutcomeAsync(
                 claimed,
                 new PublicChatDeliveryOutcome.Rejection
@@ -251,7 +251,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             new PublicChatDeliveryDeadline.ConfiguredMaximum()
         );
         var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
-        (
+        _ = (
             await outbox.BeginSendAsync(claimed, now, now.AddSeconds(1), CancellationToken.None)
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
@@ -329,15 +329,16 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                     Channel = "first",
                     EnqueuedAt = now,
                     Deadline = deadline,
-                    Items = ImmutableArray.Create(
+                    Items =
+                    [
                         new PublicChatOutboxItem
                         {
                             Message = "one automatic shoutout",
                             DeduplicationKey = PublicChatMessageDeduplication.CorrelatedKey(
                                 new PublicChatDeliveryCorrelation(1, "same-provider-message")
                             ),
-                        }
-                    ),
+                        },
+                    ],
                 },
                 CancellationToken.None
             )
@@ -368,13 +369,13 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             Outcome(1, "same-provider-message"),
             Outcome(2, "same-provider-message")
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task SeedAutomaticPinAsync(SqliteBlokeBotDbFactory database)
     {
         await using var db = await database.CreateDbContextAsync();
-        db.Hosts.Add(
+        _ = db.Hosts.Add(
             new BotHost
             {
                 EnabledFeatures = HostFeatureFlags.All,
@@ -384,8 +385,8 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 TwitchUserId = "first-id",
             }
         );
-        db.AutomaticRaidShoutoutOutcomes.Add(Outcome(1, "raid-message"));
-        db.PublicChatPinOperations.Add(
+        _ = db.AutomaticRaidShoutoutOutcomes.Add(Outcome(1, "raid-message"));
+        _ = db.PublicChatPinOperations.Add(
             new PublicChatPinOperation
             {
                 Id = 1,
@@ -403,7 +404,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
                 AttemptStartedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static AutomaticRaidShoutoutOutcome Outcome(int hostId, string providerMessageId) =>

@@ -21,8 +21,10 @@ public sealed class OverlayDashboardUiTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedAsync(database);
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
-        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -61,7 +63,7 @@ public sealed class OverlayDashboardUiTests
             page.FindAll(".segmented-motion__button").ShouldBeEmpty();
         });
 
-        page.Find("button").TextContent.ShouldNotBeNull();
+        _ = page.Find("button").TextContent.ShouldNotBeNull();
         page.Find("aside[aria-labelledby='overlay-inventory-title'] button.btn-secondary").Click();
 
         page.WaitForAssertion(() =>
@@ -126,8 +128,10 @@ public sealed class OverlayDashboardUiTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedViewerQueueAsync(database, enabled);
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
-        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -145,8 +149,8 @@ public sealed class OverlayDashboardUiTests
             page.Find("#viewer-queue-next-rows").GetAttribute("min").ShouldBe("0");
             page.Find("#viewer-queue-next-rows").GetAttribute("max").ShouldBe("12");
             page.FindAll("[aria-label='Viewer Queue sample state'] button").Count.ShouldBe(5);
-            page.FindAll("iframe").ShouldHaveSingleItem();
-            page.Find("[data-appearance-editor]").ShouldNotBeNull();
+            page.FindAll("iframe").Count.ShouldBe(1);
+            _ = page.Find("[data-appearance-editor]").ShouldNotBeNull();
             page.Markup.IndexOf("data-appearance-preview", StringComparison.Ordinal)
                 .ShouldBeLessThan(
                     page.Markup.IndexOf("data-overlay-editor", StringComparison.Ordinal)
@@ -221,10 +225,10 @@ public sealed class OverlayDashboardUiTests
         var seed = await SeedGuessingAsync(database);
         await using (var context = UiTestContextFactory.Create(database, seed.HostId))
         {
-            context.Services.AddSingleton<IModeratorAuthorityService>(
+            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
             var page = context.Render<OverlaysPage>();
 
@@ -254,7 +258,7 @@ public sealed class OverlayDashboardUiTests
 
         await using (var db = await database.CreateDbContextAsync())
         {
-            await db
+            _ = await db
                 .Hosts.Where(host => host.Id == seed.HostId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
@@ -262,10 +266,10 @@ public sealed class OverlayDashboardUiTests
         }
         await using (var context = UiTestContextFactory.Create(database, seed.HostId))
         {
-            context.Services.AddSingleton<IModeratorAuthorityService>(
+            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
             var page = context.Render<OverlaysPage>();
 
@@ -292,8 +296,10 @@ public sealed class OverlayDashboardUiTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedGuessingAsync(database);
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
-        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -351,7 +357,7 @@ public sealed class OverlayDashboardUiTests
         var styledId = Guid.Parse("1fd78bd8-044d-432f-b231-b38691fb626a");
         await using (var db = await database.CreateDbContextAsync())
         {
-            db.OverlayInstances.Add(
+            _ = db.OverlayInstances.Add(
                 new OverlayInstance
                 {
                     PublicId = styledId,
@@ -370,12 +376,14 @@ public sealed class OverlayDashboardUiTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         await using var context = UiTestContextFactory.Create(database, seed.HostId);
-        context.Services.AddSingleton<IModeratorAuthorityService>(new GrantedModeratorAuthority());
-        context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
         var page = context.Render<OverlaysPage>();
 
         page.WaitForAssertion(() =>
@@ -428,10 +436,10 @@ public sealed class OverlayDashboardUiTests
         var seed = await SeedGiveawayAsync(database);
         await using (var context = UiTestContextFactory.Create(database, seed.HostId))
         {
-            context.Services.AddSingleton<IModeratorAuthorityService>(
+            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
             var page = context.Render<OverlaysPage>();
 
             page.WaitForAssertion(() =>
@@ -455,7 +463,7 @@ public sealed class OverlayDashboardUiTests
 
         await using (var db = await database.CreateDbContextAsync())
         {
-            await db
+            _ = await db
                 .Hosts.Where(host => host.Id == seed.HostId)
                 .ExecuteUpdateAsync(setters =>
                     setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
@@ -463,10 +471,10 @@ public sealed class OverlayDashboardUiTests
         }
         await using (var context = UiTestContextFactory.Create(database, seed.HostId))
         {
-            context.Services.AddSingleton<IModeratorAuthorityService>(
+            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
                 new GrantedModeratorAuthority()
             );
-            context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
             var page = context.Render<OverlaysPage>();
 
             page.WaitForAssertion(() =>
@@ -529,8 +537,8 @@ public sealed class OverlayDashboardUiTests
             EnabledFeatures = HostFeatureFlags.Overlays,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.Parse("a255f385-c006-4a86-936b-6fd7393e0508"),
@@ -545,8 +553,8 @@ public sealed class OverlayDashboardUiTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.OverlayInstances.Add(overlay);
-        await db.SaveChangesAsync();
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
         return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
     }
 
@@ -562,8 +570,8 @@ public sealed class OverlayDashboardUiTests
             EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Guessing,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.Parse("93a5d74f-470e-4df3-920c-3f4932425a0d"),
@@ -579,8 +587,8 @@ public sealed class OverlayDashboardUiTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.OverlayInstances.Add(overlay);
-        await db.SaveChangesAsync();
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
         return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
     }
 
@@ -596,8 +604,8 @@ public sealed class OverlayDashboardUiTests
             EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Points,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.Parse("45949b52-282f-4133-b423-18d511690e70"),
@@ -613,8 +621,8 @@ public sealed class OverlayDashboardUiTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.OverlayInstances.Add(overlay);
-        await db.SaveChangesAsync();
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
         return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
     }
 
@@ -635,8 +643,8 @@ public sealed class OverlayDashboardUiTests
                 | (enabled ? HostFeatureFlags.PlayWithViewers : HostFeatureFlags.None),
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var queue = new PlayQueue
         {
             HostId = host.Id,
@@ -648,8 +656,8 @@ public sealed class OverlayDashboardUiTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.PlayQueues.Add(queue);
-        await db.SaveChangesAsync();
+        _ = db.PlayQueues.Add(queue);
+        _ = await db.SaveChangesAsync();
         var overlay = new OverlayInstance
         {
             PublicId = Guid.Parse("ecb603ce-c294-4d24-952e-a7dc5074ba3d"),
@@ -665,8 +673,8 @@ public sealed class OverlayDashboardUiTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.OverlayInstances.Add(overlay);
-        await db.SaveChangesAsync();
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
         return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
     }
 

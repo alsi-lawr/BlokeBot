@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
@@ -25,9 +26,9 @@ public sealed class ShoutoutServiceTests
                 TwitchUserId = "host-id",
                 EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.Shoutouts,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
-            db.ShoutoutHistory.Add(
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            _ = db.ShoutoutHistory.Add(
                 new ShoutoutHistoryEntry
                 {
                     HostId = host.Id,
@@ -38,10 +39,12 @@ public sealed class ShoutoutServiceTests
                     TargetTwitchUserId = "host-id",
                     TargetLogin = "host",
                     ViewerCount = 10,
-                    OccurredAtUtc = DateTime.Parse("2026-07-25T00:00:00Z").ToUniversalTime(),
+                    OccurredAtUtc = DateTime
+                        .Parse("2026-07-25T00:00:00Z", CultureInfo.InvariantCulture)
+                        .ToUniversalTime(),
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = new ShoutoutService(
             dbFactory,
@@ -60,7 +63,7 @@ public sealed class ShoutoutServiceTests
             "target-id",
             "target",
             42,
-            DateTimeOffset.Parse("2026-07-26T00:00:00Z"),
+            DateTimeOffset.Parse("2026-07-26T00:00:00Z", CultureInfo.InvariantCulture),
             null,
             null,
             EventSubShoutoutDirection.Received,
@@ -75,7 +78,7 @@ public sealed class ShoutoutServiceTests
             (await verifyDisabled.ShoutoutHistory.CountAsync()).ShouldBe(1);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.Shoutouts;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
         await service.ShoutoutReceivedAsync(delivery, CancellationToken.None);
@@ -108,7 +111,7 @@ public sealed class ShoutoutServiceTests
                     TwitchUserId = "second-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = new ShoutoutService(
             dbFactory,
@@ -127,9 +130,9 @@ public sealed class ShoutoutServiceTests
             "target-id",
             "target",
             42,
-            DateTimeOffset.Parse("2026-07-26T00:00:00Z"),
-            DateTimeOffset.Parse("2026-07-26T01:00:00Z"),
-            DateTimeOffset.Parse("2026-07-26T02:00:00Z"),
+            DateTimeOffset.Parse("2026-07-26T00:00:00Z", CultureInfo.InvariantCulture),
+            DateTimeOffset.Parse("2026-07-26T01:00:00Z", CultureInfo.InvariantCulture),
+            DateTimeOffset.Parse("2026-07-26T02:00:00Z", CultureInfo.InvariantCulture),
             EventSubShoutoutDirection.Sent,
             "provider-delivery"
         );
@@ -144,12 +147,18 @@ public sealed class ShoutoutServiceTests
         first
             .Single()
             .TargetCooldownEndsAtUtc.ShouldBe(
-                DateTime.Parse("2026-07-26T02:00:00Z").ToUniversalTime()
+                DateTime
+                    .Parse("2026-07-26T02:00:00Z", CultureInfo.InvariantCulture)
+                    .ToUniversalTime()
             );
         var dashboard = await service.LoadAsync(1, "target", CancellationToken.None);
         dashboard
             .TargetCooldown.ShouldBeOfType<ShoutoutTargetCooldownReadiness.EligibleAt>()
-            .Value.ShouldBe(DateTime.Parse("2026-07-26T02:00:00Z").ToUniversalTime());
+            .Value.ShouldBe(
+                DateTime
+                    .Parse("2026-07-26T02:00:00Z", CultureInfo.InvariantCulture)
+                    .ToUniversalTime()
+            );
     }
 
     [Test]
@@ -158,7 +167,7 @@ public sealed class ShoutoutServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -167,7 +176,7 @@ public sealed class ShoutoutServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var service = new ShoutoutService(
             dbFactory,
@@ -178,7 +187,10 @@ public sealed class ShoutoutServiceTests
             TimeProvider.System,
             new NativeTwitchFeatureGate(dbFactory)
         );
-        var targetEligibility = DateTimeOffset.Parse("2026-07-26T02:00:00Z");
+        var targetEligibility = DateTimeOffset.Parse(
+            "2026-07-26T02:00:00Z",
+            CultureInfo.InvariantCulture
+        );
         await service.ShoutoutReceivedAsync(
             new(
                 "host-id",
@@ -188,8 +200,8 @@ public sealed class ShoutoutServiceTests
                 "target-id",
                 "target",
                 42,
-                DateTimeOffset.Parse("2026-07-26T00:00:00Z"),
-                DateTimeOffset.Parse("2026-07-26T01:00:00Z"),
+                DateTimeOffset.Parse("2026-07-26T00:00:00Z", CultureInfo.InvariantCulture),
+                DateTimeOffset.Parse("2026-07-26T01:00:00Z", CultureInfo.InvariantCulture),
                 targetEligibility,
                 EventSubShoutoutDirection.Sent,
                 "target-delivery"
@@ -212,12 +224,12 @@ public sealed class ShoutoutServiceTests
                         TargetLogin = $"ordinary-{index}",
                         ViewerCount = 1,
                         OccurredAtUtc = DateTime
-                            .Parse("2026-07-26T00:01:00Z")
+                            .Parse("2026-07-26T00:01:00Z", CultureInfo.InvariantCulture)
                             .ToUniversalTime()
                             .AddMinutes(index),
                     })
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         await service.ShoutoutReceivedAsync(
@@ -229,7 +241,7 @@ public sealed class ShoutoutServiceTests
                 "ordinary-id-latest",
                 "ordinary-latest",
                 1,
-                DateTimeOffset.Parse("2026-07-26T04:00:00Z"),
+                DateTimeOffset.Parse("2026-07-26T04:00:00Z", CultureInfo.InvariantCulture),
                 null,
                 null,
                 EventSubShoutoutDirection.Received,
@@ -258,7 +270,7 @@ public sealed class ShoutoutServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -267,7 +279,7 @@ public sealed class ShoutoutServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var scopes =
             scenario is ShoutoutScenario.MissingScope
@@ -291,14 +303,14 @@ public sealed class ShoutoutServiceTests
         switch (scenario)
         {
             case ShoutoutScenario.Self:
-                outcome.ShouldBeOfType<ShoutoutOperationOutcome.SelfTarget>();
+                _ = outcome.ShouldBeOfType<ShoutoutOperationOutcome.SelfTarget>();
                 break;
             case ShoutoutScenario.Offline:
-                outcome.ShouldBeOfType<ShoutoutOperationOutcome.TargetOffline>();
+                _ = outcome.ShouldBeOfType<ShoutoutOperationOutcome.TargetOffline>();
                 break;
             case ShoutoutScenario.NotModerator:
             case ShoutoutScenario.MissingScope:
-                outcome.ShouldBeOfType<ShoutoutOperationOutcome.NotReady>();
+                _ = outcome.ShouldBeOfType<ShoutoutOperationOutcome.NotReady>();
                 break;
             default:
                 throw new InvalidOperationException();

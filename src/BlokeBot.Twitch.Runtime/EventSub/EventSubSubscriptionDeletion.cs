@@ -170,8 +170,8 @@ internal sealed class EventSubSubscriptionReconciliationStore
             }
 
             EnsureSameSubscription(existing.Subscription, subscription);
-            _pending.Remove(subscription.Channel);
-            _pendingStops.Add(subscription.Channel);
+            _ = _pending.Remove(subscription.Channel);
+            _ = _pendingStops.Add(subscription.Channel);
         }
     }
 

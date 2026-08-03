@@ -130,8 +130,8 @@ public sealed class ChatActivityHookTests
     internal static ChatCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(recorder);
-        services.AddChatCommands().AddCommandModule<RecordingCommandModule>();
+        _ = services.AddSingleton(recorder);
+        _ = services.AddChatCommands().AddCommandModule<RecordingCommandModule>();
         return services.BuildServiceProvider().GetRequiredService<ChatCommandDispatcher>();
     }
 

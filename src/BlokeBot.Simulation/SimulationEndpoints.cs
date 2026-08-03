@@ -7,7 +7,7 @@ internal static class SimulationEndpoints
 {
     public static void MapSimulationEndpoints(this WebApplication app)
     {
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/ready",
                 (SimulationReadiness readiness) =>
                 {
@@ -22,7 +22,7 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/login",
                 (string? view, string? theme) =>
                 {
@@ -42,7 +42,7 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
 
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/liveness/{state}",
                 async (
                     string state,
@@ -55,7 +55,7 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/round/{state}",
                 async (
                     string state,
@@ -68,7 +68,7 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/giveaway/{state}",
                 async (
                     string state,
@@ -81,7 +81,7 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/features/{state}",
                 async (
                     string state,
@@ -94,7 +94,7 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/simulation/commands/catalog",
                 async (
                     SimulationCommandCatalogScenario scenario,
@@ -103,7 +103,7 @@ internal static class SimulationEndpoints
                 ) => Results.Json(await scenario.SnapshotAsync(catalog, ct))
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/simulation/commands/chat",
                 async (
                     SimulationCommandCatalogScenario scenario,

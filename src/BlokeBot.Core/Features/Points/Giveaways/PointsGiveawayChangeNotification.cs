@@ -20,7 +20,7 @@ public sealed class PointsGiveawayChangeNotifier(
 
     public async ValueTask NotifyChangedAsync(int hostId, CancellationToken cancellationToken)
     {
-        await changes.NotifyChangedAsync(cancellationToken);
+        _ = await changes.NotifyChangedAsync(cancellationToken);
         foreach (var observer in observers)
         {
             await observer.GiveawayChangedAsync(hostId, cancellationToken);

@@ -52,8 +52,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
             BotRuntimeStateChangedAtUtc = changedAtUtc,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -101,8 +101,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
                 )
                 .ToList(),
         };
-        db.CustomMessageLibraryEntries.Add(entry);
-        await db.SaveChangesAsync();
+        _ = db.CustomMessageLibraryEntries.Add(entry);
+        _ = await db.SaveChangesAsync();
 
         schedule.HostId = hostId;
 
@@ -123,8 +123,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
         };
-        db.CustomAnnouncements.Add(announcement);
-        await db.SaveChangesAsync();
+        _ = db.CustomAnnouncements.Add(announcement);
+        _ = await db.SaveChangesAsync();
         return new AnnouncementSeed(announcement.Id, entry.Id);
     }
 

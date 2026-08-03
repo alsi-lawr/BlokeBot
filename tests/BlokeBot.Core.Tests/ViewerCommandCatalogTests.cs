@@ -33,8 +33,8 @@ public sealed class ViewerCommandCatalogTests
                 EnabledFeatures = HostFeatureFlags.CustomCommands,
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
             hostId = host.Id;
             db.CustomCommands.AddRange(
                 CatalogCommand(
@@ -55,7 +55,7 @@ public sealed class ViewerCommandCatalogTests
                     }
                 )
             );
-            db.OverlayInstances.Add(
+            _ = db.OverlayInstances.Add(
                 new OverlayInstance
                 {
                     HostId = hostId,
@@ -73,7 +73,7 @@ public sealed class ViewerCommandCatalogTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            db.OverlayCues.Add(
+            _ = db.OverlayCues.Add(
                 new OverlayCue
                 {
                     HostId = hostId,
@@ -88,7 +88,7 @@ public sealed class ViewerCommandCatalogTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var references = new RecordingCueAdmissions
         {
@@ -107,7 +107,7 @@ public sealed class ViewerCommandCatalogTests
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
             host.EnabledFeatures |= HostFeatureFlags.Overlays;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         references.Outcome = new OverlayCueReferenceOutcome.Available();
 
@@ -194,7 +194,7 @@ public sealed class ViewerCommandCatalogTests
             board.IsOpen = false;
             var queue = await db.PlayQueues.SingleAsync(value => value.HostId == fixture.HostId);
             queue.IsOpen = false;
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var catalog = new ViewerCommandCatalogService(
@@ -238,7 +238,7 @@ public sealed class ViewerCommandCatalogTests
                     SortOrder = 0,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var catalog = new ViewerCommandCatalogService(
@@ -261,11 +261,13 @@ public sealed class ViewerCommandCatalogTests
         var fixture = await SeedCatalogFixtureAsync(dbFactory);
         var liveness = new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline());
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>>(dbFactory);
-        services.AddSingleton<IHostStreamLivenessProvider>(liveness);
-        services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
-        services.AddSingleton<ViewerCommandCatalogService>();
-        services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>>(
+            dbFactory
+        );
+        _ = services.AddSingleton<IHostStreamLivenessProvider>(liveness);
+        _ = services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
+        _ = services.AddSingleton<ViewerCommandCatalogService>();
+        _ = services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
         var expected = await provider
             .GetRequiredService<ViewerCommandCatalogService>()
@@ -323,17 +325,17 @@ public sealed class ViewerCommandCatalogTests
                         UpdatedAtUtc = DateTime.UtcNow,
                     })
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
-        services.AddSingleton<IHostStreamLivenessProvider>(
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
+        _ = services.AddSingleton<IHostStreamLivenessProvider>(
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline())
         );
-        services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
-        services.AddSingleton<ViewerCommandCatalogService>();
-        services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
+        _ = services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
+        _ = services.AddSingleton<ViewerCommandCatalogService>();
+        _ = services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
         var snapshot = await provider
             .GetRequiredService<ViewerCommandCatalogService>()
@@ -419,12 +421,12 @@ public sealed class ViewerCommandCatalogTests
             CancellationToken.None
         );
 
-        unauthorized.ShouldBeOfType<CommandsConfigurationSaveOutcome.Unauthorized>();
-        staleHost.ShouldBeOfType<CommandsConfigurationSaveOutcome.Unauthorized>();
+        _ = unauthorized.ShouldBeOfType<CommandsConfigurationSaveOutcome.Unauthorized>();
+        _ = staleHost.ShouldBeOfType<CommandsConfigurationSaveOutcome.Unauthorized>();
         collision
             .ShouldBeOfType<CommandsConfigurationSaveOutcome.AliasConflict>()
             .Alias.ShouldBe("join");
-        disabled.ShouldBeOfType<CommandsConfigurationSaveOutcome.Saved>();
+        _ = disabled.ShouldBeOfType<CommandsConfigurationSaveOutcome.Saved>();
         (await service.LoadAsync(fixture.HostId, CancellationToken.None)).ShouldBe(
             new CommandsConfiguration(string.Empty, null)
         );
@@ -443,8 +445,8 @@ public sealed class ViewerCommandCatalogTests
             CommandsAliasesConfigured = true,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var profile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -452,8 +454,8 @@ public sealed class ViewerCommandCatalogTests
             Slug = "default",
             IsDefault = true,
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
         db.CommandAliases.AddRange(
             AppAlias(host.Id, AppCommandKind.Commands, "commands"),
             AppAlias(host.Id, AppCommandKind.Points, "loyalty"),
@@ -465,7 +467,7 @@ public sealed class ViewerCommandCatalogTests
             AppAlias(host.Id, profile.Id, AppCommandKind.Guesses, "choices"),
             AppAlias(host.Id, profile.Id, AppCommandKind.Start, "startpredict")
         );
-        db.Rounds.Add(
+        _ = db.Rounds.Add(
             new GuessRound
             {
                 HostId = host.Id,
@@ -474,7 +476,7 @@ public sealed class ViewerCommandCatalogTests
                 StartedAtUtc = DateTime.UtcNow,
             }
         );
-        db.PointsGiveaways.Add(
+        _ = db.PointsGiveaways.Add(
             new PointsGiveaway
             {
                 HostId = host.Id,
@@ -483,7 +485,7 @@ public sealed class ViewerCommandCatalogTests
                 EndsAtUtc = DateTime.UtcNow.AddMinutes(10),
             }
         );
-        db.RequestBoards.Add(
+        _ = db.RequestBoards.Add(
             new RequestBoard
             {
                 HostId = host.Id,
@@ -495,7 +497,7 @@ public sealed class ViewerCommandCatalogTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.PlayQueues.Add(
+        _ = db.PlayQueues.Add(
             new PlayQueue
             {
                 HostId = host.Id,
@@ -550,7 +552,7 @@ public sealed class ViewerCommandCatalogTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new(host.Id);
     }
 

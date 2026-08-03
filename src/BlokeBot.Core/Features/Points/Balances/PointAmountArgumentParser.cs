@@ -48,7 +48,7 @@ public static class PointAmountArgumentParser
             );
         }
 
-        if (percentage <= 0 || percentage > 100)
+        if (percentage is <= 0 or > 100)
         {
             return Result<PointAmount, PointAmountParseError>.Error(
                 PointAmountParseError.PercentageOutOfRange

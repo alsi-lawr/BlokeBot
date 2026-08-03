@@ -113,31 +113,27 @@ internal sealed class WebAuthService(
             cancellationToken
         );
 
-        if (
+        return
             authorizedHosts.Choices.Count == 0
             && !authorizedHosts.CanCreateHost
             && !admins.IsAdmin(userLogin)
-        )
-        {
-            return Success(
+            ? Success(
                 new WebAuthenticationOutcome.NotAuthorized(
                     "This Twitch account cannot create or manage a BlokeBot channel yet."
                 )
-            );
-        }
-
-        return Success(
-            new WebAuthenticationOutcome.Authorized(
-                new AuthenticatedUser(
-                    twitchUserId,
-                    twitchLogin,
-                    displayName,
-                    user.ProfileImageUrl,
-                    authorizedHosts.Choices,
-                    authorizedHosts.CanCreateHost
-                )
             )
-        );
+            : Success(
+                new WebAuthenticationOutcome.Authorized(
+                    new AuthenticatedUser(
+                        twitchUserId,
+                        twitchLogin,
+                        displayName,
+                        user.ProfileImageUrl,
+                        authorizedHosts.Choices,
+                        authorizedHosts.CanCreateHost
+                    )
+                )
+            );
     }
 
     public bool IsConfigured(WebAuthOptions currentOptions) =>

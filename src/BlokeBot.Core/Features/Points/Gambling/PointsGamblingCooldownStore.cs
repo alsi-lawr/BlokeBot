@@ -48,7 +48,7 @@ public sealed class PointsGamblingCooldownStore(TimeProvider clock)
                 .ToArray()
         )
         {
-            _blockedUntil.Remove(key);
+            _ = _blockedUntil.Remove(key);
         }
     }
 

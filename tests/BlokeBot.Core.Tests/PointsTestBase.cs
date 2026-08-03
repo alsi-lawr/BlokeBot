@@ -135,8 +135,8 @@ public abstract class PointsTestBase
         await using var db = await dbFactory.CreateDbContextAsync();
         var settings = new PointsSettings { HostId = hostId };
         configure(settings);
-        db.PointsSettings.Add(settings);
-        await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(settings);
+        _ = await db.SaveChangesAsync();
     }
 
     private protected static CommandStrategyContext<
@@ -185,8 +185,8 @@ public abstract class PointsTestBase
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

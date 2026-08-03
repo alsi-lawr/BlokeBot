@@ -119,9 +119,9 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
         await authority.Match(
             _ => mutation(),
             _ => RecoverModeratorAccessAsync(requestedHostId),
-            _ =>
+            hostMismatch =>
             {
-                Services
+                _ = Services
                     .GetRequiredService<ToastService>()
                     .Publish(
                         ToastRequest<ErrorToastStrategy>.WithTitle(
@@ -131,9 +131,9 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
                     );
                 return Task.CompletedTask;
             },
-            _ =>
+            unavailable =>
             {
-                Services
+                _ = Services
                     .GetRequiredService<ToastService>()
                     .Publish(
                         ToastRequest<WarningToastStrategy>.WithTitle(
@@ -148,7 +148,7 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
 
     private Task RecoverModeratorAccessAsync(int hostId)
     {
-        Services
+        _ = Services
             .GetRequiredService<ToastService>()
             .Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(

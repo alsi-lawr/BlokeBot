@@ -24,7 +24,8 @@ public sealed class PublicChatCommandResponseSenderTests
 
         chat.Channels.ShouldBe(["streamer"]);
         chat.Messages.ShouldBe(["public response"]);
-        chat.Deadlines.ShouldHaveSingleItem()
+        _ = chat
+            .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 

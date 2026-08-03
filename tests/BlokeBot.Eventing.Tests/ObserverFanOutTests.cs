@@ -155,7 +155,7 @@ public sealed class ObserverFanOutTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
+        _ = outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
         sink.Attempts.ShouldBe(1);
         var deadLetter = sink.Entries.ShouldHaveSingleItem();
         deadLetter.Payload.ShouldBe(new TestDeadLetter("event-42"));
@@ -226,7 +226,7 @@ public sealed class ObserverFanOutTests
         reporter.Attempts.ShouldBe(1);
         sink.Attempts.ShouldBe(1);
         exception.Causes.ShouldBe([observerFailure, reporterFailure, sinkFailure]);
-        exception.Failures.ShouldHaveSingleItem();
+        _ = exception.Failures.ShouldHaveSingleItem();
         exception
             .HandlingFailures.Select(failure => failure.Stage)
             .ShouldBe([
@@ -252,7 +252,7 @@ public sealed class ObserverFanOutTests
             }
         );
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             DispatchAsync(
                     fanOut,
                     [cancelling, Observer("later", () => laterCalled = true)],

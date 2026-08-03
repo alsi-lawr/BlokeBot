@@ -54,7 +54,7 @@ internal static class RuntimeSessionResilience
     {
         if (attemptLimit > 1)
         {
-            builder.AddRetry(
+            _ = builder.AddRetry(
                 new RetryStrategyOptions
                 {
                     MaxRetryAttempts = attemptLimit - 1,
@@ -93,7 +93,7 @@ internal static class RuntimeSessionResilience
             );
         }
 
-        builder.AddTimeout(attemptTimeout);
+        _ = builder.AddTimeout(attemptTimeout);
     }
 }
 

@@ -76,7 +76,7 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
         }
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private static Task<int> ExpireOwnedClaimAsync(
@@ -156,7 +156,7 @@ internal sealed partial class EfPublicChatOutbox
                 );
         }
 
-        await db
+        _ = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.Sending && row.ClaimExpiresAtUtc <= nowUtc
             )
@@ -193,7 +193,7 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
         }
-        await db
+        _ = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.Claimed
                 && row.ClaimExpiresAtUtc <= nowUtc
@@ -208,7 +208,7 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
                 cancellationToken
             );
-        await db
+        _ = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.Claimed
                 && row.ClaimExpiresAtUtc <= nowUtc
@@ -223,7 +223,7 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
                 cancellationToken
             );
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ExhaustConfiguredSafePreSendRetriesAsync(
@@ -277,7 +277,7 @@ internal sealed partial class EfPublicChatOutbox
                 cancellationToken
             );
         }
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task PurgeTerminalBatchAsync(

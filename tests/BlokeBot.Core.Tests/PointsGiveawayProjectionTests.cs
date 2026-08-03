@@ -20,10 +20,10 @@ public sealed class PointsGiveawayProjectionTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var started = new DateTime(2026, 7, 14, 10, 0, 0, DateTimeKind.Utc);
-        db.PointsGiveaways.Add(
+        _ = db.PointsGiveaways.Add(
             new PointsGiveaway
             {
                 HostId = host.Id,
@@ -32,7 +32,7 @@ public sealed class PointsGiveawayProjectionTests
                 EndsAtUtc = started.AddMinutes(5),
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         var view = await PointsGiveawayQueries.LoadActiveViewAsync(
             db,
@@ -40,7 +40,7 @@ public sealed class PointsGiveawayProjectionTests
             CancellationToken.None
         );
 
-        view.ShouldNotBeNull();
+        _ = view.ShouldNotBeNull();
         view!.Entrants.IsDefault.ShouldBeFalse();
         view.Entrants.IsEmpty.ShouldBeTrue();
         view.Winners.IsDefault.ShouldBeFalse();
@@ -59,8 +59,8 @@ public sealed class PointsGiveawayProjectionTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var started = new DateTime(2026, 7, 14, 10, 0, 0, DateTimeKind.Utc);
         var giveaway = new PointsGiveaway
         {
@@ -69,8 +69,8 @@ public sealed class PointsGiveawayProjectionTests
             StartedAtUtc = started,
             EndsAtUtc = started.AddMinutes(5),
         };
-        db.PointsGiveaways.Add(giveaway);
-        await db.SaveChangesAsync();
+        _ = db.PointsGiveaways.Add(giveaway);
+        _ = await db.SaveChangesAsync();
         db.PointsGiveawayEntrants.AddRange(
             new PointsGiveawayEntrant
             {
@@ -99,7 +99,7 @@ public sealed class PointsGiveawayProjectionTests
                 Payout = "20",
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         var view = await PointsGiveawayQueries.LoadActiveViewAsync(
             db,
@@ -107,8 +107,8 @@ public sealed class PointsGiveawayProjectionTests
             CancellationToken.None
         );
 
-        view.ShouldNotBeNull();
-        view!.Lifecycle.ShouldBeOfType<PointsGiveawayLifecycle.Active>();
+        _ = view.ShouldNotBeNull();
+        _ = view!.Lifecycle.ShouldBeOfType<PointsGiveawayLifecycle.Active>();
         view.Entrants.ShouldBe(["earlier", "later"]);
         view.Winners.ShouldBe([
             new PointsGiveawayWinnerView("earlier", PointAmount.ParseAbsolute("10")),
@@ -128,9 +128,9 @@ public sealed class PointsGiveawayProjectionTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        db.PointsGiveaways.Add(
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        _ = db.PointsGiveaways.Add(
             new PointsGiveaway
             {
                 HostId = host.Id,
@@ -140,9 +140,9 @@ public sealed class PointsGiveawayProjectionTests
                 CompletedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<PersistenceDataIntegrityException>(() =>
+        _ = await Should.ThrowAsync<PersistenceDataIntegrityException>(() =>
             PointsGiveawayQueries.LoadActiveViewAsync(db, host.Id, CancellationToken.None)
         );
     }

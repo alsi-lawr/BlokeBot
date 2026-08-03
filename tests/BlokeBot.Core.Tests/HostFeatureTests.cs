@@ -84,7 +84,7 @@ public sealed class HostFeatureTests
             (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
         }
 
-        await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+        _ = await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
             service.EnableAsync(
                 hostId,
                 HostFeatureFlags.NativeTwitchFeatures,
@@ -142,7 +142,7 @@ public sealed class HostFeatureTests
             CancellationToken.None
         );
 
-        disabledGuessing.ShouldBeOfType<CommandRouteResolution<
+        _ = disabledGuessing.ShouldBeOfType<CommandRouteResolution<
             GuessCommandKind,
             AppCommandRouteState
         >.Unresolved>();
@@ -175,7 +175,7 @@ public sealed class HostFeatureTests
             .Route;
         guessingRoute.Kind.ShouldBe(GuessCommandKind.Start);
         guessingRoute.State.ShouldBe(new AppCommandRouteState.Host(hostId));
-        disabledPoints.ShouldBeOfType<CommandRouteResolution<
+        _ = disabledPoints.ShouldBeOfType<CommandRouteResolution<
             PointsCommandKind,
             AppCommandRouteState
         >.Unresolved>();
@@ -196,9 +196,9 @@ public sealed class HostFeatureTests
                 IsDefault = true,
                 ReplySettings = new BotReplySettings(),
             };
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
-            db.CommandAliases.Add(
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -207,7 +207,7 @@ public sealed class HostFeatureTests
                     Alias = "score",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var features = new HostFeatureService(
             dbFactory,
@@ -247,7 +247,7 @@ public sealed class HostFeatureTests
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.CommandAliases.Add(
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = hostId,
@@ -255,7 +255,7 @@ public sealed class HostFeatureTests
                 Alias = alias,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<int> SeedHostAsync(
@@ -272,8 +272,8 @@ public sealed class HostFeatureTests
             EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 

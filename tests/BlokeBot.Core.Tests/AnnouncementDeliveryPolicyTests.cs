@@ -43,6 +43,8 @@ public sealed class AnnouncementDeliveryPolicyTests
             OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
 
-        Should.Throw<ArgumentException>(() => AnnouncementDeliveryPolicyMapper.ToDomain(entity));
+        _ = Should.Throw<ArgumentException>(() =>
+            AnnouncementDeliveryPolicyMapper.ToDomain(entity)
+        );
     }
 }

@@ -19,7 +19,7 @@ public sealed class ViewerCommandCatalogMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts (Id, Login, DisplayName, BotRuntimeState, CreatedAtUtc)
                 VALUES

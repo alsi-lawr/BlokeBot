@@ -65,7 +65,7 @@ public partial class AccessList
         }
         finally
         {
-            _pendingRemovals.Remove(entry);
+            _ = _pendingRemovals.Remove(entry);
         }
     }
 }

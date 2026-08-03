@@ -12,33 +12,35 @@ public sealed record PollTemplateDraft(
     {
         var title = Title.Trim();
         var choices = Choices.Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
-        if (title.Length is < 1 or > 60)
+        var titleInvalid = title.Length is < 1 or > 60;
+        var choicesInvalid = choices.Length is < 2 or > 5 || choices.Any(x => x.Length > 25);
+        var durationInvalid = DurationSeconds is < 15 or > 1800;
+        var channelPointsInvalid =
+            ChannelPointsVotingEnabled && ChannelPointsPerVote is not (>= 1 and <= 1_000_000);
+        return titleInvalid switch
         {
-            return new PollTemplateValidationOutcome.Invalid(
+            true => new PollTemplateValidationOutcome.Invalid(
                 "Poll titles must be 1–60 characters."
-            );
-        }
-        if (choices.Length is < 2 or > 5 || choices.Any(x => x.Length > 25))
-        {
-            return new PollTemplateValidationOutcome.Invalid(
+            ),
+            false when choicesInvalid => new PollTemplateValidationOutcome.Invalid(
                 "Polls need 2–5 choices, each no longer than 25 characters."
-            );
-        }
-        if (DurationSeconds is < 15 or > 1800)
-        {
-            return new PollTemplateValidationOutcome.Invalid(
+            ),
+            false when durationInvalid => new PollTemplateValidationOutcome.Invalid(
                 "Poll duration must be 15–1800 seconds."
-            );
-        }
-        if (ChannelPointsVotingEnabled && ChannelPointsPerVote is not (>= 1 and <= 1_000_000))
-        {
-            return new PollTemplateValidationOutcome.Invalid(
+            ),
+            false when channelPointsInvalid => new PollTemplateValidationOutcome.Invalid(
                 "Channel Points voting needs a cost from 1 to 1,000,000 per vote."
-            );
-        }
-        return new PollTemplateValidationOutcome.Valid(
-            new(title, choices, DurationSeconds, ChannelPointsVotingEnabled, ChannelPointsPerVote)
-        );
+            ),
+            _ => new PollTemplateValidationOutcome.Valid(
+                new(
+                    title,
+                    choices,
+                    DurationSeconds,
+                    ChannelPointsVotingEnabled,
+                    ChannelPointsPerVote
+                )
+            ),
+        };
     }
 }
 

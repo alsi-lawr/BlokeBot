@@ -64,7 +64,7 @@ public sealed class RequestBoardService(
                 Slug = slug,
                 CreatedAtUtc = now,
             };
-            db.RequestBoards.Add(board);
+            _ = db.RequestBoards.Add(board);
         }
         else if (!FieldShapeMatches(board.Fields, command.Fields))
         {
@@ -124,7 +124,7 @@ public sealed class RequestBoardService(
             );
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         AddEvent(
             db,
             board,
@@ -138,9 +138,9 @@ public sealed class RequestBoardService(
             },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(await LoadSummaryAsync(db, board, ct));
     }
 
@@ -203,7 +203,7 @@ public sealed class RequestBoardService(
         }
         finally
         {
-            retryGate.Release();
+            _ = retryGate.Release();
         }
     }
 
@@ -226,28 +226,25 @@ public sealed class RequestBoardService(
             );
         if (existing is not null)
         {
-            if (
-                existing.Board?.Slug != boardSlug
+            return
+                (
+                    existing.Board?.Slug != boardSlug
                     && !await db.RequestBoards.AnyAsync(
                         board =>
                             board.Id == existing.BoardId
                             && board.Slug == RequestBoardInput.NormalizeSlug(boardSlug),
                         ct
                     )
-                || !string.Equals(existing.SubmitterLogin, login, StringComparison.Ordinal)
-            )
-            {
-                return Rejected<PublicRequestSubmissionView>(
+                ) || !string.Equals(existing.SubmitterLogin, login, StringComparison.Ordinal)
+                ? Rejected<PublicRequestSubmissionView>(
                     new RequestBoardRejection.Conflict(
                         "That operation ID belongs to another submission."
                     )
+                )
+                : new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+                    ToPublicView(existing),
+                    true
                 );
-            }
-
-            return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
-                ToPublicView(existing),
-                true
-            );
         }
 
         var slug = RequestBoardInput.NormalizeSlug(boardSlug);
@@ -345,8 +342,8 @@ public sealed class RequestBoardService(
             }
         }
 
-        db.RequestSubmissions.Add(submission);
-        await db.SaveChangesAsync(ct);
+        _ = db.RequestSubmissions.Add(submission);
+        _ = await db.SaveChangesAsync(ct);
         if (!cost.IsZero)
         {
             var next = currentBalance.Subtract(cost);
@@ -384,9 +381,9 @@ public sealed class RequestBoardService(
             },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(ToPublicView(submission));
     }
 
@@ -436,7 +433,7 @@ public sealed class RequestBoardService(
         }
         finally
         {
-            retryGate.Release();
+            _ = retryGate.Release();
         }
     }
 
@@ -503,7 +500,7 @@ public sealed class RequestBoardService(
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        db.RequestSubmissionVotes.Add(
+        _ = db.RequestSubmissionVotes.Add(
             new RequestSubmissionVote
             {
                 SubmissionId = submission.Id,
@@ -521,9 +518,9 @@ public sealed class RequestBoardService(
             new { submission.Id, submission.VoteCount },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(ToPublicView(submission));
     }
 
@@ -625,9 +622,9 @@ public sealed class RequestBoardService(
             },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(await ToModeratorViewAsync(db, submission, CancellationToken.None));
     }
 
@@ -702,9 +699,9 @@ public sealed class RequestBoardService(
             new { submission.Id, Status = "Withdrawn" },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(ToPublicView(submission));
     }
 
@@ -755,19 +752,16 @@ public sealed class RequestBoardService(
 
         if (source.Status == RequestSubmissionStatus.Merged)
         {
-            if (source.MergedIntoSubmissionId != target.Id)
-            {
-                return Rejected<ModeratorRequestSubmissionView>(
+            return source.MergedIntoSubmissionId != target.Id
+                ? Rejected<ModeratorRequestSubmissionView>(
                     new RequestBoardRejection.Conflict(
                         $"This request was already merged into request #{source.MergedIntoSubmissionId}."
                     )
+                )
+                : new RequestBoardResult<ModeratorRequestSubmissionView>.Succeeded(
+                    await ToModeratorViewAsync(db, source, ct),
+                    true
                 );
-            }
-
-            return new RequestBoardResult<ModeratorRequestSubmissionView>.Succeeded(
-                await ToModeratorViewAsync(db, source, ct),
-                true
-            );
         }
 
         if (!ActiveSubmissionStatuses().Contains(source.Status))
@@ -793,7 +787,7 @@ public sealed class RequestBoardService(
             }
             else
             {
-                db.RequestSubmissionVotes.Remove(vote);
+                _ = db.RequestSubmissionVotes.Remove(vote);
             }
         }
 
@@ -819,9 +813,9 @@ public sealed class RequestBoardService(
             },
             now
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.RequestBoardsChanged, ct);
         return Succeeded(await ToModeratorViewAsync(db, source, CancellationToken.None));
     }
 
@@ -1008,27 +1002,25 @@ public sealed class RequestBoardService(
                 value => value.HostId == hostId && value.OperationId == operationId,
                 ct
             );
-        if (submission is null)
+        return submission switch
         {
-            return null;
-        }
-
-        if (
-            submission.Board?.Slug != RequestBoardInput.NormalizeSlug(boardSlug)
-            || !string.Equals(submission.SubmitterLogin, submitterLogin, StringComparison.Ordinal)
-        )
-        {
-            return Rejected<PublicRequestSubmissionView>(
+            null => null,
+            { } value
+                when value.Board?.Slug != RequestBoardInput.NormalizeSlug(boardSlug)
+                    || !string.Equals(
+                        value.SubmitterLogin,
+                        submitterLogin,
+                        StringComparison.Ordinal
+                    ) => Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.Conflict(
                     "That operation ID belongs to another submission."
                 )
-            );
-        }
-
-        return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
-            ToPublicView(submission),
-            true
-        );
+            ),
+            { } value => new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+                ToPublicView(value),
+                true
+            ),
+        };
     }
 
     private async Task<RequestBoardResult<PublicRequestSubmissionView>?> LoadCommittedVoteRetryAsync(
@@ -1045,21 +1037,18 @@ public sealed class RequestBoardService(
             .Include(value => value.Values)
                 .ThenInclude(value => value.Field)
             .SingleOrDefaultAsync(value => value.Id == submissionId && value.HostId == hostId, ct);
-        if (
+        return
             submission?.Board is null
             || !await db.RequestSubmissionVotes.AnyAsync(
                 vote => vote.SubmissionId == submissionId && vote.VoterLogin == voterLogin,
                 ct
             )
-        )
-        {
-            return null;
-        }
-
-        return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
-            ToPublicView(submission),
-            true
-        );
+            ? null
+            : (RequestBoardResult<PublicRequestSubmissionView>)
+                new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+                    ToPublicView(submission),
+                    true
+                );
     }
 
     private async Task RefundIfRequiredAsync(
@@ -1162,7 +1151,7 @@ public sealed class RequestBoardService(
             Amount = "0",
             UpdatedAtUtc = now,
         };
-        db.PointBalances.Add(balance);
+        _ = db.PointBalances.Add(balance);
         return balance;
     }
 
@@ -1205,7 +1194,7 @@ public sealed class RequestBoardService(
             payload = """{"truncated":true}""";
         }
 
-        db.RequestBoardEvents.Add(
+        _ = db.RequestBoardEvents.Add(
             new RequestBoardDomainEvent
             {
                 HostId = board.HostId,
@@ -1394,7 +1383,7 @@ public sealed class RequestBoardService(
         string? normalizedUrl = null;
         foreach (var field in board.Fields)
         {
-            command.FieldValues.TryGetValue(field.Key, out var rawValue);
+            _ = command.FieldValues.TryGetValue(field.Key, out var rawValue);
             var value = (rawValue ?? string.Empty).Trim();
             if (value.Length == 0)
             {
@@ -1461,8 +1450,8 @@ public sealed class RequestBoardService(
                             CultureInfo.InvariantCulture,
                             out var number
                         )
-                        || field.MinimumNumber is { } minimum && number < minimum
-                        || field.MaximumNumber is { } maximum && number > maximum
+                        || (field.MinimumNumber is { } minimum && number < minimum)
+                        || (field.MaximumNumber is { } maximum && number > maximum)
                     )
                     {
                         return InvalidField(field, "must be a number inside the configured range");
@@ -1573,23 +1562,19 @@ public sealed class RequestBoardService(
     )
     {
         var left = existing.OrderBy(value => value.Position).ToArray();
-        if (left.Length != requested.Count)
-        {
-            return false;
-        }
-
-        return left.Zip(requested)
-            .All(pair =>
-                pair.First.Key == RequestBoardInput.NormalizeSlug(pair.Second.Key)
-                && pair.First.Label == pair.Second.Label.Trim()
-                && pair.First.Kind == pair.Second.Kind
-                && pair.First.IsRequired == pair.Second.IsRequired
-                && pair.First.MaximumLength == EffectiveMaximumLength(pair.Second)
-                && pair.First.MinimumNumber == pair.Second.MinimumNumber
-                && pair.First.MaximumNumber == pair.Second.MaximumNumber
-                && ParseChoices(pair.First.ChoiceOptions)
-                    .SequenceEqual(pair.Second.Choices ?? [], StringComparer.Ordinal)
-            );
+        return left.Length == requested.Count
+            && left.Zip(requested)
+                .All(pair =>
+                    pair.First.Key == RequestBoardInput.NormalizeSlug(pair.Second.Key)
+                    && pair.First.Label == pair.Second.Label.Trim()
+                    && pair.First.Kind == pair.Second.Kind
+                    && pair.First.IsRequired == pair.Second.IsRequired
+                    && pair.First.MaximumLength == EffectiveMaximumLength(pair.Second)
+                    && pair.First.MinimumNumber == pair.Second.MinimumNumber
+                    && pair.First.MaximumNumber == pair.Second.MaximumNumber
+                    && ParseChoices(pair.First.ChoiceOptions)
+                        .SequenceEqual(pair.Second.Choices ?? [], StringComparer.Ordinal)
+                );
     }
 
     private static IReadOnlyList<string> ParseChoices(string value) =>

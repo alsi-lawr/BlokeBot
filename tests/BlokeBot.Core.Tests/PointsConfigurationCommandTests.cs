@@ -102,7 +102,7 @@ public sealed class PointsConfigurationCommandTests
             .ExecuteAsync(CancellationToken.None);
         var failure = result.Match<PointsConfigurationSaveFailure?>(_ => null, error => error);
 
-        failure.ShouldNotBeNull();
+        _ = failure.ShouldNotBeNull();
         failure.ShouldBe(new PointsConfigurationSaveFailure("shared"));
         failure.Message.ShouldBe("!shared is already used by another bot command.");
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -141,7 +141,7 @@ public sealed class PointsConfigurationCommandTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             service.SaveConfiguration(1, command).ExecuteAsync(cancellation.Token).AsTask()
         );
 
@@ -164,7 +164,7 @@ public sealed class PointsConfigurationCommandTests
         var result = await service
             .SaveConfiguration(hostId, command)
             .ExecuteAsync(CancellationToken.None);
-        result.Match(
+        _ = result.Match(
             static _ => true,
             failure => throw new InvalidOperationException(failure.Message)
         );
@@ -414,7 +414,7 @@ public sealed class PointsConfigurationCommandTests
     {
         var hostId = await SeedHostAsync(dbFactory);
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.CommandAliases.Add(
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = hostId,
@@ -422,7 +422,7 @@ public sealed class PointsConfigurationCommandTests
                 Alias = alias,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return hostId;
     }
 
@@ -434,7 +434,7 @@ public sealed class PointsConfigurationCommandTests
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        db.CustomCommands.Add(
+        _ = db.CustomCommands.Add(
             new CustomCommand
             {
                 HostId = hostId,
@@ -444,7 +444,7 @@ public sealed class PointsConfigurationCommandTests
                 Aliases = [new CustomCommandAlias { HostId = hostId, Alias = alias }],
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
@@ -457,8 +457,8 @@ public sealed class PointsConfigurationCommandTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

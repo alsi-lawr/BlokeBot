@@ -44,8 +44,8 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
         harness.Session.CallCount.ShouldBe(2);
         firstListening.DisposeCount.ShouldBe(1);
         secondListening.DisposeCount.ShouldBe(1);
-        harness.Session.Targets[0].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
-        harness.Session.Targets[1].ShouldBeOfType<RuntimeConnectionTarget.EventSubReconnect>();
+        _ = harness.Session.Targets[0].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
+        _ = harness.Session.Targets[1].ShouldBeOfType<RuntimeConnectionTarget.EventSubReconnect>();
         harness.Health.Reports.ShouldBeEmpty();
     }
 
@@ -110,7 +110,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
         );
 
         targets.Count.ShouldBe(2);
-        targets[0].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
+        _ = targets[0].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
         targets[1]
             .ShouldBeOfType<RuntimeConnectionTarget.EventSubReconnect>()
             .Uri.ShouldBe(reconnectEndpoint);
@@ -118,7 +118,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
         previousSession.DisposeCount.ShouldBe(1);
         replacementSession.ListenCount.ShouldBe(0);
         replacementSession.DisposeCount.ShouldBe(1);
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         var report = health
             .Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
@@ -171,7 +171,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
         harness.Session.Enqueue(
             (target, attemptToken) =>
             {
-                target.ShouldBeOfType<RuntimeConnectionTarget.Initial>();
+                _ = target.ShouldBeOfType<RuntimeConnectionTarget.Initial>();
                 cancellation.Cancel();
                 return Task.FromCanceled<RuntimeSessionEstablishment>(attemptToken);
             }
@@ -182,7 +182,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
         harness.Session.CallCount.ShouldBe(3);
         previousSession.DisposeCount.ShouldBe(1);
         harness.IdleWait.CallCount.ShouldBe(1);
-        harness.Session.Targets[2].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
+        _ = harness.Session.Targets[2].ShouldBeOfType<RuntimeConnectionTarget.Initial>();
         harness.Health.Reports.ShouldBeEmpty();
     }
 }

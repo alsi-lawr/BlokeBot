@@ -54,24 +54,31 @@ public sealed class PredictionService(
         var observer = new TaskCompletionSource<PredictionProgressFlushDecision>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        if (!_progressFlushObservers.TryAdd(hostId, observer))
-        {
-            throw new InvalidOperationException(
+        return !_progressFlushObservers.TryAdd(hostId, observer)
+            ? throw new InvalidOperationException(
                 $"Prediction progress for host {hostId} already has a flush observer."
-            );
-        }
-        return observer.Task;
+            )
+            : observer.Task;
     }
 
-    public async Task<PredictionDashboardState> LoadAsync(int hostId, CancellationToken ct)
+    public async Task<PredictionDashboardState> LoadAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return new(new PredictionAuthorizationReadiness.Disabled(), null, [], []);
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var readiness = await ReadinessAsync(hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var readiness = await ReadinessAsync(hostId, cancellationToken);
         var active = await db
             .TwitchPredictions.AsNoTracking()
             .Where(x =>
@@ -81,13 +88,13 @@ public sealed class PredictionService(
                     || x.Status == TwitchPredictionStatus.Locked
                 )
             )
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
         var templates = await db
             .TwitchPredictionTemplates.AsNoTracking()
             .Include(x => x.Outcomes)
             .Where(x => x.HostId == hostId)
             .OrderBy(x => x.Id)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         var results = await db
             .TwitchPredictions.AsNoTracking()
             .Where(x =>
@@ -97,7 +104,7 @@ public sealed class PredictionService(
             )
             .OrderByDescending(x => x.EndedAtUtc)
             .Take(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         return new(
             readiness,
             active is null ? null : View(active),
@@ -109,10 +116,16 @@ public sealed class PredictionService(
     public async Task<PredictionOperationOutcome> SaveTemplateAsync(
         int hostId,
         PredictionTemplateDraft draft,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
@@ -121,8 +134,8 @@ public sealed class PredictionService(
             return new PredictionOperationOutcome.InvalidTemplate(invalid.Message);
         }
         var valid = ((PredictionTemplateValidationOutcome.Valid)draft.Validate()).Draft;
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        if (!await HostIsEnabledAsync(db, hostId, ct))
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (!await HostIsEnabledAsync(db, hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -140,74 +153,92 @@ public sealed class PredictionService(
                 )
                 .ToArray(),
         };
-        db.TwitchPredictionTemplates.Add(template);
-        await db.SaveChangesAsync(ct);
-        await ChangedAsync(ct);
+        _ = db.TwitchPredictionTemplates.Add(template);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await ChangedAsync(cancellationToken);
         return new PredictionOperationOutcome.TemplateSaved(View(template));
     }
 
     public async Task<PredictionOperationOutcome> DeleteTemplateAsync(
         int hostId,
         int templateId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var template = await db.TwitchPredictionTemplates.SingleOrDefaultAsync(
             x => x.Id == templateId && x.HostId == hostId,
-            ct
+            cancellationToken
         );
         if (template is null)
         {
             return new PredictionOperationOutcome.TemplateNotFound();
         }
-        if (!await HostIsEnabledAsync(db, hostId, ct))
+        if (!await HostIsEnabledAsync(db, hostId, cancellationToken))
         {
             return Disabled();
         }
 
-        db.TwitchPredictionTemplates.Remove(template);
-        await db.SaveChangesAsync(ct);
-        await ChangedAsync(ct);
+        _ = db.TwitchPredictionTemplates.Remove(template);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await ChangedAsync(cancellationToken);
         return new PredictionOperationOutcome.TemplateDeleted();
     }
 
     public async Task<PredictionOperationOutcome> StartAsync(
         int hostId,
         int templateId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PredictionOperationOutcome.NotReady(_notReadyMessage);
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
         if (
-            await EligibilityAsync(token, ct)
+            await EligibilityAsync(token, cancellationToken)
             is { } eligibility
                 and not HelixPredictionEligibilityOutcome.Eligible
         )
         {
             return EligibilityOutcome(eligibility);
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         var template = await db
             .TwitchPredictionTemplates.Include(x => x.Outcomes)
-            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, ct);
+            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, cancellationToken);
         if (host?.TwitchUserId is not { Length: > 0 } || template is null)
         {
             return new PredictionOperationOutcome.TemplateNotFound();
@@ -224,13 +255,19 @@ public sealed class PredictionService(
                         x.Status == TwitchPredictionStatus.Active
                         || x.Status == TwitchPredictionStatus.Locked
                     ),
-                ct
+                cancellationToken
             )
         )
         {
             return new PredictionOperationOutcome.ActivePredictionExists();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
@@ -243,11 +280,11 @@ public sealed class PredictionService(
                 template.Outcomes.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
                 template.PredictionWindowSeconds
             ),
-            ct
+            cancellationToken
         );
         if (provider is HelixPredictionCreateOutcome.ActivePredictionExists)
         {
-            await ReconcileAsync(hostId, ct);
+            await ReconcileAsync(hostId, cancellationToken);
             return new PredictionOperationOutcome.ActivePredictionExists();
         }
         if (provider is HelixPredictionCreateOutcome.Unauthorized)
@@ -271,50 +308,63 @@ public sealed class PredictionService(
             );
         }
         var prediction = Upsert(db, hostId, created.Prediction, false).Prediction;
-        await db.SaveChangesAsync(ct);
-        await ChangedAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await ChangedAsync(cancellationToken);
         return new PredictionOperationOutcome.Started(View(prediction));
     }
 
     public Task<PredictionOperationOutcome> LockAsync(
         int hostId,
         bool confirmed,
-        CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Locked, null, confirmed, ct);
+        CancellationToken cancellationToken
+    ) => EndAsync(hostId, HelixPredictionEndStatus.Locked, null, confirmed, cancellationToken);
 
     public Task<PredictionOperationOutcome> CancelAsync(
         int hostId,
         bool confirmed,
-        CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Canceled, null, confirmed, ct);
+        CancellationToken cancellationToken
+    ) => EndAsync(hostId, HelixPredictionEndStatus.Canceled, null, confirmed, cancellationToken);
 
     public Task<PredictionOperationOutcome> ResolveAsync(
         int hostId,
         string winningOutcomeId,
         bool confirmed,
-        CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Resolved, winningOutcomeId, confirmed, ct);
+        CancellationToken cancellationToken
+    ) =>
+        EndAsync(
+            hostId,
+            HelixPredictionEndStatus.Resolved,
+            winningOutcomeId,
+            confirmed,
+            cancellationToken
+        );
 
     private async Task<PredictionOperationOutcome> EndAsync(
         int hostId,
         HelixPredictionEndStatus status,
         string? outcomeId,
         bool confirmed,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PredictionOperationOutcome.NotReady(_notReadyMessage);
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         var active = await db.TwitchPredictions.SingleOrDefaultAsync(
             x =>
                 x.HostId == hostId
@@ -322,7 +372,7 @@ public sealed class PredictionService(
                     x.Status == TwitchPredictionStatus.Active
                     || x.Status == TwitchPredictionStatus.Locked
                 ),
-            ct
+            cancellationToken
         );
         if (host?.TwitchUserId is not { Length: > 0 } || active is null)
         {
@@ -344,7 +394,13 @@ public sealed class PredictionService(
         {
             return new PredictionOperationOutcome.InvalidOutcome();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return Disabled();
         }
@@ -355,7 +411,7 @@ public sealed class PredictionService(
             active.ProviderPredictionId,
             status,
             outcomeId,
-            ct
+            cancellationToken
         );
         if (provider is HelixPredictionEndOutcome.Unauthorized)
         {
@@ -383,51 +439,61 @@ public sealed class PredictionService(
             updated.Prediction,
             active.IsExternallyStarted
         ).Prediction;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
         if (
             Terminal(prediction.Status)
-            && await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct)
+            && await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
         )
         {
-            await TrimAsync(db, hostId, ct);
-            await db.SaveChangesAsync(ct);
+            await TrimAsync(db, hostId, cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
         }
-        await ChangedAsync(ct);
+        await ChangedAsync(cancellationToken);
         return new PredictionOperationOutcome.Updated(View(prediction));
     }
 
-    public async Task ReconcileChannelAsync(string channel, CancellationToken ct)
+    public async Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken)
     {
         var login = Login.Normalize(channel);
         if (login.Length == 0)
         {
             return;
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var hostId = await db
             .Hosts.Where(x => x.Login == login)
             .Select(x => (int?)x.Id)
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
         if (hostId is { } id)
         {
-            await ReconcileAsync(id, ct);
+            await ReconcileAsync(id, cancellationToken);
         }
     }
 
-    public async Task ReconcileAsync(int hostId, CancellationToken ct)
+    public async Task ReconcileAsync(int hostId, CancellationToken cancellationToken)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return;
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return;
         }
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         if (
             host?.TwitchUserId is not { Length: > 0 } id
             || (host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions
@@ -435,7 +501,13 @@ public sealed class PredictionService(
         {
             return;
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return;
         }
@@ -443,9 +515,15 @@ public sealed class PredictionService(
         var provider = await helix.GetLatestPredictionAsync(
             new(settings.Identity.ClientId, token),
             id,
-            ct
+            cancellationToken
         );
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return;
         }
@@ -470,36 +548,36 @@ public sealed class PredictionService(
         {
             changed = ArchiveMissingActive(db, hostId);
         }
-        if (!changed || !await HostIsEnabledAsync(db, hostId, ct))
+        if (!changed || !await HostIsEnabledAsync(db, hostId, cancellationToken))
         {
             return;
         }
-        await SaveAndTrimAsync(db, hostId, ct);
-        await ChangedAsync(ct);
+        await SaveAndTrimAsync(db, hostId, cancellationToken);
+        await ChangedAsync(cancellationToken);
     }
 
     public async Task PredictionReceivedAsync(
         EventSubPredictionEvent prediction,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         if (
             !await nativeTwitch.IsEnabledAsync(
                 prediction.BroadcasterUserLogin,
                 HostFeatureFlags.Predictions,
-                ct
+                cancellationToken
             )
         )
         {
             return;
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db.Hosts.SingleOrDefaultAsync(
             x =>
                 x.TwitchUserId == prediction.BroadcasterUserId
                 || x.Login == Login.Normalize(prediction.BroadcasterUserLogin),
-            ct
+            cancellationToken
         );
         if (
             host is null
@@ -514,26 +592,26 @@ public sealed class PredictionService(
             QueueProgress(host.Id, prediction.ToHelix());
             return;
         }
-        _pendingProgress.TryRemove(host.Id, out _);
+        _ = _pendingProgress.TryRemove(host.Id, out _);
         var upsert = Upsert(db, host.Id, prediction.ToHelix(), true);
         if (!upsert.Changed)
         {
             return;
         }
-        if (!await HostIsEnabledAsync(db, host.Id, ct))
+        if (!await HostIsEnabledAsync(db, host.Id, cancellationToken))
         {
             return;
         }
 
         if (Terminal(upsert.Prediction.Status))
         {
-            await SaveAndTrimAsync(db, host.Id, ct);
+            await SaveAndTrimAsync(db, host.Id, cancellationToken);
         }
         else
         {
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(cancellationToken);
         }
-        await ChangedAsync(ct);
+        await ChangedAsync(cancellationToken);
     }
 
     private void QueueProgress(int hostId, HelixPrediction prediction)
@@ -574,7 +652,7 @@ public sealed class PredictionService(
                 )
             )
             {
-                _pendingProgress.TryRemove(hostId, out _);
+                _ = _pendingProgress.TryRemove(hostId, out _);
                 decision = PredictionProgressFlushDecision.SkippedNativeTwitchDisabled;
             }
             else if (!_pendingProgress.TryRemove(hostId, out var pending))
@@ -595,7 +673,7 @@ public sealed class PredictionService(
                 }
                 else
                 {
-                    await db.SaveChangesAsync();
+                    _ = await db.SaveChangesAsync();
                     await ChangedAsync(CancellationToken.None);
                     decision = PredictionProgressFlushDecision.Persisted;
                 }
@@ -617,51 +695,67 @@ public sealed class PredictionService(
     {
         if (_progressFlushObservers.TryRemove(hostId, out var observer))
         {
-            observer.TrySetResult(decision);
+            _ = observer.TrySetResult(decision);
         }
     }
 
     private async Task<PredictionAuthorizationReadiness> ReadinessAsync(
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                hostId,
+                HostFeatureFlags.Predictions,
+                cancellationToken
+            )
+        )
         {
             return new PredictionAuthorizationReadiness.Disabled();
         }
 
-        if (await ReadyTokenAsync(hostId, ct) is not { } token)
+        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        if (token is null)
         {
             return new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(
                 _notReadyMessage
             );
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
-        {
-            return new PredictionAuthorizationReadiness.Disabled();
-        }
 
-        return await EligibilityAsync(token, ct) switch
+        var enabled = await nativeTwitch.IsEnabledAsync(
+            hostId,
+            HostFeatureFlags.Predictions,
+            cancellationToken
+        );
+        return enabled switch
         {
-            HelixPredictionEligibilityOutcome.Eligible =>
-                new PredictionAuthorizationReadiness.Ready(),
-            HelixPredictionEligibilityOutcome.Ineligible =>
-                new PredictionAuthorizationReadiness.Ineligible(_ineligibleMessage),
-            HelixPredictionEligibilityOutcome.Unauthorized =>
-                new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(
-                    _notReadyMessage
+            false => new PredictionAuthorizationReadiness.Disabled(),
+            true => await EligibilityAsync(token, cancellationToken) switch
+            {
+                HelixPredictionEligibilityOutcome.Eligible =>
+                    new PredictionAuthorizationReadiness.Ready(),
+                HelixPredictionEligibilityOutcome.Ineligible =>
+                    new PredictionAuthorizationReadiness.Ineligible(_ineligibleMessage),
+                HelixPredictionEligibilityOutcome.Unauthorized =>
+                    new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(
+                        _notReadyMessage
+                    ),
+                _ => new PredictionAuthorizationReadiness.Unavailable(
+                    "Twitch eligibility could not be checked right now."
                 ),
-            _ => new PredictionAuthorizationReadiness.Unavailable(
-                "Twitch eligibility could not be checked right now."
-            ),
+            },
         };
     }
 
     private async Task<HelixPredictionEligibilityOutcome> EligibilityAsync(
         string token,
-        CancellationToken ct
-    ) => await helix.GetPredictionEligibilityAsync(new(settings.Identity.ClientId, token), ct);
+        CancellationToken cancellationToken
+    ) =>
+        await helix.GetPredictionEligibilityAsync(
+            new(settings.Identity.ClientId, token),
+            cancellationToken
+        );
 
     private static PredictionOperationOutcome Disabled() =>
         new PredictionOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -669,14 +763,14 @@ public sealed class PredictionService(
     private static Task<bool> HostIsEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     ) =>
         db.Hosts.AnyAsync(
             host =>
                 host.Id == hostId
                 && (host.EnabledFeatures & HostFeatureFlags.Predictions)
                     == HostFeatureFlags.Predictions,
-            ct
+            cancellationToken
         );
 
     private static PredictionOperationOutcome EligibilityOutcome(
@@ -693,23 +787,23 @@ public sealed class PredictionService(
             ),
         };
 
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct) =>
+    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken) =>
         await broadcasters.GetTokenStatusAsync(
             hostId,
             HostBroadcasterAuthorizationService.MilestoneScopes,
-            ct
+            cancellationToken
         )
             is TokenStatus.Ready ready
             ? ready.AccessToken
-            : await MissingTokenAsync(hostId, ct);
+            : await MissingTokenAsync(hostId, cancellationToken);
 
-    private async Task<string?> MissingTokenAsync(int hostId, CancellationToken ct)
+    private async Task<string?> MissingTokenAsync(int hostId, CancellationToken cancellationToken)
     {
-        await AlertAsync(hostId, ct);
+        await AlertAsync(hostId, cancellationToken);
         return null;
     }
 
-    private async Task AlertAsync(int hostId, CancellationToken ct) =>
+    private async Task AlertAsync(int hostId, CancellationToken cancellationToken) =>
         await alerts
             .Create(
                 hostId,
@@ -720,10 +814,10 @@ public sealed class PredictionService(
                 "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
                 "/twitch-operations"
             )
-            .ExecuteAsync(ct);
+            .ExecuteAsync(cancellationToken);
 
-    private async Task ChangedAsync(CancellationToken ct) =>
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+    private async Task ChangedAsync(CancellationToken cancellationToken) =>
+        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
 
     private static bool ArchiveMissingActive(BlokeBotDbContext db, int hostId)
     {
@@ -779,7 +873,7 @@ public sealed class PredictionService(
                 ProviderPredictionId = prediction.Id,
                 IsExternallyStarted = external,
             };
-            db.TwitchPredictions.Add(record);
+            _ = db.TwitchPredictions.Add(record);
         }
         var outcomes = ToProjection(prediction.Outcomes);
         var outcomesJson = JsonSerializer.Serialize(outcomes);
@@ -884,15 +978,19 @@ public sealed class PredictionService(
     private static async Task SaveAndTrimAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        await db.SaveChangesAsync(ct);
-        await TrimAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await TrimAsync(db, hostId, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task TrimAsync(BlokeBotDbContext db, int hostId, CancellationToken ct)
+    private static async Task TrimAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken cancellationToken
+    )
     {
         var excess = await db
             .TwitchPredictions.Where(x =>
@@ -902,7 +1000,7 @@ public sealed class PredictionService(
             )
             .OrderByDescending(x => x.EndedAtUtc)
             .Skip(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArrayAsync(cancellationToken);
         db.TwitchPredictions.RemoveRange(excess);
     }
 

@@ -25,15 +25,18 @@ public sealed class HostBotAccountAuthorizationService(
 
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
-            ct
+            cancellationToken
         );
-        var required = RequiredScopes(settings, await PinEnabledAsync(db, hostId, ct));
+        var required = RequiredScopes(
+            settings,
+            await PinEnabledAsync(db, hostId, cancellationToken)
+        );
 
         if (settings is null || !settings.OverrideEnabled)
         {
@@ -49,51 +52,69 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        var tokenStatus = await GetStoredTokenStatusAsync(db, settings, required, ct);
+        var tokenStatus = await GetStoredTokenStatusAsync(
+            db,
+            settings,
+            required,
+            cancellationToken
+        );
         await tokenStatus.Match(
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
             _ => Task.CompletedTask,
             missingScopes =>
-                RefreshProfileMetadataAsync(db, settings, missingScopes.AccessToken, ct),
-            ready => RefreshProfileMetadataAsync(db, settings, ready.AccessToken, ct)
+                RefreshProfileMetadataAsync(
+                    db,
+                    settings,
+                    missingScopes.AccessToken,
+                    cancellationToken
+                ),
+            ready => RefreshProfileMetadataAsync(db, settings, ready.AccessToken, cancellationToken)
         );
 
         return ToAuthorizationStatus(settings, tokenStatus);
     }
 
-    public async Task<string[]> GetRequiredScopesAsync(int hostId, CancellationToken ct)
+    public async Task<string[]> GetRequiredScopesAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var settings = await db
             .HostBotAccountSettings.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.HostId == hostId, ct);
-        return RequiredScopes(settings, await PinEnabledAsync(db, hostId, ct));
+            .SingleOrDefaultAsync(x => x.HostId == hostId, cancellationToken);
+        return RequiredScopes(settings, await PinEnabledAsync(db, hostId, cancellationToken));
     }
 
     public async Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
         string channelLogin,
         IEnumerable<string?> requiredScopes,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
             .Hosts.AsNoTracking()
             .Where(x => x.Login == Login.Normalize(channelLogin))
             .Select(x => new { x.Id })
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (host is not null)
         {
             var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
                 x => x.HostId == host.Id,
-                ct
+                cancellationToken
             );
             if (settings?.OverrideEnabled == true)
             {
-                var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
+                var status = await GetStoredTokenStatusAsync(
+                    db,
+                    settings,
+                    required,
+                    cancellationToken
+                );
                 return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
             }
         }
@@ -101,7 +122,7 @@ public sealed class HostBotAccountAuthorizationService(
         var configuredBotLogin = botSettings.Identity.BotUsername;
         var inspection = await globalTokenStatus
             .GetUserAccessTokenStatus(required)
-            .ExecuteAsync(ct);
+            .ExecuteAsync(cancellationToken);
         var globalStatus = inspection.Match<TokenStatus>(
             status => status,
             error => new TokenStatus.Unknown(error)
@@ -112,14 +133,14 @@ public sealed class HostBotAccountAuthorizationService(
     public async Task<ActiveBotAccountTokenStatus> GetCustomBotTokenStatusAsync(
         int hostId,
         IEnumerable<string?> requiredScopes,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
-            ct
+            cancellationToken
         );
         if (settings?.OverrideEnabled != true)
         {
@@ -134,7 +155,7 @@ public sealed class HostBotAccountAuthorizationService(
             };
         }
 
-        var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
+        var status = await GetStoredTokenStatusAsync(db, settings, required, cancellationToken);
         return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
     }
 
@@ -162,11 +183,13 @@ public sealed class HostBotAccountAuthorizationService(
     public async Task<bool> CanAuthorizeAsync(
         int hostId,
         HostBotAccountActor actor,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db
+            .Hosts.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         if (host is null || !HasAuthorizationAuthority(host, actor))
         {
             return false;
@@ -174,41 +197,51 @@ public sealed class HostBotAccountAuthorizationService(
 
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
-            ct
+            cancellationToken
         );
         return settings?.OverrideEnabled == true;
     }
 
-    public Task UseCustomBotAsync(int hostId, CancellationToken ct) =>
-        SelectBotAccountAsync(hostId, BotAccountSelection.Custom, ct);
+    public Task UseCustomBotAsync(int hostId, CancellationToken cancellationToken) =>
+        SelectBotAccountAsync(hostId, BotAccountSelection.Custom, cancellationToken);
 
-    public Task UseMainBotAsync(int hostId, CancellationToken ct) =>
-        SelectBotAccountAsync(hostId, BotAccountSelection.Main, ct);
+    public Task UseMainBotAsync(int hostId, CancellationToken cancellationToken) =>
+        SelectBotAccountAsync(hostId, BotAccountSelection.Main, cancellationToken);
 
     public Task<WhisperResponseConfigurationOutcome> EnableWhisperResponsesAsync(
         int hostId,
-        CancellationToken ct
-    ) => ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Enabled, ct);
+        CancellationToken cancellationToken
+    ) =>
+        ConfigureWhisperResponsesAsync(
+            hostId,
+            WhisperResponseConfiguration.Enabled,
+            cancellationToken
+        );
 
     public Task<WhisperResponseConfigurationOutcome> DisableWhisperResponsesAsync(
         int hostId,
-        CancellationToken ct
-    ) => ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Disabled, ct);
+        CancellationToken cancellationToken
+    ) =>
+        ConfigureWhisperResponsesAsync(
+            hostId,
+            WhisperResponseConfiguration.Disabled,
+            cancellationToken
+        );
 
     private async Task SelectBotAccountAsync(
         int hostId,
         BotAccountSelection selection,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
         if (host is null)
         {
             return;
         }
 
-        var settings = await EnsureSettingsAsync(db, hostId, ct);
+        var settings = await EnsureSettingsAsync(db, hostId, cancellationToken);
         if (settings is null)
         {
             return;
@@ -247,25 +280,25 @@ public sealed class HostBotAccountAuthorizationService(
                 db,
                 settings,
                 selection,
-                ct
+                cancellationToken
             )
                 ? BotChannelRuntimeState.Starting
                 : BotChannelRuntimeState.Stopped;
             host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
         }
 
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await changes.NotifyChangedAsync(cancellationToken);
     }
 
     private async Task<WhisperResponseConfigurationOutcome> ConfigureWhisperResponsesAsync(
         int hostId,
         WhisperResponseConfiguration configuration,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await EnsureSettingsAsync(db, hostId, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var settings = await EnsureSettingsAsync(db, hostId, cancellationToken);
         if (settings is null)
         {
             return new WhisperResponseConfigurationOutcome.HostNotFound();
@@ -289,8 +322,8 @@ public sealed class HostBotAccountAuthorizationService(
 
         settings.WhisperResponsesEnabled = enabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await changes.NotifyChangedAsync(cancellationToken);
         return new WhisperResponseConfigurationOutcome.Configured();
     }
 
@@ -299,17 +332,17 @@ public sealed class HostBotAccountAuthorizationService(
         HostBotAccountActor actor,
         HostBotAccountAuthorizationGrant grant
     ) =>
-        IO<HostBotAccountAuthorizationOutcome, Never>.Create(async ct =>
+        IO<HostBotAccountAuthorizationOutcome, Never>.Create(async cancellationToken =>
         {
             var mutationGate = CredentialMutationGate(hostId);
             HostBotAccountAuthorizationOutcome.Authorized? committed = null;
-            await mutationGate.WaitAsync(ct);
+            await mutationGate.WaitAsync(cancellationToken);
             try
             {
-                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
                 var host = await db
                     .Hosts.AsNoTracking()
-                    .SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                    .SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
                 if (host is null)
                 {
                     return Success(new HostBotAccountAuthorizationOutcome.HostNotFound());
@@ -320,7 +353,7 @@ public sealed class HostBotAccountAuthorizationService(
                     return Success(new HostBotAccountAuthorizationOutcome.AuthorityDenied());
                 }
 
-                var settings = await EnsureSettingsAsync(db, hostId, ct);
+                var settings = await EnsureSettingsAsync(db, hostId, cancellationToken);
                 Debug.Assert(settings is not null, "The authorized host must have settings.");
 
                 if (!settings.OverrideEnabled)
@@ -350,7 +383,7 @@ public sealed class HostBotAccountAuthorizationService(
                             : grant.ProfileImageUrl.Trim();
                         settings.TwitchUserId = grant.UserId;
                         settings.UpdatedAtUtc = DateTime.UtcNow;
-                        await db.SaveChangesAsync(ct);
+                        _ = await db.SaveChangesAsync(cancellationToken);
 
                         return new HostBotAccountAuthorizationOutcome.Authorized();
                     },
@@ -368,27 +401,29 @@ public sealed class HostBotAccountAuthorizationService(
             }
             finally
             {
-                mutationGate.Release();
+                _ = mutationGate.Release();
             }
 
             Debug.Assert(committed is not null, "The custom-bot grant must be committed.");
-            await changes.NotifyChangedAsync(ct);
+            _ = await changes.NotifyChangedAsync(cancellationToken);
             return Success(committed);
         });
 
     public async Task<HostBotAccountClearOutcome> ClearAsync(
         int hostId,
         HostBotAccountActor actor,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var mutationGate = CredentialMutationGate(hostId);
         var committed = false;
-        await mutationGate.WaitAsync(ct);
+        await mutationGate.WaitAsync(cancellationToken);
         try
         {
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var host = await db
+                .Hosts.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
             if (host is null)
             {
                 return new HostBotAccountClearOutcome.HostNotFound();
@@ -401,7 +436,7 @@ public sealed class HostBotAccountAuthorizationService(
 
             var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
                 x => x.HostId == hostId,
-                ct
+                cancellationToken
             );
             if (settings is null)
             {
@@ -410,71 +445,63 @@ public sealed class HostBotAccountAuthorizationService(
 
             ClearAuthorization(settings);
             settings.UpdatedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(cancellationToken);
             committed = true;
         }
         finally
         {
-            mutationGate.Release();
+            _ = mutationGate.Release();
         }
 
         Debug.Assert(committed, "The custom-bot grant clear must be committed.");
-        await changes.NotifyChangedAsync(ct);
+        _ = await changes.NotifyChangedAsync(cancellationToken);
         return new HostBotAccountClearOutcome.Cleared();
     }
 
-    private static bool HasAuthorizationAuthority(BotHost host, HostBotAccountActor actor)
-    {
-        if (actor is HostBotAccountActor.BotAdministrator administrator)
+    private static bool HasAuthorizationAuthority(BotHost host, HostBotAccountActor actor) =>
+        actor switch
         {
-            return !string.IsNullOrWhiteSpace(administrator.AuthenticatedUserId)
-                && !string.IsNullOrWhiteSpace(administrator.Login);
-        }
-
-        if (actor is not HostBotAccountActor.ChannelOwner owner)
-        {
-            throw new UnreachableException("Unknown custom-bot account actor.");
-        }
-
-        if (
-            string.IsNullOrWhiteSpace(owner.AuthenticatedUserId)
-            || string.IsNullOrWhiteSpace(owner.Login)
-            || !string.Equals(host.Login, Login.Normalize(owner.Login), StringComparison.Ordinal)
-        )
-        {
-            return false;
-        }
-
-        return string.IsNullOrWhiteSpace(host.TwitchUserId)
-            || string.Equals(
-                host.TwitchUserId,
-                owner.AuthenticatedUserId,
-                StringComparison.Ordinal
-            );
-    }
+            HostBotAccountActor.BotAdministrator administrator => !string.IsNullOrWhiteSpace(
+                administrator.AuthenticatedUserId
+            ) && !string.IsNullOrWhiteSpace(administrator.Login),
+            HostBotAccountActor.ChannelOwner owner => !string.IsNullOrWhiteSpace(
+                owner.AuthenticatedUserId
+            )
+                && !string.IsNullOrWhiteSpace(owner.Login)
+                && string.Equals(host.Login, Login.Normalize(owner.Login), StringComparison.Ordinal)
+                && (
+                    string.IsNullOrWhiteSpace(host.TwitchUserId)
+                    || string.Equals(
+                        host.TwitchUserId,
+                        owner.AuthenticatedUserId,
+                        StringComparison.Ordinal
+                    )
+                ),
+            _ => throw new UnreachableException("Unknown custom-bot account actor."),
+        };
 
     private async Task<HostBotAccountSettings?> EnsureSettingsAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
-            ct
+            cancellationToken
         );
         if (settings is not null)
         {
             return settings;
         }
 
-        if (!await db.Hosts.AnyAsync(x => x.Id == hostId, ct))
+        if (!await db.Hosts.AnyAsync(x => x.Id == hostId, cancellationToken))
         {
             return null;
         }
 
         settings = new HostBotAccountSettings { HostId = hostId, UpdatedAtUtc = DateTime.UtcNow };
-        db.HostBotAccountSettings.Add(settings);
+        _ = db.HostBotAccountSettings.Add(settings);
         return settings;
     }
 
@@ -486,7 +513,7 @@ public sealed class HostBotAccountAuthorizationService(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         IEnumerable<string?> requiredScopes,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
@@ -501,18 +528,19 @@ public sealed class HostBotAccountAuthorizationService(
 
         var unprotectedToken = tokenProtector.Unprotect(settings.HostId, protectedPayload);
         return await unprotectedToken.Match(
-            payload => GetPlaintextTokenStatusAsync(db, settings, payload, required, ct),
+            payload =>
+                GetPlaintextTokenStatusAsync(db, settings, payload, required, cancellationToken),
             async _ =>
             {
                 var disabled = await DisableUnusableCredentialsIfCurrentAsync(
                     db,
                     settings,
                     protectedPayload,
-                    ct
+                    cancellationToken
                 );
                 return disabled
                     ? ProtectionUnavailable(required)
-                    : await GetStoredTokenStatusAsync(db, settings, required, ct);
+                    : await GetStoredTokenStatusAsync(db, settings, required, cancellationToken);
             }
         );
     }
@@ -522,12 +550,12 @@ public sealed class HostBotAccountAuthorizationService(
         HostBotAccountSettings settings,
         HostBotAccountTokenPayload payload,
         ImmutableArray<string> required,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         if (TokenExpiresSoon(payload))
         {
-            var refresh = await RefreshTokenAsync(db, settings, payload, ct);
+            var refresh = await RefreshTokenAsync(db, settings, payload, cancellationToken);
             var refreshedPayload = refresh.Match<HostBotAccountTokenPayload?>(
                 refreshed => refreshed.Payload,
                 _ => null,
@@ -545,10 +573,10 @@ public sealed class HostBotAccountAuthorizationService(
             payload = refreshedPayload;
         }
 
-        var validation = await transport.ValidateTokenAsync(payload.AccessToken, ct);
+        var validation = await transport.ValidateTokenAsync(payload.AccessToken, cancellationToken);
         if (validation.Match(static _ => false, static _ => true))
         {
-            var refresh = await RefreshTokenAsync(db, settings, payload, ct);
+            var refresh = await RefreshTokenAsync(db, settings, payload, cancellationToken);
             var refreshedPayload = refresh.Match<HostBotAccountTokenPayload?>(
                 refreshed => refreshed.Payload,
                 _ => null,
@@ -564,7 +592,7 @@ public sealed class HostBotAccountAuthorizationService(
             }
 
             payload = refreshedPayload;
-            validation = await transport.ValidateTokenAsync(payload.AccessToken, ct);
+            validation = await transport.ValidateTokenAsync(payload.AccessToken, cancellationToken);
         }
 
         return await validation.Match(
@@ -575,7 +603,7 @@ public sealed class HostBotAccountAuthorizationService(
                     payload.AccessToken,
                     validated.Validation,
                     required,
-                    ct
+                    cancellationToken
                 ),
             _ => Task.FromResult<TokenStatus>(new TokenStatus.Invalid(required))
         );
@@ -587,7 +615,7 @@ public sealed class HostBotAccountAuthorizationService(
         string accessToken,
         TokenValidation validation,
         ImmutableArray<string> required,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var granted = ScopeSet.NormalizeMany(validation.Scopes);
@@ -596,7 +624,7 @@ public sealed class HostBotAccountAuthorizationService(
         settings.Login = validation.Login;
         settings.TwitchUserId = validation.UserId;
         settings.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
         var immutableGranted = ImmutableArray.CreateRange(granted);
         var immutableMissing = ImmutableArray.CreateRange(missing);
@@ -615,16 +643,16 @@ public sealed class HostBotAccountAuthorizationService(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         HostBotAccountTokenPayload current,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var originalProtectedPayload = settings.ProtectedTokenPayload?.ToArray();
         var mutationGate = CredentialMutationGate(settings.HostId);
-        await mutationGate.WaitAsync(ct);
+        await mutationGate.WaitAsync(cancellationToken);
         var mutationGateHeld = true;
         try
         {
-            await db.Entry(settings).ReloadAsync(ct);
+            await db.Entry(settings).ReloadAsync(cancellationToken);
             var persistedProtectedPayload = settings.ProtectedTokenPayload;
             if (persistedProtectedPayload is null)
             {
@@ -646,10 +674,10 @@ public sealed class HostBotAccountAuthorizationService(
                         ),
                     async failure =>
                     {
-                        await DisableUnusableCredentialsAsync(db, settings, ct);
-                        mutationGate.Release();
+                        await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
+                        _ = mutationGate.Release();
                         mutationGateHeld = false;
-                        await changes.NotifyChangedAsync(ct);
+                        _ = await changes.NotifyChangedAsync(cancellationToken);
                         return new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure);
                     }
                 );
@@ -659,7 +687,7 @@ public sealed class HostBotAccountAuthorizationService(
                 botSettings.Identity.ClientId,
                 botSettings.Identity.ClientSecret,
                 current.RefreshToken,
-                ct
+                cancellationToken
             );
             if (string.IsNullOrWhiteSpace(refreshed.RefreshToken))
             {
@@ -671,7 +699,10 @@ public sealed class HostBotAccountAuthorizationService(
                 refreshed.RefreshToken,
                 DateTimeOffset.UtcNow.AddSeconds(refreshed.ExpiresIn)
             );
-            var validation = await transport.ValidateTokenAsync(refreshed.AccessToken, ct);
+            var validation = await transport.ValidateTokenAsync(
+                refreshed.AccessToken,
+                cancellationToken
+            );
             if (
                 validation is not TokenValidationOutcome.Validated validated
                 || !RefreshedIdentityMatches(settings, validated.Validation)
@@ -688,7 +719,7 @@ public sealed class HostBotAccountAuthorizationService(
                 {
                     settings.ProtectedTokenPayload = protectedPayload;
                     settings.UpdatedAtUtc = DateTime.UtcNow;
-                    await db.SaveChangesAsync(ct);
+                    _ = await db.SaveChangesAsync(cancellationToken);
                     return new HostBotAccountTokenRefreshOutcome.Refreshed(refreshedPayload);
                 },
                 failure =>
@@ -709,7 +740,7 @@ public sealed class HostBotAccountAuthorizationService(
         {
             if (mutationGateHeld)
             {
-                mutationGate.Release();
+                _ = mutationGate.Release();
             }
         }
     }
@@ -737,15 +768,15 @@ public sealed class HostBotAccountAuthorizationService(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         byte[] failedProtectedPayload,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var mutationGate = CredentialMutationGate(settings.HostId);
         var disabled = false;
-        await mutationGate.WaitAsync(ct);
+        await mutationGate.WaitAsync(cancellationToken);
         try
         {
-            await db.Entry(settings).ReloadAsync(ct);
+            await db.Entry(settings).ReloadAsync(cancellationToken);
             if (
                 settings.ProtectedTokenPayload is null
                 || !ProtectedPayloadEquals(failedProtectedPayload, settings.ProtectedTokenPayload)
@@ -754,23 +785,23 @@ public sealed class HostBotAccountAuthorizationService(
                 return false;
             }
 
-            await DisableUnusableCredentialsAsync(db, settings, ct);
+            await DisableUnusableCredentialsAsync(db, settings, cancellationToken);
             disabled = true;
         }
         finally
         {
-            mutationGate.Release();
+            _ = mutationGate.Release();
         }
 
         Debug.Assert(disabled, "The unusable custom-bot credentials must be disabled.");
-        await changes.NotifyChangedAsync(ct);
+        _ = await changes.NotifyChangedAsync(cancellationToken);
         return true;
     }
 
     private static async Task DisableUnusableCredentialsAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var now = DateTime.UtcNow;
@@ -779,7 +810,10 @@ public sealed class HostBotAccountAuthorizationService(
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = now;
 
-        var host = await db.Hosts.SingleAsync(value => value.Id == settings.HostId, ct);
+        var host = await db.Hosts.SingleAsync(
+            value => value.Id == settings.HostId,
+            cancellationToken
+        );
         host.BotRuntimeState = BotChannelRuntimeState.Stopped;
         host.BotRuntimeStateChangedAtUtc = now;
 
@@ -789,11 +823,11 @@ public sealed class HostBotAccountAuthorizationService(
                 && value.Source == CustomBotCredentialAlert.Source
                 && value.SourceKey == CustomBotCredentialAlert.SourceKey
                 && value.AcknowledgedAtUtc == null,
-            ct
+            cancellationToken
         );
         if (!alertExists)
         {
-            db.DurableAlerts.Add(
+            _ = db.DurableAlerts.Add(
                 new DurableAlert
                 {
                     HostId = settings.HostId,
@@ -808,19 +842,19 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task RefreshProfileMetadataAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         string accessToken,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var user = await helix.GetCurrentUserAsync(
             new HelixRequestContext(botSettings.Identity.ClientId, accessToken),
-            ct
+            cancellationToken
         );
         if (user is null)
         {
@@ -834,14 +868,14 @@ public sealed class HostBotAccountAuthorizationService(
             ? settings.ProfileImageUrl
             : user.ProfileImageUrl;
         settings.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<bool> CanStartWithSelectedBotAccountAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         BotAccountSelection selection,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
         var required = botSettings.Identity.Scopes;
@@ -849,7 +883,7 @@ public sealed class HostBotAccountAuthorizationService(
         {
             var globalInspection = await globalTokenStatus
                 .GetUserAccessTokenStatus(required)
-                .ExecuteAsync(ct);
+                .ExecuteAsync(cancellationToken);
             return globalInspection.Match(IsReady, _ => false);
         }
 
@@ -859,7 +893,7 @@ public sealed class HostBotAccountAuthorizationService(
                 db,
                 settings,
                 RequiredScopes(settings),
-                ct
+                cancellationToken
             );
             return IsReady(customStatus);
         }
@@ -886,8 +920,11 @@ public sealed class HostBotAccountAuthorizationService(
     private static Task<bool> PinEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
-        CancellationToken ct
-    ) => db.ReplyPinPolicies.AsNoTracking().AnyAsync(policy => policy.HostId == hostId, ct);
+        CancellationToken cancellationToken
+    ) =>
+        db
+            .ReplyPinPolicies.AsNoTracking()
+            .AnyAsync(policy => policy.HostId == hostId, cancellationToken);
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(
         HostBotAccountSettings settings,

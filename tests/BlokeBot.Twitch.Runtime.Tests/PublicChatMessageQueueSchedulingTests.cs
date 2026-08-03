@@ -56,7 +56,7 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
         outbox
             .ClaimCalls.Take(2)
             .Select(call => call.Outcome.GetType())
@@ -88,7 +88,7 @@ public sealed class PublicChatMessageQueueSchedulingTests : PublicChatMessageQue
         var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
+        _ = recorded.Outcome.ShouldBeOfType<PublicChatDeliveryOutcome.Sent>();
         outbox
             .BeginSendCalls.Select(call => call.Update.GetType())
             .ShouldBe([

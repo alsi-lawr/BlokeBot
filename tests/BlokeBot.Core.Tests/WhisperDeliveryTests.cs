@@ -48,7 +48,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
 
         var error = await SendPrivateFailureAsync(harness, harness.Source());
 
-        error.ShouldBeOfType<PrivateDeliveryError.Disabled>();
+        _ = error.ShouldBeOfType<PrivateDeliveryError.Disabled>();
         harness.Http.ValidationRequestCount.ShouldBe(0);
         harness.Http.WhisperRequestCount.ShouldBe(0);
     }
@@ -63,7 +63,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
 
         var error = await SendPrivateFailureAsync(harness, harness.Source());
 
-        error.ShouldBeOfType<PrivateDeliveryError.SenderIdentityUnavailable>();
+        _ = error.ShouldBeOfType<PrivateDeliveryError.SenderIdentityUnavailable>();
         harness.Http.WhisperRequestCount.ShouldBe(0);
     }
 
@@ -77,7 +77,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
 
         var error = await SendPrivateFailureAsync(harness, harness.Source(includeUserId: false));
 
-        error.ShouldBeOfType<PrivateDeliveryError.RecipientUnavailable>();
+        _ = error.ShouldBeOfType<PrivateDeliveryError.RecipientUnavailable>();
         harness.Http.WhisperRequestCount.ShouldBe(0);
     }
 
@@ -88,7 +88,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
 
         var error = await SendPrivateFailureAsync(harness, harness.Source(userId: "custom-id"));
 
-        error.ShouldBeOfType<PrivateDeliveryError.SelfRecipient>();
+        _ = error.ShouldBeOfType<PrivateDeliveryError.SelfRecipient>();
         harness.Http.WhisperRequestCount.ShouldBe(0);
         (
             await harness.Quota.GetStatusAsync(harness.HostId, "custom-id", CancellationToken.None)
@@ -224,7 +224,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
                 .Sender.Deliver(harness.Source(), "message")
                 .ExecuteAsync(cancellation.Token);
 
-        await action.ShouldThrowAsync<OperationCanceledException>();
+        _ = await action.ShouldThrowAsync<OperationCanceledException>();
         harness.Http.ValidationRequestCount.ShouldBe(0);
         harness.Http.WhisperRequestCount.ShouldBe(0);
         harness.FailureHandler.Failures.ShouldBeEmpty();
@@ -245,7 +245,7 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
                 .Sender.Deliver(harness.Source(), "message")
                 .ExecuteAsync(cancellation.Token);
 
-        await action.ShouldThrowAsync<OperationCanceledException>();
+        _ = await action.ShouldThrowAsync<OperationCanceledException>();
         harness.Http.WhisperRequestCount.ShouldBe(1);
         harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Chat.Messages.ShouldBeEmpty();

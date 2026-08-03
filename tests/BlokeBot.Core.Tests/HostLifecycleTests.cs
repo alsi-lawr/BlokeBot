@@ -16,7 +16,7 @@ public sealed class HostLifecycleTests
         var hostId = await SeedHostedChannelGraphAsync(dbFactory);
         var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.HostRemoval"),
             (_, _) =>
@@ -56,7 +56,7 @@ public sealed class HostLifecycleTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.MissingHostRemoval"),
             (_, _) =>
@@ -79,7 +79,7 @@ public sealed class HostLifecycleTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.HostProvisioning"),
             (_, _) =>
@@ -117,8 +117,8 @@ public sealed class HostLifecycleTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        db.SiteAccessEntries.Add(
+        _ = db.Hosts.Add(host);
+        _ = db.SiteAccessEntries.Add(
             new SiteAccessEntry
             {
                 Login = "viewer",
@@ -126,10 +126,10 @@ public sealed class HostLifecycleTests
                 CreatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        db.HostModAccessSettings.Add(new HostModAccessSettings { HostId = host.Id });
-        db.HostModAccessEntries.Add(
+        _ = db.HostModAccessSettings.Add(new HostModAccessSettings { HostId = host.Id });
+        _ = db.HostModAccessEntries.Add(
             new HostModAccessEntry
             {
                 HostId = host.Id,
@@ -138,7 +138,7 @@ public sealed class HostLifecycleTests
                 CreatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.CommandAliases.Add(
+        _ = db.CommandAliases.Add(
             new CommandAlias
             {
                 HostId = host.Id,
@@ -146,8 +146,8 @@ public sealed class HostLifecycleTests
                 Alias = "!guess",
             }
         );
-        db.PointsSettings.Add(new PointsSettings { HostId = host.Id });
-        db.PointBalances.Add(
+        _ = db.PointsSettings.Add(new PointsSettings { HostId = host.Id });
+        _ = db.PointBalances.Add(
             new PointBalance
             {
                 HostId = host.Id,
@@ -156,7 +156,7 @@ public sealed class HostLifecycleTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.PointLedgerEntries.Add(
+        _ = db.PointLedgerEntries.Add(
             new PointLedgerEntry
             {
                 HostId = host.Id,
@@ -167,7 +167,7 @@ public sealed class HostLifecycleTests
                 BalanceAfter = "10",
             }
         );
-        db.PointsGiveaways.Add(
+        _ = db.PointsGiveaways.Add(
             new PointsGiveaway
             {
                 HostId = host.Id,
@@ -192,8 +192,8 @@ public sealed class HostLifecycleTests
             ReplySettings = new BotReplySettings { AvailableGuessesReply = "Guesses: {options}" },
             Options = [new GuessOption { Name = "red", ReplyText = "Red" }],
         };
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
 
         var round = new GuessRound
         {
@@ -202,10 +202,10 @@ public sealed class HostLifecycleTests
             Status = GuessRoundStatus.Open,
             StartedAtUtc = DateTime.UtcNow,
         };
-        db.Rounds.Add(round);
-        await db.SaveChangesAsync();
+        _ = db.Rounds.Add(round);
+        _ = await db.SaveChangesAsync();
 
-        db.Votes.Add(
+        _ = db.Votes.Add(
             new GuessVote
             {
                 GuessRoundId = round.Id,
@@ -214,7 +214,7 @@ public sealed class HostLifecycleTests
                 GuessedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
         return host.Id;
     }

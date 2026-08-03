@@ -18,40 +18,27 @@ public sealed class PointsCommandRouteResolver(
             context.CommandName,
             cancellationToken
         );
-        if (resolution is null)
-        {
-            return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved();
-        }
-
-        return await PointsAppCommandKindMap
-            .FromAppKind(resolution.Kind)
-            .Match(ResolveKindAsync, Unresolved);
+        return resolution is null
+            ? new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved()
+            : await PointsAppCommandKindMap
+                .FromAppKind(resolution.Kind)
+                .Match(ResolveKindAsync, Unresolved);
 
         async ValueTask<
             CommandRouteResolution<PointsCommandKind, AppCommandRouteState>
-        > ResolveKindAsync(PointsCommandKind kind)
-        {
-            if (
-                !await features.IsEnabledAsync(
-                    resolution.HostId,
-                    HostFeatureFlags.Points,
-                    cancellationToken
-                )
+        > ResolveKindAsync(PointsCommandKind kind) =>
+            !await features.IsEnabledAsync(
+                resolution.HostId,
+                HostFeatureFlags.Points,
+                cancellationToken
             )
-            {
-                return new CommandRouteResolution<
-                    PointsCommandKind,
-                    AppCommandRouteState
-                >.Unresolved();
-            }
-
-            return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Resolved(
-                new CommandRoute<PointsCommandKind, AppCommandRouteState>(
-                    kind,
-                    new AppCommandRouteState.Host(resolution.HostId)
-                )
-            );
-        }
+                ? new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved()
+                : new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Resolved(
+                    new CommandRoute<PointsCommandKind, AppCommandRouteState>(
+                        kind,
+                        new AppCommandRouteState.Host(resolution.HostId)
+                    )
+                );
 
         static ValueTask<
             CommandRouteResolution<PointsCommandKind, AppCommandRouteState>

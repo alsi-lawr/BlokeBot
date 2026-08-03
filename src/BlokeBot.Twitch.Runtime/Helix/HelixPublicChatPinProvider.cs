@@ -131,14 +131,11 @@ internal sealed class HelixPublicChatPinProvider(
     )
     {
         var reconciled = await ReconcileCurrentPinAsync(item, ids, context, cancellationToken);
-        if (reconciled is PublicChatPinExecutionOutcome.Pinned)
-        {
-            return reconciled;
-        }
-
-        return new PublicChatPinExecutionOutcome.Terminal(
-            mutation is ChatPinMutationResult.Conflict ? "conflict" : "ambiguous"
-        );
+        return reconciled is PublicChatPinExecutionOutcome.Pinned
+            ? reconciled
+            : new PublicChatPinExecutionOutcome.Terminal(
+                mutation is ChatPinMutationResult.Conflict ? "conflict" : "ambiguous"
+            );
     }
 
     private async ValueTask<PublicChatPinExecutionOutcome> ReconcileAsync(
@@ -154,21 +151,19 @@ internal sealed class HelixPublicChatPinProvider(
             ids.BotUserId,
             cancellationToken
         );
-        if (!item.IsUnpin)
-        {
-            return PublicChatPinProviderDecision.ClassifyPinRead(
+        return !item.IsUnpin
+            ? PublicChatPinProviderDecision.ClassifyPinRead(
                 item,
                 current,
                 ids.BotUserId,
                 "ambiguous-after-restart"
-            );
-        }
-
-        return PublicChatPinProviderDecision.ClassifyUnpinRead(
-            item,
-            current,
-            static () => new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
-        )!;
+            )
+            : PublicChatPinProviderDecision.ClassifyUnpinRead(
+                item,
+                current,
+                static () =>
+                    new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
+            )!;
     }
 
     private async ValueTask<PublicChatPinExecutionOutcome> ReconcileCurrentPinAsync(

@@ -267,7 +267,7 @@ public sealed class AccessListPolicyTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.AccessListPolicy"),
             (_, _) =>
@@ -310,7 +310,7 @@ public sealed class AccessListPolicyTests
             .SaveModeratorAccess(command)
             .ExecuteAsync(CancellationToken.None);
 
-        result
+        _ = result
             .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
             .ShouldBeOfType<HostModAccessSaveFailure.HostNotFound>();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -323,7 +323,7 @@ public sealed class AccessListPolicyTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var events = TestEventBus.Create<AppEventKind>();
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.HostConfig.Success"),
             (_, _) => ValueTask.CompletedTask
@@ -340,7 +340,7 @@ public sealed class AccessListPolicyTests
             failure => throw new InvalidOperationException(failure.Message)
         );
         saved.HostId.ShouldBe(hostId);
-        saved.Mode.ShouldBeOfType<HostModeratorAccessMode.AllowlistOnly>();
+        _ = saved.Mode.ShouldBeOfType<HostModeratorAccessMode.AllowlistOnly>();
         saved.NotifiedObserverCount.ShouldBe(1);
         (
             await service.LoadAsync(hostId, CancellationToken.None)
@@ -355,7 +355,7 @@ public sealed class AccessListPolicyTests
         var eventing = TestEventBus.CreateContinueAndRecord<AppEventKind>();
         var events = eventing.Events;
         var notificationCount = 0;
-        events.Subscribe(
+        _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.HostConfig.Runtime"),
             (_, _) =>
@@ -412,7 +412,10 @@ public sealed class AccessListPolicyTests
         var result = await service
             .SaveModeratorAccess(ValidSaveCommand(hostId, allowModsByDefault))
             .ExecuteAsync(CancellationToken.None);
-        result.Match(_ => true, failure => throw new InvalidOperationException(failure.Message));
+        _ = result.Match(
+            _ => true,
+            failure => throw new InvalidOperationException(failure.Message)
+        );
     }
 
     private static HostModAccessSaveCommand ValidSaveCommand(int hostId, bool allowModsByDefault) =>
@@ -433,8 +436,8 @@ public sealed class AccessListPolicyTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

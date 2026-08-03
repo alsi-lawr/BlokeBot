@@ -2,6 +2,7 @@ using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
 
@@ -86,6 +87,45 @@ public partial class FollowerOnlyChatStatusPanel
                 FollowerOnlyChatSetupState.ReconnectRequired => "reconnect",
                 _ => "unknown",
             };
+
+    private RenderFragment _manualFollowActions =>
+        builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "mt-2 flex flex-wrap items-center gap-2");
+            builder.OpenElement(2, "a");
+            builder.AddAttribute(
+                3,
+                "class",
+                "auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+            );
+            builder.AddAttribute(4, "href", _channelUrl);
+            builder.AddAttribute(5, "target", "_blank");
+            builder.AddAttribute(6, "rel", "noreferrer");
+            builder.AddContent(7, "Open Twitch channel");
+            builder.CloseElement();
+            builder.OpenElement(8, "button");
+            builder.AddAttribute(
+                9,
+                "class",
+                "control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
+            );
+            builder.AddAttribute(
+                10,
+                "onclick",
+                EventCallback.Factory.Create<MouseEventArgs>(this, RecheckAsync)
+            );
+            builder.AddContent(11, "Recheck");
+            builder.CloseElement();
+            builder.OpenElement(12, "span");
+            builder.AddAttribute(13, "class", "basis-full");
+            builder.AddContent(
+                14,
+                $"Sign in to Twitch as {BotAccountName} and follow this channel."
+            );
+            builder.CloseElement();
+            builder.CloseElement();
+        };
 }
 
 public sealed class FollowerOnlyChatStatusPanelLoadFailure { }

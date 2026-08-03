@@ -57,7 +57,7 @@ public sealed class ModeratorAuthorityService(
             return cached.Outcome;
         }
 
-        _cache.TryRemove(key, out _);
+        _ = _cache.TryRemove(key, out _);
         return await ConfirmModeratorAuthorityAsync(key, selectedHost, ct);
     }
 

@@ -55,7 +55,7 @@ internal sealed partial class EventSubChannelSession
         EventSubChannelStatus? state;
         lock (_gate)
         {
-            _states.TryGetValue(channel, out state);
+            _ = _states.TryGetValue(channel, out state);
         }
 
         if (state is EventSubChannelStatus.Degraded degraded)

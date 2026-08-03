@@ -15,7 +15,7 @@ public sealed class PersistenceLifecycleProjectionTests
         var started = new DateTime(2026, 7, 14, 10, 0, 0, DateTimeKind.Utc);
         var closed = started.AddMinutes(5);
 
-        GuessRoundLifecycle
+        _ = GuessRoundLifecycle
             .FromPersistence(GuessRoundStatus.Open, started, null, null)
             .ShouldBeOfType<GuessRoundLifecycle.Open>();
         GuessRoundLifecycle
@@ -27,7 +27,7 @@ public sealed class PersistenceLifecycleProjectionTests
             .ShouldBeOfType<GuessRoundLifecycle.Completed>()
             .WinningName.ShouldBe("blue");
 
-        Should.Throw<PersistenceDataIntegrityException>(() =>
+        _ = Should.Throw<PersistenceDataIntegrityException>(() =>
             GuessRoundLifecycle.FromPersistence(GuessRoundStatus.Completed, started, closed, null)
         );
     }
@@ -37,20 +37,20 @@ public sealed class PersistenceLifecycleProjectionTests
     {
         var completed = new DateTime(2026, 7, 14, 10, 5, 0, DateTimeKind.Utc);
 
-        PointsGiveawayLifecycle
+        _ = PointsGiveawayLifecycle
             .FromPersistence(PointsGiveawayStatus.Active, completed.AddMinutes(-5), null)
             .ShouldBeOfType<PointsGiveawayLifecycle.Active>();
-        PointsGiveawayLifecycle
+        _ = PointsGiveawayLifecycle
             .FromPersistence(PointsGiveawayStatus.Completed, completed.AddMinutes(-5), completed)
             .ShouldBeOfType<PointsGiveawayLifecycle.Completed>();
-        PointsGiveawayLifecycle
+        _ = PointsGiveawayLifecycle
             .FromPersistence(PointsGiveawayStatus.Cancelled, completed.AddMinutes(-5), completed)
             .ShouldBeOfType<PointsGiveawayLifecycle.Cancelled>();
-        PointsGiveawayLifecycle
+        _ = PointsGiveawayLifecycle
             .FromPersistence(PointsGiveawayStatus.Expired, completed.AddMinutes(-5), completed)
             .ShouldBeOfType<PointsGiveawayLifecycle.Expired>();
 
-        Should.Throw<PersistenceDataIntegrityException>(() =>
+        _ = Should.Throw<PersistenceDataIntegrityException>(() =>
             PointsGiveawayLifecycle.FromPersistence(
                 PointsGiveawayStatus.Completed,
                 completed.AddMinutes(-5),
@@ -64,20 +64,20 @@ public sealed class PersistenceLifecycleProjectionTests
     {
         var changed = new DateTime(2026, 7, 14, 10, 0, 0, DateTimeKind.Utc);
 
-        HostedChannelRuntimeLifecycle
+        _ = HostedChannelRuntimeLifecycle
             .FromPersistence(BotChannelRuntimeState.Stopped, null)
             .ShouldBeOfType<HostedChannelRuntimeLifecycle.Stopped>();
-        HostedChannelRuntimeLifecycle
+        _ = HostedChannelRuntimeLifecycle
             .FromPersistence(BotChannelRuntimeState.Starting, changed)
             .ShouldBeOfType<HostedChannelRuntimeLifecycle.Starting>();
-        HostedChannelRuntimeLifecycle
+        _ = HostedChannelRuntimeLifecycle
             .FromPersistence(BotChannelRuntimeState.Started, changed)
             .ShouldBeOfType<HostedChannelRuntimeLifecycle.Started>();
-        HostedChannelRuntimeLifecycle
+        _ = HostedChannelRuntimeLifecycle
             .FromPersistence(BotChannelRuntimeState.Stopping, changed)
             .ShouldBeOfType<HostedChannelRuntimeLifecycle.Stopping>();
 
-        Should.Throw<PersistenceDataIntegrityException>(() =>
+        _ = Should.Throw<PersistenceDataIntegrityException>(() =>
             HostedChannelRuntimeLifecycle.FromPersistence(BotChannelRuntimeState.Started, null)
         );
     }

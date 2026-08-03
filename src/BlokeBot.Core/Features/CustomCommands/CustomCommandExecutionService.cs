@@ -157,7 +157,7 @@ public sealed class CustomCommandExecutionService(
             return new CustomCommandExecutionOutcome.Handled();
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
         var reply = selectedMessage is null
@@ -221,14 +221,12 @@ public sealed class CustomCommandExecutionService(
             ReferenceRequest(hostId, storedShape),
             ct
         );
-        if (references is not OverlayCueReferenceOutcome.Available)
-        {
-            return AdmissionOutcome(references);
-        }
-        return await overlayCues.AdmitAsync(
-            Request(hostId, storedShape, null, OverlayCueAdmissionOrigin.OwnerTest),
-            ct
-        );
+        return references is not OverlayCueReferenceOutcome.Available
+            ? AdmissionOutcome(references)
+            : await overlayCues.AdmitAsync(
+                Request(hostId, storedShape, null, OverlayCueAdmissionOrigin.OwnerTest),
+                ct
+            );
     }
 
     private static OverlayCueAdmissionRequest Request(

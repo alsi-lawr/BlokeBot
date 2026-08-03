@@ -32,29 +32,29 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAnnouncements(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<CustomAnnouncement>(b =>
+        _ = modelBuilder.Entity<CustomAnnouncement>(b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "custom_announcements",
                 t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceStatus",
                         KindIn("OccurrenceStatus", _announcementOccurrenceStatuses)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcements_DeliveryType",
                         KindIn("DeliveryType", _customAnnouncementDeliveryTypes)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcements_AnnouncementColor",
                         KindIn("AnnouncementColor", _twitchAnnouncementColors)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcements_LatestDeliveryResult",
                         KindIn("LatestDeliveryResult", _customAnnouncementLatestDeliveryResults)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceState",
                         "(OccurrenceStatus = 'None' AND OccurrenceDueAtUtc IS NULL "
                             + "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL "
@@ -96,30 +96,30 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            b.HasKey(x => x.Id);
-            b.HasAlternateKey(x => new { x.HostId, x.Id });
-            b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.OccurrenceStatus)
+            _ = b.HasKey(x => x.Id);
+            _ = b.HasAlternateKey(x => new { x.HostId, x.Id });
+            _ = b.Property(x => x.Name).HasMaxLength(128);
+            _ = b.Property(x => x.OccurrenceStatus)
                 .HasConversion(
                     value => PersistedEnumTokens<AnnouncementOccurrenceStatus>.Format(value),
                     value => PersistedEnumTokens<AnnouncementOccurrenceStatus>.Parse(value)
                 )
                 .HasMaxLength(40);
-            b.Property(x => x.DeliveryType)
+            _ = b.Property(x => x.DeliveryType)
                 .HasConversion(
                     value => PersistedEnumTokens<CustomAnnouncementDeliveryType>.Format(value),
                     value => PersistedEnumTokens<CustomAnnouncementDeliveryType>.Parse(value)
                 )
                 .HasMaxLength(32)
                 .HasDefaultValue(CustomAnnouncementDeliveryType.ChatMessage);
-            b.Property(x => x.AnnouncementColor)
+            _ = b.Property(x => x.AnnouncementColor)
                 .HasConversion(
                     value => PersistedEnumTokens<TwitchAnnouncementColor>.Format(value),
                     value => PersistedEnumTokens<TwitchAnnouncementColor>.Parse(value)
                 )
                 .HasMaxLength(16)
                 .HasDefaultValue(TwitchAnnouncementColor.Primary);
-            b.Property(x => x.LatestDeliveryResult)
+            _ = b.Property(x => x.LatestDeliveryResult)
                 .HasConversion(
                     value =>
                         PersistedEnumTokens<CustomAnnouncementLatestDeliveryResult>.Format(value),
@@ -128,18 +128,18 @@ public sealed partial class BlokeBotDbContext
                 )
                 .HasMaxLength(20)
                 .HasDefaultValue(CustomAnnouncementLatestDeliveryResult.None);
-            b.Property(x => x.OccurrenceMessage).HasMaxLength(500);
-            b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.Property(x => x.OccurrenceMessage).HasMaxLength(500);
+            _ = b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasOne(x => x.MessageLibraryEntry)
+            _ = b.HasOne(x => x.MessageLibraryEntry)
                 .WithMany()
                 .HasForeignKey(x => new { x.HostId, x.MessageLibraryEntryId })
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
-            b.HasOne(x => x.Schedule)
+            _ = b.HasOne(x => x.Schedule)
                 .WithOne(x => x.Announcement)
                 .HasForeignKey<CustomAnnouncementSchedule>(x => new
                 {
@@ -148,26 +148,26 @@ public sealed partial class BlokeBotDbContext
                 })
                 .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
-            b.HasOne(x => x.DeliveryPolicy)
+            _ = b.HasOne(x => x.DeliveryPolicy)
                 .WithOne(x => x.Announcement)
                 .HasForeignKey<CustomAnnouncement>(x => new { x.HostId, x.DeliveryPolicyId })
                 .HasPrincipalKey<CustomAnnouncementDeliveryPolicy>(x => new { x.HostId, x.Id })
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Restrict);
-            b.Navigation(x => x.DeliveryPolicy).IsRequired();
+            _ = b.Navigation(x => x.DeliveryPolicy).IsRequired();
         });
 
-        modelBuilder.Entity<CustomAnnouncementDeliveryPolicy>(b =>
+        _ = modelBuilder.Entity<CustomAnnouncementDeliveryPolicy>(b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "custom_announcement_delivery_policies",
                 t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcement_delivery_policies_PolicyType",
                         KindIn("PolicyType", _customAnnouncementDeliveryPolicyTypes)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcement_delivery_policies_Payload",
                         "PolicyType = 'RetryUntilExpiredThenSkip' "
                             + "AND RetryDelayTicks IS NOT NULL AND RetryDelayTicks > 0 "
@@ -177,30 +177,30 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            b.HasKey(x => x.Id);
-            b.HasAlternateKey(x => new { x.HostId, x.Id });
-            b.HasOne<BotHost>()
+            _ = b.HasKey(x => x.Id);
+            _ = b.HasAlternateKey(x => new { x.HostId, x.Id });
+            _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            b.Property<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
+            _ = b.Property<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
                 .HasConversion<string>()
                 .HasMaxLength(48);
-            b.HasDiscriminator<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
+            _ = b.HasDiscriminator<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
                 .HasValue<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(
                     CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip
                 );
         });
 
-        modelBuilder.Entity<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(b =>
+        _ = modelBuilder.Entity<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(b =>
         {
-            b.Property(x => x.RetryDelay)
+            _ = b.Property(x => x.RetryDelay)
                 .HasConversion(
                     value => value.Value.Ticks,
                     value => new AnnouncementRetryDelay(TimeSpan.FromTicks(value))
                 )
                 .HasColumnName("RetryDelayTicks");
-            b.Property(x => x.OccurrenceLifetime)
+            _ = b.Property(x => x.OccurrenceLifetime)
                 .HasConversion(
                     value => value.Value.Ticks,
                     value => new AnnouncementOccurrenceLifetime(TimeSpan.FromTicks(value))
@@ -208,17 +208,17 @@ public sealed partial class BlokeBotDbContext
                 .HasColumnName("OccurrenceLifetimeTicks");
         });
 
-        modelBuilder.Entity<CustomAnnouncementSchedule>(b =>
+        _ = modelBuilder.Entity<CustomAnnouncementSchedule>(b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "custom_announcement_schedules",
                 t =>
                 {
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcement_schedules_ScheduleType",
                         KindIn("ScheduleType", _customAnnouncementScheduleTypes)
                     );
-                    t.HasCheckConstraint(
+                    _ = t.HasCheckConstraint(
                         "CK_custom_announcement_schedules_Payload",
                         "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 "
                             + "AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR "
@@ -230,9 +230,9 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            b.HasKey(x => x.CustomAnnouncementId);
-            b.Property<string>("ScheduleType").HasMaxLength(32);
-            b.HasDiscriminator<string>("ScheduleType")
+            _ = b.HasKey(x => x.CustomAnnouncementId);
+            _ = b.Property<string>("ScheduleType").HasMaxLength(32);
+            _ = b.HasDiscriminator<string>("ScheduleType")
                 .HasValue<IntervalCustomAnnouncementSchedule>(
                     IntervalCustomAnnouncementSchedule.Discriminator
                 )
@@ -244,18 +244,18 @@ public sealed partial class BlokeBotDbContext
                 );
         });
 
-        modelBuilder.Entity<IntervalCustomAnnouncementSchedule>(b =>
+        _ = modelBuilder.Entity<IntervalCustomAnnouncementSchedule>(b =>
             b.Property(x => x.IntervalMinutes).HasColumnName("IntervalMinutes")
         );
-        modelBuilder.Entity<IntervalAfterChatCustomAnnouncementSchedule>(b =>
+        _ = modelBuilder.Entity<IntervalAfterChatCustomAnnouncementSchedule>(b =>
         {
-            b.Property(x => x.IntervalMinutes).HasColumnName("IntervalMinutes");
-            b.Property(x => x.RequiredChatMessages).HasColumnName("RequiredChatMessages");
+            _ = b.Property(x => x.IntervalMinutes).HasColumnName("IntervalMinutes");
+            _ = b.Property(x => x.RequiredChatMessages).HasColumnName("RequiredChatMessages");
         });
-        modelBuilder.Entity<WeeklyCustomAnnouncementSchedule>(b =>
+        _ = modelBuilder.Entity<WeeklyCustomAnnouncementSchedule>(b =>
         {
-            b.Property(x => x.Day).HasColumnName("WeeklyDay");
-            b.Property(x => x.Time).HasColumnName("WeeklyTime");
+            _ = b.Property(x => x.Day).HasColumnName("WeeklyDay");
+            _ = b.Property(x => x.Time).HasColumnName("WeeklyTime");
         });
     }
 }

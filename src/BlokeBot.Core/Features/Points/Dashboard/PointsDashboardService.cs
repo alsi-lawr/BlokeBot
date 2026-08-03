@@ -58,7 +58,7 @@ public sealed class PointsDashboardService(
             var result = await balances
                 .Add(hostId, target, amount, actorLogin, "dashboard")
                 .ExecuteAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return result.Match<PointOperationOutcome>(
                 _ => new PointOperationOutcome.Succeeded(
                     "Points added.",
@@ -99,7 +99,7 @@ public sealed class PointsDashboardService(
             var result = await balances
                 .Transfer(hostId, fromLogin, target, amount)
                 .ExecuteAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return result.Match<PointOperationOutcome>(
                 _ => new PointOperationOutcome.Succeeded(
                     "Points transferred.",
@@ -131,7 +131,7 @@ public sealed class PointsDashboardService(
             var result = await balances
                 .Remove(hostId, targetLogin, amount, actorLogin, "dashboard")
                 .ExecuteAsync(ct);
-            await changes.NotifyChangedAsync(ct);
+            _ = await changes.NotifyChangedAsync(ct);
             return result.Match<PointOperationOutcome>(
                 _ => new PointOperationOutcome.Succeeded(
                     "Points removed.",
@@ -156,9 +156,9 @@ public sealed class PointsDashboardService(
             .DeleteBalance(hostId, targetLogin, actorLogin, "dashboard")
             .ExecuteAsync(ct);
         return await result.Match<Task<PointOperationOutcome>>(
-            async _ =>
+            async deleted =>
             {
-                await changes.NotifyChangedAsync(ct);
+                _ = await changes.NotifyChangedAsync(ct);
                 return new PointOperationOutcome.Succeeded(
                     "Point balance removed.",
                     CommandResponseTarget.Chat

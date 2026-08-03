@@ -40,12 +40,10 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
                 );
             }
 
-            normalized.Add(scope);
+            _ = normalized.Add(scope);
         }
 
-        return normalized.Count == 0
-            ? Empty
-            : new OAuthScopeSet(ImmutableArray.CreateRange(normalized));
+        return normalized.Count == 0 ? Empty : new OAuthScopeSet([.. normalized]);
     }
 
     public string Serialize() => string.Join(' ', _scopes);

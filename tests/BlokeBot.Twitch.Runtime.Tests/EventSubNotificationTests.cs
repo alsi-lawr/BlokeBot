@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Shouldly;
@@ -53,7 +54,9 @@ public sealed class EventSubNotificationTests
         var shoutout = notification.ShouldBeOfType<EventSubNotification.Shoutout>().Event;
         shoutout.Direction.ShouldBe(EventSubShoutoutDirection.Received);
         shoutout.MessageId.ShouldBe("delivery-1");
-        shoutout.TargetCooldownEndsAt.ShouldBe(DateTimeOffset.Parse("2026-07-26T02:00:00Z"));
+        shoutout.TargetCooldownEndsAt.ShouldBe(
+            DateTimeOffset.Parse("2026-07-26T02:00:00Z", CultureInfo.InvariantCulture)
+        );
     }
 
     [Test]
@@ -64,7 +67,7 @@ public sealed class EventSubNotificationTests
         var incomingRaid = notification.ShouldBeOfType<EventSubNotification.IncomingRaid>().Event;
         incomingRaid.MessageId.ShouldBe("raid-message-1");
         incomingRaid.MessageTimestamp.ShouldBe(
-            DateTimeOffset.Parse("2026-07-29T08:00:00.1234567Z")
+            DateTimeOffset.Parse("2026-07-29T08:00:00.1234567Z", CultureInfo.InvariantCulture)
         );
         incomingRaid.FromBroadcasterUserId.ShouldBe("source-id");
         incomingRaid.FromBroadcasterUserLogin.ShouldBe("source_login");
@@ -81,7 +84,7 @@ public sealed class EventSubNotificationTests
         var wrongVersion = JsonNode.Parse(_incomingRaidJson)!.AsObject();
         wrongVersion["metadata"]!["subscription_version"] = "2";
 
-        Parse(wrongVersion.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
+        _ = Parse(wrongVersion.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
     }
 
     internal static EventSubEnvelope IncomingRaidEnvelope() =>

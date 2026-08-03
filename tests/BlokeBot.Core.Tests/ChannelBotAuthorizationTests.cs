@@ -50,7 +50,8 @@ public sealed class ChannelBotAuthorizationTests
 
         var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
 
-        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ConfigurationUnavailable>();
+        _ =
+            outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ConfigurationUnavailable>();
     }
 
     [Test]
@@ -66,7 +67,8 @@ public sealed class ChannelBotAuthorizationTests
 
         var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
 
-        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ProviderNotValidated>();
+        _ =
+            outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ProviderNotValidated>();
     }
 
     [Test]
@@ -80,7 +82,7 @@ public sealed class ChannelBotAuthorizationTests
             .Authorize(hostId, Grant("999", "other", "channel:bot"))
             .RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<ChannelBotAuthorizationOutcome.GrantMismatch>();
+        _ = result.ShouldBeOfType<ChannelBotAuthorizationOutcome.GrantMismatch>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.ChannelBotAuthorizedAtUtc.ShouldBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBeNull();
@@ -116,9 +118,9 @@ public sealed class ChannelBotAuthorizationTests
             .Authorize(hostId, Grant("123", "STREAMER", "channel:bot", "bits:read"))
             .RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<ChannelBotAuthorizationOutcome.Authorized>();
+        _ = result.ShouldBeOfType<ChannelBotAuthorizationOutcome.Authorized>();
         var host = await LoadHostAsync(dbFactory, hostId);
-        host.ChannelBotAuthorizedAtUtc.ShouldNotBeNull();
+        _ = host.ChannelBotAuthorizedAtUtc.ShouldNotBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBe("bits:read channel:bot");
         service
             .IsCurrent(host.ChannelBotAuthorizedAtUtc, host.ChannelBotAuthorizedScopes)
@@ -146,7 +148,8 @@ public sealed class ChannelBotAuthorizationTests
 
         var result = await runtime.Start(hostId).RunAsync(CancellationToken.None);
 
-        result.ShouldBeOfType<HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired>();
+        _ =
+            result.ShouldBeOfType<HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
     }
@@ -255,8 +258,8 @@ public sealed class ChannelBotAuthorizationTests
             ChannelBotAuthorizedScopes = authorizedScopes,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -270,13 +273,14 @@ public sealed class ChannelBotAuthorizationTests
         HttpStatusCode validationStatus = HttpStatusCode.OK
     ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new(validationStatus);
+        public string? ValidatedToken { get; private set; }
 
-        public string? ValidatedToken => _handler.ValidatedToken;
+        public HttpClient CreateClient(string name) => new(new Handler(this, validationStatus));
 
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
-
-        private sealed class Handler(HttpStatusCode validationStatus) : HttpMessageHandler
+        private sealed class Handler(
+            RecordingOAuthHttpClientFactory owner,
+            HttpStatusCode validationStatus
+        ) : HttpMessageHandler
         {
             public string? ValidatedToken { get; private set; }
 
@@ -292,19 +296,16 @@ public sealed class ChannelBotAuthorizationTests
 
                 if (request.RequestUri?.AbsolutePath == "/oauth2/validate")
                 {
-                    ValidatedToken = request.Headers.Authorization?.Parameter;
-                    if (validationStatus != HttpStatusCode.OK)
-                    {
-                        return Task.FromResult(new HttpResponseMessage(validationStatus));
-                    }
-
-                    return Task.FromResult(
-                        JsonResponse(
-                            """
-                            {"user_id":"123","login":"Streamer","scopes":["channel:bot","bits:read"]}
-                            """
-                        )
-                    );
+                    owner.ValidatedToken = request.Headers.Authorization?.Parameter;
+                    return validationStatus != HttpStatusCode.OK
+                        ? Task.FromResult(new HttpResponseMessage(validationStatus))
+                        : Task.FromResult(
+                            JsonResponse(
+                                """
+                                {"user_id":"123","login":"Streamer","scopes":["channel:bot","bits:read"]}
+                                """
+                            )
+                        );
                 }
 
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));

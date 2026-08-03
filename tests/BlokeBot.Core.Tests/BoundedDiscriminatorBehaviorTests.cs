@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Points.Dashboard;
 using BlokeBot.Core.Features.Replies;
@@ -53,7 +54,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
         var hostId = await SeedHostAsync(dbFactory);
         await using (var seedDb = await dbFactory.CreateDbContextAsync())
         {
-            seedDb.ReplyDeliverySettings.Add(
+            _ = seedDb.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = hostId,
@@ -62,7 +63,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
                     Target = ReplyDeliveryTarget.Whisper,
                 }
             );
-            await seedDb.SaveChangesAsync();
+            _ = await seedDb.SaveChangesAsync();
         }
 
         await using (var corruptionDb = await dbFactory.CreateDbContextAsync())
@@ -70,13 +71,13 @@ public sealed class BoundedDiscriminatorBehaviorTests
             await corruptionDb.Database.OpenConnectionAsync();
             try
             {
-                await corruptionDb.Database.ExecuteSqlRawAsync(
+                _ = await corruptionDb.Database.ExecuteSqlRawAsync(
                     "PRAGMA ignore_check_constraints = ON"
                 );
-                await corruptionDb.Database.ExecuteSqlRawAsync(
+                _ = await corruptionDb.Database.ExecuteSqlRawAsync(
                     "UPDATE reply_delivery_settings SET Feature = 'invalid-feature'"
                 );
-                await corruptionDb.Database.ExecuteSqlRawAsync(
+                _ = await corruptionDb.Database.ExecuteSqlRawAsync(
                     "PRAGMA ignore_check_constraints = OFF"
                 );
             }
@@ -151,7 +152,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
                     .AwardGuessWin(db, hostId, 24, "alpha", Amount(10), now)
                     .ExecuteAsync(CancellationToken.None)
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         AssertSuccess(
@@ -196,7 +197,8 @@ public sealed class BoundedDiscriminatorBehaviorTests
             Target = target,
         };
 
-    private static PointAmount Amount(int value) => PointAmount.ParseAbsolute(value.ToString());
+    private static PointAmount Amount(int value) =>
+        PointAmount.ParseAbsolute(value.ToString(CultureInfo.InvariantCulture));
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
@@ -208,8 +210,8 @@ public sealed class BoundedDiscriminatorBehaviorTests
             DisplayName = "Streamer",
             CreatedAtUtc = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc),
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

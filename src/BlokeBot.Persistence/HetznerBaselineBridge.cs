@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.Sqlite;
@@ -52,9 +53,9 @@ internal static class HetznerBaselineBridge
             INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
             VALUES ($migrationId, $productVersion);
             """;
-        command.Parameters.AddWithValue("$migrationId", _baselineMigrationId);
-        command.Parameters.AddWithValue("$productVersion", _baselineProductVersion);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        _ = command.Parameters.AddWithValue("$migrationId", _baselineMigrationId);
+        _ = command.Parameters.AddWithValue("$productVersion", _baselineProductVersion);
+        _ = await command.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -71,7 +72,10 @@ internal static class HetznerBaselineBridge
                 WHERE type = 'table' AND name = '__EFMigrationsHistory'
             );
             """;
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) != 0;
+        return Convert.ToInt32(
+                await command.ExecuteScalarAsync(cancellationToken),
+                CultureInfo.InvariantCulture
+            ) != 0;
     }
 
     private static async Task<bool> HasExistingSchemaAsync(
@@ -88,7 +92,10 @@ internal static class HetznerBaselineBridge
                     AND NOT (type = 'table' AND name = '__EFMigrationsHistory')
             );
             """;
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) != 0;
+        return Convert.ToInt32(
+                await command.ExecuteScalarAsync(cancellationToken),
+                CultureInfo.InvariantCulture
+            ) != 0;
     }
 
     private static async Task<string> CalculateSchemaSignatureAsync(
@@ -112,7 +119,7 @@ internal static class HetznerBaselineBridge
         {
             if (schema.Length > 0)
             {
-                schema.Append('\n');
+                _ = schema.Append('\n');
             }
 
             var type = reader.GetString(0).ToLowerInvariant();
@@ -123,18 +130,18 @@ internal static class HetznerBaselineBridge
             }
 
             var sql = reader.GetString(2);
-            schema.Append(type).Append(':').Append(name).Append(':');
+            _ = schema.Append(type).Append(':').Append(name).Append(':');
             if (type == "table")
             {
                 EnsureTableHasNoSuffix(sql);
                 var definitions = SplitTableDefinitions(sql)
                     .Select(NormalizeSql)
                     .Order(StringComparer.Ordinal);
-                schema.AppendJoin(',', definitions);
+                _ = schema.AppendJoin(',', definitions);
             }
             else
             {
-                schema.Append(NormalizeSql(RemoveIfNotExists(sql)));
+                _ = schema.Append(NormalizeSql(RemoveIfNotExists(sql)));
             }
         }
 
@@ -215,7 +222,7 @@ internal static class HetznerBaselineBridge
             var character = sql[index];
             if (inStringLiteral)
             {
-                normalized.Append(character);
+                _ = normalized.Append(character);
                 if (character != '\'')
                 {
                     continue;
@@ -223,7 +230,7 @@ internal static class HetznerBaselineBridge
 
                 if (index + 1 < sql.Length && sql[index + 1] == '\'')
                 {
-                    normalized.Append(sql[++index]);
+                    _ = normalized.Append(sql[++index]);
                 }
                 else
                 {
@@ -236,11 +243,11 @@ internal static class HetznerBaselineBridge
             if (character == '\'')
             {
                 inStringLiteral = true;
-                normalized.Append(character);
+                _ = normalized.Append(character);
             }
             else if (character is not ('"' or '`' or '[' or ']') && !char.IsWhiteSpace(character))
             {
-                normalized.Append(char.ToLowerInvariant(character));
+                _ = normalized.Append(char.ToLowerInvariant(character));
             }
         }
 

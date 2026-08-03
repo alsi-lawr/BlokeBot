@@ -27,7 +27,7 @@ public sealed class CustomAnnouncementResilienceTests : CustomAnnouncementSchedu
         using var cancellation = new CancellationTokenSource();
         var cancellingSender = new CancellingAnnouncementSender(cancellation);
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             CreateScheduler(dbFactory, clock, cancellingSender).RunTickAsync(cancellation.Token)
         );
         await using (var db = await dbFactory.CreateDbContextAsync())

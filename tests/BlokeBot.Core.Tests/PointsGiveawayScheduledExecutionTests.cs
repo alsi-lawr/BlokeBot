@@ -35,8 +35,8 @@ public sealed class PointsGiveawayScheduledExecutionTests : PointsGiveawaySchedu
         commitCancellation.CommitAttempts.ShouldBe(1);
         commitCancellation.ObservedCancellationToken.CanBeCanceled.ShouldBeFalse();
         thrown.GiveawayId.ShouldBe(giveawayId);
-        thrown.IntendedOutcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
-        thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
+        _ = thrown.IntendedOutcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
+        _ = thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
         PointsGiveawaySchedulerFailureClassifier.IsTransient(thrown).ShouldBeFalse();
         PointsGiveawaySchedulerFailureClassifier
             .ClassifyUnhealthy(thrown)

@@ -23,7 +23,7 @@ public sealed class SiteAccessService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await EnsureSettingsAsync(db, ct);
+        _ = await EnsureSettingsAsync(db, ct);
         var changed = await AccessListStore.AddNormalizedAsync(
             db.SiteAccessEntries,
             db.SiteAccessEntries,
@@ -42,8 +42,8 @@ public sealed class SiteAccessService(
             return;
         }
 
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<bool> CanCreateHostAsync(string login, CancellationToken ct)
@@ -89,8 +89,8 @@ public sealed class SiteAccessService(
     public async Task RemoveEntryAsync(AccessListEntryKind kind, string login, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await AccessListStore.RemoveAsync(db.SiteAccessEntries, kind, login, ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await AccessListStore.RemoveAsync(db.SiteAccessEntries, kind, login, ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     public async Task SetWhitelistEnabledAsync(bool enabled, CancellationToken ct)
@@ -98,8 +98,8 @@ public sealed class SiteAccessService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, ct);
         settings.WhitelistEnabled = enabled;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
     }
 
     private static async Task<SiteAccessSettings> EnsureSettingsAsync(
@@ -114,8 +114,8 @@ public sealed class SiteAccessService(
         }
 
         settings = new SiteAccessSettings { Id = 1, WhitelistEnabled = false };
-        db.SiteAccessSettings.Add(settings);
-        await db.SaveChangesAsync(ct);
+        _ = db.SiteAccessSettings.Add(settings);
+        _ = await db.SaveChangesAsync(ct);
         return settings;
     }
 }

@@ -11,11 +11,6 @@ public sealed class AccessListProfileResolver(IAccessListProfileEnrichmentPolicy
             .Where(login => !string.IsNullOrWhiteSpace(login))
             .Select(login => login.Trim())
             .ToArray();
-        if (entries.Length == 0)
-        {
-            return [];
-        }
-
-        return await enrichment.EnrichAsync(entries, ct);
+        return entries.Length == 0 ? [] : await enrichment.EnrichAsync(entries, ct);
     }
 }

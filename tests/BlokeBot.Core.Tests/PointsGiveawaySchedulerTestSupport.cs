@@ -128,8 +128,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -148,8 +148,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             GiveawayWinnerCount = 1,
         };
         configure?.Invoke(settings);
-        db.PointsSettings.Add(settings);
-        await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(settings);
+        _ = await db.SaveChangesAsync();
     }
 
     private protected static async Task<int> SeedGiveawayAsync(
@@ -180,8 +180,8 @@ public abstract partial class PointsGiveawaySchedulerTestBase
             );
         }
 
-        db.PointsGiveaways.Add(giveaway);
-        await db.SaveChangesAsync();
+        _ = db.PointsGiveaways.Add(giveaway);
+        _ = await db.SaveChangesAsync();
         return giveaway.Id;
     }
 }

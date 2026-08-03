@@ -143,7 +143,7 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
             new FixedBroadcasterTokenStatusProvider(ReadyBroadcasterStatus())
         );
         var notificationCount = 0;
@@ -193,7 +193,7 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
             new FixedBroadcasterTokenStatusProvider(ReadyBroadcasterStatus())
         );
         var notificationCount = 0;
@@ -236,7 +236,7 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
             new DatabaseBroadcasterTokenStatusProvider(dbFactory)
         );
         using var failingSubscription = context
@@ -285,7 +285,7 @@ public sealed class HostConfigFaultRoutingTests
             new ManualTimeProvider()
         );
         var pending = new PendingBroadcasterTokenStatusProvider();
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(pending);
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(pending);
 
         var page = RenderHostConfigPage(context);
 
@@ -313,10 +313,10 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
             new FaultingBroadcasterTokenStatusProvider()
         );
-        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        _ = context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         RenderFragment content = builder =>
         {
             builder.OpenComponent<HostConfigPage>(0);
@@ -344,7 +344,7 @@ public sealed class HostConfigFaultRoutingTests
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
             host.CommandsAliasesConfigured = true;
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -352,7 +352,7 @@ public sealed class HostConfigFaultRoutingTests
                     Alias = "commands",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
@@ -383,10 +383,10 @@ public sealed class HostConfigFaultRoutingTests
             page.Find("#startup-chat-message").GetAttribute("value").ShouldBe("unsaved startup");
         });
 
-        await context
+        _ = await context
             .Services.GetRequiredService<EventBus<AppEventKind>>()
             .PublishAsync(AppEventKind.PointsChanged, CancellationToken.None);
-        await context
+        _ = await context
             .Services.GetRequiredService<EventBus<AppEventKind>>()
             .PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
 
@@ -406,7 +406,7 @@ public sealed class HostConfigFaultRoutingTests
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
             host.CommandsDefaultConflictAlias = "commands";
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
@@ -476,12 +476,12 @@ public sealed class HostConfigFaultRoutingTests
             new ManualTimeProvider()
         );
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
-        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+        _ = module.SetupVoid("focusElement", _ => true).SetVoidResult();
         var fragmentModule = context.JSInterop.SetupModule(
             "./Features/HostConfig/Page/HostConfigFragmentObserver.razor.js"
         );
-        fragmentModule.SetupVoid("observe", _ => true).SetVoidResult();
-        fragmentModule.SetupVoid("dispose", _ => true).SetVoidResult();
+        _ = fragmentModule.SetupVoid("observe", _ => true).SetVoidResult();
+        _ = fragmentModule.SetupVoid("dispose", _ => true).SetVoidResult();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("/host");
 
@@ -542,7 +542,7 @@ public sealed class HostConfigFaultRoutingTests
             page.FindAll(".feature-toggle-card").Count.ShouldBe(12);
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
-            overlays.QuerySelector("svg").ShouldNotBeNull();
+            _ = overlays.QuerySelector("svg").ShouldNotBeNull();
         });
         page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
@@ -623,7 +623,7 @@ public sealed class HostConfigFaultRoutingTests
                 ObserverIdentity.Named("Test.HostConfig.UnavailableAuthority"),
                 (_, _) =>
                 {
-                    saved.TrySetResult();
+                    _ = saved.TrySetResult();
                     return ValueTask.CompletedTask;
                 }
             );
@@ -678,7 +678,7 @@ public sealed class HostConfigFaultRoutingTests
         var logger = new RecordingLogger<UiFaultTelemetry>();
         var clock = new ManualTimeProvider();
         ConfigureHostServices(context, faultingDbFactory, logger, clock);
-        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        _ = context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         RenderFragment content = builder =>
         {
             builder.OpenComponent<HostConfigPage>(0);
@@ -723,22 +723,22 @@ public sealed class HostConfigFaultRoutingTests
         TimeProvider clock
     )
     {
-        context.Services.AddSingleton(dbFactory);
-        context.Services.AddSingleton(clock);
-        context.Services.AddSingleton<IOptions<BlokeBotOptions>>(
+        _ = context.Services.AddSingleton(dbFactory);
+        _ = context.Services.AddSingleton(clock);
+        _ = context.Services.AddSingleton<IOptions<BlokeBotOptions>>(
             Options.Create(new BlokeBotOptions())
         );
-        context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
-        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        context.Services.AddOAuthTransport();
-        context.Services.AddHelix();
-        context.Services.AddBlokeBotAppCommands();
-        context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
-        context.Services.AddBlokeBotAdmin(BotAccountAuthorizationMode.Disabled);
-        context.Services.AddBlokeBotHostedChannels(HostBotAppAccessTokenMode.Unavailable);
-        context.Services.AddBlokeBotHosts();
-        context.Services.AddTransient<ChannelBotOAuthService>();
-        context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        _ = context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
+        _ = context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        _ = context.Services.AddOAuthTransport();
+        _ = context.Services.AddHelix();
+        _ = context.Services.AddBlokeBotAppCommands();
+        _ = context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
+        _ = context.Services.AddBlokeBotAdmin(BotAccountAuthorizationMode.Disabled);
+        _ = context.Services.AddBlokeBotHostedChannels(HostBotAppAccessTokenMode.Unavailable);
+        _ = context.Services.AddBlokeBotHosts();
+        _ = context.Services.AddTransient<ChannelBotOAuthService>();
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
     }
 
     private static void ConfigureModeratorAuthorityServices(
@@ -774,7 +774,7 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
             new FixedBroadcasterTokenStatusProvider(status)
         );
         if (!owner)
@@ -813,7 +813,7 @@ public sealed class HostConfigFaultRoutingTests
     private static void SetModeratorClaims(BunitAuthorizationContext authorization, int hostId)
     {
         var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
-        authorization.SetClaims(
+        _ = authorization.SetClaims(
             TestPrincipals
                 .BlokeBotUser(
                     "moderator",
@@ -828,7 +828,7 @@ public sealed class HostConfigFaultRoutingTests
     private static void SetAdminClaims(BunitAuthorizationContext authorization, int hostId)
     {
         var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Admin);
-        authorization.SetClaims(
+        _ = authorization.SetClaims(
             TestPrincipals
                 .BlokeBotUser(
                     "administrator",
@@ -844,7 +844,7 @@ public sealed class HostConfigFaultRoutingTests
     private static void SetOwnerClaims(BunitAuthorizationContext authorization, int hostId)
     {
         var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
-        authorization.SetClaims(
+        _ = authorization.SetClaims(
             TestPrincipals
                 .BlokeBotUser(
                     "streamer",
@@ -867,8 +867,8 @@ public sealed class HostConfigFaultRoutingTests
         if (runtimeNotificationFails)
         {
             intentionalEventing = TestEventBus.CreateContinueAndRecord<AppEventKind>();
-            context.Services.AddSingleton(intentionalEventing.Events);
-            intentionalEventing.Events.Subscribe(
+            _ = context.Services.AddSingleton(intentionalEventing.Events);
+            _ = intentionalEventing.Events.Subscribe(
                 AppEventKind.HostedChannelsChanged,
                 ObserverIdentity.Named("Test.HostConfig.CurrentFailure"),
                 (_, _) =>
@@ -898,7 +898,7 @@ public sealed class HostConfigFaultRoutingTests
                 label.TextContent.Contains("Let moderators help", StringComparison.Ordinal)
             )
             .QuerySelector("input");
-        moderatorToggle.ShouldNotBeNull();
+        _ = moderatorToggle.ShouldNotBeNull();
         moderatorToggle.HasAttribute("checked").ShouldBeTrue();
         var toast = toasts.Current.ShouldHaveSingleItem();
         toast.Kind.ShouldBe(ToastKind.Error);
@@ -920,7 +920,7 @@ public sealed class HostConfigFaultRoutingTests
 
     private static IRenderedComponent<HostConfigPage> RenderHostConfigPage(BunitContext context)
     {
-        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        _ = context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         return context.Render<HostConfigPage>();
     }
 
@@ -968,8 +968,8 @@ public sealed class HostConfigFaultRoutingTests
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = await db.Hosts.SingleAsync(x => x.Id == hostId);
-        db.Hosts.Remove(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Remove(host);
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<bool> ReadAllowModsByDefaultAsync(
@@ -997,11 +997,11 @@ public sealed class HostConfigFaultRoutingTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         if (includeAccessState)
         {
-            db.HostModAccessSettings.Add(
+            _ = db.HostModAccessSettings.Add(
                 new HostModAccessSettings
                 {
                     HostId = host.Id,
@@ -1025,7 +1025,7 @@ public sealed class HostConfigFaultRoutingTests
                     CreatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         return host.Id;
@@ -1037,7 +1037,7 @@ public sealed class HostConfigFaultRoutingTests
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.HostBroadcasterAuthorizations.Add(
+        _ = db.HostBroadcasterAuthorizations.Add(
             new HostBroadcasterAuthorization
             {
                 HostId = hostId,
@@ -1052,7 +1052,7 @@ public sealed class HostConfigFaultRoutingTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task AssertBroadcasterAuthorizationPresentAsync(
@@ -1104,7 +1104,7 @@ public sealed class HostConfigFaultRoutingTests
             RequestCount++;
             cancellationToken.ThrowIfCancellationRequested();
             var request = _tokens.Dequeue();
-            request.Started?.TrySetResult();
+            _ = (request.Started?.TrySetResult());
             return request.Completion;
         }
 
@@ -1243,7 +1243,7 @@ public sealed class HostConfigFaultRoutingTests
         )
         {
             var timer = new ManualTimer(this, callback, state);
-            timer.Change(dueTime, period);
+            _ = timer.Change(dueTime, period);
             return timer;
         }
 
@@ -1310,7 +1310,7 @@ public sealed class HostConfigFaultRoutingTests
                     }
 
                     _disposed = true;
-                    owner._timers.Remove(this);
+                    _ = owner._timers.Remove(this);
                 }
             }
 
@@ -1344,7 +1344,7 @@ public sealed class HostConfigFaultRoutingTests
                     else
                     {
                         _disposed = true;
-                        owner._timers.Remove(this);
+                        _ = owner._timers.Remove(this);
                     }
                 }
 

@@ -74,30 +74,27 @@ public static class PointsConfigurationValidator
             errors.Add(new PointsConfigurationValidationError.DuplicateAlias(duplicateAlias));
         }
 
-        if (errors.Count > 0)
-        {
-            return Validation<
+        return errors.Count > 0
+            ? Validation<
                 PointsConfigurationSaveCommand,
                 PointsConfigurationValidationError
-            >.Invalid(errors[0], errors.Skip(1).ToArray());
-        }
-
-        return Validation<PointsConfigurationSaveCommand, PointsConfigurationValidationError>.Valid(
-            new PointsConfigurationSaveCommand(
-                NormalizePointLabel(draft.PointLabel),
-                aliases,
-                SnapshotReplies(draft.Replies),
-                draft.ReplyDelivery.ToMap(),
-                draft.GamblingWinRatePercent,
-                draft.GamblingCooldownSeconds,
-                draft.GiveawayDurationSeconds,
-                minimumPayout!.Value,
-                maximumPayout!.Value,
-                draft.GiveawayWinnerCount,
-                draft.GiveawayEligibility,
-                draft.GiveawayCooldownSeconds
-            )
-        );
+            >.Invalid(errors[0], errors.Skip(1).ToArray())
+            : Validation<PointsConfigurationSaveCommand, PointsConfigurationValidationError>.Valid(
+                new PointsConfigurationSaveCommand(
+                    NormalizePointLabel(draft.PointLabel),
+                    aliases,
+                    SnapshotReplies(draft.Replies),
+                    draft.ReplyDelivery.ToMap(),
+                    draft.GamblingWinRatePercent,
+                    draft.GamblingCooldownSeconds,
+                    draft.GiveawayDurationSeconds,
+                    minimumPayout!.Value,
+                    maximumPayout!.Value,
+                    draft.GiveawayWinnerCount,
+                    draft.GiveawayEligibility,
+                    draft.GiveawayCooldownSeconds
+                )
+            );
     }
 
     private static PointAmount? ParsePayout(
@@ -120,14 +117,20 @@ public static class PointsConfigurationValidator
         bool minimum,
         PointAmountParseError error
     ) =>
-        (minimum, error) switch
+        minimum switch
         {
-            (true, PointAmountParseError.AmountOutOfRange) =>
-                new PointsConfigurationValidationError.MinimumPayoutOutOfRange(),
-            (false, PointAmountParseError.AmountOutOfRange) =>
-                new PointsConfigurationValidationError.MaximumPayoutOutOfRange(),
-            (true, _) => new PointsConfigurationValidationError.InvalidMinimumPayout(),
-            (false, _) => new PointsConfigurationValidationError.InvalidMaximumPayout(),
+            true => error switch
+            {
+                PointAmountParseError.AmountOutOfRange =>
+                    new PointsConfigurationValidationError.MinimumPayoutOutOfRange(),
+                _ => new PointsConfigurationValidationError.InvalidMinimumPayout(),
+            },
+            false => error switch
+            {
+                PointAmountParseError.AmountOutOfRange =>
+                    new PointsConfigurationValidationError.MaximumPayoutOutOfRange(),
+                _ => new PointsConfigurationValidationError.InvalidMaximumPayout(),
+            },
         };
 
     private static string NormalizePointLabel(string pointLabel) =>

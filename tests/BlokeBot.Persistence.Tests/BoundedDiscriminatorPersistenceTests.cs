@@ -27,12 +27,12 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var host = Host();
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
 
             var profile = Profile(host.Id);
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
 
             db.ReplyDeliverySettings.AddRange(
                 ReplySetting(
@@ -55,7 +55,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
             db.PointLedgerEntries.AddRange(
                 supportedLedgerKinds.Select(kind => LedgerEntry(host.Id, kind))
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         await using var readDb = await dbFactory.CreateDbContextAsync();
@@ -180,19 +180,19 @@ public sealed class BoundedDiscriminatorPersistenceTests
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = Host();
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
 
         var profile = Profile(host.Id);
-        db.Profiles.Add(profile);
-        await db.SaveChangesAsync();
+        _ = db.Profiles.Add(profile);
+        _ = await db.SaveChangesAsync();
 
-        db.ReplyDeliverySettings.Add(
+        _ = db.ReplyDeliverySettings.Add(
             ReplySetting(host.Id, ReplyFeature.Guessing, "reply", ReplyDeliveryTarget.Chat)
         );
-        db.GuessOptions.Add(GuessOption(profile.Id, "guess", ReplyDeliveryTarget.Chat));
-        db.PointLedgerEntries.Add(LedgerEntry(host.Id, PointLedgerKind.Add));
-        await db.SaveChangesAsync();
+        _ = db.GuessOptions.Add(GuessOption(profile.Id, "guess", ReplyDeliveryTarget.Chat));
+        _ = db.PointLedgerEntries.Add(LedgerEntry(host.Id, PointLedgerKind.Add));
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task CorruptAsync(SqliteBlokeBotDbFactory dbFactory, string corruptionSql)
@@ -201,9 +201,9 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await db.Database.OpenConnectionAsync();
         try
         {
-            await db.Database.ExecuteSqlRawAsync("PRAGMA ignore_check_constraints = ON");
-            await db.Database.ExecuteSqlRawAsync(corruptionSql);
-            await db.Database.ExecuteSqlRawAsync("PRAGMA ignore_check_constraints = OFF");
+            _ = await db.Database.ExecuteSqlRawAsync("PRAGMA ignore_check_constraints = ON");
+            _ = await db.Database.ExecuteSqlRawAsync(corruptionSql);
+            _ = await db.Database.ExecuteSqlRawAsync("PRAGMA ignore_check_constraints = OFF");
         }
         finally
         {

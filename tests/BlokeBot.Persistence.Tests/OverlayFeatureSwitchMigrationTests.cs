@@ -18,7 +18,7 @@ public sealed class OverlayFeatureSwitchMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_overlayInstances);
-            await before.Database.ExecuteSqlRawAsync(
+            _ = await before.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
@@ -58,7 +58,7 @@ public sealed class OverlayFeatureSwitchMigrationTests
         await using (var latest = await factory.CreateDbContextAsync())
         {
             await latest.GetService<IMigrator>().MigrateAsync(_overlayFeatureSwitch);
-            await latest.Database.ExecuteSqlRawAsync(
+            _ = await latest.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)

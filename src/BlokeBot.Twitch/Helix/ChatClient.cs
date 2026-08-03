@@ -34,7 +34,7 @@ public sealed class ChatClient(
         );
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<SendMessageResponse>(
             _jsonOptions,

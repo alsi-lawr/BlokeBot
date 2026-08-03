@@ -79,7 +79,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
 
         harness.Session.CallCount.ShouldBe(1);
         listening.DisposeCount.ShouldBe(1);
-        harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
+        _ = harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         var report = harness
             .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();

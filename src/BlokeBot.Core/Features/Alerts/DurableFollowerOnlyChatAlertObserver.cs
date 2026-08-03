@@ -36,7 +36,7 @@ internal sealed class DurableFollowerOnlyChatAlertObserver(
             return;
         }
 
-        await alerts
+        _ = await alerts
             .Create(
                 host.Id,
                 DurableAlertSeverity.Warning,

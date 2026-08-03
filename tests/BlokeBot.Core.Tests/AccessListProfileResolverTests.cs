@@ -40,13 +40,14 @@ public sealed class AccessListProfileResolverTests
                 TokenCachePath = "tokens.json",
             }
         );
+        using var appTokens = new AppAccessTokenProvider(
+            http,
+            identity,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var resolver = new AccessListProfileResolver(
             new HelixAccessListProfileEnrichmentPolicy(
-                new AppAccessTokenProvider(
-                    http,
-                    identity,
-                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-                ),
+                appTokens,
                 new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 identity
             )
@@ -70,28 +71,20 @@ public sealed class AccessListProfileResolverTests
 
     private sealed class ProfileHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        internal int TokenRequestCountValue { get; set; }
+        internal int UserRequestCountValue { get; set; }
+        internal string? UserRequestAccessTokenValue { get; set; }
+        internal string? UserRequestClientIdValue { get; set; }
 
-        public int TokenRequestCount => _handler.TokenRequestCount;
+        public int TokenRequestCount => TokenRequestCountValue;
+        public int UserRequestCount => UserRequestCountValue;
+        public string? UserRequestAccessToken => UserRequestAccessTokenValue;
+        public string? UserRequestClientId => UserRequestClientIdValue;
 
-        public int UserRequestCount => _handler.UserRequestCount;
+        public HttpClient CreateClient(string name) => new(new Handler(this));
 
-        public string? UserRequestAccessToken => _handler.UserRequestAccessToken;
-
-        public string? UserRequestClientId => _handler.UserRequestClientId;
-
-        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
-
-        private sealed class Handler : HttpMessageHandler
+        private sealed class Handler(ProfileHttpClientFactory owner) : HttpMessageHandler
         {
-            public int TokenRequestCount { get; private set; }
-
-            public int UserRequestCount { get; private set; }
-
-            public string? UserRequestAccessToken { get; private set; }
-
-            public string? UserRequestClientId { get; private set; }
-
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
@@ -107,7 +100,7 @@ public sealed class AccessListProfileResolverTests
 
             private HttpResponseMessage TokenResponse()
             {
-                TokenRequestCount++;
+                owner.TokenRequestCountValue++;
                 return JsonResponse(
                     """
                     {"access_token":"app-token","expires_in":3600}
@@ -117,9 +110,9 @@ public sealed class AccessListProfileResolverTests
 
             private HttpResponseMessage UserResponse(HttpRequestMessage request)
             {
-                UserRequestCount++;
-                UserRequestAccessToken = request.Headers.Authorization?.Parameter;
-                UserRequestClientId = request.Headers.GetValues("Client-Id").Single();
+                owner.UserRequestCountValue++;
+                owner.UserRequestAccessTokenValue = request.Headers.Authorization?.Parameter;
+                owner.UserRequestClientIdValue = request.Headers.GetValues("Client-Id").Single();
                 return JsonResponse(
                     """
                     {"data":[{"id":"1","login":"viewer","display_name":"Viewer","profile_image_url":"https://cdn.example/viewer.png"},{"id":"2","login":"blank","display_name":"Blank","profile_image_url":" "}]}

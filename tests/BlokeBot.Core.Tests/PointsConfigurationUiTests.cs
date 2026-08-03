@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Configuration;
 using BlokeBot.Core.Features.Toasts;
@@ -17,9 +18,9 @@ public sealed class PointsConfigurationUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedInvalidSettingsAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        context.Services.AddSingleton<PointsChangeNotifier>();
-        context.Services.AddSingleton<PointsConfigurationService>();
-        context.ComponentFactories.AddStub<PointsEligibilitySelector>();
+        _ = context.Services.AddSingleton<PointsChangeNotifier>();
+        _ = context.Services.AddSingleton<PointsConfigurationService>();
+        _ = context.ComponentFactories.AddStub<PointsEligibilitySelector>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
 
@@ -86,7 +87,11 @@ public sealed class PointsConfigurationUiTests
         page.Find("#duration").Change("1");
         page.Find("#winnerCount").Change("1");
         page.Find("#cooldown")
-            .Change(PointsConfigurationValidator.MinimumGiveawayCooldownSeconds.ToString());
+            .Change(
+                PointsConfigurationValidator.MinimumGiveawayCooldownSeconds.ToString(
+                    CultureInfo.InvariantCulture
+                )
+            );
         page.FindAll("button")
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
@@ -140,9 +145,9 @@ public sealed class PointsConfigurationUiTests
             EnabledFeatures = HostFeatureFlags.Points,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        db.PointsSettings.Add(
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        _ = db.PointsSettings.Add(
             new PointsSettings
             {
                 HostId = host.Id,
@@ -152,7 +157,7 @@ public sealed class PointsConfigurationUiTests
                 GiveawayCooldownSeconds = 299,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

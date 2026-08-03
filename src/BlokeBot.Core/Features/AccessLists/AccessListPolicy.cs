@@ -87,7 +87,7 @@ internal static class AccessListStore
             return false;
         }
 
-        entries.Add(createEntry(normalizedLogin));
+        _ = entries.Add(createEntry(normalizedLogin));
         return true;
     }
 
@@ -115,14 +115,11 @@ internal static class AccessListStore
         where TEntry : class, IAccessListEntry
     {
         var normalized = NormalizeLogin(login).Match<string?>(value => value, _ => null);
-        if (normalized is null)
-        {
-            return 0;
-        }
-
-        return await scopedEntries
-            .Where(x => x.Kind == kind && x.Login == normalized)
-            .ExecuteDeleteAsync(ct);
+        return normalized is null
+            ? 0
+            : await scopedEntries
+                .Where(x => x.Kind == kind && x.Login == normalized)
+                .ExecuteDeleteAsync(ct);
     }
 
     public static Result<string, AccessListLoginNormalizationFailure> NormalizeLogin(string login)

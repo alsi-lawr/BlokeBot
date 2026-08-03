@@ -83,11 +83,11 @@ public sealed class HostedChannelConnectionStatusUiTests
 
     private static void ConfigureHostedChannelServices(BunitContext context)
     {
-        context.Services.AddSingleton<IOptions<BlokeBotOptions>>(
+        _ = context.Services.AddSingleton<IOptions<BlokeBotOptions>>(
             Options.Create(new BlokeBotOptions())
         );
-        context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
-        context.Services.AddSingleton<IConfiguration>(
+        _ = context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
+        _ = context.Services.AddSingleton<IConfiguration>(
             new ConfigurationBuilder()
                 .AddInMemoryCollection(
                     new Dictionary<string, string?>
@@ -97,13 +97,13 @@ public sealed class HostedChannelConnectionStatusUiTests
                 )
                 .Build()
         );
-        context.Services.AddOAuthTransport();
-        context.Services.AddHelix();
-        context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
-        context.Services.AddBlokeBotAdmin(BotAccountAuthorizationMode.Disabled);
-        context.Services.AddBlokeBotHostedChannels(HostBotAppAccessTokenMode.Unavailable);
-        context.Services.AddBlokeBotHosts();
-        context.Services.AddTransient<ChannelBotOAuthService>();
+        _ = context.Services.AddOAuthTransport();
+        _ = context.Services.AddHelix();
+        _ = context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
+        _ = context.Services.AddBlokeBotAdmin(BotAccountAuthorizationMode.Disabled);
+        _ = context.Services.AddBlokeBotHostedChannels(HostBotAppAccessTokenMode.Unavailable);
+        _ = context.Services.AddBlokeBotHosts();
+        _ = context.Services.AddTransient<ChannelBotOAuthService>();
     }
 
     private static AuthenticatedSession Session(int hostId, string login, AuthRole role)
@@ -128,8 +128,8 @@ public sealed class HostedChannelConnectionStatusUiTests
             ChannelBotAuthorizedAtUtc = DateTime.UtcNow,
             ChannelBotAuthorizedScopes = string.Empty,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

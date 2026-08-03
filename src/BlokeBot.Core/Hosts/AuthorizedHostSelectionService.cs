@@ -28,7 +28,7 @@ internal sealed class AuthorizedHostSelectionService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var selfHost = await LoadSelfHostChoice(db, userLogin).ExecuteAsync(ct);
-        selfHost.Match(
+        _ = selfHost.Match(
             host =>
                 host.Match(
                     value =>

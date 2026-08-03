@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Shouldly;
@@ -9,7 +10,7 @@ public sealed class HostBotAccountTokenProtectorTests
     private static readonly HostBotAccountTokenPayload _payload = new(
         "access-token",
         "refresh-token",
-        DateTimeOffset.Parse("2026-07-22T12:00:00Z")
+        DateTimeOffset.Parse("2026-07-22T12:00:00Z", CultureInfo.InvariantCulture)
     );
 
     [Test]

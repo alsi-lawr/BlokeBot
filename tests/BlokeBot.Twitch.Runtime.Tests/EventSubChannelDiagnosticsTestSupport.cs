@@ -93,7 +93,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
         )
         {
             var timer = new ManualTimer(this, callback, state);
-            timer.Change(dueTime, period);
+            _ = timer.Change(dueTime, period);
             return timer;
         }
 
@@ -115,7 +115,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
         {
             lock (_gate)
             {
-                _timers.Add(timer);
+                _ = _timers.Add(timer);
             }
         }
 
@@ -123,7 +123,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
         {
             lock (_gate)
             {
-                _timers.Remove(timer);
+                _ = _timers.Remove(timer);
             }
         }
 

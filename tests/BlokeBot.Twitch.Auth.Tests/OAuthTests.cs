@@ -26,12 +26,13 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient();
         var store = new MemoryTokenStore();
+        using var cache = new AccessTokenCache();
         var flow = new OAuthFlow(
             IdentityWithPath("tokens.json"),
             oauth,
             new InMemoryOAuthStateStore(),
             store,
-            new AccessTokenCache()
+            cache
         );
 
         var outcome = await flow.CompleteAuthorizationAsync(
@@ -40,7 +41,7 @@ public sealed class OAuthTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<OAuthFlowCompletionOutcome.InvalidState>();
+        _ = outcome.ShouldBeOfType<OAuthFlowCompletionOutcome.InvalidState>();
         oauth.ExchangeCalls.ShouldBe(0);
         store.Saved.ShouldBeNull();
     }
@@ -54,13 +55,8 @@ public sealed class OAuthTests
         };
         var states = new InMemoryOAuthStateStore();
         var store = new MemoryTokenStore();
-        var flow = new OAuthFlow(
-            IdentityWithPath("tokens.json"),
-            oauth,
-            states,
-            store,
-            new AccessTokenCache()
-        );
+        using var cache = new AccessTokenCache();
+        var flow = new OAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store, cache);
         var state = IssuedState(flow);
 
         var outcome = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
@@ -78,7 +74,7 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("cached", "refresh", _currentTime.AddHours(1)),
         };
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
 
         var accessToken = Success(
@@ -102,10 +98,11 @@ public sealed class OAuthTests
             LoadStarted = loadStarted,
             ContinueLoad = continueLoad,
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var first = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
         var second = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
         await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
         var accessTokens = (await Task.WhenAll(first, second)).Select(Success).ToArray();
@@ -125,7 +122,7 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("old-access", "old-refresh", _currentTime.AddMinutes(-1)),
         };
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
 
         var accessToken = Success(
@@ -149,7 +146,8 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("old-access", "old-refresh", _currentTime.AddMinutes(-1)),
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var requests = Enumerable
             .Range(0, 8)
@@ -172,7 +170,8 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("old-access", "old-refresh", _currentTime.AddMinutes(-1)),
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var accessToken = Success(
             await provider.GetAccessToken().ExecuteAsync(CancellationToken.None)
@@ -196,7 +195,8 @@ public sealed class OAuthTests
             Loaded = new TokenSet("old-access", "old-refresh", _currentTime.AddMinutes(-1)),
             SaveException = saveError,
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var exception = await Should.ThrowAsync<IOException>(() =>
             provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
@@ -221,7 +221,7 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore();
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
 
         var unavailable = Error(
@@ -249,7 +249,8 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("failed", "refresh", _currentTime.AddHours(1)),
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var thrown = await Should.ThrowAsync<IOException>(() =>
             provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
@@ -276,7 +277,8 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("expired", "refresh", _currentTime.AddMinutes(-1)),
         };
-        var provider = Provider(new AccessTokenCache(), store, oauth);
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
 
         var thrown = await Should.ThrowAsync<HttpRequestException>(() =>
             provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
@@ -309,11 +311,11 @@ public sealed class OAuthTests
             LoadStarted = loadStarted,
             ContinueLoad = continueLoad,
         };
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
 
         var loading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
         var invalidation = cache.ClearAsync(CancellationToken.None);
         await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
         Success(await loading).ShouldBe("first");
@@ -321,7 +323,7 @@ public sealed class OAuthTests
         store.Loaded = new TokenSet("second", "refresh", _currentTime.AddHours(1));
 
         var reloading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
         await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
 
         Success(await reloading).ShouldBe("second");
@@ -339,13 +341,10 @@ public sealed class OAuthTests
             LoadStarted = loadStarted,
             ContinueLoad = continueLoad,
         };
-        var provider = Provider(
-            new AccessTokenCache(),
-            store,
-            new FakeOAuthClient { ValidateResult = true }
-        );
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, new FakeOAuthClient { ValidateResult = true });
         var loading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
         using var cancellation = new CancellationTokenSource();
         var queued = provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask();
 
@@ -366,14 +365,11 @@ public sealed class OAuthTests
         var loadStarted = Channel.CreateUnbounded<bool>();
         var continueLoad = Channel.CreateUnbounded<bool>();
         var store = new MemoryTokenStore { LoadStarted = loadStarted, ContinueLoad = continueLoad };
-        var provider = Provider(
-            new AccessTokenCache(),
-            store,
-            new FakeOAuthClient { ValidateResult = true }
-        );
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, new FakeOAuthClient { ValidateResult = true });
         using var cancellation = new CancellationTokenSource();
         var loading = provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
 
         await cancellation.CancelAsync();
         var thrown = await Should.ThrowAsync<OperationCanceledException>(() => loading);
@@ -381,7 +377,7 @@ public sealed class OAuthTests
         thrown.CancellationToken.ShouldBe(cancellation.Token);
         store.Loaded = new TokenSet("recovered", "refresh", _currentTime.AddHours(1));
         var retry = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
-        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        _ = await loadStarted.Reader.ReadAsync(CancellationToken.None);
         await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
 
         Success(await retry).ShouldBe("recovered");
@@ -396,7 +392,7 @@ public sealed class OAuthTests
         {
             Loaded = new TokenSet("first", "refresh", _currentTime.AddHours(1)),
         };
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
         Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
             .ShouldBe("first");
@@ -415,11 +411,12 @@ public sealed class OAuthTests
     public async Task PreCancelledRequest_RequestingAccess_PropagatesCancellationBeforeLoad()
     {
         var store = new MemoryTokenStore();
-        var provider = Provider(new AccessTokenCache(), store, new FakeOAuthClient());
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, new FakeOAuthClient());
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask()
         );
 
@@ -431,11 +428,8 @@ public sealed class OAuthTests
     {
         var loadError = new IOException("Token load failed.");
         var store = new MemoryTokenStore { LoadException = loadError };
-        var provider = Provider(
-            new AccessTokenCache(),
-            store,
-            new FakeOAuthClient { ValidateResult = true }
-        );
+        using var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, new FakeOAuthClient { ValidateResult = true });
 
         var exception = await Should.ThrowAsync<IOException>(() =>
             provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
@@ -480,7 +474,7 @@ public sealed class OAuthTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             store.SaveAsync(
                 path,
                 new TokenSet("replacement", "refresh", _currentTime.AddHours(2)),
@@ -510,14 +504,14 @@ public sealed class OAuthTests
             Loaded = new TokenSet("old-access", "old-refresh", _currentTime.AddHours(1)),
         };
         var states = new InMemoryOAuthStateStore();
-        var cache = new AccessTokenCache();
+        using var cache = new AccessTokenCache();
         var provider = Provider(cache, store, oauth);
         Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
             .ShouldBe("old-access");
         var flow = new OAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store, cache);
         var state = IssuedState(flow);
 
-        await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
+        _ = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
         var accessToken = Success(
             await provider.GetAccessToken().ExecuteAsync(CancellationToken.None)
         );

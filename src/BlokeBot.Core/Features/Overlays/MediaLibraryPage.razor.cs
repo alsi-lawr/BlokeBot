@@ -16,7 +16,7 @@ public partial class MediaLibraryPage
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPageContextAsync();
+        _ = await LoadPageContextAsync();
         await LoadAsync();
     }
 

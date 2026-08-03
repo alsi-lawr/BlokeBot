@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using BlokeBot.Core.Components.Layout;
 using Bunit;
@@ -304,7 +305,7 @@ public sealed class ApplicationCardLayoutTests
         return new(
             Enum.Parse<CardAuthoringKind>(columns[0], ignoreCase: true),
             columns[1],
-            int.Parse(columns[2]),
+            int.Parse(columns[2], CultureInfo.InvariantCulture),
             Enum.Parse<CardMembership>(columns[3], ignoreCase: true),
             columns[4]
         );

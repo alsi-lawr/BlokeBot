@@ -111,7 +111,7 @@ internal sealed class IrcConnectionSession(
                 foreach (var channel in channelLogins)
                 {
                     await JoinChannelAsync(writer, channel, cancellationToken);
-                    joinedChannels.Add(channel);
+                    _ = joinedChannels.Add(channel);
                     startedChannels.Add(channel);
                 }
                 await AwaitAuthenticationAsync(reader, writer, cancellationToken);
@@ -204,7 +204,7 @@ internal sealed class IrcConnectionSession(
         )
         {
             await writer.WriteLineAsync($"PART #{channel}");
-            joinedChannels.Remove(channel);
+            _ = joinedChannels.Remove(channel);
             stoppedChannels.Add(channel);
             _log.LogInformation("Parted Twitch IRC channel #{Channel}.", channel);
         }
@@ -214,7 +214,7 @@ internal sealed class IrcConnectionSession(
         )
         {
             await JoinChannelAsync(writer, channel, cancellationToken);
-            joinedChannels.Add(channel);
+            _ = joinedChannels.Add(channel);
             startedChannels.Add(channel);
             _log.LogInformation("Joined Twitch IRC channel #{Channel}.", channel);
         }

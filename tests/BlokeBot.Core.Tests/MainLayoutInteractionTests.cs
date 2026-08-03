@@ -16,11 +16,11 @@ public sealed class MainLayoutInteractionTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.ComponentFactories.AddStub<NavMenu>();
-        context.ComponentFactories.AddStub<TopBarControls>();
-        context.ComponentFactories.AddStub<ThemeToggle>();
-        context.ComponentFactories.AddStub<PageHelpButton>();
-        context.ComponentFactories.AddStub<ToastHost>();
+        _ = context.ComponentFactories.AddStub<NavMenu>();
+        _ = context.ComponentFactories.AddStub<TopBarControls>();
+        _ = context.ComponentFactories.AddStub<ThemeToggle>();
+        _ = context.ComponentFactories.AddStub<PageHelpButton>();
+        _ = context.ComponentFactories.AddStub<ToastHost>();
         var cut = context.Render<MainLayout>();
         var menuButton = cut.Find("#mobile-navigation-menu-button");
         var background = cut.Find("[data-mobile-navigation-background]");
@@ -61,12 +61,12 @@ public sealed class DesktopRailInteractionTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var module = context.JSInterop.SetupModule("./Components/Layout/MainLayout.razor.js");
-        module.Setup<bool>("readRailPresentation").SetResult(true);
-        context.ComponentFactories.AddStub<NavMenu>();
-        context.ComponentFactories.AddStub<TopBarControls>();
-        context.ComponentFactories.AddStub<ThemeToggle>();
-        context.ComponentFactories.AddStub<PageHelpButton>();
-        context.ComponentFactories.AddStub<ToastHost>();
+        _ = module.Setup<bool>("readRailPresentation").SetResult(true);
+        _ = context.ComponentFactories.AddStub<NavMenu>();
+        _ = context.ComponentFactories.AddStub<TopBarControls>();
+        _ = context.ComponentFactories.AddStub<ThemeToggle>();
+        _ = context.ComponentFactories.AddStub<PageHelpButton>();
+        _ = context.ComponentFactories.AddStub<ToastHost>();
 
         var cut = context.Render<MainLayout>();
         var railToggle = cut.Find("button[aria-controls='desktop-navigation-rail']");
@@ -246,19 +246,21 @@ public sealed class NavMenuInventoryTests
             EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
     private static void SetupExpandedGroups(BunitJSModuleInterop module)
     {
-        module.Setup<bool>("readBoolean", "blokebot.sidebar.guessing.open", true).SetResult(true);
-        module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
-        module
+        _ = module
+            .Setup<bool>("readBoolean", "blokebot.sidebar.guessing.open", true)
+            .SetResult(true);
+        _ = module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
+        _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.customcommands.open", true)
             .SetResult(true);
-        module
+        _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.nativetwitch.open", true)
             .SetResult(true);
     }
@@ -292,7 +294,7 @@ public sealed class SharedDisclosureTests
         cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
         cut.Find($"#{targetId}").HasAttribute("hidden").ShouldBeFalse();
         cut.Find($"#{targetId}").GetAttribute("aria-hidden").ShouldBe("false");
-        cut.Find("input[aria-label='Configuration value']").ShouldNotBeNull();
+        _ = cut.Find("input[aria-label='Configuration value']").ShouldNotBeNull();
     }
 
     [Test]
@@ -300,7 +302,7 @@ public sealed class SharedDisclosureTests
     {
         using var context = new BunitContext();
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
-        module.SetupVoid("focusElement", "validation-target").SetVoidResult();
+        _ = module.SetupVoid("focusElement", "validation-target").SetVoidResult();
         RenderFragment content = builder =>
             builder.AddMarkupContent(0, "<input id='validation-target' value='unsaved value' />");
 
@@ -383,7 +385,7 @@ public sealed class SharedPageContractTests
         cut.Find(".dashboard-page").ClassList.ShouldContain("dashboard-page--wide");
         var actionsRegion = cut.Find("[data-persistent-page-actions]");
         actionsRegion.TextContent.ShouldContain("Save changes");
-        actionsRegion.ParentElement.ShouldNotBeNull();
+        _ = actionsRegion.ParentElement.ShouldNotBeNull();
         actionsRegion.ParentElement!.ClassList.ShouldContain("page-header__actions");
         cut.FindAll(".dashboard-page__action-bar").ShouldBeEmpty();
         var feedback = cut.Find("[data-save-feedback]");

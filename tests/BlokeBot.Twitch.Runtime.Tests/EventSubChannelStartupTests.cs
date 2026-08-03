@@ -42,7 +42,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             "bad",
             async cancellationToken =>
             {
-                await releaseFailure.Reader.ReadAsync(cancellationToken);
+                _ = await releaseFailure.Reader.ReadAsync(cancellationToken);
                 throw failure;
             }
         );
@@ -108,7 +108,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             async cancellationToken =>
             {
                 enteredAttempt.Writer.TryWrite(true).ShouldBeTrue();
-                await neverCompletes.Reader.ReadAsync(cancellationToken);
+                _ = await neverCompletes.Reader.ReadAsync(cancellationToken);
                 return new BotAccount("slow-bot", "slow-secret");
             }
         );
@@ -116,7 +116,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
 
         harness.Session.Start(["good", "slow"], CancellationToken.None);
         var startup = harness.Session.DrainAsync();
-        await enteredAttempt.Reader.ReadAsync();
+        _ = await enteredAttempt.Reader.ReadAsync();
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
         await startup;
 
@@ -170,7 +170,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>();
         ClassifiedFailure(diagnostic.Failure).Exception.ShouldBeSameAs(failure);
-        harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
+        _ = harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         harness.Session.ActiveChannels.ShouldBeEmpty();
         operations.CreateCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(0);
@@ -204,7 +204,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             EventSubChannelNextAction.RetryOnNextReconciliation,
             Now
         );
-        harness
+        _ = harness
             .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>()
             .Failure.ShouldBeOfType<EventSubChannelFailureContext.MissingChannel>();
@@ -276,7 +276,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             EventSubChannelNextAction.RetryOnNextReconciliation,
             Now
         );
-        harness
+        _ = harness
             .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>()
             .Failure.ShouldBeOfType<EventSubChannelFailureContext.MissingBot>();
@@ -317,7 +317,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
             EventSubChannelNextAction.NoFurtherAction,
             Now
         );
-        harness
+        _ = harness
             .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>()
             .Failure.ShouldBeOfType<EventSubChannelFailureContext.StartupMessageRejected>();
@@ -340,7 +340,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         operations.StartupDeliveryCount("channel").ShouldBe(1);
         operations.ChannelStartedCount("channel").ShouldBe(2);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
-        harness
+        _ = harness
             .Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelStatus.Healthy>();
         harness

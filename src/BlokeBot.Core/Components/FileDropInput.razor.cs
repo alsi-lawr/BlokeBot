@@ -120,20 +120,14 @@ public partial class FileDropInput
         catch (TaskCanceledException) { }
     }
 
-    private static string SizeLabel(long bytes)
-    {
-        if (bytes < 1024)
+    private static string SizeLabel(long bytes) =>
+        bytes switch
         {
-            return bytes == 1 ? "1 byte" : $"{bytes} bytes";
-        }
-
-        if (bytes < 1024 * 1024)
-        {
-            return $"{bytes / 1024m:0.##} KB";
-        }
-
-        return $"{bytes / (1024m * 1024m):0.##} MB";
-    }
+            1 => "1 byte",
+            < 1024 => $"{bytes} bytes",
+            < (1024 * 1024) => $"{bytes / 1024m:0.##} KB",
+            _ => $"{bytes / (1024m * 1024m):0.##} MB",
+        };
 
     private sealed record SelectedFile(string Name, long Size);
 }

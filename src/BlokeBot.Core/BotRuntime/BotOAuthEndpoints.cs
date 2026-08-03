@@ -34,7 +34,7 @@ internal static class BotOAuthEndpoints
     {
         var botOAuth = app.MapGroup("/oauth").RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/start",
                 async (
@@ -70,7 +70,7 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/callback",
                 async (
@@ -155,9 +155,9 @@ internal static class BotOAuthEndpoints
 
                     var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
                     return await completion.Match<Task<IResult>>(
-                        async _ =>
+                        async completed =>
                         {
-                            await changes.NotifyChangedAsync(ct);
+                            _ = await changes.NotifyChangedAsync(ct);
                             return Result(
                                 BlokeBotAuthOutcome.Success,
                                 BlokeBotAuthStatus.Ok,
@@ -182,7 +182,7 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/channel-bot/start",
                 async (
@@ -237,7 +237,7 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/channel-bot/callback",
                 async (
@@ -359,7 +359,7 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/host-bot/start",
                 async (
@@ -426,7 +426,7 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization();
 
-        botOAuth
+        _ = botOAuth
             .MapGet(
                 "/broadcaster/start",
                 (HttpContext context) =>
@@ -440,36 +440,33 @@ internal static class BotOAuthEndpoints
                     var oauth = context.RequestServices.GetService<HostBotAccountOAuthService>();
                     var states =
                         context.RequestServices.GetService<HostBroadcasterOAuthStateStore>();
-                    if (!session.CanAuthorizeSelectedHost || selected is null)
+                    return (session.CanAuthorizeSelectedHost, selected, oauth, states) switch
                     {
-                        return ConnectionAccessResult(session);
-                    }
-                    if (oauth is null || states is null)
-                    {
-                        return Result(
+                        (false, _, _, _) or (_, null, _, _) => ConnectionAccessResult(session),
+                        (_, _, null, _) or (_, _, _, null) => Result(
                             BlokeBotAuthOutcome.Unavailable,
                             BlokeBotAuthStatus.ServiceUnavailable,
                             BlokeBotAuthRetryAction.None,
                             BlokeBotAuthReturnAction.ChannelSetup
-                        );
-                    }
-                    return oauth
-                        .CreateAuthorizationUriForScopes(
-                            states.Issue(session.UserId, selected.Id),
-                            OAuthAuthorizationScopeSet.Create(
-                                HostBroadcasterAuthorizationService.MilestoneScopes
-                            )
-                        )
-                        .Match<IResult>(
-                            ready => Results.Redirect(ready.AuthorizationUri.ToString()),
-                            _ =>
-                                Result(
-                                    BlokeBotAuthOutcome.Unavailable,
-                                    BlokeBotAuthStatus.ServiceUnavailable,
-                                    BlokeBotAuthRetryAction.None,
-                                    BlokeBotAuthReturnAction.ChannelSetup
+                        ),
+                        (_, { } selectedHost, { } readyOauth, { } readyStates) => readyOauth
+                            .CreateAuthorizationUriForScopes(
+                                readyStates.Issue(session.UserId, selectedHost.Id),
+                                OAuthAuthorizationScopeSet.Create(
+                                    HostBroadcasterAuthorizationService.MilestoneScopes
                                 )
-                        );
+                            )
+                            .Match<IResult>(
+                                ready => Results.Redirect(ready.AuthorizationUri.ToString()),
+                                _ =>
+                                    Result(
+                                        BlokeBotAuthOutcome.Unavailable,
+                                        BlokeBotAuthStatus.ServiceUnavailable,
+                                        BlokeBotAuthRetryAction.None,
+                                        BlokeBotAuthReturnAction.ChannelSetup
+                                    )
+                            ),
+                    };
                 }
             )
             .RequireAuthorization();

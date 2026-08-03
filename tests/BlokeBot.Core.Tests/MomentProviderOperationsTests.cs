@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
@@ -62,8 +61,8 @@ public sealed class MomentProviderOperationsTests
         );
 
         var ambiguous = outcome.ShouldBeOfType<MomentProviderOutcome.Ambiguous>();
-        ambiguous.ClipId.ShouldNotBeNull();
-        ambiguous.MarkerId.ShouldNotBeNull();
+        _ = ambiguous.ClipId.ShouldNotBeNull();
+        _ = ambiguous.MarkerId.ShouldNotBeNull();
         ambiguous.Reason.ShouldContain("fallback marker");
         http.MarkerPosts.ShouldBe(1);
     }
@@ -86,7 +85,7 @@ public sealed class MomentProviderOperationsTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<MomentProviderOutcome.Failed>();
+        _ = outcome.ShouldBeOfType<MomentProviderOutcome.Failed>();
         http.ClipPosts.ShouldBe(1);
         http.MarkerPosts.ShouldBe(0);
     }
@@ -115,7 +114,7 @@ public sealed class MomentProviderOperationsTests
             secondOutcome = await second
                 .CaptureAsync(1, publicId, true, "Community moment", CancellationToken.None)
                 .WaitAsync(TimeSpan.FromSeconds(5));
-            secondOutcome.ShouldBeOfType<MomentProviderOutcome.Pending>();
+            _ = secondOutcome.ShouldBeOfType<MomentProviderOutcome.Pending>();
             http.ClipPosts.ShouldBe(1);
             http.MarkerPosts.ShouldBe(0);
         }
@@ -141,7 +140,7 @@ public sealed class MomentProviderOperationsTests
     {
         var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await database.CreateDbContextAsync();
-        db.Hosts.Add(
+        _ = db.Hosts.Add(
             new BotHost
             {
                 Login = "one",
@@ -150,7 +149,7 @@ public sealed class MomentProviderOperationsTests
                 EnabledFeatures = HostFeatureFlags.All,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return database;
     }
 
@@ -201,8 +200,8 @@ public sealed class MomentProviderOperationsTests
                         "one",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             );
 
@@ -245,17 +244,15 @@ public sealed class MomentProviderOperationsTests
                 if (request.RequestUri.AbsolutePath == "/helix/streams/markers")
                 {
                     owner.MarkerPosts++;
-                    if (owner._markerAmbiguous)
-                    {
-                        throw new HttpRequestException("ambiguous marker response");
-                    }
-                    return Task.FromResult(
-                        Json(
-                            """
-                            {"data":[{"id":"marker-id","description":"Community moment","position_seconds":42,"created_at":"2026-07-30T12:00:00Z","URL":"https://twitch.test/marker"}]}
-                            """
-                        )
-                    );
+                    return owner._markerAmbiguous
+                        ? throw new HttpRequestException("ambiguous marker response")
+                        : Task.FromResult(
+                            Json(
+                                """
+                                {"data":[{"id":"marker-id","description":"Community moment","position_seconds":42,"created_at":"2026-07-30T12:00:00Z","URL":"https://twitch.test/marker"}]}
+                                """
+                            )
+                        );
                 }
                 throw new InvalidOperationException(
                     $"Unexpected request {request.Method} {request.RequestUri}"
@@ -325,7 +322,7 @@ public sealed class MomentProviderOperationsTests
                 {
                     case ("/helix/clips", "POST"):
                         owner._clipPostCounter.Increment();
-                        owner._clipPostStarted.TrySetResult();
+                        _ = owner._clipPostStarted.TrySetResult();
                         await owner._releaseClipPost.Task.WaitAsync(cancellationToken);
                         return Json(
                             """{"data":[{"id":"delayed-clip-id","edit_url":"https://twitch.test/edit"}]}"""

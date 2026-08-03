@@ -20,8 +20,8 @@ public sealed class GuessingHistoryTests
                 DisplayName = "Streamer",
                 CreatedAtUtc = DateTime.UtcNow,
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
 
             var profile = new GuessRoundProfile
             {
@@ -31,10 +31,10 @@ public sealed class GuessingHistoryTests
                 IsDefault = true,
                 ReplySettings = new BotReplySettings(),
             };
-            db.Profiles.Add(profile);
-            await db.SaveChangesAsync();
+            _ = db.Profiles.Add(profile);
+            _ = await db.SaveChangesAsync();
 
-            db.Rounds.Add(
+            _ = db.Rounds.Add(
                 new GuessRound
                 {
                     HostId = host.Id,
@@ -43,7 +43,7 @@ public sealed class GuessingHistoryTests
                     StartedAtUtc = DateTime.UtcNow.AddMinutes(-5),
                 }
             );
-            db.Rounds.Add(
+            _ = db.Rounds.Add(
                 new GuessRound
                 {
                     HostId = host.Id,
@@ -69,7 +69,7 @@ public sealed class GuessingHistoryTests
                     ],
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var service = new GuessingHistoryService(dbFactory);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using BlokeBot.Site.Components;
 using Serilog;
 
@@ -11,7 +12,10 @@ internal static class SiteApplication
     internal static void ConfigureBootstrapLogging() =>
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
-            .WriteTo.Console(outputTemplate: ConsoleOutputTemplate)
+            .WriteTo.Console(
+                outputTemplate: ConsoleOutputTemplate,
+                formatProvider: CultureInfo.InvariantCulture
+            )
             .CreateBootstrapLogger();
 
     public static WebApplication Build(
@@ -26,17 +30,22 @@ internal static class SiteApplication
                 ApplicationName = typeof(SiteApplication).Assembly.GetName().Name,
             }
         );
-        builder.WebHost.UseStaticWebAssets();
-        builder.Host.UseSerilog(
+        _ = builder.WebHost.UseStaticWebAssets();
+        _ = builder.Host.UseSerilog(
             (context, services, logging) =>
             {
-                logging.ReadFrom.Configuration(context.Configuration).ReadFrom.Services(services);
+                _ = logging
+                    .ReadFrom.Configuration(context.Configuration)
+                    .ReadFrom.Services(services);
                 if (!context.Configuration.GetSection("Serilog:WriteTo").Exists())
                 {
-                    logging.Enrich.FromLogContext();
+                    _ = logging.Enrich.FromLogContext();
                     if (configureDefaults is null)
                     {
-                        logging.WriteTo.Console(outputTemplate: ConsoleOutputTemplate);
+                        _ = logging.WriteTo.Console(
+                            outputTemplate: ConsoleOutputTemplate,
+                            formatProvider: CultureInfo.InvariantCulture
+                        );
                     }
                     else
                     {
@@ -45,7 +54,7 @@ internal static class SiteApplication
                 }
             }
         );
-        builder
+        _ = builder
             .Services.AddOptions<BlokeBotSiteOptions>()
             .BindConfiguration("BlokeBotSite")
             .Validate(
@@ -53,24 +62,24 @@ internal static class SiteApplication
                 BlokeBotSiteOptionsValidation.LiveAppUrlFailure
             )
             .ValidateOnStart();
-        builder.Services.AddSingleton(SiteProductVersion.Current);
-        builder.Services.AddRazorComponents();
+        _ = builder.Services.AddSingleton(SiteProductVersion.Current);
+        _ = builder.Services.AddRazorComponents();
 
         var app = builder.Build();
         var pathBase = app.Configuration["BlokeBotSite:PathBase"];
         if (!string.IsNullOrWhiteSpace(pathBase))
         {
-            app.UsePathBase(pathBase);
+            _ = app.UsePathBase(pathBase);
         }
 
-        app.UseSerilogRequestLogging();
-        app.MapMethods(
+        _ = app.UseSerilogRequestLogging();
+        _ = app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],
             () => Results.Redirect("blokebot-mark.svg")
         );
-        app.MapStaticAssets();
-        app.MapRazorComponents<App>().DisableAntiforgery();
+        _ = app.MapStaticAssets();
+        _ = app.MapRazorComponents<App>().DisableAntiforgery();
         return app;
     }
 }

@@ -48,7 +48,7 @@ internal sealed class OAuthFlow(
     )
     {
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
-        await cache.ExecuteSynchronizedAsync(
+        _ = await cache.ExecuteSynchronizedAsync(
             async (transaction, token) =>
             {
                 await tokens.SaveAsync(identity.TokenCachePath, tokenSet, token);

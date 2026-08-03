@@ -54,7 +54,7 @@ public sealed class PointsGiveawayRehydrationTests : PointsGiveawaySchedulerTest
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Expired);
-        giveaway.CompletedAtUtc.ShouldNotBeNull();
+        _ = giveaway.CompletedAtUtc.ShouldNotBeNull();
         (await db.PointsGiveawayWinners.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
         (await db.PointBalances.CountAsync(x => x.HostId == hostId)).ShouldBe(0);

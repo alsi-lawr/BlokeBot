@@ -47,7 +47,7 @@ internal sealed class AdminHostManagementService(
     public IO<AdminHostOperationOutcome, AdminHostOperationError> RemoveHost(int hostId) =>
         IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
-            await runtime.Stop(hostId).ExecuteAsync(ct);
+            _ = await runtime.Stop(hostId).ExecuteAsync(ct);
             var removed = await hostRemoval.RemoveAsync(hostId, ct);
             return Success(
                 new AdminHostOperationOutcome.Completed(
@@ -107,7 +107,7 @@ internal sealed class AdminHostManagementService(
         var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
             ? user.Login
             : user.DisplayName;
-        await hostProvisioning.EnsureHostAsync(
+        _ = await hostProvisioning.EnsureHostAsync(
             user.Login,
             user.Id,
             displayName,

@@ -45,7 +45,7 @@ public sealed class AutomaticRaidShoutoutTemplateTests
             .ShouldBeOfType<AutomaticRaidTemplateParseOutcome.Valid>()
             .Template.AuthoredCharacters.ShouldBe(150);
 
-        AutomaticRaidShoutoutTemplate
+        _ = AutomaticRaidShoutoutTemplate
             .Parse(boundary + "x")
             .ShouldBeOfType<AutomaticRaidTemplateParseOutcome.Invalid>();
         AutomaticRaidShoutoutTemplate

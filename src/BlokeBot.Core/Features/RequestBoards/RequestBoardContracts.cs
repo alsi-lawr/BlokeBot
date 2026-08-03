@@ -203,7 +203,7 @@ internal static class RequestBoardInput
     public static bool IsValidSlug(string value) =>
         value.Length is >= 1 and <= 48
         && value[0] is >= 'a' and <= 'z'
-        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
+        && value.All(character => character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
     public static string NormalizeTitle(string value)
     {
@@ -215,10 +215,10 @@ internal static class RequestBoardInput
             {
                 if (needsSpace && builder.Length > 0)
                 {
-                    builder.Append(' ');
+                    _ = builder.Append(' ');
                 }
 
-                builder.Append(character);
+                _ = builder.Append(character);
                 needsSpace = false;
             }
             else

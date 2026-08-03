@@ -43,7 +43,7 @@ public sealed class GuessingConfigurationCommandTests
                 async command =>
                 {
                     saveInvoked = true;
-                    await service
+                    _ = await service
                         .SaveConfiguration(seed.HostId, command)
                         .ExecuteAsync(CancellationToken.None);
                 },
@@ -70,14 +70,14 @@ public sealed class GuessingConfigurationCommandTests
         var firstCommand = ValidCommand(firstDraft);
         var staleCommand = ValidCommand(staleDraft);
 
-        await service
+        _ = await service
             .SaveConfiguration(seed.HostId, firstCommand)
             .ExecuteAsync(CancellationToken.None);
         var staleResult = await service
             .SaveConfiguration(seed.HostId, staleCommand)
             .ExecuteAsync(CancellationToken.None);
 
-        staleResult
+        _ = staleResult
             .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
             .ShouldBeOfType<GuessingConfigurationSaveFailure.ConcurrentEdit>();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -122,7 +122,7 @@ public sealed class GuessingConfigurationCommandTests
 
         var failure = result.Match<GuessingConfigurationLoadFailure?>(_ => null, error => error);
 
-        failure.ShouldNotBeNull();
+        _ = failure.ShouldNotBeNull();
         failure.ShouldBe(new GuessingConfigurationLoadFailure());
         failure.Message.ShouldBe(
             "That round type is no longer available. Reloaded the current settings."
@@ -170,8 +170,8 @@ public sealed class GuessingConfigurationCommandTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var defaultProfile = new GuessRoundProfile
         {
             HostId = host.Id,
@@ -190,7 +190,7 @@ public sealed class GuessingConfigurationCommandTests
             Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
         };
         db.Profiles.AddRange(defaultProfile, specialProfile);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new(host.Id, defaultProfile.Id, specialProfile.Id);
     }
 

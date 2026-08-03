@@ -35,8 +35,8 @@ public sealed class GuessingHostSeeder(
                 IsDefault = true,
                 ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
             };
-            db.Profiles.Add(defaultProfile);
-            await db.SaveChangesAsync(ct);
+            _ = db.Profiles.Add(defaultProfile);
+            _ = await db.SaveChangesAsync(ct);
         }
 
         foreach (var command in commands.Descriptors)
@@ -57,7 +57,7 @@ public sealed class GuessingHostSeeder(
 
             foreach (var alias in command.DefaultAliases)
             {
-                db.CommandAliases.Add(
+                _ = db.CommandAliases.Add(
                     new CommandAlias
                     {
                         HostId = hostId,
@@ -69,6 +69,6 @@ public sealed class GuessingHostSeeder(
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
     }
 }

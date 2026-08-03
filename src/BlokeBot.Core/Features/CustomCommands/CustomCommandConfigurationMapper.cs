@@ -302,15 +302,10 @@ internal static class CustomCommandConfigurationMapper
         policy as RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         ?? throw new UnreachableException("Unknown custom announcement delivery policy.");
 
-    private static int ToWholeSeconds(TimeSpan value)
-    {
-        if (value.Ticks % TimeSpan.TicksPerSecond != 0)
-        {
-            throw new InvalidOperationException(
+    private static int ToWholeSeconds(TimeSpan value) =>
+        value.Ticks % TimeSpan.TicksPerSecond != 0
+            ? throw new InvalidOperationException(
                 "Announcement delivery timing must use whole seconds."
-            );
-        }
-
-        return checked((int)(value.Ticks / TimeSpan.TicksPerSecond));
-    }
+            )
+            : checked((int)(value.Ticks / TimeSpan.TicksPerSecond));
 }

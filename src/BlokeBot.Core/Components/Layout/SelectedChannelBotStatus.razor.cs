@@ -71,25 +71,27 @@ public partial class SelectedChannelBotStatus
     }
 
     private string _selectedBotStatusText =>
-        _selectedHostStatus is { } status
-            ? status.Lifecycle.Match(
+        _selectedHostStatus switch
+        {
+            null => "unknown",
+            { } status => status.Lifecycle.Match(
                 _ =>
-                    status.IsChannelBotAuthorized
-                        ? (
-                            status.ChannelBotAuthorizationScopesCurrent ? "chat connected"
-                            : CanAuthorizeSelectedHost() ? "reconnect bot"
-                            : "Channel owner needs to reconnect the bot"
-                        )
-                        : (
-                            CanAuthorizeSelectedHost()
-                                ? "connect bot"
-                                : "Channel owner needs to reconnect the bot"
-                        ),
+                    status.IsChannelBotAuthorized switch
+                    {
+                        true => status.ChannelBotAuthorizationScopesCurrent switch
+                        {
+                            true => "chat connected",
+                            false when CanAuthorizeSelectedHost() => "reconnect bot",
+                            _ => "Channel owner needs to reconnect the bot",
+                        },
+                        false when CanAuthorizeSelectedHost() => "connect bot",
+                        _ => "Channel owner needs to reconnect the bot",
+                    },
                 static _ => "bot starting",
                 static _ => "bot running",
                 static _ => "bot stopping"
-            )
-            : "Channel owner needs to reconnect the bot";
+            ),
+        };
 
     protected override void OnInitialized() =>
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(

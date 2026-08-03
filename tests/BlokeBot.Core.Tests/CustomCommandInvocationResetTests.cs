@@ -59,8 +59,8 @@ public sealed class CustomCommandInvocationResetTests
 
         db.ChangeTracker.Clear();
         var command = await db.CustomCommands.SingleAsync(stored => stored.Id == seed.CommandId);
-        db.CustomCommands.Remove(command);
-        await db.SaveChangesAsync();
+        _ = db.CustomCommands.Remove(command);
+        _ = await db.SaveChangesAsync();
 
         db.ChangeTracker.Clear();
         (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
@@ -80,8 +80,8 @@ public sealed class CustomCommandInvocationResetTests
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         var command = new CustomCommand
         {
             HostId = host.Id,
@@ -89,8 +89,8 @@ public sealed class CustomCommandInvocationResetTests
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        db.CustomCommands.Add(command);
-        await db.SaveChangesAsync();
+        _ = db.CustomCommands.Add(command);
+        _ = await db.SaveChangesAsync();
         db.CustomCommandInvocationClaims.AddRange(
             new CustomCommandInvocationClaim
             {
@@ -114,7 +114,7 @@ public sealed class CustomCommandInvocationResetTests
                 ClaimedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return new Seed(host.Id, command.Id);
     }
 

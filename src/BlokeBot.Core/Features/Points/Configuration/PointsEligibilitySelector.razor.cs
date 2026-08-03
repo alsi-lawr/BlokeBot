@@ -36,11 +36,20 @@ public partial class PointsEligibilitySelector
     private bool _followerEligibilityAvailable => _status?.IsModerator == true;
 
     private string _followerEligibilityTitle =>
-        IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
-        : _followerEligibilityAvailable ? "Followers can enter."
-        : BackgroundError is { } error ? error.FollowerReadStatusMessage
-        : _status?.ModeratorStatusMessage
-            ?? "Follower-only giveaways are not ready for this channel.";
+        IsBackgroundLoading switch
+        {
+            true => "Checking whether follower-only giveaways can work.",
+            false => _followerEligibilityAvailable switch
+            {
+                true => "Followers can enter.",
+                false => BackgroundError switch
+                {
+                    { } error => error.FollowerReadStatusMessage,
+                    _ => _status?.ModeratorStatusMessage
+                        ?? "Follower-only giveaways are not ready for this channel.",
+                },
+            },
+        };
 
     private async Task OnEligibilityChangedAsync(ChangeEventArgs args)
     {

@@ -60,7 +60,7 @@ public sealed class PlayQueueService(
                         Slug = slug,
                         CreatedAtUtc = now,
                     };
-                    db.PlayQueues.Add(queue);
+                    _ = db.PlayQueues.Add(queue);
                 }
                 else if (
                     await db.PlayQueueEntries.AnyAsync(value => value.QueueId == queue.Id, ct)
@@ -113,7 +113,7 @@ public sealed class PlayQueueService(
                     })
                 );
 
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 AddEvent(
                     db,
                     queue,
@@ -128,7 +128,7 @@ public sealed class PlayQueueService(
                     },
                     now
                 );
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(await LoadSummaryAsync(db, queue, ct));
             },
             ct,
@@ -211,7 +211,7 @@ public sealed class PlayQueueService(
                     );
                 }
 
-                await ConvergeAndPruneAsync(db, queue, now, ct);
+                _ = await ConvergeAndPruneAsync(db, queue, now, ct);
                 if (!queue.IsOpen)
                 {
                     return Rejected<PublicPlayQueueEntryView>(new PlayQueueRejection.Closed());
@@ -273,7 +273,7 @@ public sealed class PlayQueueService(
                         QueueId = queue.Id,
                         IdentityKey = identityKey,
                     };
-                    db.PlayQueueEntries.Add(entry);
+                    _ = db.PlayQueueEntries.Add(entry);
                 }
 
                 entry.TwitchUserId = CleanOptional(command.Viewer.TwitchUserId);
@@ -294,9 +294,9 @@ public sealed class PlayQueueService(
                     entry.Values.Add(new PlayQueueEntryValue { FieldId = field.Id, Value = value });
                 }
 
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 AddEvent(db, queue, entry, PlayQueueEventKind.Joined, new { entry.Id }, now);
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(await ToPublicViewAsync(db, queue, entry, ct));
             },
             ct,
@@ -329,7 +329,7 @@ public sealed class PlayQueueService(
                 entry.PartyNumber = null;
                 entry.UpdatedAtUtc = now;
                 AddEvent(db, queue, entry, PlayQueueEventKind.Left, new { entry.Id }, now);
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(await ToPublicViewAsync(db, queue, entry, ct));
             },
             ct
@@ -370,7 +370,7 @@ public sealed class PlayQueueService(
                 entry.ReadyExpiresAtUtc = null;
                 entry.UpdatedAtUtc = now;
                 AddEvent(db, queue, entry, PlayQueueEventKind.Ready, new { entry.Id }, now);
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(await ToPublicViewAsync(db, queue, entry, ct));
             },
             ct
@@ -406,7 +406,7 @@ public sealed class PlayQueueService(
                     new { entry.Id, entry.ReadyExpiresAtUtc },
                     now
                 );
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(await ToModeratorViewAsync(db, queue, entry, ct));
             },
             ct
@@ -446,39 +446,34 @@ public sealed class PlayQueueService(
         int priority,
         string privateModeratorNote,
         CancellationToken ct
-    )
-    {
-        if (priority is < -1000 or > 1000 || privateModeratorNote.Trim().Length > 1000)
-        {
-            return Task.FromResult<PlayQueueResult<ModeratorPlayQueueEntryView>>(
+    ) =>
+        priority is < -1000 or > 1000 || privateModeratorNote.Trim().Length > 1000
+            ? Task.FromResult<PlayQueueResult<ModeratorPlayQueueEntryView>>(
                 Rejected<ModeratorPlayQueueEntryView>(
                     new PlayQueueRejection.Invalid(
                         "Priority must be from -1000 to 1000 and the private note at most 1000 characters."
                     )
                 )
+            )
+            : MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
+                hostId,
+                entryId,
+                async (db, queue, entry, now) =>
+                {
+                    var idempotent =
+                        entry.Priority == priority
+                        && entry.PrivateModeratorNote == privateModeratorNote.Trim();
+                    entry.Priority = priority;
+                    entry.PrivateModeratorNote = privateModeratorNote.Trim();
+                    entry.UpdatedAtUtc = now;
+                    _ = await db.SaveChangesAsync(ct);
+                    return new PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded(
+                        await ToModeratorViewAsync(db, queue, entry, ct),
+                        idempotent
+                    );
+                },
+                ct
             );
-        }
-
-        return MutateModeratorEntryAsync<ModeratorPlayQueueEntryView>(
-            hostId,
-            entryId,
-            async (db, queue, entry, now) =>
-            {
-                var idempotent =
-                    entry.Priority == priority
-                    && entry.PrivateModeratorNote == privateModeratorNote.Trim();
-                entry.Priority = priority;
-                entry.PrivateModeratorNote = privateModeratorNote.Trim();
-                entry.UpdatedAtUtc = now;
-                await db.SaveChangesAsync(ct);
-                return new PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded(
-                    await ToModeratorViewAsync(db, queue, entry, ct),
-                    idempotent
-                );
-            },
-            ct
-        );
-    }
 
     public Task<PlayQueueResult<PlayQueueSelection>> ReplaceOneAsync(
         int hostId,
@@ -502,7 +497,7 @@ public sealed class PlayQueueService(
                 entry.Status = PlayQueueEntryStatus.Skipped;
                 entry.PartyNumber = null;
                 entry.UpdatedAtUtc = now;
-                db.PlayQueueExclusions.Add(
+                _ = db.PlayQueueExclusions.Add(
                     new PlayQueueExclusion
                     {
                         HostId = hostId,
@@ -547,7 +542,7 @@ public sealed class PlayQueueService(
                     replacement.Status = PlayQueueEntryStatus.Selected;
                     replacement.PartyNumber = queue.CurrentPartyNumber;
                     replacement.UpdatedAtUtc = now;
-                    db.PlayQueueParticipation.Add(
+                    _ = db.PlayQueueParticipation.Add(
                         new PlayQueueParticipation
                         {
                             HostId = hostId,
@@ -571,7 +566,7 @@ public sealed class PlayQueueService(
                     },
                     now
                 );
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(
                     new PlayQueueSelection(
                         queue.CurrentPartyNumber,
@@ -621,7 +616,7 @@ public sealed class PlayQueueService(
                         new { queue.Slug, queue.IsOpen },
                         now
                     );
-                    await db.SaveChangesAsync(ct);
+                    _ = await db.SaveChangesAsync(ct);
                 }
 
                 return new PlayQueueResult<PlayQueueSummary>.Succeeded(
@@ -658,7 +653,7 @@ public sealed class PlayQueueService(
                     );
                 }
 
-                await ConvergeAndPruneAsync(db, queue, now, ct);
+                _ = await ConvergeAndPruneAsync(db, queue, now, ct);
                 var current = queue
                     .Entries.Where(value => value.Status == PlayQueueEntryStatus.Selected)
                     .ToList();
@@ -692,7 +687,7 @@ public sealed class PlayQueueService(
                     )
                     .Select(value => value.IdentityKey)
                     .ToListAsync(ct);
-                candidates.RemoveAll(value => excludedKeys.Contains(value.IdentityKey));
+                _ = candidates.RemoveAll(value => excludedKeys.Contains(value.IdentityKey));
                 var lastParticipation = await LatestParticipationAsync(db, queue.Id, ct);
                 var ordered = OrderCandidates(queue, candidates, lastParticipation).ToList();
                 var selected = SelectWithRoles(queue, ordered, []);
@@ -709,7 +704,7 @@ public sealed class PlayQueueService(
                     member.ReadyExpiresAtUtc = null;
                     member.PartyNumber = queue.CurrentPartyNumber;
                     member.UpdatedAtUtc = now;
-                    db.PlayQueueParticipation.Add(
+                    _ = db.PlayQueueParticipation.Add(
                         new PlayQueueParticipation
                         {
                             HostId = hostId,
@@ -732,7 +727,7 @@ public sealed class PlayQueueService(
                     },
                     now
                 );
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 return Succeeded(
                     new PlayQueueSelection(
                         queue.CurrentPartyNumber,
@@ -769,32 +764,29 @@ public sealed class PlayQueueService(
             .Hosts.Where(host => host.Login == normalizedHost)
             .Select(host => (int?)host.Id)
             .SingleOrDefaultAsync(ct);
-        if (hostId is null)
-        {
-            return null;
-        }
-
-        return await ReadPageAsync(
-            hostId.Value,
-            PlayQueueInput.NormalizeSlug(queueSlug),
-            async (db, queue) =>
-            {
-                var waiting = OrderedWaiting(queue.Entries)
-                    .Select((entry, index) => ToPublicView(queue, entry, index + 1))
-                    .ToArray();
-                var party = queue
-                    .Entries.Where(value => value.Status == PlayQueueEntryStatus.Selected)
-                    .OrderBy(value => value.Id)
-                    .Select(entry => ToPublicView(queue, entry, 0))
-                    .ToArray();
-                return new PublicPlayQueueSnapshot(
-                    await LoadSummaryAsync(db, queue, ct),
-                    waiting,
-                    party
-                );
-            },
-            ct
-        );
+        return hostId is null
+            ? null
+            : await ReadPageAsync(
+                hostId.Value,
+                PlayQueueInput.NormalizeSlug(queueSlug),
+                async (db, queue) =>
+                {
+                    var waiting = OrderedWaiting(queue.Entries)
+                        .Select((entry, index) => ToPublicView(queue, entry, index + 1))
+                        .ToArray();
+                    var party = queue
+                        .Entries.Where(value => value.Status == PlayQueueEntryStatus.Selected)
+                        .OrderBy(value => value.Id)
+                        .Select(entry => ToPublicView(queue, entry, 0))
+                        .ToArray();
+                    return new PublicPlayQueueSnapshot(
+                        await LoadSummaryAsync(db, queue, ct),
+                        waiting,
+                        party
+                    );
+                },
+                ct
+            );
     }
 
     public Task<ModeratorPlayQueuePage?> GetModeratorPageAsync(
@@ -849,21 +841,16 @@ public sealed class PlayQueueService(
         int currentLimit,
         int nextLimit,
         CancellationToken cancellationToken
-    )
-    {
-        if (currentLimit is < 0 or > 12 || nextLimit is < 0 or > 12 || queueId <= 0)
-        {
-            return Task.FromResult<PlayQueueOverlayState?>(null);
-        }
-
-        return ReadOverlayStateCoreAsync(
-            hostId,
-            queueId,
-            currentLimit,
-            nextLimit,
-            cancellationToken
-        );
-    }
+    ) =>
+        currentLimit is < 0 or > 12 || nextLimit is < 0 or > 12 || queueId <= 0
+            ? Task.FromResult<PlayQueueOverlayState?>(null)
+            : ReadOverlayStateCoreAsync(
+                hostId,
+                queueId,
+                currentLimit,
+                nextLimit,
+                cancellationToken
+            );
 
     public async Task<PlayQueueResult<PublicPlayQueueEntryView>> GetPositionAsync(
         int hostId,
@@ -890,7 +877,7 @@ public sealed class PlayQueueService(
         var entry = page
             .Waiting.Concat(page.CurrentParty)
             .FirstOrDefault(value =>
-                value.TwitchUserId is not null && identity == $"id:{value.TwitchUserId}"
+                (value.TwitchUserId is not null && identity == $"id:{value.TwitchUserId}")
                 || value.NormalizedLogin == login
             );
         return entry is null
@@ -950,7 +937,7 @@ public sealed class PlayQueueService(
                 entry.UpdatedAtUtc = now;
                 if (!idempotent)
                 {
-                    db.PlayQueueExclusions.Add(
+                    _ = db.PlayQueueExclusions.Add(
                         new PlayQueueExclusion
                         {
                             HostId = hostId,
@@ -961,7 +948,7 @@ public sealed class PlayQueueService(
                         }
                     );
                     AddEvent(db, queue, entry, eventKind, new { entry.Id }, now);
-                    await db.SaveChangesAsync(ct);
+                    _ = await db.SaveChangesAsync(ct);
                 }
 
                 return new PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded(
@@ -1007,7 +994,7 @@ public sealed class PlayQueueService(
                     return Rejected<T>(new PlayQueueRejection.NotFound("Queue not found."));
                 }
 
-                await ConvergeAndPruneAsync(db, queue, now, ct);
+                _ = await ConvergeAndPruneAsync(db, queue, now, ct);
                 return await mutate(db, queue, entry, now);
             },
             ct,
@@ -1042,7 +1029,7 @@ public sealed class PlayQueueService(
                     );
                 }
 
-                await ConvergeAndPruneAsync(db, queue, now, ct);
+                _ = await ConvergeAndPruneAsync(db, queue, now, ct);
                 var entry = await FindEntryAsync(db, queue.Id, viewer, ct);
                 return entry is null
                     ? Rejected<PublicPlayQueueEntryView>(new PlayQueueRejection.NotJoined())
@@ -1086,7 +1073,7 @@ public sealed class PlayQueueService(
             );
             if (changed)
             {
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
             }
 
             var value = await project(db, queue);
@@ -1094,7 +1081,7 @@ public sealed class PlayQueueService(
             await transaction.CommitAsync(ct);
             if (changed)
             {
-                await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                _ = await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
                 await NotifyOverlayChangesAsync(committedChanges, ct);
             }
 
@@ -1102,7 +1089,7 @@ public sealed class PlayQueueService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -1130,18 +1117,18 @@ public sealed class PlayQueueService(
                 convergeBeforeMutation is not null && await convergeBeforeMutation(db, now);
             if (converged)
             {
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 await transaction.CreateSavepointAsync("AfterReadinessConvergence", ct);
             }
 
             var result = await mutate(db, now);
             if (result is PlayQueueResult<T>.Succeeded succeeded)
             {
-                await db.SaveChangesAsync(ct);
+                _ = await db.SaveChangesAsync(ct);
                 var committedChanges =
                     succeeded.WasIdempotent && !converged ? [] : CommittedChanges(db, hostId);
                 await transaction.CommitAsync(ct);
-                await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                _ = await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
                 await NotifyOverlayChangesAsync(committedChanges, ct);
             }
             else if (converged)
@@ -1149,7 +1136,7 @@ public sealed class PlayQueueService(
                 var committedChanges = CommittedChanges(db, hostId);
                 await transaction.RollbackToSavepointAsync("AfterReadinessConvergence", ct);
                 await transaction.CommitAsync(ct);
-                await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+                _ = await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
                 await NotifyOverlayChangesAsync(committedChanges, ct);
             }
 
@@ -1157,7 +1144,7 @@ public sealed class PlayQueueService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -1227,7 +1214,7 @@ public sealed class PlayQueueService(
             entry.Status = PlayQueueEntryStatus.NoShow;
             entry.ReadyExpiresAtUtc = null;
             entry.UpdatedAtUtc = now;
-            db.PlayQueueExclusions.Add(
+            _ = db.PlayQueueExclusions.Add(
                 new PlayQueueExclusion
                 {
                     HostId = queue.HostId,
@@ -1531,10 +1518,15 @@ public sealed class PlayQueueService(
                     )
                     && (
                         value.Priority > entry.Priority
-                        || value.Priority == entry.Priority && value.JoinedAtUtc < entry.JoinedAtUtc
-                        || value.Priority == entry.Priority
+                        || (
+                            value.Priority == entry.Priority
+                            && value.JoinedAtUtc < entry.JoinedAtUtc
+                        )
+                        || (
+                            value.Priority == entry.Priority
                             && value.JoinedAtUtc == entry.JoinedAtUtc
                             && value.Id < entry.Id
+                        )
                     )
                 )
                 .LongCountAsync(ct) + 1;
@@ -1629,7 +1621,7 @@ public sealed class PlayQueueService(
         var values = new List<(PlayQueueField Field, string Value)>();
         foreach (var field in queue.Fields.OrderBy(value => value.Position))
         {
-            normalized.TryGetValue(field.Key, out var value);
+            _ = normalized.TryGetValue(field.Key, out var value);
             value ??= string.Empty;
             if (value.Length > 200)
             {
@@ -1755,33 +1747,29 @@ public sealed class PlayQueueService(
         }
 
         var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (
+        var roleRequirementsInvalid =
             command.RoleRequirements.Any(value =>
                 value.Role.Trim().Length is < 1 or > 64
                 || value.MinimumCount is < 1
                 || !roles.Add(value.Role.Trim())
             )
-            || command.RoleRequirements.Sum(value => value.MinimumCount) > command.Capacity
-        )
-        {
-            return new PlayQueueRejection.Invalid(
-                "Role requirements must be unique and fit the party capacity."
-            );
-        }
+            || command.RoleRequirements.Sum(value => value.MinimumCount) > command.Capacity;
 
-        if (
+        var roleCompositionInvalid =
             command.RoleRequirements.Count > 0
             && !command.Fields.Any(value =>
                 PlayQueueInput.NormalizeKey(value.Key) == "preferred-role"
-            )
-        )
-        {
-            return new PlayQueueRejection.Invalid(
-                "Role composition requires a preferred-role field."
             );
-        }
-
-        return null;
+        return roleRequirementsInvalid switch
+        {
+            true => new PlayQueueRejection.Invalid(
+                "Role requirements must be unique and fit the party capacity."
+            ),
+            false when roleCompositionInvalid => new PlayQueueRejection.Invalid(
+                "Role composition requires a preferred-role field."
+            ),
+            false => null,
+        };
     }
 
     private static bool FieldShapeMatches(
@@ -1893,17 +1881,17 @@ public sealed class PlayQueueService(
     private static PlayQueueOverlayTransition TransitionFor(IEnumerable<PlayQueueEventKind> events)
     {
         var kinds = events.ToArray();
-        if (kinds.Contains(PlayQueueEventKind.PartySelected))
+        return kinds switch
         {
-            return PlayQueueOverlayTransition.PartyChanged;
-        }
-        if (kinds.Any(kind => kind is PlayQueueEventKind.Ready or PlayQueueEventKind.NoShow))
-        {
-            return PlayQueueOverlayTransition.ReadyOutcome;
-        }
-        return kinds.Contains(PlayQueueEventKind.ReadyCheckStarted)
-            ? PlayQueueOverlayTransition.SelectedNext
-            : PlayQueueOverlayTransition.None;
+            _ when kinds.Contains(PlayQueueEventKind.PartySelected) =>
+                PlayQueueOverlayTransition.PartyChanged,
+            _ when kinds.Any(kind =>
+                    kind is PlayQueueEventKind.Ready or PlayQueueEventKind.NoShow
+                ) => PlayQueueOverlayTransition.ReadyOutcome,
+            _ when kinds.Contains(PlayQueueEventKind.ReadyCheckStarted) =>
+                PlayQueueOverlayTransition.SelectedNext,
+            _ => PlayQueueOverlayTransition.None,
+        };
     }
 
     private async ValueTask NotifyOverlayChangesAsync(
@@ -1944,7 +1932,7 @@ public sealed class PlayQueueService(
             );
         }
 
-        db.PlayQueueEvents.Add(
+        _ = db.PlayQueueEvents.Add(
             new PlayQueueDomainEvent
             {
                 HostId = queue.HostId,

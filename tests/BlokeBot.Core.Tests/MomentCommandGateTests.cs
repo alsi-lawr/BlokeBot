@@ -17,7 +17,7 @@ public sealed class MomentCommandGateTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await database.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.None,
@@ -26,7 +26,7 @@ public sealed class MomentCommandGateTests
                     TwitchUserId = "streamer-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var liveness = new RecordingLivenessProvider();
         var providerOperations = new RecordingMomentProvider();
@@ -37,10 +37,10 @@ public sealed class MomentCommandGateTests
             TimeProvider.System
         );
         var services = new ServiceCollection();
-        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        services.AddSingleton<IHostStreamLivenessProvider>(liveness);
-        services.AddSingleton(moments);
-        services.AddChatCommands().AddCommandModule<MomentCommandModule>();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton<IHostStreamLivenessProvider>(liveness);
+        _ = services.AddSingleton(moments);
+        _ = services.AddChatCommands().AddCommandModule<MomentCommandModule>();
         await using var serviceProvider = services.BuildServiceProvider();
         var dispatcher = serviceProvider.GetRequiredService<ChatCommandDispatcher>();
         var responses = new List<string>();

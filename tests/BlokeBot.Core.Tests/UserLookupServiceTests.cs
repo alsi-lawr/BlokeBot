@@ -166,7 +166,7 @@ public sealed class UserLookupServiceTests
     {
         var service = CreateService("""{"data":[]}""", HttpStatusCode.BadGateway);
 
-        await Should.ThrowAsync<HttpRequestException>(() =>
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
             service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None).AsTask()
         );
     }
@@ -178,7 +178,7 @@ public sealed class UserLookupServiceTests
         cancellation.Cancel();
         var service = CreateService("""{"data":[]}""");
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             service.FindByLogin("viewer").ExecuteAsync(cancellation.Token).AsTask()
         );
     }

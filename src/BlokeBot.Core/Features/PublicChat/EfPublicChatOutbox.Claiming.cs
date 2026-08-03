@@ -60,7 +60,7 @@ internal sealed partial class EfPublicChatOutbox
                     sendStartedAt,
                     cancellationToken
                 );
-                await db.SaveChangesAsync(cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return new PublicChatClaimUpdate.Expired();
             }
@@ -94,14 +94,14 @@ internal sealed partial class EfPublicChatOutbox
                 return new PublicChatClaimUpdate.OwnershipLost();
             }
 
-            db.PublicChatSendReceipts.Add(
+            _ = db.PublicChatSendReceipts.Add(
                 new PublicChatSendReceipt
                 {
                     OutboxMessageId = message.Id,
                     AttemptedAtUtc = sendStartedAt.UtcDateTime,
                 }
             );
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return new PublicChatClaimUpdate.Applied();
         }
@@ -133,7 +133,7 @@ internal sealed partial class EfPublicChatOutbox
                     releasedAt,
                     cancellationToken
                 );
-                await db.SaveChangesAsync(cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
                 return new PublicChatClaimUpdate.Expired();
             }
 
@@ -399,34 +399,27 @@ internal sealed partial class EfPublicChatOutbox
         return new PublicChatClaimOutcome.Claimed(MapClaimed(claimed));
     }
 
-    private static PublicChatClaimedMessage MapClaimed(PublicChatOutboxMessage row)
-    {
-        if (
-            row.Message is null
-            || row.DeduplicationKey is null
-            || row.NextAttemptAtUtc is null
-            || row.ClaimToken is null
-            || row.ClaimExpiresAtUtc is null
-        )
-        {
-            throw new UnreachableException(
+    private static PublicChatClaimedMessage MapClaimed(PublicChatOutboxMessage row) =>
+        row.Message is null
+        || row.DeduplicationKey is null
+        || row.NextAttemptAtUtc is null
+        || row.ClaimToken is null
+        || row.ClaimExpiresAtUtc is null
+            ? throw new UnreachableException(
                 "A claimed public chat outbox row has an invalid persistence shape."
-            );
-        }
-
-        return new PublicChatClaimedMessage
-        {
-            Id = row.Id,
-            Channel = row.Channel,
-            Message = row.Message,
-            EnqueuedAt = ToDateTimeOffset(row.CreatedAtUtc),
-            ExpiresAt = ToDateTimeOffset(row.ExpiresAtUtc),
-            Attempt = row.AttemptCount + 1,
-            ClaimToken = new PublicChatClaimToken(row.ClaimToken.Value),
-            ClaimExpiresAt = ToDateTimeOffset(row.ClaimExpiresAtUtc.Value),
-            DeduplicationKey = new PublicChatDeduplicationKey(row.DeduplicationKey),
-        };
-    }
+            )
+            : new PublicChatClaimedMessage
+            {
+                Id = row.Id,
+                Channel = row.Channel,
+                Message = row.Message,
+                EnqueuedAt = ToDateTimeOffset(row.CreatedAtUtc),
+                ExpiresAt = ToDateTimeOffset(row.ExpiresAtUtc),
+                Attempt = row.AttemptCount + 1,
+                ClaimToken = new PublicChatClaimToken(row.ClaimToken.Value),
+                ClaimExpiresAt = ToDateTimeOffset(row.ClaimExpiresAtUtc.Value),
+                DeduplicationKey = new PublicChatDeduplicationKey(row.DeduplicationKey),
+            };
 
     private static DateTime EligibleAt(
         PublicChatOutboxMessage row,

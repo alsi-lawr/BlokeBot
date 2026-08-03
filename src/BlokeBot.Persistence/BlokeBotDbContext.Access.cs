@@ -10,15 +10,15 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAccess(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<SiteAccessSettings>(b =>
+        _ = modelBuilder.Entity<SiteAccessSettings>(b =>
         {
-            b.ToTable("site_access_settings");
-            b.HasKey(x => x.Id);
+            _ = b.ToTable("site_access_settings");
+            _ = b.HasKey(x => x.Id);
         });
 
-        modelBuilder.Entity<SiteAccessEntry>(b =>
+        _ = modelBuilder.Entity<SiteAccessEntry>(b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "site_access_entries",
                 t =>
                     t.HasCheckConstraint(
@@ -26,32 +26,32 @@ public sealed partial class BlokeBotDbContext
                         KindIn("Kind", _accessKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Kind)
+            _ = b.HasKey(x => x.Id);
+            _ = b.Property(x => x.Login).HasMaxLength(128);
+            _ = b.Property(x => x.Kind)
                 .HasConversion(
                     kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
                     value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => new { x.Kind, x.Login }).IsUnique();
+            _ = b.HasIndex(x => new { x.Kind, x.Login }).IsUnique();
         });
 
-        modelBuilder.Entity<HostModAccessSettings>(b =>
+        _ = modelBuilder.Entity<HostModAccessSettings>(b =>
         {
-            b.ToTable("host_mod_access_settings");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.AllowModsByDefault).HasDefaultValue(true);
-            b.HasIndex(x => x.HostId).IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.ToTable("host_mod_access_settings");
+            _ = b.HasKey(x => x.Id);
+            _ = b.Property(x => x.AllowModsByDefault).HasDefaultValue(true);
+            _ = b.HasIndex(x => x.HostId).IsUnique();
+            _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<HostModAccessEntry>(b =>
+        _ = modelBuilder.Entity<HostModAccessEntry>(b =>
         {
-            b.ToTable(
+            _ = b.ToTable(
                 "host_mod_access_entries",
                 t =>
                     t.HasCheckConstraint(
@@ -59,22 +59,22 @@ public sealed partial class BlokeBotDbContext
                         KindIn("Kind", _accessKinds)
                     )
             );
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Kind)
+            _ = b.HasKey(x => x.Id);
+            _ = b.Property(x => x.Login).HasMaxLength(128);
+            _ = b.Property(x => x.Kind)
                 .HasConversion(
                     kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
                     value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => new
+            _ = b.HasIndex(x => new
                 {
                     x.HostId,
                     x.Kind,
                     x.Login,
                 })
                 .IsUnique();
-            b.HasOne<BotHost>()
+            _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);

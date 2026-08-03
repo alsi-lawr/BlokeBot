@@ -88,7 +88,7 @@ public sealed class OverlayLiveCoordinatorTests
     )
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (
+        _ = (
             await connection.Messages.ReadAsync(timeout.Token)
         ).ShouldBeOfType<OverlayLiveTransportMessage.Baseline>();
     }
@@ -132,7 +132,7 @@ public sealed class OverlayLiveCoordinatorTests
         {
             if (Interlocked.Increment(ref _calls) == 2)
             {
-                _entered.TrySetResult();
+                _ = _entered.TrySetResult();
                 await _release.Task.WaitAsync(cancellationToken);
             }
 
@@ -159,7 +159,7 @@ public sealed class OverlayLiveCoordinatorTests
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _calls) == 2)
             {
-                _failureObserved.TrySetResult();
+                _ = _failureObserved.TrySetResult();
                 return Task.FromException<OverlaySnapshotProjection>(
                     new InvalidOperationException("Synthetic projection failure.")
                 );

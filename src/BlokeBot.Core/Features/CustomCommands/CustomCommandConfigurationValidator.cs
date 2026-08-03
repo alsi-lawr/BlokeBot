@@ -130,26 +130,23 @@ public static class CustomCommandConfigurationValidator
         EnsureUniqueAliases(commands, errors);
         var timeZone = NormalizeTimeZone(draft.TimeZoneId, errors);
 
-        if (errors.Count > 0)
-        {
-            return Validation<
+        return errors.Count > 0
+            ? Validation<
                 CustomCommandConfigurationSaveCommand,
                 CustomCommandConfigurationValidationError
-            >.Invalid(errors[0], errors.Skip(1).ToArray());
-        }
-
-        return Validation<
-            CustomCommandConfigurationSaveCommand,
-            CustomCommandConfigurationValidationError
-        >.Valid(
-            new CustomCommandConfigurationSaveCommand(
-                timeZone,
-                messageEntries,
-                commands,
-                counters,
-                announcements
-            )
-        );
+            >.Invalid(errors[0], errors.Skip(1).ToArray())
+            : Validation<
+                CustomCommandConfigurationSaveCommand,
+                CustomCommandConfigurationValidationError
+            >.Valid(
+                new CustomCommandConfigurationSaveCommand(
+                    timeZone,
+                    messageEntries,
+                    commands,
+                    counters,
+                    announcements
+                )
+            );
     }
 
     private static IReadOnlyList<CustomMessageLibraryEntryValue> SnapshotMessageEntries(

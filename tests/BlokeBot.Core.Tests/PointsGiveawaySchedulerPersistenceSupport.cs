@@ -16,27 +16,15 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     {
         public int Attempts { get; private set; }
 
-        public BlokeBotDbContext CreateDbContext()
-        {
-            if (++Attempts == 1)
-            {
-                throw failure;
-            }
-
-            return inner.CreateDbContext();
-        }
+        public BlokeBotDbContext CreateDbContext() =>
+            ++Attempts == 1 ? throw failure : inner.CreateDbContext();
 
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        )
-        {
-            if (++Attempts == 1)
-            {
-                return Task.FromException<BlokeBotDbContext>(failure);
-            }
-
-            return inner.CreateDbContextAsync(cancellationToken);
-        }
+        ) =>
+            ++Attempts == 1
+                ? Task.FromException<BlokeBotDbContext>(failure)
+                : inner.CreateDbContextAsync(cancellationToken);
     }
 
     private protected sealed class RecordingDbContextFactory(
@@ -88,7 +76,7 @@ public abstract partial class PointsGiveawaySchedulerTestBase
                 .Options;
             await using (var db = new BlokeBotDbContext(creationOptions))
             {
-                await db.Database.EnsureCreatedAsync();
+                _ = await db.Database.EnsureCreatedAsync();
             }
 
             var options = new DbContextOptionsBuilder<BlokeBotDbContext>()

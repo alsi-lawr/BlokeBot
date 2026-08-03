@@ -173,12 +173,12 @@ public sealed class CustomCommandConfigurationTests
 
         action.TargetOverlayPublicId = other.TargetId;
         references.Outcome = new OverlayCueReferenceOutcome.Missing(OverlayCueReferencePart.Target);
-        (
+        _ = (
             await SaveFailureAsync(service, hostId, loaded)
         ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
         action.TargetOverlayPublicId = owned.TargetId;
         references.Outcome = new OverlayCueReferenceOutcome.Disabled(OverlayCueReferencePart.Cue);
-        (
+        _ = (
             await SaveFailureAsync(service, hostId, loaded)
         ).ShouldBeOfType<CustomCommandConfigurationSaveFailure.OverlayCueReference>();
         references.Requests.Count.ShouldBe(3);
@@ -237,7 +237,7 @@ public sealed class CustomCommandConfigurationTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        await Should.ThrowAsync<OperationCanceledException>(() =>
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
             service
                 .SaveConfiguration(
                     1,
@@ -258,7 +258,7 @@ public sealed class CustomCommandConfigurationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.CommandAliases.Add(
+            _ = db.CommandAliases.Add(
                 new CommandAlias
                 {
                     HostId = hostId,
@@ -266,7 +266,7 @@ public sealed class CustomCommandConfigurationTests
                     Alias = "points",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var service = CreateService(dbFactory);
@@ -323,7 +323,7 @@ public sealed class CustomCommandConfigurationTests
 
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         loaded.Commands.Single().Aliases.ShouldBe("new-alias");
-        loaded.Commands.Single().Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
+        _ = loaded.Commands.Single().Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
         var loadedSchedule = loaded
             .Announcements.Single()
             .Schedule.ShouldBeOfType<IntervalAfterChatCustomAnnouncementScheduleEditor>();
@@ -344,7 +344,7 @@ public sealed class CustomCommandConfigurationTests
         await SaveValidAsync(service, hostId, loaded);
 
         var final = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
-        final.Commands.Single().Action.ShouldBeOfType<MessageCustomCommandActionEditor>();
+        _ = final.Commands.Single().Action.ShouldBeOfType<MessageCustomCommandActionEditor>();
         var finalSchedule = final
             .Announcements.Single()
             .Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
@@ -407,7 +407,7 @@ public sealed class CustomCommandConfigurationTests
         var missingId = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         missingId.Commands.Single().Id = 999_999;
         var missingError = await SaveFailureAsync(service, firstHostId, missingId);
-        missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
+        _ = missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var invalidMessage = ConfigurationWithCommands(("Invalid", "invalid"));
         invalidMessage.Commands.Single().Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId =
@@ -425,7 +425,7 @@ public sealed class CustomCommandConfigurationTests
         counterErrors.ShouldContain(error => error.Message.Contains("Choose a counter"));
 
         var hostBoundaryError = await SaveFailureAsync(service, secondHostId, stored);
-        hostBoundaryError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
+        _ = hostBoundaryError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var unchanged = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         unchanged.Commands.Single().Name.ShouldBe("Command");
@@ -868,7 +868,7 @@ public sealed class CustomCommandConfigurationTests
         var result = await service
             .SaveConfiguration(hostId, ValidCommand(draft))
             .ExecuteAsync(CancellationToken.None);
-        result.Match(
+        _ = result.Match(
             static _ => true,
             failure => throw new InvalidOperationException(failure.Message)
         );
@@ -899,8 +899,8 @@ public sealed class CustomCommandConfigurationTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -913,7 +913,7 @@ public sealed class CustomCommandConfigurationTests
         var targetId = Guid.NewGuid();
         var cueId = Guid.NewGuid();
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             new OverlayInstance
             {
                 HostId = hostId,
@@ -931,7 +931,7 @@ public sealed class CustomCommandConfigurationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        db.OverlayCues.Add(
+        _ = db.OverlayCues.Add(
             new OverlayCue
             {
                 HostId = hostId,
@@ -946,7 +946,7 @@ public sealed class CustomCommandConfigurationTests
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         return (targetId, cueId);
     }
 }

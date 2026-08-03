@@ -19,7 +19,9 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
             serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>(),
             serviceProvider.GetRequiredService<EventBus<AppEventKind>>()
         ));
-        services.Replace(ServiceDescriptor.Singleton<IPublicChatPinStore, EfPublicChatPinStore>());
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<IPublicChatPinStore, EfPublicChatPinStore>()
+        );
         return services;
     }
 }

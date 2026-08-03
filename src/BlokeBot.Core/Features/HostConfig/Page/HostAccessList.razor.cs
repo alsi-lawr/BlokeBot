@@ -62,7 +62,7 @@ public partial class HostAccessList
         }
         finally
         {
-            _pendingRemovals.Remove(entry);
+            _ = _pendingRemovals.Remove(entry);
         }
     }
 }

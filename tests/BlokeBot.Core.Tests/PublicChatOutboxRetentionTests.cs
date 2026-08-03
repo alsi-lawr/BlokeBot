@@ -44,7 +44,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             retained.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
         }
 
-        (
+        _ = (
             await new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
@@ -79,7 +79,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             Retention(duration)
         );
 
-        (
+        _ = (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -111,7 +111,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             Retention(duration)
         );
 
-        (
+        _ = (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -150,7 +150,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             Retention(TimeSpan.FromMinutes(10))
         );
 
-        (
+        _ = (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -164,7 +164,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(1);
         }
 
-        (
+        _ = (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -194,21 +194,21 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             await using (var db = await dbFactory.CreateDbContextAsync())
             {
                 var outstanding = OutstandingRow(status, now);
-                db.PublicChatOutboxMessages.Add(outstanding);
-                db.PublicChatOutboxMessages.Add(
+                _ = db.PublicChatOutboxMessages.Add(outstanding);
+                _ = db.PublicChatOutboxMessages.Add(
                     TerminalRow(PublicChatOutboxStatus.Unexpected, now.AddMinutes(-20))
                 );
-                await db.SaveChangesAsync();
+                _ = await db.SaveChangesAsync();
                 if (status == PublicChatOutboxStatus.Sending)
                 {
-                    db.PublicChatSendReceipts.Add(
+                    _ = db.PublicChatSendReceipts.Add(
                         new PublicChatSendReceipt
                         {
                             OutboxMessageId = outstanding.Id,
                             AttemptedAtUtc = outstanding.SendStartedAtUtc!.Value,
                         }
                     );
-                    await db.SaveChangesAsync();
+                    _ = await db.SaveChangesAsync();
                 }
             }
             var outbox = new EfPublicChatOutbox(
@@ -254,7 +254,7 @@ public sealed class PublicChatOutboxRetentionTests : PublicChatOutboxIntegration
             Command("streamer", "not accepted"),
             CancellationToken.None
         );
-        outcome
+        _ = outcome
             .ShouldBeOfType<PublicChatEnqueueOutcome.Ambiguous>()
             .Cause.ShouldBeOfType<DbUpdateException>();
         transport.DeliveryCount.ShouldBe(0);

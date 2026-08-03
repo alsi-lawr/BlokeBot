@@ -129,11 +129,11 @@ public sealed class OverlayInstanceService(
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
-        db.OverlayInstances.Add(overlay);
-        db.OverlayInstanceEvents.Add(
+        _ = db.OverlayInstances.Add(overlay);
+        _ = db.OverlayInstanceEvents.Add(
             DomainEvent(actor, overlay, OverlayInstanceEventKind.Created, now)
         );
-        await db.SaveChangesAsync(ct);
+        _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await NotifyAsync(
             actor,
@@ -154,43 +154,39 @@ public sealed class OverlayInstanceService(
     )
     {
         var name = command.Name.Trim();
-        if (!ValidOverlayIdAndRevision(command.OverlayId, command.ExpectedRevision))
+        return ValidOverlayIdAndRevision(command.OverlayId, command.ExpectedRevision) switch
         {
-            return Task.FromResult(
+            false => Task.FromResult(
                 Rejected<OverlayInstanceView>(
                     new OverlayInstanceRejection.Invalid(
                         "An overlay ID and positive expected revision are required."
                     )
                 )
-            );
-        }
-        if (name.Length is < 1 or > _maximumNameLength)
-        {
-            return Task.FromResult(
+            ),
+            true when name.Length is < 1 or > _maximumNameLength => Task.FromResult(
                 Rejected<OverlayInstanceView>(
                     new OverlayInstanceRejection.Invalid(
                         "The overlay name must be from 1 to 128 characters."
                     )
                 )
-            );
-        }
-
-        return UpdateAsync(
-            session,
-            command.OverlayId,
-            command.ExpectedRevision,
-            OverlayInstanceEventKind.Renamed,
-            (query, now) =>
-                query.ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(value => value.Name, name)
-                            .SetProperty(value => value.UpdatedAtUtc, now)
-                            .SetProperty(value => value.Revision, value => value.Revision + 1),
-                    ct
-                ),
-            ct
-        );
+            ),
+            _ => UpdateAsync(
+                session,
+                command.OverlayId,
+                command.ExpectedRevision,
+                OverlayInstanceEventKind.Renamed,
+                (query, now) =>
+                    query.ExecuteUpdateAsync(
+                        setters =>
+                            setters
+                                .SetProperty(value => value.Name, name)
+                                .SetProperty(value => value.UpdatedAtUtc, now)
+                                .SetProperty(value => value.Revision, value => value.Revision + 1),
+                        ct
+                    ),
+                ct
+            ),
+        };
     }
 
     public async Task<OverlayInstanceResult<OverlayInstanceView>> ConfigureAsync(
@@ -277,10 +273,10 @@ public sealed class OverlayInstanceService(
             changed.ConfigurationJson = command.Configuration.ToPersistenceJson();
             changed.UpdatedAtUtc = now;
             changed.Revision++;
-            db.OverlayInstanceEvents.Add(
+            _ = db.OverlayInstanceEvents.Add(
                 DomainEvent(actor, changed, OverlayInstanceEventKind.Configured, now)
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await NotifyAsync(
                 actor,
@@ -293,7 +289,7 @@ public sealed class OverlayInstanceService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -383,10 +379,10 @@ public sealed class OverlayInstanceService(
             overlay.KeyVersion++;
             overlay.UpdatedAtUtc = now;
             overlay.Revision++;
-            db.OverlayInstanceEvents.Add(
+            _ = db.OverlayInstanceEvents.Add(
                 DomainEvent(actor, overlay, OverlayInstanceEventKind.KeyRotated, now)
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await NotifyAsync(
                 actor,
@@ -401,7 +397,7 @@ public sealed class OverlayInstanceService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -462,10 +458,10 @@ public sealed class OverlayInstanceService(
             }
 
             overlay.Revision++;
-            db.OverlayInstanceEvents.Add(
+            _ = db.OverlayInstanceEvents.Add(
                 DomainEvent(actor, overlay, OverlayInstanceEventKind.Deleted, now)
             );
-            await db.SaveChangesAsync(ct);
+            _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await NotifyAsync(
                 actor,
@@ -478,7 +474,7 @@ public sealed class OverlayInstanceService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -568,8 +564,8 @@ public sealed class OverlayInstanceService(
             }
 
             ApplyUpdateToSnapshot(overlay, kind, now);
-            db.OverlayInstanceEvents.Add(DomainEvent(actor, overlay, kind, now));
-            await db.SaveChangesAsync(ct);
+            _ = db.OverlayInstanceEvents.Add(DomainEvent(actor, overlay, kind, now));
+            _ = await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await NotifyAsync(actor, overlay.PublicId, kind, overlay.Revision, ct);
             var changed = await db
@@ -582,7 +578,7 @@ public sealed class OverlayInstanceService(
         }
         finally
         {
-            gate.Release();
+            _ = gate.Release();
         }
     }
 
@@ -677,13 +673,13 @@ public sealed class OverlayInstanceService(
                 value => value.HostId == hostId && value.PublicId == overlayId,
                 ct
             );
-        if (overlay is null)
+        return overlay switch
         {
-            return new MutationTarget.Rejected(new OverlayInstanceRejection.NotFound());
-        }
-        return overlay.Revision == expectedRevision.Value
-            ? new MutationTarget.Found(overlay)
-            : new MutationTarget.Rejected(new OverlayInstanceRejection.Conflict());
+            null => new MutationTarget.Rejected(new OverlayInstanceRejection.NotFound()),
+            { Revision: var revision } when revision == expectedRevision.Value =>
+                new MutationTarget.Found(overlay),
+            _ => new MutationTarget.Rejected(new OverlayInstanceRejection.Conflict()),
+        };
     }
 
     private async Task NotifyAsync(
@@ -702,7 +698,7 @@ public sealed class OverlayInstanceService(
             revision,
             actor.UserId
         );
-        await events.PublishAsync(AppEventKind.OverlaysChanged, ct);
+        _ = await events.PublishAsync(AppEventKind.OverlaysChanged, ct);
     }
 
     private void LogDenied(string operation, string actorUserId, int? hostId, string reason) =>
@@ -767,24 +763,33 @@ public sealed class OverlayInstanceService(
     private static OverlayInstanceRejection? ValidateCreate(CreateOverlayInstanceCommand command)
     {
         var name = command.Name.Trim();
-        if (name.Length is < 1 or > _maximumNameLength)
+        return (name.Length is < 1 or > _maximumNameLength) switch
         {
-            return new OverlayInstanceRejection.Invalid(
+            true => new OverlayInstanceRejection.Invalid(
                 "The overlay name must be from 1 to 128 characters."
-            );
-        }
-        if (!Enum.IsDefined(command.Type))
-        {
-            return new OverlayInstanceRejection.Invalid("The overlay type is not supported.");
-        }
-        if (command.Configuration is null || command.Configuration.Type != command.Type)
-        {
-            return new OverlayInstanceRejection.Invalid(
-                "The configuration type must match the overlay type."
-            );
-        }
-        return null;
+            ),
+            false => ValidateCreateConfiguration(command),
+        };
     }
+
+    private static OverlayInstanceRejection? ValidateCreateConfiguration(
+        CreateOverlayInstanceCommand command
+    ) =>
+        Enum.IsDefined(command.Type) switch
+        {
+            false => new OverlayInstanceRejection.Invalid("The overlay type is not supported."),
+            true => command.Configuration switch
+            {
+                null => new OverlayInstanceRejection.Invalid(
+                    "The configuration type must match the overlay type."
+                ),
+                { Type: var configurationType } when configurationType != command.Type =>
+                    new OverlayInstanceRejection.Invalid(
+                        "The configuration type must match the overlay type."
+                    ),
+                _ => null,
+            },
+        };
 
     private string GenerateAccessKey()
     {

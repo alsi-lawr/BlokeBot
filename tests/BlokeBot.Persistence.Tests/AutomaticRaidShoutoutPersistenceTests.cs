@@ -16,7 +16,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         var hostId = await SeedHostAsync(db, "host");
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
+        _ = await db.Database.ExecuteSqlInterpolatedAsync(
             $"INSERT INTO automatic_raid_shoutout_settings (HostId, UpdatedAtUtc) VALUES ({hostId}, {DateTime.UtcNow});"
         );
 
@@ -39,7 +39,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
                     AutomaticRaidShoutoutOutcomeStatus.Ambiguous,
                 _ => AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
             };
-            db.AutomaticRaidShoutoutOutcomes.Add(
+            _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 new AutomaticRaidShoutoutOutcome
                 {
                     HostId = hostId,
@@ -56,7 +56,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
                 }
             );
         }
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
         (await db.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(
             Enum.GetValues<AutomaticRaidShoutoutResultCode>().Length
         );
@@ -70,20 +70,20 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         var hostId = await SeedHostAsync(db, "host");
         var otherHostId = await SeedHostAsync(db, "other");
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO automatic_raid_shoutout_settings (HostId, MinimumViewerCount, UpdatedAtUtc) VALUES ({hostId}, 0, {DateTime.UtcNow});"
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO automatic_raid_shoutout_settings (HostId, Mechanism, UpdatedAtUtc) VALUES ({hostId}, {"Bogus"}, {DateTime.UtcNow});"
             )
         );
         db.AutomaticRaidProcessedEvents.AddRange(Claim(hostId, "same"), Claim(otherHostId, "same"));
-        await db.SaveChangesAsync();
-        db.AutomaticRaidProcessedEvents.Add(Claim(hostId, "same"));
-        await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        _ = await db.SaveChangesAsync();
+        _ = db.AutomaticRaidProcessedEvents.Add(Claim(hostId, "same"));
+        _ = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
     [Test]
@@ -98,7 +98,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         var raiderDisplayName = "Raider";
         var delivered = "Delivered";
 
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO automatic_raid_shoutout_outcomes
@@ -134,8 +134,8 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 }

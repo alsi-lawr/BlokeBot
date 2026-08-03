@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
@@ -27,10 +26,10 @@ public sealed class PollServiceTests
                 DisplayName = "Host",
                 TwitchUserId = "host-id",
             };
-            db.Hosts.Add(host);
-            await db.SaveChangesAsync();
-            db.TwitchPollTemplates.Add(Template(host.Id, "Retained template"));
-            await db.SaveChangesAsync();
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            _ = db.TwitchPollTemplates.Add(Template(host.Id, "Retained template"));
+            _ = await db.SaveChangesAsync();
         }
         var http = new PollHttpClientFactory();
         var service = CreateService(dbFactory, http);
@@ -46,9 +45,9 @@ public sealed class PollServiceTests
             CancellationToken.None
         );
 
-        state.Authorization.ShouldBeOfType<PollAuthorizationReadiness.Disabled>();
+        _ = state.Authorization.ShouldBeOfType<PollAuthorizationReadiness.Disabled>();
         state.Templates.ShouldBeEmpty();
-        save.ShouldBeOfType<PollOperationOutcome.NotReady>();
+        _ = save.ShouldBeOfType<PollOperationOutcome.NotReady>();
         http.CreateRequests.ShouldBe(0);
         await using (var verifyDisabled = await dbFactory.CreateDbContextAsync())
         {
@@ -56,7 +55,7 @@ public sealed class PollServiceTests
             (await verifyDisabled.TwitchPolls.CountAsync()).ShouldBe(0);
             var host = await verifyDisabled.Hosts.SingleAsync();
             host.EnabledFeatures |= HostFeatureFlags.Polls;
-            await verifyDisabled.SaveChangesAsync();
+            _ = await verifyDisabled.SaveChangesAsync();
         }
 
         var restored = await service.LoadAsync(1, CancellationToken.None);
@@ -71,7 +70,7 @@ public sealed class PollServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -80,7 +79,7 @@ public sealed class PollServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var http = new PollHttpClientFactory();
@@ -112,8 +111,8 @@ public sealed class PollServiceTests
             CancellationToken.None
         );
 
-        rejected.ShouldBeOfType<PollOperationOutcome.InvalidTemplate>();
-        started.ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
+        _ = rejected.ShouldBeOfType<PollOperationOutcome.InvalidTemplate>();
+        _ = started.ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
         await using var verify = await dbFactory.CreateDbContextAsync();
         var template = (await verify.TwitchPollTemplates.ToArrayAsync()).ShouldHaveSingleItem();
         template.ChannelPointsPerVote.ShouldBe(1_000_000);
@@ -126,7 +125,7 @@ public sealed class PollServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -135,7 +134,7 @@ public sealed class PollServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
 
         var service = CreateService(dbFactory, new PollHttpClientFactory());
@@ -162,7 +161,7 @@ public sealed class PollServiceTests
         var result = state.Results.ShouldHaveSingleItem();
         result.Status.ShouldBe("Completed");
         result.Choices.ShouldHaveSingleItem().Votes.ShouldBe(2);
-        result.EndedAtUtc.ShouldNotBeNull();
+        _ = result.EndedAtUtc.ShouldNotBeNull();
     }
 
     [Test]
@@ -171,7 +170,7 @@ public sealed class PollServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -180,7 +179,7 @@ public sealed class PollServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var events = TestEventBus.Create<AppEventKind>();
         var service = new PollService(
@@ -188,7 +187,7 @@ public sealed class PollServiceTests
             new StaticBroadcasterProvider(
                 new TokenStatus.Unavailable(
                     AccessTokenUnavailableReason.MissingRefreshToken,
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             ),
             new HelixClient(
@@ -220,7 +219,7 @@ public sealed class PollServiceTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            db.Hosts.Add(
+            _ = db.Hosts.Add(
                 new BotHost
                 {
                     EnabledFeatures = HostFeatureFlags.All,
@@ -229,7 +228,7 @@ public sealed class PollServiceTests
                     TwitchUserId = "host-id",
                 }
             );
-            await db.SaveChangesAsync();
+            _ = await db.SaveChangesAsync();
         }
         var http = new PollHttpClientFactory();
         http.Enqueue(CreateResponse("external-poll", "host-id", "External poll", "ACTIVE"));
@@ -240,7 +239,7 @@ public sealed class PollServiceTests
         var guarded = await service.EndAsync(1, false, CancellationToken.None);
         var ended = await service.EndAsync(1, true, CancellationToken.None);
 
-        guarded.ShouldBeOfType<PollOperationOutcome.ConfirmationRequired>();
+        _ = guarded.ShouldBeOfType<PollOperationOutcome.ConfirmationRequired>();
         ended.ShouldBeOfType<PollOperationOutcome.Ended>().Poll.Status.ShouldBe("Terminated");
         http.EndRequests.ShouldBe(1);
         (await service.LoadAsync(1, CancellationToken.None)).ActivePoll.ShouldBeNull();
@@ -324,8 +323,8 @@ public sealed class PollServiceTests
                         "host",
                         OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
                     ),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
-                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
                 )
             ) { }
     }

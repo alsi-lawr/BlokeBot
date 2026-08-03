@@ -41,7 +41,7 @@ public sealed class PageHelpButtonTests
         helpButtons.Single().Click();
 
         cut.Find("button[aria-label='Page help']").HasAttribute("aria-expanded").ShouldBeTrue();
-        cut.Find("button[aria-label='Close help']").ShouldNotBeNull();
+        _ = cut.Find("button[aria-label='Close help']").ShouldNotBeNull();
         cut.Find("h2").TextContent.ShouldBe(title);
         cut.Markup.ShouldContain(distinctiveContent);
     }

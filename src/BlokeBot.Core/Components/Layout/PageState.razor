@@ -2,7 +2,7 @@
 
 <section class="page-state"
          data-page-state="@Kind.ToString().ToLowerInvariant()"
-         role="@Role">
+         role="@_role">
     <div class="space-y-2">
         <h2 class="page-state__title">@Title</h2>
         @if (!string.IsNullOrWhiteSpace(Description))
@@ -15,26 +15,3 @@
         <div class="page-state__actions">@Actions</div>
     }
 </section>
-
-@code {
-    [Parameter]
-    public RenderFragment? Actions { get; set; }
-
-    [Parameter]
-    public string Description { get; set; } = string.Empty;
-
-    [Parameter, EditorRequired]
-    public PageStateKind Kind { get; set; }
-
-    [Parameter, EditorRequired]
-    public string Title { get; set; } = string.Empty;
-
-    private string? Role =>
-        Kind switch
-        {
-            PageStateKind.Loading or PageStateKind.Success => "status",
-            PageStateKind.Failure => "alert",
-            PageStateKind.Empty or PageStateKind.Unavailable => null,
-            _ => throw new UnreachableException(),
-        };
-}

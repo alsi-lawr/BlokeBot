@@ -21,7 +21,7 @@ public sealed class NativeTwitchMigrationTests
         await using (var published = await upgradedFactory.CreateDbContextAsync())
         {
             await published.GetService<IMigrator>().MigrateAsync(_nativeTwitchFeatureSwitch);
-            await published.Database.ExecuteSqlRawAsync(
+            _ = await published.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
@@ -30,7 +30,7 @@ public sealed class NativeTwitchMigrationTests
                     (2, 'other-bits-id', 'other-bits', 'other-bits', 0, 23, '2026-07-30T00:00:00Z');
                 """
             );
-            published.TwitchCustomRewards.Add(
+            _ = published.TwitchCustomRewards.Add(
                 new TwitchCustomReward
                 {
                     HostId = 1,
@@ -40,7 +40,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            published.TwitchRewardRedemptions.Add(
+            _ = published.TwitchRewardRedemptions.Add(
                 new TwitchRewardRedemption
                 {
                     HostId = 1,
@@ -54,7 +54,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            published.TwitchPredictionTemplates.Add(
+            _ = published.TwitchPredictionTemplates.Add(
                 new TwitchPredictionTemplate
                 {
                     HostId = 1,
@@ -68,7 +68,7 @@ public sealed class NativeTwitchMigrationTests
                     ],
                 }
             );
-            published.TwitchPredictions.Add(
+            _ = published.TwitchPredictions.Add(
                 new TwitchPrediction
                 {
                     HostId = 1,
@@ -80,7 +80,7 @@ public sealed class NativeTwitchMigrationTests
                     UpdatedAtUtc = DateTime.UtcNow,
                 }
             );
-            await published.SaveChangesAsync();
+            _ = await published.SaveChangesAsync();
             await published.Database.MigrateAsync();
         }
 

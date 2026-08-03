@@ -144,7 +144,7 @@ internal sealed class CustomAnnouncementScheduler(
         {
             CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.TerminalAmbiguous, now);
             announcement.LatestDeliveryResult = CustomAnnouncementLatestDeliveryResult.Ambiguous;
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "InterruptedAttempt");
             return;
         }
@@ -158,7 +158,7 @@ internal sealed class CustomAnnouncementScheduler(
             )
             {
                 MarkInvalidTimeZone(announcement, now);
-                await db.SaveChangesAsync(cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
                 LogTerminal(announcement, candidate, "InvalidTimeZone");
             }
 
@@ -168,7 +168,7 @@ internal sealed class CustomAnnouncementScheduler(
         if (announcement.OccurrenceStatus == AnnouncementOccurrenceStatus.TerminalInvalidTimeZone)
         {
             ResetOccurrence(announcement);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
         }
 
         var due = ((AnnouncementScheduleEvaluation.Evaluated)schedule).Due;
@@ -181,14 +181,14 @@ internal sealed class CustomAnnouncementScheduler(
         if (announcement.OccurrenceDueAtUtc != dueAt.UtcDateTime)
         {
             StartOccurrence(announcement, dueAt, policy.OccurrenceLifetime);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
         }
 
         var expiresAt = RequireUtc(announcement.OccurrenceExpiresAtUtc, "expiry");
         if (now >= expiresAt)
         {
             CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.SkippedExpired, now);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "Expired");
             return;
         }
@@ -233,7 +233,7 @@ internal sealed class CustomAnnouncementScheduler(
                 AnnouncementOccurrenceStatus.TerminalMissingMessage,
                 now
             );
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "MissingMessage");
             return;
         }
@@ -243,7 +243,7 @@ internal sealed class CustomAnnouncementScheduler(
         announcement.OccurrenceNextAttemptAtUtc = null;
         announcement.OccurrenceMessage = message;
         announcement.UpdatedAtUtc = now.UtcDateTime;
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
         var outcome = await sender.EnqueueAsync(
             new CustomAnnouncementDeliveryRequest(
@@ -312,7 +312,7 @@ internal sealed class CustomAnnouncementScheduler(
                 throw new UnreachableException("Unknown announcement enqueue outcome.");
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
         if (IsTerminal(announcement.OccurrenceStatus))
         {
             LogTerminal(
@@ -403,17 +403,21 @@ internal sealed class CustomAnnouncementScheduler(
             TimeZoneInfo.ConvertTimeToUtc(scheduledLocal, timeZone),
             TimeSpan.Zero
         );
-        if ((announcement.LastOccurrenceAtUtc ?? announcement.LastSentAtUtc) >= dueAt.UtcDateTime)
+        var hasAlreadyOccurred =
+            (announcement.LastOccurrenceAtUtc ?? announcement.LastSentAtUtc) >= dueAt.UtcDateTime;
+        var runtimeChanged = candidate.Runtime.ChangedAtUtc > dueAt.UtcDateTime;
+        return hasAlreadyOccurred switch
         {
-            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
-        }
-
-        if (candidate.Runtime.ChangedAtUtc > dueAt.UtcDateTime)
-        {
-            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
-        }
-
-        return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.Due(dueAt));
+            true => new AnnouncementScheduleEvaluation.Evaluated(
+                new AnnouncementDueResult.NotDue()
+            ),
+            false when runtimeChanged => new AnnouncementScheduleEvaluation.Evaluated(
+                new AnnouncementDueResult.NotDue()
+            ),
+            false => new AnnouncementScheduleEvaluation.Evaluated(
+                new AnnouncementDueResult.Due(dueAt)
+            ),
+        };
     }
 
     private static TimeZoneInfo? ResolveTimeZone(string? timeZoneId)

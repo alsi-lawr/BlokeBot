@@ -25,35 +25,28 @@ internal sealed record EventSubIncomingRaidWireEvent
     [JsonPropertyName("viewers")]
     public int? ViewerCount { get; init; }
 
-    internal EventSubIncomingRaidEvent? ToDomain(EventSubMetadata metadata)
-    {
-        if (
-            string.IsNullOrWhiteSpace(metadata.MessageId)
-            || metadata.MessageTimestamp is not { } messageTimestamp
-            || messageTimestamp == default
-            || string.IsNullOrWhiteSpace(FromBroadcasterUserId)
-            || string.IsNullOrWhiteSpace(FromBroadcasterUserLogin)
-            || string.IsNullOrWhiteSpace(FromBroadcasterUserName)
-            || string.IsNullOrWhiteSpace(ToBroadcasterUserId)
-            || string.IsNullOrWhiteSpace(ToBroadcasterUserLogin)
-            || string.IsNullOrWhiteSpace(ToBroadcasterUserName)
-            || ViewerCount is not { } viewerCount
-            || viewerCount < 0
-        )
-        {
-            return null;
-        }
-
-        return new(
-            metadata.MessageId,
-            messageTimestamp,
-            FromBroadcasterUserId,
-            FromBroadcasterUserLogin,
-            FromBroadcasterUserName,
-            ToBroadcasterUserId,
-            ToBroadcasterUserLogin,
-            ToBroadcasterUserName,
-            viewerCount
-        );
-    }
+    internal EventSubIncomingRaidEvent? ToDomain(EventSubMetadata metadata) =>
+        string.IsNullOrWhiteSpace(metadata.MessageId)
+        || metadata.MessageTimestamp is not { } messageTimestamp
+        || messageTimestamp == default
+        || string.IsNullOrWhiteSpace(FromBroadcasterUserId)
+        || string.IsNullOrWhiteSpace(FromBroadcasterUserLogin)
+        || string.IsNullOrWhiteSpace(FromBroadcasterUserName)
+        || string.IsNullOrWhiteSpace(ToBroadcasterUserId)
+        || string.IsNullOrWhiteSpace(ToBroadcasterUserLogin)
+        || string.IsNullOrWhiteSpace(ToBroadcasterUserName)
+        || ViewerCount is not { } viewerCount
+        || viewerCount < 0
+            ? null
+            : new(
+                metadata.MessageId,
+                messageTimestamp,
+                FromBroadcasterUserId,
+                FromBroadcasterUserLogin,
+                FromBroadcasterUserName,
+                ToBroadcasterUserId,
+                ToBroadcasterUserLogin,
+                ToBroadcasterUserName,
+                viewerCount
+            );
 }

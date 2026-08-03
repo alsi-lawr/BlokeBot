@@ -69,15 +69,24 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         };
 
     private string _readinessText =>
-        !_draft.Enabled
-            ? "Off. Your settings are saved, but incoming raids will not trigger a shoutout."
-        : _draft.Mechanism == AutomaticRaidShoutoutMechanism.Native
-            ? "Keep the bot account connected to Twitch. If Twitch’s shoutout cooldown is still active, this raid is skipped rather than sent as a chat message."
-        : _draft.ChatPresentation == AutomaticRaidChatPresentation.Announcement
-            ? "Keep public chat connected and allow the bot to send announcements. If the announcement fails, BlokeBot does not send a regular message instead."
-        : _draft.ChatPresentation == AutomaticRaidChatPresentation.Pinned
-            ? "Keep public chat connected and allow the bot to pin messages. The message may appear even if Twitch cannot pin it afterwards."
-        : "Keep public chat connected so BlokeBot can send the message once.";
+        _draft.Enabled switch
+        {
+            false =>
+                "Off. Your settings are saved, but incoming raids will not trigger a shoutout.",
+            true => _draft.Mechanism switch
+            {
+                AutomaticRaidShoutoutMechanism.Native =>
+                    "Keep the bot account connected to Twitch. If Twitch’s shoutout cooldown is still active, this raid is skipped rather than sent as a chat message.",
+                _ => _draft.ChatPresentation switch
+                {
+                    AutomaticRaidChatPresentation.Announcement =>
+                        "Keep public chat connected and allow the bot to send announcements. If the announcement fails, BlokeBot does not send a regular message instead.",
+                    AutomaticRaidChatPresentation.Pinned =>
+                        "Keep public chat connected and allow the bot to pin messages. The message may appear even if Twitch cannot pin it afterwards.",
+                    _ => "Keep public chat connected so BlokeBot can send the message once.",
+                },
+            },
+        };
 
     protected override Task OnInitializedAsync()
     {

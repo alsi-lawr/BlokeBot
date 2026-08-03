@@ -24,18 +24,35 @@ public sealed record AuthenticatedSession
 
     public bool IsAdminEditing => !string.IsNullOrWhiteSpace(AdminEditingLogin);
 
-    public string DisplayRole =>
-        IsBotAccount ? AuthRoleCodec.Encode(AuthRole.Bot)
-        : State.Match<AuthRole?>(_ => null, selected => selected.Selection.Current.Role, _ => null)
-            is { } hostRole
-            ? AuthRoleCodec.Encode(hostRole)
-        : Role is { } role ? AuthRoleCodec.Encode(role)
-        : "operator";
+    public string DisplayRole
+    {
+        get
+        {
+            if (IsBotAccount)
+            {
+                return AuthRoleCodec.Encode(AuthRole.Bot);
+            }
+            var hostRole = State.Match<AuthRole?>(
+                _ => null,
+                selected => selected.Selection.Current.Role,
+                _ => null
+            );
+            return (hostRole, Role) switch
+            {
+                ({ } selectedRole, _) => AuthRoleCodec.Encode(selectedRole),
+                (_, { } role) => AuthRoleCodec.Encode(role),
+                _ => "operator",
+            };
+        }
+    }
 
     public string DisplayText =>
-        !string.IsNullOrWhiteSpace(DisplayName) ? DisplayName
-        : !string.IsNullOrWhiteSpace(Login) ? Login
-        : "Twitch user";
+        (DisplayName, Login) switch
+        {
+            ({ Length: > 0 } display, _) => display,
+            (_, { Length: > 0 } login) => login,
+            _ => "Twitch user",
+        };
 
     public bool HasCapability(AuthSessionCapability capability) =>
         capability switch
@@ -55,24 +72,18 @@ public sealed record AuthenticatedSession
             _ => false,
         };
 
-    public bool CanOpenHostConfig(IReadOnlySet<int> existingHostIds)
-    {
-        if (IsBotAccount)
-        {
-            return false;
-        }
-
-        return CanCreateHost
-            || (
-                State.Match(
-                    _ => false,
-                    selected =>
-                        existingHostIds.Contains(selected.Selection.Current.Id)
-                        && CanManageSelectedHostConfig,
-                    _ => false
-                )
-            );
-    }
+    public bool CanOpenHostConfig(IReadOnlySet<int> existingHostIds) =>
+        !IsBotAccount
+        && (
+            CanCreateHost
+            || State.Match(
+                _ => false,
+                selected =>
+                    existingHostIds.Contains(selected.Selection.Current.Id)
+                    && CanManageSelectedHostConfig,
+                _ => false
+            )
+        );
 
     public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds) =>
         !IsBotAccount
@@ -185,12 +196,9 @@ public sealed record AuthenticatedSession
         var current = availableHosts.FirstOrDefault(host =>
             BotHostClaimCodec.Equivalent(host, selectedHost)
         );
-        if (current is null)
-        {
-            return new AuthSessionState.Invalid();
-        }
-
-        return new AuthSessionState.Selected(new BotHostSelection(current, availableHosts));
+        return current is { } selected
+            ? new AuthSessionState.Selected(new BotHostSelection(selected, availableHosts))
+            : new AuthSessionState.Invalid();
     }
 
     private static DecodedHostClaims DecodeHostClaims(ClaimsPrincipal user)
@@ -215,36 +223,24 @@ public sealed record AuthenticatedSession
         );
     }
 
-    private static Result<AuthRole?, InvalidSessionClaims> DecodeOptionalRole(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Result<AuthRole?, InvalidSessionClaims>.Success(null);
-        }
+    private static Result<AuthRole?, InvalidSessionClaims> DecodeOptionalRole(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? Result<AuthRole?, InvalidSessionClaims>.Success(null)
+            : AuthRoleCodec
+                .Decode(value)
+                .Match<Result<AuthRole?, InvalidSessionClaims>>(
+                    decoded => Result<AuthRole?, InvalidSessionClaims>.Success(decoded),
+                    _ => Result<AuthRole?, InvalidSessionClaims>.Error(new())
+                );
 
-        var role = AuthRoleCodec.Decode(value).Match<AuthRole?>(decoded => decoded, _ => null);
-        if (role is not null)
-        {
-            return Result<AuthRole?, InvalidSessionClaims>.Success(role);
-        }
-
-        return Result<AuthRole?, InvalidSessionClaims>.Error(new());
-    }
-
-    private static Result<BotHostChoice?, InvalidSessionClaims> DecodeOptionalHost(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Result<BotHostChoice?, InvalidSessionClaims>.Success(null);
-        }
-
-        if (BotHostClaimCodec.Decode(value) is { } host)
-        {
-            return Result<BotHostChoice?, InvalidSessionClaims>.Success(host);
-        }
-
-        return Result<BotHostChoice?, InvalidSessionClaims>.Error(new());
-    }
+    private static Result<BotHostChoice?, InvalidSessionClaims> DecodeOptionalHost(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? Result<BotHostChoice?, InvalidSessionClaims>.Success(null)
+            : BotHostClaimCodec.Decode(value) switch
+            {
+                { } host => Result<BotHostChoice?, InvalidSessionClaims>.Success(host),
+                _ => Result<BotHostChoice?, InvalidSessionClaims>.Error(new()),
+            };
 
     private static bool BooleanClaim(ClaimsPrincipal user, string claimType) =>
         string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);

@@ -110,7 +110,7 @@ public sealed class AutomaticRaidShoutoutObserver(
                 await using var transaction = await db.Database.BeginTransactionAsync(
                     cancellationToken
                 );
-                await db.Database.ExecuteSqlInterpolatedAsync(
+                _ = await db.Database.ExecuteSqlInterpolatedAsync(
                     $"DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc < {now.UtcDateTime};",
                     cancellationToken
                 );
@@ -142,8 +142,8 @@ public sealed class AutomaticRaidShoutoutObserver(
                     MessageTimestampUtc = incomingRaid.MessageTimestamp.UtcDateTime,
                     ClaimedAtUtc = now.UtcDateTime,
                 };
-                db.AutomaticRaidShoutoutOutcomes.Add(outcome);
-                await db.SaveChangesAsync(cancellationToken);
+                _ = db.AutomaticRaidShoutoutOutcomes.Add(outcome);
+                _ = await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return outcome.Id;
             }
@@ -197,9 +197,9 @@ public sealed class AutomaticRaidShoutoutObserver(
                 );
         }
         outcome.CompletedAtUtc = now;
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
-        await db
+        _ = await db
             .AutomaticRaidShoutoutOutcomes.Where(value =>
                 value.HostId == hostId
                 && (

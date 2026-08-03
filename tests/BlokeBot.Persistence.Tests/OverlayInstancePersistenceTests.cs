@@ -19,7 +19,7 @@ public sealed class OverlayInstancePersistenceTests
         await using (var db = await factory.CreateDbContextAsync())
         {
             await db.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            await db.Database.ExecuteSqlRawAsync(
+            _ = await db.Database.ExecuteSqlRawAsync(
                 """
                 INSERT INTO hosts
                     (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, CreatedAtUtc)
@@ -53,24 +53,24 @@ public sealed class OverlayInstancePersistenceTests
             DisplayName = "Host",
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
 
         var digest = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
-        db.OverlayInstances.Add(
+        _ = db.OverlayInstances.Add(
             Overlay(host.Id, Guid.NewGuid(), digest, """{"schemaVersion":1}""")
         );
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
 
-        await Should.ThrowAsync<DbUpdateException>(async () =>
+        _ = await Should.ThrowAsync<DbUpdateException>(async () =>
         {
             await using var duplicate = await factory.CreateDbContextAsync();
-            duplicate.OverlayInstances.Add(
+            _ = duplicate.OverlayInstances.Add(
                 Overlay(host.Id, Guid.NewGuid(), digest, """{"schemaVersion":1}""")
             );
-            await duplicate.SaveChangesAsync();
+            _ = await duplicate.SaveChangesAsync();
         });
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO overlay_instances
@@ -83,7 +83,7 @@ public sealed class OverlayInstancePersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO overlay_instances
@@ -96,7 +96,7 @@ public sealed class OverlayInstancePersistenceTests
                 """
             )
         );
-        await Should.ThrowAsync<SqliteException>(() =>
+        _ = await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO overlay_instances
@@ -124,7 +124,7 @@ public sealed class OverlayInstancePersistenceTests
             )
         );
 
-        db.OverlayInstanceEvents.Add(
+        _ = db.OverlayInstanceEvents.Add(
             new OverlayInstanceDomainEvent
             {
                 HostId = host.Id,
@@ -138,9 +138,9 @@ public sealed class OverlayInstancePersistenceTests
                 OccurredAtUtc = DateTime.UtcNow,
             }
         );
-        await db.SaveChangesAsync();
-        db.Hosts.Remove(host);
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
+        _ = db.Hosts.Remove(host);
+        _ = await db.SaveChangesAsync();
         (await db.OverlayInstances.CountAsync()).ShouldBe(0);
         (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(0);
     }

@@ -13,7 +13,7 @@ public sealed class BlokeBotProcessTests
             Path.GetTempPath(),
             $"blokebot-process-tests-{Guid.NewGuid():N}"
         );
-        Directory.CreateDirectory(workingDirectory);
+        _ = Directory.CreateDirectory(workingDirectory);
         try
         {
             var help = await RunAsync(workingDirectory, "help");
@@ -39,7 +39,7 @@ public sealed class BlokeBotProcessTests
             Path.GetTempPath(),
             $"blokebot-process-tests-{Guid.NewGuid():N}"
         );
-        Directory.CreateDirectory(workingDirectory);
+        _ = Directory.CreateDirectory(workingDirectory);
         try
         {
             var response = await RunAsync(

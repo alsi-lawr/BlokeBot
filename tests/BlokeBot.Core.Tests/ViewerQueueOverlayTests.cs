@@ -38,7 +38,7 @@ public sealed class ViewerQueueOverlayTests
             }
         )
         {
-            OverlayConfiguration
+            _ = OverlayConfiguration
                 .Parse(OverlayType.ViewerQueue, invalid)
                 .ShouldBeOfType<OverlayConfigurationParseResult.Invalid>();
         }
@@ -82,7 +82,7 @@ public sealed class ViewerQueueOverlayTests
         {
             var privateEntry = await privateUpdate.PlayQueueEntries.FirstAsync();
             privateEntry.PrivateModeratorNote = "PRIVATE-MODERATOR-NOTE";
-            await privateUpdate.SaveChangesAsync();
+            _ = await privateUpdate.SaveChangesAsync();
         }
 
         var state = await service.ReadOverlayStateAsync(
@@ -93,7 +93,7 @@ public sealed class ViewerQueueOverlayTests
             CancellationToken.None
         );
 
-        state.ShouldNotBeNull();
+        _ = state.ShouldNotBeNull();
         state.TotalQueueSize.ShouldBe(5);
         state.CurrentParty.Count.ShouldBe(2);
         state
@@ -170,18 +170,18 @@ public sealed class ViewerQueueOverlayTests
         enabled.Snapshot.Appearance.ShouldBe(appearance);
         enabled.Snapshot.Animation.ShouldBe("none");
         enabled.Snapshot.State.TotalQueueSize.ShouldBe(1);
-        (
+        _ = (
             await service.ReadOverlayStateAsync(hostId, queue.Id, 12, 12, CancellationToken.None)
         ).ShouldNotBeNull();
 
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.PlayWithViewers);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
         (
             await service.ReadOverlayStateAsync(hostId, queue.Id, 12, 12, CancellationToken.None)
         ).ShouldBeNull();
-        (
+        _ = (
             await provider.ProjectViewerQueueSampleAsync(
                 instance,
                 ViewerQueueOverlaySampleState.PartyChanged,
@@ -190,7 +190,7 @@ public sealed class ViewerQueueOverlayTests
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
 
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.Overlays);
-        (
+        _ = (
             await provider.ProjectAsync(instance, CancellationToken.None)
         ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
         (
@@ -204,7 +204,7 @@ public sealed class ViewerQueueOverlayTests
         restored.Snapshot.Appearance.ShouldBe(appearance);
         restored.Snapshot.Animation.ShouldBe("none");
         restored.Snapshot.State.TotalQueueSize.ShouldBe(1);
-        (
+        _ = (
             await service.ReadOverlayStateAsync(hostId, queue.Id, 12, 12, CancellationToken.None)
         ).ShouldNotBeNull();
         (
@@ -317,7 +317,7 @@ public sealed class ViewerQueueOverlayTests
         );
 
         unchanged.WasIdempotent.ShouldBeTrue();
-        observer.Changes.ShouldHaveSingleItem();
+        _ = observer.Changes.ShouldHaveSingleItem();
         observer.EventCounts.ShouldBe([4]);
     }
 
@@ -477,8 +477,8 @@ public sealed class ViewerQueueOverlayTests
             EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = DateTime.UtcNow,
         };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
         return host.Id;
     }
 
@@ -491,7 +491,7 @@ public sealed class ViewerQueueOverlayTests
         await using var db = await database.CreateDbContextAsync();
         var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
         host.EnabledFeatures = features;
-        await db.SaveChangesAsync();
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenAsync(

@@ -35,11 +35,11 @@
                     break;
                 case FollowerOnlyChatSetupState.Waiting:
                     <p>@BotAccountName can chat after @_presentation.EligibleAtUtc!.Value.ToLocalTime().ToString("g").</p>
-                    @ManualFollowActions
+                    @_manualFollowActions
                     break;
                 case FollowerOnlyChatSetupState.NotFollowing:
                     <p>@BotAccountName is not following.</p>
-                    @ManualFollowActions
+                    @_manualFollowActions
                     break;
                 case FollowerOnlyChatSetupState.ReconnectRequired:
                     <p>Reconnect @BotAccountName to check this status.</p>
@@ -61,14 +61,3 @@
         }
     </div>
 </div>
-
-@code {
-    private RenderFragment ManualFollowActions => @<div class="mt-2 flex flex-wrap items-center gap-2">
-        <a class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition"
-           href="@_channelUrl"
-           target="_blank"
-           rel="noreferrer">Open Twitch channel</a>
-        <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="RecheckAsync">Recheck</button>
-        <span class="basis-full">Sign in to Twitch as @BotAccountName and follow this channel.</span>
-    </div>;
-}

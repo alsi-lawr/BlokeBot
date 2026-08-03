@@ -222,24 +222,19 @@ public sealed record BotPolicies
     }
 
     private static TOptions BindRequired<TOptions>(IConfigurationSection section)
-        where TOptions : class
-    {
-        if (!section.Exists())
-        {
-            throw new OptionsValidationException(
+        where TOptions : class =>
+        !section.Exists()
+            ? throw new OptionsValidationException(
                 section.Path,
                 typeof(TOptions),
                 [$"Configuration section '{section.Path}' is required."]
-            );
-        }
-
-        return section.Get<TOptions>()
-            ?? throw new OptionsValidationException(
-                section.Path,
-                typeof(TOptions),
-                [$"Configuration section '{section.Path}' is invalid."]
-            );
-    }
+            )
+            : section.Get<TOptions>()
+                ?? throw new OptionsValidationException(
+                    section.Path,
+                    typeof(TOptions),
+                    [$"Configuration section '{section.Path}' is invalid."]
+                );
 
     private static TOptions Validate<TOptions>(
         string boundary,
@@ -252,12 +247,9 @@ public sealed record BotPolicies
         AddFailures(generatedValidator.Validate(boundary, options), failures);
         AddFailures(RetryDelayRangeValidator.Validate(options), failures);
 
-        if (failures.Count > 0)
-        {
-            throw new OptionsValidationException(boundary, typeof(TOptions), failures);
-        }
-
-        return options;
+        return failures.Count > 0
+            ? throw new OptionsValidationException(boundary, typeof(TOptions), failures)
+            : options;
     }
 
     private static void AddFailures(ValidateOptionsResult result, List<string> failures)

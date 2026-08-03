@@ -47,8 +47,8 @@ public sealed class FileDropInputTests
     public async Task Render_UsesOneAccessibleBrowseButtonAndNativeFileBoundary()
     {
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IJSRuntime, NullJsRuntime>();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IJSRuntime, NullJsRuntime>();
         await using var provider = services.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(
             provider,
@@ -413,11 +413,18 @@ public sealed class FileDropInputTests
                     "..",
                     "src",
                     "BlokeBot.Core",
-                    fileName.EndsWith(".razor", StringComparison.Ordinal) ? "Components"
-                        : fileName.EndsWith(".razor.js", StringComparison.Ordinal) ? "Components"
-                        : fileName.EndsWith(".css", StringComparison.Ordinal)
-                            ? Path.Combine("Styles", "components")
-                        : "Features",
+                    fileName switch
+                    {
+                        _ when fileName.EndsWith(".razor", StringComparison.Ordinal) =>
+                            "Components",
+                        _ when fileName.EndsWith(".razor.js", StringComparison.Ordinal) =>
+                            "Components",
+                        _ when fileName.EndsWith(".css", StringComparison.Ordinal) => Path.Combine(
+                            "Styles",
+                            "components"
+                        ),
+                        _ => "Features",
+                    },
                     fileName.EndsWith(".cs", StringComparison.Ordinal)
                         ? Path.Combine("Overlays", fileName)
                         : fileName

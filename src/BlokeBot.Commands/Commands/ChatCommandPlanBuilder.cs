@@ -35,14 +35,11 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
         ArgumentNullException.ThrowIfNull(handler);
 
         var normalized = CommandAliasNormalizer.Normalize(route);
-        if (!_routes.TryAdd(normalized, handler))
-        {
-            throw new InvalidOperationException(
+        return !_routes.TryAdd(normalized, handler)
+            ? throw new InvalidOperationException(
                 $"Command route '!{normalized}' was registered more than once."
-            );
-        }
-
-        return this;
+            )
+            : (IChatCommandBuilder)this;
     }
 
     public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler) =>

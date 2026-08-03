@@ -9,11 +9,11 @@ public sealed class BotRuntimeStatusTests
     {
         var status = new BotRuntimeStatusStore();
 
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
 
         status.MarkAuthorized();
 
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
 
         status.MarkConnected(["channel"]);
 
@@ -21,11 +21,11 @@ public sealed class BotRuntimeStatusTests
 
         status.MarkDisconnected();
 
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
 
         status.MarkUnauthorized();
 
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 
     [Test]
@@ -33,8 +33,8 @@ public sealed class BotRuntimeStatusTests
     {
         var status = new BotRuntimeStatusStore();
 
-        Should.Throw<ArgumentException>(() => status.MarkConnected([]));
+        _ = Should.Throw<ArgumentException>(() => status.MarkConnected([]));
 
-        status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 }

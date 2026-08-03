@@ -52,7 +52,7 @@ public sealed class OAuthTransport(
             new FormUrlEncodedContent(form),
             cancellationToken
         );
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         return ToTokenResponse(
             await response.Content.ReadFromJsonAsync<TokenPayload>(_jsonOptions, cancellationToken)
@@ -100,7 +100,7 @@ public sealed class OAuthTransport(
             new FormUrlEncodedContent(form),
             cancellationToken
         );
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         return ToTokenResponse(
             await response.Content.ReadFromJsonAsync<TokenPayload>(_jsonOptions, cancellationToken)
@@ -126,14 +126,14 @@ public sealed class OAuthTransport(
                 return new TokenValidationOutcome.NotValidated();
             }
 
-            response.EnsureSuccessStatusCode();
+            _ = response.EnsureSuccessStatusCode();
         }
 
         var payload = await response.Content.ReadFromJsonAsync<TokenValidationPayload>(
             _jsonOptions,
             cancellationToken
         );
-        if (
+        return
             payload is null
             || string.IsNullOrWhiteSpace(payload.UserId)
             || string.IsNullOrWhiteSpace(payload.Login)
@@ -142,33 +142,25 @@ public sealed class OAuthTransport(
                 string.IsNullOrWhiteSpace(scope)
                 || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
             )
-        )
-        {
-            throw new JsonException("Twitch returned an invalid token validation payload.");
-        }
-
-        return new TokenValidationOutcome.Validated(
-            new TokenValidation(
-                payload.UserId,
-                Login.Normalize(payload.Login),
-                OAuthScopeSet.Create(payload.Scopes)
-            )
-        );
+            ? throw new JsonException("Twitch returned an invalid token validation payload.")
+            : (TokenValidationOutcome)
+                new TokenValidationOutcome.Validated(
+                    new TokenValidation(
+                        payload.UserId,
+                        Login.Normalize(payload.Login),
+                        OAuthScopeSet.Create(payload.Scopes)
+                    )
+                );
     }
 
-    private static OAuthTokenResponse ToTokenResponse(TokenPayload? payload)
-    {
-        if (string.IsNullOrWhiteSpace(payload?.AccessToken))
-        {
-            throw new InvalidOperationException("Twitch did not return an access token.");
-        }
-
-        return new OAuthTokenResponse(
-            payload.AccessToken,
-            payload.RefreshToken ?? string.Empty,
-            payload.ExpiresIn
-        );
-    }
+    private static OAuthTokenResponse ToTokenResponse(TokenPayload? payload) =>
+        string.IsNullOrWhiteSpace(payload?.AccessToken)
+            ? throw new InvalidOperationException("Twitch did not return an access token.")
+            : new OAuthTokenResponse(
+                payload.AccessToken,
+                payload.RefreshToken ?? string.Empty,
+                payload.ExpiresIn
+            );
 
     private sealed record TokenPayload
     {

@@ -116,7 +116,7 @@ internal sealed partial class EfPublicChatOutbox
                 );
             }
 
-            await db
+            _ = await db
                 .PublicChatPinOperations.Where(operation =>
                     operation.OutboxMessageId == message.Id
                     && operation.Status == PublicChatPinOperationStatus.AwaitingDelivery
@@ -133,8 +133,8 @@ internal sealed partial class EfPublicChatOutbox
                     cancellationToken
                 );
 
-            db.PublicChatOutboxMessages.Remove(deleted);
-            await db.SaveChangesAsync(cancellationToken);
+            _ = db.PublicChatOutboxMessages.Remove(deleted);
+            _ = await db.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return new PublicChatClaimUpdate.Applied();
@@ -199,7 +199,7 @@ internal sealed partial class EfPublicChatOutbox
                         recordedAt,
                         cancellationToken
                     );
-                    await db.SaveChangesAsync(cancellationToken);
+                    _ = await db.SaveChangesAsync(cancellationToken);
                 }
                 return expired;
             }
@@ -320,7 +320,7 @@ internal sealed partial class EfPublicChatOutbox
                     recordedAt,
                     cancellationToken
                 );
-                await db.SaveChangesAsync(cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
             }
             return update;
         }
@@ -366,7 +366,7 @@ internal sealed partial class EfPublicChatOutbox
                 recordedAt,
                 cancellationToken
             );
-            await expiryDb.SaveChangesAsync(cancellationToken);
+            _ = await expiryDb.SaveChangesAsync(cancellationToken);
             return new PublicChatClaimUpdate.Expired();
         }
 
@@ -528,7 +528,7 @@ internal sealed partial class EfPublicChatOutbox
                 recordedAt,
                 cancellationToken
             );
-            await expiryDb.SaveChangesAsync(cancellationToken);
+            _ = await expiryDb.SaveChangesAsync(cancellationToken);
             return new PublicChatClaimUpdate.Expired();
         }
 
@@ -616,11 +616,11 @@ internal sealed partial class EfPublicChatOutbox
                 completedAt,
                 cancellationToken
             );
-            await db.SaveChangesAsync(cancellationToken);
+            _ = await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             if (alertCreated && events is not null)
             {
-                await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+                _ = await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
             }
             return new PublicChatClaimUpdate.Applied();
         }

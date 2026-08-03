@@ -53,7 +53,7 @@ public sealed class CustomAnnouncementChatActivity(
             announcement.UpdatedAtUtc = now;
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private static bool HasCustomCommands(HostFeatureFlags features) =>

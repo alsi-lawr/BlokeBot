@@ -1,26 +1,3 @@
 <span class="@_indicatorClass" aria-label="@_label" title="@_label">
     <span class="rank-indicator__prefix">#</span>@Rank
 </span>
-
-@code {
-    [Parameter]
-    public int Rank { get; set; }
-
-    private string _indicatorClass =>
-        Rank switch
-        {
-            1 => "rank-indicator rank-indicator--gold",
-            2 => "rank-indicator rank-indicator--silver",
-            3 => "rank-indicator rank-indicator--bronze",
-            _ => "rank-indicator",
-        };
-
-    private string _label =>
-        Rank switch
-        {
-            1 => "First place",
-            2 => "Second place",
-            3 => "Third place",
-            _ => $"Rank {Rank}",
-        };
-}

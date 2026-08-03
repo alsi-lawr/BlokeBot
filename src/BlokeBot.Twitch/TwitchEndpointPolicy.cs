@@ -51,7 +51,7 @@ public sealed class TwitchEndpointPolicy
 
         if (
             !origin.IsAbsoluteUri
-            || origin.Scheme != Uri.UriSchemeHttp && origin.Scheme != Uri.UriSchemeHttps
+            || (origin.Scheme != Uri.UriSchemeHttp && origin.Scheme != Uri.UriSchemeHttps)
             || !string.IsNullOrEmpty(origin.Query)
             || !string.IsNullOrEmpty(origin.Fragment)
         )

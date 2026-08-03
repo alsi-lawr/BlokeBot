@@ -13,7 +13,7 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task ChannelAndBotUsers_Resolving_ReturnsResolvedIdentities()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """
             {"data":[{"id":"channel-id","login":"channel"},{"id":"bot-id","login":"bot"}]}
             """
@@ -44,7 +44,9 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task BotUserWithoutChannel_Resolving_ReturnsMissingChannel()
     {
-        var factory = new IdentityHttpClientFactory("""{"data":[{"id":"bot-id","login":"bot"}]}""");
+        using var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"bot-id","login":"bot"}]}"""
+        );
         var resolver = CreateResolver(factory);
 
         var result = await resolver.ResolveAsync(
@@ -54,13 +56,13 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatIdentityResolution.MissingChannel>();
+        _ = result.ShouldBeOfType<ChatIdentityResolution.MissingChannel>();
     }
 
     [Test]
     public async Task ChannelUserWithoutBot_Resolving_ReturnsMissingBot()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"channel"}]}"""
         );
         var resolver = CreateResolver(factory);
@@ -72,13 +74,15 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        result.ShouldBeOfType<ChatIdentityResolution.MissingBot>();
+        _ = result.ShouldBeOfType<ChatIdentityResolution.MissingBot>();
     }
 
     [Test]
     public async Task MissingChannel_CreatingEventSubSubscription_IsTerminalWithoutCreateRequest()
     {
-        var factory = new IdentityHttpClientFactory("""{"data":[{"id":"bot-id","login":"bot"}]}""");
+        using var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"bot-id","login":"bot"}]}"""
+        );
         var operations = new EventSubChannelOperations(
             Settings(),
             new UnusedAccountProvider(),
@@ -98,7 +102,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingChannel>();
+        _ = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingChannel>();
         factory.EventSubRequestCount.ShouldBe(0);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("access-token");
@@ -107,7 +111,7 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task MissingBot_CreatingEventSubSubscription_IsTerminalWithoutCreateRequest()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"private-channel-login"}]}"""
         );
         var operations = new EventSubChannelOperations(
@@ -129,7 +133,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingBot>();
+        _ = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingBot>();
         factory.EventSubRequestCount.ShouldBe(0);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("private-bot-login");
@@ -139,16 +143,17 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task MissingChannel_PreparingPublicChat_IsTerminalWithoutTokenOrSendRequest()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"bot-id","login":"private-bot-login"}]}"""
         );
         var identity = Identity();
+        using var appTokens = new AppAccessTokenProvider(
+            factory,
+            identity,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var transport = new HelixPublicChatTransport(
-            new AppAccessTokenProvider(
-                factory,
-                identity,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            ),
+            appTokens,
             new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
@@ -162,7 +167,7 @@ public sealed class ChatIdentityResolverTests
         );
 
         var missingChannel = result.ShouldBeOfType<PublicChatPreparationOutcome.MissingChannel>();
-        PublicChatDeliveryClassifier
+        _ = PublicChatDeliveryClassifier
             .MapPreparationFailure(missingChannel)
             .ShouldBeOfType<PublicChatDeliveryOutcome.MissingChannel>();
         factory.AppTokenRequestCount.ShouldBe(0);
@@ -175,16 +180,17 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task MissingBot_PreparingPublicChat_IsTerminalWithoutTokenOrSendRequest()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"private-channel-login"}]}"""
         );
         var identity = Identity();
+        using var appTokens = new AppAccessTokenProvider(
+            factory,
+            identity,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var transport = new HelixPublicChatTransport(
-            new AppAccessTokenProvider(
-                factory,
-                identity,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            ),
+            appTokens,
             new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
@@ -198,7 +204,7 @@ public sealed class ChatIdentityResolverTests
         );
 
         var missingBot = result.ShouldBeOfType<PublicChatPreparationOutcome.MissingBot>();
-        PublicChatDeliveryClassifier
+        _ = PublicChatDeliveryClassifier
             .MapPreparationFailure(missingBot)
             .ShouldBeOfType<PublicChatDeliveryOutcome.MissingBot>();
         factory.AppTokenRequestCount.ShouldBe(0);
@@ -215,7 +221,7 @@ public sealed class ChatIdentityResolverTests
         int successfulPollSubscriptions
     )
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"channel"}]}"""
         );
         var operations = CreateEventSubOperations(
@@ -247,7 +253,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
+        _ = deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
         factory
             .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
             .Select(request => request.SubscriptionId)
@@ -262,7 +268,7 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task IncomingRaidSubscription_Creating_UsesConfiguredBotUserTokenWithoutAppToken()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"channel"}]}"""
         );
         var operations = CreateEventSubOperations(
@@ -280,7 +286,8 @@ public sealed class ChatIdentityResolverTests
         );
 
         var created = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
-        created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+        _ =
+            created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
         created.Subscription.AccessToken.ShouldBe("configured-bot-user-token");
         factory.AppTokenRequestCount.ShouldBe(0);
         factory
@@ -296,7 +303,7 @@ public sealed class ChatIdentityResolverTests
     [Test]
     public async Task PollSubscriptionGroup_NoGrantPreservesBotGroup_AndRecreateUsesBroadcasterAuthority()
     {
-        var factory = new IdentityHttpClientFactory(
+        using var factory = new IdentityHttpClientFactory(
             """
             {"data":[{"id":"channel-id","login":"channel"},{"id":"bot-id","login":"bot"}]}
             """
@@ -332,7 +339,7 @@ public sealed class ChatIdentityResolverTests
             "session-id",
             CancellationToken.None
         );
-        shoutoutSetup.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
+        _ = shoutoutSetup.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         var unavailable = await operations
             .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
             .ExecuteAsync(CancellationToken.None);
@@ -342,7 +349,8 @@ public sealed class ChatIdentityResolverTests
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
             )
         );
-        botSubscription.PollSubscriptions.ShouldBeOfType<EventSubOperationSubscriptionState.NotConfigured>();
+        _ =
+            botSubscription.PollSubscriptions.ShouldBeOfType<EventSubOperationSubscriptionState.NotConfigured>();
         factory.EventSubRequestCount.ShouldBe(3);
 
         var created = await operations.CreateSubscriptionAsync(
@@ -367,8 +375,8 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
-        recreated.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
+        _ = deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
+        _ = recreated.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         factory
             .EventSubRequests.Where(request => request.Method == HttpMethod.Post)
             .Take(3)
@@ -379,7 +387,9 @@ public sealed class ChatIdentityResolverTests
                 "channel.shoutout.receive",
             ]);
         factory
-            .EventSubRequests.Where(request => request.Type?.StartsWith("channel.poll.") == true)
+            .EventSubRequests.Where(request =>
+                request.Type?.StartsWith("channel.poll.", StringComparison.Ordinal) == true
+            )
             .Select(request => request.Authorization)
             .Distinct()
             .ShouldBe(["Bearer broadcaster-token"]);
@@ -401,10 +411,11 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
+        _ = outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
         chat.Messages.ShouldBe(["private startup payload"]);
         chat.Channels.ShouldBe(["private-channel-login"]);
-        chat.Deadlines.ShouldHaveSingleItem()
+        _ = chat
+            .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 
@@ -423,8 +434,8 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
-        reconnectOutcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
+        _ = outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
+        _ = reconnectOutcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
         chat.Messages.ShouldBeEmpty();
     }
 
@@ -439,7 +450,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Rejected>();
+        _ = outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Rejected>();
         chat.Messages.ShouldBe(["private startup payload"]);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("private startup payload");
@@ -579,7 +590,9 @@ public sealed class ChatIdentityResolverTests
         };
     }
 
-    private sealed class IdentityHttpClientFactory(string usersJson) : IHttpClientFactory
+    private sealed class IdentityHttpClientFactory(string usersJson)
+        : IHttpClientFactory,
+            IDisposable
     {
         private readonly Handler _handler = new(usersJson);
 
@@ -603,6 +616,8 @@ public sealed class ChatIdentityResolverTests
         internal string LastQuery => _handler.LastQuery;
 
         public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+
+        public void Dispose() => _handler.Dispose();
 
         internal sealed record EventSubRequest(
             HttpMethod Method,
@@ -687,20 +702,22 @@ public sealed class ChatIdentityResolverTests
                         request.Headers.Authorization?.ToString()
                     )
                 );
-                if (request.Method == HttpMethod.Delete)
+                return (request.Method == HttpMethod.Delete) switch
                 {
-                    return new HttpResponseMessage(HttpStatusCode.NoContent);
-                }
-
-                return
-                    _failEventSubPostAt
-                    == EventSubRequests.Count(eventSubRequest =>
-                        eventSubRequest.Method == HttpMethod.Post
-                    )
-                    ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
-                    : JsonResponse(
-                        $$"""{"data":[{"id":"subscription-{{EventSubRequestCount}}"}]}"""
-                    );
+                    true => new HttpResponseMessage(HttpStatusCode.NoContent),
+                    false => (
+                        _failEventSubPostAt
+                        == EventSubRequests.Count(eventSubRequest =>
+                            eventSubRequest.Method == HttpMethod.Post
+                        )
+                    ) switch
+                    {
+                        true => new HttpResponseMessage(HttpStatusCode.InternalServerError),
+                        _ => JsonResponse(
+                            $$"""{"data":[{"id":"subscription-{{EventSubRequestCount}}"}]}"""
+                        ),
+                    },
+                };
             }
 
             private HttpResponseMessage ChatResponse()

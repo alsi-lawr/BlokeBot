@@ -89,10 +89,10 @@ public sealed class OverlayCueConfigurationTests
         );
         var url = new Uri("https://internal.example.test/widget");
 
-        (
+        _ = (
             await safe.ValidateAsync(url, CancellationToken.None)
         ).ShouldBeOfType<OverlayRemoteUrlDecision.Rejected>();
-        (
+        _ = (
             await optedIn.ValidateAsync(url, CancellationToken.None)
         ).ShouldBeOfType<OverlayRemoteUrlDecision.Allowed>();
         dns.Requests.ShouldBe(["internal.example.test", "internal.example.test"]);

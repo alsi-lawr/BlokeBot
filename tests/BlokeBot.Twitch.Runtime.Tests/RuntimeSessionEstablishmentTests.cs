@@ -116,7 +116,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         var unavailable = outcome.ShouldBeOfType<RuntimeSessionOutcome.TokenUnavailable>();
         unavailable.Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
         harness.Session.CallCount.ShouldBe(1);
-        harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
+        _ = harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
         harness.Health.Reports.ShouldBeEmpty();
     }
 
@@ -135,7 +135,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
+        _ = outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
             harness
@@ -244,7 +244,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
+        _ = outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
             harness
@@ -278,7 +278,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             cancellation.Token
         );
 
-        outcome.ShouldBeOfType<RuntimeSessionOutcome.Canceled>();
+        _ = outcome.ShouldBeOfType<RuntimeSessionOutcome.Canceled>();
         harness.Session.CallCount.ShouldBe(1);
         harness.Health.Reports.ShouldBeEmpty();
     }

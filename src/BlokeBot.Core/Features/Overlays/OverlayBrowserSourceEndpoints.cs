@@ -38,7 +38,7 @@ internal static class OverlayBrowserSourceEndpoints
 
     internal static void MapOverlayBrowserSourceEndpoints(this WebApplication app)
     {
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/assets/blokebot-overlay.css",
                 (HttpContext context) =>
                 {
@@ -47,7 +47,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/assets/blokebot-overlay.js",
                 (HttpContext context) =>
                 {
@@ -56,7 +56,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/{accessKey}",
                 async (
                     HttpContext context,
@@ -90,7 +90,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/{accessKey}/appearance.css",
                 async (
                     HttpContext context,
@@ -112,7 +112,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/{accessKey}/events",
                 async (
                     HttpContext context,
@@ -148,7 +148,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/{accessKey}/state",
                 async (
                     HttpContext context,
@@ -197,7 +197,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlay/{accessKey}/media/{assetId:guid}/{contentRevision:int}",
                 async (
                     HttpContext context,
@@ -229,7 +229,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        app.MapPost(
+        _ = app.MapPost(
                 "/overlay/{accessKey}/cue-complete/{runId:guid}",
                 async (
                     HttpContext context,
@@ -251,7 +251,7 @@ internal static class OverlayBrowserSourceEndpoints
                     {
                         return Unavailable();
                     }
-                    await playback.CompleteAsync(
+                    _ = await playback.CompleteAsync(
                         resolved.Instance.HostId,
                         resolved.Instance.OverlayId,
                         runId,
@@ -263,7 +263,7 @@ internal static class OverlayBrowserSourceEndpoints
             .DisableAntiforgery()
             .AllowAnonymous();
 
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}",
                 async (
                     HttpContext context,
@@ -345,7 +345,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .RequireAuthorization("HostSelected");
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/appearance.css",
                 async (
                     HttpContext context,
@@ -369,7 +369,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .RequireAuthorization("HostSelected");
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/state",
                 async (
                     HttpContext context,
@@ -398,62 +398,81 @@ internal static class OverlayBrowserSourceEndpoints
                         "representative",
                         StringComparison.Ordinal
                     );
-                    var projection =
+                    OverlaySnapshotProjection projection;
+                    if (
                         representative
                         && resolved.Instance.Type is OverlayType.Guessing
                         && TryParseSample(context.Request.Query["sample"], out var sample)
-                            ? await ProjectSampleSafelyAsync(
-                                stateProvider,
-                                resolved.Instance,
-                                sample,
-                                context.RequestServices,
-                                cancellationToken
-                            )
-                        : representative
+                    )
+                    {
+                        projection = await ProjectSampleSafelyAsync(
+                            stateProvider,
+                            resolved.Instance,
+                            sample,
+                            context.RequestServices,
+                            cancellationToken
+                        );
+                    }
+                    else if (
+                        representative
                         && resolved.Instance.Type is OverlayType.EventFeed
                         && TryParseEventFeedSample(
                             context.Request.Query["sample"],
                             out var eventKind
                         )
-                            ? await ProjectSampleSafelyAsync(
-                                stateProvider,
-                                resolved.Instance,
-                                eventKind,
-                                context.RequestServices,
-                                cancellationToken
-                            )
-                        : representative
+                    )
+                    {
+                        projection = await ProjectSampleSafelyAsync(
+                            stateProvider,
+                            resolved.Instance,
+                            eventKind,
+                            context.RequestServices,
+                            cancellationToken
+                        );
+                    }
+                    else if (
+                        representative
                         && resolved.Instance.Type is OverlayType.ViewerQueue
                         && TryParseViewerQueueSample(
                             context.Request.Query["sample"],
                             out var queueSample
                         )
-                            ? await ProjectSampleSafelyAsync(
-                                stateProvider,
-                                resolved.Instance,
-                                queueSample,
-                                context.RequestServices,
-                                cancellationToken
-                            )
-                        : representative
+                    )
+                    {
+                        projection = await ProjectSampleSafelyAsync(
+                            stateProvider,
+                            resolved.Instance,
+                            queueSample,
+                            context.RequestServices,
+                            cancellationToken
+                        );
+                    }
+                    else if (
+                        representative
                         && resolved.Instance.Type is OverlayType.Giveaway
                         && TryParseGiveawaySample(
                             context.Request.Query["sample"],
                             out var giveawaySample
                         )
-                            ? await ProjectSampleSafelyAsync(
-                                stateProvider,
-                                resolved.Instance,
-                                giveawaySample,
-                                context.RequestServices,
-                                cancellationToken
-                            )
-                        : await ProjectSafelyAsync(
+                    )
+                    {
+                        projection = await ProjectSampleSafelyAsync(
+                            stateProvider,
+                            resolved.Instance,
+                            giveawaySample,
+                            context.RequestServices,
+                            cancellationToken
+                        );
+                    }
+                    else
+                    {
+                        projection = await ProjectSafelyAsync(
                             stateProvider,
                             resolved.Instance,
                             context.RequestServices,
                             cancellationToken
                         );
+                    }
                     return projection switch
                     {
                         OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
@@ -475,7 +494,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .RequireAuthorization("HostSelected");
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/media/{assetId:guid}/{contentRevision:int}",
                 async (
                     HttpContext context,
@@ -509,7 +528,7 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .RequireAuthorization("HostSelected");
-        app.MapPost(
+        _ = app.MapPost(
                 "/overlays/preview/{overlayId:guid}/cue-complete/{runId:guid}",
                 async (
                     HttpContext context,
@@ -533,7 +552,7 @@ internal static class OverlayBrowserSourceEndpoints
                     {
                         return Unavailable();
                     }
-                    await playback.CompleteAsync(
+                    _ = await playback.CompleteAsync(
                         resolved.Instance.HostId,
                         resolved.Instance.OverlayId,
                         runId,
@@ -544,7 +563,7 @@ internal static class OverlayBrowserSourceEndpoints
             )
             .DisableAntiforgery()
             .RequireAuthorization("HostSelected");
-        app.MapGet(
+        _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/events",
                 async (
                     HttpContext context,
@@ -617,38 +636,34 @@ internal static class OverlayBrowserSourceEndpoints
             {
                 return new OverlayPreviewResolution.Unavailable();
             }
-            if (
+            var guessingDisabled =
                 succeeded.Value.Type is OverlayType.Guessing
                 && !await features.IsEnabledAsync(
                     selectedHost.Id,
                     HostFeatureFlags.Guessing,
                     cancellationToken
-                )
-            )
-            {
-                return new OverlayPreviewResolution.Unavailable();
-            }
-            if (
+                );
+            var giveawayDisabled =
                 succeeded.Value.Type is OverlayType.Giveaway
                 && !await features.IsEnabledAsync(
                     selectedHost.Id,
                     HostFeatureFlags.Points,
                     cancellationToken
-                )
-            )
+                );
+            return guessingDisabled switch
             {
-                return new OverlayPreviewResolution.Unavailable();
-            }
-
-            return new OverlayPreviewResolution.Resolved(
-                new ResolvedOverlayInstance(
-                    selectedHost.Id,
-                    succeeded.Value.Id,
-                    succeeded.Value.Type,
-                    succeeded.Value.Configuration,
-                    succeeded.Value.Revision
-                )
-            );
+                true => new OverlayPreviewResolution.Unavailable(),
+                false when giveawayDisabled => new OverlayPreviewResolution.Unavailable(),
+                false => new OverlayPreviewResolution.Resolved(
+                    new ResolvedOverlayInstance(
+                        selectedHost.Id,
+                        succeeded.Value.Id,
+                        succeeded.Value.Type,
+                        succeeded.Value.Configuration,
+                        succeeded.Value.Revision
+                    )
+                ),
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1004,20 +1019,21 @@ internal static class OverlayBrowserSourceEndpoints
         }
 
         var segments = value.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (
-            segments.Length is < 2
+        return (
+            segments.Length < 2
             || !string.Equals(segments[0], "overlay", StringComparison.OrdinalIgnoreCase)
             || string.Equals(segments[1], "assets", StringComparison.OrdinalIgnoreCase)
-        )
+        ) switch
         {
-            return path;
-        }
-
-        return segments.Length == 2
-            ? new PathString("/overlay/[redacted]")
-            : new PathString(
-                $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(value => value.ToLowerInvariant()))}"
-            );
+            true => path,
+            false => segments.Length switch
+            {
+                2 => new PathString("/overlay/[redacted]"),
+                _ => new PathString(
+                    $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(value => value.ToLowerInvariant()))}"
+                ),
+            },
+        };
     }
 
     private sealed class OverlayLiveStreamResult(

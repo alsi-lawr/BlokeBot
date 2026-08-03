@@ -1,3 +1,4 @@
+using System.Globalization;
 using Shouldly;
 
 namespace BlokeBot.Functional.Tests;
@@ -74,7 +75,11 @@ public sealed class ResultTests
     {
         var bound = Result<int, TestError>
             .Success(21)
-            .Bind(value => Result<string, TestError>.Success((value * 2).ToString()));
+            .Bind(value =>
+                Result<string, TestError>.Success(
+                    (value * 2).ToString(CultureInfo.InvariantCulture)
+                )
+            );
 
         bound.Match(value => value, _ => string.Empty).ShouldBe("42");
     }
