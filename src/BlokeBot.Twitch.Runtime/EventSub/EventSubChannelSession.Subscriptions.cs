@@ -267,6 +267,7 @@ internal sealed partial class EventSubChannelSession
                     cancellationToken
                 );
             active = reconciliation.Subscription;
+            ReplaceTrackedSubscription(active);
             if (reconciliation.Outcome is { } failure)
             {
                 return (active, failure);

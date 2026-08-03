@@ -49,6 +49,138 @@ public sealed class TransportClientTests
     }
 
     [Test]
+    [Arguments(HttpStatusCode.BadRequest, "Bad Request", "poll is unavailable", null)]
+    [Arguments(HttpStatusCode.Conflict, "Conflict", "subscription already exists", "existing-id")]
+    public async Task EventSubSubscription_Creating_ThrowsBoundedProviderFailure(
+        HttpStatusCode statusCode,
+        string providerError,
+        string providerMessage,
+        string? existingSubscriptionId
+    )
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (_, _) =>
+                Task.FromResult(
+                    new HttpResponseMessage(statusCode)
+                    {
+                        Content = new StringContent(
+                            $$"""{"error":"{{providerError}}","message":"{{providerMessage}}","id":"{{existingSubscriptionId}}"}""",
+                            Encoding.UTF8,
+                            "application/json"
+                        ),
+                    }
+                )
+        );
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
+            client.CreateChatMessageSubscriptionAsync(
+                Context(),
+                "channel-id",
+                "bot-id",
+                "session-id",
+                CancellationToken.None
+            )
+        );
+
+        failure.StatusCode.ShouldBe(statusCode);
+        failure.ProviderError.ShouldBe(providerError);
+        failure.ProviderMessage.ShouldBe(providerMessage);
+        failure.ExistingSubscriptionId.ShouldBe(existingSubscriptionId);
+        failure.Message.ShouldNotContain(providerMessage);
+    }
+
+    [Test]
+    public async Task EventSubSubscription_Creating_MalformedOversizedBodyDoesNotLeakBody()
+    {
+        var secret = "access-token-secret";
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (_, _) =>
+                Task.FromResult(
+                    new HttpResponseMessage(HttpStatusCode.BadRequest)
+                    {
+                        Content = new StringContent(
+                            $$"""{"message":"{{secret}}"}{{new string('x', 20_000)}}""",
+                            Encoding.UTF8,
+                            "application/json"
+                        ),
+                    }
+                )
+        );
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
+            client.CreateChatMessageSubscriptionAsync(
+                Context(),
+                "channel-id",
+                "bot-id",
+                "session-id",
+                CancellationToken.None
+            )
+        );
+
+        failure.ProviderMessage.ShouldBeNull();
+        failure.ToString().ShouldNotContain(secret);
+        failure.ToString().Length.ShouldBeLessThan(1000);
+    }
+
+    [Test]
+    public async Task EventSubSubscription_Creating_EchoedRequestValuesAreRedacted()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (_, _) =>
+                Task.FromResult(
+                    new HttpResponseMessage(HttpStatusCode.BadRequest)
+                    {
+                        Content = new StringContent(
+                            """
+                            {
+                              "error": "access-token",
+                              "message": "client-id/session-id/channel-id/bot-id",
+                              "id": "access-token"
+                            }
+                            """,
+                            Encoding.UTF8,
+                            "application/json"
+                        ),
+                    }
+                )
+        );
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
+            client.CreateChatMessageSubscriptionAsync(
+                Context(),
+                "channel-id",
+                "bot-id",
+                "session-id",
+                CancellationToken.None
+            )
+        );
+
+        failure.ProviderError.ShouldBe("[redacted]");
+        failure.ProviderMessage.ShouldBe("[redacted]/[redacted]/[redacted]/[redacted]");
+        failure.ExistingSubscriptionId.ShouldBeNull();
+        failure.ToString().ShouldNotContain("client-id");
+        failure.ToString().ShouldNotContain("access-token");
+        failure.ToString().ShouldNotContain("session-id");
+        failure.ToString().ShouldNotContain("channel-id");
+        failure.ToString().ShouldNotContain("bot-id");
+    }
+
+    [Test]
     public async Task IncomingRaidSubscription_Creating_UsesVersionOneTargetConditionAndWebSocket()
     {
         var factory = new ScriptedHttpClientFactory();
