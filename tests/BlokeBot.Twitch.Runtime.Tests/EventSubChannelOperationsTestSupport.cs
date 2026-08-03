@@ -218,7 +218,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
             string channel,
             EventSubAuthorizationContext authorization,
             BotAccount account,
-            string sessionId,
             CancellationToken cancellationToken,
             EventSubOperationSubscriptionKind? operationKind = null
         )
@@ -237,10 +236,9 @@ public abstract partial class EventSubChannelRecoveryTestBase
                         new ActiveEventSubSubscription
                         {
                             Channel = channel,
-                            SubscriptionId = $"{sessionId}-{channel}",
+                            SubscriptionId = $"subscription-{channel}",
                             BotLogin = account.Login,
                             Authorization = authorization,
-                            AccessToken = account.AccessToken,
                             Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
                         }
                     )

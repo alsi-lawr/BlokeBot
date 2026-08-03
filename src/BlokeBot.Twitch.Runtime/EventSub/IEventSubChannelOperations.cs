@@ -13,7 +13,6 @@ internal interface IEventSubChannelOperations
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
-        string sessionId,
         CancellationToken cancellationToken,
         EventSubOperationSubscriptionKind? operationKind = null
     );

@@ -9,117 +9,19 @@ namespace BlokeBot.Twitch;
 
 public sealed class EventSubClient(
     IHttpClientFactory httpClientFactory,
-    TwitchEndpointPolicy endpointPolicy
-)
+    TwitchEndpointPolicy endpointPolicy,
+    EventSubWebhookOptions webhook,
+    IAppAccessTokenProvider appAccessTokens,
+    IEventSubSubscriptionVerification verification
+) : IEventSubSubscriptionTransport
 {
     private const int _maxErrorBodyBytes = 16 * 1024;
     private const int _maxDiagnosticFieldLength = 256;
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
-    public Task<string> CreateChatMessageSubscriptionAsync(
-        HelixRequestContext context,
-        string broadcasterId,
-        string botUserId,
-        string sessionId,
-        CancellationToken cancellationToken
-    ) =>
-        CreateSubscriptionAsync(
-            context,
-            new(
-                "channel.chat.message",
-                "1",
-                new Dictionary<string, string>
-                {
-                    ["broadcaster_user_id"] = broadcasterId,
-                    ["user_id"] = botUserId,
-                },
-                sessionId
-            ),
-            cancellationToken
-        );
-
-    public Task<string> CreateShoutoutCreateSubscriptionAsync(
-        HelixRequestContext context,
-        string broadcasterId,
-        string moderatorId,
-        string sessionId,
-        CancellationToken cancellationToken
-    ) =>
-        CreateSubscriptionAsync(
-            context,
-            new(
-                "channel.shoutout.create",
-                "1",
-                new Dictionary<string, string>
-                {
-                    ["broadcaster_user_id"] = broadcasterId,
-                    ["moderator_user_id"] = moderatorId,
-                },
-                sessionId
-            ),
-            cancellationToken
-        );
-
-    public Task<string> CreateShoutoutReceiveSubscriptionAsync(
-        HelixRequestContext context,
-        string broadcasterId,
-        string moderatorId,
-        string sessionId,
-        CancellationToken cancellationToken
-    ) =>
-        CreateSubscriptionAsync(
-            context,
-            new(
-                "channel.shoutout.receive",
-                "1",
-                new Dictionary<string, string>
-                {
-                    ["broadcaster_user_id"] = broadcasterId,
-                    ["moderator_user_id"] = moderatorId,
-                },
-                sessionId
-            ),
-            cancellationToken
-        );
-
-    public Task<string> CreateIncomingRaidSubscriptionAsync(
-        HelixRequestContext context,
-        string broadcasterId,
-        string sessionId,
-        CancellationToken cancellationToken
-    ) =>
-        CreateSubscriptionAsync(
-            context,
-            new(
-                "channel.raid",
-                "1",
-                new Dictionary<string, string> { ["to_broadcaster_user_id"] = broadcasterId },
-                sessionId
-            ),
-            cancellationToken
-        );
-
-    public Task<string> CreatePollSubscriptionAsync(
-        HelixRequestContext context,
-        string type,
-        string broadcasterId,
-        string sessionId,
-        CancellationToken cancellationToken
-    ) =>
-        CreateSubscriptionAsync(
-            context,
-            new(
-                type,
-                "1",
-                new Dictionary<string, string> { ["broadcaster_user_id"] = broadcasterId },
-                sessionId
-            ),
-            cancellationToken
-        );
-
-    public async Task<string> CreateSubscriptionAsync(
-        HelixRequestContext context,
+    public async Task<string> CreateAsync(
+        string clientId,
         EventSubSubscriptionRequest subscription,
         CancellationToken cancellationToken
     )
@@ -131,14 +33,16 @@ public sealed class EventSubClient(
             Condition = subscription.Condition,
             Transport = new SubscriptionTransport
             {
-                Method = "websocket",
-                SessionId = subscription.SessionId,
+                Method = "webhook",
+                Callback = webhook.CallbackUri.AbsoluteUri,
+                Secret = webhook.Secret,
             },
         };
+        var managementContext = await ManagementContextAsync(clientId, cancellationToken);
         using var request = HelixRequest.Create(
             HttpMethod.Post,
             endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri,
-            context
+            managementContext
         );
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
@@ -148,9 +52,10 @@ public sealed class EventSubClient(
                 response,
                 cancellationToken,
                 [
-                    context.ClientId,
-                    context.AccessToken,
-                    subscription.SessionId,
+                    managementContext.ClientId,
+                    managementContext.AccessToken,
+                    webhook.CallbackUri.AbsoluteUri,
+                    webhook.Secret,
                     .. subscription.Condition.Values,
                 ]
             );
@@ -160,11 +65,19 @@ public sealed class EventSubClient(
             _jsonOptions,
             cancellationToken
         );
-        return result?.Data.FirstOrDefault()?.Id
+        var subscriptionId =
+            result?.Data.FirstOrDefault()?.Id
             ?? throw new InvalidOperationException(
                 "Twitch did not return an EventSub subscription ID."
             );
+        await verification.WaitAsync(subscriptionId, cancellationToken);
+        return subscriptionId;
     }
+
+    private async Task<HelixRequestContext> ManagementContextAsync(
+        string clientId,
+        CancellationToken cancellationToken
+    ) => new(clientId, await appAccessTokens.GetAccessTokenAsync(cancellationToken));
 
     private static async ValueTask<EventSubSubscriptionCreationException> CreateSubscriptionFailureAsync(
         HttpResponseMessage response,
@@ -338,7 +251,69 @@ public sealed class EventSubClient(
             : sanitized[..Math.Min(sanitized.Length, _maxDiagnosticFieldLength)];
     }
 
-    public async Task DeleteSubscriptionAsync(
+    public async Task ResetAsync(string clientId, CancellationToken cancellationToken)
+    {
+        var context = await ManagementContextAsync(clientId, cancellationToken);
+        foreach (var subscription in await ListOwnedAsync(context, cancellationToken))
+        {
+            await DeleteAsync(context, subscription.Id, cancellationToken);
+        }
+    }
+
+    public async Task<IReadOnlySet<string>> ListEnabledOwnedIdsAsync(
+        string clientId,
+        CancellationToken cancellationToken
+    ) =>
+        (
+            await ListOwnedAsync(
+                await ManagementContextAsync(clientId, cancellationToken),
+                cancellationToken
+            )
+        )
+            .Where(static subscription =>
+                subscription.Status.Equals("enabled", StringComparison.Ordinal)
+            )
+            .Select(static subscription => subscription.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+    private async Task<IReadOnlyList<EventSubSubscription>> ListOwnedAsync(
+        HelixRequestContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        var owned = new List<EventSubSubscription>();
+        string? cursor = null;
+        do
+        {
+            var inventory = await ListPageAsync(context, cursor, cancellationToken);
+            owned.AddRange(
+                inventory.Subscriptions.Where(subscription =>
+                    subscription.Method.Equals("webhook", StringComparison.Ordinal)
+                    && string.Equals(
+                        subscription.Callback,
+                        webhook.CallbackUri.AbsoluteUri,
+                        StringComparison.Ordinal
+                    )
+                )
+            );
+            cursor = inventory.Cursor;
+        } while (!string.IsNullOrWhiteSpace(cursor));
+
+        return owned;
+    }
+
+    public async Task DeleteAsync(
+        string clientId,
+        string subscriptionId,
+        CancellationToken cancellationToken
+    ) =>
+        await DeleteAsync(
+            await ManagementContextAsync(clientId, cancellationToken),
+            subscriptionId,
+            cancellationToken
+        );
+
+    private async Task DeleteAsync(
         HelixRequestContext context,
         string subscriptionId,
         CancellationToken cancellationToken
@@ -355,6 +330,42 @@ public sealed class EventSubClient(
         }
 
         _ = response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<EventSubSubscriptionInventory> ListSubscriptionsAsync(
+        string clientId,
+        string? after,
+        CancellationToken cancellationToken
+    ) =>
+        await ListPageAsync(
+            await ManagementContextAsync(clientId, cancellationToken),
+            after,
+            cancellationToken
+        );
+
+    private async Task<EventSubSubscriptionInventory> ListPageAsync(
+        HelixRequestContext context,
+        string? after,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri = endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri;
+        if (!string.IsNullOrWhiteSpace(after))
+        {
+            uri += $"?after={Uri.EscapeDataString(after)}";
+        }
+
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        _ = response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<SubscriptionListResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return new EventSubSubscriptionInventory(
+            result?.Data.Select(static item => item.ToSubscription()).ToArray() ?? [],
+            result?.Pagination?.Cursor
+        );
     }
 
     private sealed record CreateSubscriptionRequest
@@ -375,10 +386,13 @@ public sealed class EventSubClient(
     private sealed record SubscriptionTransport
     {
         [JsonPropertyName("method")]
-        public required string Method { get; init; }
+        public string Method { get; init; } = string.Empty;
 
-        [JsonPropertyName("session_id")]
-        public required string SessionId { get; init; }
+        [JsonPropertyName("callback")]
+        public string? Callback { get; init; }
+
+        [JsonPropertyName("secret")]
+        public string Secret { get; init; } = string.Empty;
     }
 
     private sealed record SubscriptionResponse
@@ -387,9 +401,58 @@ public sealed class EventSubClient(
         public required ImmutableArray<SubscriptionItem> Data { get; init; }
     }
 
+    private sealed record SubscriptionListResponse
+    {
+        [JsonPropertyName("data")]
+        public ImmutableArray<SubscriptionItem> Data { get; init; }
+
+        [JsonPropertyName("pagination")]
+        public Pagination? Pagination { get; init; }
+    }
+
+    private sealed record Pagination
+    {
+        [JsonPropertyName("cursor")]
+        public string? Cursor { get; init; }
+    }
+
     private sealed record SubscriptionItem
     {
         [JsonPropertyName("id")]
         public required string Id { get; init; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; init; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public string Type { get; init; } = string.Empty;
+
+        [JsonPropertyName("version")]
+        public string Version { get; init; } = string.Empty;
+
+        [JsonPropertyName("condition")]
+        public IReadOnlyDictionary<string, string> Condition { get; init; } =
+            new Dictionary<string, string>();
+
+        [JsonPropertyName("transport")]
+        public SubscriptionTransport Transport { get; init; } = new();
+
+        public EventSubSubscription ToSubscription() =>
+            new(Id, Status, Type, Version, Condition, Transport.Method, Transport.Callback);
     }
 }
+
+public sealed record EventSubSubscriptionInventory(
+    IReadOnlyList<EventSubSubscription> Subscriptions,
+    string? Cursor
+);
+
+public sealed record EventSubSubscription(
+    string Id,
+    string Status,
+    string Type,
+    string Version,
+    IReadOnlyDictionary<string, string> Condition,
+    string Method,
+    string? Callback
+);

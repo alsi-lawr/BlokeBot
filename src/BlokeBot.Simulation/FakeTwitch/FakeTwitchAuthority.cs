@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
-using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -88,10 +89,10 @@ public sealed class FakeTwitchAuthority
     private readonly Dictionary<string, AuthorizationCode> _codes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AccessGrant> _accessTokens = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AccessGrant> _refreshTokens = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, FakeTwitchSession> _sessions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FakeTwitchSubscription> _subscriptions = new(
         StringComparer.Ordinal
     );
+    private readonly Dictionary<string, string> _subscriptionSecrets = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FakeTwitchClip> _clips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FakeTwitchMarker> _markers = new(StringComparer.Ordinal);
     private readonly List<FakeTwitchTranscriptEntry> _transcript = [];
@@ -232,6 +233,181 @@ public sealed class FakeTwitchAuthority
         }
     }
 
+    public void RequireAppToken(HttpRequest request)
+    {
+        lock (_gate)
+        {
+            if (
+                !string.Equals(
+                    request.Headers["Client-Id"],
+                    Definition.ClientId,
+                    StringComparison.Ordinal
+                )
+                || !TryGetGrant(ReadBearerToken(request), out var grant)
+                || grant.User is not null
+            )
+            {
+                throw new FakeTwitchProtocolException(
+                    HttpStatusCode.Unauthorized,
+                    "invalid_app_token"
+                );
+            }
+        }
+    }
+
+    public string SubscribeWebhook(
+        HttpRequest request,
+        string type,
+        string version,
+        IReadOnlyDictionary<string, string> condition,
+        string callback,
+        string secret
+    )
+    {
+        RequireAppToken(request);
+        var botSubscription =
+            type
+            is "channel.chat.message"
+                or "channel.shoutout.create"
+                or "channel.shoutout.receive";
+        var raidSubscription = type is "channel.raid";
+        var broadcasterSubscription =
+            type
+            is "channel.poll.begin"
+                or "channel.poll.progress"
+                or "channel.poll.end"
+                or "channel.prediction.begin"
+                or "channel.prediction.progress"
+                or "channel.prediction.lock"
+                or "channel.prediction.end"
+                or "channel.channel_points_custom_reward_redemption.add"
+                or "channel.channel_points_custom_reward_redemption.update";
+        if (
+            version != "1"
+            || (!botSubscription && !raidSubscription && !broadcasterSubscription)
+            || !condition.TryGetValue(
+                raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
+                out var broadcasterId
+            )
+            || broadcasterId != Definition.AuthorizedUser.Id
+            || (
+                botSubscription
+                && (
+                    !condition.TryGetValue(
+                        type == "channel.chat.message" ? "user_id" : "moderator_user_id",
+                        out var botId
+                    )
+                    || botId != Definition.BotUser.Id
+                )
+            )
+            || string.IsNullOrWhiteSpace(callback)
+            || string.IsNullOrWhiteSpace(secret)
+        )
+        {
+            throw new FakeTwitchProtocolException(
+                HttpStatusCode.BadRequest,
+                "invalid_subscription"
+            );
+        }
+
+        var id = NextId("subscription");
+        var subscription = new FakeTwitchSubscription
+        {
+            Id = id,
+            Type = type,
+            Method = "webhook",
+            Callback = callback,
+            Status = "webhook_callback_verification_pending",
+            Version = version,
+            Condition = condition,
+        };
+        lock (_gate)
+        {
+            _subscriptions.Add(id, subscription);
+            _subscriptionSecrets.Add(id, secret);
+            Record("eventsub.subscribe", $"{type}:{id}");
+        }
+
+        _ = DeliverInitialWebhookAsync(subscription, secret);
+
+        return id;
+    }
+
+    public async Task DeliverDuplicateNotificationAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken
+    )
+    {
+        var (subscription, secret) = GetSubscriptionDelivery(subscriptionId);
+        var body =
+            NotificationBodies(subscription).FirstOrDefault()
+            ?? throw new InvalidOperationException(
+                "The fake EventSub subscription has no deterministic notification."
+            );
+        var messageId = $"fake-eventsub-duplicate-{subscriptionId}";
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var response = await SendWebhookAsync(
+                subscription.Callback,
+                secret,
+                messageId,
+                "notification",
+                subscription.Type,
+                body,
+                cancellationToken
+            );
+            _ = response.EnsureSuccessStatusCode();
+        }
+
+        lock (_gate)
+        {
+            Record("eventsub.duplicate", subscriptionId);
+        }
+    }
+
+    public async Task RevokeAuthorizationAsync(
+        string subscriptionId,
+        CancellationToken cancellationToken
+    )
+    {
+        FakeTwitchSubscription revoked;
+        string secret;
+        lock (_gate)
+        {
+            if (
+                !_subscriptions.TryGetValue(subscriptionId, out var subscription)
+                || !_subscriptionSecrets.TryGetValue(subscriptionId, out secret!)
+            )
+            {
+                throw new ArgumentException(
+                    "The fake EventSub subscription does not exist.",
+                    nameof(subscriptionId)
+                );
+            }
+
+            revoked = subscription with { Status = "authorization_revoked" };
+            _subscriptions[subscriptionId] = revoked;
+        }
+
+        var body = JsonSerializer.SerializeToUtf8Bytes(
+            new { subscription = SubscriptionPayload(revoked) }
+        );
+        using var response = await SendWebhookAsync(
+            revoked.Callback,
+            secret,
+            $"fake-eventsub-revocation-{subscriptionId}",
+            "revocation",
+            revoked.Type,
+            body,
+            cancellationToken
+        );
+        _ = response.EnsureSuccessStatusCode();
+        lock (_gate)
+        {
+            Record("eventsub.revoke", subscriptionId);
+        }
+    }
+
     public void RequireAccessToken(HttpRequest request)
     {
         lock (_gate)
@@ -321,106 +497,9 @@ public sealed class FakeTwitchAuthority
         }
     }
 
-    public FakeTwitchSession OpenSession(WebSocket socket)
-    {
-        lock (_gate)
-        {
-            var session = new FakeTwitchSession(NextId("session"), socket);
-            _sessions.Add(session.Id, session);
-            Record("eventsub.connect", session.Id);
-            return session;
-        }
-    }
-
-    public string Subscribe(
-        HttpRequest request,
-        string type,
-        string version,
-        IReadOnlyDictionary<string, string> condition,
-        string sessionId
-    )
-    {
-        var subscriber = RequireUserToken(request);
-        var botSubscription =
-            type
-            is "channel.chat.message"
-                or "channel.shoutout.create"
-                or "channel.shoutout.receive";
-        var raidSubscription = type is "channel.raid";
-        var broadcasterSubscription =
-            type
-            is "channel.poll.begin"
-                or "channel.poll.progress"
-                or "channel.poll.end"
-                or "channel.prediction.begin"
-                or "channel.prediction.progress"
-                or "channel.prediction.lock"
-                or "channel.prediction.end"
-                or "channel.channel_points_custom_reward_redemption.add"
-                or "channel.channel_points_custom_reward_redemption.update";
-        if (
-            version != "1"
-            || (!botSubscription && !raidSubscription && !broadcasterSubscription)
-            || !condition.TryGetValue(
-                raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
-                out var broadcasterId
-            )
-            || broadcasterId != Definition.AuthorizedUser.Id
-            || (
-                botSubscription
-                && (
-                    subscriber.Id != Definition.BotUser.Id
-                    || !condition.TryGetValue(
-                        type == "channel.chat.message" ? "user_id" : "moderator_user_id",
-                        out var botId
-                    )
-                    || botId != Definition.BotUser.Id
-                )
-            )
-            || (raidSubscription && subscriber.Id != Definition.BotUser.Id)
-            || (broadcasterSubscription && subscriber.Id != Definition.AuthorizedUser.Id)
-        )
-        {
-            throw new FakeTwitchProtocolException(
-                HttpStatusCode.BadRequest,
-                "invalid_subscription"
-            );
-        }
-
-        FakeTwitchSession session;
-        string id;
-        lock (_gate)
-        {
-            if (
-                !_sessions.TryGetValue(sessionId, out session!)
-                || session.Socket.State is not WebSocketState.Open
-            )
-            {
-                throw new FakeTwitchProtocolException(HttpStatusCode.Conflict, "unknown_session");
-            }
-
-            id = NextId("subscription");
-            _subscriptions.Add(
-                id,
-                new(
-                    id,
-                    type,
-                    sessionId,
-                    broadcasterId,
-                    botSubscription || raidSubscription ? Definition.BotUser.Id : null,
-                    subscriber.Id
-                )
-            );
-            Record("eventsub.subscribe", $"{type}:{id}");
-        }
-
-        _ = DeliverInitialEventsAsync(session, type);
-        return id;
-    }
-
     public void Unsubscribe(HttpRequest request, string id)
     {
-        _ = RequireUserToken(request);
+        RequireAppToken(request);
         lock (_gate)
         {
             if (!_subscriptions.Remove(id))
@@ -431,6 +510,7 @@ public sealed class FakeTwitchAuthority
                 );
             }
 
+            _ = _subscriptionSecrets.Remove(id);
             Record("eventsub.unsubscribe", id);
         }
     }
@@ -495,18 +575,6 @@ public sealed class FakeTwitchAuthority
         }
     }
 
-    public void CloseSession(string id)
-    {
-        FakeTwitchSession? session;
-        lock (_gate)
-        {
-            _ = _sessions.Remove(id, out session);
-            Record("eventsub.disconnect", id);
-        }
-
-        session?.Dispose();
-    }
-
     private FakeTwitchToken ExchangeCode(string? code, string? redirectUri) =>
         string.IsNullOrWhiteSpace(code)
         || !_codes.Remove(code, out var authorization)
@@ -561,37 +629,164 @@ public sealed class FakeTwitchAuthority
     private void Record(string kind, string detail) =>
         _transcript.Add(new(NextId("transcript"), kind, detail));
 
-    private async Task DeliverInitialEventsAsync(FakeTwitchSession session, string type)
+    private (FakeTwitchSubscription Subscription, string Secret) GetSubscriptionDelivery(
+        string subscriptionId
+    )
+    {
+        lock (_gate)
+        {
+            if (
+                _subscriptions.TryGetValue(subscriptionId, out var subscription)
+                && _subscriptionSecrets.TryGetValue(subscriptionId, out var secret)
+            )
+            {
+                return (subscription, secret);
+            }
+        }
+
+        throw new ArgumentException(
+            "The fake EventSub subscription does not exist.",
+            nameof(subscriptionId)
+        );
+    }
+
+    private async Task DeliverInitialWebhookAsync(
+        FakeTwitchSubscription subscription,
+        string secret
+    )
     {
         try
         {
-            foreach (
-                var payload in type switch
-                {
-                    "channel.chat.message" => ChatEvents(),
-                    "channel.poll.begin" => PollEvents(),
-                    _ => [],
-                }
+            var challenge = $"fake-challenge-{subscription.Id}";
+            var verificationBody = JsonSerializer.SerializeToUtf8Bytes(
+                new { challenge, subscription = SubscriptionPayload(subscription) }
+            );
+            using (
+                var verification = await SendWebhookAsync(
+                    subscription.Callback,
+                    secret,
+                    $"fake-eventsub-verification-{subscription.Id}",
+                    "webhook_callback_verification",
+                    subscription.Type,
+                    verificationBody,
+                    CancellationToken.None
+                )
             )
             {
-                await session.SendAsync(payload);
+                if (
+                    verification.StatusCode is not HttpStatusCode.OK
+                    || !string.Equals(
+                        await verification.Content.ReadAsStringAsync(),
+                        challenge,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    throw new InvalidOperationException(
+                        "The fake EventSub callback challenge was rejected."
+                    );
+                }
+            }
+
+            lock (_gate)
+            {
+                if (_subscriptions.TryGetValue(subscription.Id, out var pending))
+                {
+                    subscription = pending with { Status = "enabled" };
+                    _subscriptions[subscription.Id] = subscription;
+                    Record("eventsub.challenge", subscription.Type);
+                }
+            }
+
+            var deliveryNumber = 0;
+            foreach (var body in NotificationBodies(subscription))
+            {
+                var messageId = $"fake-eventsub-{subscription.Type}-{++deliveryNumber:D4}";
+                using var response = await SendWebhookAsync(
+                    subscription.Callback,
+                    secret,
+                    messageId,
+                    "notification",
+                    subscription.Type,
+                    body,
+                    CancellationToken.None
+                );
+                _ = response.EnsureSuccessStatusCode();
                 lock (_gate)
                 {
-                    Record("eventsub.deliver", type);
+                    Record("eventsub.deliver", subscription.Type);
                 }
             }
         }
-        catch (WebSocketException)
+        catch (Exception exception)
         {
-            CloseSession(session.Id);
+            lock (_gate)
+            {
+                Record("eventsub.delivery.error", exception.GetType().Name);
+            }
         }
     }
 
-    private IEnumerable<string> ChatEvents()
+    private static async Task<HttpResponseMessage> SendWebhookAsync(
+        string callback,
+        string secret,
+        string messageId,
+        string messageType,
+        string subscriptionType,
+        byte[] body,
+        CancellationToken cancellationToken
+    )
+    {
+        var timestamp = SimulationMode.Now.ToString("O");
+        var prefix = Encoding.UTF8.GetBytes(messageId + timestamp);
+        var signed = new byte[prefix.Length + body.Length];
+        prefix.CopyTo(signed, 0);
+        body.CopyTo(signed, prefix.Length);
+        var signature =
+            "sha256="
+            + Convert
+                .ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), signed))
+                .ToLowerInvariant();
+        using var request = new HttpRequestMessage(HttpMethod.Post, callback)
+        {
+            Content = new ByteArrayContent(body),
+        };
+        request.Content.Headers.ContentType = new("application/json");
+        request.Headers.Add("Twitch-Eventsub-Message-Id", messageId);
+        request.Headers.Add("Twitch-Eventsub-Message-Type", messageType);
+        request.Headers.Add("Twitch-Eventsub-Message-Timestamp", timestamp);
+        request.Headers.Add("Twitch-Eventsub-Message-Signature", signature);
+        request.Headers.Add("Twitch-Eventsub-Subscription-Type", subscriptionType);
+        request.Headers.Add("Twitch-Eventsub-Subscription-Version", "1");
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    private static object SubscriptionPayload(FakeTwitchSubscription subscription) =>
+        new
+        {
+            id = subscription.Id,
+            status = subscription.Status,
+            type = subscription.Type,
+            version = subscription.Version,
+            condition = subscription.Condition,
+            transport = new { method = subscription.Method, callback = subscription.Callback },
+            created_at = "2026-08-03T12:00:00Z",
+            cost = 0,
+        };
+
+    private IEnumerable<byte[]> NotificationBodies(FakeTwitchSubscription subscription) =>
+        subscription.Type switch
+        {
+            "channel.chat.message" => ChatEvents(subscription),
+            "channel.poll.begin" => PollEvents(subscription),
+            _ => [],
+        };
+
+    private IEnumerable<byte[]> ChatEvents(FakeTwitchSubscription subscription)
     {
         yield return Notification(
-            "chat-ordinary-0001",
-            "channel.chat.message",
+            subscription,
             new
             {
                 broadcaster_user_id = Definition.AuthorizedUser.Id,
@@ -604,8 +799,7 @@ public sealed class FakeTwitchAuthority
             }
         );
         yield return Notification(
-            "chat-moderator-0002",
-            "channel.chat.message",
+            subscription,
             new
             {
                 broadcaster_user_id = Definition.AuthorizedUser.Id,
@@ -626,8 +820,7 @@ public sealed class FakeTwitchAuthority
             }
         );
         yield return Notification(
-            "chat-custom-command-0003",
-            "channel.chat.message",
+            subscription,
             new
             {
                 broadcaster_user_id = Definition.AuthorizedUser.Id,
@@ -641,11 +834,10 @@ public sealed class FakeTwitchAuthority
         );
     }
 
-    private IEnumerable<string> PollEvents()
+    private IEnumerable<byte[]> PollEvents(FakeTwitchSubscription subscription)
     {
         yield return Notification(
-            "poll-begin-0001",
-            "channel.poll.begin",
+            subscription,
             new
             {
                 id = "poll-0001",
@@ -669,19 +861,9 @@ public sealed class FakeTwitchAuthority
         );
     }
 
-    private static string Notification(string id, string type, object @event) =>
-        JsonSerializer.Serialize(
-            new
-            {
-                metadata = new
-                {
-                    message_id = id,
-                    message_type = "notification",
-                    subscription_type = type,
-                    subscription_version = "1",
-                },
-                payload = new { subscription = new { type, version = "1" }, @event },
-            }
+    private static byte[] Notification(FakeTwitchSubscription subscription, object @event) =>
+        JsonSerializer.SerializeToUtf8Bytes(
+            new { subscription = SubscriptionPayload(subscription), @event }
         );
 
     private static string? ReadBearerToken(HttpRequest request)
@@ -730,7 +912,6 @@ public static class FakeTwitchHostingExtensions
     public static WebApplication MapFakeTwitch(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        _ = app.UseWebSockets();
         var authority = app.Services.GetRequiredService<FakeTwitchAuthority>();
 
         _ = app.MapGet("/oauth2/authorize", (HttpRequest request) => Authorize(authority, request));
@@ -768,6 +949,10 @@ public static class FakeTwitchHostingExtensions
             "/helix/eventsub/subscriptions",
             (HttpRequest request) => SubscribeAsync(authority, request)
         );
+        _ = app.MapGet(
+            "/helix/eventsub/subscriptions",
+            (HttpRequest request) => ListSubscriptions(authority, request)
+        );
         _ = app.MapDelete(
             "/helix/eventsub/subscriptions",
             (HttpRequest request) => Unsubscribe(authority, request)
@@ -776,7 +961,6 @@ public static class FakeTwitchHostingExtensions
             "/helix/chat/messages",
             (HttpRequest request) => ChatMessageAsync(authority, request)
         );
-        _ = app.Map("/ws", context => WebSocketAsync(authority, context));
         _ = app.MapMethods(
             "/oauth2/{**path}",
             ["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -1142,12 +1326,7 @@ public static class FakeTwitchHostingExtensions
         try
         {
             var payload = await request.ReadFromJsonAsync<SubscriptionRequest>();
-            if (
-                payload is null
-                || payload.Transport is null
-                || payload.Transport.Method != "websocket"
-                || string.IsNullOrWhiteSpace(payload.Transport.SessionId)
-            )
+            if (payload is null || payload.Transport is null)
             {
                 throw new FakeTwitchProtocolException(
                     HttpStatusCode.BadRequest,
@@ -1155,17 +1334,64 @@ public static class FakeTwitchHostingExtensions
                 );
             }
 
-            var id = authority.Subscribe(
+            if (!payload.Transport.Method.Equals("webhook", StringComparison.Ordinal))
+            {
+                throw new FakeTwitchProtocolException(
+                    HttpStatusCode.BadRequest,
+                    "invalid_transport"
+                );
+            }
+
+            var id = authority.SubscribeWebhook(
                 request,
                 payload.Type,
                 payload.Version,
                 payload.Condition,
-                payload.Transport.SessionId
+                payload.Transport.Callback ?? string.Empty,
+                payload.Transport.Secret ?? string.Empty
             );
             return Results.Json(
                 new { data = new[] { new { id } } },
                 statusCode: StatusCodes.Status202Accepted
             );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static IResult ListSubscriptions(FakeTwitchAuthority authority, HttpRequest request)
+    {
+        try
+        {
+            authority.RequireAppToken(request);
+            const int PageSize = 5;
+            var offset = int.TryParse(request.Query["after"], out var parsed) ? parsed : 0;
+            var subscriptions = authority
+                .ActiveSubscriptions.OrderBy(static subscription => subscription.Id)
+                .ToArray();
+            var items = subscriptions
+                .Skip(offset)
+                .Take(PageSize)
+                .Select(subscription => new
+                {
+                    id = subscription.Id,
+                    status = subscription.Status,
+                    type = subscription.Type,
+                    version = subscription.Version,
+                    condition = subscription.Condition,
+                    transport = new
+                    {
+                        method = subscription.Method,
+                        callback = subscription.Callback,
+                    },
+                });
+            string? next =
+                offset + PageSize < subscriptions.Length
+                    ? (offset + PageSize).ToString(CultureInfo.InvariantCulture)
+                    : null;
+            return Results.Json(new { data = items, pagination = new { cursor = next } });
         }
         catch (FakeTwitchProtocolException failure)
         {
@@ -1192,103 +1418,6 @@ public static class FakeTwitchHostingExtensions
         catch (FakeTwitchProtocolException failure)
         {
             return Error(failure);
-        }
-    }
-
-    private static async Task<IResult> ChatMessageAsync(
-        FakeTwitchAuthority authority,
-        HttpRequest request
-    )
-    {
-        try
-        {
-            var message = await request.ReadFromJsonAsync<ChatMessageRequest>();
-            if (message is not { })
-            {
-                throw new FakeTwitchProtocolException(
-                    HttpStatusCode.BadRequest,
-                    "invalid_chat_message"
-                );
-            }
-
-            authority.RecordChatMessage(
-                request,
-                message.BroadcasterId,
-                message.SenderId,
-                message.Message
-            );
-            return Results.Json(
-                new
-                {
-                    data = new[]
-                    {
-                        new
-                        {
-                            message_id = authority.NextMessageId(),
-                            is_sent = true,
-                            drop_reason = (object?)null,
-                        },
-                    },
-                }
-            );
-        }
-        catch (FakeTwitchProtocolException failure)
-        {
-            return Error(failure);
-        }
-    }
-
-    private static async Task WebSocketAsync(FakeTwitchAuthority authority, HttpContext context)
-    {
-        if (!context.WebSockets.IsWebSocketRequest)
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { error = "websocket_required" });
-            return;
-        }
-
-        using var socket = await context.WebSockets.AcceptWebSocketAsync();
-        var session = authority.OpenSession(socket);
-        try
-        {
-            await session.SendAsync(
-                JsonSerializer.Serialize(
-                    new
-                    {
-                        metadata = new
-                        {
-                            message_id = "welcome-0001",
-                            message_type = "session_welcome",
-                            subscription_type = string.Empty,
-                            subscription_version = string.Empty,
-                        },
-                        payload = new
-                        {
-                            session = new
-                            {
-                                id = session.Id,
-                                status = "connected",
-                                connected_at = "2026-07-15T12:00:00Z",
-                                keepalive_timeout_seconds = 30,
-                                reconnect_url = (string?)null,
-                            },
-                        },
-                    }
-                )
-            );
-            var buffer = new byte[128];
-            while (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
-            {
-                var received = await socket.ReceiveAsync(buffer, context.RequestAborted);
-                if (received.MessageType == WebSocketMessageType.Close)
-                {
-                    break;
-                }
-            }
-        }
-        finally
-        {
-            authority.CloseSession(session.Id);
         }
     }
 
@@ -1353,6 +1482,49 @@ public static class FakeTwitchHostingExtensions
             statusCode: (int)failure.StatusCode
         );
 
+    private static async Task<IResult> ChatMessageAsync(
+        FakeTwitchAuthority authority,
+        HttpRequest request
+    )
+    {
+        try
+        {
+            var message = await request.ReadFromJsonAsync<ChatMessageRequest>();
+            if (message is not { })
+            {
+                throw new FakeTwitchProtocolException(
+                    HttpStatusCode.BadRequest,
+                    "invalid_chat_message"
+                );
+            }
+
+            authority.RecordChatMessage(
+                request,
+                message.BroadcasterId,
+                message.SenderId,
+                message.Message
+            );
+            return Results.Json(
+                new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            message_id = authority.NextMessageId(),
+                            is_sent = true,
+                            drop_reason = (object?)null,
+                        },
+                    },
+                }
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
     private static IResult Unsupported(HttpRequest request) =>
         Results.Json(
             new
@@ -1384,8 +1556,11 @@ public static class FakeTwitchHostingExtensions
         [JsonPropertyName("method")]
         public required string Method { get; init; }
 
-        [JsonPropertyName("session_id")]
-        public required string SessionId { get; init; }
+        [JsonPropertyName("callback")]
+        public string? Callback { get; init; }
+
+        [JsonPropertyName("secret")]
+        public string? Secret { get; init; }
     }
 
     private sealed record ChatMessageRequest
@@ -1420,49 +1595,23 @@ public sealed record FakeTwitchTokenValidation(
     IReadOnlySet<string> Scopes
 );
 
-/// <summary>Represents a fake EventSub WebSocket session.</summary>
-public sealed class FakeTwitchSession(string id, WebSocket socket) : IDisposable
-{
-    private readonly SemaphoreSlim _sendGate = new(1, 1);
-
-    public string Id { get; } = id;
-
-    public WebSocket Socket { get; } = socket;
-
-    public void Dispose()
-    {
-        _sendGate.Wait();
-        _sendGate.Dispose();
-    }
-
-    public async Task SendAsync(string payload)
-    {
-        await _sendGate.WaitAsync();
-        try
-        {
-            await Socket.SendAsync(
-                Encoding.UTF8.GetBytes(payload),
-                WebSocketMessageType.Text,
-                true,
-                CancellationToken.None
-            );
-        }
-        finally
-        {
-            _ = _sendGate.Release();
-        }
-    }
-}
-
 /// <summary>Represents one fake EventSub subscription.</summary>
-public sealed record FakeTwitchSubscription(
-    string Id,
-    string Type,
-    string SessionId,
-    string BroadcasterId,
-    string? BotUserId,
-    string SubscriberUserId
-);
+public sealed record FakeTwitchSubscription
+{
+    public required string Id { get; init; }
+
+    public required string Type { get; init; }
+
+    public required string Method { get; init; }
+
+    public required string Callback { get; init; }
+
+    public required string Status { get; init; }
+
+    public required string Version { get; init; }
+
+    public required IReadOnlyDictionary<string, string> Condition { get; init; }
+}
 
 internal sealed class FakeTwitchProtocolException(HttpStatusCode statusCode, string error)
     : Exception(error)

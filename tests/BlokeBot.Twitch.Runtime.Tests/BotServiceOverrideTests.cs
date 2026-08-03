@@ -18,7 +18,7 @@ public sealed class BotServiceOverrideTests
         var tokens = new RecordingAccessTokenProvider();
         var chat = new RecordingChatMessageSender();
         var services = CreateServices(tokens, chat);
-        _ = services.AddTwitchBot(ConfigureBot, ValidPolicies());
+        _ = services.AddTwitchBot(ConfigureBot, ValidPolicies(), online: false);
         using var provider = services.BuildServiceProvider();
 
         var account = await provider
@@ -57,7 +57,7 @@ public sealed class BotServiceOverrideTests
         _ = services.AddSingleton(responseSender);
         _ = services.AddSingleton(lifecycleNotifier);
         _ = services
-            .AddTwitchBot(ConfigureBot, ValidPolicies())
+            .AddTwitchBot(ConfigureBot, ValidPolicies(), online: false)
             .OverrideAccountProviderWith<FeatureAccountProvider>()
             .OverrideCommandResponseSenderWith<FeatureResponseSender>()
             .OverrideChannelLifecycleNotifierWith<FeatureLifecycleNotifier>();
@@ -111,7 +111,7 @@ public sealed class BotServiceOverrideTests
         _ = services.AddSingleton(responseSender);
         _ = services.AddSingleton(lifecycleNotifier);
         _ = services
-            .AddTwitchBot(ValidConfiguration())
+            .AddTwitchBot(ValidConfiguration(), online: false)
             .OverrideAccountProviderWith<FirstFeatureAccountProvider>()
             .OverrideAccountProviderWith<FeatureAccountProvider>()
             .OverrideCommandResponseSenderWith<FirstFeatureResponseSender>()
@@ -167,7 +167,8 @@ public sealed class BotServiceOverrideTests
         return services;
     }
 
-    private static void ConfigureBot(BotOptions options) =>
+    private static void ConfigureBot(BotOptions options)
+    {
         options.Identity = new BotIdentityOptions
         {
             BotUsername = "MainBot",
@@ -177,6 +178,12 @@ public sealed class BotServiceOverrideTests
             Scopes = ["chat:read"],
             TokenCachePath = "private-token-cache.json",
         };
+        options.EventSubWebhook = new EventSubWebhookOptions
+        {
+            CallbackUri = new Uri("http://127.0.0.1:5080/eventsub/twitch"),
+            Secret = "runtime-test-secret",
+        };
+    }
 
     private static BotPolicyOptions ValidPolicies()
     {
@@ -184,14 +191,6 @@ public sealed class BotServiceOverrideTests
         return new()
         {
             IrcSession = new IrcSessionResilienceOptions
-            {
-                AttemptLimit = 1,
-                Delay = delay,
-                MaximumDelay = delay,
-                DelayBackoffType = DelayBackoffType.Constant,
-                AttemptTimeout = TimeSpan.FromMinutes(1),
-            },
-            EventSubSession = new EventSubSessionResilienceOptions
             {
                 AttemptLimit = 1,
                 Delay = delay,
@@ -235,16 +234,13 @@ public sealed class BotServiceOverrideTests
             ["TwitchBot:Identity:RedirectUri"] = "https://localhost/callback",
             ["TwitchBot:Identity:Scopes:0"] = "chat:read",
             ["TwitchBot:Identity:TokenCachePath"] = "private-token-cache.json",
+            ["TwitchBot:EventSubWebhook:CallbackUri"] = "http://127.0.0.1:5080/eventsub/twitch",
+            ["TwitchBot:EventSubWebhook:Secret"] = "runtime-test-secret",
             ["TwitchBot:Policies:IrcSession:AttemptLimit"] = "1",
             ["TwitchBot:Policies:IrcSession:Delay"] = "00:00:01",
             ["TwitchBot:Policies:IrcSession:MaximumDelay"] = "00:00:01",
             ["TwitchBot:Policies:IrcSession:DelayBackoffType"] = "Constant",
             ["TwitchBot:Policies:IrcSession:AttemptTimeout"] = "00:01:00",
-            ["TwitchBot:Policies:EventSubSession:AttemptLimit"] = "1",
-            ["TwitchBot:Policies:EventSubSession:Delay"] = "00:00:01",
-            ["TwitchBot:Policies:EventSubSession:MaximumDelay"] = "00:00:01",
-            ["TwitchBot:Policies:EventSubSession:DelayBackoffType"] = "Constant",
-            ["TwitchBot:Policies:EventSubSession:AttemptTimeout"] = "00:01:00",
             ["TwitchBot:Policies:EventSubChannelRecovery:AttemptLimit"] = "1",
             ["TwitchBot:Policies:EventSubChannelRecovery:Delay"] = "00:00:01",
             ["TwitchBot:Policies:EventSubChannelRecovery:MaximumDelay"] = "00:00:01",

@@ -15,9 +15,6 @@ public sealed class BotPolicyTests
         new IrcSessionResilienceOptionsValidator()
             .Validate("IRC session", options.IrcSession)
             .Failed.ShouldBeFalse();
-        new EventSubSessionResilienceOptionsValidator()
-            .Validate("EventSub session", options.EventSubSession)
-            .Failed.ShouldBeFalse();
         new EventSubChannelRecoveryOptionsValidator()
             .Validate("EventSub channel recovery", options.EventSubChannelRecovery)
             .Failed.ShouldBeFalse();
@@ -78,25 +75,6 @@ public sealed class BotPolicyTests
     }
 
     [Test]
-    public void InvalidEventSubSessionValues_Validating_RejectsRangesAndEnum()
-    {
-        var result = new EventSubSessionResilienceOptionsValidator().Validate(
-            "EventSub session",
-            new EventSubSessionResilienceOptions
-            {
-                AttemptLimit = 0,
-                Delay = TimeSpan.Zero,
-                MaximumDelay = TimeSpan.Zero,
-                DelayBackoffType = (DelayBackoffType)int.MaxValue,
-                AttemptTimeout = TimeSpan.Zero,
-            }
-        );
-
-        result.Failed.ShouldBeTrue();
-        result.Failures.Count().ShouldBeGreaterThanOrEqualTo(5);
-    }
-
-    [Test]
     public void InvalidEventSubChannelRecoveryValues_Validating_RejectsRanges()
     {
         var result = new EventSubChannelRecoveryOptionsValidator().Validate(
@@ -150,7 +128,6 @@ public sealed class BotPolicyTests
 
     [Test]
     [Arguments("IrcSession")]
-    [Arguments("EventSubSession")]
     [Arguments("EventSubChannelRecovery")]
     [Arguments("PublicChatRetry")]
     [Arguments("PublicChatDeliveryLifetime")]
@@ -202,7 +179,6 @@ public sealed class BotPolicyTests
         var policies = BotPolicies.BindRequired(section);
 
         policies.IrcSession.AttemptLimit.ShouldBe(5);
-        policies.EventSubSession.AttemptTimeout.ShouldBe(TimeSpan.FromMinutes(2));
         policies.EventSubChannelRecovery.DelayBackoffType.ShouldBe(DelayBackoffType.Exponential);
         policies.PublicChatRetry.MaximumDelay.ShouldBe(TimeSpan.FromSeconds(30));
         policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
@@ -234,14 +210,6 @@ public sealed class BotPolicyTests
                 AttemptLimit = 5,
                 Delay = TimeSpan.FromSeconds(3),
                 MaximumDelay = TimeSpan.FromSeconds(30),
-                DelayBackoffType = DelayBackoffType.Exponential,
-                AttemptTimeout = TimeSpan.FromMinutes(2),
-            },
-            EventSubSession = new EventSubSessionResilienceOptions
-            {
-                AttemptLimit = 5,
-                Delay = TimeSpan.FromSeconds(5),
-                MaximumDelay = TimeSpan.FromMinutes(1),
                 DelayBackoffType = DelayBackoffType.Exponential,
                 AttemptTimeout = TimeSpan.FromMinutes(2),
             },
@@ -278,11 +246,6 @@ public sealed class BotPolicyTests
             ["TwitchBot:Policies:IrcSession:MaximumDelay"] = "00:00:30",
             ["TwitchBot:Policies:IrcSession:DelayBackoffType"] = "Exponential",
             ["TwitchBot:Policies:IrcSession:AttemptTimeout"] = "00:02:00",
-            ["TwitchBot:Policies:EventSubSession:AttemptLimit"] = "5",
-            ["TwitchBot:Policies:EventSubSession:Delay"] = "00:00:05",
-            ["TwitchBot:Policies:EventSubSession:MaximumDelay"] = "00:01:00",
-            ["TwitchBot:Policies:EventSubSession:DelayBackoffType"] = "Exponential",
-            ["TwitchBot:Policies:EventSubSession:AttemptTimeout"] = "00:02:00",
             ["TwitchBot:Policies:EventSubChannelRecovery:AttemptLimit"] = "5",
             ["TwitchBot:Policies:EventSubChannelRecovery:Delay"] = "00:00:05",
             ["TwitchBot:Policies:EventSubChannelRecovery:MaximumDelay"] = "00:01:00",

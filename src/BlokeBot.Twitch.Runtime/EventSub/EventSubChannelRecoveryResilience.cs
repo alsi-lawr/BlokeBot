@@ -1,5 +1,4 @@
 using System.Net.Sockets;
-using System.Net.WebSockets;
 using System.Security.Authentication;
 using System.Text.Json;
 using Polly;
@@ -78,8 +77,7 @@ internal static class EventSubChannelFailureClassifier
             HttpRequestException http when IsTransientHttpStatus(http.StatusCode) =>
                 EventSubChannelFailureClassification.Transient,
             HttpRequestException => EventSubChannelFailureClassification.Terminal,
-            SocketException or WebSocketException or IOException =>
-                EventSubChannelFailureClassification.Transient,
+            SocketException or IOException => EventSubChannelFailureClassification.Transient,
             AuthenticationException
             or InvalidDataException
             or InvalidOperationException

@@ -50,6 +50,10 @@ public sealed class BlokeBotHostTests
                   "ClientId": "configured-client",
                   "ClientSecret": "configured-secret",
                   "RedirectUri": "http://127.0.0.1/oauth/callback"
+                },
+                "EventSubWebhook": {
+                  "CallbackUri": "https://bot.blokebot.com/eventsub/twitch",
+                  "Secret": "configured-webhook-secret"
                 }
               }
             }

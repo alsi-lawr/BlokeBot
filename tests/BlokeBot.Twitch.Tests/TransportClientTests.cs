@@ -8,7 +8,7 @@ namespace BlokeBot.Twitch.Tests;
 public sealed class TransportClientTests
 {
     [Test]
-    public async Task ChatMessageSubscription_Creating_SendsTypedPayloadAndReturnsId()
+    public async Task EventSubSubscription_Creating_UsesSignedWebhookTransport()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
@@ -18,206 +18,158 @@ public sealed class TransportClientTests
                 using var payload = JsonDocument.Parse(
                     await request.Content!.ReadAsStringAsync(cancellationToken)
                 );
-                payload
-                    .RootElement.GetProperty("type")
+                var transport = payload.RootElement.GetProperty("transport");
+                transport.GetProperty("method").GetString().ShouldBe("webhook");
+                transport
+                    .GetProperty("callback")
                     .GetString()
-                    .ShouldBe("channel.chat.message");
-                payload.RootElement.GetProperty("version").GetString().ShouldBe("1");
-                var condition = payload.RootElement.GetProperty("condition");
-                condition.GetProperty("broadcaster_user_id").GetString().ShouldBe("channel-id");
-                condition.GetProperty("user_id").GetString().ShouldBe("bot-id");
-                var transport = payload.RootElement.GetProperty("transport");
-                transport.GetProperty("method").GetString().ShouldBe("websocket");
-                transport.GetProperty("session_id").GetString().ShouldBe("session-id");
-                return JsonResponse("""{"data":[{"id":"subscription-id"}]}""");
+                    .ShouldBe("https://bot.blokebot.com/eventsub/twitch");
+                transport.GetProperty("secret").GetString().ShouldBe("webhook-secret");
+                return JsonResponse("""{ "data": [{ "id": "subscription-1" }] }""");
             }
         );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
+        var client = CreateEventSubClient(factory);
 
-        var subscriptionId = await client.CreateChatMessageSubscriptionAsync(
-            Context(),
-            "channel-id",
-            "bot-id",
-            "session-id",
+        var id = await client.CreateAsync(
+            "client-id",
+            new EventSubSubscriptionRequest(
+                "channel.chat.message",
+                "1",
+                new Dictionary<string, string>
+                {
+                    ["broadcaster_user_id"] = "channel-id",
+                    ["user_id"] = "bot-id",
+                }
+            ),
             CancellationToken.None
         );
 
-        subscriptionId.ShouldBe("subscription-id");
+        id.ShouldBe("subscription-1");
     }
 
     [Test]
-    [Arguments(HttpStatusCode.BadRequest, "Bad Request", "poll is unavailable", null)]
-    [Arguments(HttpStatusCode.Conflict, "Conflict", "subscription already exists", "existing-id")]
-    public async Task EventSubSubscription_Creating_ThrowsBoundedProviderFailure(
-        HttpStatusCode statusCode,
-        string providerError,
-        string providerMessage,
-        string? existingSubscriptionId
-    )
+    public async Task EventSubSubscription_Creating_WaitsForCallbackVerification()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            (_, _) =>
+            static (_, _) => Task.FromResult(JsonResponse("""{"data":[{"id":"subscription-1"}]}"""))
+        );
+        var verification = new BlockingVerification();
+        var client = CreateEventSubClient(factory, verification);
+
+        var creation = client.CreateAsync(
+            "client-id",
+            new EventSubSubscriptionRequest(
+                "channel.chat.message",
+                "1",
+                new Dictionary<string, string> { ["broadcaster_user_id"] = "channel-id" }
+            ),
+            CancellationToken.None
+        );
+        await verification.WaitStarted.WaitAsync(TimeSpan.FromSeconds(2));
+
+        creation.IsCompleted.ShouldBeFalse();
+        verification.Confirm("subscription-1");
+
+        (await creation).ShouldBe("subscription-1");
+    }
+
+    [Test]
+    public async Task EventSubSubscription_Listing_MapsWebhookTransportAndPagination()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            static (_, _) =>
                 Task.FromResult(
-                    new HttpResponseMessage(statusCode)
-                    {
-                        Content = new StringContent(
-                            $$"""{"error":"{{providerError}}","message":"{{providerMessage}}","id":"{{existingSubscriptionId}}"}""",
-                            Encoding.UTF8,
-                            "application/json"
-                        ),
-                    }
+                    JsonResponse(
+                        """
+                        {
+                          "data": [{
+                            "id": "subscription-1",
+                            "status": "enabled",
+                            "type": "channel.chat.message",
+                            "version": "1",
+                            "condition": {"broadcaster_user_id":"channel-id"},
+                            "transport": {"method":"webhook", "callback":"https://bot.blokebot.com/eventsub/twitch"}
+                          }],
+                          "pagination": {"cursor":"next-page"}
+                        }
+                        """
+                    )
                 )
         );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        var client = CreateEventSubClient(factory);
+
+        var inventory = await client.ListSubscriptionsAsync(
+            "client-id",
+            null,
+            CancellationToken.None
         );
 
-        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
-            client.CreateChatMessageSubscriptionAsync(
-                Context(),
-                "channel-id",
-                "bot-id",
-                "session-id",
-                CancellationToken.None
-            )
-        );
-
-        failure.StatusCode.ShouldBe(statusCode);
-        failure.ProviderError.ShouldBe(providerError);
-        failure.ProviderMessage.ShouldBe(providerMessage);
-        failure.ExistingSubscriptionId.ShouldBe(existingSubscriptionId);
-        failure.Message.ShouldNotContain(providerMessage);
+        inventory.Cursor.ShouldBe("next-page");
+        var subscription = inventory.Subscriptions.ShouldHaveSingleItem();
+        subscription.Method.ShouldBe("webhook");
+        subscription.Callback.ShouldBe("https://bot.blokebot.com/eventsub/twitch");
     }
 
     [Test]
-    public async Task EventSubSubscription_Creating_MalformedOversizedBodyDoesNotLeakBody()
-    {
-        var secret = "access-token-secret";
-        var factory = new ScriptedHttpClientFactory();
-        factory.Respond(
-            (_, _) =>
-                Task.FromResult(
-                    new HttpResponseMessage(HttpStatusCode.BadRequest)
-                    {
-                        Content = new StringContent(
-                            $$"""{"message":"{{secret}}"}{{new string('x', 20_000)}}""",
-                            Encoding.UTF8,
-                            "application/json"
-                        ),
-                    }
-                )
-        );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
-
-        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
-            client.CreateChatMessageSubscriptionAsync(
-                Context(),
-                "channel-id",
-                "bot-id",
-                "session-id",
-                CancellationToken.None
-            )
-        );
-
-        failure.ProviderMessage.ShouldBeNull();
-        failure.ToString().ShouldNotContain(secret);
-        failure.ToString().Length.ShouldBeLessThan(1000);
-    }
-
-    [Test]
-    public async Task EventSubSubscription_Creating_EchoedRequestValuesAreRedacted()
+    public async Task OwnedSubscriptionHealth_ListsOnlyEnabledExactCallbackWebhookIds()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(
-            (_, _) =>
+            static (_, _) =>
                 Task.FromResult(
-                    new HttpResponseMessage(HttpStatusCode.BadRequest)
-                    {
-                        Content = new StringContent(
-                            """
+                    JsonResponse(
+                        """
+                        {
+                          "data": [
                             {
-                              "error": "access-token",
-                              "message": "client-id/session-id/channel-id/bot-id",
-                              "id": "access-token"
+                              "id": "healthy", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "revoked", "status": "authorization_revoked",
+                              "type": "channel.poll.begin", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "failed", "status": "notification_failures_exceeded",
+                              "type": "channel.prediction.begin", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "disabled", "status": "disabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "pending", "status": "webhook_callback_verification_pending",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "sibling", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://sibling.invalid/eventsub"}
+                            },
+                            {
+                              "id": "socket", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"websocket","callback":"https://bot.blokebot.com/eventsub/twitch"}
                             }
-                            """,
-                            Encoding.UTF8,
-                            "application/json"
-                        ),
-                    }
+                          ],
+                          "pagination": {}
+                        }
+                        """
+                    )
                 )
         );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
+        var client = CreateEventSubClient(factory);
 
-        var failure = await Should.ThrowAsync<EventSubSubscriptionCreationException>(() =>
-            client.CreateChatMessageSubscriptionAsync(
-                Context(),
-                "channel-id",
-                "bot-id",
-                "session-id",
-                CancellationToken.None
-            )
-        );
+        var healthyIds = await client.ListEnabledOwnedIdsAsync("client-id", CancellationToken.None);
 
-        failure.ProviderError.ShouldBe("[redacted]");
-        failure.ProviderMessage.ShouldBe("[redacted]/[redacted]/[redacted]/[redacted]");
-        failure.ExistingSubscriptionId.ShouldBeNull();
-        failure.ToString().ShouldNotContain("client-id");
-        failure.ToString().ShouldNotContain("access-token");
-        failure.ToString().ShouldNotContain("session-id");
-        failure.ToString().ShouldNotContain("channel-id");
-        failure.ToString().ShouldNotContain("bot-id");
-    }
-
-    [Test]
-    public async Task IncomingRaidSubscription_Creating_UsesVersionOneTargetConditionAndWebSocket()
-    {
-        var factory = new ScriptedHttpClientFactory();
-        factory.Respond(
-            static async (request, cancellationToken) =>
-            {
-                AssertContext(request, HttpMethod.Post, "/helix/eventsub/subscriptions");
-                using var payload = JsonDocument.Parse(
-                    await request.Content!.ReadAsStringAsync(cancellationToken)
-                );
-                payload.RootElement.GetProperty("type").GetString().ShouldBe("channel.raid");
-                payload.RootElement.GetProperty("version").GetString().ShouldBe("1");
-                var condition = payload.RootElement.GetProperty("condition");
-                condition
-                    .EnumerateObject()
-                    .Select(static property => property.Name)
-                    .ShouldBe(["to_broadcaster_user_id"]);
-                condition.GetProperty("to_broadcaster_user_id").GetString().ShouldBe("target-id");
-                var transport = payload.RootElement.GetProperty("transport");
-                transport.GetProperty("method").GetString().ShouldBe("websocket");
-                transport.GetProperty("session_id").GetString().ShouldBe("session-id");
-                return JsonResponse("""{"data":[{"id":"raid-subscription-id"}]}""");
-            }
-        );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
-
-        var subscriptionId = await client.CreateIncomingRaidSubscriptionAsync(
-            Context(),
-            "target-id",
-            "session-id",
-            CancellationToken.None
-        );
-
-        subscriptionId.ShouldBe("raid-subscription-id");
+        healthyIds.ShouldBe(new HashSet<string>(StringComparer.Ordinal) { "healthy" });
     }
 
     [Test]
@@ -232,12 +184,9 @@ public sealed class TransportClientTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             }
         );
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
+        var client = CreateEventSubClient(factory);
 
-        await client.DeleteSubscriptionAsync(Context(), "subscription/id", CancellationToken.None);
+        await client.DeleteAsync("client-id", "subscription/id", CancellationToken.None);
 
         factory.RequestCount.ShouldBe(1);
     }
@@ -246,14 +195,145 @@ public sealed class TransportClientTests
     public async Task MissingSubscription_Deleting_TreatsNotFoundAsDeleted()
     {
         var factory = RespondingWith(HttpStatusCode.NotFound);
-        var client = new EventSubClient(
-            factory,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-        );
+        var client = CreateEventSubClient(factory);
 
-        await client.DeleteSubscriptionAsync(Context(), "missing", CancellationToken.None);
+        await client.DeleteAsync("client-id", "missing", CancellationToken.None);
 
         factory.RequestCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task StartupReset_PaginatesThenDeletesOnlyExactCallbackWebhooksBeforeCreation()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            static (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Get, "/helix/eventsub/subscriptions");
+                request.RequestUri!.Query.ShouldBeEmpty();
+                return Task.FromResult(
+                    JsonResponse(
+                        """
+                        {
+                          "data": [
+                            {
+                              "id": "owned-1", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "sibling", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://sibling.invalid/eventsub"}
+                            },
+                            {
+                              "id": "socket", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"websocket","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            }
+                          ],
+                          "pagination": {"cursor":"page-2"}
+                        }
+                        """
+                    )
+                );
+            }
+        );
+        factory.Respond(
+            static (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Get, "/helix/eventsub/subscriptions");
+                request.RequestUri!.Query.ShouldBe("?after=page-2");
+                return Task.FromResult(
+                    JsonResponse(
+                        """
+                        {
+                          "data": [
+                            {
+                              "id": "conduit", "status": "enabled",
+                              "type": "channel.chat.message", "version": "1", "condition": {},
+                              "transport": {"method":"conduit","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            },
+                            {
+                              "id": "owned-2", "status": "revoked",
+                              "type": "channel.poll.begin", "version": "1", "condition": {},
+                              "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                            }
+                          ],
+                          "pagination": {}
+                        }
+                        """
+                    )
+                );
+            }
+        );
+        foreach (var expectedId in new[] { "owned-1", "owned-2" })
+        {
+            factory.Respond(
+                (request, _) =>
+                {
+                    AssertContext(request, HttpMethod.Delete, "/helix/eventsub/subscriptions");
+                    request.RequestUri!.Query.ShouldBe($"?id={expectedId}");
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+                }
+            );
+        }
+        factory.Respond(
+            static (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Post, "/helix/eventsub/subscriptions");
+                return Task.FromResult(JsonResponse("""{"data":[{"id":"fresh-subscription"}]}"""));
+            }
+        );
+        var client = CreateEventSubClient(factory);
+
+        await client.ResetAsync("client-id", CancellationToken.None);
+        var created = await client.CreateAsync(
+            "client-id",
+            new EventSubSubscriptionRequest(
+                "channel.chat.message",
+                "1",
+                new Dictionary<string, string> { ["broadcaster_user_id"] = "channel-id" }
+            ),
+            CancellationToken.None
+        );
+
+        created.ShouldBe("fresh-subscription");
+        factory.RequestCount.ShouldBe(5);
+    }
+
+    [Test]
+    public async Task StartupReset_DeleteFailureStopsBeforeFreshCreation()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            static (_, _) =>
+                Task.FromResult(
+                    JsonResponse(
+                        """
+                        {
+                          "data": [{
+                            "id": "owned", "status": "enabled",
+                            "type": "channel.chat.message", "version": "1", "condition": {},
+                            "transport": {"method":"webhook","callback":"https://bot.blokebot.com/eventsub/twitch"}
+                          }],
+                          "pagination": {}
+                        }
+                        """
+                    )
+                )
+        );
+        factory.Respond(
+            static (_, _) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError))
+        );
+        var client = CreateEventSubClient(factory);
+
+        _ = await Should.ThrowAsync<HttpRequestException>(() =>
+            client.ResetAsync("client-id", CancellationToken.None)
+        );
+
+        factory.RequestCount.ShouldBe(2);
     }
 
     [Test]
@@ -641,6 +721,56 @@ public sealed class TransportClientTests
         result.GetType().ShouldBe(expectedType);
     }
 
+    private static EventSubClient CreateEventSubClient(
+        ScriptedHttpClientFactory factory,
+        IEventSubSubscriptionVerification? verification = null
+    ) =>
+        new(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default,
+            new EventSubWebhookOptions
+            {
+                CallbackUri = new Uri("https://bot.blokebot.com/eventsub/twitch"),
+                Secret = "webhook-secret",
+            },
+            new StaticAppAccessTokenProvider(),
+            verification ?? new ImmediateVerification()
+        );
+
+    private sealed class StaticAppAccessTokenProvider : IAppAccessTokenProvider
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-access-token");
+    }
+
+    private sealed class ImmediateVerification : IEventSubSubscriptionVerification
+    {
+        public Task WaitAsync(string subscriptionId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public void Confirm(string subscriptionId) { }
+    }
+
+    private sealed class BlockingVerification : IEventSubSubscriptionVerification
+    {
+        private readonly TaskCompletionSource _confirmed = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _waitStarted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal Task WaitStarted => _waitStarted.Task;
+
+        public async Task WaitAsync(string subscriptionId, CancellationToken cancellationToken)
+        {
+            _ = _waitStarted.TrySetResult();
+            await _confirmed.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Confirm(string subscriptionId) => _confirmed.TrySetResult();
+    }
+
     private static void AssertContext(
         HttpRequestMessage request,
         HttpMethod method,
@@ -650,7 +780,11 @@ public sealed class TransportClientTests
         request.Method.ShouldBe(method);
         request.RequestUri!.AbsolutePath.ShouldBe(absolutePath);
         request.Headers.Authorization!.Scheme.ShouldBe("Bearer");
-        request.Headers.Authorization.Parameter.ShouldBe("access-token");
+        request.Headers.Authorization.Parameter.ShouldBe(
+            absolutePath.StartsWith("/helix/eventsub/", StringComparison.Ordinal)
+                ? "app-access-token"
+                : "access-token"
+        );
         request.Headers.GetValues("Client-Id").Single().ShouldBe("client-id");
     }
 

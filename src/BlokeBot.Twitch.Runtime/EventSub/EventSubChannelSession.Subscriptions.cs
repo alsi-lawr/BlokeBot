@@ -110,7 +110,6 @@ internal sealed partial class EventSubChannelSession
                                 channel,
                                 authorization,
                                 account,
-                                sessionId,
                                 token
                             ),
                         cancellationToken
@@ -330,7 +329,6 @@ internal sealed partial class EventSubChannelSession
                             channel,
                             authorization,
                             resolvedAccount,
-                            sessionId,
                             token,
                             kind
                         ),

@@ -1,5 +1,4 @@
 using System.Net.Sockets;
-using System.Net.WebSockets;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Shouldly;
@@ -28,19 +27,10 @@ public sealed class RuntimeSessionBoundaryTests : RuntimeSessionResilienceTestBa
         IrcSessionFailureClassifier
             .Classify(cancellation, canceled.Token)
             .ShouldBe(RuntimeSessionFailureClassification.Cancellation);
-        EventSubSessionFailureClassifier
-            .Classify(cancellation, CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Unexpected);
         IrcSessionFailureClassifier
             .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(RuntimeSessionFailureClassification.Transient);
-        EventSubSessionFailureClassifier
-            .Classify(transientHttp, CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Transient);
         IrcSessionFailureClassifier
-            .Classify(terminalHttp, CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Terminal);
-        EventSubSessionFailureClassifier
             .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(RuntimeSessionFailureClassification.Terminal);
     }
@@ -51,18 +41,9 @@ public sealed class RuntimeSessionBoundaryTests : RuntimeSessionResilienceTestBa
         IrcSessionFailureClassifier
             .Classify(new SocketException((int)SocketError.ConnectionReset), CancellationToken.None)
             .ShouldBe(RuntimeSessionFailureClassification.Transient);
-        EventSubSessionFailureClassifier
-            .Classify(
-                new WebSocketException(WebSocketError.ConnectionClosedPrematurely),
-                CancellationToken.None
-            )
-            .ShouldBe(RuntimeSessionFailureClassification.Transient);
         IrcSessionFailureClassifier
             .Classify(new JsonException("invalid payload"), CancellationToken.None)
             .ShouldBe(RuntimeSessionFailureClassification.Terminal);
-        EventSubSessionFailureClassifier
-            .Classify(new TimeoutException("establishment timeout"), CancellationToken.None)
-            .ShouldBe(RuntimeSessionFailureClassification.Timeout);
     }
 
     [Test]
@@ -102,7 +83,7 @@ public sealed class RuntimeSessionBoundaryTests : RuntimeSessionResilienceTestBa
         health.Report(
             new RuntimeSessionHealthReport.ReconnectScheduled
             {
-                Runtime = ChatRuntime.EventSub,
+                Runtime = ChatRuntime.Irc,
                 Classification = RuntimeSessionFailureClassification.Transient,
                 Attempt = 3,
                 Exception = new IOException(Secret),
@@ -113,7 +94,7 @@ public sealed class RuntimeSessionBoundaryTests : RuntimeSessionResilienceTestBa
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Exception.ShouldBeNull();
         entry.Message.ShouldNotContain(Secret);
-        entry.Properties["Runtime"].ShouldBe(ChatRuntime.EventSub);
+        entry.Properties["Runtime"].ShouldBe(ChatRuntime.Irc);
         entry.Properties["Classification"].ShouldBe(RuntimeSessionFailureClassification.Transient);
         entry.Properties["Attempt"].ShouldBe(3);
         entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);

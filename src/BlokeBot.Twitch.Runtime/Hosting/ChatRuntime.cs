@@ -11,7 +11,7 @@ public enum ChatRuntime
     Irc,
 
     /// <summary>
-    /// Uses EventSub WebSocket to receive chat messages and Helix to send replies.
+    /// Uses Twitch EventSub webhooks to receive chat messages and Helix to send replies.
     /// </summary>
     EventSub,
 }

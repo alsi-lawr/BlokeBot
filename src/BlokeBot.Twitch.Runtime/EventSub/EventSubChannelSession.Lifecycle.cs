@@ -3,7 +3,6 @@ using System.Runtime.ExceptionServices;
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed partial class EventSubChannelSession(
-    string sessionId,
     IEventSubChannelOperations operations,
     EventSubChannelRecoveryPipeline recovery,
     EventSubSubscriptionReconciliationStore pendingDeletions,
@@ -134,12 +133,54 @@ internal sealed partial class EventSubChannelSession(
         IReadOnlyList<string> desiredChannels,
         EventSubChannelRecoveryTrigger trigger,
         CancellationToken cancellationToken
+    ) =>
+        await ScheduleAndDrainAsync(
+            token =>
+                RunReconciliationAsync(BotChannelList.Normalize(desiredChannels), trigger, token),
+            cancellationToken
+        );
+
+    internal async Task RepairMissingSubscriptionsAndDrainAsync(
+        IReadOnlySet<string> enabledRemoteSubscriptionIds,
+        IReadOnlyList<string> desiredChannels,
+        CancellationToken cancellationToken
+    ) =>
+        await ScheduleAndDrainAsync(
+            token =>
+                RepairMissingSubscriptionsAsync(
+                    enabledRemoteSubscriptionIds,
+                    BotChannelList.Normalize(desiredChannels),
+                    token
+                ),
+            cancellationToken
+        );
+
+    internal async Task RepairRevokedSubscriptionAndDrainAsync(
+        string subscriptionId,
+        IReadOnlyList<string> desiredChannels,
+        CancellationToken cancellationToken
+    ) =>
+        await ScheduleAndDrainAsync(
+            token =>
+                RepairSubscriptionsAsync(
+                    FindChannels(subscription =>
+                        ContainsSubscription(subscription, subscriptionId)
+                    ),
+                    BotChannelList.Normalize(desiredChannels),
+                    EventSubChannelRecoveryTrigger.Explicit,
+                    token
+                ),
+            cancellationToken
+        );
+
+    private async Task ScheduleAndDrainAsync(
+        Func<CancellationToken, Task> work,
+        CancellationToken cancellationToken
     )
     {
-        var desired = BotChannelList.Normalize(desiredChannels);
         while (true)
         {
-            Task work;
+            Task currentWork;
             var scheduled = false;
             lock (_gate)
             {
@@ -154,17 +195,120 @@ internal sealed partial class EventSubChannelSession(
                 if (_currentWork.IsCompleted)
                 {
                     _currentWork.GetAwaiter().GetResult();
-                    ScheduleLocked(token => RunReconciliationAsync(desired, trigger, token));
+                    ScheduleLocked(work);
                     scheduled = true;
                 }
 
-                work = _currentWork;
+                currentWork = _currentWork;
             }
 
-            await work.WaitAsync(cancellationToken);
+            await currentWork.WaitAsync(cancellationToken);
             if (scheduled)
             {
                 return;
+            }
+        }
+    }
+
+    private async Task RepairMissingSubscriptionsAsync(
+        IReadOnlySet<string> enabledRemoteSubscriptionIds,
+        IReadOnlyList<string> desiredChannels,
+        CancellationToken cancellationToken
+    )
+    {
+        var missing = FindChannels(subscription =>
+            SubscriptionIds(subscription).Any(id => !enabledRemoteSubscriptionIds.Contains(id))
+        );
+        await RepairSubscriptionsAsync(
+            missing,
+            desiredChannels,
+            EventSubChannelRecoveryTrigger.Periodic,
+            cancellationToken
+        );
+    }
+
+    private async Task RepairSubscriptionsAsync(
+        IReadOnlyList<string> channels,
+        IReadOnlyList<string> desiredChannels,
+        EventSubChannelRecoveryTrigger trigger,
+        CancellationToken cancellationToken
+    )
+    {
+        var desired = desiredChannels.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        await Task.WhenAll(
+            channels.Select(async channel =>
+            {
+                await RunImmediateAsync(
+                    channel,
+                    EventSubChannelReconciliationTarget.Absent,
+                    trigger,
+                    cancellationToken
+                );
+                if (desired.Contains(channel))
+                {
+                    await RunImmediateAsync(
+                        channel,
+                        EventSubChannelReconciliationTarget.Present,
+                        trigger,
+                        cancellationToken
+                    );
+                }
+            })
+        );
+        await RunReconciliationAsync(desiredChannels, trigger, cancellationToken);
+    }
+
+    private IReadOnlyList<string> FindChannels(Func<ActiveEventSubSubscription, bool> predicate)
+    {
+        lock (_gate)
+        {
+            return
+            [
+                .. _subscriptions
+                    .Where(pair => predicate(pair.Value))
+                    .Select(static pair => pair.Key),
+            ];
+        }
+    }
+
+    private static bool ContainsSubscription(
+        ActiveEventSubSubscription subscription,
+        string subscriptionId
+    ) => SubscriptionIds(subscription).Contains(subscriptionId, StringComparer.Ordinal);
+
+    private static IEnumerable<string> SubscriptionIds(ActiveEventSubSubscription subscription)
+    {
+        yield return subscription.SubscriptionId;
+        foreach (var id in subscription.AdditionalSubscriptionIds)
+        {
+            yield return id;
+        }
+
+        foreach (
+            var operation in new[]
+            {
+                subscription.ShoutoutSubscriptions,
+                subscription.RaidSubscriptions,
+                subscription.PollSubscriptions,
+                subscription.RewardRedemptionSubscriptions,
+                subscription.PredictionSubscriptions,
+            }
+        )
+        {
+            var active = operation switch
+            {
+                EventSubOperationSubscriptionState.Active value => value.Subscription,
+                EventSubOperationSubscriptionState.CleanupPending value => value.Subscription,
+                _ => null,
+            };
+            if (active is null)
+            {
+                continue;
+            }
+
+            foreach (var id in SubscriptionIds(active))
+            {
+                yield return id;
             }
         }
     }

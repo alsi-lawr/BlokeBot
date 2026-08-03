@@ -52,10 +52,11 @@ internal static class SimulationApplication
                         fakeTwitch.Origin,
                         "helix/"
                     ).AbsoluteUri,
-                    [$"{TwitchEndpointPolicy.ConfigurationSectionName}:EventSubWebSocketUri"] =
-                        new UriBuilder(fakeTwitch.Origin) { Scheme = "ws", Path = "ws" }
-                            .Uri
-                            .AbsoluteUri,
+                    ["TwitchBot:EventSubWebhook:CallbackUri"] = new Uri(
+                        dashboardOrigin,
+                        "eventsub/twitch"
+                    ).AbsoluteUri,
+                    ["TwitchBot:EventSubWebhook:Secret"] = "fake-eventsub-secret",
                     ["TwitchBot:Identity:BotUsername"] = scenario.BotUser.Login,
                     ["TwitchBot:Identity:ClientId"] = scenario.ClientId,
                     ["TwitchBot:Identity:ClientSecret"] = "fake-twitch-secret",

@@ -1,5 +1,4 @@
 using BlokeBot.Commands;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
@@ -12,22 +11,16 @@ public sealed class NativeEventDispatchTests
         var gate = new MutableNativeTwitchFeatureStateProvider();
         var channelPoints = new RecordingChannelPointsObserver();
         var predictions = new RecordingPredictionObserver();
-        var session = new EventSubConnectionSession(
+        var session = new EventSubDeliveryHandler(
             null!,
             null!,
-            null!,
-            null!,
-            new BotRuntimeStatusStore(),
             gate,
-            new EventSubChannelReconciliationTrigger(null!),
             [],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
             >(BotObserverBoundaries.EventSubMessages),
-            NullLogger<EventSubConnectionSession>.Instance,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default,
             channelPointsObservers: [channelPoints],
             predictionObservers: [predictions]
         );
@@ -86,7 +79,7 @@ public sealed class NativeEventDispatchTests
     }
 
     [Test]
-    public async Task IncomingRaid_TargetGateAndConnectionLocalDuplicateSuppressionPrecedeObserver()
+    public async Task IncomingRaid_TransportNeutralHandlerDispatchesEachAdmittedDelivery()
     {
         var firstGate = new MutableNativeTwitchFeatureStateProvider
         {
@@ -99,8 +92,9 @@ public sealed class NativeEventDispatchTests
         await firstSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
         await firstSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
 
-        firstGate.Channels.ShouldBe(["target_login"]);
-        firstObserver.Events.ShouldHaveSingleItem().MessageId.ShouldBe("raid-message-1");
+        firstGate.Channels.ShouldBe(["target_login", "target_login"]);
+        firstObserver.Events.Count.ShouldBe(2);
+        firstObserver.Events.ShouldAllBe(@event => @event.MessageId == "raid-message-1");
 
         var secondGate = new MutableNativeTwitchFeatureStateProvider
         {
@@ -147,26 +141,20 @@ public sealed class NativeEventDispatchTests
         wrongTargetObserver.Events.ShouldBeEmpty();
     }
 
-    private static EventSubConnectionSession CreateSession(
+    private static EventSubDeliveryHandler CreateSession(
         INativeTwitchFeatureStateProvider gate,
         IIncomingRaidEventObserver observer
     ) =>
         new(
             null!,
             null!,
-            null!,
-            null!,
-            new BotRuntimeStatusStore(),
             gate,
-            new EventSubChannelReconciliationTrigger(null!),
             [],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
             >(BotObserverBoundaries.EventSubMessages),
-            NullLogger<EventSubConnectionSession>.Instance,
-            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default,
             incomingRaidObservers: [observer]
         );
 

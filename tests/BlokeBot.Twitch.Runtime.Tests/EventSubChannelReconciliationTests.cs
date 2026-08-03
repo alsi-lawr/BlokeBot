@@ -6,6 +6,71 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubChannelReconciliationTests : EventSubChannelRecoveryTestBase
 {
     [Test]
+    public async Task PeriodicInventoryHealth_RecreatesTrackedChannelWithNoEnabledOwnedId()
+    {
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        await harness.Session.RepairMissingSubscriptionsAndDrainAsync(
+            new HashSet<string>(StringComparer.Ordinal),
+            ["channel"],
+            CancellationToken.None
+        );
+
+        operations.CreateCount("channel").ShouldBe(2);
+        operations.DeleteCount("channel").ShouldBe(1);
+        _ = harness
+            .Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<EventSubChannelStatus.Healthy>();
+    }
+
+    [Test]
+    public async Task PeriodicInventoryHealth_RecreatesChannelAbsentFromEnabledIdsAndKeepsSiblingHealthy()
+    {
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+        harness.Session.Start(["missing", "healthy"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        harness.Diagnostics.Clear();
+
+        await harness.Session.RepairMissingSubscriptionsAndDrainAsync(
+            new HashSet<string>(StringComparer.Ordinal) { "subscription-healthy" },
+            ["missing", "healthy"],
+            CancellationToken.None
+        );
+
+        operations.CreateCount("missing").ShouldBe(2);
+        operations.DeleteCount("missing").ShouldBe(1);
+        operations.CreateCount("healthy").ShouldBe(1);
+        operations.DeleteCount("healthy").ShouldBe(0);
+        harness.Status.Current.Channels.ShouldAllBe(status =>
+            status is EventSubChannelStatus.Healthy
+        );
+    }
+
+    [Test]
+    public async Task Revocation_RecreatesOwningChannelWithoutTouchingSibling()
+    {
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+        harness.Session.Start(["revoked", "healthy"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        await harness.Session.RepairRevokedSubscriptionAndDrainAsync(
+            "subscription-revoked",
+            ["revoked", "healthy"],
+            CancellationToken.None
+        );
+
+        operations.CreateCount("revoked").ShouldBe(2);
+        operations.DeleteCount("revoked").ShouldBe(1);
+        operations.CreateCount("healthy").ShouldBe(1);
+        operations.DeleteCount("healthy").ShouldBe(0);
+    }
+
+    [Test]
     public async Task Reconciliation_TransientDeleteFailure_RecoversThroughOwnedPolicy()
     {
         var failure = new IOException("remote delete failed once");
@@ -140,8 +205,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.CompleteStopCount("channel").ShouldBe(0);
         var pending = harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem();
         pending.Subscription.Channel.ShouldBe("channel");
-        pending.Subscription.SubscriptionId.ShouldBe("session-id-channel");
-        pending.Subscription.AccessToken.ShouldBe("channel-secret");
+        pending.Subscription.SubscriptionId.ShouldBe("subscription-channel");
         var unresolved = pending.State.ShouldBeOfType<EventSubPendingDeletionState.Unresolved>();
         unresolved.Failure.Classification.ShouldBe(EventSubChannelFailureClassification.Transient);
         unresolved.Failure.Exception.ShouldBeSameAs(failure);
@@ -307,8 +371,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
 
         replacementOperations.DeleteCount("channel").ShouldBe(1);
         var deleted = replacementOperations.DeleteAttempts("channel").ShouldHaveSingleItem();
-        deleted.SubscriptionId.ShouldBe("session-id-channel");
-        deleted.AccessToken.ShouldBe("channel-secret");
+        deleted.SubscriptionId.ShouldBe("subscription-channel");
         replacementOperations.CompleteStopCount("channel").ShouldBe(1);
         sharedPendingDeletions.PendingDeletions.ShouldBeEmpty();
         sharedPendingDeletions.HasPendingReconciliation.ShouldBeFalse();

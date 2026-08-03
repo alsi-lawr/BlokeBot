@@ -23,7 +23,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         );
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -66,7 +66,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         );
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -109,7 +109,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         );
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -131,7 +131,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(failure));
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -161,7 +161,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Session.Enqueue((_, _) => EstablishedAsync(listening));
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -195,7 +195,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(final));
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -240,7 +240,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(failure));
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             CancellationToken.None
         );
 
@@ -274,7 +274,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         );
 
         var outcome = await harness.EstablishSessionAsync(
-            new RuntimeConnectionTarget.Initial(),
+            new RuntimeConnectionTarget(),
             cancellation.Token
         );
 

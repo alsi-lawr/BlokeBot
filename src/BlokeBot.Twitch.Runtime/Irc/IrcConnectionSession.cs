@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
@@ -47,17 +46,6 @@ internal sealed class IrcConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        target
-            .Match<Action>(
-                static _ => static () => { },
-                static _ =>
-                    static () =>
-                        throw new UnreachableException(
-                            "IRC sessions can only establish the default Twitch endpoint."
-                        )
-            )
-            .Invoke();
-
         var channelLogins = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );

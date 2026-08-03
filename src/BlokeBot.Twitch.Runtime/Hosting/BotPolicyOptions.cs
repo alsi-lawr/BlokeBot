@@ -31,32 +31,6 @@ public sealed record IrcSessionResilienceOptions
 }
 
 /// <summary>
-/// Mutable configuration transport for the EventSub session resilience boundary.
-/// </summary>
-public sealed record EventSubSessionResilienceOptions
-{
-    [Required]
-    [Range(1, int.MaxValue)]
-    public required int? AttemptLimit { get; set; }
-
-    [Required]
-    [Range(typeof(TimeSpan), PolicyDuration.Minimum, PolicyDuration.Maximum)]
-    public required TimeSpan? Delay { get; set; }
-
-    [Required]
-    [Range(typeof(TimeSpan), PolicyDuration.Minimum, PolicyDuration.Maximum)]
-    public required TimeSpan? MaximumDelay { get; set; }
-
-    [Required]
-    [EnumDataType(typeof(DelayBackoffType))]
-    public required DelayBackoffType? DelayBackoffType { get; set; }
-
-    [Required]
-    [Range(typeof(TimeSpan), PolicyDuration.Minimum, PolicyDuration.Maximum)]
-    public required TimeSpan? AttemptTimeout { get; set; }
-}
-
-/// <summary>
 /// Mutable configuration transport for per-channel EventSub recovery.
 /// </summary>
 public sealed record EventSubChannelRecoveryOptions
@@ -127,10 +101,6 @@ public sealed record PublicChatTerminalRetentionOptions
 [OptionsValidator]
 public sealed partial class IrcSessionResilienceOptionsValidator
     : IValidateOptions<IrcSessionResilienceOptions> { }
-
-[OptionsValidator]
-public sealed partial class EventSubSessionResilienceOptionsValidator
-    : IValidateOptions<EventSubSessionResilienceOptions> { }
 
 [OptionsValidator]
 public sealed partial class EventSubChannelRecoveryOptionsValidator
