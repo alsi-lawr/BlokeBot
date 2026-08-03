@@ -61,18 +61,24 @@ public sealed class OAuthTransportTests
     [Test]
     public void InvalidAuthorizationScopeValues_CreatingScopeSet_RejectsInvalidElements()
     {
-        _ = Should.Throw<ArgumentNullException>(() => OAuthAuthorizationScopeSet.Create(null!));
-        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([]));
-        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([null!]));
-        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([" "]));
-        _ = Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create(["chat read"]));
+        _ = Should.Throw<ArgumentNullException>(static () =>
+            OAuthAuthorizationScopeSet.Create(null!)
+        );
+        _ = Should.Throw<ArgumentException>(static () => OAuthAuthorizationScopeSet.Create([]));
+        _ = Should.Throw<ArgumentException>(static () =>
+            OAuthAuthorizationScopeSet.Create([null!])
+        );
+        _ = Should.Throw<ArgumentException>(static () => OAuthAuthorizationScopeSet.Create([" "]));
+        _ = Should.Throw<ArgumentException>(static () =>
+            OAuthAuthorizationScopeSet.Create(["chat read"])
+        );
     }
 
     [Test]
     public async Task AuthorizationCodeAndTokenPayload_ExchangingThenValidating_MapsRequestsAndResponses()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/oauth2/token");
             var form = ReadContent(request);
@@ -86,7 +92,7 @@ public sealed class OAuthTransportTests
                 """
             );
         });
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/oauth2/validate");
             request.Headers.Authorization!.Scheme.ShouldBe("OAuth");
@@ -124,7 +130,7 @@ public sealed class OAuthTransportTests
     public async Task InvalidToken_Validating_ReturnsTypedRejection()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        factory.Respond(static _ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
         var client = new OAuthTransport(
             factory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
@@ -139,7 +145,9 @@ public sealed class OAuthTransportTests
     public async Task NoGrantedScopes_Validating_ReturnsValidatedEmptyScopeSet()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(_ => JsonResponse("""{"user_id":"123","login":"Streamer","scopes":[]}"""));
+        factory.Respond(static _ =>
+            JsonResponse("""{"user_id":"123","login":"Streamer","scopes":[]}""")
+        );
         var client = new OAuthTransport(
             factory,
             global::BlokeBot.Twitch.TwitchEndpointPolicy.Default

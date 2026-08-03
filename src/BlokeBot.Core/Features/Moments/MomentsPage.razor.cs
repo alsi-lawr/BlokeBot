@@ -68,7 +68,10 @@ public partial class MomentsPage
         var streamResult = await _streams
             .GetStreamLiveness(HostLogin)
             .ExecuteAsync(CancellationToken.None);
-        var stream = streamResult.Match(value => value, _ => throw new UnreachableException());
+        var stream = streamResult.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
         switch (stream)
         {
             case HostStreamLivenessOutcome.Live live:

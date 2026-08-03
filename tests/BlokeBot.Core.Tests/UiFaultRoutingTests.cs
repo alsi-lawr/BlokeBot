@@ -18,7 +18,10 @@ public sealed class UiFaultRoutingTests
             new HostBotReadinessOutcome.Unknown(new(true, false, false, false))
         );
 
-        var failure = result.Match<HostBotChannelStatusLoadFailure?>(_ => null, error => error);
+        var failure = result.Match<HostBotChannelStatusLoadFailure?>(
+            static _ => null,
+            static error => error
+        );
 
         _ = failure.ShouldNotBeNull();
         failure.ModeratorStatusMessage.ShouldBe(
@@ -50,7 +53,7 @@ public sealed class UiFaultRoutingTests
         entry.Properties["HostId"].ShouldBe(42);
         entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
         entry.Message.ShouldNotContain(SensitiveMessage);
-        entry.Properties.Values.ShouldAllBe(value =>
+        entry.Properties.Values.ShouldAllBe(static value =>
             value == null || !value.ToString()!.Contains(SensitiveMessage, StringComparison.Ordinal)
         );
     }
@@ -177,7 +180,7 @@ public sealed class UiFaultRoutingTests
             CancellationToken,
             Task<Result<string, TestExpectedFailure>>
         > Loader { get; set; } =
-            _ => Task.FromResult(Result<string, TestExpectedFailure>.Success(string.Empty));
+            static _ => Task.FromResult(Result<string, TestExpectedFailure>.Success(string.Empty));
 
         public TestExpectedFailure? Error => BackgroundError;
 

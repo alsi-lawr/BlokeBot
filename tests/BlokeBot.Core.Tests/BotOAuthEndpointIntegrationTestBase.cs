@@ -102,10 +102,10 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     TestAuthenticationHandler.SchemeName,
                     static _ => { }
                 );
-            _ = builder.Services.AddAuthorization(options =>
+            _ = builder.Services.AddAuthorization(static options =>
                 options.AddPolicy(
                     "BotAdmin",
-                    policy =>
+                    static policy =>
                         policy
                             .RequireAuthenticatedUser()
                             .AddRequirements(

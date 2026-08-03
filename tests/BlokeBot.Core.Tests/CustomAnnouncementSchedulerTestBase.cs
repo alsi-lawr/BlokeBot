@@ -97,7 +97,8 @@ public abstract class CustomAnnouncementSchedulerTestBase
             UpdatedAtUtc = createdAtUtc,
             Variants = variants
                 .Select(
-                    (text, index) => new CustomMessageVariant { SortOrder = index, Text = text }
+                    static (text, index) =>
+                        new CustomMessageVariant { SortOrder = index, Text = text }
                 )
                 .ToList(),
         };

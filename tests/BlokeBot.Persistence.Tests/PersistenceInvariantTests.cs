@@ -474,7 +474,7 @@ public sealed class PersistenceInvariantTests
     private static void AssertTokens<TEnum>(IReadOnlyList<(TEnum Value, string Token)> cases)
         where TEnum : struct, Enum
     {
-        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(item => item.Token));
+        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(static item => item.Token));
         foreach (var (value, token) in cases)
         {
             PersistedEnumTokens<TEnum>.Format(value).ShouldBe(token);

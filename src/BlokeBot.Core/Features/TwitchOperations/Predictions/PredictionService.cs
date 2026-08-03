@@ -927,13 +927,13 @@ public sealed class PredictionService(
         IReadOnlyList<HelixPredictionOutcome> outcomes
     ) =>
         outcomes
-            .Select(x => new PredictionOutcomeView(
+            .Select(static x => new PredictionOutcomeView(
                 x.Id,
                 x.Title,
                 x.Color,
                 x.Users,
                 x.ChannelPoints,
-                x.TopPredictors.Select(p => new PredictionTopPredictorView(
+                x.TopPredictors.Select(static p => new PredictionTopPredictorView(
                         p.UserLogin,
                         p.UserName,
                         p.ChannelPointsUsed,
@@ -1008,7 +1008,7 @@ public sealed class PredictionService(
         new(
             template.Id,
             template.Title,
-            template.Outcomes.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
+            template.Outcomes.OrderBy(static x => x.Position).Select(static x => x.Title).ToArray(),
             template.PredictionWindowSeconds
         );
 

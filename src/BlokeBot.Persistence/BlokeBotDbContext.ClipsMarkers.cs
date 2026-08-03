@@ -13,35 +13,35 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureClipsMarkers(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<TwitchClip>(b =>
+        _ = modelBuilder.Entity<TwitchClip>(static b =>
         {
             _ = b.ToTable(
                 "twitch_clips",
-                table =>
+                static table =>
                     table.HasCheckConstraint(
                         "CK_twitch_clips_Status",
                         KindIn("Status", _twitchClipStatusKinds)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdempotencyKey).HasMaxLength(128);
-            _ = b.Property(x => x.ProviderClipId).HasMaxLength(128);
-            _ = b.Property(x => x.EditUrl).HasMaxLength(1024);
-            _ = b.Property(x => x.FinalUrl).HasMaxLength(1024);
-            _ = b.Property(x => x.BroadcasterTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.BroadcasterLogin).HasMaxLength(128);
-            _ = b.Property(x => x.CreatorTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.CreatorLogin).HasMaxLength(128);
-            _ = b.Property(x => x.VideoId).HasMaxLength(128);
-            _ = b.Property(x => x.FailureReason).HasMaxLength(256);
-            _ = b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdempotencyKey).HasMaxLength(128);
+            _ = b.Property(static x => x.ProviderClipId).HasMaxLength(128);
+            _ = b.Property(static x => x.EditUrl).HasMaxLength(1024);
+            _ = b.Property(static x => x.FinalUrl).HasMaxLength(1024);
+            _ = b.Property(static x => x.BroadcasterTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.BroadcasterLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.CreatorTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.CreatorLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.VideoId).HasMaxLength(128);
+            _ = b.Property(static x => x.FailureReason).HasMaxLength(256);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<TwitchClipStatus>.Format(status),
-                    value => PersistedEnumTokens<TwitchClipStatus>.Parse(value)
+                    static status => PersistedEnumTokens<TwitchClipStatus>.Format(status),
+                    static value => PersistedEnumTokens<TwitchClipStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.HasIndex(x => new { x.HostId, x.IdempotencyKey }).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.HasIndex(static x => new { x.HostId, x.IdempotencyKey }).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.Status,
@@ -49,38 +49,38 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<TwitchStreamMarker>(b =>
+        _ = modelBuilder.Entity<TwitchStreamMarker>(static b =>
         {
             _ = b.ToTable(
                 "twitch_stream_markers",
-                table =>
+                static table =>
                     table.HasCheckConstraint(
                         "CK_twitch_stream_markers_Status",
                         KindIn("Status", _twitchStreamMarkerStatusKinds)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdempotencyKey).HasMaxLength(128);
-            _ = b.Property(x => x.ProviderMarkerId).HasMaxLength(128);
-            _ = b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdempotencyKey).HasMaxLength(128);
+            _ = b.Property(static x => x.ProviderMarkerId).HasMaxLength(128);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<TwitchStreamMarkerStatus>.Format(status),
-                    value => PersistedEnumTokens<TwitchStreamMarkerStatus>.Parse(value)
+                    static status => PersistedEnumTokens<TwitchStreamMarkerStatus>.Format(status),
+                    static value => PersistedEnumTokens<TwitchStreamMarkerStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.Description).HasMaxLength(140);
-            _ = b.Property(x => x.MarkerUrl).HasMaxLength(1024);
-            _ = b.Property(x => x.VideoId).HasMaxLength(128);
-            _ = b.Property(x => x.FailureReason).HasMaxLength(256);
-            _ = b.HasIndex(x => new { x.HostId, x.IdempotencyKey }).IsUnique();
-            _ = b.HasIndex(x => new { x.HostId, x.CreatedAtUtc });
+            _ = b.Property(static x => x.Description).HasMaxLength(140);
+            _ = b.Property(static x => x.MarkerUrl).HasMaxLength(1024);
+            _ = b.Property(static x => x.VideoId).HasMaxLength(128);
+            _ = b.Property(static x => x.FailureReason).HasMaxLength(256);
+            _ = b.HasIndex(static x => new { x.HostId, x.IdempotencyKey }).IsUnique();
+            _ = b.HasIndex(static x => new { x.HostId, x.CreatedAtUtc });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

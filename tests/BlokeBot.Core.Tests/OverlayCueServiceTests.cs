@@ -499,7 +499,7 @@ public sealed class OverlayCueServiceTests
             .ToArray();
         survivingFiles.Length.ShouldBe(2);
         survivingFiles.ShouldContain(originalPath);
-        survivingFiles.Sum(path => new FileInfo(path).Length).ShouldBe(1036);
+        survivingFiles.Sum(static path => new FileInfo(path).Length).ShouldBe(1036);
         await using var additional = new MemoryStream(Mp4Bytes());
         _ = (
             await fixture.Cues.UploadAssetAsync(
@@ -1047,7 +1047,7 @@ public sealed class OverlayCueServiceTests
                 (
                     StorageKeysUnavailable
                     && fileName.Length == 32
-                    && fileName.All(character =>
+                    && fileName.All(static character =>
                         character is (>= '0' and <= '9') or (>= 'a' and <= 'f')
                     )
                 )

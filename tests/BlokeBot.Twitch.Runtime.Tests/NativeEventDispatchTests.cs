@@ -75,7 +75,7 @@ public sealed class NativeEventDispatchTests
         await session.DispatchPredictionAsync(prediction, CancellationToken.None);
 
         predictions.Deliveries.ShouldBe(1);
-        gate.Requests.Select(request => request.Feature)
+        gate.Requests.Select(static request => request.Feature)
             .ShouldBe([
                 NativeTwitchFeature.RewardsAndRedemptions,
                 NativeTwitchFeature.Predictions,

@@ -83,7 +83,7 @@ public sealed record OverlayCueConfiguration
     public ImmutableArray<Guid> ReferencedAssetIds =>
         Layers
             .OfType<OverlayCueLayer.UploadedMedia>()
-            .Select(layer => layer.AssetId)
+            .Select(static layer => layer.AssetId)
             .Distinct()
             .Order()
             .ToImmutableArray();

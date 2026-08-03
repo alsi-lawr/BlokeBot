@@ -803,9 +803,9 @@ public sealed class OverlayInstanceService(
 
     private static BotHostChoice? SelectedHost(AuthenticatedSession session) =>
         session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
 
     private static bool ValidOverlayIdAndRevision(
@@ -832,7 +832,10 @@ public sealed class OverlayInstanceService(
         _mutationGates[(int)((uint)overlayId.GetHashCode() % _mutationGates.Length)];
 
     private static SemaphoreSlim[] CreateMutationGates() =>
-        Enumerable.Range(0, _mutationGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+        Enumerable
+            .Range(0, _mutationGateCount)
+            .Select(static _ => new SemaphoreSlim(1, 1))
+            .ToArray();
 
     private static string PersistedEventName(OverlayInstanceEventKind kind) =>
         PersistedEnumTokens<OverlayInstanceEventKind>.Format(kind);

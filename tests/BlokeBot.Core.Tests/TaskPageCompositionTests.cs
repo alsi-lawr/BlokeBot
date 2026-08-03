@@ -19,7 +19,7 @@ public sealed class TaskPageCompositionTests
         var page = context.Render<HomePage>();
 
         page.FindAll("a.home-info-card")
-            .Select(link =>
+            .Select(static link =>
                 (link.QuerySelector("h2")?.TextContent.Trim(), link.GetAttribute("href"))
             )
             .ShouldBe([

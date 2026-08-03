@@ -43,8 +43,8 @@ public sealed class BoundedDiscriminatorBehaviorTests
         ];
 
         supportedKinds
-            .Select(item => PointsDashboard.LedgerChangeLabel(item.Kind))
-            .ShouldBe(supportedKinds.Select(item => item.Label));
+            .Select(static item => PointsDashboard.LedgerChangeLabel(item.Kind))
+            .ShouldBe(supportedKinds.Select(static item => item.Label));
     }
 
     [Test]
@@ -164,7 +164,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
         await using var readDb = await dbFactory.CreateDbContextAsync();
         var kinds = await readDb
             .PointLedgerEntries.AsNoTracking()
-            .Select(x => x.Kind)
+            .Select(static x => x.Kind)
             .Distinct()
             .ToListAsync();
         kinds

@@ -42,7 +42,7 @@ public sealed class ChatCommandDispatcher
         foreach (var dynamicHandler in _plan.DynamicHandlers)
         {
             var handled = await dynamicHandler(context, args, cancellationToken);
-            if (handled.Match(_ => false, _ => true))
+            if (handled.Match(static _ => false, static _ => true))
             {
                 return;
             }

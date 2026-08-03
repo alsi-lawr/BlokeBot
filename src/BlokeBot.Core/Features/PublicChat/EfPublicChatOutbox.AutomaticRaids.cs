@@ -11,8 +11,8 @@ internal sealed partial class EfPublicChatOutbox
         PublicChatHttpStatus httpStatus
     ) =>
         httpStatus.Match(
-            known => SafePreSendExhaustionResult(known.Value),
-            () => AutomaticRaidShoutoutResultCode.Unexpected
+            static known => SafePreSendExhaustionResult(known.Value),
+            static () => AutomaticRaidShoutoutResultCode.Unexpected
         );
 
     private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(

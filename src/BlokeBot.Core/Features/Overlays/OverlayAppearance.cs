@@ -123,7 +123,10 @@ public sealed record OverlayAppearance
                     ',',
                     StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
                 );
-            if (selectors.Length == 0 || selectors.Any(selector => !_selectors.Contains(selector)))
+            if (
+                selectors.Length == 0
+                || selectors.Any(static selector => !_selectors.Contains(selector))
+            )
             {
                 return "Use only the documented overlay-local selectors: .overlay, .card, .accent, .kicker, .title, .detail, and .result.";
             }
@@ -164,7 +167,7 @@ public sealed record OverlayAppearance
             : Regex.Replace(
                 Css,
                 @"(?<selector>[^{}]+)\{",
-                match =>
+                static match =>
                     string.Join(
                         ",",
                         match
@@ -174,7 +177,7 @@ public sealed record OverlayAppearance
                                 StringSplitOptions.TrimEntries
                                     | StringSplitOptions.RemoveEmptyEntries
                             )
-                            .Select(selector => $"#overlay-root {selector}")
+                            .Select(static selector => $"#overlay-root {selector}")
                     ) + "{"
             );
 }

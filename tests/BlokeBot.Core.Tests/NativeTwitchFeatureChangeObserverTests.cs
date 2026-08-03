@@ -72,19 +72,19 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             .GetRequiredService<IAutomaticRaidNativeShoutoutOperation>()
             .ShouldBeSameAs(shoutouts);
 
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(AutomaticRaidShoutoutConfigurationService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(AutomaticRaidShoutoutObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IAutomaticRaidShoutoutDelivery)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IIncomingRaidEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
@@ -173,33 +173,33 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             CancellationToken.None
         );
 
-        handler.Paths.ShouldContain(path =>
+        handler.Paths.ShouldContain(static path =>
             path.EndsWith("/helix/polls", StringComparison.Ordinal)
         );
         handler
-            .Paths.Count(path =>
+            .Paths.Count(static path =>
                 path.EndsWith("/helix/channel_points/custom_rewards", StringComparison.Ordinal)
             )
             .ShouldBe(2);
-        handler.Paths.ShouldContain(path =>
+        handler.Paths.ShouldContain(static path =>
             path.EndsWith("/helix/predictions", StringComparison.Ordinal)
         );
 
         var services = new ServiceCollection();
         _ = services.AddBlokeBotTwitchOperations();
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(ChannelPointsService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(PredictionService)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IChannelPointsEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
-        services.ShouldContain(descriptor =>
+        services.ShouldContain(static descriptor =>
             descriptor.ServiceType == typeof(IPredictionEventObserver)
             && descriptor.Lifetime == ServiceLifetime.Singleton
         );
@@ -228,7 +228,7 @@ public sealed class NativeTwitchFeatureChangeObserverTests
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("channel", "token")

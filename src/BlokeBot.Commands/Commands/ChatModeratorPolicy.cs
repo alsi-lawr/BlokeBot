@@ -9,7 +9,7 @@ public static class ChatModeratorPolicy
             message.Tags.TryGetValue("badges", out var badges)
             && badges
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(x =>
+                .Any(static x =>
                     x.StartsWith("broadcaster/", StringComparison.OrdinalIgnoreCase)
                     || x.StartsWith("moderator/", StringComparison.OrdinalIgnoreCase)
                 )

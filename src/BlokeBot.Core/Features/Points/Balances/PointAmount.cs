@@ -65,7 +65,7 @@ public readonly record struct PointAmount : IComparable<PointAmount>
         ParseNonNegativeAbsolute(value)
             .Match(
                 static amount => amount,
-                error =>
+                static error =>
                     throw error switch
                     {
                         PointAmountParseError.InvalidFormat => new FormatException(

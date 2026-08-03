@@ -14,11 +14,11 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureMoments(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<MomentHubSettings>(b =>
+        _ = modelBuilder.Entity<MomentHubSettings>(static b =>
         {
             _ = b.ToTable(
                 "moment_hub_settings",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_moment_hub_settings_MergeWindowSeconds",
@@ -30,46 +30,46 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.RewardPolicy)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.RewardPolicy)
                 .HasConversion(
-                    value => PersistedEnumTokens<MomentRewardPolicy>.Format(value),
-                    value => PersistedEnumTokens<MomentRewardPolicy>.Parse(value)
+                    static value => PersistedEnumTokens<MomentRewardPolicy>.Format(value),
+                    static value => PersistedEnumTokens<MomentRewardPolicy>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.RewardAmount).HasMaxLength(128);
-            _ = b.HasIndex(x => x.HostId).IsUnique();
+            _ = b.Property(static x => x.RewardAmount).HasMaxLength(128);
+            _ = b.HasIndex(static x => x.HostId).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentCandidate>(b =>
+        _ = modelBuilder.Entity<MomentCandidate>(static b =>
         {
             _ = b.ToTable(
                 "moment_candidates",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_moment_candidates_State",
                         KindIn("State", _momentCandidateStates)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.PublicId).HasConversion<string>();
-            _ = b.Property(x => x.StreamIdentity).HasMaxLength(128);
-            _ = b.Property(x => x.State)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.PublicId).HasConversion<string>();
+            _ = b.Property(static x => x.StreamIdentity).HasMaxLength(128);
+            _ = b.Property(static x => x.State)
                 .HasConversion(
-                    value => PersistedEnumTokens<MomentCandidateState>.Format(value),
-                    value => PersistedEnumTokens<MomentCandidateState>.Parse(value)
+                    static value => PersistedEnumTokens<MomentCandidateState>.Format(value),
+                    static value => PersistedEnumTokens<MomentCandidateState>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.PublicTitle).HasMaxLength(200);
-            _ = b.Property(x => x.PublicCategory).HasMaxLength(64);
-            _ = b.Property(x => x.ProviderFailureReason).HasMaxLength(500);
-            _ = b.Property(x => x.PrivateRejectionReason).HasMaxLength(1000);
-            _ = b.HasIndex(x => x.PublicId).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.PublicTitle).HasMaxLength(200);
+            _ = b.Property(static x => x.PublicCategory).HasMaxLength(64);
+            _ = b.Property(static x => x.ProviderFailureReason).HasMaxLength(500);
+            _ = b.Property(static x => x.PrivateRejectionReason).HasMaxLength(1000);
+            _ = b.HasIndex(static x => x.PublicId).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.StreamIdentity,
@@ -77,44 +77,44 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasOne(x => x.TwitchClip)
+            _ = b.HasOne(static x => x.TwitchClip)
                 .WithMany()
-                .HasForeignKey(x => x.TwitchClipId)
+                .HasForeignKey(static x => x.TwitchClipId)
                 .OnDelete(DeleteBehavior.SetNull);
-            _ = b.HasOne(x => x.TwitchStreamMarker)
+            _ = b.HasOne(static x => x.TwitchStreamMarker)
                 .WithMany()
-                .HasForeignKey(x => x.TwitchStreamMarkerId)
+                .HasForeignKey(static x => x.TwitchStreamMarkerId)
                 .OnDelete(DeleteBehavior.SetNull);
-            _ = b.HasOne(x => x.MergedIntoCandidate)
+            _ = b.HasOne(static x => x.MergedIntoCandidate)
                 .WithMany()
-                .HasForeignKey(x => x.MergedIntoCandidateId)
+                .HasForeignKey(static x => x.MergedIntoCandidateId)
                 .OnDelete(DeleteBehavior.Restrict);
-            _ = b.HasMany(x => x.CaptureRequests)
-                .WithOne(x => x.Candidate)
-                .HasForeignKey(x => x.CandidateId)
+            _ = b.HasMany(static x => x.CaptureRequests)
+                .WithOne(static x => x.Candidate)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasMany(x => x.Contributors)
-                .WithOne(x => x.Candidate)
-                .HasForeignKey(x => x.CandidateId)
+            _ = b.HasMany(static x => x.Contributors)
+                .WithOne(static x => x.Candidate)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasMany(x => x.Suggestions)
-                .WithOne(x => x.Candidate)
-                .HasForeignKey(x => x.CandidateId)
+            _ = b.HasMany(static x => x.Suggestions)
+                .WithOne(static x => x.Candidate)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasMany(x => x.Votes)
-                .WithOne(x => x.Candidate)
-                .HasForeignKey(x => x.CandidateId)
+            _ = b.HasMany(static x => x.Votes)
+                .WithOne(static x => x.Candidate)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentCaptureRequest>(b =>
+        _ = modelBuilder.Entity<MomentCaptureRequest>(static b =>
         {
             _ = b.ToTable("moment_capture_requests");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdentityKey).HasMaxLength(160);
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdentityKey).HasMaxLength(160);
+            _ = b.HasIndex(static x => new
             {
                 x.CandidateId,
                 x.CapturedAtUtc,
@@ -122,17 +122,17 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentContributor>(b =>
+        _ = modelBuilder.Entity<MomentContributor>(static b =>
         {
             _ = b.ToTable("moment_contributors");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdentityKey).HasMaxLength(160);
-            _ = b.Property(x => x.TwitchUserId).HasMaxLength(128);
-            _ = b.Property(x => x.NormalizedLogin).HasMaxLength(128);
-            _ = b.Property(x => x.DisplayName).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.CandidateId, x.IdentityKey }).IsUnique();
-            _ = b.HasIndex(x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdentityKey).HasMaxLength(160);
+            _ = b.Property(static x => x.TwitchUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.NormalizedLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.DisplayName).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.CandidateId, x.IdentityKey }).IsUnique();
+            _ = b.HasIndex(static x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.CandidateId,
                 x.FirstCapturedAtUtc,
@@ -140,14 +140,14 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentSuggestion>(b =>
+        _ = modelBuilder.Entity<MomentSuggestion>(static b =>
         {
             _ = b.ToTable("moment_suggestions");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdentityKey).HasMaxLength(160);
-            _ = b.Property(x => x.SuggestedTitle).HasMaxLength(200);
-            _ = b.Property(x => x.SuggestedCategory).HasMaxLength(64);
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdentityKey).HasMaxLength(160);
+            _ = b.Property(static x => x.SuggestedTitle).HasMaxLength(200);
+            _ = b.Property(static x => x.SuggestedCategory).HasMaxLength(64);
+            _ = b.HasIndex(static x => new
             {
                 x.CandidateId,
                 x.CreatedAtUtc,
@@ -155,102 +155,102 @@ public sealed partial class BlokeBotDbContext
             });
         });
 
-        _ = modelBuilder.Entity<MomentVote>(b =>
+        _ = modelBuilder.Entity<MomentVote>(static b =>
         {
             _ = b.ToTable("moment_votes");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.IdentityKey).HasMaxLength(160);
-            _ = b.Property(x => x.TwitchUserId).HasMaxLength(128);
-            _ = b.Property(x => x.NormalizedLogin).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.CandidateId, x.IdentityKey }).IsUnique();
-            _ = b.HasIndex(x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.IdentityKey).HasMaxLength(160);
+            _ = b.Property(static x => x.TwitchUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.NormalizedLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.CandidateId, x.IdentityKey }).IsUnique();
+            _ = b.HasIndex(static x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<MomentModerationAudit>(b =>
+        _ = modelBuilder.Entity<MomentModerationAudit>(static b =>
         {
             _ = b.ToTable("moment_moderation_audit");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Action).HasMaxLength(32);
-            _ = b.Property(x => x.ActorLogin).HasMaxLength(128);
-            _ = b.Property(x => x.PrivateText).HasMaxLength(1000);
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Action).HasMaxLength(32);
+            _ = b.Property(static x => x.ActorLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.PrivateText).HasMaxLength(1000);
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.CandidateId,
                 x.Id,
             });
-            _ = b.HasOne(x => x.Candidate)
+            _ = b.HasOne(static x => x.Candidate)
                 .WithMany()
-                .HasForeignKey(x => x.CandidateId)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentDomainEvent>(b =>
+        _ = modelBuilder.Entity<MomentDomainEvent>(static b =>
         {
             _ = b.ToTable(
                 "moment_events",
-                t =>
+                static t =>
                     t.HasCheckConstraint("CK_moment_events_Kind", KindIn("Kind", _momentEventKinds))
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<MomentEventKind>.Format(value),
-                    value => PersistedEnumTokens<MomentEventKind>.Parse(value)
+                    static value => PersistedEnumTokens<MomentEventKind>.Format(value),
+                    static value => PersistedEnumTokens<MomentEventKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.StreamIdentity).HasMaxLength(128);
-            _ = b.Property(x => x.PublicPayload).HasMaxLength(1024);
-            _ = b.Property(x => x.OperationKey).HasMaxLength(200);
-            _ = b.HasIndex(x => new { x.HostId, x.Id });
-            _ = b.HasIndex(x => new { x.HostId, x.OperationKey })
+            _ = b.Property(static x => x.StreamIdentity).HasMaxLength(128);
+            _ = b.Property(static x => x.PublicPayload).HasMaxLength(1024);
+            _ = b.Property(static x => x.OperationKey).HasMaxLength(200);
+            _ = b.HasIndex(static x => new { x.HostId, x.Id });
+            _ = b.HasIndex(static x => new { x.HostId, x.OperationKey })
                 .IsUnique()
                 .HasFilter("\"OperationKey\" IS NOT NULL");
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
             _ = b.HasOne<MomentCandidate>()
                 .WithMany()
-                .HasForeignKey(x => x.CandidateId)
+                .HasForeignKey(static x => x.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<MomentMerge>(b =>
+        _ = modelBuilder.Entity<MomentMerge>(static b =>
         {
             _ = b.ToTable("moment_merges");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.ActorLogin).HasMaxLength(128);
-            _ = b.Property(x => x.PrivateText).HasMaxLength(1000);
-            _ = b.HasIndex(x => x.SourceCandidateId).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ActorLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.PrivateText).HasMaxLength(1000);
+            _ = b.HasIndex(static x => x.SourceCandidateId).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.TargetCandidateId,
                 x.MergedAtUtc,
             });
-            _ = b.HasOne(x => x.SourceCandidate)
+            _ = b.HasOne(static x => x.SourceCandidate)
                 .WithMany()
-                .HasForeignKey(x => x.SourceCandidateId)
+                .HasForeignKey(static x => x.SourceCandidateId)
                 .OnDelete(DeleteBehavior.Restrict);
-            _ = b.HasOne(x => x.TargetCandidate)
+            _ = b.HasOne(static x => x.TargetCandidate)
                 .WithMany()
-                .HasForeignKey(x => x.TargetCandidateId)
+                .HasForeignKey(static x => x.TargetCandidateId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<MomentWeeklyFinalization>(b =>
+        _ = modelBuilder.Entity<MomentWeeklyFinalization>(static b =>
         {
             _ = b.ToTable("moment_weekly_finalizations");
-            _ = b.HasKey(x => x.Id);
-            _ = b.HasIndex(x => new { x.HostId, x.WeekStartsAtUtc }).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasIndex(static x => new { x.HostId, x.WeekStartsAtUtc }).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasOne(x => x.WinningCandidate)
+            _ = b.HasOne(static x => x.WinningCandidate)
                 .WithMany()
-                .HasForeignKey(x => x.WinningCandidateId)
+                .HasForeignKey(static x => x.WinningCandidateId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

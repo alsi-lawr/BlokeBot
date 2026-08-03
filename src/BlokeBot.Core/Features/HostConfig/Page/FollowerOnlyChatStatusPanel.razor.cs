@@ -37,7 +37,7 @@ public partial class FollowerOnlyChatStatusPanel
         var result = await _followerOnlyChat.GetReadiness(HostLogin).ExecuteAsync(ct);
         return result.Match(
             Result<FollowerOnlyChatReadiness, FollowerOnlyChatStatusPanelLoadFailure>.Success,
-            _ => throw new UnreachableException()
+            static _ => throw new UnreachableException()
         );
     }
 

@@ -54,15 +54,15 @@ public sealed class HostBotAccountTokenProtectorTests
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
     ) =>
         result.Match(
-            value => value,
-            _ => throw new InvalidOperationException("Expected protection to succeed.")
+            static value => value,
+            static _ => throw new InvalidOperationException("Expected protection to succeed.")
         );
 
     private static HostBotAccountTokenProtectionFailure Error<TValue>(
         BlokeBot.Functional.Result<TValue, HostBotAccountTokenProtectionFailure> result
     ) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected protection to fail."),
-            failure => failure
+            static _ => throw new InvalidOperationException("Expected protection to fail."),
+            static failure => failure
         );
 }

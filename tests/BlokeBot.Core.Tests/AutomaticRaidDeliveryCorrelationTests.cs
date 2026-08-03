@@ -160,12 +160,12 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
         await using var verify = await database.CreateDbContextAsync();
-        var first = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+        var first = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 1
         );
         first.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.NotDelivered);
         first.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Rejected);
-        var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+        var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 2
         );
         second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
@@ -231,7 +231,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         );
 
         await using var verify = await database.CreateDbContextAsync();
-        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
+        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static value =>
             value.HostId == 1
         );
         outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.NotDelivered);
@@ -264,7 +264,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         );
 
         await using var verify = await database.CreateDbContextAsync();
-        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(value =>
+        var outcome = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static value =>
             value.HostId == 1
         );
         outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Ambiguous);
@@ -298,12 +298,12 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
     private static async Task AssertRateLimitedOutcomeAsync(SqliteBlokeBotDbFactory database)
     {
         await using var verify = await database.CreateDbContextAsync();
-        var first = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+        var first = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 1
         );
         first.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.NotDelivered);
         first.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.RateLimited);
-        var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+        var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(static outcome =>
             outcome.HostId == 2
         );
         second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);

@@ -20,12 +20,12 @@ internal sealed record FollowerOnlyChatReadinessPresentation(
 {
     public static FollowerOnlyChatReadinessPresentation From(FollowerOnlyChatReadiness readiness) =>
         readiness.Match<FollowerOnlyChatReadinessPresentation>(
-            _ => new(FollowerOnlyChatSetupState.NotRequired, null),
-            _ => new(FollowerOnlyChatSetupState.Exempt, null),
-            _ => new(FollowerOnlyChatSetupState.Eligible, null),
-            waiting => new(FollowerOnlyChatSetupState.Waiting, waiting.EligibleAtUtc),
-            _ => new(FollowerOnlyChatSetupState.NotFollowing, null),
-            unavailable =>
+            static _ => new(FollowerOnlyChatSetupState.NotRequired, null),
+            static _ => new(FollowerOnlyChatSetupState.Exempt, null),
+            static _ => new(FollowerOnlyChatSetupState.Eligible, null),
+            static waiting => new(FollowerOnlyChatSetupState.Waiting, waiting.EligibleAtUtc),
+            static _ => new(FollowerOnlyChatSetupState.NotFollowing, null),
+            static unavailable =>
                 new(
                     unavailable.Failure
                     == FollowerOnlyChatVerificationFailure.MissingFollowReadScope

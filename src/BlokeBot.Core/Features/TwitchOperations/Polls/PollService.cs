@@ -579,7 +579,7 @@ public sealed class PollService(
         new(
             template.Id,
             template.Title,
-            template.Choices.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
+            template.Choices.OrderBy(static x => x.Position).Select(static x => x.Title).ToArray(),
             template.DurationSeconds,
             template.ChannelPointsVotingEnabled,
             template.ChannelPointsPerVote

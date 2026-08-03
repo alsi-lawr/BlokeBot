@@ -336,7 +336,7 @@ public static class CustomCommandConfigurationValidator
                 );
             }
 
-            if (aliases.Any(alias => alias.Length > _aliasMaxLength))
+            if (aliases.Any(static alias => alias.Length > _aliasMaxLength))
             {
                 AddError(
                     errors,
@@ -463,7 +463,7 @@ public static class CustomCommandConfigurationValidator
             (1, editor.OneArgumentMessageLibraryEntryId),
             (2, editor.TwoArgumentMessageLibraryEntryId),
         };
-        if (replyRequired && routes.All(route => route.MessageEntryId is null))
+        if (replyRequired && routes.All(static route => route.MessageEntryId is null))
         {
             AddError(
                 errors,
@@ -544,7 +544,7 @@ public static class CustomCommandConfigurationValidator
             if (
                 editor.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
                 && messageEntries.TryGetValue(editor.MessageLibraryEntryId, out var messageEntry)
-                && messageEntry.Variants.Any(variant =>
+                && messageEntry.Variants.Any(static variant =>
                     variant.Text.Length > _twitchAnnouncementMaxLength
                 )
             )
@@ -791,7 +791,10 @@ public static class CustomCommandConfigurationValidator
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
-        if (ids.GroupBy(id => id).FirstOrDefault(group => group.Count() > 1) is not null)
+        if (
+            ids.GroupBy(static id => id).FirstOrDefault(static group => group.Count() > 1)
+            is not null
+        )
         {
             AddError(
                 errors,
@@ -808,9 +811,9 @@ public static class CustomCommandConfigurationValidator
     )
     {
         var duplicate = names
-            .Where(value => !string.IsNullOrWhiteSpace(value.Name))
-            .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Count() > 1);
+            .Where(static value => !string.IsNullOrWhiteSpace(value.Name))
+            .GroupBy(static value => value.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(static group => group.Count() > 1);
         if (duplicate is not null)
         {
             AddError(

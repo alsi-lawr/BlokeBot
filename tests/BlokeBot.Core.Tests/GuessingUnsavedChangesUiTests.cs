@@ -25,7 +25,7 @@ public sealed class GuessingUnsavedChangesUiTests
             .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
 
         page.FindAll("[data-unsaved-profile-dialog] button")
-            .Select(button => button.TextContent.Trim())
+            .Select(static button => button.TextContent.Trim())
             .ShouldBe(["Save and switch", "Discard and switch", "Keep editing"]);
         AssertSelectedProfile(page, seed.DefaultProfileId, "green");
 

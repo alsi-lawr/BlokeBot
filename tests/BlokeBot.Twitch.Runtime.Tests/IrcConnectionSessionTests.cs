@@ -103,12 +103,12 @@ public sealed class IrcConnectionSessionTests
         _ = chat
             .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
-        var warning = logger.Entries.Single(entry => entry.Level == LogLevel.Warning);
+        var warning = logger.Entries.Single(static entry => entry.Level == LogLevel.Warning);
         warning.Exception.ShouldBeNull();
         warning.Message.ShouldContain("rejected");
         warning.Message.ShouldNotContain(PrivateStartupMessage);
         warning.Properties["Channel"].ShouldBe("channel");
-        logger.Entries.ShouldNotContain(entry => entry.Message.Contains("accepted"));
+        logger.Entries.ShouldNotContain(static entry => entry.Message.Contains("accepted"));
     }
 
     [Test]
@@ -276,7 +276,7 @@ public sealed class IrcConnectionSessionTests
         )
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                ? values.ToDictionary(static pair => pair.Key, static pair => pair.Value)
                 : [];
             Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }

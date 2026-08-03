@@ -77,7 +77,7 @@ public sealed class PersistenceLifecycleProjectionTests
             .FromPersistence(BotChannelRuntimeState.Stopping, changed)
             .ShouldBeOfType<HostedChannelRuntimeLifecycle.Stopping>();
 
-        _ = Should.Throw<PersistenceDataIntegrityException>(() =>
+        _ = Should.Throw<PersistenceDataIntegrityException>(static () =>
             HostedChannelRuntimeLifecycle.FromPersistence(BotChannelRuntimeState.Started, null)
         );
     }

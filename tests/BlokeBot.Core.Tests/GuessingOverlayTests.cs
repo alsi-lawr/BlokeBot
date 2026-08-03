@@ -52,9 +52,9 @@ public sealed class GuessingOverlayTests
         open.ResultDurationMilliseconds.ShouldBe(9000);
         open.State.ShouldBeOfType<GuessingV1OverlayPresentationState.Open>()
             .ShouldSatisfyAllConditions(
-                state => state.RoundName.ShouldBe("Match winner"),
-                state => state.GuessCount.ShouldBe(3),
-                state => state.ClosesAtUtc.ShouldBeNull()
+                static state => state.RoundName.ShouldBe("Match winner"),
+                static state => state.GuessCount.ShouldBe(3),
+                static state => state.ClosesAtUtc.ShouldBeNull()
             );
 
         await UpdateRoundAsync(
@@ -133,7 +133,7 @@ public sealed class GuessingOverlayTests
         }
 
         states
-            .Select(state => state.Phase)
+            .Select(static state => state.Phase)
             .ShouldBe([
                 GuessingOverlayPhase.NoRound,
                 GuessingOverlayPhase.Open,

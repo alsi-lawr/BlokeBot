@@ -7,7 +7,7 @@ internal static class BlokeBotAuthResultPage
 {
     public static IResult Render(BlokeBotAuthResult result)
     {
-        var encode = (string value) => WebUtility.HtmlEncode(value);
+        var encode = static (string value) => WebUtility.HtmlEncode(value);
         var view = View(result);
         var retry = RetryAction(result.RetryAction) is { } action
             ? $"<a class=\"button button-primary\" href=\"{action.Url}\">{action.Text}</a>"

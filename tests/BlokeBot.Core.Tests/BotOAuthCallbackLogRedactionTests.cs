@@ -47,7 +47,7 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
             entry.Message.ShouldNotContain(hostState);
             entry.Message.ShouldNotContain(broadcasterState);
             entry
-                .Properties.Values.Any(value =>
+                .Properties.Values.Any(static value =>
                     value is not null
                     && value.ToString()!.Contains("-sentinel", StringComparison.Ordinal)
                 )

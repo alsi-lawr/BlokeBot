@@ -403,7 +403,7 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
     )
     {
         var operations = new ScriptedChannelOperations();
-        var ids = Enumerable.Range(1, createdCount).Select(x => $"created-{x}").ToArray();
+        var ids = Enumerable.Range(1, createdCount).Select(static x => $"created-{x}").ToArray();
         operations.EnqueueCreateOutcome(
             "channel",
             new EventSubSubscriptionSetupOutcome.PartiallyCreated(

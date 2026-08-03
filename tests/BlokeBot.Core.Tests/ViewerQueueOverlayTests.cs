@@ -97,9 +97,9 @@ public sealed class ViewerQueueOverlayTests
         state.TotalQueueSize.ShouldBe(5);
         state.CurrentParty.Count.ShouldBe(2);
         state
-            .Next.Select(value => value.DisplayName)
+            .Next.Select(static value => value.DisplayName)
             .ShouldBe(["waiting0", "waiting1", "waiting2"]);
-        state.Next.ShouldAllBe(value => value.Fields.Count == 3);
+        state.Next.ShouldAllBe(static value => value.Fields.Count == 3);
         state
             .Next[0]
             .Fields.ShouldBe([
@@ -127,7 +127,7 @@ public sealed class ViewerQueueOverlayTests
         );
         anonymous!
             .CurrentParty.Concat(anonymous.Next)
-            .ShouldAllBe(value => value.DisplayName == null);
+            .ShouldAllBe(static value => value.DisplayName == null);
         (
             await service.ReadOverlayStateAsync(hostId, queue.Id, 13, 0, CancellationToken.None)
         ).ShouldBeNull();
@@ -462,8 +462,8 @@ public sealed class ViewerQueueOverlayTests
 
     private static PlayQueueResult<T>.Succeeded Success<T>(PlayQueueResult<T> result) =>
         result.Match(
-            value => value,
-            rejected => throw new InvalidOperationException(rejected.Reason.Message)
+            static value => value,
+            static rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)

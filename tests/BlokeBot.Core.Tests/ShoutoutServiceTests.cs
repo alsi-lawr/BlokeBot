@@ -141,9 +141,9 @@ public sealed class ShoutoutServiceTests
         await service.ShoutoutReceivedAsync(delivery, CancellationToken.None);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        var first = await verify.ShoutoutHistory.Where(x => x.HostId == 1).ToArrayAsync();
+        var first = await verify.ShoutoutHistory.Where(static x => x.HostId == 1).ToArrayAsync();
         first.Length.ShouldBe(1);
-        (await verify.ShoutoutHistory.Where(x => x.HostId == 2).CountAsync()).ShouldBe(0);
+        (await verify.ShoutoutHistory.Where(static x => x.HostId == 2).CountAsync()).ShouldBe(0);
         first
             .Single()
             .TargetCooldownEndsAtUtc.ShouldBe(
@@ -213,7 +213,7 @@ public sealed class ShoutoutServiceTests
             db.ShoutoutHistory.AddRange(
                 Enumerable
                     .Range(0, 100)
-                    .Select(index => new ShoutoutHistoryEntry
+                    .Select(static index => new ShoutoutHistoryEntry
                     {
                         HostId = 1,
                         Direction = ShoutoutHistoryDirection.Received,
@@ -251,7 +251,9 @@ public sealed class ShoutoutServiceTests
         );
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.ShoutoutHistory.AnyAsync(x => x.TargetLogin == "target")).ShouldBeFalse();
+        (
+            await verify.ShoutoutHistory.AnyAsync(static x => x.TargetLogin == "target")
+        ).ShouldBeFalse();
         var dashboard = await service.LoadAsync(1, "target", CancellationToken.None);
         dashboard
             .TargetCooldown.ShouldBeOfType<ShoutoutTargetCooldownReadiness.EligibleAt>()

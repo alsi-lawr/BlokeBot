@@ -23,7 +23,7 @@ public sealed class ReplyDeliveryMap
         new(whisperKeys);
 
     public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings) =>
-        new(settings.Where(x => x.Target.IsWhisper()).Select(x => x.ReplyKey));
+        new(settings.Where(static x => x.Target.IsWhisper()).Select(static x => x.ReplyKey));
 
     public bool IsWhisper(string replyKey) => _whisperKeys.Contains(replyKey);
 

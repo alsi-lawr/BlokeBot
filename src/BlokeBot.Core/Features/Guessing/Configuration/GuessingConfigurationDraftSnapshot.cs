@@ -92,7 +92,7 @@ internal sealed class GuessingConfigurationDraftSnapshot
 
     private static GuessOptionValue[] CaptureOptions(IEnumerable<GuessOptionEditor> options) =>
         options
-            .Select(option => new GuessOptionValue(
+            .Select(static option => new GuessOptionValue(
                 option.Name,
                 option.ReplyText,
                 option.ReplyTarget
@@ -102,6 +102,6 @@ internal sealed class GuessingConfigurationDraftSnapshot
     private static string[] CaptureWhisperReplyKeys(GuessingConfiguration configuration) =>
         configuration
             .ReplyDelivery.ToMap()
-            .WhisperKeys.OrderBy(key => key, StringComparer.Ordinal)
+            .WhisperKeys.OrderBy(static key => key, StringComparer.Ordinal)
             .ToArray();
 }

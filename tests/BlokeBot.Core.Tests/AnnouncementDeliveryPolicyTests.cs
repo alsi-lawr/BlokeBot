@@ -27,7 +27,7 @@ public sealed class AnnouncementDeliveryPolicyTests
     [Test]
     public void MissingEntity_Mapping_ThrowsRequiredPolicyError()
     {
-        var exception = Should.Throw<InvalidOperationException>(() =>
+        var exception = Should.Throw<InvalidOperationException>(static () =>
             AnnouncementDeliveryPolicyMapper.ToDomain(null)
         );
 

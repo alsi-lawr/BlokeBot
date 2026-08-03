@@ -19,7 +19,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
             {
                 lock (_gate)
                 {
-                    return _reports.Select(report => report.Status).ToArray();
+                    return _reports.Select(static report => report.Status).ToArray();
                 }
             }
         }

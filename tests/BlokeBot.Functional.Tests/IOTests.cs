@@ -38,13 +38,13 @@ public sealed class IOTests
     [Test]
     public async Task Success_Executing_ReturnsSuccessResult()
     {
-        var io = IO<int, TestError>.Create(_ =>
+        var io = IO<int, TestError>.Create(static _ =>
             ValueTask.FromResult(Result<int, TestError>.Success(42))
         );
 
         var result = await io.ExecuteAsync(CancellationToken.None);
 
-        result.Match(value => value, _ => 0).ShouldBe(42);
+        result.Match(static value => value, static _ => 0).ShouldBe(42);
     }
 
     [Test]

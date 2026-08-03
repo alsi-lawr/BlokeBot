@@ -131,8 +131,9 @@ public sealed class PointBalanceIOTests
 
         _ = result
             .Match(
-                _ => throw new InvalidOperationException("Expected the point cap to reject add."),
-                failure => failure
+                static _ =>
+                    throw new InvalidOperationException("Expected the point cap to reject add."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -154,8 +155,9 @@ public sealed class PointBalanceIOTests
 
         _ = result
             .Match(
-                _ => throw new InvalidOperationException("Expected an unknown-user failure."),
-                failure => failure
+                static _ =>
+                    throw new InvalidOperationException("Expected an unknown-user failure."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.UnknownUser>();
         await using var db = await dbFactory.CreateDbContextAsync();

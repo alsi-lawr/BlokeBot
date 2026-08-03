@@ -22,7 +22,7 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task ModeratorWithPriorAuthorization_CheckingAuthority_UsesSessionActorAndAppToken()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(request =>
+        fixture.Helix.Respond(static request =>
         {
             request.RequestUri!.Query.ShouldContain("user_id=moderator-id");
             request.Headers.Authorization!.Parameter.ShouldBe("app-token");
@@ -45,9 +45,9 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task DefinitiveAuthority_CheckingBeforeAndAtExpiry_UsesPerUserHostCacheForFifteenMinutes()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(_ => AllowedResponse());
-        fixture.Helix.Respond(_ => AllowedResponse());
-        fixture.Helix.Respond(_ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
+        fixture.Helix.Respond(static _ => AllowedResponse());
 
         _ = (
             await fixture.Service.AuthorizeAsync(
@@ -90,7 +90,7 @@ public sealed class ModeratorAuthorityServiceTests
     public async Task MissingModeratedChannel_CheckingAuthority_ConfirmsRevocationAndCachesTheDenial()
     {
         await using var fixture = await Fixture.CreateAsync();
-        fixture.Helix.Respond(_ => JsonResponse("""{"data":[],"pagination":{}}"""));
+        fixture.Helix.Respond(static _ => JsonResponse("""{"data":[],"pagination":{}}"""));
 
         _ = (
             await fixture.Service.AuthorizeAsync(

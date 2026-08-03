@@ -61,11 +61,11 @@ public partial class PageHelpButton
         HelpForPath(path) is { } help
         && !string.IsNullOrWhiteSpace(help.Title)
         && help.Sections.Count > 0
-        && help.Sections.All(section =>
+        && help.Sections.All(static section =>
             !string.IsNullOrWhiteSpace(section.Title)
             && (
                 !string.IsNullOrWhiteSpace(section.Body)
-                || section.Items.Any(item => !string.IsNullOrWhiteSpace(item))
+                || section.Items.Any(static item => !string.IsNullOrWhiteSpace(item))
             )
         );
 

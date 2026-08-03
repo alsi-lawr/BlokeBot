@@ -93,10 +93,10 @@ public sealed class RequestBoardServiceTests
             await service.ConfigureAsync(hostId, Board(), CancellationToken.None)
         );
 
-        configured.Value.Fields.Select(value => value.Key).ShouldBe(["prompt"]);
+        configured.Value.Fields.Select(static value => value.Key).ShouldBe(["prompt"]);
         _ = rejected.ShouldBeOfType<RequestBoardRejection.Conflict>();
         (await service.GetPublicPageAsync("alpha", "games", CancellationToken.None))!
-            .Board.Fields.Select(value => value.Key)
+            .Board.Fields.Select(static value => value.Key)
             .ShouldBe(["prompt"]);
     }
 
@@ -240,10 +240,10 @@ public sealed class RequestBoardServiceTests
         invalidUrl.Message.ShouldContain("valid HTTP or HTTPS URL");
         invalidClip.Message.ShouldContain("valid Twitch clip URL");
         valid
-            .Value.Values.Single(value => value.Key == "link")
+            .Value.Values.Single(static value => value.Key == "link")
             .Value.ShouldBe("https://example.com/watch");
-        valid.Value.Values.Single(value => value.Key == "format").Value.ShouldBe("Video");
-        valid.Value.Values.Single(value => value.Key == "rating").Value.ShouldBe("5.5");
+        valid.Value.Values.Single(static value => value.Key == "format").Value.ShouldBe("Video");
+        valid.Value.Values.Single(static value => value.Key == "rating").Value.ShouldBe("5.5");
     }
 
     [Test]
@@ -676,8 +676,8 @@ public sealed class RequestBoardServiceTests
 
     private static RequestBoardResult<T>.Succeeded Success<T>(RequestBoardResult<T> result) =>
         result.Match(
-            value => value,
-            rejected =>
+            static value => value,
+            static rejected =>
                 throw new InvalidOperationException(
                     $"Expected success but received: {rejected.Reason.Message}"
                 )
@@ -685,8 +685,8 @@ public sealed class RequestBoardServiceTests
 
     private static RequestBoardRejection Rejection<T>(RequestBoardResult<T> result) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected rejection."),
-            rejected => rejected.Reason
+            static _ => throw new InvalidOperationException("Expected rejection."),
+            static rejected => rejected.Reason
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)

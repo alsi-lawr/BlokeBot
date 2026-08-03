@@ -18,7 +18,7 @@ public sealed class SimulationLaunchReadinessTests
     [Test]
     public async Task ReadyDashboard_OnlyBecomesReadyAfterNormalStartupPhases()
     {
-        _ = Should.Throw<InvalidOperationException>(() =>
+        _ = Should.Throw<InvalidOperationException>(static () =>
             SimulationMode.SelectScenario(["--simulation-scenario", "unknown"])
         );
 
@@ -169,7 +169,7 @@ public sealed class SimulationLaunchReadinessTests
                 await client.PostAsync($"/simulation/commands/features/{state}", null)
             ).StatusCode.ShouldBe(HttpStatusCode.OK);
             await using var verify = await database.CreateDbContextAsync();
-            (await verify.Hosts.Select(host => host.EnabledFeatures).SingleAsync()).ShouldBe(
+            (await verify.Hosts.Select(static host => host.EnabledFeatures).SingleAsync()).ShouldBe(
                 expected
             );
         }

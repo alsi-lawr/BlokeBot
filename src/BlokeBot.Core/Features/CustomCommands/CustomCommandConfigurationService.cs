@@ -162,10 +162,12 @@ public sealed class CustomCommandConfigurationService(
         CustomCommandAliasConflict conflict
     ) =>
         conflict.Match<CustomCommandConfigurationSaveFailure>(
-            builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
+            static builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
                 builtIn.Alias
             ),
-            custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(custom.Alias)
+            static custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(
+                custom.Alias
+            )
         );
 
     private async Task<CustomCommandConfigurationSaveCommand> DisableUnavailableNativeAnnouncementsAsync(

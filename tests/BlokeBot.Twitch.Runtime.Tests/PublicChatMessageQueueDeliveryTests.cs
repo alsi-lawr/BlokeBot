@@ -148,7 +148,7 @@ public sealed class PublicChatMessageQueueDeliveryTests : PublicChatMessageQueue
         outbox.ScriptClaims(new PublicChatClaimOutcome.Claimed(Claimed("secret chat payload")));
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var transport = new ScriptedTransport(
-            (_, cancellationToken) =>
+            static (_, cancellationToken) =>
                 ValueTask.FromResult(
                     PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                         new InvalidOperationException("secret provider response"),

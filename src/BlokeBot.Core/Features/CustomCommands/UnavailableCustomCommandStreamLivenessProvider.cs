@@ -6,7 +6,7 @@ namespace BlokeBot.Core.Features.CustomCommands;
 internal sealed class UnavailableCustomCommandStreamLivenessProvider : IHostStreamLivenessProvider
 {
     public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-        IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+        IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
             ValueTask.FromResult(
                 Result<HostStreamLivenessOutcome, Never>.Success(
                     new HostStreamLivenessOutcome.Unavailable(

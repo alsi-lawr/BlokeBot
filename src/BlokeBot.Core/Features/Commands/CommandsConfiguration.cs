@@ -136,9 +136,9 @@ public sealed class CommandsConfigurationService(
     private static bool CanConfigure(AuthenticatedSession session, int hostId)
     {
         var selectedHost = session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         return selectedHost?.Id == hostId && session.CanManageSelectedHostConfig;
     }

@@ -28,9 +28,9 @@ public sealed class ChatIdentityResolverTests
         );
 
         var resolved = result.Match(
-            identity => identity,
-            _ => throw new InvalidOperationException("Expected resolved chat identities."),
-            _ => throw new InvalidOperationException("Expected resolved chat identities.")
+            static identity => identity,
+            static _ => throw new InvalidOperationException("Expected resolved chat identities."),
+            static _ => throw new InvalidOperationException("Expected resolved chat identities.")
         );
         resolved.BroadcasterId.ShouldBe("channel-id");
         resolved.BotUserId.ShouldBe("bot-id");
@@ -255,12 +255,12 @@ public sealed class ChatIdentityResolverTests
 
         _ = deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
         factory
-            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
-            .Select(request => request.SubscriptionId)
+            .EventSubRequests.Where(static request => request.Method == HttpMethod.Delete)
+            .Select(static request => request.SubscriptionId)
             .ShouldBe(subscriptionIds);
         factory
-            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
-            .Select(request => request.Authorization)
+            .EventSubRequests.Where(static request => request.Method == HttpMethod.Delete)
+            .Select(static request => request.Authorization)
             .Distinct()
             .ShouldBe(["Bearer broadcaster-token"]);
     }
@@ -293,9 +293,9 @@ public sealed class ChatIdentityResolverTests
         factory
             .EventSubRequests.ShouldHaveSingleItem()
             .ShouldSatisfyAllConditions(
-                request => request.Method.ShouldBe(HttpMethod.Post),
-                request => request.Type.ShouldBe("channel.raid"),
-                request => request.Authorization.ShouldBe("Bearer configured-bot-user-token")
+                static request => request.Method.ShouldBe(HttpMethod.Post),
+                static request => request.Type.ShouldBe("channel.raid"),
+                static request => request.Authorization.ShouldBe("Bearer configured-bot-user-token")
             );
         factory.LastAuthorization.ShouldBe("Bearer configured-bot-user-token");
     }
@@ -378,24 +378,24 @@ public sealed class ChatIdentityResolverTests
         _ = deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
         _ = recreated.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         factory
-            .EventSubRequests.Where(request => request.Method == HttpMethod.Post)
+            .EventSubRequests.Where(static request => request.Method == HttpMethod.Post)
             .Take(3)
-            .Select(request => request.Type)
+            .Select(static request => request.Type)
             .ShouldBe([
                 "channel.chat.message",
                 "channel.shoutout.create",
                 "channel.shoutout.receive",
             ]);
         factory
-            .EventSubRequests.Where(request =>
+            .EventSubRequests.Where(static request =>
                 request.Type?.StartsWith("channel.poll.", StringComparison.Ordinal) == true
             )
-            .Select(request => request.Authorization)
+            .Select(static request => request.Authorization)
             .Distinct()
             .ShouldBe(["Bearer broadcaster-token"]);
         factory
-            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
-            .Select(request => request.Authorization)
+            .EventSubRequests.Where(static request => request.Method == HttpMethod.Delete)
+            .Select(static request => request.Authorization)
             .Distinct()
             .ShouldBe(["Bearer broadcaster-token"]);
     }
@@ -504,8 +504,8 @@ public sealed class ChatIdentityResolverTests
             .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
             .ExecuteAsync(CancellationToken.None);
         return result.Match(
-            account => account,
-            reason =>
+            static account => account,
+            static reason =>
                 throw new InvalidOperationException($"Expected broadcaster account: {reason}.")
         );
     }
@@ -638,7 +638,7 @@ public sealed class ChatIdentityResolverTests
 
             internal void FailNextEventSubPostAfter(int successfulPosts) =>
                 _failEventSubPostAt =
-                    EventSubRequests.Count(request => request.Method == HttpMethod.Post)
+                    EventSubRequests.Count(static request => request.Method == HttpMethod.Post)
                     + successfulPosts
                     + 1;
 
@@ -691,8 +691,8 @@ public sealed class ChatIdentityResolverTests
                 var subscriptionId = request
                     .RequestUri?.Query.TrimStart('?')
                     .Split('&', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(parameter => parameter.Split('=', 2))
-                    .FirstOrDefault(parameter => parameter[0] == "id")
+                    .Select(static parameter => parameter.Split('=', 2))
+                    .FirstOrDefault(static parameter => parameter[0] == "id")
                     ?.ElementAtOrDefault(1);
                 EventSubRequests.Add(
                     new EventSubRequest(
@@ -707,7 +707,7 @@ public sealed class ChatIdentityResolverTests
                     true => new HttpResponseMessage(HttpStatusCode.NoContent),
                     false => (
                         _failEventSubPostAt
-                        == EventSubRequests.Count(eventSubRequest =>
+                        == EventSubRequests.Count(static eventSubRequest =>
                             eventSubRequest.Method == HttpMethod.Post
                         )
                     ) switch
@@ -775,7 +775,7 @@ public sealed class ChatIdentityResolverTests
     private sealed class UnusedAccountProvider : IBotAccountProvider
     {
         public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromException<Result<BotAccount, AccessTokenUnavailableReason>>(
                     new InvalidOperationException("Account lookup was not expected.")
                 )

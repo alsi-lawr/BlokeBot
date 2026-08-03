@@ -67,8 +67,8 @@ public sealed class PointsConfigurationCommandTests
         var errors = PointsConfigurationValidator
             .Validate(draft)
             .Match(
-                _ => Array.Empty<PointsConfigurationValidationError>(),
-                invalid => invalid.ToArray()
+                static _ => Array.Empty<PointsConfigurationValidationError>(),
+                static invalid => invalid.ToArray()
             );
 
         errors.ShouldContain(new PointsConfigurationValidationError.InvalidMinimumPayout());
@@ -100,7 +100,10 @@ public sealed class PointsConfigurationCommandTests
         var result = await service
             .SaveConfiguration(hostId, ValidCommand(draft))
             .ExecuteAsync(CancellationToken.None);
-        var failure = result.Match<PointsConfigurationSaveFailure?>(_ => null, error => error);
+        var failure = result.Match<PointsConfigurationSaveFailure?>(
+            static _ => null,
+            static error => error
+        );
 
         _ = failure.ShouldNotBeNull();
         failure.ShouldBe(new PointsConfigurationSaveFailure("shared"));
@@ -123,7 +126,10 @@ public sealed class PointsConfigurationCommandTests
         var result = await service
             .SaveConfiguration(hostId, ValidCommand(draft))
             .ExecuteAsync(CancellationToken.None);
-        var failure = result.Match<PointsConfigurationSaveFailure?>(_ => null, error => error);
+        var failure = result.Match<PointsConfigurationSaveFailure?>(
+            static _ => null,
+            static error => error
+        );
 
         failure.ShouldBe(new PointsConfigurationSaveFailure("shared"));
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -166,7 +172,7 @@ public sealed class PointsConfigurationCommandTests
             .ExecuteAsync(CancellationToken.None);
         _ = result.Match(
             static _ => true,
-            failure => throw new InvalidOperationException(failure.Message)
+            static failure => throw new InvalidOperationException(failure.Message)
         );
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
 

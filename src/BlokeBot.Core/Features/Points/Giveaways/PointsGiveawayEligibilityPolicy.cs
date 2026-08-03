@@ -77,7 +77,7 @@ public sealed class PointsGiveawayEligibilityPolicy(
         tags.TryGetValue("badges", out var badges)
         && badges
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(x => x.StartsWith("subscriber/", StringComparison.OrdinalIgnoreCase));
+            .Any(static x => x.StartsWith("subscriber/", StringComparison.OrdinalIgnoreCase));
 }
 
 internal sealed class PointsGiveawayStreamLivenessException(

@@ -65,18 +65,20 @@ internal static class PublicChatDeliveryClassifier
         PublicChatPreparationOutcome outcome
     ) =>
         outcome.Match<PublicChatDeliveryOutcome>(
-            _ =>
+            static _ =>
                 throw new InvalidOperationException(
                     "A ready public chat preparation is not a delivery failure."
                 ),
             static _ => new PublicChatDeliveryOutcome.MissingChannel(),
             static _ => new PublicChatDeliveryOutcome.MissingBot(),
-            unavailable => new PublicChatDeliveryOutcome.TokenUnavailable(unavailable.Reason),
-            transient => new PublicChatDeliveryOutcome.SafePreSendTransient
+            static unavailable => new PublicChatDeliveryOutcome.TokenUnavailable(
+                unavailable.Reason
+            ),
+            static transient => new PublicChatDeliveryOutcome.SafePreSendTransient
             {
                 Diagnostic = transient.Diagnostic,
             },
-            unexpected => new PublicChatDeliveryOutcome.Unexpected
+            static unexpected => new PublicChatDeliveryOutcome.Unexpected
             {
                 Diagnostic = unexpected.Diagnostic,
                 Cause = unexpected.Cause,
@@ -85,8 +87,8 @@ internal static class PublicChatDeliveryClassifier
 
     internal static PublicChatDeliveryOutcome MapSendResult(PublicChatTransportSendResult result) =>
         result.Match<PublicChatDeliveryOutcome>(
-            sent => new PublicChatDeliveryOutcome.Sent(sent.TwitchMessageId),
-            rejected => new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
+            static sent => new PublicChatDeliveryOutcome.Sent(sent.TwitchMessageId),
+            static rejected => new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
         );
 
     private static bool IsSafePreSendTransient(Exception exception) =>

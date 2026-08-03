@@ -227,8 +227,8 @@ public sealed class ViewerCommandCatalogTests
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var custom = await db
-                .CustomCommands.Include(value => value.Aliases)
-                .SingleAsync(value => value.Name == "Public");
+                .CustomCommands.Include(static value => value.Aliases)
+                .SingleAsync(static value => value.Name == "Public");
             custom.Aliases.Clear();
             custom.Aliases.Add(
                 new CustomCommandAlias
@@ -248,10 +248,10 @@ public sealed class ViewerCommandCatalogTests
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
-        snapshot.Entries.ShouldNotContain(entry =>
+        snapshot.Entries.ShouldNotContain(static entry =>
             entry.Source == ViewerCommandCatalogSource.Custom && entry.Name == "!join"
         );
-        snapshot.Conflicts.ShouldContain(message => message.Contains("!join"));
+        snapshot.Conflicts.ShouldContain(static message => message.Contains("!join"));
     }
 
     [Test]

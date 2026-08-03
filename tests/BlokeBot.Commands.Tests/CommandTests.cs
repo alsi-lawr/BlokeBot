@@ -99,7 +99,7 @@ public sealed class CommandTests
     public async Task RegisteredCommandModule_Dispatching_ExecutesModuleHandler()
     {
         List<CommandResponse> responses = [];
-        var dispatcher = BuildDispatcher(builder => builder.AddCommandModule<TestModule>());
+        var dispatcher = BuildDispatcher(static builder => builder.AddCommandModule<TestModule>());
 
         await dispatcher.DispatchResponsesAsync(
             Message("alice", "!module value"),

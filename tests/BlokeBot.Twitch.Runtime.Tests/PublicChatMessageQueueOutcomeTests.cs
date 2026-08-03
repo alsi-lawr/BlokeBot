@@ -142,7 +142,7 @@ public sealed class PublicChatMessageQueueOutcomeTests : PublicChatMessageQueueT
         outbox.ScriptOutstanding([pending], [pending], [pending]);
         var observer = new RecordingQueueAlertObserver();
         var transport = new ScriptedTransport(
-            (_, cancellationToken) =>
+            static (_, cancellationToken) =>
                 ValueTask.FromResult(
                     PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                         new IOException("preparation failed"),

@@ -121,12 +121,12 @@ public sealed class ClipMarkerServiceTests
         await using (var verifyMoments = await dbFactory.CreateDbContextAsync())
         {
             (
-                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                await verifyMoments.TwitchClips.SingleAsync(static clip =>
                     clip.IdempotencyKey == "clip-attempt"
                 )
             ).Status.ShouldBe(TwitchClipStatus.Pending);
             (
-                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                await verifyMoments.TwitchClips.SingleAsync(static clip =>
                     clip.IdempotencyKey == "moment:public-id:clip"
                 )
             ).Status.ShouldBe(TwitchClipStatus.Available);
@@ -405,7 +405,7 @@ public sealed class ClipMarkerServiceTests
         );
 
         outcomes
-            .All(value =>
+            .All(static value =>
                 value
                     is ClipMarkerOperationOutcome.ClipPending
                         or ClipMarkerOperationOutcome.ClipAmbiguous
@@ -469,7 +469,7 @@ public sealed class ClipMarkerServiceTests
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

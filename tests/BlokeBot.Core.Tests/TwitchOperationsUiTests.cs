@@ -177,7 +177,7 @@ public sealed class TwitchOperationsUiTests
         };
 
         presentations
-            .Select(value => value.Band)
+            .Select(static value => value.Band)
             .ShouldBe([
                 RedemptionWaitingAgeBand.Fresh,
                 RedemptionWaitingAgeBand.Fresh,
@@ -186,7 +186,7 @@ public sealed class TwitchOperationsUiTests
                 RedemptionWaitingAgeBand.NeedsAttention,
             ]);
         presentations
-            .Select(value => value.SemanticValue)
+            .Select(static value => value.SemanticValue)
             .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
         presentations[0].Age.ShouldBe(TimeSpan.Zero);
         presentations[0].Label.ShouldBe("New · waiting less than a minute");
@@ -428,7 +428,7 @@ public sealed class TwitchOperationsUiTests
                 nativeTwitch
             )
         );
-        _ = context.Services.AddSingleton<IShoutoutDashboardOperations>(provider =>
+        _ = context.Services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
         _ = context.Services.AddSingleton(
@@ -449,7 +449,7 @@ public sealed class TwitchOperationsUiTests
                 nativeTwitch
             )
         );
-        _ = context.Services.AddSingleton<IClipMarkerDashboardOperations>(provider =>
+        _ = context.Services.AddSingleton<IClipMarkerDashboardOperations>(static provider =>
             provider.GetRequiredService<ClipMarkerService>()
         );
         _ = context.Services.AddSingleton(
@@ -487,7 +487,7 @@ public sealed class TwitchOperationsUiTests
 
     private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page) =>
         page.FindAll(".disclosure-title, .task-panel__title")
-            .Select(element => element.TextContent.Trim())
+            .Select(static element => element.TextContent.Trim())
             .ToArray();
 
     private static ChannelPointsRewardView Reward() =>
@@ -609,7 +609,7 @@ public sealed class TwitchOperationsUiTests
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
         ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable

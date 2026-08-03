@@ -46,13 +46,13 @@ public partial class BotAccountAuthorizationSection
     public string EnableToggleLabel { get; set; } = "Enable";
 
     [Parameter]
-    public Func<bool, Task> EnableToggleChanged { get; set; } = _ => Task.CompletedTask;
+    public Func<bool, Task> EnableToggleChanged { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<Task> Clear { get; set; } = () => Task.CompletedTask;
+    public Func<Task> Clear { get; set; } = static () => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<Task> Refresh { get; set; } = () => Task.CompletedTask;
+    public Func<Task> Refresh { get; set; } = static () => Task.CompletedTask;
 
     private string _authorizedAccountText =>
         Status?.AuthorizedLogin is { Length: > 0 } login

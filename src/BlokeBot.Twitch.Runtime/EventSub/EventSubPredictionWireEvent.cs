@@ -53,7 +53,7 @@ internal sealed record EventSubPredictionWireEvent
                 BroadcasterUserLogin,
                 Id,
                 Title,
-                Outcomes.Select(x => x.ToDomain()).ToArray(),
+                Outcomes.Select(static x => x.ToDomain()).ToArray(),
                 status,
                 StartedAt,
                 LocksAt ?? LockedAt,
@@ -90,7 +90,7 @@ internal sealed record EventSubPredictionWireEvent
                 Color,
                 Users,
                 ChannelPoints,
-                (TopPredictors ?? []).Select(x => x.ToDomain()).ToArray()
+                (TopPredictors ?? []).Select(static x => x.ToDomain()).ToArray()
             );
     }
 

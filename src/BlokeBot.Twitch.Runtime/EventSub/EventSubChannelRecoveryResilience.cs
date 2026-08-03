@@ -24,7 +24,7 @@ internal static class EventSubChannelRecoveryResilience
                     Delay = policy.Delay,
                     MaxDelay = policy.MaximumDelay,
                     BackoffType = policy.DelayBackoffType,
-                    ShouldHandle = args =>
+                    ShouldHandle = static args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
                                 ? EventSubChannelFailureClassifier.IsRecoverable(

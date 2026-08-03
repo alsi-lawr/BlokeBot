@@ -30,8 +30,10 @@ public sealed class OverlayInstancePersistenceTests
         }
 
         await using var migrated = await factory.CreateDbContextAsync();
-        (await migrated.Hosts.Select(value => value.Login).ToArrayAsync()).ShouldBe(["host"]);
-        (await migrated.Hosts.Select(value => value.EnabledFeatures).SingleAsync()).ShouldBe(
+        (await migrated.Hosts.Select(static value => value.Login).ToArrayAsync()).ShouldBe([
+            "host",
+        ]);
+        (await migrated.Hosts.Select(static value => value.EnabledFeatures).SingleAsync()).ShouldBe(
             HostFeatureFlags.All
         );
         (await migrated.Database.GetAppliedMigrationsAsync()).ShouldContain(_overlayMigration);

@@ -85,7 +85,7 @@ public sealed class AutomaticRaidShoutoutConfigurationTests
         ).ShouldBeOfType<AutomaticRaidShoutoutSaveOutcome.Invalid>();
 
         rejected
-            .Errors.Select(error => error.Field)
+            .Errors.Select(static error => error.Field)
             .ShouldBe(
                 [
                     AutomaticRaidShoutoutValidationField.MinimumViewerCount,

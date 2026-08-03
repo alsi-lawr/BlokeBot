@@ -1042,7 +1042,7 @@ public static class FakeTwitchHostingExtensions
                                     video_id = "fake-video",
                                     markers = authority
                                         .Markers(request)
-                                        .Select(marker => new
+                                        .Select(static marker => new
                                         {
                                             id = marker.Id,
                                             description = marker.Description,

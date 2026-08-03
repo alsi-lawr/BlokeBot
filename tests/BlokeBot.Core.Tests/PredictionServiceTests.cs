@@ -30,7 +30,7 @@ public sealed class PredictionServiceTests
         ).Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Ineligible>();
         handler.BroadcasterType = "affiliate";
         await service.ReconcileAsync(first.Id, CancellationToken.None);
-        handler.Requests.ShouldContain(request =>
+        handler.Requests.ShouldContain(static request =>
             request.Method == HttpMethod.Get
             && request.Query.Contains("first=25")
             && request.Query.Contains("broadcaster_id=first-id")
@@ -63,8 +63,8 @@ public sealed class PredictionServiceTests
 
         await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
         await service.PredictionReceivedAsync(Event("locked"), CancellationToken.None);
-        (await service.LoadAsync(first.Id, CancellationToken.None)).Results.ShouldContain(result =>
-            result.Status == "Resolved"
+        (await service.LoadAsync(first.Id, CancellationToken.None)).Results.ShouldContain(
+            static result => result.Status == "Resolved"
         );
         handler.BroadcasterType = "partner";
         _ = (

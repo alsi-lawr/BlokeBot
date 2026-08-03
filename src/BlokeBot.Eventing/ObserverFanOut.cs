@@ -172,9 +172,9 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         {
             (> 0, _) => throw new ObserverFanOutEscalationException(
                 failures,
-                failureHandlingFailures.Select(failure => failure.Summary).ToArray(),
+                failureHandlingFailures.Select(static failure => failure.Summary).ToArray(),
                 exactObserverFailures
-                    .Concat(failureHandlingFailures.Select(failure => failure.Exception))
+                    .Concat(failureHandlingFailures.Select(static failure => failure.Exception))
                     .ToArray()
             ),
             (_, 0) => new ObserverFanOutOutcome.AllSucceeded { ObserverCount = observers.Count },

@@ -196,14 +196,16 @@ internal static class RequestBoardInput
 
     public static bool IsValidLogin(string value) =>
         value.Length is >= 1 and <= 128
-        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
+        && value.All(static character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     public static string NormalizeSlug(string value) => value.Trim().ToLowerInvariant();
 
     public static bool IsValidSlug(string value) =>
         value.Length is >= 1 and <= 48
         && value[0] is >= 'a' and <= 'z'
-        && value.All(character => character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
+        && value.All(static character =>
+            character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-'
+        );
 
     public static string NormalizeTitle(string value)
     {
@@ -272,7 +274,7 @@ internal static class RequestBoardInput
     public static IReadOnlyList<string> ParseTags(string value) =>
         value
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(tag => tag.ToLowerInvariant())
+            .Select(static tag => tag.ToLowerInvariant())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 

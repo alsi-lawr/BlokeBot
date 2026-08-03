@@ -206,7 +206,7 @@ public sealed class ChatActivityHookTests
         )
         {
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                ? values.ToDictionary(static pair => pair.Key, static pair => pair.Value)
                 : [];
             Entries.Add(new LogEntry(formatter(state, exception), properties));
         }

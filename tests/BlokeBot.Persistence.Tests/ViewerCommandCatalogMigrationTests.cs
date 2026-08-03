@@ -59,34 +59,34 @@ public sealed class ViewerCommandCatalogMigrationTests
         (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_catalogMigration);
         (
             await migrated
-                .CustomCommandAliases.OrderBy(value => value.SortOrder)
-                .Select(value => value.Alias)
+                .CustomCommandAliases.OrderBy(static value => value.SortOrder)
+                .Select(static value => value.Alias)
                 .ToArrayAsync()
         ).ShouldBe(["Alpha", "beta", "zeta"]);
         (
             await migrated
-                .CommandAliases.Where(value =>
+                .CommandAliases.Where(static value =>
                     value.HostId == 1 && value.Kind == AppCommandKind.Join
                 )
-                .Select(value => value.Alias)
+                .Select(static value => value.Alias)
                 .SingleAsync()
         ).ShouldBe("enter");
         (
             await migrated
-                .CommandAliases.Where(value =>
+                .CommandAliases.Where(static value =>
                     value.HostId == 2 && value.Kind == AppCommandKind.Join
                 )
-                .Select(value => value.Alias)
+                .Select(static value => value.Alias)
                 .SingleAsync()
         ).ShouldBe("join");
         (
             await migrated
-                .CommandAliases.Where(value => value.Kind == AppCommandKind.Commands)
-                .OrderBy(value => value.HostId)
-                .Select(value => value.HostId)
+                .CommandAliases.Where(static value => value.Kind == AppCommandKind.Commands)
+                .OrderBy(static value => value.HostId)
+                .Select(static value => value.HostId)
                 .ToArrayAsync()
         ).ShouldBe([1, 2]);
-        var conflict = await migrated.Hosts.SingleAsync(value => value.Id == 3);
+        var conflict = await migrated.Hosts.SingleAsync(static value => value.Id == 3);
         conflict.CommandsAliasesConfigured.ShouldBeTrue();
         conflict.CommandsDefaultConflictAlias.ShouldBe("commands");
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldContain(_independentChatTools);

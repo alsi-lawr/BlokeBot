@@ -20,7 +20,7 @@ public sealed class PointsConfigurationTests : PointsTestBase
             .ExecuteAsync(CancellationToken.None);
         _ = result.Match(
             static _ => true,
-            failure => throw new InvalidOperationException(failure.Message)
+            static failure => throw new InvalidOperationException(failure.Message)
         );
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
 

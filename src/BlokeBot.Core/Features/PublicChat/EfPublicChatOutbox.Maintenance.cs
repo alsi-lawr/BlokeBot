@@ -118,13 +118,13 @@ internal sealed partial class EfPublicChatOutbox
     {
         var expiresAtUtc = await db
             .PublicChatOutboxMessages.AsNoTracking()
-            .Where(row =>
+            .Where(static row =>
                 row.Status == PublicChatOutboxStatus.Pending
                 || row.Status == PublicChatOutboxStatus.Claimed
                 || row.Status == PublicChatOutboxStatus.SafePreSendTransient
             )
-            .OrderBy(row => row.ExpiresAtUtc)
-            .Select(row => (DateTime?)row.ExpiresAtUtc)
+            .OrderBy(static row => row.ExpiresAtUtc)
+            .Select(static row => (DateTime?)row.ExpiresAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
         return expiresAtUtc is { } value ? ToDateTimeOffset(value) : null;
     }
@@ -352,8 +352,8 @@ internal sealed partial class EfPublicChatOutbox
     )
     {
         var completedAtUtc = await TerminalRows(db)
-            .OrderBy(row => row.CompletedAtUtc)
-            .Select(row => row.CompletedAtUtc)
+            .OrderBy(static row => row.CompletedAtUtc)
+            .Select(static row => row.CompletedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
         if (completedAtUtc is not { } completedAt)
         {
@@ -396,7 +396,7 @@ internal sealed partial class EfPublicChatOutbox
     }
 
     private static IQueryable<PublicChatOutboxMessage> TerminalRows(BlokeBotDbContext db) =>
-        db.PublicChatOutboxMessages.Where(row =>
+        db.PublicChatOutboxMessages.Where(static row =>
             row.Status == PublicChatOutboxStatus.SafePreSendExhausted
             || row.Status == PublicChatOutboxStatus.MissingChannel
             || row.Status == PublicChatOutboxStatus.MissingBot

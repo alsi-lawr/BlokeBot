@@ -23,9 +23,9 @@ public sealed class HostedChannelConnectionStatusUiTests
     {
         using var context = new BunitContext();
 
-        var saved = context.Render<HostedChannelRow>(parameters =>
+        var saved = context.Render<HostedChannelRow>(static parameters =>
             parameters.Add(
-                component => component.Host,
+                static component => component.Host,
                 new HostedChannelAdminView(
                     1,
                     "streamer",
@@ -36,9 +36,9 @@ public sealed class HostedChannelConnectionStatusUiTests
                 )
             )
         );
-        var needed = context.Render<HostedChannelRow>(parameters =>
+        var needed = context.Render<HostedChannelRow>(static parameters =>
             parameters.Add(
-                component => component.Host,
+                static component => component.Host,
                 new HostedChannelAdminView(
                     2,
                     "otherstreamer",

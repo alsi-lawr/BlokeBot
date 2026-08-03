@@ -286,16 +286,16 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
     [Test]
     public void TimingValues_InvalidDurations_AreRejected()
     {
-        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new AnnouncementRetryDelay(TimeSpan.Zero)
         );
-        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new AnnouncementRetryDelay(TimeSpan.FromTicks(-1))
         );
-        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new AnnouncementOccurrenceLifetime(TimeSpan.Zero)
         );
-        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(60).Add(TimeSpan.FromTicks(1)))
         );
         new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(60)).Value.ShouldBe(

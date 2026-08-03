@@ -66,7 +66,7 @@ public static class BlokeBotApplication
         var online = runtime == BlokeBotRuntimeMode.Online;
         _ = builder.Services.AddEventBus<AppEventKind>(
             ObserverBoundary.Named("BlokeBot.ApplicationEvents"),
-            eventKind => ObserverEventIdentity.Named($"BlokeBot.{eventKind}")
+            static eventKind => ObserverEventIdentity.Named($"BlokeBot.{eventKind}")
         );
         _ = builder
             .Services.AddBlokeBotAppCommands()
@@ -173,7 +173,7 @@ public static class BlokeBotApplication
         _ = app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],
-            () => Results.Redirect("/blokebot-mark.svg")
+            static () => Results.Redirect("/blokebot-mark.svg")
         );
         _ = app.UseStaticFiles();
         _ = app.MapStaticAssets();

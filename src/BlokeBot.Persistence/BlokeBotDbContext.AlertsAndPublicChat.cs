@@ -22,31 +22,31 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAlertsAndPublicChat(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<DurableAlert>(b =>
+        _ = modelBuilder.Entity<DurableAlert>(static b =>
         {
             _ = b.ToTable(
                 "durable_alerts",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_durable_alerts_Severity",
                         KindIn("Severity", _durableAlertSeverities)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Severity)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Severity)
                 .HasConversion(
-                    severity => PersistedEnumTokens<DurableAlertSeverity>.Format(severity),
-                    value => PersistedEnumTokens<DurableAlertSeverity>.Parse(value)
+                    static severity => PersistedEnumTokens<DurableAlertSeverity>.Format(severity),
+                    static value => PersistedEnumTokens<DurableAlertSeverity>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.Source).HasMaxLength(64);
-            _ = b.Property(x => x.SourceKey).HasMaxLength(256);
-            _ = b.Property(x => x.Title).HasMaxLength(160);
-            _ = b.Property(x => x.Message).HasMaxLength(1000);
-            _ = b.Property(x => x.LinkPath).HasMaxLength(256);
-            _ = b.Property(x => x.AcknowledgedByLogin).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.HostId, x.AcknowledgedAtUtc });
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.Source).HasMaxLength(64);
+            _ = b.Property(static x => x.SourceKey).HasMaxLength(256);
+            _ = b.Property(static x => x.Title).HasMaxLength(160);
+            _ = b.Property(static x => x.Message).HasMaxLength(1000);
+            _ = b.Property(static x => x.LinkPath).HasMaxLength(256);
+            _ = b.Property(static x => x.AcknowledgedByLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.AcknowledgedAtUtc });
+            _ = b.HasIndex(static x => new
                 {
                     x.HostId,
                     x.Source,
@@ -56,15 +56,15 @@ public sealed partial class BlokeBotDbContext
                 .HasFilter("\"AcknowledgedAtUtc\" IS NULL");
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PublicChatOutboxMessage>(b =>
+        _ = modelBuilder.Entity<PublicChatOutboxMessage>(static b =>
         {
             _ = b.ToTable(
                 "public_chat_outbox",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_outbox_Status",
@@ -179,47 +179,51 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Channel).HasMaxLength(128);
-            _ = b.Property(x => x.DeduplicationKey).HasMaxLength(64);
-            _ = b.Property(x => x.FailurePhase)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Channel).HasMaxLength(128);
+            _ = b.Property(static x => x.DeduplicationKey).HasMaxLength(64);
+            _ = b.Property(static x => x.FailurePhase)
                 .HasConversion(
-                    phase =>
+                    static phase =>
                         phase.HasValue
                             ? PersistedEnumTokens<PublicChatOutboxFailurePhase>.Format(phase.Value)
                             : null,
-                    value =>
+                    static value =>
                         value == null
                             ? null
                             : PersistedEnumTokens<PublicChatOutboxFailurePhase>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.FailureType).HasMaxLength(512);
-            _ = b.Property(x => x.RejectionCode).HasMaxLength(128);
-            _ = b.Property(x => x.Status)
+            _ = b.Property(static x => x.FailureType).HasMaxLength(512);
+            _ = b.Property(static x => x.RejectionCode).HasMaxLength(128);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    status => PersistedEnumTokens<PublicChatOutboxStatus>.Format(status),
-                    value => PersistedEnumTokens<PublicChatOutboxStatus>.Parse(value)
+                    static status => PersistedEnumTokens<PublicChatOutboxStatus>.Format(status),
+                    static value => PersistedEnumTokens<PublicChatOutboxStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.HasIndex(x => new
+            _ = b.HasIndex(static x => new
             {
                 x.Status,
                 x.NextAttemptAtUtc,
                 x.CreatedAtUtc,
                 x.Id,
             });
-            _ = b.HasIndex(x => new { x.Status, x.ClaimExpiresAtUtc });
-            _ = b.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
-            _ = b.HasIndex(x => x.ClaimToken).IsUnique().HasFilter("\"ClaimToken\" IS NOT NULL");
-            _ = b.HasIndex(x => x.ClaimSlot).IsUnique().HasFilter("\"ClaimSlot\" IS NOT NULL");
+            _ = b.HasIndex(static x => new { x.Status, x.ClaimExpiresAtUtc });
+            _ = b.HasIndex(static x => new { x.Status, x.ExpiresAtUtc });
+            _ = b.HasIndex(static x => x.ClaimToken)
+                .IsUnique()
+                .HasFilter("\"ClaimToken\" IS NOT NULL");
+            _ = b.HasIndex(static x => x.ClaimSlot)
+                .IsUnique()
+                .HasFilter("\"ClaimSlot\" IS NOT NULL");
         });
 
-        _ = modelBuilder.Entity<PublicChatSendReceipt>(b =>
+        _ = modelBuilder.Entity<PublicChatSendReceipt>(static b =>
         {
             _ = b.ToTable(
                 "public_chat_send_receipts",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_public_chat_send_receipts_Delivery",
                         "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR "
@@ -227,28 +231,28 @@ public sealed partial class BlokeBotDbContext
                             + "AND DeliveredAtUtc IS NOT NULL)"
                     )
             );
-            _ = b.HasKey(x => x.OutboxMessageId);
-            _ = b.Property(x => x.OutboxMessageId).ValueGeneratedNever();
-            _ = b.Property(x => x.DeliveredDeduplicationKey).HasMaxLength(64);
-            _ = b.Property(x => x.TwitchMessageId).HasMaxLength(128);
-            _ = b.HasIndex(x => x.AttemptedAtUtc);
-            _ = b.HasIndex(x => x.DeliveredAtUtc);
+            _ = b.HasKey(static x => x.OutboxMessageId);
+            _ = b.Property(static x => x.OutboxMessageId).ValueGeneratedNever();
+            _ = b.Property(static x => x.DeliveredDeduplicationKey).HasMaxLength(64);
+            _ = b.Property(static x => x.TwitchMessageId).HasMaxLength(128);
+            _ = b.HasIndex(static x => x.AttemptedAtUtc);
+            _ = b.HasIndex(static x => x.DeliveredAtUtc);
         });
 
-        _ = modelBuilder.Entity<ReplyPinPolicy>(b =>
+        _ = modelBuilder.Entity<ReplyPinPolicy>(static b =>
         {
             _ = b.ToTable(
                 "reply_pin_policies",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_reply_pin_policies_DurationSeconds",
                         "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Feature).HasMaxLength(64);
-            _ = b.Property(x => x.ReplyKey).HasMaxLength(128);
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Feature).HasMaxLength(64);
+            _ = b.Property(static x => x.ReplyKey).HasMaxLength(128);
+            _ = b.HasIndex(static x => new
                 {
                     x.HostId,
                     x.Feature,
@@ -257,15 +261,15 @@ public sealed partial class BlokeBotDbContext
                 .IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<PublicChatPinOperation>(b =>
+        _ = modelBuilder.Entity<PublicChatPinOperation>(static b =>
         {
             _ = b.ToTable(
                 "public_chat_pin_operations",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_public_chat_pin_operations_Kind",
@@ -281,57 +285,57 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<PublicChatPinOperationKind>.Format(value),
-                    value => PersistedEnumTokens<PublicChatPinOperationKind>.Parse(value)
+                    static value => PersistedEnumTokens<PublicChatPinOperationKind>.Format(value),
+                    static value => PersistedEnumTokens<PublicChatPinOperationKind>.Parse(value)
                 )
                 .HasMaxLength(16);
-            _ = b.Property(x => x.Status)
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    value => PersistedEnumTokens<PublicChatPinOperationStatus>.Format(value),
-                    value => PersistedEnumTokens<PublicChatPinOperationStatus>.Parse(value)
+                    static value => PersistedEnumTokens<PublicChatPinOperationStatus>.Format(value),
+                    static value => PersistedEnumTokens<PublicChatPinOperationStatus>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.Channel).HasMaxLength(128);
-            _ = b.Property(x => x.Feature).HasMaxLength(64);
-            _ = b.Property(x => x.ReplyKey).HasMaxLength(128);
-            _ = b.Property(x => x.TwitchMessageId).HasMaxLength(128);
-            _ = b.Property(x => x.PinnerTwitchUserId).HasMaxLength(128);
-            _ = b.Property(x => x.Outcome).HasMaxLength(512);
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.Channel).HasMaxLength(128);
+            _ = b.Property(static x => x.Feature).HasMaxLength(64);
+            _ = b.Property(static x => x.ReplyKey).HasMaxLength(128);
+            _ = b.Property(static x => x.TwitchMessageId).HasMaxLength(128);
+            _ = b.Property(static x => x.PinnerTwitchUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.Outcome).HasMaxLength(512);
+            _ = b.HasIndex(static x => new
             {
                 x.Status,
                 x.CreatedAtUtc,
                 x.Id,
             });
-            _ = b.HasIndex(x => x.OutboxMessageId)
+            _ = b.HasIndex(static x => x.OutboxMessageId)
                 .IsUnique()
                 .HasFilter("\"OutboxMessageId\" IS NOT NULL");
             _ = b.HasOne<PublicChatOutboxMessage>()
                 .WithOne()
-                .HasForeignKey<PublicChatPinOperation>(x => x.OutboxMessageId)
+                .HasForeignKey<PublicChatPinOperation>(static x => x.OutboxMessageId)
                 .OnDelete(DeleteBehavior.Cascade);
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ActivePublicChatPin>(b =>
+        _ = modelBuilder.Entity<ActivePublicChatPin>(static b =>
         {
             _ = b.ToTable("active_public_chat_pins");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Channel).HasMaxLength(128);
-            _ = b.Property(x => x.TwitchMessageId).HasMaxLength(128);
-            _ = b.Property(x => x.PinnerTwitchUserId).HasMaxLength(128);
-            _ = b.Property(x => x.Feature).HasMaxLength(64);
-            _ = b.Property(x => x.ReplyKey).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.HostId, x.Channel }).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Channel).HasMaxLength(128);
+            _ = b.Property(static x => x.TwitchMessageId).HasMaxLength(128);
+            _ = b.Property(static x => x.PinnerTwitchUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.Feature).HasMaxLength(64);
+            _ = b.Property(static x => x.ReplyKey).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.Channel }).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

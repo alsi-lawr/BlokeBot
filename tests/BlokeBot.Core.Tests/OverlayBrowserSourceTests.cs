@@ -66,7 +66,7 @@ public sealed class OverlayBrowserSourceTests
         using var document = JsonDocument.Parse(json);
         document
             .RootElement.EnumerateObject()
-            .Select(property => property.Name)
+            .Select(static property => property.Name)
             .ShouldBe([
                 "overlayType",
                 "schemaVersion",
@@ -105,7 +105,7 @@ public sealed class OverlayBrowserSourceTests
         using var parsed = JsonDocument.Parse(state);
         var root = parsed.RootElement;
         root.EnumerateObject()
-            .Select(property => property.Name)
+            .Select(static property => property.Name)
             .ShouldBe([
                 "overlayType",
                 "schemaVersion",
@@ -295,7 +295,9 @@ public sealed class OverlayBrowserSourceTests
         bytes.ShouldBe("ftyp"u8.ToArray());
         response.Headers.CacheControl?.Private.ShouldBeTrue();
         response.Headers.CacheControl?.MaxAge.ShouldBe(TimeSpan.FromDays(365));
-        response.Headers.CacheControl?.Extensions.ShouldContain(value => value.Name == "immutable");
+        response.Headers.CacheControl?.Extensions.ShouldContain(static value =>
+            value.Name == "immutable"
+        );
         response.Headers.GetValues("X-Content-Type-Options").Single().ShouldBe("nosniff");
         response
             .Headers.GetValues("Content-Security-Policy")

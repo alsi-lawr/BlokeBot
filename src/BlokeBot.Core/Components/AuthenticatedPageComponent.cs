@@ -38,9 +38,9 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     {
         PageContext = await PageContexts.FromAsync(AuthenticationState);
         Host = PageContext.Session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         ActorLogin = PageContext.ActorLogin;
         return PageContext;

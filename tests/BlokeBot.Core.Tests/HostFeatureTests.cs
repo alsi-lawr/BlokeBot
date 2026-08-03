@@ -54,12 +54,14 @@ public sealed class HostFeatureTests
     public void NewHostModel_DefaultsEveryChatToolOff()
     {
         new BotHost().EnabledFeatures.ShouldBe(HostFeatureFlags.None);
-        HostFeatureCatalog.Cards(HostFeatureFlags.None).ShouldAllBe(feature => !feature.Enabled);
+        HostFeatureCatalog
+            .Cards(HostFeatureFlags.None)
+            .ShouldAllBe(static feature => !feature.Enabled);
         HostFeatureCatalog.Features.Count.ShouldBe(12);
         HostFeatureCatalog.Features.ShouldBeUnique();
         HostFeatureCatalog
             .Cards(HostFeatureFlags.None)
-            .Select(card => card.Feature)
+            .Select(static card => card.Feature)
             .ShouldBe(HostFeatureCatalog.Features);
     }
 
@@ -225,7 +227,9 @@ public sealed class HostFeatureTests
         );
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
+        var profileId = await verify
+            .Profiles.Select(static x => x.Id)
+            .SingleAsync(CancellationToken.None);
         var resolved = route
             .ShouldBeOfType<CommandRouteResolution<
                 GuessCommandKind,
@@ -283,7 +287,7 @@ public sealed class HostFeatureTests
     )
     {
         var features = await service.Load(hostId).RunAsync(CancellationToken.None);
-        return features.Match<HostFeatureFlags?>(value => value, () => null);
+        return features.Match<HostFeatureFlags?>(static value => value, static () => null);
     }
 
     private sealed class RecordingNativeTwitchFeatureChangeObserver

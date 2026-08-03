@@ -84,7 +84,7 @@ public sealed class MomentCommandGateTests
         public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
         {
             Calls++;
-            return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+            return IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
                         new HostStreamLivenessOutcome.Live("stream-id")

@@ -96,7 +96,7 @@ public sealed class EventFeedOverlayTests
                 }
             )
             .ShouldBe("{viewer} received 5 points");
-        _ = Should.Throw<ArgumentException>(() =>
+        _ = Should.Throw<ArgumentException>(static () =>
             EventFeedTemplateRenderer.Render(
                 new EventFeedKindConfiguration(true, "{actor}", OverlayEventFeedPriority.Normal, 5),
                 new OverlayEventPresentation.PointAward
@@ -175,7 +175,7 @@ public sealed class EventFeedOverlayTests
         var reconnect = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         reconnect!.Active!.Id.ShouldBe(state.Active.Id);
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-1")
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-1")
             .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Consumed);
     }
 
@@ -196,7 +196,8 @@ public sealed class EventFeedOverlayTests
         promoted!.Active!.Body.ShouldContain("two");
         promoted.Active.DisplayDeadlineUtc.ShouldBe(fixture.Clock.GetUtcNow().AddSeconds(6));
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-2").DurationSeconds.ShouldBe(6);
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-2")
+            .DurationSeconds.ShouldBe(6);
     }
 
     [Test]
@@ -218,7 +219,7 @@ public sealed class EventFeedOverlayTests
         var restored = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         restored!.Active!.Kind.ShouldBe("guessingWinner");
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.Single(x => x.SourceKey == "ledger-1")
+        db.OverlayEventFeedItems.Single(static x => x.SourceKey == "ledger-1")
             .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Suppressed);
     }
 
@@ -253,8 +254,8 @@ public sealed class EventFeedOverlayTests
             EventFeedOverflowPolicy.DropNewest
         );
         var kinds = OverlayConfiguration.EventFeedV1.Default.Kinds.ToDictionary(
-            pair => pair.Key,
-            pair =>
+            static pair => pair.Key,
+            static pair =>
                 pair.Key == OverlayEventFeedKind.PointAward
                     ? new EventFeedKindConfiguration(
                         pair.Value.Enabled,
@@ -453,7 +454,7 @@ public sealed class EventFeedOverlayTests
         }
         var state = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
         state!.Active!.Kind.ShouldBe("pointAward");
-        state.Pending.ShouldContain(card => card.Kind == "guessingWinner");
+        state.Pending.ShouldContain(static card => card.Kind == "guessingWinner");
     }
 
     [Test]

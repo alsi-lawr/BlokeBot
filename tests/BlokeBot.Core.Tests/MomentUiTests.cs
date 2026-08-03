@@ -360,7 +360,7 @@ public sealed class MomentUiTests
     private sealed class OfflineStreamLivenessProvider : IHostStreamLivenessProvider
     {
         public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+            IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
                         new HostStreamLivenessOutcome.Offline()
@@ -372,7 +372,7 @@ public sealed class MomentUiTests
     private sealed class UnavailableStreamLivenessProvider : IHostStreamLivenessProvider
     {
         public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+            IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
                         new HostStreamLivenessOutcome.Unavailable(

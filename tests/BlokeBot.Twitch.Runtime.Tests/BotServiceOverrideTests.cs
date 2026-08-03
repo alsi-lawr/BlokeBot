@@ -269,8 +269,8 @@ public sealed class BotServiceOverrideTests
 
     private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
         result.Match(
-            account => account,
-            reason =>
+            static account => account,
+            static reason =>
                 throw new InvalidOperationException($"Expected a bot account, received {reason}.")
         );
 
@@ -328,7 +328,7 @@ public sealed class BotServiceOverrideTests
     private sealed class FirstFeatureAccountProvider : IBotAccountProvider
     {
         public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(

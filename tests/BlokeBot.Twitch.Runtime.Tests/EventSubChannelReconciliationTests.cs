@@ -167,7 +167,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
         operations.DeleteCount("bad").ShouldBe(1);
         operations.CompleteStopCount("bad").ShouldBe(0);
         harness.Session.ActiveChannels.ShouldBe(["bad", "good"]);
-        var states = harness.Status.Current.Channels.ToDictionary(state => state.Channel);
+        var states = harness.Status.Current.Channels.ToDictionary(static state => state.Channel);
         _ = states["good"].ShouldBeOfType<EventSubChannelStatus.Healthy>();
         var degraded = states["bad"].ShouldBeOfType<EventSubChannelStatus.Degraded>();
         AssertFailure(

@@ -52,7 +52,7 @@ internal sealed partial class EfPublicChatOutbox
     }
 
     private static int? HttpStatusCode(PublicChatHttpStatus status) =>
-        status.Match<int?>(known => known.Value, () => null);
+        status.Match<int?>(static known => known.Value, static () => null);
 
     private static bool IsSqliteContention(Exception exception) =>
         exception switch

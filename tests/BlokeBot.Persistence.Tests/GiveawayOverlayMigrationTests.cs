@@ -53,7 +53,10 @@ public sealed class GiveawayOverlayMigrationTests
                 IsEnabled = true,
                 ConfigurationJson =
                     """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
-                AccessKeyDigest = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                AccessKeyDigest = Enumerable
+                    .Range(1, 32)
+                    .Select(static value => (byte)value)
+                    .ToArray(),
                 KeyVersion = 1,
                 Revision = 1,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -64,8 +67,8 @@ public sealed class GiveawayOverlayMigrationTests
 
         (
             await upgraded
-                .OverlayInstances.OrderBy(value => value.Id)
-                .Select(value => value.Type)
+                .OverlayInstances.OrderBy(static value => value.Id)
+                .Select(static value => value.Type)
                 .ToArrayAsync()
         ).ShouldBe([OverlayType.CuePlayer, OverlayType.Giveaway]);
     }

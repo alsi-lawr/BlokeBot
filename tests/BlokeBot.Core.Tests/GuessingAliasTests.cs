@@ -72,8 +72,10 @@ public sealed class GuessingAliasTests
 
         var afterSave = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         afterSave.Aliases.StartAliases.ShouldBe("updated");
-        afterSave.Profile.Options.Select(option => option.Name).ShouldBe(["green", "amber"]);
-        afterSave.Profile.Options.Select(option => option.ReplyText).ShouldBe(["Green", "Amber"]);
+        afterSave.Profile.Options.Select(static option => option.Name).ShouldBe(["green", "amber"]);
+        afterSave
+            .Profile.Options.Select(static option => option.ReplyText)
+            .ShouldBe(["Green", "Amber"]);
     }
 
     [Test]
@@ -90,7 +92,7 @@ public sealed class GuessingAliasTests
             .ExecuteAsync(CancellationToken.None);
 
         _ = result
-            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+            .Match<GuessingConfigurationSaveFailure?>(static _ => null, static failure => failure)
             .ShouldBeOfType<GuessingConfigurationSaveFailure.AliasAlreadyUsed>();
     }
 
@@ -109,12 +111,12 @@ public sealed class GuessingAliasTests
             .ExecuteAsync(CancellationToken.None);
 
         result
-            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+            .Match<GuessingConfigurationSaveFailure?>(static _ => null, static failure => failure)
             .ShouldBe(new GuessingConfigurationSaveFailure.AliasAlreadyUsed("shared"));
         await using var db = await dbFactory.CreateDbContextAsync();
         var aliases = await db
-            .CommandAliases.OrderBy(alias => alias.Alias)
-            .Select(alias => alias.Alias)
+            .CommandAliases.OrderBy(static alias => alias.Alias)
+            .Select(static alias => alias.Alias)
             .ToArrayAsync();
         aliases.ShouldBe(["default", "special"]);
         (await db.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("shared");
@@ -324,8 +326,8 @@ public sealed class GuessingAliasTests
             .LoadConfiguration(hostId, new GuessingProfileSelection.Selected(profileId))
             .ExecuteAsync(CancellationToken.None);
         return result.Match(
-            configuration => configuration,
-            failure => throw new InvalidOperationException(failure.Message)
+            static configuration => configuration,
+            static failure => throw new InvalidOperationException(failure.Message)
         );
     }
 

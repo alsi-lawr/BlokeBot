@@ -37,7 +37,7 @@ internal sealed record BlokeBotTwitchModeSelection(
             "Twitch features are offline because required configuration is missing.",
             "Set these fields and restart blokebot:",
         };
-        lines.AddRange(MissingEnvironmentKeys.Select(key => $"  - {key}"));
+        lines.AddRange(MissingEnvironmentKeys.Select(static key => $"  - {key}"));
         return string.Join(Environment.NewLine, lines);
     }
 

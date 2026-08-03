@@ -16,9 +16,9 @@ public sealed class OAuthTests
         var state = store.Issue();
 
         state.ShouldNotBeNullOrWhiteSpace();
-        store.Consume(state).Match(_ => true, _ => false).ShouldBeTrue();
-        store.Consume(state).Match(_ => true, _ => false).ShouldBeFalse();
-        store.Consume("missing").Match(_ => true, _ => false).ShouldBeFalse();
+        store.Consume(state).Match(static _ => true, static _ => false).ShouldBeTrue();
+        store.Consume(state).Match(static _ => true, static _ => false).ShouldBeFalse();
+        store.Consume("missing").Match(static _ => true, static _ => false).ShouldBeFalse();
     }
 
     [Test]
@@ -107,7 +107,7 @@ public sealed class OAuthTests
         await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
         var accessTokens = (await Task.WhenAll(first, second)).Select(Success).ToArray();
 
-        accessTokens.ShouldAllBe(accessToken => accessToken == "cached");
+        accessTokens.ShouldAllBe(static accessToken => accessToken == "cached");
         store.LoadCalls.ShouldBe(1);
     }
 
@@ -456,8 +456,9 @@ public sealed class OAuthTests
         var loaded = await store.LoadAsync(path, CancellationToken.None);
 
         var loadedToken = loaded.Match(
-            value => value,
-            () => throw new InvalidOperationException("Expected the stored token to be loaded.")
+            static value => value,
+            static () =>
+                throw new InvalidOperationException("Expected the stored token to be loaded.")
         );
         loadedToken.AccessToken.ShouldBe(token.AccessToken);
         loadedToken.RefreshToken.ShouldBe(token.RefreshToken);
@@ -525,7 +526,7 @@ public sealed class OAuthTests
         var query = flow.CreateAuthorizationUri().Query.TrimStart('?');
         var state = query
             .Split('&')
-            .Single(parameter => parameter.StartsWith("state=", StringComparison.Ordinal));
+            .Single(static parameter => parameter.StartsWith("state=", StringComparison.Ordinal));
         return Uri.UnescapeDataString(state["state=".Length..]);
     }
 
@@ -544,16 +545,17 @@ public sealed class OAuthTests
 
     private static string Success(Result<string, AccessTokenUnavailableReason> result) =>
         result.Match(
-            value => value,
-            error => throw new InvalidOperationException($"Expected a token, received {error}.")
+            static value => value,
+            static error =>
+                throw new InvalidOperationException($"Expected a token, received {error}.")
         );
 
     private static AccessTokenUnavailableReason Error(
         Result<string, AccessTokenUnavailableReason> result
     ) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected token unavailability."),
-            error => error
+            static _ => throw new InvalidOperationException("Expected token unavailability."),
+            static error => error
         );
 
     private static BotIdentity IdentityWithPath(string path) =>

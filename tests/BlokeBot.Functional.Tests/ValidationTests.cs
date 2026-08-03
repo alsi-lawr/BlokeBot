@@ -7,9 +7,9 @@ public sealed class ValidationTests
     [Test]
     public void Valid_Mapping_TransformsValue()
     {
-        var mapped = Validation<int, string>.Valid(21).Map(value => value * 2);
+        var mapped = Validation<int, string>.Valid(21).Map(static value => value * 2);
 
-        mapped.Match(value => value, _ => 0).ShouldBe(42);
+        mapped.Match(static value => value, static _ => 0).ShouldBe(42);
     }
 
     [Test]
@@ -53,7 +53,10 @@ public sealed class ValidationTests
     {
         var combined = Validation<int, string>
             .Invalid("first")
-            .Combine(Validation<int, string>.Invalid("second"), (first, second) => first + second);
+            .Combine(
+                Validation<int, string>.Invalid("second"),
+                static (first, second) => first + second
+            );
 
         GetErrors(combined).ShouldBe(["first", "second"]);
     }
@@ -63,10 +66,13 @@ public sealed class ValidationTests
     {
         var combined = Validation<int, string>
             .Invalid("first", "second")
-            .Combine(Validation<int, string>.Invalid("third"), (first, second) => first + second)
+            .Combine(
+                Validation<int, string>.Invalid("third"),
+                static (first, second) => first + second
+            )
             .Combine(
                 Validation<int, string>.Invalid("fourth", "fifth"),
-                (first, second) => first + second
+                static (first, second) => first + second
             );
 
         GetErrors(combined).ShouldBe(["first", "second", "third", "fourth", "fifth"]);
@@ -77,10 +83,13 @@ public sealed class ValidationTests
     {
         var validThenInvalid = Validation<int, string>
             .Valid(1)
-            .Combine(Validation<int, string>.Invalid("right"), (first, second) => first + second);
+            .Combine(
+                Validation<int, string>.Invalid("right"),
+                static (first, second) => first + second
+            );
         var invalidThenValid = Validation<int, string>
             .Invalid("left")
-            .Combine(Validation<int, string>.Valid(2), (first, second) => first + second);
+            .Combine(Validation<int, string>.Valid(2), static (first, second) => first + second);
 
         GetErrors(validThenInvalid).ShouldBe(["right"]);
         GetErrors(invalidThenValid).ShouldBe(["left"]);
@@ -106,10 +115,10 @@ public sealed class ValidationTests
     {
         var result = Validation<int, string>
             .Invalid("first", "second")
-            .ToResult(errors => new AggregateError(string.Join("|", errors)));
+            .ToResult(static errors => new AggregateError(string.Join("|", errors)));
 
         result
-            .Match(_ => new AggregateError("unexpected"), error => error)
+            .Match(static _ => new AggregateError("unexpected"), static error => error)
             .ShouldBe(new AggregateError("first|second"));
     }
 
@@ -158,7 +167,7 @@ public sealed class ValidationTests
 
     private static IReadOnlyList<TError> GetErrors<TValue, TError>(
         Validation<TValue, TError> validation
-    ) => validation.Match<IReadOnlyList<TError>>(_ => [], errors => errors);
+    ) => validation.Match<IReadOnlyList<TError>>(static _ => [], static errors => errors);
 
     private sealed record AggregateError(string Message);
 

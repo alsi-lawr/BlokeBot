@@ -10,64 +10,64 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureAccess(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<SiteAccessSettings>(b =>
+        _ = modelBuilder.Entity<SiteAccessSettings>(static b =>
         {
             _ = b.ToTable("site_access_settings");
-            _ = b.HasKey(x => x.Id);
+            _ = b.HasKey(static x => x.Id);
         });
 
-        _ = modelBuilder.Entity<SiteAccessEntry>(b =>
+        _ = modelBuilder.Entity<SiteAccessEntry>(static b =>
         {
             _ = b.ToTable(
                 "site_access_entries",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_site_access_entries_Kind",
                         KindIn("Kind", _accessKinds)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Login).HasMaxLength(128);
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
-                    value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
+                    static kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
+                    static value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.HasIndex(x => new { x.Kind, x.Login }).IsUnique();
+            _ = b.HasIndex(static x => new { x.Kind, x.Login }).IsUnique();
         });
 
-        _ = modelBuilder.Entity<HostModAccessSettings>(b =>
+        _ = modelBuilder.Entity<HostModAccessSettings>(static b =>
         {
             _ = b.ToTable("host_mod_access_settings");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.AllowModsByDefault).HasDefaultValue(true);
-            _ = b.HasIndex(x => x.HostId).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.AllowModsByDefault).HasDefaultValue(true);
+            _ = b.HasIndex(static x => x.HostId).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<HostModAccessEntry>(b =>
+        _ = modelBuilder.Entity<HostModAccessEntry>(static b =>
         {
             _ = b.ToTable(
                 "host_mod_access_entries",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_host_mod_access_entries_Kind",
                         KindIn("Kind", _accessKinds)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Login).HasMaxLength(128);
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
-                    value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
+                    static kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
+                    static value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.HasIndex(x => new
+            _ = b.HasIndex(static x => new
                 {
                     x.HostId,
                     x.Kind,
@@ -76,7 +76,7 @@ public sealed partial class BlokeBotDbContext
                 .IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

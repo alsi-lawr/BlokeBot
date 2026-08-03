@@ -10,15 +10,17 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotPublicChat(this IServiceCollection services)
     {
-        services.TryAddSingleton<IPublicChatOutbox>(serviceProvider => new EfPublicChatOutbox(
-            serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
-            serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
-                BotResiliencePipeline.PublicChatDelivery
-            ),
-            serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
-            serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>(),
-            serviceProvider.GetRequiredService<EventBus<AppEventKind>>()
-        ));
+        services.TryAddSingleton<IPublicChatOutbox>(
+            static serviceProvider => new EfPublicChatOutbox(
+                serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
+                serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
+                    BotResiliencePipeline.PublicChatDelivery
+                ),
+                serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
+                serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>(),
+                serviceProvider.GetRequiredService<EventBus<AppEventKind>>()
+            )
+        );
         _ = services.Replace(
             ServiceDescriptor.Singleton<IPublicChatPinStore, EfPublicChatPinStore>()
         );

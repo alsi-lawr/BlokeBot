@@ -130,7 +130,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>
-        $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
+        $"{columnName} IN ({string.Join(", ", values.Select(static value => $"'{value}'"))})";
 
     private static string KindInOrNull(string columnName, IEnumerable<string> values) =>
         $"{columnName} IS NULL OR {KindIn(columnName, values)}";

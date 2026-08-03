@@ -224,7 +224,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
             .Receipt.MessageIds.Length.ShouldBe(2);
         outbox
             .EnqueueCalls.ShouldHaveSingleItem()
-            .Batch.Items.Select(item => item.Message)
+            .Batch.Items.Select(static item => item.Message)
             .ShouldBe(["alpha", "beta gamma"]);
         transport.Deliveries.ShouldBeEmpty();
     }

@@ -9,10 +9,10 @@ public sealed class ChatCommandCompositionTests
     {
         ChatCommandRegistration[] registrations =
         [
-            Registration(commands =>
+            Registration(static commands =>
                 commands
                     .UseFilter<AllowFilter>()
-                    .Map("callback", (_, _, _) => ValueTask.CompletedTask)
+                    .Map("callback", static (_, _, _) => ValueTask.CompletedTask)
             ),
         ];
         var filter = new AllowFilter();
@@ -46,7 +46,7 @@ public sealed class ChatCommandCompositionTests
     private sealed class CompositionModule : IChatCommandModule
     {
         public void AddCommands(IChatCommandBuilder commands) =>
-            commands.Map("module", (_, _, _) => ValueTask.CompletedTask);
+            commands.Map("module", static (_, _, _) => ValueTask.CompletedTask);
     }
 
     private sealed class AllowFilter : IChatCommandFilter;

@@ -48,9 +48,9 @@ public partial class TopBarControls : IDisposable
     {
         var pageContext = await _pageContext.FromAsync(_authenticationState);
         var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         _activeAlertCount =
             selectedHost is null || pageContext.IsBotAccount

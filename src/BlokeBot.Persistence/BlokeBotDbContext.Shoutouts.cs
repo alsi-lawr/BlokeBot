@@ -16,41 +16,41 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureShoutouts(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<ShoutoutHistoryEntry>(b =>
+        _ = modelBuilder.Entity<ShoutoutHistoryEntry>(static b =>
         {
             _ = b.ToTable("shoutout_history");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.ProviderMessageId).HasMaxLength(128);
-            _ = b.Property(x => x.SourceTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.SourceLogin).HasMaxLength(128);
-            _ = b.Property(x => x.TargetTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.TargetLogin).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.HostId, x.OccurredAtUtc });
-            _ = b.HasIndex(x => new { x.HostId, x.ProviderMessageId }).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ProviderMessageId).HasMaxLength(128);
+            _ = b.Property(static x => x.SourceTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.SourceLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.TargetTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.TargetLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.OccurredAtUtc });
+            _ = b.HasIndex(static x => new { x.HostId, x.ProviderMessageId }).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ShoutoutCooldownState>(b =>
+        _ = modelBuilder.Entity<ShoutoutCooldownState>(static b =>
         {
             _ = b.ToTable("shoutout_cooldowns");
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.TargetTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.TargetLogin).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.HostId, x.TargetTwitchUserId }).IsUnique();
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.TargetTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.TargetLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.TargetTwitchUserId }).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidShoutoutSettings>(b =>
+        _ = modelBuilder.Entity<AutomaticRaidShoutoutSettings>(static b =>
         {
             _ = b.ToTable(
                 "automatic_raid_shoutout_settings",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_settings_MinimumViewerCount",
@@ -74,65 +74,65 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Enabled).HasDefaultValue(false);
-            _ = b.Property(x => x.MinimumViewerCount).HasDefaultValue(1);
-            _ = b.Property(x => x.Mechanism)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Enabled).HasDefaultValue(false);
+            _ = b.Property(static x => x.MinimumViewerCount).HasDefaultValue(1);
+            _ = b.Property(static x => x.Mechanism)
                 .HasConversion(
-                    v => PersistedEnumTokens<AutomaticRaidShoutoutMechanism>.Format(v),
-                    v => PersistedEnumTokens<AutomaticRaidShoutoutMechanism>.Parse(v)
+                    static v => PersistedEnumTokens<AutomaticRaidShoutoutMechanism>.Format(v),
+                    static v => PersistedEnumTokens<AutomaticRaidShoutoutMechanism>.Parse(v)
                 )
                 .HasMaxLength(16)
                 .HasDefaultValue(AutomaticRaidShoutoutMechanism.Native);
-            _ = b.Property(x => x.ChatPresentation)
+            _ = b.Property(static x => x.ChatPresentation)
                 .HasConversion(
-                    v => PersistedEnumTokens<AutomaticRaidChatPresentation>.Format(v),
-                    v => PersistedEnumTokens<AutomaticRaidChatPresentation>.Parse(v)
+                    static v => PersistedEnumTokens<AutomaticRaidChatPresentation>.Format(v),
+                    static v => PersistedEnumTokens<AutomaticRaidChatPresentation>.Parse(v)
                 )
                 .HasMaxLength(16)
                 .HasDefaultValue(AutomaticRaidChatPresentation.Regular);
-            _ = b.Property(x => x.MessageTemplate)
+            _ = b.Property(static x => x.MessageTemplate)
                 .HasMaxLength(1024)
                 .HasDefaultValue(AutomaticRaidShoutoutDefaults.MessageTemplate);
-            _ = b.Property(x => x.AnnouncementColor)
+            _ = b.Property(static x => x.AnnouncementColor)
                 .HasConversion(
-                    v => PersistedEnumTokens<TwitchAnnouncementColor>.Format(v),
-                    v => PersistedEnumTokens<TwitchAnnouncementColor>.Parse(v)
+                    static v => PersistedEnumTokens<TwitchAnnouncementColor>.Format(v),
+                    static v => PersistedEnumTokens<TwitchAnnouncementColor>.Parse(v)
                 )
                 .HasMaxLength(16)
                 .HasDefaultValue(TwitchAnnouncementColor.Primary);
-            _ = b.HasIndex(x => x.HostId).IsUnique();
+            _ = b.HasIndex(static x => x.HostId).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidProcessedEvent>(b =>
+        _ = modelBuilder.Entity<AutomaticRaidProcessedEvent>(static b =>
         {
             _ = b.ToTable(
                 "automatic_raid_processed_events",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_automatic_raid_processed_events_Expiry",
                         "ExpiresAtUtc >= ClaimedAtUtc"
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.ProviderMessageId).HasMaxLength(128);
-            _ = b.HasIndex(x => new { x.HostId, x.ProviderMessageId }).IsUnique();
-            _ = b.HasIndex(x => x.ExpiresAtUtc);
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ProviderMessageId).HasMaxLength(128);
+            _ = b.HasIndex(static x => new { x.HostId, x.ProviderMessageId }).IsUnique();
+            _ = b.HasIndex(static x => x.ExpiresAtUtc);
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<AutomaticRaidShoutoutOutcome>(b =>
+        _ = modelBuilder.Entity<AutomaticRaidShoutoutOutcome>(static b =>
         {
             _ = b.ToTable(
                 "automatic_raid_shoutout_outcomes",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_Status",
@@ -148,34 +148,34 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.ProviderMessageId).HasMaxLength(128);
-            _ = b.Property(x => x.SourceTwitchUserId).HasMaxLength(64);
-            _ = b.Property(x => x.SourceLogin).HasMaxLength(128);
-            _ = b.Property(x => x.SourceDisplayName).HasMaxLength(128);
-            _ = b.Property(x => x.Status)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.ProviderMessageId).HasMaxLength(128);
+            _ = b.Property(static x => x.SourceTwitchUserId).HasMaxLength(64);
+            _ = b.Property(static x => x.SourceLogin).HasMaxLength(128);
+            _ = b.Property(static x => x.SourceDisplayName).HasMaxLength(128);
+            _ = b.Property(static x => x.Status)
                 .HasConversion(
-                    v => PersistedEnumTokens<AutomaticRaidShoutoutOutcomeStatus>.Format(v),
-                    v => PersistedEnumTokens<AutomaticRaidShoutoutOutcomeStatus>.Parse(v)
+                    static v => PersistedEnumTokens<AutomaticRaidShoutoutOutcomeStatus>.Format(v),
+                    static v => PersistedEnumTokens<AutomaticRaidShoutoutOutcomeStatus>.Parse(v)
                 )
                 .HasMaxLength(20);
-            _ = b.Property(x => x.ResultCode)
+            _ = b.Property(static x => x.ResultCode)
                 .HasConversion(
-                    v =>
+                    static v =>
                         v.HasValue
                             ? PersistedEnumTokens<AutomaticRaidShoutoutResultCode>.Format(v.Value)
                             : null,
-                    v =>
+                    static v =>
                         v == null
                             ? null
                             : PersistedEnumTokens<AutomaticRaidShoutoutResultCode>.Parse(v)
                 )
                 .HasMaxLength(32);
-            _ = b.HasIndex(x => new { x.HostId, x.ProviderMessageId }).IsUnique();
-            _ = b.HasIndex(x => new { x.HostId, x.CompletedAtUtc });
+            _ = b.HasIndex(static x => new { x.HostId, x.ProviderMessageId }).IsUnique();
+            _ = b.HasIndex(static x => new { x.HostId, x.CompletedAtUtc });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

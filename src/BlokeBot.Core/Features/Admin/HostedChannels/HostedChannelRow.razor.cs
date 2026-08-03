@@ -25,13 +25,13 @@ public partial class HostedChannelRow
     public bool CanEditHost { get; set; } = true;
 
     [Parameter, EditorRequired]
-    public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> RemoveHost { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<int, Task> StartBot { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> StartBot { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
-    public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
+    public Func<int, Task> StopBot { get; set; } = static _ => Task.CompletedTask;
 
     private string _editHostHref =>
         $"/admin/select-host?hostId={Host.Id}&returnUrl={Uri.EscapeDataString("/admin")}";

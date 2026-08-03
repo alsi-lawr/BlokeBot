@@ -85,7 +85,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
         await SeedSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GiveawayDurationSeconds = 0;
                 settings.GiveawayWinnerCount = 0;
@@ -171,7 +171,7 @@ public sealed class PointsGiveawayManagementTests : PointsGiveawaySchedulerTestB
         await SeedSettingsAsync(
             dbFactory,
             hostId,
-            settings => settings.GiveawayCooldownSeconds = 120
+            static settings => settings.GiveawayCooldownSeconds = 120
         );
         _ = await SeedGiveawayAsync(
             dbFactory,

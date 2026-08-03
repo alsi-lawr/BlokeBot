@@ -190,7 +190,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomMessageLibraryEntry>();
         foreach (var editor in editors)
         {
@@ -223,7 +223,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomCounter>();
         foreach (var editor in editors)
         {
@@ -257,7 +257,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomCommand>();
         foreach (var editor in editors)
         {
@@ -311,7 +311,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var existingById = existing.ToDictionary(x => x.Id);
+        var existingById = existing.ToDictionary(static x => x.Id);
         var result = new Dictionary<int, CustomAnnouncement>();
         foreach (var editor in editors)
         {
@@ -364,7 +364,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
         CancellationToken ct
     )
     {
-        var configuredCommands = command.Commands.Where(x => x.Id > 0).ToDictionary(x => x.Id);
+        var configuredCommands = command
+            .Commands.Where(static x => x.Id > 0)
+            .ToDictionary(static x => x.Id);
         foreach (var storedCommand in existingCommands)
         {
             if (
@@ -380,8 +382,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
         }
 
         var configuredAnnouncements = command
-            .Announcements.Where(x => x.Id > 0)
-            .ToDictionary(x => x.Id);
+            .Announcements.Where(static x => x.Id > 0)
+            .ToDictionary(static x => x.Id);
         foreach (var announcement in existingAnnouncements)
         {
             if (
@@ -570,8 +572,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
             HasMissingPositiveId(
                 command.MessageEntries,
                 messageEntries,
-                configured => configured.Id,
-                stored => stored.Id
+                static configured => configured.Id,
+                static stored => stored.Id
             )
         )
         {
@@ -582,8 +584,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
             HasMissingPositiveId(
                 command.Counters,
                 counters,
-                configured => configured.Id,
-                stored => stored.Id
+                static configured => configured.Id,
+                static stored => stored.Id
             )
         )
         {
@@ -593,14 +595,14 @@ public sealed class CustomCommandConfigurationGraphWriter(
         var commandMissing = HasMissingPositiveId(
             command.Commands,
             commands,
-            configured => configured.Id,
-            stored => stored.Id
+            static configured => configured.Id,
+            static stored => stored.Id
         );
         var announcementMissing = HasMissingPositiveId(
             command.Announcements,
             announcements,
-            configured => configured.Id,
-            stored => stored.Id
+            static configured => configured.Id,
+            static stored => stored.Id
         );
         return commandMissing switch
         {

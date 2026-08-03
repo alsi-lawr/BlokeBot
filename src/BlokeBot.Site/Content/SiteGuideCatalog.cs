@@ -3,10 +3,10 @@ namespace BlokeBot.Site.Content;
 internal static class SiteGuideCatalog
 {
     private static readonly IReadOnlyDictionary<string, SiteGuidePage> _pages = CreatePages()
-        .ToDictionary(page => page.Route, StringComparer.Ordinal);
+        .ToDictionary(static page => page.Route, StringComparer.Ordinal);
 
     internal static IReadOnlyList<SiteGuidePage> All { get; } =
-        SiteRoutes.GuideTopics.Select(route => _pages[route]).ToArray();
+        SiteRoutes.GuideTopics.Select(static route => _pages[route]).ToArray();
 
     internal static IReadOnlyList<SiteGuideNavigationGroup> NavigationGroups { get; } =
     [

@@ -79,7 +79,11 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
         new()
         {
             Routes = new ReadOnlyDictionary<string, ChatCommandHandler>(
-                _routes.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
+                _routes.ToDictionary(
+                    static x => x.Key,
+                    static x => x.Value,
+                    StringComparer.OrdinalIgnoreCase
+                )
             ),
             DynamicHandlers = Array.AsReadOnly<DynamicChatCommandHandler>([.. _dynamicHandlers]),
             Filters = Array.AsReadOnly<IChatCommandFilter>([.. _filters]),

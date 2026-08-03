@@ -343,7 +343,7 @@ public sealed class CustomCommandExecutionTests
         {
             (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(2);
             (
-                await db.CustomCommandInvocationClaims.AnyAsync(claim =>
+                await db.CustomCommandInvocationClaims.AnyAsync(static claim =>
                     claim.TwitchUserId == "bob-id"
                 )
             ).ShouldBeFalse();
@@ -862,7 +862,8 @@ public sealed class CustomCommandExecutionTests
             UpdatedAtUtc = now,
             Variants = variants
                 .Select(
-                    (text, index) => new CustomMessageVariant { SortOrder = index, Text = text }
+                    static (text, index) =>
+                        new CustomMessageVariant { SortOrder = index, Text = text }
                 )
                 .ToList(),
         };
@@ -950,7 +951,7 @@ public sealed class CustomCommandExecutionTests
         {
             Message = Message(login, "streamer", text, tags),
             CommandName = text.TrimStart('!'),
-            Responder = responder ?? ((_, _) => ValueTask.CompletedTask),
+            Responder = responder ?? (static (_, _) => ValueTask.CompletedTask),
         };
 
     private static async Task SetLimitAsync(

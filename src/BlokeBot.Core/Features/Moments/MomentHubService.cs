@@ -1266,10 +1266,10 @@ public sealed class MomentHubService(
             candidate.CapturedAtUtc,
             candidate.ApprovedAtUtc,
             candidate
-                .Contributors.OrderBy(value => value.FirstCapturedAtUtc)
-                .ThenBy(value => value.Id)
+                .Contributors.OrderBy(static value => value.FirstCapturedAtUtc)
+                .ThenBy(static value => value.Id)
                 .Take(MomentLimits.MaximumContributorCount)
-                .Select(value => new MomentContributorView(
+                .Select(static value => new MomentContributorView(
                     value.DisplayName,
                     value.NormalizedLogin,
                     value.CaptureCount,

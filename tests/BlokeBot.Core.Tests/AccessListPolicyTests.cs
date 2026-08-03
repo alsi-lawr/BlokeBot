@@ -311,7 +311,7 @@ public sealed class AccessListPolicyTests
             .ExecuteAsync(CancellationToken.None);
 
         _ = result
-            .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
+            .Match<HostModAccessSaveFailure?>(static _ => null, static failure => failure)
             .ShouldBeOfType<HostModAccessSaveFailure.HostNotFound>();
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.HostModAccessSettings.CountAsync()).ShouldBe(0);
@@ -326,7 +326,7 @@ public sealed class AccessListPolicyTests
         _ = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
             ObserverIdentity.Named("Test.HostConfig.Success"),
-            (_, _) => ValueTask.CompletedTask
+            static (_, _) => ValueTask.CompletedTask
         );
         var service = new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(events));
         var command = ValidSaveCommand(hostId, allowModsByDefault: false);
@@ -336,8 +336,8 @@ public sealed class AccessListPolicyTests
             .ExecuteAsync(CancellationToken.None);
 
         var saved = result.Match(
-            success => success,
-            failure => throw new InvalidOperationException(failure.Message)
+            static success => success,
+            static failure => throw new InvalidOperationException(failure.Message)
         );
         saved.HostId.ShouldBe(hostId);
         _ = saved.Mode.ShouldBeOfType<HostModeratorAccessMode.AllowlistOnly>();
@@ -413,8 +413,8 @@ public sealed class AccessListPolicyTests
             .SaveModeratorAccess(ValidSaveCommand(hostId, allowModsByDefault))
             .ExecuteAsync(CancellationToken.None);
         _ = result.Match(
-            _ => true,
-            failure => throw new InvalidOperationException(failure.Message)
+            static _ => true,
+            static failure => throw new InvalidOperationException(failure.Message)
         );
     }
 
@@ -422,8 +422,8 @@ public sealed class AccessListPolicyTests
         HostModAccessSaveValidator
             .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowModsByDefault))
             .Match(
-                command => command,
-                errors => throw new InvalidOperationException(errors[0].Message)
+                static command => command,
+                static errors => throw new InvalidOperationException(errors[0].Message)
             );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)

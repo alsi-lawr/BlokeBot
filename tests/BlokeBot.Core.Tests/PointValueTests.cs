@@ -24,8 +24,8 @@ public sealed class PointValueTests : PointsTestBase
                 )
             )
             .ShouldBe("Error:AmountOutOfRange");
-        _ = Should.Throw<ArgumentOutOfRangeException>(() => new PointAmount(-1));
-        _ = Should.Throw<ArgumentOutOfRangeException>(() =>
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () => new PointAmount(-1));
+        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
             new PointAmount(PointAmount.MaximumValue + 1)
         );
     }

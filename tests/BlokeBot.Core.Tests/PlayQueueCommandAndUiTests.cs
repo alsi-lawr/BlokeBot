@@ -392,10 +392,10 @@ public sealed class PlayQueueCommandAndUiTests
         );
 
     private static IRenderedComponent<PublicPlayQueuePage> RenderPublicPage(BunitContext context) =>
-        context.Render<PublicPlayQueuePage>(parameters =>
+        context.Render<PublicPlayQueuePage>(static parameters =>
             parameters
-                .Add(value => value.Channel, "streamer")
-                .Add(value => value.QueueSlug, "squad")
+                .Add(static value => value.Channel, "streamer")
+                .Add(static value => value.QueueSlug, "squad")
         );
 
     private static IElement FindButton<TComponent>(IRenderedComponent<TComponent> page, string text)
@@ -423,7 +423,7 @@ public sealed class PlayQueueCommandAndUiTests
     private static async Task<long> EntryIdAsync(SqliteBlokeBotDbFactory database)
     {
         await using var db = await database.CreateDbContextAsync();
-        return await db.PlayQueueEntries.Select(entry => entry.Id).SingleAsync();
+        return await db.PlayQueueEntries.Select(static entry => entry.Id).SingleAsync();
     }
 
     private static async Task DispatchAsync(
@@ -482,7 +482,7 @@ public sealed class PlayQueueCommandAndUiTests
         ) =>
             Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>(
                 recipients
-                    .Select(recipient => new PrivateLobbyDeliveryOutcome(
+                    .Select(static recipient => new PrivateLobbyDeliveryOutcome(
                         recipient.Login,
                         false,
                         "Unavailable"

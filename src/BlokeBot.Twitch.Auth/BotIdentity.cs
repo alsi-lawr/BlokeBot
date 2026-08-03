@@ -63,7 +63,7 @@ public sealed record BotIdentity
                 [$"{nameof(BotIdentityOptions.Scopes)} must contain only valid scopes."]
             ),
             (_, { } scopes)
-                when scopes.Any(scope =>
+                when scopes.Any(static scope =>
                     string.IsNullOrWhiteSpace(scope)
                     || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
                 ) => throw new OptionsValidationException(

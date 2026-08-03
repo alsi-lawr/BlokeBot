@@ -11,9 +11,9 @@ public partial class AccountMenu
 
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
 
     private string _currentPath => "/" + _navigation.ToBaseRelativePath(_navigation.Uri);

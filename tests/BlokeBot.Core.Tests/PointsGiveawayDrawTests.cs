@@ -44,7 +44,7 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         await SeedSettingsAsync(
             dbFactory,
             hostId,
-            settings => settings.GiveawayEligibility = PointsEligibilityMode.Subscribers
+            static settings => settings.GiveawayEligibility = PointsEligibilityMode.Subscribers
         );
         _ = await SeedGiveawayAsync(
             dbFactory,

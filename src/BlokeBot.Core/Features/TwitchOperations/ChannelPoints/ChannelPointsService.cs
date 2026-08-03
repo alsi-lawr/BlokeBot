@@ -862,8 +862,8 @@ public sealed class ChannelPointsService(
         IEnumerable<HelixRewardRedemption> redemptions
     ) =>
         redemptions
-            .OrderByDescending(x => x.RedeemedAt)
-            .ThenByDescending(x => x.Id, StringComparer.Ordinal);
+            .OrderByDescending(static x => x.RedeemedAt)
+            .ThenByDescending(static x => x.Id, StringComparer.Ordinal);
 
     private static ChannelPointsReconciliationOutcome ReconciliationFailure(
         HelixCustomRewardsLookupOutcome result

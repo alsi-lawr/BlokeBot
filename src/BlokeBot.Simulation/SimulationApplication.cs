@@ -67,7 +67,7 @@ internal static class SimulationApplication
             );
             _ = builder.WebHost.UseStaticWebAssets();
             _ = builder.Host.UseSerilog(
-                (context, services, logging) =>
+                static (context, services, logging) =>
                 {
                     _ = logging
                         .ReadFrom.Configuration(context.Configuration)
@@ -85,7 +85,7 @@ internal static class SimulationApplication
             );
 
             _ = builder.Services.AddSingleton<SimulationDatabaseKeeper>();
-            _ = builder.Services.AddBlokeBotPersistence(services =>
+            _ = builder.Services.AddBlokeBotPersistence(static services =>
                 services.GetRequiredService<SimulationDatabaseKeeper>().ConnectionString
             );
             _ = builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();

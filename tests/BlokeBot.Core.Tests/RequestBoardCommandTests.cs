@@ -61,8 +61,8 @@ public sealed class RequestBoardCommandTests
         await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
         await DispatchAsync(dispatcher, Message("viewer", "!requestapprove 1"), responses);
 
-        responses.ShouldContain(value => value.Contains("submitted for moderator review"));
-        responses.ShouldContain(value => value.Contains("/requests/streamer/games"));
+        responses.ShouldContain(static value => value.Contains("submitted for moderator review"));
+        responses.ShouldContain(static value => value.Contains("/requests/streamer/games"));
         responses[^1].ShouldContain("moderator-only");
         (
             await boardService.GetModeratorSubmissionAsync(hostId, 1, CancellationToken.None)

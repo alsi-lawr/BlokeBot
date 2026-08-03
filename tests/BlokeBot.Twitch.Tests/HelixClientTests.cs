@@ -11,7 +11,7 @@ public sealed class HelixClientTests
     public async Task LiveStreamPayload_LoadingStream_ReturnsTwitchStreamId()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/streams");
             request.RequestUri.Query.ShouldContain("user_login=streamer");
@@ -63,7 +63,7 @@ public sealed class HelixClientTests
     public async Task ChannelInformation_LoadingRaiderMetadata_ReturnsTypedGameAndTitle()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Get);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/channels");
@@ -113,7 +113,7 @@ public sealed class HelixClientTests
     public async Task FollowerPayload_CheckingFollowerStatus_ReturnsFollows()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/channels/followers");
             request.RequestUri.Query.ShouldContain("broadcaster_id=broadcaster-id");
@@ -170,7 +170,7 @@ public sealed class HelixClientTests
     public async Task ChatSettingsPayload_LoadingWithAppToken_ParsesFollowerModeAndDuration()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/settings");
             request.RequestUri.Query.ShouldBe("?broadcaster_id=broadcaster-id");
@@ -202,7 +202,7 @@ public sealed class HelixClientTests
     public async Task FollowedChannelPayload_CheckingActiveBotFollowStatus_UsesDirectActorQuery()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/channels/followed");
             request.RequestUri.Query.ShouldContain("user_id=validated-bot-subject");
@@ -304,7 +304,7 @@ public sealed class HelixClientTests
     public async Task AcceptedShoutout_SendingThroughHelix_MapsToSent()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Post);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/shoutouts");
@@ -330,7 +330,7 @@ public sealed class HelixClientTests
     public async Task PaginatedModeratedChannels_LoadingThroughHelix_ReturnsAllPagesWithAuth()
     {
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Headers.Authorization!.Scheme.ShouldBe("Bearer");
             request.Headers.Authorization.Parameter.ShouldBe("token");
@@ -348,7 +348,7 @@ public sealed class HelixClientTests
                 """
             );
         });
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.RequestUri!.Query.ShouldContain("after=next");
             return JsonResponse(
@@ -370,7 +370,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        channels.Select(channel => channel.BroadcasterLogin).ShouldBe(["one", "two"]);
+        channels.Select(static channel => channel.BroadcasterLogin).ShouldBe(["one", "two"]);
     }
 
     [Test]
@@ -380,7 +380,7 @@ public sealed class HelixClientTests
             {"data":[{"id":"poll-id","broadcaster_id":"broadcaster-id","title":"Question","choices":[{"id":"one","title":"Yes","votes":2,"channel_points_votes":1},{"id":"two","title":"No","votes":1,"channel_points_votes":0}],"status":"ACTIVE","started_at":"2026-07-26T10:00:00Z","ends_at":"2026-07-26T10:02:00Z"}]}
             """;
         var factory = new ScriptedHttpClientFactory();
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Get);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
@@ -388,7 +388,7 @@ public sealed class HelixClientTests
             request.RequestUri.Query.ShouldContain("first=1");
             return JsonResponse(ActivePoll);
         });
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Post);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
@@ -401,7 +401,7 @@ public sealed class HelixClientTests
                 );
             return JsonResponse(ActivePoll);
         });
-        factory.Respond(request =>
+        factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Patch);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");

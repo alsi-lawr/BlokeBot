@@ -15,7 +15,7 @@ internal static class SimulationServiceCollectionExtensions
         );
         _ = services.AddSingleton<SimulationCommandCatalogScenario>();
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IHostStreamLivenessProvider>(provider =>
+            ServiceDescriptor.Singleton<IHostStreamLivenessProvider>(static provider =>
                 provider.GetRequiredService<SimulationCommandCatalogScenario>()
             )
         );
@@ -30,27 +30,27 @@ internal static class SimulationServiceCollectionExtensions
         );
         _ = services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(provider =>
+            ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IPollDashboardOperations>(provider =>
+            ServiceDescriptor.Singleton<IPollDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IClipMarkerDashboardOperations>(provider =>
+            ServiceDescriptor.Singleton<IClipMarkerDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IChannelPointsDashboardOperations>(provider =>
+            ServiceDescriptor.Singleton<IChannelPointsDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );
         _ = services.Replace(
-            ServiceDescriptor.Singleton<IPredictionDashboardOperations>(provider =>
+            ServiceDescriptor.Singleton<IPredictionDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );

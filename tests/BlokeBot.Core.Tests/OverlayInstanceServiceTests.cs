@@ -326,8 +326,8 @@ public sealed class OverlayInstanceServiceTests
         await using var db = await fixture.Database.CreateDbContextAsync();
         (
             await db
-                .OverlayInstanceEvents.OrderBy(value => value.Id)
-                .Select(value => value.Kind)
+                .OverlayInstanceEvents.OrderBy(static value => value.Id)
+                .Select(static value => value.Kind)
                 .ToArrayAsync()
         ).ShouldBe([
             OverlayInstanceEventKind.Created,

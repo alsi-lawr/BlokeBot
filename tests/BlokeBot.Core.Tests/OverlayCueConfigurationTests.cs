@@ -48,11 +48,11 @@ public sealed class OverlayCueConfigurationTests
             .Value;
 
         created
-            .Layers.Select(layer => layer.GetType())
-            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.GetType()));
+            .Layers.Select(static layer => layer.GetType())
+            .ShouldBe(parsed.Layers.Reverse().Select(static layer => layer.GetType()));
         created
-            .Layers.Select(layer => layer.ZIndex)
-            .ShouldBe(parsed.Layers.Reverse().Select(layer => layer.ZIndex));
+            .Layers.Select(static layer => layer.ZIndex)
+            .ShouldBe(parsed.Layers.Reverse().Select(static layer => layer.ZIndex));
         OverlayCueConfiguration
             .Parse(created.ToPersistenceJson())
             .ShouldBeOfType<OverlayCueConfigurationResult.Valid>()

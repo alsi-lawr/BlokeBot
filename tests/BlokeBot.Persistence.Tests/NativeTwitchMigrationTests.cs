@@ -89,32 +89,34 @@ public sealed class NativeTwitchMigrationTests
         {
             (
                 await upgraded
-                    .Hosts.OrderBy(host => host.Id)
-                    .Select(host => (long)host.EnabledFeatures)
+                    .Hosts.OrderBy(static host => host.Id)
+                    .Select(static host => (long)host.EnabledFeatures)
                     .ToArrayAsync()
             ).ShouldBe([247L, 247L]);
             (
                 await upgraded
-                    .TwitchCustomRewards.Select(value => value.ProviderRewardId)
+                    .TwitchCustomRewards.Select(static value => value.ProviderRewardId)
                     .ToArrayAsync()
             ).ShouldBe(["reward"]);
             (
                 await upgraded
-                    .TwitchRewardRedemptions.Select(value => value.ProviderRedemptionId)
+                    .TwitchRewardRedemptions.Select(static value => value.ProviderRedemptionId)
                     .ToArrayAsync()
             ).ShouldBe(["redemption"]);
             (
-                await upgraded.TwitchPredictionTemplates.Select(value => value.Title).ToArrayAsync()
+                await upgraded
+                    .TwitchPredictionTemplates.Select(static value => value.Title)
+                    .ToArrayAsync()
             ).ShouldBe(["Template"]);
             (
                 await upgraded
-                    .TwitchPredictionTemplateOutcomes.OrderBy(value => value.Position)
-                    .Select(value => value.Title)
+                    .TwitchPredictionTemplateOutcomes.OrderBy(static value => value.Position)
+                    .Select(static value => value.Title)
                     .ToArrayAsync()
             ).ShouldBe(["Yes", "No"]);
             (
                 await upgraded
-                    .TwitchPredictions.Select(value => value.ProviderPredictionId)
+                    .TwitchPredictions.Select(static value => value.ProviderPredictionId)
                     .ToArrayAsync()
             ).ShouldBe(["prediction"]);
 

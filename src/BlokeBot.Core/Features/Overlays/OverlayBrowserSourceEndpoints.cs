@@ -23,7 +23,7 @@ internal static class OverlayBrowserSourceEndpoints
 
     internal static void UseOverlayAccessLogRedaction(this WebApplication app) =>
         app.Use(
-            async (context, next) =>
+            static async (context, next) =>
             {
                 try
                 {
@@ -40,7 +40,7 @@ internal static class OverlayBrowserSourceEndpoints
     {
         _ = app.MapGet(
                 "/overlay/assets/blokebot-overlay.css",
-                (HttpContext context) =>
+                static (HttpContext context) =>
                 {
                     ApplyPrivateBrowserSourceHeaders(context.Response);
                     return Results.Text(OverlayBrowserSourceAssets.Stylesheet, "text/css");
@@ -49,7 +49,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/assets/blokebot-overlay.js",
-                (HttpContext context) =>
+                static (HttpContext context) =>
                 {
                     ApplyPrivateBrowserSourceHeaders(context.Response);
                     return Results.Text(OverlayBrowserSourceAssets.JavaScript, "text/javascript");
@@ -58,7 +58,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/{accessKey}",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     OverlayInstanceResolver resolver,
@@ -92,7 +92,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/{accessKey}/appearance.css",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     OverlayInstanceResolver resolver,
@@ -114,7 +114,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/{accessKey}/events",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     OverlayInstanceResolver resolver,
@@ -150,7 +150,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/{accessKey}/state",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     OverlayInstanceResolver resolver,
@@ -199,7 +199,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapGet(
                 "/overlay/{accessKey}/media/{assetId:guid}/{contentRevision:int}",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     Guid assetId,
@@ -231,7 +231,7 @@ internal static class OverlayBrowserSourceEndpoints
             .AllowAnonymous();
         _ = app.MapPost(
                 "/overlay/{accessKey}/cue-complete/{runId:guid}",
-                async (
+                static async (
                     HttpContext context,
                     string accessKey,
                     Guid runId,
@@ -265,7 +265,7 @@ internal static class OverlayBrowserSourceEndpoints
 
         _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     OverlayInstanceService overlays,
@@ -347,7 +347,7 @@ internal static class OverlayBrowserSourceEndpoints
             .RequireAuthorization("HostSelected");
         _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/appearance.css",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     OverlayInstanceService overlays,
@@ -371,7 +371,7 @@ internal static class OverlayBrowserSourceEndpoints
             .RequireAuthorization("HostSelected");
         _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/state",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     OverlayInstanceService overlays,
@@ -496,7 +496,7 @@ internal static class OverlayBrowserSourceEndpoints
             .RequireAuthorization("HostSelected");
         _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/media/{assetId:guid}/{contentRevision:int}",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     Guid assetId,
@@ -530,7 +530,7 @@ internal static class OverlayBrowserSourceEndpoints
             .RequireAuthorization("HostSelected");
         _ = app.MapPost(
                 "/overlays/preview/{overlayId:guid}/cue-complete/{runId:guid}",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     Guid runId,
@@ -565,7 +565,7 @@ internal static class OverlayBrowserSourceEndpoints
             .RequireAuthorization("HostSelected");
         _ = app.MapGet(
                 "/overlays/preview/{overlayId:guid}/events",
-                async (
+                static async (
                     HttpContext context,
                     Guid overlayId,
                     OverlayInstanceService overlays,
@@ -615,9 +615,9 @@ internal static class OverlayBrowserSourceEndpoints
         {
             var session = AuthenticatedSession.FromPrincipal(context.User);
             var selectedHost = session.State.Match<BotHostChoice?>(
-                _ => null,
-                selected => selected.Selection.Current,
-                _ => null
+                static _ => null,
+                static selected => selected.Selection.Current,
+                static _ => null
             );
             if (
                 selectedHost is null
@@ -1030,7 +1030,7 @@ internal static class OverlayBrowserSourceEndpoints
             {
                 2 => new PathString("/overlay/[redacted]"),
                 _ => new PathString(
-                    $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(value => value.ToLowerInvariant()))}"
+                    $"/overlay/[redacted]/{string.Join('/', segments.Skip(2).Select(static value => value.ToLowerInvariant()))}"
                 ),
             },
         };

@@ -144,16 +144,16 @@ public static class ServiceCollectionExtensions
         _ = services.AddHostedService<PublicChatPinWorker>();
         services.TryAddSingleton<IPublicChatMessageSender, PublicChatMessageSender>();
         _ = services.AddSingleton<BotRuntimeStatusStore>();
-        _ = services.AddSingleton<IBotRuntimeStatusAccessor>(sp =>
+        _ = services.AddSingleton<IBotRuntimeStatusAccessor>(static sp =>
             sp.GetRequiredService<BotRuntimeStatusStore>()
         );
         _ = services.AddSingleton<EventSubChannelStatusStore>();
-        _ = services.AddSingleton<IEventSubChannelStatusAccessor>(serviceProvider =>
+        _ = services.AddSingleton<IEventSubChannelStatusAccessor>(static serviceProvider =>
             serviceProvider.GetRequiredService<EventSubChannelStatusStore>()
         );
         services.TryAddSingleton<EventSubSubscriptionReconciliationStore>();
         services.TryAddSingleton<EventSubChannelReconciliationTrigger>();
-        services.TryAddSingleton<IEventSubChannelReconciliationTrigger>(serviceProvider =>
+        services.TryAddSingleton<IEventSubChannelReconciliationTrigger>(static serviceProvider =>
             serviceProvider.GetRequiredService<EventSubChannelReconciliationTrigger>()
         );
         services.TryAddSingleton<

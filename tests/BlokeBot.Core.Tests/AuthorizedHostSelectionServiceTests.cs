@@ -76,9 +76,9 @@ public sealed class AuthorizedHostSelectionServiceTests
         );
 
         result.CanCreateHost.ShouldBeTrue();
-        result.Choices.Select(x => x.Login).ShouldBe(["streamer", "allowed"]);
-        result.Choices.Single(x => x.Login == "streamer").Role.ShouldBe(AuthRole.Streamer);
-        result.Choices.Single(x => x.Login == "allowed").Role.ShouldBe(AuthRole.Moderator);
+        result.Choices.Select(static x => x.Login).ShouldBe(["streamer", "allowed"]);
+        result.Choices.Single(static x => x.Login == "streamer").Role.ShouldBe(AuthRole.Streamer);
+        result.Choices.Single(static x => x.Login == "allowed").Role.ShouldBe(AuthRole.Moderator);
     }
 
     private static async Task<int> SeedHostAsync(

@@ -337,7 +337,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
             .IncomingRaidReceivedAsync(Raid("same", _now, 1, "other"), CancellationToken.None);
 
         delivery.Requests.Count.ShouldBe(2);
-        delivery.Requests.Select(request => request.HostLogin).ShouldBe(["host", "other"]);
+        delivery.Requests.Select(static request => request.HostLogin).ShouldBe(["host", "other"]);
     }
 
     [Test]
@@ -390,17 +390,17 @@ public sealed class AutomaticRaidShoutoutObserverTests
         await using (var beforeFresh = await factory.CreateDbContextAsync())
         {
             (
-                await beforeFresh.AutomaticRaidProcessedEvents.AnyAsync(value =>
+                await beforeFresh.AutomaticRaidProcessedEvents.AnyAsync(static value =>
                     value.ProviderMessageId == "expired"
                 )
             ).ShouldBeTrue();
         }
         await observer.IncomingRaidReceivedAsync(Raid("fresh", _now, 1), CancellationToken.None);
 
-        delivery.Requests.Select(request => request.ProviderMessageId).ShouldBe(["fresh"]);
+        delivery.Requests.Select(static request => request.ProviderMessageId).ShouldBe(["fresh"]);
         await using var verification = await factory.CreateDbContextAsync();
         (
-            await verification.AutomaticRaidProcessedEvents.AnyAsync(value =>
+            await verification.AutomaticRaidProcessedEvents.AnyAsync(static value =>
                 value.ProviderMessageId == "expired"
             )
         ).ShouldBeFalse();

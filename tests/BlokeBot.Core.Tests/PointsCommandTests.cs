@@ -125,7 +125,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = 30;
@@ -190,7 +190,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = 1;
@@ -262,7 +262,7 @@ public sealed class PointsCommandTests : PointsTestBase
         await SeedPointsSettingsAsync(
             dbFactory,
             hostId,
-            settings =>
+            static settings =>
             {
                 settings.GamblingWinRatePercent = 100;
                 settings.GamblingCooldownSeconds = -1;

@@ -44,8 +44,8 @@ public sealed class OverlayAppearanceMigrationTests
 
         await using var upgraded = await factory.CreateDbContextAsync();
         var json = await upgraded
-            .OverlayInstances.OrderBy(value => value.Name)
-            .Select(value => value.ConfigurationJson)
+            .OverlayInstances.OrderBy(static value => value.Name)
+            .Select(static value => value.ConfigurationJson)
             .ToArrayAsync();
 
         json[0].ShouldNotContain("\"appearance\"");

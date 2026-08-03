@@ -107,7 +107,7 @@ public sealed class SiteAccessService(
         CancellationToken ct
     )
     {
-        var settings = await db.SiteAccessSettings.SingleOrDefaultAsync(x => x.Id == 1, ct);
+        var settings = await db.SiteAccessSettings.SingleOrDefaultAsync(static x => x.Id == 1, ct);
         if (settings is not null)
         {
             return settings;

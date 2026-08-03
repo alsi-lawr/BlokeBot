@@ -29,7 +29,7 @@ public partial class PointsEligibilitySelector
         var result = await _hostBotStatus.GetReadiness(HostLogin).ExecuteAsync(ct);
         return result.Match(
             HostBotChannelStatusLoadFailure.FromReadiness,
-            _ => throw new UnreachableException()
+            static _ => throw new UnreachableException()
         );
     }
 

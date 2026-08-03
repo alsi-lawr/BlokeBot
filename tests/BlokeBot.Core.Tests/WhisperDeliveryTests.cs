@@ -25,8 +25,8 @@ public sealed class WhisperDeliveryTests : WhisperResponseTestBase
         var result = await delivery.ExecuteAsync(CancellationToken.None);
 
         var receipt = result.Match(
-            receipt => receipt,
-            _ => throw new InvalidOperationException("Expected private delivery success.")
+            static receipt => receipt,
+            static _ => throw new InvalidOperationException("Expected private delivery success.")
         );
         receipt.ShouldBe(new PrivateDeliveryReceipt());
         harness.Http.ValidationRequestCount.ShouldBe(1);

@@ -18,9 +18,9 @@ public partial class SelectedChannelBotStatus
 
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
-            _ => null,
-            selected => selected.Selection,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection,
+            static _ => null
         );
 
     private bool _selectedHostBotAuthorized =>
@@ -126,8 +126,12 @@ public partial class SelectedChannelBotStatus
             .LoadHostRuntimeSummary(_selection.Current.Id)
             .ExecuteAsync(CancellationToken.None);
         _selectedHostStatus = result.Match(
-            option => option.Match<HostedChannelRuntimeSummary?>(value => value, () => null),
-            _ => throw new UnreachableException()
+            static option =>
+                option.Match<HostedChannelRuntimeSummary?>(
+                    static value => value,
+                    static () => null
+                ),
+            static _ => throw new UnreachableException()
         );
     }
 

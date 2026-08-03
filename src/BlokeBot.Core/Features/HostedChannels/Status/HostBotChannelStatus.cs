@@ -29,18 +29,18 @@ public sealed record HostBotChannelStatus
 
     public static HostBotChannelStatus FromReadiness(HostBotReadinessOutcome outcome) =>
         outcome.Match(
-            _ => NotConfigured(),
-            _ => NeedsAuthorization(),
-            _ => NeedsAuthorization(),
-            _ => NeedsAuthorization(),
-            _ => Unknown(),
-            missing => MissingModeratorCheckPermission(missing.Capabilities),
-            missing => MissingModeratorCheckPermission(missing.Capabilities),
-            _ => Unknown(),
-            _ => NeedsAuthorization(),
-            _ => NotModerator(),
-            _ => MissingFollowerReadPermission(),
-            _ => Ready()
+            static _ => NotConfigured(),
+            static _ => NeedsAuthorization(),
+            static _ => NeedsAuthorization(),
+            static _ => NeedsAuthorization(),
+            static _ => Unknown(),
+            static missing => MissingModeratorCheckPermission(missing.Capabilities),
+            static missing => MissingModeratorCheckPermission(missing.Capabilities),
+            static _ => Unknown(),
+            static _ => NeedsAuthorization(),
+            static _ => NotModerator(),
+            static _ => MissingFollowerReadPermission(),
+            static _ => Ready()
         );
 
     private static HostBotChannelStatus NotConfigured() =>

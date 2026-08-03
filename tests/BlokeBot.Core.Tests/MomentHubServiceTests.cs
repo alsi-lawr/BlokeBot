@@ -39,8 +39,8 @@ public sealed class MomentHubServiceTests
 
         _ = rejected
             .Match(
-                _ => throw new InvalidOperationException("Expected rejection."),
-                value => value.Reason
+                static _ => throw new InvalidOperationException("Expected rejection."),
+                static value => value.Reason
             )
             .ShouldBeOfType<MomentRejection.FeatureDisabled>();
         provider.Calls.ShouldBe(0);
@@ -227,15 +227,17 @@ public sealed class MomentHubServiceTests
         (await verify.PointLedgerEntries.CountAsync()).ShouldBe(2);
         (
             await verify
-                .PointLedgerEntries.Select(value => value.OperationKey)
+                .PointLedgerEntries.Select(static value => value.OperationKey)
                 .Distinct()
                 .CountAsync()
         ).ShouldBe(2);
-        (await verify.PointBalances.Select(value => value.Amount).ToArrayAsync())
+        (await verify.PointBalances.Select(static value => value.Amount).ToArrayAsync())
             .Sum(int.Parse)
             .ShouldBe(50);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Approved)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Approved
+            )
         ).ShouldBe(1);
         (await service.GetEventsAsync(alpha, 0, 1000, CancellationToken.None)).Count.ShouldBe(3);
     }
@@ -355,7 +357,9 @@ public sealed class MomentHubServiceTests
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentWeeklyFinalizations.CountAsync()).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Winner)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Winner
+            )
         ).ShouldBe(1);
     }
 
@@ -482,7 +486,7 @@ public sealed class MomentHubServiceTests
             second.ApproveAsync(host, command, CancellationToken.None)
         );
         var approvalSuccesses = approvals.Select(Success).ToArray();
-        approvalSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        approvalSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         var votes = await Task.WhenAll(
             first.VoteAsync(
@@ -499,7 +503,7 @@ public sealed class MomentHubServiceTests
             )
         );
         var voteSuccesses = votes.Select(Success).ToArray();
-        voteSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        voteSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         var weekStart = clock.GetUtcNow().UtcDateTime;
         clock.Advance(TimeSpan.FromDays(7));
@@ -508,21 +512,25 @@ public sealed class MomentHubServiceTests
             second.FinalizeWeekAsync(host, weekStart, CancellationToken.None)
         );
         var finalizationSuccesses = finalizations.Select(Success).ToArray();
-        finalizationSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+        finalizationSuccesses.Count(static value => value.WasIdempotent).ShouldBe(1);
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.MomentVotes.CountAsync()).ShouldBe(1);
         (await verify.PointLedgerEntries.CountAsync()).ShouldBe(1);
         (await verify.MomentWeeklyFinalizations.CountAsync()).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Approved)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Approved
+            )
         ).ShouldBe(1);
         (
-            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Winner)
+            await verify.MomentEvents.CountAsync(static value =>
+                value.Kind == MomentEventKind.Winner
+            )
         ).ShouldBe(1);
         var operationKeys = await verify
-            .MomentEvents.Where(value => value.OperationKey != null)
-            .Select(value => value.OperationKey)
+            .MomentEvents.Where(static value => value.OperationKey != null)
+            .Select(static value => value.OperationKey)
             .ToArrayAsync();
         operationKeys.Length.ShouldBe(2);
         operationKeys.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
@@ -685,8 +693,8 @@ public sealed class MomentHubServiceTests
 
     private static MomentResult<T>.Succeeded Success<T>(MomentResult<T> result) =>
         result.Match(
-            value => value,
-            rejected => throw new InvalidOperationException(rejected.Reason.Message)
+            static value => value,
+            static rejected => throw new InvalidOperationException(rejected.Reason.Message)
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)

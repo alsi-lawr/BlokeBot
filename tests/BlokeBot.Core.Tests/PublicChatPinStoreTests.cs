@@ -31,7 +31,7 @@ public sealed class PublicChatPinStoreTests
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         (
-            await verify.PublicChatPinOperations.CountAsync(operation =>
+            await verify.PublicChatPinOperations.CountAsync(static operation =>
                 operation.Kind == PublicChatPinOperationKind.Unpin
             )
         ).ShouldBe(expectedResetCount);

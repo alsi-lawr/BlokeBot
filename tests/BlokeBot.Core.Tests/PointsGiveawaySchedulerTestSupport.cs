@@ -40,14 +40,14 @@ public abstract partial class PointsGiveawaySchedulerTestBase
         PointOperationOutcome outcome
     ) =>
         outcome.Match(
-            succeeded => succeeded,
-            _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
+            static succeeded => succeeded,
+            static _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
         );
 
     private protected static PointOperationOutcome.Failed Failed(PointOperationOutcome outcome) =>
         outcome.Match(
-            _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
-            failed => failed
+            static _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
+            static failed => failed
         );
 
     private protected static PointsGiveawayScheduler CreateScheduler(

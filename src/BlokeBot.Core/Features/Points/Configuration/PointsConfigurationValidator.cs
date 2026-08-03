@@ -64,7 +64,7 @@ public static class PointsConfigurationValidator
         var duplicateAlias = CommandAliasPolicy.FindDuplicateAlias(
             aliases
                 .ToDrafts()
-                .Select(alias => new BlokeBot.Commands.CommandAliasDraft<AppCommandKind>(
+                .Select(static alias => new BlokeBot.Commands.CommandAliasDraft<AppCommandKind>(
                     alias.Kind,
                     alias.Aliases
                 ))

@@ -72,7 +72,9 @@ public sealed class CommandCatalogTests
         var resolution = await resolver.ResolveAsync("streamer", "score", CancellationToken.None);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
-        var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
+        var profileId = await verify
+            .Profiles.Select(static x => x.Id)
+            .SingleAsync(CancellationToken.None);
         _ = resolution.ShouldNotBeNull();
         resolution.Kind.ShouldBe(AppCommandKind.Start);
         resolution.Scope.ShouldBeOfType<CommandAliasScope.Profile>().ProfileId.ShouldBe(profileId);
@@ -215,11 +217,13 @@ public sealed class CommandCatalogTests
 
         var aliases = await db
             .CommandAliases.AsNoTracking()
-            .OrderBy(alias => alias.Alias)
+            .OrderBy(static alias => alias.Alias)
             .ToListAsync(CancellationToken.None);
-        aliases.Select(alias => alias.Alias).ShouldBe(["balance", "score"]);
-        aliases.Single(alias => alias.Alias == "balance").GuessRoundProfileId.ShouldBeNull();
-        aliases.Single(alias => alias.Alias == "score").GuessRoundProfileId.ShouldBe(profile.Id);
+        aliases.Select(static alias => alias.Alias).ShouldBe(["balance", "score"]);
+        aliases.Single(static alias => alias.Alias == "balance").GuessRoundProfileId.ShouldBeNull();
+        aliases
+            .Single(static alias => alias.Alias == "score")
+            .GuessRoundProfileId.ShouldBe(profile.Id);
     }
 
     [Test]
@@ -229,16 +233,16 @@ public sealed class CommandCatalogTests
         var points = PointsCatalog();
 
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Start)
+            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Start)
             .DefaultAliases.ShouldBe(["startguessing"]);
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Guess)
+            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Guess)
             .DefaultAliases.ShouldBe(["guess"]);
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.Points)
+            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Points)
             .DefaultAliases.ShouldBe(["points"]);
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.Giveaway)
+            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Giveaway)
             .DefaultAliases.ShouldBe(["giveaway"]);
     }
 
@@ -250,28 +254,40 @@ public sealed class CommandCatalogTests
 
         _ = guessing
             .Find(GuessCommandKind.Start)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
         _ = points
             .Find(PointsCommandKind.AddPoints)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
         _ = points
             .Find(PointsCommandKind.Points)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.Everyone>();
         _ = guessing
             .Find(GuessCommandKind.Guess)
-            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .Match(
+                static _ => throw new InvalidOperationException(),
+                static found => found.Strategy.Access
+            )
             .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
@@ -286,19 +302,19 @@ public sealed class CommandCatalogTests
 
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match(kind => kind, () => throw new InvalidOperationException())
+            .Match(static kind => kind, static () => throw new InvalidOperationException())
             .ShouldBe(GuessCommandKind.Win);
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match(kind => kind, () => throw new InvalidOperationException())
+            .Match(static kind => kind, static () => throw new InvalidOperationException())
             .ShouldBe(PointsCommandKind.Giveaway);
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match(_ => false, () => true)
+            .Match(static _ => false, static () => true)
             .ShouldBeTrue();
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match(_ => false, () => true)
+            .Match(static _ => false, static () => true)
             .ShouldBeTrue();
 
         var guessingKinds = GuessingAppCommandKindMap.AppKinds;
@@ -322,14 +338,14 @@ public sealed class CommandCatalogTests
 
         _ = insufficient
             .Match<PointBalanceMutationFailure>(
-                _ => throw new InvalidOperationException("Expected insufficient balance."),
-                failure => failure
+                static _ => throw new InvalidOperationException("Expected insufficient balance."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.InsufficientBalance>();
         _ = invalid
             .Match<PointBalanceMutationFailure>(
-                _ => throw new InvalidOperationException("Expected invalid amount."),
-                failure => failure
+                static _ => throw new InvalidOperationException("Expected invalid amount."),
+                static failure => failure
             )
             .ShouldBeOfType<PointBalanceMutationFailure.InvalidAmount>();
     }

@@ -9,7 +9,7 @@ public partial class HostAccessList
     private readonly HashSet<string> _pendingRemovals = new(StringComparer.OrdinalIgnoreCase);
 
     [Parameter]
-    public Func<Task> Add { get; set; } = () => Task.CompletedTask;
+    public Func<Task> Add { get; set; } = static () => Task.CompletedTask;
 
     [Parameter]
     public bool Disabled { get; set; }
@@ -24,7 +24,7 @@ public partial class HostAccessList
     public EventCallback<string> NewLoginChanged { get; set; }
 
     [Parameter]
-    public Func<string, Task> Remove { get; set; } = _ => Task.CompletedTask;
+    public Func<string, Task> Remove { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter]
     public string Title { get; set; } = string.Empty;

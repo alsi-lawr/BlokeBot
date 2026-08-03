@@ -20,11 +20,11 @@ public sealed partial class BlokeBotDbContext
 
     private static void ConfigureOverlays(ModelBuilder modelBuilder)
     {
-        _ = modelBuilder.Entity<OverlayInstance>(b =>
+        _ = modelBuilder.Entity<OverlayInstance>(static b =>
         {
             _ = b.ToTable(
                 "overlay_instances",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_instances_Type",
@@ -51,21 +51,21 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.PublicId).HasConversion<string>();
-            _ = b.Property(x => x.Name).HasMaxLength(128);
-            _ = b.Property(x => x.Type)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.PublicId).HasConversion<string>();
+            _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.Type)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayType>.Format(value),
-                    value => PersistedEnumTokens<OverlayType>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayType>.Format(value),
+                    static value => PersistedEnumTokens<OverlayType>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.ConfigurationJson).HasMaxLength(8192);
-            _ = b.Property(x => x.AccessKeyDigest).HasMaxLength(32);
-            _ = b.Property(x => x.Revision).IsConcurrencyToken();
-            _ = b.HasIndex(x => x.PublicId).IsUnique();
-            _ = b.HasIndex(x => x.AccessKeyDigest).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.ConfigurationJson).HasMaxLength(8192);
+            _ = b.Property(static x => x.AccessKeyDigest).HasMaxLength(32);
+            _ = b.Property(static x => x.Revision).IsConcurrencyToken();
+            _ = b.HasIndex(static x => x.PublicId).IsUnique();
+            _ = b.HasIndex(static x => x.AccessKeyDigest).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.UpdatedAtUtc,
@@ -73,31 +73,31 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<OverlayInstanceDomainEvent>(b =>
+        _ = modelBuilder.Entity<OverlayInstanceDomainEvent>(static b =>
         {
             _ = b.ToTable(
                 "overlay_instance_events",
-                t =>
+                static t =>
                     t.HasCheckConstraint(
                         "CK_overlay_instance_events_Kind",
                         KindIn("Kind", _overlayInstanceEventKinds)
                     )
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.OverlayPublicId).HasConversion<string>();
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.OverlayPublicId).HasConversion<string>();
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayInstanceEventKind>.Format(value),
-                    value => PersistedEnumTokens<OverlayInstanceEventKind>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayInstanceEventKind>.Format(value),
+                    static value => PersistedEnumTokens<OverlayInstanceEventKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.ActorUserId).HasMaxLength(128);
-            _ = b.Property(x => x.ActorLogin).HasMaxLength(128);
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.ActorUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.ActorLogin).HasMaxLength(128);
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.OverlayPublicId,
@@ -105,15 +105,15 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<OverlayCue>(b =>
+        _ = modelBuilder.Entity<OverlayCue>(static b =>
         {
             _ = b.ToTable(
                 "overlay_cues",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_cues_Name",
@@ -137,20 +137,20 @@ public sealed partial class BlokeBotDbContext
                     _ = t.HasCheckConstraint("CK_overlay_cues_Revision", "Revision > 0");
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.HasAlternateKey(x => new { x.Id, x.HostId });
-            _ = b.Property(x => x.PublicId).HasConversion<string>();
-            _ = b.Property(x => x.Name).HasMaxLength(128);
-            _ = b.Property(x => x.QueuePolicy)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasAlternateKey(static x => new { x.Id, x.HostId });
+            _ = b.Property(static x => x.PublicId).HasConversion<string>();
+            _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.QueuePolicy)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Format(value),
-                    value => PersistedEnumTokens<OverlayCueQueuePolicy>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayCueQueuePolicy>.Format(value),
+                    static value => PersistedEnumTokens<OverlayCueQueuePolicy>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.ConfigurationJson).HasMaxLength(32768);
-            _ = b.Property(x => x.Revision).IsConcurrencyToken();
-            _ = b.HasIndex(x => x.PublicId).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.ConfigurationJson).HasMaxLength(32768);
+            _ = b.Property(static x => x.Revision).IsConcurrencyToken();
+            _ = b.HasIndex(static x => x.PublicId).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.Name,
@@ -158,15 +158,15 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<OverlayMediaAsset>(b =>
+        _ = modelBuilder.Entity<OverlayMediaAsset>(static b =>
         {
             _ = b.ToTable(
                 "overlay_media_assets",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_media_assets_Name",
@@ -186,15 +186,15 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.HasAlternateKey(x => new { x.Id, x.HostId });
-            _ = b.Property(x => x.PublicId).HasConversion<string>();
-            _ = b.Property(x => x.Name).HasMaxLength(128);
-            _ = b.Property(x => x.ContentType).HasMaxLength(32);
-            _ = b.Property(x => x.StorageKey).HasMaxLength(32);
-            _ = b.HasIndex(x => x.PublicId).IsUnique();
-            _ = b.HasIndex(x => x.StorageKey).IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasAlternateKey(static x => new { x.Id, x.HostId });
+            _ = b.Property(static x => x.PublicId).HasConversion<string>();
+            _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.ContentType).HasMaxLength(32);
+            _ = b.Property(static x => x.StorageKey).HasMaxLength(32);
+            _ = b.HasIndex(static x => x.PublicId).IsUnique();
+            _ = b.HasIndex(static x => x.StorageKey).IsUnique();
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.Name,
@@ -202,32 +202,32 @@ public sealed partial class BlokeBotDbContext
             });
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<OverlayCueMediaAssetReference>(b =>
+        _ = modelBuilder.Entity<OverlayCueMediaAssetReference>(static b =>
         {
             _ = b.ToTable("overlay_cue_media_asset_references");
-            _ = b.HasKey(x => new { x.CueId, x.AssetId });
-            _ = b.HasIndex(x => new { x.HostId, x.AssetId });
-            _ = b.HasOne(x => x.Cue)
+            _ = b.HasKey(static x => new { x.CueId, x.AssetId });
+            _ = b.HasIndex(static x => new { x.HostId, x.AssetId });
+            _ = b.HasOne(static x => x.Cue)
                 .WithMany()
-                .HasForeignKey(x => new { x.CueId, x.HostId })
-                .HasPrincipalKey(x => new { x.Id, x.HostId })
+                .HasForeignKey(static x => new { x.CueId, x.HostId })
+                .HasPrincipalKey(static x => new { x.Id, x.HostId })
                 .OnDelete(DeleteBehavior.Cascade);
-            _ = b.HasOne(x => x.Asset)
+            _ = b.HasOne(static x => x.Asset)
                 .WithMany()
-                .HasForeignKey(x => new { x.AssetId, x.HostId })
-                .HasPrincipalKey(x => new { x.Id, x.HostId })
+                .HasForeignKey(static x => new { x.AssetId, x.HostId })
+                .HasPrincipalKey(static x => new { x.Id, x.HostId })
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        _ = modelBuilder.Entity<OverlayEventFeedItem>(b =>
+        _ = modelBuilder.Entity<OverlayEventFeedItem>(static b =>
         {
             _ = b.ToTable(
                 "overlay_event_feed_items",
-                t =>
+                static t =>
                 {
                     _ = t.HasCheckConstraint(
                         "CK_overlay_event_feed_items_Kind",
@@ -255,48 +255,48 @@ public sealed partial class BlokeBotDbContext
                     );
                 }
             );
-            _ = b.HasKey(x => x.Id);
-            _ = b.Property(x => x.Kind)
+            _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayEventFeedKind>.Format(value),
-                    value => PersistedEnumTokens<OverlayEventFeedKind>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayEventFeedKind>.Format(value),
+                    static value => PersistedEnumTokens<OverlayEventFeedKind>.Parse(value)
                 )
                 .HasMaxLength(32);
-            _ = b.Property(x => x.Priority)
+            _ = b.Property(static x => x.Priority)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayEventFeedPriority>.Format(value),
-                    value => PersistedEnumTokens<OverlayEventFeedPriority>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayEventFeedPriority>.Format(value),
+                    static value => PersistedEnumTokens<OverlayEventFeedPriority>.Parse(value)
                 )
                 .HasMaxLength(16);
-            _ = b.Property(x => x.Lifecycle)
+            _ = b.Property(static x => x.Lifecycle)
                 .HasConversion(
-                    value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Format(value),
-                    value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Parse(value)
+                    static value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Format(value),
+                    static value => PersistedEnumTokens<OverlayEventFeedLifecycle>.Parse(value)
                 )
                 .HasMaxLength(16);
-            _ = b.Property(x => x.SourceKey).HasMaxLength(160);
-            _ = b.Property(x => x.Title).HasMaxLength(160);
-            _ = b.HasIndex(x => new
+            _ = b.Property(static x => x.SourceKey).HasMaxLength(160);
+            _ = b.Property(static x => x.Title).HasMaxLength(160);
+            _ = b.HasIndex(static x => new
                 {
                     x.OverlayInstanceId,
                     x.Kind,
                     x.SourceKey,
                 })
                 .IsUnique();
-            _ = b.HasIndex(x => new
+            _ = b.HasIndex(static x => new
             {
                 x.HostId,
                 x.OverlayInstanceId,
                 x.Lifecycle,
                 x.EnqueuedAtUtc,
             });
-            _ = b.HasOne(x => x.OverlayInstance)
+            _ = b.HasOne(static x => x.OverlayInstance)
                 .WithMany()
-                .HasForeignKey(x => x.OverlayInstanceId)
+                .HasForeignKey(static x => x.OverlayInstanceId)
                 .OnDelete(DeleteBehavior.Cascade);
             _ = b.HasOne<BotHost>()
                 .WithMany()
-                .HasForeignKey(x => x.HostId)
+                .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

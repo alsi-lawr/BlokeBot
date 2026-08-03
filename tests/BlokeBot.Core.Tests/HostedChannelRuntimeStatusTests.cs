@@ -47,7 +47,7 @@ public sealed class HostedChannelRuntimeStatusTests
 
         var summary = (
             await service.LoadHostRuntimeSummary(hostId).RunAsync(CancellationToken.None)
-        ).Match<HostedChannelRuntimeSummary?>(value => value, () => null);
+        ).Match<HostedChannelRuntimeSummary?>(static value => value, static () => null);
 
         _ = summary.ShouldNotBeNull();
         summary!.IsChannelBotAuthorized.ShouldBeTrue();

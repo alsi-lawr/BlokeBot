@@ -681,8 +681,8 @@ public sealed class HostBotAccountAuthorizationTests
 
     private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result) =>
         result.Match(
-            account => account,
-            reason =>
+            static account => account,
+            static reason =>
                 throw new InvalidOperationException(
                     $"Expected an authorized bot account, received {reason}."
                 )
@@ -692,8 +692,8 @@ public sealed class HostBotAccountAuthorizationTests
         Result<BotAccount, AccessTokenUnavailableReason> result
     ) =>
         result.Match(
-            _ => throw new InvalidOperationException("Expected token unavailability."),
-            reason => reason
+            static _ => throw new InvalidOperationException("Expected token unavailability."),
+            static reason => reason
         );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)

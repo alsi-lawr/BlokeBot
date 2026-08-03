@@ -278,12 +278,12 @@ internal sealed class EventSubConnectionSession(
             ["user-id"] = chatEvent.ChatterUserId,
             ["badges"] = string.Join(
                 ',',
-                chatEvent.Badges.Select(badge => $"{badge.SetId}/{badge.Id}")
+                chatEvent.Badges.Select(static badge => $"{badge.SetId}/{badge.Id}")
             ),
         };
 
         if (
-            chatEvent.Badges.Any(badge =>
+            chatEvent.Badges.Any(static badge =>
                 badge.SetId.Equals("moderator", StringComparison.OrdinalIgnoreCase)
             )
         )

@@ -120,7 +120,10 @@ public sealed class GuessingConfigurationCommandTests
             .LoadConfiguration(seed.HostId, new GuessingProfileSelection.Selected(int.MaxValue))
             .ExecuteAsync(CancellationToken.None);
 
-        var failure = result.Match<GuessingConfigurationLoadFailure?>(_ => null, error => error);
+        var failure = result.Match<GuessingConfigurationLoadFailure?>(
+            static _ => null,
+            static error => error
+        );
 
         _ = failure.ShouldNotBeNull();
         failure.ShouldBe(new GuessingConfigurationLoadFailure());
@@ -143,8 +146,8 @@ public sealed class GuessingConfigurationCommandTests
             .LoadConfiguration(hostId, new GuessingProfileSelection.Selected(profileId))
             .ExecuteAsync(CancellationToken.None);
         return result.Match(
-            configuration => configuration,
-            failure => throw new InvalidOperationException(failure.Message)
+            static configuration => configuration,
+            static failure => throw new InvalidOperationException(failure.Message)
         );
     }
 
@@ -152,13 +155,13 @@ public sealed class GuessingConfigurationCommandTests
         GuessingConfigurationValidator
             .Validate(draft)
             .Match(
-                command => command,
-                errors => throw new InvalidOperationException(ValidationMessage(errors))
+                static command => command,
+                static errors => throw new InvalidOperationException(ValidationMessage(errors))
             );
 
     private static string ValidationMessage(
         IReadOnlyList<GuessingConfigurationValidationError> errors
-    ) => string.Join(" ", errors.Select(error => error.Message));
+    ) => string.Join(" ", errors.Select(static error => error.Message));
 
     private static async Task<ProfileSeed> SeedProfilesAsync(SqliteBlokeBotDbFactory dbFactory)
     {

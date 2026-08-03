@@ -85,7 +85,7 @@ public sealed class OverlayDashboardUiTests
 
         var card = HostFeatureCatalog
             .Cards(HostFeatureFlags.Overlays)
-            .Single(value => value.Feature == HostFeatureFlags.Overlays);
+            .Single(static value => value.Feature == HostFeatureFlags.Overlays);
 
         card.Enabled.ShouldBeTrue();
         card.Name.ShouldBe("Overlays");

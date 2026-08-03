@@ -38,8 +38,8 @@ public static class PersistedEnumTokens<TEnum>
     private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue() =>
         Enum.GetValues<TEnum>()
             .ToDictionary(
-                value => value,
-                value =>
+                static value => value,
+                static value =>
                     typeof(TEnum)
                         .GetField(value.ToString())
                         ?.GetCustomAttribute<PersistedTokenAttribute>()

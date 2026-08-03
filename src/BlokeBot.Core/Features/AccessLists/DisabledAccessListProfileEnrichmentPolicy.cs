@@ -7,6 +7,6 @@ internal sealed class DisabledAccessListProfileEnrichmentPolicy : IAccessListPro
         CancellationToken cancellationToken
     ) =>
         Task.FromResult<IReadOnlyList<AccessListEntryProfile>>([
-            .. logins.Select(login => new AccessListEntryProfile(login, null)),
+            .. logins.Select(static login => new AccessListEntryProfile(login, null)),
         ]);
 }

@@ -20,7 +20,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = null,
                 ExpectedRejectionCode = null,
                 ExpectedInitialSendCount = 0,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         static (_, _) =>
                             ValueTask.FromResult<PublicChatPreparationOutcome>(
@@ -39,7 +39,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = null,
                 ExpectedRejectionCode = null,
                 ExpectedInitialSendCount = 0,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         static (_, _) =>
                             ValueTask.FromResult<PublicChatPreparationOutcome>(
@@ -58,7 +58,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = null,
                 ExpectedRejectionCode = "followers_only",
                 ExpectedInitialSendCount = 1,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         Ready,
                         static (_, _) =>
@@ -79,7 +79,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = null,
                 ExpectedRejectionCode = null,
                 ExpectedInitialSendCount = 1,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         Ready,
                         static (_, _) =>
@@ -98,7 +98,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = typeof(IOException).FullName,
                 ExpectedRejectionCode = null,
                 ExpectedInitialSendCount = 1,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         Ready,
                         static (_, _) =>
@@ -114,7 +114,7 @@ public sealed class PublicChatOutboxDeliveryOutcomeTests : PublicChatOutboxInteg
                 ExpectedFailureType = typeof(InvalidOperationException).FullName,
                 ExpectedRejectionCode = null,
                 ExpectedInitialSendCount = 0,
-                CreateTransport = () =>
+                CreateTransport = static () =>
                     new ScriptedPublicChatTransport(
                         static (_, cancellationToken) =>
                             ValueTask.FromResult(

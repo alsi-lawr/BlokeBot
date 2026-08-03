@@ -119,8 +119,8 @@ internal sealed class AuthorizedHostSelectionService(
 
     private static BotHostChoice[] Sort(IEnumerable<BotHostChoice> choices) =>
         choices
-            .DistinctBy(host => host.Id)
-            .OrderByDescending(host => host.Role == AuthRole.Streamer)
-            .ThenBy(host => host.DisplayName)
+            .DistinctBy(static host => host.Id)
+            .OrderByDescending(static host => host.Role == AuthRole.Streamer)
+            .ThenBy(static host => host.DisplayName)
             .ToArray();
 }

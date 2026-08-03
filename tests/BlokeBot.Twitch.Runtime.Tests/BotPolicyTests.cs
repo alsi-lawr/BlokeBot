@@ -48,28 +48,28 @@ public sealed class BotPolicyTests
         );
 
         result.Failed.ShouldBeTrue();
-        result.Failures.ShouldContain(failure =>
+        result.Failures.ShouldContain(static failure =>
             failure.Contains(
                 nameof(IrcSessionResilienceOptions.AttemptLimit),
                 StringComparison.Ordinal
             )
         );
-        result.Failures.ShouldContain(failure =>
+        result.Failures.ShouldContain(static failure =>
             failure.Contains(nameof(IrcSessionResilienceOptions.Delay), StringComparison.Ordinal)
         );
-        result.Failures.ShouldContain(failure =>
+        result.Failures.ShouldContain(static failure =>
             failure.Contains(
                 nameof(IrcSessionResilienceOptions.MaximumDelay),
                 StringComparison.Ordinal
             )
         );
-        result.Failures.ShouldContain(failure =>
+        result.Failures.ShouldContain(static failure =>
             failure.Contains(
                 nameof(IrcSessionResilienceOptions.DelayBackoffType),
                 StringComparison.Ordinal
             )
         );
-        result.Failures.ShouldContain(failure =>
+        result.Failures.ShouldContain(static failure =>
             failure.Contains(
                 nameof(IrcSessionResilienceOptions.AttemptTimeout),
                 StringComparison.Ordinal

@@ -10,8 +10,10 @@ public sealed class CommandStrategyCatalog<TKind, TState>
 
     public CommandStrategyCatalog(IEnumerable<ICommandStrategy<TKind, TState>> strategies)
     {
-        var strategyArray = strategies.OrderBy(x => x.Kind).ToArray();
-        var duplicate = strategyArray.GroupBy(x => x.Kind).FirstOrDefault(x => x.Count() > 1);
+        var strategyArray = strategies.OrderBy(static x => x.Kind).ToArray();
+        var duplicate = strategyArray
+            .GroupBy(static x => x.Kind)
+            .FirstOrDefault(static x => x.Count() > 1);
         if (duplicate is not null)
         {
             throw new InvalidOperationException(
@@ -19,7 +21,9 @@ public sealed class CommandStrategyCatalog<TKind, TState>
             );
         }
 
-        var missing = Enum.GetValues<TKind>().Except(strategyArray.Select(x => x.Kind)).ToArray();
+        var missing = Enum.GetValues<TKind>()
+            .Except(strategyArray.Select(static x => x.Kind))
+            .ToArray();
         if (missing.Length > 0)
         {
             throw new InvalidOperationException(
@@ -28,12 +32,12 @@ public sealed class CommandStrategyCatalog<TKind, TState>
         }
 
         Descriptors = strategyArray
-            .Select(strategy => new CommandStrategyDescriptor<TKind>(
+            .Select(static strategy => new CommandStrategyDescriptor<TKind>(
                 strategy.Kind,
                 CommandAliasNormalizer.NormalizeMany(strategy.DefaultAliases)
             ))
             .ToArray();
-        _strategies = strategyArray.ToDictionary(x => x.Kind);
+        _strategies = strategyArray.ToDictionary(static x => x.Kind);
     }
 
     public IReadOnlyList<CommandStrategyDescriptor<TKind>> Descriptors { get; }

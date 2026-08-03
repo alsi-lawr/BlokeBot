@@ -1317,7 +1317,7 @@ public sealed class RequestBoardService(
                 field.Kind == RequestBoardFieldKind.Choice
                 && (
                     choices.Count is < 1 or > RequestBoardLimits.MaximumChoices
-                    || choices.Any(value =>
+                    || choices.Any(static value =>
                         string.IsNullOrWhiteSpace(value)
                         || value.Length > 100
                         || value.Contains('\n', StringComparison.Ordinal)
@@ -1508,7 +1508,7 @@ public sealed class RequestBoardService(
         var tags = NormalizeTags(command.Tags);
         return
             tags.Count > RequestBoardLimits.MaximumTags
-            || tags.Any(value => value.Length is < 1 or > 32)
+            || tags.Any(static value => value.Length is < 1 or > 32)
             ? new RequestBoardRejection.Invalid("Moderation tags exceed their supported bounds.")
             : null;
     }
@@ -1541,8 +1541,8 @@ public sealed class RequestBoardService(
         ];
 
     private static IReadOnlyList<string> NormalizeTags(IEnumerable<string> tags) =>
-        tags.Select(value => value.Trim().ToLowerInvariant())
-            .Where(value => value.Length > 0)
+        tags.Select(static value => value.Trim().ToLowerInvariant())
+            .Where(static value => value.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -1561,10 +1561,10 @@ public sealed class RequestBoardService(
         IReadOnlyList<RequestBoardFieldCommand> requested
     )
     {
-        var left = existing.OrderBy(value => value.Position).ToArray();
+        var left = existing.OrderBy(static value => value.Position).ToArray();
         return left.Length == requested.Count
             && left.Zip(requested)
-                .All(pair =>
+                .All(static pair =>
                     pair.First.Key == RequestBoardInput.NormalizeSlug(pair.Second.Key)
                     && pair.First.Label == pair.Second.Label.Trim()
                     && pair.First.Kind == pair.Second.Kind
@@ -1584,12 +1584,12 @@ public sealed class RequestBoardService(
         IEnumerable<RequestSubmission> submissions
     ) =>
         submissions
-            .OrderBy(value => StatusOrder(value.Status))
-            .ThenByDescending(value => value.Priority)
-            .ThenByDescending(value => value.VoteCount)
-            .ThenBy(value => value.QueuePosition == 0 ? long.MaxValue : value.QueuePosition)
-            .ThenBy(value => value.CreatedAtUtc)
-            .ThenBy(value => value.Id);
+            .OrderBy(static value => StatusOrder(value.Status))
+            .ThenByDescending(static value => value.Priority)
+            .ThenByDescending(static value => value.VoteCount)
+            .ThenBy(static value => value.QueuePosition == 0 ? long.MaxValue : value.QueuePosition)
+            .ThenBy(static value => value.CreatedAtUtc)
+            .ThenBy(static value => value.Id);
 
     private static int StatusOrder(RequestSubmissionStatus status) =>
         status switch
@@ -1620,9 +1620,9 @@ public sealed class RequestBoardService(
             submission.MergedIntoSubmissionId,
             submission.CreatedAtUtc,
             submission
-                .Values.OrderBy(value => value.Field?.Position ?? int.MaxValue)
-                .Where(value => value.Field is not null)
-                .Select(value => new RequestFieldValueView(
+                .Values.OrderBy(static value => value.Field?.Position ?? int.MaxValue)
+                .Where(static value => value.Field is not null)
+                .Select(static value => new RequestFieldValueView(
                     value.Field!.Key,
                     value.Field.Label,
                     value.Field.Kind,
@@ -1681,8 +1681,8 @@ public sealed class RequestBoardService(
             board.VotingEnabled,
             RequestBoard.DefaultOrderingDescription,
             board
-                .Fields.OrderBy(value => value.Position)
-                .Select(value => new RequestBoardFieldView(
+                .Fields.OrderBy(static value => value.Position)
+                .Select(static value => new RequestBoardFieldView(
                     value.Id,
                     value.Key,
                     value.Label,
@@ -1711,7 +1711,7 @@ public sealed class RequestBoardService(
     }
 
     private static SemaphoreSlim[] CreateRetryGates() =>
-        Enumerable.Range(0, _retryGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+        Enumerable.Range(0, _retryGateCount).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();
 
     private static SemaphoreSlim RetryGateFor(SemaphoreSlim[] gates, int hash) =>
         gates[(int)((uint)hash % (uint)gates.Length)];

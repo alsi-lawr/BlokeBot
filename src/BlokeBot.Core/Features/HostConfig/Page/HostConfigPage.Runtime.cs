@@ -175,9 +175,9 @@ public partial class HostConfigPage
     {
         var pageContext = await LoadPageContextAsync();
         var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
+            static _ => null,
+            static selected => selected.Selection.Current,
+            static _ => null
         );
         if (selectedHost?.Id != hostId)
         {
@@ -319,7 +319,10 @@ public partial class HostConfigPage
     private async Task StartCoreAsync(int hostId)
     {
         var result = await _runtime.Start(hostId).ExecuteAsync(CancellationToken.None);
-        var outcome = result.Match(value => value, _ => throw new UnreachableException());
+        var outcome = result.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
         await LoadCoreAsync();
         if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {
@@ -343,7 +346,10 @@ public partial class HostConfigPage
     private async Task StopCoreAsync(int hostId)
     {
         var result = await _runtime.Stop(hostId).ExecuteAsync(CancellationToken.None);
-        var outcome = result.Match(value => value, _ => throw new UnreachableException());
+        var outcome = result.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
         await LoadCoreAsync();
         if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {

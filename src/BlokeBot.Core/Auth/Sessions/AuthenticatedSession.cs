@@ -33,9 +33,9 @@ public sealed record AuthenticatedSession
                 return AuthRoleCodec.Encode(AuthRole.Bot);
             }
             var hostRole = State.Match<AuthRole?>(
-                _ => null,
-                selected => selected.Selection.Current.Role,
-                _ => null
+                static _ => null,
+                static selected => selected.Selection.Current.Role,
+                static _ => null
             );
             return (hostRole, Role) switch
             {
@@ -58,16 +58,20 @@ public sealed record AuthenticatedSession
         capability switch
         {
             AuthSessionCapability.BotAdmin => IsBotAdmin,
-            AuthSessionCapability.HostSelected => State.Match(_ => false, _ => true, _ => false),
+            AuthSessionCapability.HostSelected => State.Match(
+                static _ => false,
+                static _ => true,
+                static _ => false
+            ),
             AuthSessionCapability.Operator => !IsBotAccount
                 && State.Match(
-                    _ => false,
-                    selected =>
+                    static _ => false,
+                    static selected =>
                         selected.Selection.Current.Role
                             is AuthRole.Admin
                                 or AuthRole.Streamer
                                 or AuthRole.Moderator,
-                    _ => false
+                    static _ => false
                 ),
             _ => false,
         };
@@ -229,8 +233,8 @@ public sealed record AuthenticatedSession
             : AuthRoleCodec
                 .Decode(value)
                 .Match<Result<AuthRole?, InvalidSessionClaims>>(
-                    decoded => Result<AuthRole?, InvalidSessionClaims>.Success(decoded),
-                    _ => Result<AuthRole?, InvalidSessionClaims>.Error(new())
+                    static decoded => Result<AuthRole?, InvalidSessionClaims>.Success(decoded),
+                    static _ => Result<AuthRole?, InvalidSessionClaims>.Error(new())
                 );
 
     private static Result<BotHostChoice?, InvalidSessionClaims> DecodeOptionalHost(string? value) =>

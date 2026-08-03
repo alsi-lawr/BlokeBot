@@ -54,8 +54,10 @@ public sealed class ToastServiceTests
     [Test]
     public void RequiredContent_ConstructingRequest_RejectsBlankMessageAndTitle()
     {
-        _ = Should.Throw<ArgumentException>(() => new ToastRequest<StatusToastStrategy>("  "));
-        _ = Should.Throw<ArgumentException>(() =>
+        _ = Should.Throw<ArgumentException>(static () =>
+            new ToastRequest<StatusToastStrategy>("  ")
+        );
+        _ = Should.Throw<ArgumentException>(static () =>
             ToastRequest<StatusToastStrategy>.WithTitle("Saved.", "  ")
         );
     }

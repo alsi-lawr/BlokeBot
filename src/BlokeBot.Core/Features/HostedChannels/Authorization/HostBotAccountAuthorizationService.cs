@@ -1036,7 +1036,13 @@ public sealed class HostBotAccountAuthorizationService(
     }
 
     private static bool IsReady(TokenStatus status) =>
-        status.Match(_ => false, _ => false, _ => false, _ => false, _ => true);
+        status.Match(
+            static _ => false,
+            static _ => false,
+            static _ => false,
+            static _ => false,
+            static _ => true
+        );
 
     private static InvalidOperationException BotNotReady(string channelLogin) =>
         new($"The bot for #{channelLogin} is not ready yet.");

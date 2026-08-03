@@ -16,8 +16,8 @@ public partial class ClipsMarkersPage
 
     private bool _hasAttentionRequired =>
         _state?.PendingClips.Count > 0
-        || _state?.Results.Any(clip => clip.Status == "Ambiguous") == true
-        || _state?.Markers.Any(marker => marker.Status == "Ambiguous") == true;
+        || _state?.Results.Any(static clip => clip.Status == "Ambiguous") == true
+        || _state?.Markers.Any(static marker => marker.Status == "Ambiguous") == true;
 
     protected override async Task OnInitializedAsync()
     {

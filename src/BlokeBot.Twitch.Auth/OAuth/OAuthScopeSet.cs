@@ -73,5 +73,7 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
         && scope[0] != ':'
         && scope[^1] != ':'
         && !scope.Contains("::", StringComparison.Ordinal)
-        && scope.All(character => char.IsAsciiLetterOrDigit(character) || character is ':' or '_');
+        && scope.All(static character =>
+            char.IsAsciiLetterOrDigit(character) || character is ':' or '_'
+        );
 }

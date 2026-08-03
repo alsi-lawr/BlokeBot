@@ -13,7 +13,7 @@ internal static class BotOAuthEndpoints
     public static void MapUnavailableBotOAuthEndpoint(this WebApplication app) =>
         app.MapGet(
                 "/oauth/start",
-                (HttpContext context) =>
+                static (HttpContext context) =>
                     AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
                         ? Result(
                             BlokeBotAuthOutcome.Unavailable,

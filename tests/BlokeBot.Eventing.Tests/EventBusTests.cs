@@ -161,7 +161,7 @@ public sealed class EventBusTests
             fanOut,
             new EventBusEventIdentity<string>
             {
-                Project = key => ObserverEventIdentity.Named($"Event.{key}"),
+                Project = static key => ObserverEventIdentity.Named($"Event.{key}"),
             }
         );
     }

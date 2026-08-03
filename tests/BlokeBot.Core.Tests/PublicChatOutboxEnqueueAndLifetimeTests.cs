@@ -229,13 +229,13 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
             )
         );
         var transport = new ScriptedPublicChatTransport(
-            (_, _) =>
+            static (_, _) =>
                 ValueTask.FromResult<PublicChatPreparationOutcome>(
                     new PublicChatPreparationOutcome.TokenUnavailable(
                         AccessTokenUnavailableReason.MissingRefreshToken
                     )
                 ),
-            (_, _) =>
+            static (_, _) =>
                 ValueTask.FromException<PublicChatTransportSendResult>(
                     new InvalidOperationException("A token-unavailable message must not be sent.")
                 )
@@ -339,7 +339,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         await using var db = await dbFactory.CreateDbContextAsync();
         var rows = await db
             .PublicChatOutboxMessages.AsNoTracking()
-            .OrderBy(x => x.Id)
+            .OrderBy(static x => x.Id)
             .ToArrayAsync();
         rows[0].CreatedAtUtc.ShouldBe(now.UtcDateTime);
         rows[0].ExpiresAtUtc.ShouldBe(producerExpiry.UtcDateTime);

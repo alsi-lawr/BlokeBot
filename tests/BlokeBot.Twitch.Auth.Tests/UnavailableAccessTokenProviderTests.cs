@@ -12,8 +12,9 @@ public sealed class UnavailableAccessTokenProviderTests
         var result = await provider.GetAccessToken().ExecuteAsync(CancellationToken.None);
 
         var reason = result.Match(
-            _ => throw new InvalidOperationException("Expected an unavailable access token."),
-            unavailable => unavailable
+            static _ =>
+                throw new InvalidOperationException("Expected an unavailable access token."),
+            static unavailable => unavailable
         );
         reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
     }

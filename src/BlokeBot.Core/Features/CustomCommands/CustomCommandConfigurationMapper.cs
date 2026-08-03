@@ -13,9 +13,9 @@ internal static class CustomCommandConfigurationMapper
             SelectionMode = entry.SelectionMode,
             CurrentVariantIndex = entry.CurrentVariantIndex,
             Variants = entry
-                .Variants.OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .Select(x => new CustomMessageVariantEditor { Id = x.Id, Text = x.Text })
+                .Variants.OrderBy(static x => x.SortOrder)
+                .ThenBy(static x => x.Id)
+                .Select(static x => new CustomMessageVariantEditor { Id = x.Id, Text = x.Text })
                 .ToList(),
         };
 
@@ -34,7 +34,10 @@ internal static class CustomCommandConfigurationMapper
             Name = command.Name,
             Aliases = string.Join(
                 ", ",
-                command.Aliases.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Select(x => x.Alias)
+                command
+                    .Aliases.OrderBy(static x => x.SortOrder)
+                    .ThenBy(static x => x.Id)
+                    .Select(static x => x.Alias)
             ),
             Enabled = command.Enabled,
             ModeratorOnly = command.ModeratorOnly,

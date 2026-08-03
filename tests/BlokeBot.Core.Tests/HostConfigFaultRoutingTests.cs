@@ -38,7 +38,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             ReadyBroadcasterStatus(),
             owner: true,
-            page =>
+            static page =>
             {
                 page.Markup.ShouldContain("Chat access");
                 page.Markup.ShouldContain("Twitch integration");
@@ -58,7 +58,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: true,
-            page =>
+            static page =>
             {
                 page.Markup.ShouldContain("The channel owner must connect this integration.");
                 var action = BroadcasterActions(page).ShouldHaveSingleItem();
@@ -73,7 +73,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Invalid([]),
             owner: true,
-            page =>
+            static page =>
             {
                 page.Markup.ShouldContain("The channel owner must reconnect this integration.");
                 var action = BroadcasterActions(page).ShouldHaveSingleItem();
@@ -88,7 +88,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
             owner: false,
-            page =>
+            static page =>
             {
                 page.Markup.ShouldContain("The channel owner must connect this integration.");
                 BroadcasterActions(page).ShouldBeEmpty();
@@ -101,7 +101,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             ReadyBroadcasterStatus(),
             owner: false,
-            page =>
+            static page =>
             {
                 page.Find("[data-twitch-integration]")
                     .TextContent.ShouldContain(
@@ -117,7 +117,7 @@ public sealed class HostConfigFaultRoutingTests
         await AssertTwitchOperationsPresentationAsync(
             new TokenStatus.Invalid([]),
             owner: false,
-            page =>
+            static page =>
             {
                 page.Markup.ShouldContain("The channel owner must reconnect this integration.");
                 BroadcasterActions(page).ShouldBeEmpty();
@@ -791,7 +791,7 @@ public sealed class HostConfigFaultRoutingTests
         IRenderedComponent<HostConfigPage> page
     ) =>
         page.FindComponents<AuthPopupButton>()
-            .Where(action => action.Instance.Url == "/oauth/broadcaster/start")
+            .Where(static action => action.Instance.Url == "/oauth/broadcaster/start")
             .ToArray();
 
     private static IReadOnlyList<IElement> TwitchIntegrationDisconnectActions(
@@ -926,7 +926,7 @@ public sealed class HostConfigFaultRoutingTests
 
     private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page) =>
         page.FindAll("button")
-            .Single(button =>
+            .Single(static button =>
                 button.TextContent.Contains("Available viewer commands", StringComparison.Ordinal)
             );
 
@@ -955,11 +955,11 @@ public sealed class HostConfigFaultRoutingTests
         where TComponent : IComponent
     {
         page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "All mods")
+            .Single(static button => button.TextContent.Trim() == "All mods")
             .HasAttribute("aria-pressed")
             .ShouldBe(allowModsByDefault);
         page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Allowed list only")
+            .Single(static button => button.TextContent.Trim() == "Allowed list only")
             .HasAttribute("aria-pressed")
             .ShouldBe(!allowModsByDefault);
     }

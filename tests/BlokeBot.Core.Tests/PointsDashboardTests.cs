@@ -158,7 +158,7 @@ public sealed class PointsDashboardTests : PointsTestBase
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var ledger = await db
-            .PointLedgerEntries.OrderBy(x => x.Id)
+            .PointLedgerEntries.OrderBy(static x => x.Id)
             .ToListAsync(CancellationToken.None);
         Success(result).Message.ShouldBe("Point balance removed.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);

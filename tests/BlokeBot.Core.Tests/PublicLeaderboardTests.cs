@@ -28,7 +28,7 @@ public sealed class PublicLeaderboardTests
 
         var host = (
             await lookup.Find("@Streamer").RunAsync(CancellationToken.None)
-        ).Match<PublicLeaderboardHost?>(value => value, () => null);
+        ).Match<PublicLeaderboardHost?>(static value => value, static () => null);
 
         _ = host.ShouldNotBeNull();
         host.Login.ShouldBe("streamer");
@@ -44,7 +44,7 @@ public sealed class PublicLeaderboardTests
 
         var host = (
             await lookup.Find("missing").RunAsync(CancellationToken.None)
-        ).Match<PublicLeaderboardHost?>(value => value, () => null);
+        ).Match<PublicLeaderboardHost?>(static value => value, static () => null);
 
         host.ShouldBeNull();
     }

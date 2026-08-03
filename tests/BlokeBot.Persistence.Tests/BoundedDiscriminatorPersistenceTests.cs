@@ -131,7 +131,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await AssertCorruptionFailureAsync(
             "UPDATE reply_delivery_settings SET Feature = 'invalid-feature'",
             typeof(ReplyFeature),
-            async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
+            static async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
         );
 
     [Test]
@@ -139,7 +139,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await AssertCorruptionFailureAsync(
             "UPDATE reply_delivery_settings SET Target = 'invalid-target'",
             typeof(ReplyDeliveryTarget),
-            async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
+            static async db => _ = await db.ReplyDeliverySettings.AsNoTracking().SingleAsync()
         );
 
     [Test]
@@ -147,7 +147,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await AssertCorruptionFailureAsync(
             "UPDATE guess_options SET ReplyTarget = 'invalid-target'",
             typeof(ReplyDeliveryTarget),
-            async db => _ = await db.GuessOptions.AsNoTracking().SingleAsync()
+            static async db => _ = await db.GuessOptions.AsNoTracking().SingleAsync()
         );
 
     [Test]
@@ -155,7 +155,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
         await AssertCorruptionFailureAsync(
             "UPDATE point_ledger_entries SET Kind = 'invalid-kind'",
             typeof(PointLedgerKind),
-            async db => _ = await db.PointLedgerEntries.AsNoTracking().SingleAsync()
+            static async db => _ = await db.PointLedgerEntries.AsNoTracking().SingleAsync()
         );
 
     private static async Task AssertCorruptionFailureAsync(

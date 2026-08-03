@@ -16,8 +16,8 @@ public abstract record TokenStatusError
 
     public ImmutableArray<string> RequiredScopes =>
         Match(
-            acquisition => acquisition.RequiredScopesSnapshot,
-            validation => validation.RequiredScopesSnapshot
+            static acquisition => acquisition.RequiredScopesSnapshot,
+            static validation => validation.RequiredScopesSnapshot
         );
 
     public sealed record AcquisitionUnavailable(

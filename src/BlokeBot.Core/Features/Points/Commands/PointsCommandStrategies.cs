@@ -56,8 +56,8 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     )
     {
         var response = outcome.Match(
-            succeeded => new CommandResponse(succeeded.Target, succeeded.Message),
-            failed => new CommandResponse(failed.Target, failed.Message)
+            static succeeded => new CommandResponse(succeeded.Target, succeeded.Message),
+            static failed => new CommandResponse(failed.Target, failed.Message)
         );
         if (!string.IsNullOrWhiteSpace(response.Message))
         {

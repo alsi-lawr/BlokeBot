@@ -8,8 +8,8 @@ public static class Login
     public static string[] NormalizeMany(IEnumerable<string?> values) =>
         values
             .Select(Normalize)
-            .Where(login => login.Length > 0)
+            .Where(static login => login.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(login => login, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static login => login, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 }

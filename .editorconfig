@@ -207,6 +207,28 @@ dotnet_diagnostic.IDE0005.severity = none
 [src/BlokeBot.Site/Components/Pages/GuideTopic.razor.cs]
 dotnet_diagnostic.IDE0005.severity = none
 
+# The Razor-generated HomePage type consumes this import from the markup partial.
+[tests/BlokeBot.Core.Tests/TaskPageCompositionTests.cs]
+dotnet_diagnostic.CS8019.severity = none
+dotnet_diagnostic.IDE0005.severity = none
+
+# These standalone code-behind files retain generated Razor instance context; IDE0320's
+# detached analysis incorrectly proposes static lambdas for their generated component members.
+[src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/Points/Dashboard/PointsDashboard.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
+[src/BlokeBot.Core/Features/TwitchOperations/Predictions/Page/PredictionsPage.razor.cs]
+dotnet_diagnostic.IDE0320.severity = none
+
 [src/BlokeBot.Persistence/Migrations/*.cs]
 charset = utf-8-bom
 # EF migration source is generated from migration identifiers and provider templates.

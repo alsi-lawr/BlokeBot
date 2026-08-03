@@ -19,14 +19,14 @@ public static class TwitchOperationsServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotTwitchOperations(this IServiceCollection services)
     {
         _ = services.AddSingleton<NativeTwitchFeatureGate>();
-        _ = services.AddSingleton<INativeTwitchFeatureStateProvider>(provider =>
+        _ = services.AddSingleton<INativeTwitchFeatureStateProvider>(static provider =>
             provider.GetRequiredService<NativeTwitchFeatureGate>()
         );
         _ = services.AddSingleton<ShoutoutService>();
-        _ = services.AddSingleton<IShoutoutDashboardOperations>(provider =>
+        _ = services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
-        _ = services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(provider =>
+        _ = services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
         _ = services.AddSingleton<AutomaticRaidShoutoutConfigurationService>();
@@ -45,18 +45,18 @@ public static class TwitchOperationsServiceCollectionExtensions
         services.TryAddSingleton<IAutomaticRaidShoutoutDelivery, AutomaticRaidShoutoutDelivery>();
         _ = services.AddSingleton<AutomaticRaidShoutoutObserver>();
         _ = services.AddSingleton<PollService>();
-        _ = services.AddSingleton<IPollDashboardOperations>(provider =>
+        _ = services.AddSingleton<IPollDashboardOperations>(static provider =>
             provider.GetRequiredService<PollService>()
         );
         _ = services.AddSingleton<ClipMarkerService>();
-        _ = services.AddSingleton<IClipMarkerDashboardOperations>(provider =>
+        _ = services.AddSingleton<IClipMarkerDashboardOperations>(static provider =>
             provider.GetRequiredService<ClipMarkerService>()
         );
         _ = services.AddSingleton<ChannelPointsService>();
-        _ = services.AddSingleton<IChannelPointsDashboardOperations>(provider =>
+        _ = services.AddSingleton<IChannelPointsDashboardOperations>(static provider =>
             provider.GetRequiredService<ChannelPointsService>()
         );
-        _ = services.AddSingleton(provider => new PredictionService(
+        _ = services.AddSingleton(static provider => new PredictionService(
             provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
             provider.GetRequiredService<IHostBroadcasterTokenStatusProvider>(),
             provider.GetRequiredService<HelixClient>(),
@@ -67,26 +67,26 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<NativeTwitchFeatureGate>(),
             TimeProvider.System
         ));
-        _ = services.AddSingleton<IPredictionDashboardOperations>(provider =>
+        _ = services.AddSingleton<IPredictionDashboardOperations>(static provider =>
             provider.GetRequiredService<PredictionService>()
         );
         _ = services.AddSingleton<
             INativeTwitchFeatureChangeObserver,
             NativeTwitchFeatureChangeObserver
         >();
-        _ = services.AddSingleton<IPollEventObserver>(provider =>
+        _ = services.AddSingleton<IPollEventObserver>(static provider =>
             provider.GetRequiredService<PollService>()
         );
-        _ = services.AddSingleton<IPredictionEventObserver>(provider =>
+        _ = services.AddSingleton<IPredictionEventObserver>(static provider =>
             provider.GetRequiredService<PredictionService>()
         );
-        _ = services.AddSingleton<IChannelPointsEventObserver>(provider =>
+        _ = services.AddSingleton<IChannelPointsEventObserver>(static provider =>
             provider.GetRequiredService<ChannelPointsService>()
         );
-        _ = services.AddSingleton<IShoutoutEventObserver>(provider =>
+        _ = services.AddSingleton<IShoutoutEventObserver>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
-        _ = services.AddSingleton<IIncomingRaidEventObserver>(provider =>
+        _ = services.AddSingleton<IIncomingRaidEventObserver>(static provider =>
             provider.GetRequiredService<AutomaticRaidShoutoutObserver>()
         );
         return services;

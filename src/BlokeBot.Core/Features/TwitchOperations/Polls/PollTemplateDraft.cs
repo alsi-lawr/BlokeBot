@@ -11,9 +11,12 @@ public sealed record PollTemplateDraft(
     public PollTemplateValidationOutcome Validate()
     {
         var title = Title.Trim();
-        var choices = Choices.Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
+        var choices = Choices
+            .Select(static x => x.Trim())
+            .Where(static x => x.Length > 0)
+            .ToArray();
         var titleInvalid = title.Length is < 1 or > 60;
-        var choicesInvalid = choices.Length is < 2 or > 5 || choices.Any(x => x.Length > 25);
+        var choicesInvalid = choices.Length is < 2 or > 5 || choices.Any(static x => x.Length > 25);
         var durationInvalid = DurationSeconds is < 15 or > 1800;
         var channelPointsInvalid =
             ChannelPointsVotingEnabled && ChannelPointsPerVote is not (>= 1 and <= 1_000_000);

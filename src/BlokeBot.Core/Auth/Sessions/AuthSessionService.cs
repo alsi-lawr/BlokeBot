@@ -144,7 +144,7 @@ internal sealed class AuthSessionService(BotAdminService admins, BotSettings bot
         }
 
         claims.AddRange(
-            hosts.Select(host => new Claim(
+            hosts.Select(static host => new Claim(
                 BotHostClaims.AvailableHost,
                 BotHostClaimCodec.Encode(host)
             ))

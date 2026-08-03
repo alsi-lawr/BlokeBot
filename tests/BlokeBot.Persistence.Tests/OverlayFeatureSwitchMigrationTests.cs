@@ -33,8 +33,8 @@ public sealed class OverlayFeatureSwitchMigrationTests
 
         await using var upgraded = await factory.CreateDbContextAsync();
         var masks = await upgraded
-            .Hosts.OrderBy(value => value.Id)
-            .Select(value => (long)value.EnabledFeatures)
+            .Hosts.OrderBy(static value => value.Id)
+            .Select(static value => (long)value.EnabledFeatures)
             .ToArrayAsync();
         masks.ShouldBe([16L, 20L, 80L]);
         (
@@ -73,8 +73,8 @@ public sealed class OverlayFeatureSwitchMigrationTests
         await using var downgraded = await factory.CreateDbContextAsync();
         (
             await downgraded
-                .Hosts.OrderBy(value => value.Id)
-                .Select(value => (long)value.EnabledFeatures)
+                .Hosts.OrderBy(static value => value.Id)
+                .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([15L, 64L]);
         (

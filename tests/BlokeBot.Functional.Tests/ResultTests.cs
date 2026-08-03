@@ -47,9 +47,9 @@ public sealed class ResultTests
     [Test]
     public void Success_Mapping_TransformsValue()
     {
-        var mapped = Result<int, TestError>.Success(21).Map(value => value * 2);
+        var mapped = Result<int, TestError>.Success(21).Map(static value => value * 2);
 
-        mapped.Match(value => value, _ => 0).ShouldBe(42);
+        mapped.Match(static value => value, static _ => 0).ShouldBe(42);
     }
 
     [Test]
@@ -75,13 +75,13 @@ public sealed class ResultTests
     {
         var bound = Result<int, TestError>
             .Success(21)
-            .Bind(value =>
+            .Bind(static value =>
                 Result<string, TestError>.Success(
                     (value * 2).ToString(CultureInfo.InvariantCulture)
                 )
             );
 
-        bound.Match(value => value, _ => string.Empty).ShouldBe("42");
+        bound.Match(static value => value, static _ => string.Empty).ShouldBe("42");
     }
 
     [Test]

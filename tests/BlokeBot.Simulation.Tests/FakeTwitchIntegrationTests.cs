@@ -395,7 +395,7 @@ public sealed class FakeTwitchIntegrationTests
         public void AddCommands(IChatCommandBuilder commands) =>
             commands.Map(
                 "hello",
-                async (context, _, cancellationToken) =>
+                static async (context, _, cancellationToken) =>
                     await context.ReplyAsync("normal command response", cancellationToken)
             );
     }
@@ -464,7 +464,7 @@ public sealed class FakeTwitchIntegrationTests
     private sealed class StaticBotAccountProvider : IBotAccountProvider
     {
         public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+            IO<BotAccount, AccessTokenUnavailableReason>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(
                         new BotAccount("blokebot", FakeTwitchAuthority.BotAccessToken)
@@ -485,9 +485,9 @@ public sealed class FakeTwitchIntegrationTests
             EventSubAuthorizationContext authorization
         ) =>
             authorization.Match(
-                _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
-                _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
-                _ => Success("samplechannel", FakeTwitchAuthority.BroadcasterAccessToken)
+                static _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
+                static _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
+                static _ => Success("samplechannel", FakeTwitchAuthority.BroadcasterAccessToken)
             );
 
         public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(

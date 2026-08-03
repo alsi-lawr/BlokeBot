@@ -3,7 +3,7 @@ namespace BlokeBot.Core.Tests;
 internal static class TestCommandContext
 {
     public static ChatCommandContext Create(string login, string channel, string commandName) =>
-        Create(login, channel, commandName, [], (_, _) => ValueTask.CompletedTask);
+        Create(login, channel, commandName, [], static (_, _) => ValueTask.CompletedTask);
 
     public static ChatCommandContext Create(
         string login,

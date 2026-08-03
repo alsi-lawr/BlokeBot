@@ -118,7 +118,7 @@ public sealed class CustomCommandSettingsUiTests
         var control = cut.Find($"#{expected.ControlId}");
         control.GetAttribute("aria-invalid").ShouldBe("true");
         control.GetAttribute("aria-describedby").ShouldBe($"{expected.ControlId}-error");
-        var focus = context.JSInterop.Invocations.Last(invocation =>
+        var focus = context.JSInterop.Invocations.Last(static invocation =>
             invocation.Identifier == "Blazor._internal.domWrapper.focus"
         );
         focus.Arguments[0].ShouldBeElementReferenceTo(control);
@@ -303,11 +303,11 @@ public sealed class CustomCommandSettingsUiTests
 
         var name = cut.Find($"#command-{seeded.CommandId}-name");
         name.Input(string.Empty);
-        var focusCountBeforeValidation = context.JSInterop.Invocations.Count(invocation =>
+        var focusCountBeforeValidation = context.JSInterop.Invocations.Count(static invocation =>
             invocation.Identifier == "Blazor._internal.domWrapper.focus"
         );
         var expectedNameReference = context
-            .JSInterop.Invocations.Last(invocation =>
+            .JSInterop.Invocations.Last(static invocation =>
                 invocation.Identifier == "Blazor._internal.domWrapper.focus"
             )
             .Arguments[0];
@@ -315,7 +315,7 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         var focusInvocations = context
-            .JSInterop.Invocations.Where(invocation =>
+            .JSInterop.Invocations.Where(static invocation =>
                 invocation.Identifier == "Blazor._internal.domWrapper.focus"
             )
             .ToArray();
@@ -424,7 +424,7 @@ public sealed class CustomCommandSettingsUiTests
         var invalid = cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay");
         invalid.GetAttribute("aria-invalid").ShouldBe("true");
         context
-            .JSInterop.Invocations.Last(invocation =>
+            .JSInterop.Invocations.Last(static invocation =>
                 invocation.Identifier == "Blazor._internal.domWrapper.focus"
             )
             .Arguments[0]
@@ -555,7 +555,10 @@ public sealed class CustomCommandSettingsUiTests
         var title = summary.QuerySelector("#custom-command-validation-title");
         _ = title.ShouldNotBeNull();
         title.TextContent.Trim().ShouldBe("Check these settings");
-        return summary.QuerySelectorAll("li").Select(item => item.TextContent.Trim()).ToArray();
+        return summary
+            .QuerySelectorAll("li")
+            .Select(static item => item.TextContent.Trim())
+            .ToArray();
     }
 
     private static ValidationSectionExpectation InvalidateSection(

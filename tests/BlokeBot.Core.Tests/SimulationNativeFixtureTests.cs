@@ -26,7 +26,7 @@ public sealed class SimulationNativeFixtureTests
             ["native-clips-markers"] = "/twitch-operations/clips-markers",
             ["native-channel-points"] = "/twitch-operations/channel-points",
             ["native-predictions"] = "/twitch-operations/predictions",
-        }.ShouldAllBe(pair => SimulationViewCatalog.PathFor(pair.Key) == pair.Value);
+        }.ShouldAllBe(static pair => SimulationViewCatalog.PathFor(pair.Key) == pair.Value);
 
     [Test]
     public void OverlayAliasResolvesToTheDeterministicDashboardRoute() =>

@@ -1326,15 +1326,15 @@ public sealed class PlayQueueService(
         IEnumerable<PlayQueueEntry> entries
     ) =>
         entries
-            .Where(value =>
+            .Where(static value =>
                 value.Status
                     is PlayQueueEntryStatus.Waiting
                         or PlayQueueEntryStatus.AwaitingReady
                         or PlayQueueEntryStatus.Ready
             )
-            .OrderByDescending(value => value.Priority)
-            .ThenBy(value => value.JoinedAtUtc)
-            .ThenBy(value => value.Id);
+            .OrderByDescending(static value => value.Priority)
+            .ThenBy(static value => value.JoinedAtUtc)
+            .ThenBy(static value => value.Id);
 
     private async Task<PlayQueue?> LoadQueueAsync(
         BlokeBotDbContext db,
@@ -1486,8 +1486,8 @@ public sealed class PlayQueueService(
                 ? "Higher priority, then earlier join time, then entry ID."
                 : "Higher priority, then least recent participation, earlier join time, then entry ID.",
             queue
-                .Fields.OrderBy(value => value.Position)
-                .Select(value => new PlayQueueFieldView(
+                .Fields.OrderBy(static value => value.Position)
+                .Select(static value => new PlayQueueFieldView(
                     value.Id,
                     value.Key,
                     value.Label,
@@ -1495,8 +1495,11 @@ public sealed class PlayQueueService(
                 ))
                 .ToArray(),
             queue
-                .RoleRequirements.OrderBy(value => value.Role)
-                .Select(value => new PlayQueueRoleRequirementView(value.Role, value.MinimumCount))
+                .RoleRequirements.OrderBy(static value => value.Role)
+                .Select(static value => new PlayQueueRoleRequirementView(
+                    value.Role,
+                    value.MinimumCount
+                ))
                 .ToArray()
         );
 
@@ -1778,9 +1781,9 @@ public sealed class PlayQueueService(
     ) =>
         stored.Count == commanded.Count
         && stored
-            .OrderBy(value => value.Position)
+            .OrderBy(static value => value.Position)
             .Zip(commanded)
-            .All(pair =>
+            .All(static pair =>
                 pair.First.Key == PlayQueueInput.NormalizeKey(pair.Second.Key)
                 && pair.First.Label == pair.Second.Label.Trim()
                 && pair.First.Choices == string.Join('\n', pair.Second.Choices ?? [])
@@ -1885,7 +1888,7 @@ public sealed class PlayQueueService(
         {
             _ when kinds.Contains(PlayQueueEventKind.PartySelected) =>
                 PlayQueueOverlayTransition.PartyChanged,
-            _ when kinds.Any(kind =>
+            _ when kinds.Any(static kind =>
                     kind is PlayQueueEventKind.Ready or PlayQueueEventKind.NoShow
                 ) => PlayQueueOverlayTransition.ReadyOutcome,
             _ when kinds.Contains(PlayQueueEventKind.ReadyCheckStarted) =>
@@ -1906,7 +1909,7 @@ public sealed class PlayQueueService(
     }
 
     private static string PreferredRole(PlayQueueEntry entry) =>
-        entry.Values.FirstOrDefault(value => value.Field?.Key == "preferred-role")?.Value
+        entry.Values.FirstOrDefault(static value => value.Field?.Key == "preferred-role")?.Value
         ?? string.Empty;
 
     private static IReadOnlyList<string> Choices(string value) =>
@@ -1953,7 +1956,7 @@ public sealed class PlayQueueService(
     }
 
     private static SemaphoreSlim[] CreateGates() =>
-        Enumerable.Range(0, _gateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+        Enumerable.Range(0, _gateCount).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();
 
     private static PlayQueueResult<T>.Succeeded Succeeded<T>(T value) => new(value);
 

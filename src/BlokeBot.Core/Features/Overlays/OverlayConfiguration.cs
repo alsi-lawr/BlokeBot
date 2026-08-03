@@ -74,8 +74,8 @@ public abstract record OverlayConfiguration
     internal static OverlayConfiguration FromPersistence(OverlayType type, string json) =>
         Parse(type, json)
             .Match(
-                valid => valid.Value,
-                invalid =>
+                static valid => valid.Value,
+                static invalid =>
                     throw new InvalidOperationException(
                         $"Persisted overlay configuration is invalid: {invalid.Message}"
                     )
@@ -190,7 +190,7 @@ public abstract record OverlayConfiguration
                 || dto.OverflowPolicy is null
                 || dto.Kinds is null
                 || dto.Kinds.Count != 3
-                || dto.Kinds.Any(pair =>
+                || dto.Kinds.Any(static pair =>
                     pair.Value is null || pair.Value.Template is null || pair.Value.Priority is null
                 )
             )
@@ -208,8 +208,9 @@ public abstract record OverlayConfiguration
                             dto.Capacity,
                             PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
                             dto.Kinds.ToDictionary(
-                                pair => PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
-                                pair => new EventFeedKindConfiguration(
+                                static pair =>
+                                    PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
+                                static pair => new EventFeedKindConfiguration(
                                     pair.Value!.Enabled,
                                     pair.Value.Template!,
                                     PersistedEnumTokens<OverlayEventFeedPriority>.Parse(
@@ -526,8 +527,8 @@ public abstract record OverlayConfiguration
                     Capacity,
                     PersistedEnumTokens<EventFeedOverflowPolicy>.Format(OverflowPolicy),
                     Kinds.ToDictionary(
-                        pair => PersistedEnumTokens<OverlayEventFeedKind>.Format(pair.Key),
-                        pair =>
+                        static pair => PersistedEnumTokens<OverlayEventFeedKind>.Format(pair.Key),
+                        static pair =>
                             (EventFeedKindConfigurationDto?)
                                 new EventFeedKindConfigurationDto(
                                     pair.Value.Enabled,

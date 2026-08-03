@@ -33,14 +33,16 @@ public sealed class GuessingDashboardRejectionTests
         var cut = context.Render<GuessingDashboard>();
 
         cut.FindAll("[role='tab']")
-            .Single(tab => tab.TextContent.Trim() == "Live")
+            .Single(static tab => tab.TextContent.Trim() == "Live")
             .GetAttribute("aria-selected")
             .ShouldBe("true");
         cut.FindAll("[role='tab']")
-            .Select(tab => tab.TextContent.Trim())
+            .Select(static tab => tab.TextContent.Trim())
             .ShouldBe(["Live", "History", "Leaderboard"]);
 
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Start round").Click();
+        cut.FindAll("button")
+            .Single(static button => button.TextContent.Trim() == "Start round")
+            .Click();
 
         var sent = chat.Messages.ShouldHaveSingleItem();
         sent.Channel.ShouldBe("streamer");
