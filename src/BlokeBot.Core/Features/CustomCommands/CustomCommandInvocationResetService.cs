@@ -21,13 +21,15 @@ public sealed class CustomCommandInvocationResetService(
     )
     {
         var resolution = await viewers.ResolveAsync(viewerLogin, ct);
-        if (resolution is CustomCommandViewerResolution.NotFound)
-        {
-            return new CustomCommandInvocationResetOutcome.ViewerNotFound();
-        }
-
-        var viewer = ((CustomCommandViewerResolution.Found)resolution).Viewer;
-        return await ResetAsync(hostId, commandId, actor, new ResetTarget.OneViewer(viewer), ct);
+        return resolution is CustomCommandViewerResolution.Found found
+            ? await ResetAsync(
+                hostId,
+                commandId,
+                actor,
+                new ResetTarget.OneViewer(found.Viewer),
+                ct
+            )
+            : new CustomCommandInvocationResetOutcome.ViewerNotFound();
     }
 
     public Task<CustomCommandInvocationResetOutcome> ResetAllViewersAsync(

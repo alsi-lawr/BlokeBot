@@ -62,7 +62,9 @@ public sealed class CustomCommandConfigurationTests
                         Name = "Hello",
                         Aliases = "!HI, hello",
                         Enabled = false,
-                        ModeratorOnly = true,
+                        AllowEveryone = false,
+                        AllowModerators = true,
+                        AllowedUsers = [new("viewer-id", "viewer", "Viewer")],
                         CooldownSeconds = 12,
                         CooldownScope = CustomCommandCooldownScope.User,
                         InvocationLimit = CustomCommandInvocationLimit.OncePerStreamPerUser,
@@ -116,7 +118,9 @@ public sealed class CustomCommandConfigurationTests
         command.Name.ShouldBe("Hello");
         command.Aliases.ShouldBe("hi, hello");
         command.Enabled.ShouldBeFalse();
-        command.ModeratorOnly.ShouldBeTrue();
+        command.AllowEveryone.ShouldBeFalse();
+        command.AllowModerators.ShouldBeTrue();
+        command.AllowedUsers.ShouldBe([new("viewer-id", "viewer", "Viewer")]);
         command.CooldownSeconds.ShouldBe(12);
         command.CooldownScope.ShouldBe(CustomCommandCooldownScope.User);
         command.InvocationLimit.ShouldBe(CustomCommandInvocationLimit.OncePerStreamPerUser);
@@ -205,6 +209,40 @@ public sealed class CustomCommandConfigurationTests
         var afterSave = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         afterSave.Commands.Single().Aliases.ShouldBe("updated");
         afterSave.MessageEntries.Single().Variants.Single().Text.ShouldBe("Updated reply.");
+    }
+
+    [Test]
+    public async Task SelectedUsers_CommandAndFeatureDisableCycles_RetainAccessPolicy()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory);
+        var draft = ConfigurationWithCommands(("Command", "command"));
+        var command = draft.Commands.Single();
+        command.AllowEveryone = false;
+        command.AllowModerators = true;
+        command.AllowedUsers.Add(new("selected-id", "viewer", "Viewer"));
+        command.Enabled = false;
+        await SaveValidAsync(service, hostId, draft);
+
+        await using (var disabled = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await disabled.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures &= ~HostFeatureFlags.CustomCommands;
+            _ = await disabled.SaveChangesAsync();
+            host.EnabledFeatures |= HostFeatureFlags.CustomCommands;
+            _ = await disabled.SaveChangesAsync();
+        }
+        var reloaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        reloaded.Commands.Single().Enabled = true;
+        await SaveValidAsync(service, hostId, reloaded);
+
+        var restored = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        var restoredCommand = restored.Commands.Single();
+        restoredCommand.Enabled.ShouldBeTrue();
+        restoredCommand.AllowEveryone.ShouldBeFalse();
+        restoredCommand.AllowModerators.ShouldBeTrue();
+        restoredCommand.AllowedUsers.ShouldBe([new("selected-id", "viewer", "Viewer")]);
     }
 
     [Test]

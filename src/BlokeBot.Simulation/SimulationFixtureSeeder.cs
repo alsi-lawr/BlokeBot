@@ -572,9 +572,20 @@ internal sealed class SimulationFixtureSeeder(
             new CustomCommand
             {
                 HostId = hostId,
-                Name = "Moderator-only fixture",
+                Name = "Access policy fixture",
                 Enabled = true,
-                ModeratorOnly = true,
+                AllowEveryone = false,
+                AllowModerators = true,
+                AllowedUsers =
+                [
+                    new CustomCommandAllowedUser
+                    {
+                        HostId = hostId,
+                        TwitchUserId = "3000",
+                        Login = "trustedviewer",
+                        DisplayName = "Trusted Viewer",
+                    },
+                ],
                 Action = new MessageCustomCommandAction
                 {
                     HostId = hostId,

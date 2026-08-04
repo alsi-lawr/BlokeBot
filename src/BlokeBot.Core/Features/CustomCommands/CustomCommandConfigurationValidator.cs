@@ -285,6 +285,7 @@ public static class CustomCommandConfigurationValidator
                 );
             }
 
+            var allowedUsers = SnapshotAllowedUsers(editor, names[index], errors);
             var action = editor.Action switch
             {
                 MessageCustomCommandActionEditor => new CustomCommandActionValue.Message(
@@ -356,12 +357,58 @@ public static class CustomCommandConfigurationValidator
                     names[index],
                     aliases,
                     editor.Enabled,
-                    editor.ModeratorOnly,
+                    editor.AllowEveryone,
+                    editor.AllowModerators,
+                    allowedUsers,
                     editor.CooldownSeconds,
                     editor.CooldownScope,
                     editor.InvocationLimit,
                     action
                 )
+            );
+        }
+
+        return values;
+    }
+
+    private static IReadOnlyList<CustomCommandAllowedUserValue> SnapshotAllowedUsers(
+        CustomCommandEditor editor,
+        string commandName,
+        ICollection<CustomCommandConfigurationValidationError> errors
+    )
+    {
+        var values = editor
+            .AllowedUsers.Select(user => new CustomCommandAllowedUserValue(
+                user.TwitchUserId.Trim(),
+                Login.Normalize(user.Login),
+                user.DisplayName.Trim()
+            ))
+            .ToArray();
+        if (
+            values.Any(user =>
+                user.TwitchUserId.Length is 0 or > 128
+                || user.Login.Length is 0 or > 128
+                || user.DisplayName.Length is 0 or > 128
+            )
+        )
+        {
+            AddError(
+                errors,
+                $"Command '{commandName}' has a selected Twitch account that must be added again.",
+                CommandTarget(editor.Id, CustomCommandValidationFieldKind.AllowedUsers)
+            );
+        }
+
+        if (
+            values
+                .GroupBy(user => user.TwitchUserId, StringComparer.Ordinal)
+                .Any(group => group.Count() > 1)
+        )
+        {
+            AddError(
+                errors,
+                $"Command '{commandName}' has the same selected Twitch account more than once.",
+                CommandTarget(editor.Id, CustomCommandValidationFieldKind.AllowedUsers)
             );
         }
 

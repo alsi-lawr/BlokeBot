@@ -13,6 +13,7 @@
 @inject CustomCommandInvocationResetService _invocationResets
 @inject CustomCommandExecutionService _execution
 @inject IOverlayCueAdmissionService _overlayCues
+@inject ICustomCommandViewerResolver _viewers
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
@@ -288,7 +289,7 @@
                                  aria-current="@(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? "true" : null)">
                                 <div class="min-w-0">
                                     <p id="@InventoryLabelId(CustomCommandEditorKind.Command, command.Id)" class="text-sm font-semibold text-slate-900">@command.Name</p>
-                                    <p class="text-xs text-muted-foreground">Command · @(command.Enabled ? "On" : "Off") · @ActionKindLabel(command.ActionKind) · @CommandAdvancedSummary(command)</p>
+                                    <p class="text-xs text-muted-foreground">Command · @(command.Enabled ? "On" : "Off") · @CommandAccessSummary(command) · @ActionKindLabel(command.ActionKind) · @CommandAdvancedSummary(command)</p>
                                 </div>
                                 <button class="btn-secondary"
                                         data-action="edit-command"
@@ -328,10 +329,99 @@
                                         <input id="@CommandEnabledToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.Enabled" />
                                         Turned on
                                     </label>
-                                    <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
-                                        <input id="@CommandModeratorOnlyToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
-                                        Only moderators can use this
-                                    </label>
+                                    <section class="space-y-3 md:col-span-2"
+                                             aria-labelledby="@CommandAccessLabelId(command)"
+                                             data-command-access>
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <div>
+                                                <h3 id="@CommandAccessLabelId(command)" class="label">Who can use this?</h3>
+                                                <p class="mt-1 text-xs text-muted-foreground">@CommandAccessSummary(command)</p>
+                                            </div>
+                                            <div class="flex flex-wrap gap-2" role="group" aria-label="Command access">
+                                                <button id="@CommandEveryoneAccessId(command)"
+                                                        class="custom-command-access-choice @(command.AllowEveryone ? "btn-primary" : "btn-secondary")"
+                                                        type="button"
+                                                        aria-pressed="@(command.AllowEveryone ? "true" : "false")"
+                                                        @onclick="() => SetCommandAccess(command, true)">Everyone</button>
+                                                <button id="@CommandRestrictedAccessId(command)"
+                                                        class="custom-command-access-choice @(!command.AllowEveryone ? "btn-primary" : "btn-secondary")"
+                                                        type="button"
+                                                        aria-pressed="@(!command.AllowEveryone ? "true" : "false")"
+                                                        @onclick="() => SetCommandAccess(command, false)">Restricted</button>
+                                            </div>
+                                        </div>
+                                        @if (command.AllowedUserFeedback is not null)
+                                        {
+                                            <p class="text-sm text-muted-foreground"
+                                               role="status"
+                                               data-allowed-user-feedback>@command.AllowedUserFeedback</p>
+                                        }
+                                        @if (!command.AllowEveryone)
+                                        {
+                                            <button id="@CommandModeratorAccessId(command)"
+                                                    class="custom-command-access-choice custom-command-access-grant @(command.AllowModerators ? "btn-primary" : "btn-secondary")"
+                                                    data-selected="@(command.AllowModerators ? "true" : "false")"
+                                                    type="button"
+                                                    aria-pressed="@(command.AllowModerators ? "true" : "false")"
+                                                    @onclick="() => ToggleModeratorAccess(command)">
+                                                <span class="font-semibold">Moderators</span>
+                                                <span class="text-xs">@(command.AllowModerators ? "Allowed" : "Not allowed")</span>
+                                            </button>
+                                            @if (!command.AllowModerators && command.AllowedUsers.Count == 0)
+                                            {
+                                                <p class="text-sm text-muted-foreground" data-streamer-only>
+                                                    Only the streamer can use this command.
+                                                </p>
+                                            }
+                                            <CollapsibleSection ContentId="@CommandSelectedUsersContentId(command)"
+                                                                Title="Selected people"
+                                                                Description="@SelectedUsersSummary(command)"
+                                                                InitiallyOpen="false"
+                                                                OpenRequest="@CommandAccessOpenRequest(command.Id)">
+                                                <div class="space-y-3 p-4">
+                                                    @if (command.AllowedUsers.Count == 0)
+                                                    {
+                                                        <p class="text-sm text-muted-foreground">No selected people yet.</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <ul class="space-y-2" aria-label="Selected Twitch accounts">
+                                                            @foreach (var user in command.AllowedUsers)
+                                                            {
+                                                                <li class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg p-3"
+                                                                    data-allowed-user-id="@user.TwitchUserId">
+                                                                    <span class="min-w-0">
+                                                                        <span class="block truncate text-sm font-semibold">@user.DisplayName</span>
+                                                                        <span class="block truncate text-xs text-muted-foreground">@@@user.Login</span>
+                                                                    </span>
+                                                                    <button class="btn-secondary"
+                                                                            type="button"
+                                                                            data-action="remove-allowed-user"
+                                                                            aria-label="Remove @user.DisplayName"
+                                                                            @onclick="() => RemoveAllowedUser(command, user)">Remove</button>
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    }
+                                                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                                        <Field Id="@CommandAllowedUserFieldId(command)"
+                                                               Label="Twitch login"
+                                                               ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
+                                                               FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.AllowedUsers))"
+                                                               @bind-Value="command.AllowedUserLoginDraft"
+                                                               Placeholder="viewer_name" />
+                                                        <button class="btn-secondary"
+                                                                type="button"
+                                                                data-action="add-allowed-user"
+                                                                disabled="@command.AllowedUserLookupInProgress"
+                                                                @onclick="() => AddAllowedUserAsync(command)">
+                                                            @(command.AllowedUserLookupInProgress ? "Looking up..." : "Add person")
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </CollapsibleSection>
+                                        }
+                                    </section>
                                     <div class="space-y-2">
                                         <label class="label" for="@CommandActionFieldId(command)">What happens?</label>
                                         <select id="@CommandActionFieldId(command)"

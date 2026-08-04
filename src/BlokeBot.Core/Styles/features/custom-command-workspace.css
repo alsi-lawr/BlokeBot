@@ -51,6 +51,24 @@
             var(--app-shadow-sm);
     }
 
+    .custom-command-access-choice[aria-pressed="true"] {
+        border-color: var(--app-focus-border);
+        box-shadow:
+            inset 0.2rem 0 0 var(--app-focus-border),
+            var(--app-shadow-sm);
+        color: var(--app-text-strong);
+    }
+
+    .custom-command-access-grant.btn-primary,
+    .custom-command-access-grant.btn-secondary {
+        justify-content: space-between;
+        height: auto;
+        min-height: 2.75rem;
+        padding: 0.625rem 0.875rem;
+        text-align: left;
+        width: 100%;
+    }
+
     @container custom-command-workspace (min-width: 65rem) {
         .custom-command-workspace {
             align-items: start;

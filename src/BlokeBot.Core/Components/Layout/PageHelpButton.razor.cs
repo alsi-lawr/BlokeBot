@@ -540,6 +540,8 @@ public partial class PageHelpButton
                     "Use <code>{user}</code> for the viewer's name and <code>{channel}</code> for the channel name.",
                     "Use <code>{args}</code> for everything typed after the command, or <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
                     "Counter commands can use <code>{count}</code> for the new number.",
+                    "Everyone makes a command public. Restricted commands can independently allow moderators and selected Twitch accounts; with neither selected, only the streamer can use the command.",
+                    "Selected people are matched by their Twitch account, so a later Twitch name change does not remove access.",
                     "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, cue playback, testing, chat replies, cooldowns, one-time viewer use, and viewer-catalog listing are paused.",
                     "Turning either switch back on restores the saved cue setup without replaying commands that were suppressed while it was off.",
                     "Test cue checks the selected cue and Browser Source without sending chat, starting a cooldown, or consuming a one-time viewer use.",

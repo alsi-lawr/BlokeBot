@@ -40,7 +40,17 @@ internal static class CustomCommandConfigurationMapper
                     .Select(static x => x.Alias)
             ),
             Enabled = command.Enabled,
-            ModeratorOnly = command.ModeratorOnly,
+            AllowEveryone = command.AllowEveryone,
+            AllowModerators = command.AllowModerators,
+            AllowedUsers = command
+                .AllowedUsers.OrderBy(static user => user.DisplayName)
+                .ThenBy(static user => user.Login)
+                .Select(static user => new CustomCommandAllowedUserEditor(
+                    user.TwitchUserId,
+                    user.Login,
+                    user.DisplayName
+                ))
+                .ToList(),
             CooldownSeconds = command.CooldownSeconds,
             CooldownScope = command.CooldownScope,
             InvocationLimit = command.InvocationLimit,

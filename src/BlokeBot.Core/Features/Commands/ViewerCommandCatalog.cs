@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
@@ -15,7 +16,22 @@ public enum ViewerCommandCatalogSource
     Custom,
 }
 
-public sealed record ViewerCommandCatalogEntry(string Name, ViewerCommandCatalogSource Source);
+public sealed record ViewerCommandCatalogEntry(
+    string Name,
+    ViewerCommandCatalogSource Source,
+    string? AccessSummary = null
+)
+{
+    internal ViewerCommandCatalogAvailability Availability { get; init; }
+}
+
+internal enum ViewerCommandCatalogAvailability
+{
+    Available,
+    TurnedOff,
+    ActionUnavailable,
+    Shadowed,
+}
 
 public sealed record ViewerCommandCatalogSnapshot(
     IReadOnlyList<ViewerCommandCatalogEntry> Entries,
@@ -57,12 +73,14 @@ public sealed class ViewerCommandCatalogService(
                 host.Login,
                 host.EnabledFeatures,
                 host.CommandsDefaultConflictAlias,
+                null,
                 ct
             );
     }
 
-    public async Task<ViewerCommandCatalogSnapshot> LoadForChannelAsync(
+    public async Task<ViewerCommandCatalogSnapshot> LoadForViewerAsync(
         string channelLogin,
+        ChatMessage viewer,
         CancellationToken ct
     )
     {
@@ -87,6 +105,7 @@ public sealed class ViewerCommandCatalogService(
                 host.Login,
                 host.EnabledFeatures,
                 host.CommandsDefaultConflictAlias,
+                viewer,
                 ct
             );
     }
@@ -97,6 +116,7 @@ public sealed class ViewerCommandCatalogService(
         string hostLogin,
         HostFeatureFlags enabledFeatures,
         string? defaultConflictAlias,
+        ChatMessage? viewer,
         CancellationToken ct
     )
     {
@@ -134,8 +154,10 @@ public sealed class ViewerCommandCatalogService(
         var customCommands = enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ? await db
                 .CustomCommands.AsNoTracking()
+                .AsSplitQuery()
                 .Include(value => value.Action)
                 .Include(value => value.Aliases)
+                .Include(value => value.AllowedUsers)
                 .Where(value => value.HostId == hostId)
                 .ToArrayAsync(ct)
             : [];
@@ -229,54 +251,114 @@ public sealed class ViewerCommandCatalogService(
 
         if (enabledFeatures.Contains(HostFeatureFlags.CustomCommands))
         {
-            foreach (
-                var command in customCommands.Where(value =>
-                    value.Enabled
-                    && !value.ModeratorOnly
-                    && IsCustomActionAvailable(value.Action, availableCueActions)
-                )
-            )
+            foreach (var command in customCommands)
             {
                 var canonical = command
                     .Aliases.OrderBy(value => value.SortOrder)
                     .ThenBy(value => value.Id)
                     .Select(value => value.Alias)
                     .FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(canonical))
+                if (string.IsNullOrWhiteSpace(canonical))
                 {
-                    candidates.Add(Candidate.Custom(canonical, command.Id));
+                    continue;
                 }
+
+                var availability = CustomAvailability(command, availableCueActions);
+                if (
+                    viewer is not null
+                    && (
+                        availability is not ViewerCommandCatalogAvailability.Available
+                        || !CustomCommandAccessPolicy.Allows(hostLogin, command, viewer)
+                    )
+                )
+                {
+                    continue;
+                }
+
+                candidates.Add(
+                    Candidate.Custom(
+                        canonical,
+                        command.Id,
+                        CustomAccessSummary(command),
+                        availability
+                    )
+                );
             }
         }
 
-        var entries = candidates
-            .Where(candidate =>
+        var inventoryForOwner = viewer is null;
+        var listedCandidates = new List<Candidate>();
+        foreach (var candidate in candidates)
+        {
+            if (inventoryForOwner && candidate.Source == ViewerCommandCatalogSource.Custom)
+            {
+                var ownerCandidate = candidate;
+                if (
+                    candidate.Availability is ViewerCommandCatalogAvailability.Available
+                    && !IsActuallyDispatchedTo(
+                        candidate,
+                        appAliases,
+                        customCommands,
+                        enabledFeatures,
+                        availableCueActions
+                    )
+                )
+                {
+                    AddConflict(conflicts, candidate, listed: true);
+                    ownerCandidate = candidate with
+                    {
+                        Availability = ViewerCommandCatalogAvailability.Shadowed,
+                    };
+                }
+
+                listedCandidates.Add(ownerCandidate);
+                continue;
+            }
+
+            if (
                 IsActuallyDispatchedTo(
                     candidate,
                     appAliases,
                     customCommands,
                     enabledFeatures,
                     availableCueActions
-                ) || AddConflict(conflicts, candidate)
+                )
             )
+            {
+                listedCandidates.Add(candidate);
+            }
+            else
+            {
+                AddConflict(conflicts, candidate, listed: false);
+            }
+        }
+
+        var entries = listedCandidates
             .DistinctBy(candidate => candidate.LogicalIdentity)
             .Select(candidate => new ViewerCommandCatalogEntry(
                 $"!{candidate.Alias}",
-                candidate.Source
-            ))
+                candidate.Source,
+                candidate.AccessSummary
+            )
+            {
+                Availability = candidate.Availability,
+            })
             .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(entry => entry.Name, StringComparer.Ordinal)
             .ToArray();
         return new(entries, conflicts.Distinct(StringComparer.Ordinal).ToArray(), unavailable);
     }
 
-    private static bool AddConflict(ICollection<string> conflicts, Candidate candidate)
-    {
+    private static void AddConflict(
+        ICollection<string> conflicts,
+        Candidate candidate,
+        bool listed
+    ) =>
         conflicts.Add(
-            $"!{candidate.Alias} is shadowed by another command and is not listed. Change that alias to make it available."
+            listed
+                ? $"!{candidate.Alias} is shadowed by another command. Change that alias to make it available."
+                : $"!{candidate.Alias} is shadowed by another command and is not listed. Change that alias to make it available."
         );
-        return false;
-    }
 
     private static void AddAppCandidate(
         ICollection<Candidate> candidates,
@@ -351,6 +433,23 @@ public sealed class ViewerCommandCatalogService(
         action is not OverlayCueCustomCommandAction cue
         || availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId));
 
+    private static string CustomAccessSummary(CustomCommand command) =>
+        CustomCommandAccessPolicy.Describe(
+            command.AllowEveryone,
+            command.AllowModerators,
+            command.AllowedUsers.Count
+        );
+
+    private static ViewerCommandCatalogAvailability CustomAvailability(
+        CustomCommand command,
+        IReadOnlySet<CueActionIdentity> availableCueActions
+    ) =>
+        command.Enabled
+            ? IsCustomActionAvailable(command.Action, availableCueActions)
+                ? ViewerCommandCatalogAvailability.Available
+                : ViewerCommandCatalogAvailability.ActionUnavailable
+            : ViewerCommandCatalogAvailability.TurnedOff;
+
     private async Task<IReadOnlySet<CueActionIdentity>> AvailableCueActionsAsync(
         int hostId,
         IReadOnlyList<CustomCommand> commands,
@@ -410,7 +509,9 @@ public sealed class ViewerCommandCatalogService(
         ViewerCommandCatalogSource Source,
         bool FixedRoute,
         AppCommandKind? AppKind,
-        int? CustomCommandId
+        int? CustomCommandId,
+        string? AccessSummary,
+        ViewerCommandCatalogAvailability Availability
     )
     {
         public static Candidate Fixed(FixedChatCommandRoute route) =>
@@ -420,20 +521,38 @@ public sealed class ViewerCommandCatalogService(
                 ViewerCommandCatalogSource.BuiltIn,
                 true,
                 null,
-                null
+                null,
+                null,
+                ViewerCommandCatalogAvailability.Available
             );
 
         public static Candidate App(string alias, AppCommandKind kind) =>
-            new(alias, $"app:{kind}", ViewerCommandCatalogSource.BuiltIn, false, kind, null);
+            new(
+                alias,
+                $"app:{kind}",
+                ViewerCommandCatalogSource.BuiltIn,
+                false,
+                kind,
+                null,
+                null,
+                ViewerCommandCatalogAvailability.Available
+            );
 
-        public static Candidate Custom(string alias, int commandId) =>
+        public static Candidate Custom(
+            string alias,
+            int commandId,
+            string accessSummary,
+            ViewerCommandCatalogAvailability availability
+        ) =>
             new(
                 alias,
                 $"custom:{commandId}",
                 ViewerCommandCatalogSource.Custom,
                 false,
                 null,
-                commandId
+                commandId,
+                accessSummary,
+                availability
             );
     }
 }

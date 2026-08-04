@@ -337,19 +337,19 @@
                     @(_commandsSaving ? "Saving..." : "Save Commands")
                 </button>
 
-                <CollapsibleSection Title="Available viewer commands"
-                                    Description="Main command names viewers can use right now."
+                <CollapsibleSection Title="Viewer command inventory"
+                                    Description="Canonical command names, access, and current availability."
                                     InitiallyOpen="false"
                                     Opened="RefreshCommandCatalogAsync"
                                     ContentId="available-viewer-commands">
                     <div class="space-y-3 p-4" aria-live="polite" data-command-catalog>
                         @if (_commandCatalogLoading)
                         {
-                            <p class="text-sm text-muted-foreground">Loading available commands...</p>
+                            <p class="text-sm text-muted-foreground">Loading command inventory...</p>
                         }
                         else if (_commandCatalog is null)
                         {
-                            <p class="text-sm text-muted-foreground">Open this list to check current command availability.</p>
+                            <p class="text-sm text-muted-foreground">Open this list to check configured commands and current availability.</p>
                         }
                         else
                         {
@@ -377,17 +377,27 @@
                             @if (_commandCatalog.Entries.Count == 0)
                             {
                                 <p class="text-sm text-muted-foreground" data-command-catalog-empty>
-                                    No viewer commands are currently available.
+                                    No viewer commands are configured or currently available.
                                 </p>
                             }
                             else
                             {
-                                <ul class="flex flex-wrap gap-2" aria-label="Available viewer commands">
+                                <ul class="flex flex-wrap gap-2" aria-label="Viewer command inventory">
                                     @foreach (var entry in _commandCatalog.Entries)
                                     {
-                                        <li class="control-surface rounded-full px-3 py-1 text-sm font-semibold"
+                                        <li class="control-surface rounded-lg px-3 py-2 text-sm font-semibold"
                                             data-command-source="@entry.Source.ToString().ToLowerInvariant()">
-                                            @entry.Name
+                                            <span class="block">@entry.Name</span>
+                                            @if (entry.AccessSummary is not null)
+                                            {
+                                                <span class="block text-xs font-medium text-muted-foreground"
+                                                      data-command-access-summary>@entry.AccessSummary</span>
+                                            }
+                                            @if (CommandAvailabilitySummary(entry.Availability) is { } availability)
+                                            {
+                                                <span class="block text-xs font-bold text-amber-700"
+                                                      data-command-availability>@availability</span>
+                                            }
                                         </li>
                                     }
                                 </ul>

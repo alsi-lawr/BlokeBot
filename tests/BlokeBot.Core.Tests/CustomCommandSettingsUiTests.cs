@@ -1,4 +1,5 @@
 using BlokeBot.Announcements;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Eventing;
@@ -50,6 +51,124 @@ public sealed class CustomCommandSettingsUiTests
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
 
         cut.FindAll($"#command-{seeded.CommandId}-counter-id").ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task RestrictedAccess_Editing_ResolvesStableUsersAndRetainsDraftsAcrossFailuresAndTabs()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        _ = context.Services.AddSingleton<ICustomCommandViewerResolver>(
+            new QueueViewerResolver(
+                new CustomCommandViewerResolution.Found(new("selected-id", "viewer", "Viewer")),
+                new CustomCommandViewerResolution.Found(
+                    new("selected-id", "renamed", "Viewer renamed")
+                ),
+                new CustomCommandViewerResolution.Unavailable()
+            )
+        );
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-access-restricted").Click();
+
+        cut.FindAll("[data-command-access] input[type='checkbox']").ShouldBeEmpty();
+        var restricted = cut.Find($"#command-{seeded.CommandId}-access-restricted");
+        restricted.GetAttribute("aria-pressed").ShouldBe("true");
+        restricted.ClassList.ShouldContain("btn-primary");
+        cut.Find($"#command-{seeded.CommandId}-access-everyone")
+            .ClassList.ShouldContain("btn-secondary");
+        cut.Find("[data-streamer-only]").TextContent.ShouldContain("Only the streamer");
+        cut.Find($"button[aria-controls='command-{seeded.CommandId}-selected-users']").Click();
+        var login = cut.Find($"#command-{seeded.CommandId}-allowed-user");
+        login.Input("#");
+        cut.Find("button[data-action='add-allowed-user']").Click();
+        cut.Find("[data-allowed-user-feedback]")
+            .TextContent.ShouldBe("Enter a valid Twitch login.");
+
+        login.Input("viewer");
+        cut.Find("button[data-action='add-allowed-user']").Click();
+
+        cut.Find("[data-allowed-user-id='selected-id']").TextContent.ShouldContain("@viewer");
+        login.GetAttribute("value").ShouldBe(string.Empty);
+        cut.Find("#custom-command-message-library-tab").Click();
+        cut.Find("#custom-command-commands-tab").Click();
+        cut.Find($"button[aria-controls='command-{seeded.CommandId}-selected-users']").Click();
+        cut.Find("[data-allowed-user-id='selected-id']").TextContent.ShouldContain("Viewer");
+
+        login = cut.Find($"#command-{seeded.CommandId}-allowed-user");
+        login.Input("renamed");
+        cut.Find("button[data-action='add-allowed-user']").Click();
+
+        cut.Find("[data-allowed-user-feedback]")
+            .TextContent.ShouldBe("That Twitch account is already selected.");
+        login.GetAttribute("value").ShouldBe("renamed");
+        cut.FindAll("[data-allowed-user-id='selected-id']").Count.ShouldBe(1);
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        await using (var saved = await dbFactory.CreateDbContextAsync())
+        {
+            var user = await saved.CustomCommandAllowedUsers.SingleAsync();
+            user.TwitchUserId.ShouldBe("selected-id");
+            user.Login.ShouldBe("viewer");
+            user.DisplayName.ShouldBe("Viewer");
+        }
+
+        cut.Find($"button[aria-controls='command-{seeded.CommandId}-selected-users']").Click();
+        login = cut.Find($"#command-{seeded.CommandId}-allowed-user");
+        login.Input("offline_viewer");
+        cut.Find("button[data-action='add-allowed-user']").Click();
+
+        cut.Find("[data-allowed-user-feedback]").TextContent.ShouldContain("lookup is unavailable");
+        login.GetAttribute("value").ShouldBe("offline_viewer");
+        cut.Find("button[data-action='remove-allowed-user']").Click();
+        cut.FindAll("[data-allowed-user-id='selected-id']").ShouldBeEmpty();
+        cut.Find("button[aria-label='Save custom commands']").Click();
+        await using var removed = await dbFactory.CreateDbContextAsync();
+        (await removed.CustomCommandAllowedUsers.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task SaveFailure_CompletingCallback_ReportsInlineAndRetainsTheAccessDraft()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        var faultingFactory = new ArmableDbContextFactory(dbFactory);
+        var logger = new RecordingLogger<UiFaultTelemetry>();
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        _ = context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(faultingFactory);
+        _ = context.Services.AddSingleton(new UiFaultTelemetry(logger));
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-name").Input("Unsaved command");
+        cut.Find($"#command-{seeded.CommandId}-access-restricted").Click();
+        cut.Find($"#command-{seeded.CommandId}-access-moderators").Click();
+        cut.Find($"button[aria-controls='command-{seeded.CommandId}-selected-users']").Click();
+        cut.Find($"#command-{seeded.CommandId}-allowed-user").Input("pending_viewer");
+        faultingFactory.Fault = new IOException("Expected test save failure.");
+
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        cut.Find("[data-allowed-user-feedback]")
+            .TextContent.ShouldBe("Changes were not saved. Try again without reloading the page.");
+        cut.Find($"#command-{seeded.CommandId}-name")
+            .GetAttribute("value")
+            .ShouldBe("Unsaved command");
+        cut.Find($"#command-{seeded.CommandId}-allowed-user")
+            .GetAttribute("value")
+            .ShouldBe("pending_viewer");
+        cut.Find($"#command-{seeded.CommandId}-access-restricted")
+            .GetAttribute("aria-pressed")
+            .ShouldBe("true");
+        var moderators = cut.Find($"#command-{seeded.CommandId}-access-moderators");
+        moderators.GetAttribute("aria-pressed").ShouldBe("true");
+        moderators.ClassList.ShouldContain("btn-primary");
+        cut.Find("button[aria-label='Save custom commands']")
+            .GetAttribute("data-save-state")
+            .ShouldBe("dirty");
+        var fault = logger.Entries.ShouldHaveSingleItem();
+        fault.Properties["UiOperation"].ShouldBe("SaveAsync");
+        fault.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
     }
 
     [Test]
@@ -729,6 +848,45 @@ public sealed class CustomCommandSettingsUiTests
             _failed = true;
             throw new IOException("Expected test load failure.");
         }
+    }
+
+    private sealed class ArmableDbContextFactory(IDbContextFactory<BlokeBotDbContext> inner)
+        : IDbContextFactory<BlokeBotDbContext>
+    {
+        public Exception? Fault { get; set; }
+
+        public BlokeBotDbContext CreateDbContext()
+        {
+            ThrowIfFaulted();
+            return inner.CreateDbContext();
+        }
+
+        public Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            ThrowIfFaulted();
+            return inner.CreateDbContextAsync(cancellationToken);
+        }
+
+        private void ThrowIfFaulted()
+        {
+            if (Fault is not null)
+            {
+                throw Fault;
+            }
+        }
+    }
+
+    private sealed class QueueViewerResolver(params CustomCommandViewerResolution[] resolutions)
+        : ICustomCommandViewerResolver
+    {
+        private readonly Queue<CustomCommandViewerResolution> _resolutions = new(resolutions);
+
+        public Task<CustomCommandViewerResolution> ResolveAsync(
+            string login,
+            CancellationToken ct
+        ) => Task.FromResult(_resolutions.Dequeue());
     }
 
     public enum ValidationSection

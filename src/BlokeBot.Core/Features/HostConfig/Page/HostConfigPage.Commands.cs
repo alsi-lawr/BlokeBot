@@ -112,4 +112,16 @@ public partial class HostConfigPage
 
     private void PublishCommandsError(string message) =>
         _toasts.Publish(ToastRequest<ErrorToastStrategy>.WithTitle(message, "Commands not saved"));
+
+    private static string? CommandAvailabilitySummary(
+        ViewerCommandCatalogAvailability availability
+    ) =>
+        availability switch
+        {
+            ViewerCommandCatalogAvailability.Available => null,
+            ViewerCommandCatalogAvailability.TurnedOff => "Turned off",
+            ViewerCommandCatalogAvailability.ActionUnavailable => "Action unavailable",
+            ViewerCommandCatalogAvailability.Shadowed => "Shadowed by another command",
+            _ => null,
+        };
 }

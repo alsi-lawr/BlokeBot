@@ -32,7 +32,7 @@ public sealed class AutomationRuntimeMigrationTests
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
-        (await upgraded.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_migration);
+        (await upgraded.Database.GetAppliedMigrationsAsync()).ShouldContain(_migration);
         (await upgraded.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (
             await ScalarAsync(

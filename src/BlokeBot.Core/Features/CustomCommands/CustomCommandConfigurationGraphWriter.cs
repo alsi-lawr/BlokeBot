@@ -26,8 +26,10 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .ToListAsync(ct);
         var counters = await db.CustomCounters.Where(x => x.HostId == hostId).ToListAsync(ct);
         var commands = await db
-            .CustomCommands.Include(x => x.Action)
+            .CustomCommands.AsSplitQuery()
+            .Include(x => x.Action)
             .Include(x => x.Aliases)
+            .Include(x => x.AllowedUsers)
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
         var announcements = await db
@@ -96,6 +98,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         await DeleteRemovedPrincipalsAsync(db, command, messageEntries, counters, ct);
         await ReplaceVariantsAsync(db, command.MessageEntries, messageEntityByEditorId, ct);
         await ReplaceAliasesAsync(db, hostId, command.Commands, commandEntityByEditor, ct);
+        await ReplaceAllowedUsersAsync(db, hostId, command.Commands, commandEntityByEditor, ct);
         ApplyFinalFields(
             command,
             messageEntityByEditorId,
@@ -272,7 +275,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
             command.Name = TemporaryName("command", editor.Id);
             command.Enabled = editor.Enabled;
-            command.ModeratorOnly = editor.ModeratorOnly;
+            command.AllowEveryone = editor.AllowEveryone;
+            command.AllowModerators = editor.AllowModerators;
             command.CooldownSeconds = editor.CooldownSeconds;
             command.CooldownScope = editor.CooldownScope;
             command.InvocationLimit = editor.InvocationLimit;
@@ -516,6 +520,36 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     }
                 );
             }
+        }
+    }
+
+    private static async Task ReplaceAllowedUsersAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        IReadOnlyList<CustomCommandValue> configuredCommands,
+        IReadOnlyDictionary<int, CustomCommand> commands,
+        CancellationToken ct
+    )
+    {
+        var existing = await db
+            .CustomCommandAllowedUsers.Where(user => user.HostId == hostId)
+            .ToListAsync(ct);
+        db.CustomCommandAllowedUsers.RemoveRange(existing);
+        _ = await db.SaveChangesAsync(ct);
+
+        foreach (var configured in configuredCommands)
+        {
+            var commandId = commands[configured.Id].Id;
+            db.CustomCommandAllowedUsers.AddRange(
+                configured.AllowedUsers.Select(user => new CustomCommandAllowedUser
+                {
+                    HostId = hostId,
+                    CustomCommandId = commandId,
+                    TwitchUserId = user.TwitchUserId,
+                    Login = user.Login,
+                    DisplayName = user.DisplayName,
+                })
+            );
         }
     }
 

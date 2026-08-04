@@ -36,13 +36,21 @@ public sealed class CustomCommandViewerResolver(
             )
                 is { } user
             ? new CustomCommandViewerResolution.Found(
-                new CustomCommandViewer(user.Id, Login.Normalize(user.Login))
+                new CustomCommandViewer(
+                    user.Id,
+                    Login.Normalize(user.Login),
+                    string.IsNullOrWhiteSpace(user.DisplayName) ? user.Login : user.DisplayName
+                )
             )
             : new CustomCommandViewerResolution.NotFound();
     }
 }
 
-public sealed record CustomCommandViewer(string TwitchUserId, string Login);
+public sealed record CustomCommandViewer(
+    string TwitchUserId,
+    string Login,
+    string DisplayName = ""
+);
 
 public abstract record CustomCommandViewerResolution
 {
@@ -51,12 +59,14 @@ public abstract record CustomCommandViewerResolution
     public sealed record Found(CustomCommandViewer Viewer) : CustomCommandViewerResolution;
 
     public sealed record NotFound : CustomCommandViewerResolution;
+
+    public sealed record Unavailable : CustomCommandViewerResolution;
 }
 
 internal sealed class UnavailableCustomCommandViewerResolver : ICustomCommandViewerResolver
 {
     public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct) =>
         Task.FromResult<CustomCommandViewerResolution>(
-            new CustomCommandViewerResolution.NotFound()
+            new CustomCommandViewerResolution.Unavailable()
         );
 }
