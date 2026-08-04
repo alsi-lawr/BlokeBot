@@ -195,6 +195,84 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
+    public async Task ActionKind_ChangingToAutomation_ShowsConnectedFlowsAndGenericAdvancedSummary()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-action-kind")
+            .Change(CustomCommandActionKind.Automation.ToString());
+
+        var connection = cut.Find("[data-automation-command]");
+        connection.TextContent.ShouldContain("Connected automations");
+        connection.TextContent.ShouldContain("every enabled automation flow connected to it");
+        connection.TextContent.ShouldContain("building and editing automations arrive");
+        connection.TextContent.ShouldNotContain("runtime");
+        cut.FindAll($"#command-{seeded.CommandId}-0-argument-reply").ShouldBeEmpty();
+        cut.FindAll("select[data-flow-picker]").ShouldBeEmpty();
+        var advanced = cut.Find("button[aria-controls='custom-command-advanced-settings']");
+        advanced.TextContent.ShouldContain("Default settings");
+        advanced.TextContent.ShouldNotContain("Automation");
+        advanced.Click();
+        cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");
+        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
+            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
+        advanced = cut.Find("button[aria-controls='custom-command-advanced-settings']");
+        advanced.Click();
+        advanced.TextContent.ShouldContain("15s cooldown");
+        advanced.TextContent.ShouldContain("Once per viewer (until reset)");
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (
+            await db
+                .CustomCommandActions.OfType<AutomationCustomCommandAction>()
+                .CountAsync(action => action.CustomCommandId == seeded.CommandId)
+        ).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task AutomationsOff_RenderingActionChoice_HidesNewChoiceButRetainsStoredActionRecovery()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == seeded.HostId);
+            host.EnabledFeatures &= ~HostFeatureFlags.Automations;
+            _ = await db.SaveChangesAsync();
+        }
+        await using (var context = UiTestContextFactory.Create(dbFactory, seeded.HostId))
+        {
+            var cut = context.Render<CustomCommandSettingsPage>();
+            cut.FindAll("option[value='Automation']").ShouldBeEmpty();
+        }
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var command = await db
+                .CustomCommands.Include(value => value.Action)
+                .SingleAsync(value => value.Id == seeded.CommandId);
+            _ = db.CustomCommandActions.Remove(command.Action);
+            _ = await db.SaveChangesAsync();
+            command.Action = new AutomationCustomCommandAction { HostId = seeded.HostId };
+            _ = await db.SaveChangesAsync();
+        }
+
+        await using var retainedContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var retained = retainedContext.Render<CustomCommandSettingsPage>();
+
+        retained.FindAll("option[value='Automation']").Count.ShouldBe(1);
+        retained.Find("option[value='Automation']").HasAttribute("disabled").ShouldBeTrue();
+        var recovery = retained.Find("[data-automation-command]");
+        recovery.TextContent.ShouldContain("Automations are off");
+        recovery.TextContent.ShouldContain("setup is retained");
+        recovery.QuerySelector("a[href='/host#chat-tools']")!.TextContent.ShouldBe("Channel setup");
+        retained.FindAll("select[data-flow-picker]").ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task NewAnnouncement_Adding_SavesWithoutValidation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

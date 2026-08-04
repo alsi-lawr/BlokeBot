@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
@@ -150,6 +151,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<CustomCommandAliasRegistry>();
         _ = services.AddSingleton<CustomCommandCooldownStore>();
         _ = services.AddSingleton<CustomCommandExecutionService>();
+        services.TryAddSingleton<
+            ICustomCommandAutomationRuntime,
+            UnavailableCustomCommandAutomationRuntime
+        >();
         services.TryAddSingleton<
             IOverlayCueAdmissionService,
             UnavailableOverlayCueAdmissionService

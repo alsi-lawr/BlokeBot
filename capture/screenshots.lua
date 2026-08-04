@@ -142,18 +142,29 @@ local succeeded, failure = pcall(function()
   viset.page.wait_for(viset.javascript(ready_expression), "20s")
   if view == "custom-commands" then
     viset.page.wait_for(
-      viset.javascript([[Boolean(document.querySelector("[data-command-access]"))]]),
+      viset.javascript([[Boolean(document.querySelector("[id$='-action-kind']"))]]),
       "20s"
     )
     viset.page.evaluate(viset.javascript([=[
       (() => {
-        const access = document.querySelector("[data-command-access]");
-        const moderators = access?.querySelector("[id$='-access-moderators']");
-        if (!access || !moderators) {
-          throw new Error("Selected command access controls were not found.");
+        const action = document.querySelector("[id$='-action-kind']");
+        if (!action) {
+          throw new Error("Selected command action control was not found.");
         }
-        moderators.focus({ preventScroll: true });
-        moderators.scrollIntoView({ block: "center" });
+        action.value = "Automation";
+        action.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      })()
+    ]=]))
+    viset.page.wait_for(
+      viset.javascript([[Boolean(document.querySelector("[data-automation-command]"))]]),
+      "20s"
+    )
+    viset.page.evaluate(viset.javascript([=[
+      (() => {
+        const action = document.querySelector("[id$='-action-kind']");
+        action.focus({ preventScroll: true });
+        action.scrollIntoView({ block: "center" });
         return true;
       })()
     ]=]))

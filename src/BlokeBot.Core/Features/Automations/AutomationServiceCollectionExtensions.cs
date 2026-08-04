@@ -17,6 +17,12 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton<AutomationActionExecutor>();
         services.TryAddSingleton<AutomationFlowService>();
         services.TryAddSingleton<AutomationRuntimeService>();
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<
+                ICustomCommandAutomationRuntime,
+                CustomCommandAutomationRuntime
+            >()
+        );
         services.TryAddSingleton<AutomationRunQueryService>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<

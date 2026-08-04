@@ -225,9 +225,9 @@ public sealed record AutomationChannel(
 
 public sealed record AutomationStream(
     string TwitchStreamId,
-    string Title,
-    string GameName,
-    DateTimeOffset StartedAtUtc
+    string? Title,
+    string? GameName,
+    DateTimeOffset? StartedAtUtc
 );
 
 public sealed record AutomationTimestamps(

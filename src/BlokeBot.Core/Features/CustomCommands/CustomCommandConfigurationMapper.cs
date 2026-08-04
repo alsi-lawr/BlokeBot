@@ -73,6 +73,7 @@ internal static class CustomCommandConfigurationMapper
                     QueuePolicy = action.QueuePolicy,
                     ReplyOrder = action.ReplyOrder,
                 },
+                AutomationCustomCommandAction => new AutomationCustomCommandActionEditor(),
                 _ => throw new InvalidOperationException("Unsupported custom command action."),
             },
         };
@@ -165,6 +166,10 @@ internal static class CustomCommandConfigurationMapper
                 CuePublicId = cue.CuePublicId,
                 QueuePolicy = cue.QueuePolicy,
                 ReplyOrder = cue.ReplyOrder,
+            },
+            CustomCommandActionValue.Automation => new AutomationCustomCommandAction
+            {
+                HostId = hostId,
             },
             _ => throw new InvalidOperationException("Unsupported custom command action."),
         };
@@ -292,7 +297,9 @@ internal static class CustomCommandConfigurationMapper
                 or
                 (CounterCustomCommandAction, CustomCommandActionValue.Counter)
                 or
-                (OverlayCueCustomCommandAction, CustomCommandActionValue.OverlayCue);
+                (OverlayCueCustomCommandAction, CustomCommandActionValue.OverlayCue)
+                or
+                (AutomationCustomCommandAction, CustomCommandActionValue.Automation);
 
     public static bool ScheduleMatches(
         CustomAnnouncementSchedule schedule,

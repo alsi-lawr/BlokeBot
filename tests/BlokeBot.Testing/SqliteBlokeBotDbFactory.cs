@@ -1,6 +1,7 @@
 using BlokeBot.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace BlokeBot.Testing;
 
@@ -9,23 +10,32 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
     private readonly SqliteConnection _keeperConnection;
     private readonly DbContextOptions<BlokeBotDbContext> _options;
 
-    private SqliteBlokeBotDbFactory(SqliteConnection keeperConnection, string connectionString)
+    private SqliteBlokeBotDbFactory(
+        SqliteConnection keeperConnection,
+        string connectionString,
+        IInterceptor[] interceptors
+    )
     {
         _keeperConnection = keeperConnection;
         _options = new DbContextOptionsBuilder<BlokeBotDbContext>()
             .UseSqlite(connectionString)
+            .AddInterceptors(interceptors)
             .Options;
     }
 
-    public static async Task<SqliteBlokeBotDbFactory> CreateAsync()
+    public static async Task<SqliteBlokeBotDbFactory> CreateAsync(
+        params IInterceptor[] interceptors
+    )
     {
-        var factory = await CreateEmptyAsync();
+        var factory = await CreateEmptyAsync(interceptors);
         await using var db = factory.CreateDbContext();
         _ = await db.Database.EnsureCreatedAsync();
         return factory;
     }
 
-    public static async Task<SqliteBlokeBotDbFactory> CreateEmptyAsync()
+    public static async Task<SqliteBlokeBotDbFactory> CreateEmptyAsync(
+        params IInterceptor[] interceptors
+    )
     {
         var connectionString = new SqliteConnectionStringBuilder
         {
@@ -37,7 +47,7 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
         }.ToString();
         var keeperConnection = new SqliteConnection(connectionString);
         await keeperConnection.OpenAsync();
-        return new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
+        return new SqliteBlokeBotDbFactory(keeperConnection, connectionString, interceptors);
     }
 
     public BlokeBotDbContext CreateDbContext() => new(_options);

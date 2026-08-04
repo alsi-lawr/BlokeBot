@@ -19,6 +19,7 @@ public sealed class CustomCommandModule(CustomCommandExecutionService execution)
             _ => new CommandHandlingOutcome.Handled(),
             _ => new CommandHandlingOutcome.Handled(),
             _ => new CommandHandlingOutcome.Handled(),
+            _ => new CommandHandlingOutcome.Handled(),
             _ => new CommandHandlingOutcome.Handled()
         );
     }

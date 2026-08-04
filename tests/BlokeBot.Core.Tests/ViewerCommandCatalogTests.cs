@@ -1,4 +1,5 @@
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
@@ -97,7 +98,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
-            references
+            references,
+            new UnavailableCustomCommandAutomationRuntime()
         );
 
         var overlaysOff = await catalog.LoadForHostAsync(hostId, CancellationToken.None);
@@ -118,7 +120,7 @@ public sealed class ViewerCommandCatalogTests
         overlaysOn
             .Entries.Single(entry => entry.Name == "!cue")
             .Availability.ShouldBe(ViewerCommandCatalogAvailability.Available);
-        references.Requests.Count.ShouldBe(2);
+        references.Requests.Count.ShouldBe(1);
     }
 
     [Test]
@@ -129,7 +131,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
-            new RecordingCueAdmissions()
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
         );
 
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
@@ -200,7 +203,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
-            new RecordingCueAdmissions()
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
         );
 
         var owner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
@@ -277,7 +281,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
-            references
+            references,
+            new UnavailableCustomCommandAutomationRuntime()
         );
 
         var owner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
@@ -306,6 +311,94 @@ public sealed class ViewerCommandCatalogTests
             && !message.Contains("unavailable", StringComparison.OrdinalIgnoreCase)
             && !message.Contains("secret", StringComparison.OrdinalIgnoreCase)
         );
+    }
+
+    [Test]
+    public async Task AutomationCommand_LoadingCatalog_RequiresBothParentsAndAnEnabledSourceFlow()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedCatalogFixtureAsync(dbFactory);
+        int commandId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var command = CatalogCommand(
+                fixture.HostId,
+                "automate",
+                new AutomationCustomCommandAction { HostId = fixture.HostId }
+            );
+            _ = db.CustomCommands.Add(command);
+            _ = await db.SaveChangesAsync();
+            commandId = command.Id;
+        }
+        var automations = new CatalogAutomationRuntime(new HashSet<int> { commandId });
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            automations
+        );
+
+        var availableOwner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
+        var availableViewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+        availableOwner
+            .Entries.Single(entry => entry.Name == "!automate")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.Available);
+        availableViewer.Names.ShouldContain("!automate");
+
+        await SetFeaturesAsync(
+            dbFactory,
+            fixture.HostId,
+            HostFeatureFlags.All & ~HostFeatureFlags.Automations
+        );
+        var automationOffOwner = await catalog.LoadForHostAsync(
+            fixture.HostId,
+            CancellationToken.None
+        );
+        var automationOffViewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+        automationOffOwner
+            .Entries.Single(entry => entry.Name == "!automate")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.ActionUnavailable);
+        automationOffViewer.Names.ShouldNotContain("!automate");
+
+        await SetFeaturesAsync(
+            dbFactory,
+            fixture.HostId,
+            HostFeatureFlags.All & ~HostFeatureFlags.CustomCommands
+        );
+        var commandsOffOwner = await catalog.LoadForHostAsync(
+            fixture.HostId,
+            CancellationToken.None
+        );
+        var commandsOffViewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+        commandsOffOwner
+            .Entries.Single(entry => entry.Name == "!automate")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.TurnedOff);
+        commandsOffViewer.Names.ShouldNotContain("!automate");
+
+        await SetFeaturesAsync(dbFactory, fixture.HostId, HostFeatureFlags.All);
+        automations.AvailableCommandIds = new HashSet<int>();
+        var noFlowOwner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
+        var noFlowViewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+        noFlowOwner
+            .Entries.Single(entry => entry.Name == "!automate")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.ActionUnavailable);
+        noFlowViewer.Names.ShouldNotContain("!automate");
     }
 
     private static CustomCommand CatalogCommand(
@@ -348,7 +441,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
-            new RecordingCueAdmissions()
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
@@ -392,7 +486,8 @@ public sealed class ViewerCommandCatalogTests
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
-            new RecordingCueAdmissions()
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
@@ -416,6 +511,10 @@ public sealed class ViewerCommandCatalogTests
         );
         _ = services.AddSingleton<IHostStreamLivenessProvider>(liveness);
         _ = services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
+        _ = services.AddSingleton<
+            ICustomCommandAutomationRuntime,
+            UnavailableCustomCommandAutomationRuntime
+        >();
         _ = services.AddSingleton<ViewerCommandCatalogService>();
         _ = services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
@@ -488,6 +587,10 @@ public sealed class ViewerCommandCatalogTests
             new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline())
         );
         _ = services.AddSingleton<IOverlayCueAdmissionService>(new RecordingCueAdmissions());
+        _ = services.AddSingleton<
+            ICustomCommandAutomationRuntime,
+            UnavailableCustomCommandAutomationRuntime
+        >();
         _ = services.AddSingleton<ViewerCommandCatalogService>();
         _ = services.AddChatCommands().AddCommandModule<ViewerCommandCatalogModule>();
         await using var provider = services.BuildServiceProvider();
@@ -718,6 +821,18 @@ public sealed class ViewerCommandCatalogTests
     private static CommandAlias AppAlias(int hostId, AppCommandKind kind, string alias) =>
         AppAlias(hostId, null, kind, alias);
 
+    private static async Task SetFeaturesAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        HostFeatureFlags features
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+        host.EnabledFeatures = features;
+        _ = await db.SaveChangesAsync();
+    }
+
     private static CommandAlias AppAlias(
         int hostId,
         int? profileId,
@@ -792,6 +907,22 @@ public sealed class ViewerCommandCatalogTests
             OverlayCueAdmissionRequest request,
             CancellationToken cancellationToken
         ) => Task.FromResult<OverlayCueAdmissionOutcome>(new OverlayCueAdmissionOutcome.Missing());
+    }
+
+    private sealed class CatalogAutomationRuntime(IReadOnlySet<int> availableCommandIds)
+        : ICustomCommandAutomationRuntime
+    {
+        public IReadOnlySet<int> AvailableCommandIds { get; set; } = availableCommandIds;
+
+        public Task<CustomCommandAutomationDispatchOutcome> DispatchAsync(
+            CustomCommandAutomationDispatchRequest request,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<IReadOnlySet<int>> AvailableCommandIdsAsync(
+            AutomationHostId hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(AvailableCommandIds);
     }
 
     private sealed record CatalogFixture(int HostId);

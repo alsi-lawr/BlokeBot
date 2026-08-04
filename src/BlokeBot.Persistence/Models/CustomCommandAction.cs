@@ -35,6 +35,11 @@ public sealed class MessageCustomCommandAction : CustomCommandAction
     public const string Discriminator = "Message";
 }
 
+public sealed class AutomationCustomCommandAction : CustomCommandAction
+{
+    public const string Discriminator = "Automation";
+}
+
 public sealed class CounterCustomCommandAction : CustomCommandAction
 {
     public const string Discriminator = "Counter";

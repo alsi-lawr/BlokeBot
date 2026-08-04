@@ -193,8 +193,8 @@ public sealed class SimulationLaunchReadinessTests
         var unavailableJson = unavailable!.RootElement.GetRawText();
         unavailableJson.ShouldNotContain("!guess");
         unavailableJson.ShouldNotContain("!enter");
-        unavailableJson.ShouldNotContain("!welcome");
-        unavailableJson.ShouldNotContain("!moment");
+        unavailableJson.ShouldContain("!welcome");
+        unavailableJson.ShouldContain("!moment");
         unavailableJson.ShouldContain("Moment commands are unavailable");
     }
 }
