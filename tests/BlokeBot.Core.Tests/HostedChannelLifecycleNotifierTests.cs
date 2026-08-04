@@ -44,7 +44,21 @@ public sealed class HostedChannelLifecycleNotifierTests
                 new HostedChannelChangeNotifier(events)
             ),
             CreatePollService(dbFactory, http, events),
-            CreateClipMarkerService(dbFactory, events)
+            new ClipMarkerService(
+                dbFactory,
+                new ReadyBroadcasterProvider(),
+                new HelixClient(
+                    new PollHttpClientFactory(),
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                ),
+                BotSettings.FromOptions(
+                    new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+                ),
+                events,
+                new DurableAlertService(dbFactory, TimeProvider.System, events),
+                TimeProvider.System,
+                new NativeTwitchFeatureGate(dbFactory)
+            )
         );
 
         await notifier.ChannelStartedAsync("Streamer", CancellationToken.None);
@@ -118,26 +132,6 @@ public sealed class HostedChannelLifecycleNotifierTests
             ),
             events,
             new DurableAlertService(dbFactory, TimeProvider.System, events),
-            new NativeTwitchFeatureGate(dbFactory)
-        );
-
-    private static ClipMarkerService CreateClipMarkerService(
-        SqliteBlokeBotDbFactory dbFactory,
-        EventBus<AppEventKind> events
-    ) =>
-        new(
-            dbFactory,
-            new ReadyBroadcasterProvider(),
-            new HelixClient(
-                new PollHttpClientFactory(),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            ),
-            BotSettings.FromOptions(
-                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
-            ),
-            events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
-            TimeProvider.System,
             new NativeTwitchFeatureGate(dbFactory)
         );
 

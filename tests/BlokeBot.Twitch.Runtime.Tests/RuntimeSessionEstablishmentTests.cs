@@ -7,10 +7,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceTestBase
 {
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task FirstEstablishment_Succeeding_ReturnsEstablishedWithoutFailureReport(
-        ChatRuntime runtime
-    )
+    public async Task FirstEstablishment_Succeeding_ReturnsEstablishedWithoutFailureReport()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var listening = new ScriptedEstablishedSession();
@@ -39,10 +36,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task TransientFailureThenEstablishment_RunningPipeline_RetriesAndResetsStatus(
-        ChatRuntime runtime
-    )
+    public async Task TransientFailureThenEstablishment_RunningPipeline_RetriesAndResetsStatus()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new IOException("transport unavailable");
@@ -81,7 +75,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 1,
             failure
@@ -90,10 +84,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task TokenUnavailable_DuringEstablishment_ReturnsTypedOutcomeWithoutRetry(
-        ChatRuntime runtime
-    )
+    public async Task TokenUnavailable_DuringEstablishment_ReturnsTypedOutcomeWithoutRetry()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         harness.Session.Enqueue(
@@ -121,10 +112,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task UnexpectedEstablishmentFailure_RunningPipeline_ReportsUnhealthyWithoutRetry(
-        ChatRuntime runtime
-    )
+    public async Task UnexpectedEstablishmentFailure_RunningPipeline_ReportsUnhealthyWithoutRetry()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new ApplicationException("unexpected runtime defect");
@@ -141,7 +129,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Unexpected,
             attempt: 1,
             failure
@@ -149,10 +137,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task TimeoutThenEstablishment_RunningPipeline_RetriesThroughDirectTimeoutHook(
-        ChatRuntime runtime
-    )
+    public async Task TimeoutThenEstablishment_RunningPipeline_RetriesThroughDirectTimeoutHook()
     {
         var harness = CreateRunnerHarness(attemptLimit: 2);
         var failure = new TimeoutRejectedException("establishment timed out");
@@ -172,7 +157,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Timeout,
             attempt: 1,
             failure
@@ -181,10 +166,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task TransientEstablishmentFailures_ExhaustingAttempts_ReportBoundedUnhealthy(
-        ChatRuntime runtime
-    )
+    public async Task TransientEstablishmentFailures_ExhaustingAttempts_ReportBoundedUnhealthy()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var first = new IOException("first transport failure");
@@ -204,14 +186,14 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Health.Reports.Count.ShouldBe(3);
         AssertReport(
             harness.Health.Reports[0].ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 1,
             first
         );
         AssertReport(
             harness.Health.Reports[1].ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 2,
             second
@@ -222,7 +204,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         unhealthy.Report.ShouldBeSameAs(finalReport);
         AssertReport(
             finalReport,
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 3,
             final
@@ -230,10 +212,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task SingleAttemptPolicy_TransientFailure_DoesNotAddCompatibilityRetry(
-        ChatRuntime runtime
-    )
+    public async Task SingleAttemptPolicy_TransientFailure_DoesNotAddCompatibilityRetry()
     {
         var harness = CreateRunnerHarness(attemptLimit: 1);
         var failure = new IOException("only establishment attempt failed");
@@ -250,7 +229,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 1,
             failure
@@ -258,10 +237,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task CallerCancellation_DuringEstablishment_StopsWithoutFailureReport(
-        ChatRuntime runtime
-    )
+    public async Task CallerCancellation_DuringEstablishment_StopsWithoutFailureReport()
     {
         using var cancellation = new CancellationTokenSource();
         var harness = CreateRunnerHarness(attemptLimit: 3);
@@ -284,10 +260,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task IdleEstablishment_RunningRuntime_WaitsOutsideRetryThenRechecks(
-        ChatRuntime runtime
-    )
+    public async Task IdleEstablishment_RunningRuntime_WaitsOutsideRetryThenRechecks()
     {
         using var cancellation = new CancellationTokenSource();
         var harness = CreateRunnerHarness(attemptLimit: 3);
@@ -308,10 +281,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task EstablishedSession_Listening_UsesHostLifetimeTokenNotAttemptTimeout(
-        ChatRuntime runtime
-    )
+    public async Task EstablishedSession_Listening_UsesHostLifetimeTokenNotAttemptTimeout()
     {
         using var cancellation = new CancellationTokenSource();
         var harness = CreateRunnerHarness(attemptLimit: 3);
@@ -333,10 +303,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task SuccessfulEstablishment_AfterDisconnect_ResetsConsecutiveAttemptBudget(
-        ChatRuntime runtime
-    )
+    public async Task SuccessfulEstablishment_AfterDisconnect_ResetsConsecutiveAttemptBudget()
     {
         using var cancellation = new CancellationTokenSource();
         var harness = CreateRunnerHarness(attemptLimit: 3);
@@ -366,7 +333,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         harness.Health.Reports.Count.ShouldBe(4);
         AssertReport(
             harness.Health.Reports[0].ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 1,
             firstEstablishmentFailure
@@ -375,21 +342,21 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
             harness
                 .Health.Reports[1]
                 .ShouldBeOfType<RuntimeSessionHealthReport.ReconnectScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 2,
             disconnect
         );
         AssertReport(
             harness.Health.Reports[2].ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 1,
             secondCycleFirstFailure
         );
         AssertReport(
             harness.Health.Reports[3].ShouldBeOfType<RuntimeSessionHealthReport.RetryScheduled>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Transient,
             attempt: 2,
             secondCycleSecondFailure

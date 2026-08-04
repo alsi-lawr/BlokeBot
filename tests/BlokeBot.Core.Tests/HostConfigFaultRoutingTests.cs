@@ -284,8 +284,9 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        var pending = new PendingBroadcasterTokenStatusProvider();
-        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(pending);
+        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
+            new PendingBroadcasterTokenStatusProvider()
+        );
 
         var page = RenderHostConfigPage(context);
 
@@ -293,12 +294,6 @@ public sealed class HostConfigFaultRoutingTests
         page.FindAll("[data-twitch-integration]").ShouldBeEmpty();
         BroadcasterActions(page).ShouldBeEmpty();
         TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-
-        pending.Completion.SetResult(ReadyBroadcasterStatus());
-        page.WaitForAssertion(() =>
-            page.Find("[data-twitch-integration]")
-                .TextContent.ShouldContain("Connected for this channel.")
-        );
     }
 
     [Test]

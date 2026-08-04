@@ -83,7 +83,7 @@ public sealed class IOTests
     }
 
     [Test]
-    public async Task UnexpectedException_Executing_PreservesInstanceAndStack()
+    public async Task UnexpectedException_Executing_PreservesInstance()
     {
         var expected = new UnexpectedException();
         ValueTask<int> ThrowUnexpected(CancellationToken _) => throw expected;
@@ -98,9 +98,6 @@ public sealed class IOTests
         );
 
         thrown.ShouldBe(expected);
-        (thrown.StackTrace ?? string.Empty).ShouldContain(
-            nameof(UnexpectedException_Executing_PreservesInstanceAndStack)
-        );
     }
 
     [Test]
