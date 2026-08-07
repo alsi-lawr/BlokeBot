@@ -80,12 +80,15 @@ public sealed class ChannelPointsServiceTests
                 "redemption",
                 "managed",
                 "Managed",
+                100,
                 "viewer",
                 "viewer",
+                "Viewer",
                 "hello",
                 HelixRewardRedemptionStatus.Unfulfilled,
                 DateTimeOffset.Parse("2026-07-26T10:00:00Z", CultureInfo.InvariantCulture),
-                "message-1"
+                "message-1",
+                true
             ),
             CancellationToken.None
         );
@@ -96,12 +99,15 @@ public sealed class ChannelPointsServiceTests
                 "redemption",
                 "managed",
                 "Managed",
+                100,
                 "viewer",
                 "viewer",
+                "Viewer",
                 "hello",
                 HelixRewardRedemptionStatus.Unfulfilled,
                 DateTimeOffset.Parse("2026-07-26T10:00:00Z", CultureInfo.InvariantCulture),
-                "message-1"
+                "message-1",
+                true
             ),
             CancellationToken.None
         );
@@ -371,12 +377,15 @@ public sealed class ChannelPointsServiceTests
             id,
             "managed",
             "Managed",
+            100,
             "viewer-id",
             "viewer",
+            "Viewer",
             "input",
             HelixRewardRedemptionStatus.Unfulfilled,
             DateTimeOffset.UtcNow,
-            $"message-{id}"
+            $"message-{id}",
+            true
         );
 
     private static async Task SetNativeAsync(

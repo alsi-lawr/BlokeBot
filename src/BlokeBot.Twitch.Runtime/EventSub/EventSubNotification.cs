@@ -105,7 +105,13 @@ internal abstract record EventSubNotification
             "channel.channel_points_custom_reward_redemption.add"
             or "channel.channel_points_custom_reward_redemption.update" =>
                 payload.Deserialize<EventSubRewardRedemptionWireEvent>(options) is { } redemption
-                    ? new RewardRedemption(redemption.ToDomain(envelope.Metadata.MessageId))
+                    ? new RewardRedemption(
+                        redemption.ToDomain(
+                            envelope.Metadata.MessageId,
+                            subscriptionType
+                                == "channel.channel_points_custom_reward_redemption.add"
+                        )
+                    )
                     : new Unknown(),
             "stream.online" => payload.Deserialize<EventSubStreamOnlineWireEvent>(options)
                 is { } streamOnline

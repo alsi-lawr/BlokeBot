@@ -179,6 +179,35 @@ public sealed class TwitchEventAutomationRuntime(
             cancellation
         );
 
+    public Task RewardRedemptionReceivedAsync(
+        EventSubRewardRedemptionEvent redemption,
+        CancellationToken cancellation
+    ) =>
+        // Only channel.channel_points_custom_reward_redemption.add deliveries start flows; a
+        // status update never re-triggers the redemption's automation.
+        redemption.IsNewRedemption
+            ? HandleAsync(
+                redemption.BroadcasterUserId,
+                redemption.BroadcasterUserLogin,
+                redemption.MessageId,
+                AutomationDefinitionIds.RewardRedemptionSource,
+                (host, receivedAtUtc) =>
+                    RedemptionAutomationContext.Create(host, redemption, receivedAtUtc),
+                configuration =>
+                    configuration is RewardRedemptionSourceConfiguration required
+                    && (
+                        required.RewardId is null
+                        || string.Equals(
+                            required.RewardId,
+                            redemption.RewardId,
+                            StringComparison.Ordinal
+                        )
+                    ),
+                cancellation,
+                HostFeatureFlags.Automations | HostFeatureFlags.RewardsAndRedemptions
+            )
+            : Task.CompletedTask;
+
     public async ValueTask<bool> RequiresAsync(
         string channel,
         AutomationEventSubRequirement requirement,
@@ -220,7 +249,8 @@ public sealed class TwitchEventAutomationRuntime(
         AutomationDefinitionId definitionId,
         Func<BotHost, DateTimeOffset, AutomationContext> createContext,
         Func<AutomationConfiguration, bool> matches,
-        CancellationToken cancellation
+        CancellationToken cancellation,
+        HostFeatureFlags requiredFeatures = HostFeatureFlags.Automations
     )
     {
         try
@@ -240,8 +270,10 @@ public sealed class TwitchEventAutomationRuntime(
                 return;
             }
 
-            // The Automations switch gate runs before any receipt or run row is written.
-            if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
+            // The feature-switch gate runs before any receipt or run row is written. Every source
+            // requires Automations; redemption deliveries additionally require the Rewards &
+            // redemptions parent switch.
+            if (!host.EnabledFeatures.Contains(requiredFeatures))
             {
                 return;
             }

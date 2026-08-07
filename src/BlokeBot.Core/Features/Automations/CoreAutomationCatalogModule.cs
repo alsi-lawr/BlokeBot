@@ -36,6 +36,12 @@ public static class AutomationDefinitionIds
     public static AutomationDefinitionId HypeTrainEndSource { get; } = new("hype-train-end");
 
     public static AutomationDefinitionId ChatNotificationSource { get; } = new("chat-notification");
+
+    public static AutomationDefinitionId RewardRedemptionSource { get; } = new("reward-redemption");
+
+    public static AutomationDefinitionId FulfilRedemptionAction { get; } = new("fulfil-redemption");
+
+    public static AutomationDefinitionId CancelRedemptionAction { get; } = new("cancel-redemption");
 }
 
 internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule

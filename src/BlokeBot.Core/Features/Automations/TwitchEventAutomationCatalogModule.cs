@@ -19,6 +19,8 @@ public static class TwitchEventAutomationSources
     public const string SubscriptionsScope = "channel:read:subscriptions";
     public const string BitsScope = "bits:read";
     public const string HypeTrainScope = "channel:read:hype_train";
+    public const string RedemptionsReadScope = "channel:read:redemptions";
+    public const string RedemptionsManageScope = "channel:manage:redemptions";
 
     public static ImmutableArray<TwitchEventAutomationSourceDescriptor> All { get; } =
     [
@@ -88,6 +90,15 @@ public static class TwitchEventAutomationSources
             [],
             "channel.chat.notification"
         ),
+        // The redemption EventSub subscription lifecycle is owned by the Rewards & redemptions
+        // feature; this descriptor only surfaces the subscription type and scope readiness. The
+        // manage scope covers the Fulfil/Cancel actions and the source completion policy.
+        new(
+            AutomationDefinitionIds.RewardRedemptionSource,
+            AutomationEventSubRequirement.Redemptions,
+            [RedemptionsReadScope, RedemptionsManageScope],
+            "channel.channel_points_custom_reward_redemption.add"
+        ),
     ];
 
     public static ImmutableArray<string> ChatNotificationNoticeTypes { get; } =
@@ -106,6 +117,18 @@ public static class TwitchEventAutomationSources
         "bits_badge_tier",
         "charity_donation",
     ];
+
+    public static ImmutableArray<string> RedemptionCompletionPolicies { get; } =
+    ["manual", "fulfil-on-success", "cancel-on-failure"];
+
+    internal static RedemptionCompletionPolicy? ParseCompletionPolicy(string token) =>
+        token switch
+        {
+            "manual" => RedemptionCompletionPolicy.Manual,
+            "fulfil-on-success" => RedemptionCompletionPolicy.FulfilOnSuccess,
+            "cancel-on-failure" => RedemptionCompletionPolicy.CancelOnFailure,
+            _ => null,
+        };
 }
 
 internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogModule
@@ -139,6 +162,9 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
             "Starts an automation when a Hype Train finishes."
         ),
         ChatNotificationSource(),
+        RewardRedemptionSource(),
+        FulfilRedemptionAction(),
+        CancelRedemptionAction(),
     ];
 
     private static AutomationPortMetadata FlowPort() =>
@@ -485,6 +511,151 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                         "Choose a supported notification type."
                     )
         );
+
+    private static AutomationPortMetadata FlowInput() =>
+        new(new("flow"), "Flow", "Runs this node.", AutomationPortValueType.Flow);
+
+    private static AutomationPortMetadata CompleteOutput() =>
+        new(
+            new("complete"),
+            "Complete",
+            "Continues after this node.",
+            AutomationPortValueType.Flow
+        );
+
+    private static AutomationDefinition<RewardRedemptionSourceConfiguration> RewardRedemptionSource() =>
+        new(
+            new(
+                AutomationDefinitionIds.RewardRedemptionSource,
+                AutomationNodeKind.Source,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new(
+                    "Channel Points redemption",
+                    "Starts an automation when a viewer redeems a Custom Reward. Externally created rewards trigger read-only automations; only BlokeBot-manageable rewards can be fulfilled or cancelled.",
+                    "Twitch events"
+                ),
+                [],
+                [
+                    FlowPort(),
+                    ActorPort("Viewer", "The viewer who redeemed the reward."),
+                    ChannelPort(),
+                    EventTimePort(),
+                ],
+                [
+                    new(
+                        new("reward-id"),
+                        "Reward filter",
+                        "Only redemptions of the selected Custom Reward start this automation. Leave unset to start on every redemption.",
+                        new AutomationConfigurationFieldType.Reference(
+                            AutomationReferenceKind.CustomReward
+                        ),
+                        false
+                    ),
+                    new(
+                        new("completion-policy"),
+                        "Completion policy",
+                        "How the redemption status is updated when the flow finishes: keep it manual, fulfil it when the flow succeeds, or cancel it when the flow fails. Automatic updates apply only to BlokeBot-manageable rewards.",
+                        new AutomationConfigurationFieldType.Choice(
+                            TwitchEventAutomationSources.RedemptionCompletionPolicies
+                        ),
+                        true
+                    ),
+                ],
+                AutomationActionCapabilities.None,
+                AutomationActionRetrySafety.NotApplicable
+            ),
+            ParseRewardRedemption,
+            ValidateRewardRedemption
+        );
+
+    private static AutomationDefinition<FulfilRedemptionActionConfiguration> FulfilRedemptionAction() =>
+        new(
+            new(
+                AutomationDefinitionIds.FulfilRedemptionAction,
+                AutomationNodeKind.Action,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new(
+                    "Fulfil redemption",
+                    "Marks the triggering Channel Points redemption as fulfilled. Available only for BlokeBot-manageable rewards and unfulfilled redemptions.",
+                    "Channel Points"
+                ),
+                [FlowInput()],
+                [CompleteOutput()],
+                [],
+                AutomationActionCapabilities.ChangesPoints,
+                AutomationActionRetrySafety.Unsafe
+            ),
+            static _ => Parsed(new FulfilRedemptionActionConfiguration()),
+            static _ => AutomationValidationResult.Valid
+        );
+
+    private static AutomationDefinition<CancelRedemptionActionConfiguration> CancelRedemptionAction() =>
+        new(
+            new(
+                AutomationDefinitionIds.CancelRedemptionAction,
+                AutomationNodeKind.Action,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new(
+                    "Cancel redemption",
+                    "Cancels the triggering Channel Points redemption so Twitch refunds the viewer's points. Available only for BlokeBot-manageable rewards and unfulfilled redemptions.",
+                    "Channel Points"
+                ),
+                [FlowInput()],
+                [CompleteOutput()],
+                [],
+                AutomationActionCapabilities.ChangesPoints,
+                AutomationActionRetrySafety.Unsafe
+            ),
+            static _ => Parsed(new CancelRedemptionActionConfiguration()),
+            static _ => AutomationValidationResult.Valid
+        );
+
+    private static AutomationConfigurationParseResult ParseRewardRedemption(JsonElement json)
+    {
+        if (
+            !TryReadString(json, "completion-policy", out var policyToken)
+            || TwitchEventAutomationSources.ParseCompletionPolicy(policyToken) is not { } policy
+        )
+        {
+            return Invalid("completion-policy", "Choose how the redemption status is completed.");
+        }
+
+        string? rewardId = null;
+        if (
+            json.ValueKind == JsonValueKind.Object
+            && json.TryGetProperty("reward-id", out var rewardProperty)
+            && rewardProperty.ValueKind != JsonValueKind.Null
+        )
+        {
+            rewardId =
+                rewardProperty.ValueKind == JsonValueKind.String
+                    ? rewardProperty.GetString()
+                    : null;
+            if (string.IsNullOrWhiteSpace(rewardId))
+            {
+                return Invalid("reward-id", "Choose a Custom Reward for the filter.");
+            }
+        }
+
+        return Parsed(new RewardRedemptionSourceConfiguration(rewardId, policy));
+    }
+
+    private static AutomationValidationResult ValidateRewardRedemption(
+        RewardRedemptionSourceConfiguration configuration
+    ) =>
+        configuration.RewardId switch
+        {
+            null => AutomationValidationResult.Valid,
+            { Length: >= 1 and <= 128 } rewardId when !string.IsNullOrWhiteSpace(rewardId) =>
+                AutomationValidationResult.Valid,
+            _ => AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("reward-id")),
+                "Choose a Custom Reward for the filter."
+            ),
+        };
 
     private static bool TryReadString(JsonElement json, string propertyName, out string value)
     {

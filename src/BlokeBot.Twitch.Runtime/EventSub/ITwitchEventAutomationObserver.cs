@@ -39,6 +39,11 @@ public interface ITwitchEventAutomationObserver
         EventSubChatNotificationEvent notification,
         CancellationToken cancellation
     );
+
+    Task RewardRedemptionReceivedAsync(
+        EventSubRewardRedemptionEvent redemption,
+        CancellationToken cancellation
+    );
 }
 
 /// <summary>
@@ -64,6 +69,13 @@ public enum AutomationEventSubRequirement
     HypeTrain,
     ChatNotifications,
     IncomingRaids,
+
+    /// <summary>
+    /// The redemption EventSub subscription lifecycle is owned by the Rewards &amp; redemptions
+    /// feature, which subscribes whenever that feature is enabled. This requirement exists for
+    /// automation diagnostics metadata and is never consulted for subscription creation.
+    /// </summary>
+    Redemptions,
 }
 
 public sealed record EventSubStreamOnlineEvent(

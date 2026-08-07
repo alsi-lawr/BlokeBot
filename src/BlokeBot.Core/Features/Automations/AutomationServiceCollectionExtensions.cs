@@ -35,6 +35,12 @@ public static class AutomationServiceCollectionExtensions
         );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
+                IAutomationRunCompletionObserver,
+                RedemptionCompletionPolicyObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
                 IHostFeatureChangeObserver,
                 AutomationFeatureDisableObserver
             >()

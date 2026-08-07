@@ -14,12 +14,15 @@ public sealed record EventSubRewardRedemptionEvent(
     string RedemptionId,
     string RewardId,
     string RewardTitle,
+    int RewardCost,
     string UserId,
     string UserLogin,
+    string UserName,
     string UserInput,
     HelixRewardRedemptionStatus Status,
     DateTimeOffset RedeemedAt,
-    string MessageId
+    string MessageId,
+    bool IsNewRedemption
 )
 {
     public HelixRewardRedemption ToHelix() =>

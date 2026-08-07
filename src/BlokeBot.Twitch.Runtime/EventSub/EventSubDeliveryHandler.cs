@@ -329,5 +329,14 @@ internal sealed class EventSubDeliveryHandler(
         {
             await observer.RedemptionReceivedAsync(redemption, cancellationToken);
         }
+
+        // The Rewards & redemptions parent gate above also bounds automation dispatch; automation
+        // observers run after the Channel Points observers so the redemption row exists before any
+        // flow acts on it, and they additionally enforce the Automations switch and the durable
+        // delivery receipt themselves.
+        await NotifyAutomationObserversAsync(
+            (observer, token) => observer.RewardRedemptionReceivedAsync(redemption, token),
+            cancellationToken
+        );
     }
 }

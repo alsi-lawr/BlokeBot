@@ -77,6 +77,7 @@ public enum AutomationReferenceKind
     CustomCommand,
     OverlayCue,
     OverlayTarget,
+    CustomReward,
 }
 
 public enum AutomationSchemaCompatibilityStatus
@@ -203,6 +204,22 @@ public sealed record HypeTrainSourceConfiguration : AutomationConfiguration;
 
 public sealed record ChatNotificationSourceConfiguration(string NoticeType)
     : AutomationConfiguration;
+
+public enum RedemptionCompletionPolicy
+{
+    Manual,
+    FulfilOnSuccess,
+    CancelOnFailure,
+}
+
+public sealed record RewardRedemptionSourceConfiguration(
+    string? RewardId,
+    RedemptionCompletionPolicy CompletionPolicy
+) : AutomationConfiguration;
+
+public sealed record FulfilRedemptionActionConfiguration : AutomationConfiguration;
+
+public sealed record CancelRedemptionActionConfiguration : AutomationConfiguration;
 
 public sealed record SendChatActionConfiguration(string Message) : AutomationConfiguration;
 
