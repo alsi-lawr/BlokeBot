@@ -103,6 +103,11 @@ internal sealed class EventSubDeliveryHandler(
         {
             await observer.ShoutoutReceivedAsync(shoutout, cancellationToken);
         }
+
+        await NotifyAutomationObserversAsync(
+            (observer, token) => observer.ShoutoutOccurredAsync(shoutout, token),
+            cancellationToken
+        );
     }
 
     public async Task DispatchNotificationAsync(
@@ -258,6 +263,11 @@ internal sealed class EventSubDeliveryHandler(
         {
             await observer.PollReceivedAsync(poll, cancellationToken);
         }
+
+        await NotifyAutomationObserversAsync(
+            (observer, token) => observer.PollChangedAsync(poll, token),
+            cancellationToken
+        );
     }
 
     internal async Task DispatchIncomingRaidAsync(
@@ -307,6 +317,11 @@ internal sealed class EventSubDeliveryHandler(
         {
             await observer.PredictionReceivedAsync(prediction, cancellationToken);
         }
+
+        await NotifyAutomationObserversAsync(
+            (observer, token) => observer.PredictionChangedAsync(prediction, token),
+            cancellationToken
+        );
     }
 
     internal async Task DispatchRewardRedemptionAsync(

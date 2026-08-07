@@ -19,7 +19,8 @@ public sealed record EventSubPredictionEvent(
     DateTimeOffset? LocksAt,
     DateTimeOffset? EndedAt,
     string? WinningOutcomeId,
-    string MessageId
+    string MessageId,
+    EventSubPredictionStage Stage
 )
 {
     public HelixPrediction ToHelix() =>
@@ -57,6 +58,14 @@ public sealed record EventSubPredictionEvent(
             EndedAt,
             WinningOutcomeId
         );
+}
+
+public enum EventSubPredictionStage
+{
+    Begin,
+    Progress,
+    Lock,
+    End,
 }
 
 public sealed record EventSubPredictionOutcome(

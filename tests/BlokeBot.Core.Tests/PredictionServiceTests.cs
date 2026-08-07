@@ -270,6 +270,44 @@ public sealed class PredictionServiceTests
             .ShouldBe(expectedHistory);
     }
 
+    [Test]
+    public async Task DraftStart_ValidatesGatesAndStartsWithoutPersistingATemplate()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        var handler = new PredictionHandler { BroadcasterType = "affiliate" };
+        var service = CreateService(database, handler);
+
+        await SetNativeAsync(database, false);
+        var gated = await service.StartAsync(host.Id, ValidTemplate(), CancellationToken.None);
+        gated
+            .ShouldBeOfType<PredictionOperationOutcome.NotReady>()
+            .Message.ShouldBe(NativeTwitchFeatureGate.DisabledMessage);
+        handler.Requests.ShouldBeEmpty();
+
+        await SetNativeAsync(database, true);
+        var invalid = await service.StartAsync(
+            host.Id,
+            new PredictionTemplateDraft("Question", ["Yes"], 60),
+            CancellationToken.None
+        );
+        _ = invalid.ShouldBeOfType<PredictionOperationOutcome.InvalidTemplate>();
+        handler.Requests.ShouldBeEmpty();
+
+        var started = await service.StartAsync(host.Id, ValidTemplate(), CancellationToken.None);
+
+        _ = started.ShouldBeOfType<PredictionOperationOutcome.Started>();
+        handler.Requests.ShouldContain(static request => request.Method == HttpMethod.Post);
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.TwitchPredictionTemplates.CountAsync()).ShouldBe(0);
+        var prediction = (await verify.TwitchPredictions.ToArrayAsync()).ShouldHaveSingleItem();
+        prediction.IsExternallyStarted.ShouldBeFalse();
+        prediction.Status.ShouldBe(TwitchPredictionStatus.Active);
+
+        var conflict = await service.StartAsync(host.Id, ValidTemplate(), CancellationToken.None);
+        _ = conflict.ShouldBeOfType<PredictionOperationOutcome.ActivePredictionExists>();
+    }
+
     private static PredictionTemplateDraft ValidTemplate() => new("Question", ["Yes", "No"], 60);
 
     private static async Task SetNativeAsync(
@@ -358,7 +396,13 @@ public sealed class PredictionServiceTests
             null,
             status is "resolved" ? DateTimeOffset.UtcNow : null,
             status is "resolved" ? "yes" : null,
-            Guid.NewGuid().ToString("N")
+            Guid.NewGuid().ToString("N"),
+            status switch
+            {
+                "active" => EventSubPredictionStage.Begin,
+                "locked" => EventSubPredictionStage.Lock,
+                _ => EventSubPredictionStage.End,
+            }
         );
 
     private sealed class ReadyBroadcaster : IHostBroadcasterTokenStatusProvider

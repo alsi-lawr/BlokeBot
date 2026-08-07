@@ -5,6 +5,7 @@ using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -101,6 +102,55 @@ public sealed class AutomationEventsPageUiTests
             .TextContent.ShouldContain(
                 "Tools for building and editing flows arrive in a later release"
             );
+    }
+
+    [Test]
+    public async Task NativeOperationSources_AppearOnlyWhileTheirBackingFeatureIsEnabled()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            HostFeatureFlags.Automations
+                | HostFeatureFlags.CustomCommands
+                | HostFeatureFlags.Shoutouts
+                | HostFeatureFlags.Polls
+                | HostFeatureFlags.ClipsAndMarkers
+                | HostFeatureFlags.Predictions
+        );
+        await using var context = CreateContext(
+            dbFactory,
+            hostId,
+            new TokenStatus.Ready(
+                "token",
+                new("streamer-id", "streamer", OAuthScopeSet.Empty),
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
+                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
+            )
+        );
+
+        var cut = context.Render<AutomationEventsPage>();
+
+        cut.FindAll("[data-automation-event-source]").Count.ShouldBe(21);
+        cut.Find("[data-automation-event-source='shoutout-sent']")
+            .TextContent.ShouldContain("channel.shoutout.create");
+        cut.Find("[data-automation-event-source='shoutout-received']")
+            .TextContent.ShouldContain("channel.shoutout.receive");
+        cut.Find("[data-automation-event-source='poll-started']")
+            .TextContent.ShouldContain("channel.poll.begin");
+        cut.Find("[data-automation-event-source='prediction-ended']")
+            .TextContent.ShouldContain("channel.prediction.end");
+
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures &= ~HostFeatureFlags.Polls;
+            _ = await db.SaveChangesAsync();
+        }
+
+        var withoutPolls = context.Render<AutomationEventsPage>();
+        withoutPolls.FindAll("[data-automation-event-source]").Count.ShouldBe(18);
+        withoutPolls.FindAll("[data-automation-event-source='poll-started']").ShouldBeEmpty();
+        withoutPolls.FindAll("[data-automation-event-source='shoutout-sent']").Count.ShouldBe(1);
     }
 
     private static BunitContext CreateContext(

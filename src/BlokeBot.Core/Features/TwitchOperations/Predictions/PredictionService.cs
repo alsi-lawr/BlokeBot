@@ -18,7 +18,7 @@ public sealed class PredictionService(
     DurableAlertService alerts,
     ILogger<PredictionService> logger,
     NativeTwitchFeatureGate nativeTwitch
-) : IPredictionEventObserver, IPredictionDashboardOperations
+) : IPredictionEventObserver, IPredictionDashboardOperations, IPredictionAutomationOperations
 {
     private const int _resultsToKeep = 100;
     private const string _notReadyMessage = "Reconnect the selected channel's Twitch integration.";
@@ -199,6 +199,45 @@ public sealed class PredictionService(
         int hostId,
         int templateId,
         CancellationToken cancellationToken
+    ) =>
+        !await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, cancellationToken)
+            ? Disabled()
+            : await StartCoreAsync(
+                hostId,
+                async (db, ct) =>
+                {
+                    var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                    var template = await db
+                        .TwitchPredictionTemplates.Include(x => x.Outcomes)
+                        .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, ct);
+                    return host?.TwitchUserId is not { Length: > 0 } || template is null
+                        ? new PredictionStartResolution.Failed(
+                            new PredictionOperationOutcome.TemplateNotFound()
+                        )
+                        : new PredictionStartResolution.Ready(
+                            host,
+                            new HelixPredictionCreateRequest(
+                                template.Title,
+                                template
+                                    .Outcomes.OrderBy(x => x.Position)
+                                    .Select(x => x.Title)
+                                    .ToArray(),
+                                template.PredictionWindowSeconds
+                            )
+                        );
+                },
+                cancellationToken
+            );
+
+    /// <summary>
+    /// Starts a prediction directly from a validated draft without persisting a template.
+    /// Automation actions use this path; it applies the same feature gate, readiness,
+    /// eligibility, single-active-prediction, and provider rules as starting a saved template.
+    /// </summary>
+    public async Task<PredictionOperationOutcome> StartAsync(
+        int hostId,
+        PredictionTemplateDraft draft,
+        CancellationToken cancellationToken
     )
     {
         if (
@@ -211,6 +250,50 @@ public sealed class PredictionService(
         {
             return Disabled();
         }
+        var validation = draft.Validate();
+        if (validation is PredictionTemplateValidationOutcome.Invalid invalid)
+        {
+            return new PredictionOperationOutcome.InvalidTemplate(invalid.Message);
+        }
+        var valid = ((PredictionTemplateValidationOutcome.Valid)validation).Draft;
+        return await StartCoreAsync(
+            hostId,
+            async (db, ct) =>
+            {
+                var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                return host?.TwitchUserId is not { Length: > 0 }
+                    ? new PredictionStartResolution.Failed(
+                        new PredictionOperationOutcome.NotReady(_notReadyMessage)
+                    )
+                    : new PredictionStartResolution.Ready(
+                        host,
+                        new HelixPredictionCreateRequest(
+                            valid.Title,
+                            [.. valid.Outcomes],
+                            valid.PredictionWindowSeconds
+                        )
+                    );
+            },
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Shared orchestration for starting a prediction: readiness token, feature-gate re-check,
+    /// eligibility, start-request resolution, feature check, single-active-prediction check,
+    /// final feature-gate re-check, provider call, and outcome mapping with upsert. Both the
+    /// template-based and draft-based start paths delegate here.
+    /// </summary>
+    private async Task<PredictionOperationOutcome> StartCoreAsync(
+        int hostId,
+        Func<
+            BlokeBotDbContext,
+            CancellationToken,
+            Task<PredictionStartResolution>
+        > resolveStartAsync,
+        CancellationToken cancellationToken
+    )
+    {
         var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
@@ -235,14 +318,12 @@ public sealed class PredictionService(
             return EligibilityOutcome(eligibility);
         }
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
-        var template = await db
-            .TwitchPredictionTemplates.Include(x => x.Outcomes)
-            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, cancellationToken);
-        if (host?.TwitchUserId is not { Length: > 0 } || template is null)
+        var resolution = await resolveStartAsync(db, cancellationToken);
+        if (resolution is PredictionStartResolution.Failed failed)
         {
-            return new PredictionOperationOutcome.TemplateNotFound();
+            return failed.Outcome;
         }
+        var (host, request) = (PredictionStartResolution.Ready)resolution;
         if ((host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions)
         {
             return Disabled();
@@ -274,12 +355,8 @@ public sealed class PredictionService(
 
         var provider = await helix.CreatePredictionAsync(
             new(settings.Identity.ClientId, token),
-            host.TwitchUserId,
-            new(
-                template.Title,
-                template.Outcomes.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
-                template.PredictionWindowSeconds
-            ),
+            host.TwitchUserId!,
+            request,
             cancellationToken
         );
         if (provider is HelixPredictionCreateOutcome.ActivePredictionExists)
@@ -311,6 +388,14 @@ public sealed class PredictionService(
         _ = await db.SaveChangesAsync(cancellationToken);
         await ChangedAsync(cancellationToken);
         return new PredictionOperationOutcome.Started(View(prediction));
+    }
+
+    private abstract record PredictionStartResolution
+    {
+        public sealed record Ready(BotHost Host, HelixPredictionCreateRequest Request)
+            : PredictionStartResolution;
+
+        public sealed record Failed(PredictionOperationOutcome Outcome) : PredictionStartResolution;
     }
 
     public Task<PredictionOperationOutcome> LockAsync(

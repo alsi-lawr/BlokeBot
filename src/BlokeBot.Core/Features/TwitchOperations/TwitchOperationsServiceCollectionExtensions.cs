@@ -48,6 +48,9 @@ public static class TwitchOperationsServiceCollectionExtensions
         _ = services.AddSingleton<IPollDashboardOperations>(static provider =>
             provider.GetRequiredService<PollService>()
         );
+        _ = services.AddSingleton<IPollAutomationOperations>(static provider =>
+            provider.GetRequiredService<PollService>()
+        );
         _ = services.AddSingleton<ClipMarkerService>();
         _ = services.AddSingleton<IClipMarkerDashboardOperations>(static provider =>
             provider.GetRequiredService<ClipMarkerService>()
@@ -68,6 +71,9 @@ public static class TwitchOperationsServiceCollectionExtensions
             TimeProvider.System
         ));
         _ = services.AddSingleton<IPredictionDashboardOperations>(static provider =>
+            provider.GetRequiredService<PredictionService>()
+        );
+        _ = services.AddSingleton<IPredictionAutomationOperations>(static provider =>
             provider.GetRequiredService<PredictionService>()
         );
         _ = services.AddSingleton<

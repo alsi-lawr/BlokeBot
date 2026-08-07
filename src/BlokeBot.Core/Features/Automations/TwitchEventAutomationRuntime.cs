@@ -208,6 +208,104 @@ public sealed class TwitchEventAutomationRuntime(
             )
             : Task.CompletedTask;
 
+    public Task ShoutoutOccurredAsync(
+        EventSubShoutoutEvent shoutout,
+        CancellationToken cancellation
+    )
+    {
+        var definitionId =
+            shoutout.Direction == EventSubShoutoutDirection.Sent
+                ? AutomationDefinitionIds.ShoutoutSentSource
+                : AutomationDefinitionIds.ShoutoutReceivedSource;
+        return HandleAsync(
+            shoutout.BroadcasterUserId,
+            shoutout.BroadcasterUserLogin,
+            shoutout.MessageId,
+            definitionId,
+            (host, receivedAtUtc) =>
+                NativeOperationAutomationContext.Shoutout(
+                    host,
+                    definitionId,
+                    shoutout,
+                    receivedAtUtc
+                ),
+            configuration =>
+                shoutout.Direction == EventSubShoutoutDirection.Sent
+                    ? configuration is ShoutoutSentSourceConfiguration
+                    : configuration is ShoutoutReceivedSourceConfiguration,
+            cancellation,
+            HostFeatureFlags.Automations | HostFeatureFlags.Shoutouts
+        );
+    }
+
+    public Task PollChangedAsync(EventSubPollEvent poll, CancellationToken cancellation)
+    {
+        var definitionId = poll.Stage switch
+        {
+            EventSubPollStage.Begin => AutomationDefinitionIds.PollStartedSource,
+            EventSubPollStage.Progress => AutomationDefinitionIds.PollProgressedSource,
+            _ => AutomationDefinitionIds.PollEndedSource,
+        };
+        return HandleAsync(
+            poll.BroadcasterUserId,
+            poll.BroadcasterUserLogin,
+            poll.MessageId,
+            definitionId,
+            (host, receivedAtUtc) =>
+                NativeOperationAutomationContext.Poll(host, definitionId, poll, receivedAtUtc),
+            configuration =>
+                poll.Stage switch
+                {
+                    EventSubPollStage.Begin => configuration is PollStartedSourceConfiguration,
+                    EventSubPollStage.Progress => configuration
+                        is PollProgressedSourceConfiguration,
+                    _ => configuration is PollEndedSourceConfiguration,
+                },
+            cancellation,
+            HostFeatureFlags.Automations | HostFeatureFlags.Polls
+        );
+    }
+
+    public Task PredictionChangedAsync(
+        EventSubPredictionEvent prediction,
+        CancellationToken cancellation
+    )
+    {
+        var definitionId = prediction.Stage switch
+        {
+            EventSubPredictionStage.Begin => AutomationDefinitionIds.PredictionStartedSource,
+            EventSubPredictionStage.Progress => AutomationDefinitionIds.PredictionProgressedSource,
+            EventSubPredictionStage.Lock => AutomationDefinitionIds.PredictionLockedSource,
+            _ => AutomationDefinitionIds.PredictionEndedSource,
+        };
+        return HandleAsync(
+            prediction.BroadcasterUserId,
+            prediction.BroadcasterUserLogin,
+            prediction.MessageId,
+            definitionId,
+            (host, receivedAtUtc) =>
+                NativeOperationAutomationContext.Prediction(
+                    host,
+                    definitionId,
+                    prediction,
+                    receivedAtUtc
+                ),
+            configuration =>
+                prediction.Stage switch
+                {
+                    EventSubPredictionStage.Begin => configuration
+                        is PredictionStartedSourceConfiguration,
+                    EventSubPredictionStage.Progress => configuration
+                        is PredictionProgressedSourceConfiguration,
+                    EventSubPredictionStage.Lock => configuration
+                        is PredictionLockedSourceConfiguration,
+                    _ => configuration is PredictionEndedSourceConfiguration,
+                },
+            cancellation,
+            HostFeatureFlags.Automations | HostFeatureFlags.Predictions
+        );
+    }
+
     public async ValueTask<bool> RequiresAsync(
         string channel,
         AutomationEventSubRequirement requirement,
@@ -271,8 +369,9 @@ public sealed class TwitchEventAutomationRuntime(
             }
 
             // The feature-switch gate runs before any receipt or run row is written. Every source
-            // requires Automations; redemption deliveries additionally require the Rewards &
-            // redemptions parent switch.
+            // requires Automations; native-operation deliveries additionally require their single
+            // backing Native Twitch feature switch, such as Rewards & redemptions, Shoutouts,
+            // Polls, or Predictions.
             if (!host.EnabledFeatures.Contains(requiredFeatures))
             {
                 return;

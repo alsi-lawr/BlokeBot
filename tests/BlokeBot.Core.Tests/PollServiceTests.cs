@@ -245,6 +245,64 @@ public sealed class PollServiceTests
         (await service.LoadAsync(1, CancellationToken.None)).ActivePoll.ShouldBeNull();
     }
 
+    [Test]
+    public async Task DraftStart_ValidatesGatesAndStartsWithoutPersistingATemplate()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            _ = db.Hosts.Add(
+                new BotHost
+                {
+                    EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.Polls,
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var http = new PollHttpClientFactory();
+        var service = CreateService(dbFactory, http);
+        var draft = new PollTemplateDraft("Question", ["Yes", "No"], 60, true, 500);
+
+        var gated = await service.StartAsync(1, draft, CancellationToken.None);
+        gated
+            .ShouldBeOfType<PollOperationOutcome.NotReady>()
+            .Message.ShouldBe(NativeTwitchFeatureGate.DisabledMessage);
+        http.CreateRequests.ShouldBe(0);
+
+        await using (var enable = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await enable.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.Polls;
+            _ = await enable.SaveChangesAsync();
+        }
+
+        var invalid = await service.StartAsync(
+            1,
+            new PollTemplateDraft(new string('x', 61), ["Yes", "No"], 60, false, null),
+            CancellationToken.None
+        );
+        _ = invalid.ShouldBeOfType<PollOperationOutcome.InvalidTemplate>();
+        http.CreateRequests.ShouldBe(0);
+
+        http.Enqueue(CreateResponse("draft-poll", "host-id", "Question", "ACTIVE"));
+        var started = await service.StartAsync(1, draft, CancellationToken.None);
+
+        _ = started.ShouldBeOfType<PollOperationOutcome.Started>();
+        http.CreateRequests.ShouldBe(1);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchPollTemplates.CountAsync()).ShouldBe(0);
+        var poll = (await verify.TwitchPolls.ToArrayAsync()).ShouldHaveSingleItem();
+        poll.IsExternallyStarted.ShouldBeFalse();
+        poll.Status.ShouldBe(TwitchPollStatus.Active);
+
+        var conflict = await service.StartAsync(1, draft, CancellationToken.None);
+        _ = conflict.ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
+        http.CreateRequests.ShouldBe(1);
+    }
+
     private static PollService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         PollHttpClientFactory http
@@ -292,7 +350,8 @@ public sealed class PollServiceTests
             status,
             new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 7, 26, 10, 1, 0, TimeSpan.Zero),
-            messageId
+            messageId,
+            status == "ACTIVE" ? EventSubPollStage.Progress : EventSubPollStage.End
         );
 
     private static HttpResponseMessage CreateResponse(

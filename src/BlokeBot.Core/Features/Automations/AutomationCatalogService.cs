@@ -23,15 +23,27 @@ public sealed class AutomationCatalogService
     public async Task<AutomationCatalogSnapshot> DiscoverAsync(
         AutomationHostId hostId,
         CancellationToken cancellationToken
-    ) =>
-        await AvailabilityAsync(hostId, cancellationToken) switch
-        {
-            AutomationCatalogAvailability.Enabled => new(
-                AutomationCatalogAvailability.Enabled,
-                _catalog.Descriptors
-            ),
-            var availability => new(availability, []),
-        };
+    )
+    {
+        var result = await _features.Load(hostId.Value).RunAsync(cancellationToken);
+        return result.Match(
+            enabled =>
+                enabled.Contains(HostFeatureFlags.Automations)
+                    ? new AutomationCatalogSnapshot(
+                        AutomationCatalogAvailability.Enabled,
+                        [
+                            .. _catalog.Descriptors.Where(descriptor =>
+                                enabled.Contains(
+                                    NativeOperationAutomations.BackingFeature(descriptor.Id.Value)
+                                )
+                            ),
+                        ]
+                    )
+                    : new AutomationCatalogSnapshot(AutomationCatalogAvailability.Disabled, []),
+            static () =>
+                new AutomationCatalogSnapshot(AutomationCatalogAvailability.HostNotFound, [])
+        );
+    }
 
     public Task<AutomationConfigurationCheck> ValidateForSaveAsync(
         AutomationHostId hostId,

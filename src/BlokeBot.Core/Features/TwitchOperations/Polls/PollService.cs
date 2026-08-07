@@ -17,7 +17,7 @@ public sealed class PollService(
     EventBus<AppEventKind> events,
     DurableAlertService alerts,
     NativeTwitchFeatureGate nativeTwitch
-) : IPollEventObserver, IPollDashboardOperations
+) : IPollEventObserver, IPollDashboardOperations, IPollAutomationOperations
 {
     private const int _resultsToKeep = 100;
 
@@ -111,6 +111,47 @@ public sealed class PollService(
         int hostId,
         int templateId,
         CancellationToken cancellationToken
+    ) =>
+        !await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken)
+            ? new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage)
+            : await StartCoreAsync(
+                hostId,
+                async (db, ct) =>
+                {
+                    var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                    var template = await db
+                        .TwitchPollTemplates.Include(x => x.Choices)
+                        .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, ct);
+                    return host is null || template is null
+                        ? new PollStartResolution.Failed(
+                            new PollOperationOutcome.TemplateNotFound()
+                        )
+                        : new PollStartResolution.Ready(
+                            host,
+                            new HelixPollCreateRequest(
+                                template.Title,
+                                template
+                                    .Choices.OrderBy(x => x.Position)
+                                    .Select(x => x.Title)
+                                    .ToArray(),
+                                template.DurationSeconds,
+                                template.ChannelPointsVotingEnabled,
+                                template.ChannelPointsPerVote
+                            )
+                        );
+                },
+                cancellationToken
+            );
+
+    /// <summary>
+    /// Starts a poll directly from a validated draft without persisting a template. Automation
+    /// actions use this path; it applies the same feature gate, readiness, single-active-poll,
+    /// and provider rules as starting a saved template.
+    /// </summary>
+    public async Task<PollOperationOutcome> StartAsync(
+        int hostId,
+        PollTemplateDraft draft,
+        CancellationToken cancellationToken
     )
     {
         if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
@@ -118,6 +159,51 @@ public sealed class PollService(
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
+        var validation = draft.Validate();
+        if (validation is PollTemplateValidationOutcome.Invalid invalid)
+        {
+            return new PollOperationOutcome.InvalidTemplate(invalid.Message);
+        }
+        var valid = ((PollTemplateValidationOutcome.Valid)validation).Draft;
+
+        return await StartCoreAsync(
+            hostId,
+            async (db, ct) =>
+            {
+                var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                return host?.TwitchUserId is not { Length: > 0 }
+                    ? new PollStartResolution.Failed(
+                        new PollOperationOutcome.NotReady(
+                            "Select a connected Twitch channel first."
+                        )
+                    )
+                    : new PollStartResolution.Ready(
+                        host,
+                        new HelixPollCreateRequest(
+                            valid.Title,
+                            [.. valid.Choices],
+                            valid.DurationSeconds,
+                            valid.ChannelPointsVotingEnabled,
+                            valid.ChannelPointsVotingEnabled ? valid.ChannelPointsPerVote : null
+                        )
+                    );
+            },
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Shared orchestration for starting a poll: readiness token, start-request resolution,
+    /// feature check, single-active-poll check, feature-gate re-check, provider call, and
+    /// outcome mapping with upsert. Both the template-based and draft-based start paths
+    /// delegate here.
+    /// </summary>
+    private async Task<PollOperationOutcome> StartCoreAsync(
+        int hostId,
+        Func<BlokeBotDbContext, CancellationToken, Task<PollStartResolution>> resolveStartAsync,
+        CancellationToken cancellationToken
+    )
+    {
         var token = await ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
@@ -126,14 +212,12 @@ public sealed class PollService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, cancellationToken);
-        var template = await db
-            .TwitchPollTemplates.Include(x => x.Choices)
-            .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, cancellationToken);
-        if (host is null || template is null)
+        var resolution = await resolveStartAsync(db, cancellationToken);
+        if (resolution is PollStartResolution.Failed failed)
         {
-            return new PollOperationOutcome.TemplateNotFound();
+            return failed.Outcome;
         }
+        var (host, request) = (PollStartResolution.Ready)resolution;
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Polls))
         {
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -155,13 +239,7 @@ public sealed class PollService(
         var provider = await helix.CreatePollAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
             host.TwitchUserId!,
-            new(
-                template.Title,
-                template.Choices.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
-                template.DurationSeconds,
-                template.ChannelPointsVotingEnabled,
-                template.ChannelPointsPerVote
-            ),
+            request,
             cancellationToken
         );
         if (provider is HelixPollCreateOutcome.ActivePollExists)
@@ -179,6 +257,14 @@ public sealed class PollService(
         _ = await db.SaveChangesAsync(cancellationToken);
         _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
         return new PollOperationOutcome.Started(View(poll));
+    }
+
+    private abstract record PollStartResolution
+    {
+        public sealed record Ready(BotHost Host, HelixPollCreateRequest Request)
+            : PollStartResolution;
+
+        public sealed record Failed(PollOperationOutcome Outcome) : PollStartResolution;
     }
 
     public async Task<PollOperationOutcome> EndAsync(
