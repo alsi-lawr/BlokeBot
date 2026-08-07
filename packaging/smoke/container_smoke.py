@@ -155,10 +155,20 @@ def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) 
         markers = ("Your channel. Your bot. Your rules.",)
         accepted_statuses = frozenset({200})
 
+    run_arguments = ["run", "--rm", "--detach"]
+    if kind == "site":
+        # Online site startup requires explicit privacy configuration; the smoke run supplies
+        # throwaway values the way a real deployment supplies its own.
+        run_arguments += [
+            "--env",
+            "BlokeBotSite__ControllerName=BlokeBot (container smoke)",
+            "--env",
+            "BlokeBotSite__PrivacyContact=privacy@smoke.invalid",
+            "--env",
+            "BlokeBotSite__PrivacyNoticeUrl=https://smoke.invalid/privacy",
+        ]
     container = _docker(
-        "run",
-        "--rm",
-        "--detach",
+        *run_arguments,
         "--publish",
         f"127.0.0.1::{internal_port}",
         image,

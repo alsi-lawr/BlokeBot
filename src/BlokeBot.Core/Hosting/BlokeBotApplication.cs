@@ -56,6 +56,26 @@ public static class BlokeBotApplication
             .Services.AddOptions<WebAuthOptions>()
             .BindConfiguration("TwitchWebAuth")
             .ValidateOnStart();
+        var privacy = builder
+            .Services.AddOptions<PrivacyNoticeOptions>()
+            .BindConfiguration("BlokeBotPrivacy")
+            .Validate(
+                PrivacyNoticeOptionsValidation.HasValidNoticeUrlWhenConfigured,
+                PrivacyNoticeOptionsValidation.NoticeUrlFailure
+            )
+            .ValidateOnStart();
+        if (
+            PrivacyNoticeOptionsValidation.RequiredFor(
+                runtime == BlokeBotRuntimeMode.Online,
+                builder.Environment.EnvironmentName
+            )
+        )
+        {
+            _ = privacy.Validate(
+                PrivacyNoticeOptionsValidation.IsComplete,
+                PrivacyNoticeOptionsValidation.RequiredFailure
+            );
+        }
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
         var twitchEndpoints =

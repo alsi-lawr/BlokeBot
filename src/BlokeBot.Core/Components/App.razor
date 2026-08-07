@@ -26,6 +26,49 @@
     }
     <script>
         (() => {
+            const flagKey = "blokebot.preferences.disabled";
+            const preferenceKeys = [
+                "blokebot.theme",
+                "blokebot.sidebar.guessing.open",
+                "blokebot.sidebar.points.open",
+                "blokebot.sidebar.customcommands.open",
+                "blokebot.sidebar.automations.open",
+                "blokebot.sidebar.nativetwitch.open",
+                "blokebot.shell.rail.v1",
+            ];
+            const enabled = () => {
+                try {
+                    return window.localStorage.getItem(flagKey) !== "true";
+                } catch {
+                    return false;
+                }
+            };
+            const disable = () => {
+                try {
+                    window.localStorage.setItem(flagKey, "true");
+                    for (const key of preferenceKeys)
+                        window.localStorage.removeItem(key);
+                } catch {
+                }
+
+                window.blokeBotTheme?.sync();
+                window.blokeBotNavigation?.sync();
+                return enabled();
+            };
+            const enable = () => {
+                try {
+                    window.localStorage.removeItem(flagKey);
+                } catch {
+                }
+
+                return enabled();
+            };
+
+            window.blokeBotPreferences = { enabled, disable, enable };
+        })();
+    </script>
+    <script>
+        (() => {
             const storageKey = "blokebot.theme";
             const media = window.matchMedia("(prefers-color-scheme: dark)");
             const valid = value => value === "dark" || value === "light";
@@ -48,7 +91,7 @@
                 if (document.documentElement.style.colorScheme !== theme)
                     document.documentElement.style.colorScheme = theme;
 
-                if (!persist)
+                if (!persist || !window.blokeBotPreferences.enabled())
                     return;
 
                 try {

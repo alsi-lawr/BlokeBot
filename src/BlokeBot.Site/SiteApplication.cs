@@ -54,7 +54,7 @@ internal static class SiteApplication
                 }
             }
         );
-        _ = builder
+        var options = builder
             .Services.AddOptions<BlokeBotSiteOptions>()
             .BindConfiguration("BlokeBotSite")
             .Validate(
@@ -62,6 +62,13 @@ internal static class SiteApplication
                 BlokeBotSiteOptionsValidation.LiveAppUrlFailure
             )
             .ValidateOnStart();
+        if (!builder.Environment.IsDevelopment())
+        {
+            _ = options.Validate(
+                BlokeBotSiteOptionsValidation.HasCompletePrivacyConfiguration,
+                BlokeBotSiteOptionsValidation.PrivacyConfigurationFailure
+            );
+        }
         _ = builder.Services.AddSingleton(SiteProductVersion.Current);
         _ = builder.Services.AddRazorComponents();
 

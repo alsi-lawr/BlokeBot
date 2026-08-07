@@ -48,12 +48,15 @@ internal sealed class AdminHostManagementService(
         IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
             _ = await runtime.Stop(hostId).ExecuteAsync(ct);
-            var removed = await hostRemoval.RemoveAsync(hostId, ct);
-            return Success(
-                new AdminHostOperationOutcome.Completed(
-                    removed ? "Channel removed." : "Channel was already removed."
+            var result = await hostRemoval.RemoveAsync(hostId, ct);
+            var message = result.Removed ? "Channel removed." : "Channel was already removed.";
+            AdminHostOperationOutcome outcome = result.Media is HostMediaCleanup.Failed failed
+                ? new AdminHostOperationOutcome.Rejected(
+                    $"{message} Its overlay media could not be fully deleted; "
+                        + $"remove {failed.Directory} from the server manually."
                 )
-            );
+                : new AdminHostOperationOutcome.Completed(message);
+            return Success(outcome);
         });
 
     public IO<AdminHostOperationOutcome, AdminHostOperationError> StartBot(int hostId) =>

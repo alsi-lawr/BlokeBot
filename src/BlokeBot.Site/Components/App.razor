@@ -60,7 +60,8 @@
             button.addEventListener("click", () => {
                 const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
                 try {
-                    window.localStorage.setItem("blokebot.theme", theme);
+                    if (window.localStorage.getItem("blokebot.preferences.disabled") !== "true")
+                        window.localStorage.setItem("blokebot.theme", theme);
                 } catch {
                 }
                 applyTheme(theme);

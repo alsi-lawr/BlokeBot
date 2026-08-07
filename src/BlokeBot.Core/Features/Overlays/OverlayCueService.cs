@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
 using System.Security.Cryptography;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Eventing;
@@ -689,14 +688,7 @@ internal sealed class OverlayCueService(
 
     private string HostContentDirectory(int hostId)
     {
-        var databaseDirectory =
-            Path.GetDirectoryName(Path.GetFullPath(_options.DatabasePath))
-            ?? throw new InvalidOperationException("The database path has no parent directory.");
-        var directory = Path.Combine(
-            databaseDirectory,
-            "overlay-media",
-            hostId.ToString(CultureInfo.InvariantCulture)
-        );
+        var directory = OverlayMediaDirectory.HostDirectory(_options.DatabasePath, hostId);
         _ = Directory.CreateDirectory(directory);
         if (!OperatingSystem.IsWindows())
         {

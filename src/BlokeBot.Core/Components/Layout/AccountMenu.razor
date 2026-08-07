@@ -35,5 +35,18 @@
                 Sign out
             </button>
         </form>
+        @if (_noticeUrl is not null)
+        {
+            <a class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" href="@_noticeUrl" target="_blank" rel="noreferrer">
+                Privacy notice
+            </a>
+        }
+        <button class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold"
+                type="button"
+                aria-pressed="@(_preferencesEnabled ? "true" : "false")"
+                title="When off, saved view preferences are removed from this browser and no new ones are stored."
+                @onclick="TogglePreferenceSavingAsync">
+            @(_preferencesEnabled ? "Stop saving view preferences" : "Save view preferences")
+        </button>
     </div>
 </details>

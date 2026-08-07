@@ -4,6 +4,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Hosts;
+using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Core.Auth.Web;
 
@@ -13,7 +14,13 @@ internal static class AuthEndpoints
     {
         _ = app.MapGet(
                 "/auth/login",
-                (HttpContext context, WebAuthService auth, bool? start, string? returnUrl) =>
+                (
+                    HttpContext context,
+                    WebAuthService auth,
+                    IOptions<PrivacyNoticeOptions> privacy,
+                    bool? start,
+                    string? returnUrl
+                ) =>
                 {
                     var action =
                         start == true
@@ -28,7 +35,11 @@ internal static class AuthEndpoints
                             BlokeBotAuthReturnAction.SignIn
                         )
                         : action.Match<IResult>(
-                            _ => Results.Content(LoginPage.Render(), "text/html"),
+                            _ =>
+                                Results.Content(
+                                    LoginPage.Render(privacy.Value.NoticeUri?.ToString()),
+                                    "text/html"
+                                ),
                             _ => StartLogin()
                         );
                     IResult StartLogin()

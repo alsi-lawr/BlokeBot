@@ -19,6 +19,7 @@ public sealed class SitePresentationTests
         await using var app = SiteApplication.Build([
             "--urls=http://127.0.0.1:0",
             $"--BlokeBotSite:LiveAppUrl={LiveAppUrl}",
+            .. SiteTestConfiguration.PrivacyArguments,
         ]);
 
         try
@@ -46,6 +47,7 @@ public sealed class SitePresentationTests
         foreach (var configuredValue in new string?[] { null, "", "   " })
         {
             var arguments = new List<string> { "--urls=http://127.0.0.1:0" };
+            arguments.AddRange(SiteTestConfiguration.PrivacyArguments);
             if (configuredValue is not null)
             {
                 arguments.Add($"--BlokeBotSite:LiveAppUrl={configuredValue}");
@@ -77,6 +79,7 @@ public sealed class SitePresentationTests
             await using var app = SiteApplication.Build([
                 "--urls=http://127.0.0.1:0",
                 $"--BlokeBotSite:LiveAppUrl={configuredValue}",
+                .. SiteTestConfiguration.PrivacyArguments,
             ]);
 
             var exception = await Should.ThrowAsync<OptionsValidationException>(() =>
@@ -91,7 +94,10 @@ public sealed class SitePresentationTests
     [Test]
     public async Task Footer_RendersActualSiteProductVersion()
     {
-        await using var app = SiteApplication.Build(["--urls=http://127.0.0.1:0"]);
+        await using var app = SiteApplication.Build([
+            "--urls=http://127.0.0.1:0",
+            .. SiteTestConfiguration.PrivacyArguments,
+        ]);
 
         try
         {

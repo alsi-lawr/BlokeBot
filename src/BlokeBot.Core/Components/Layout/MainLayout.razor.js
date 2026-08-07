@@ -30,6 +30,9 @@ export function readRailPresentation() {
 
 export function writeRailPresentation(iconRail) {
     try {
+        if (window.localStorage.getItem("blokebot.preferences.disabled") === "true")
+            return;
+
         window.localStorage.setItem(
             railPreferenceKey,
             JSON.stringify({

@@ -157,7 +157,7 @@ internal static class BlokeBotHost
         );
     }
 
-    private static BlokeBotStatePaths ResolveStatePaths(
+    internal static BlokeBotStatePaths ResolveStatePaths(
         IConfiguration configuration,
         string? dataDirectory
     )

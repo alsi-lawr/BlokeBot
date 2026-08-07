@@ -134,7 +134,10 @@ public sealed class SiteGuideMediaManifestTests
     [Test]
     public async Task GuideRoutes_RenderUsableFeatureSidebarAndCurrentGuidance()
     {
-        await using var app = SiteApplication.Build(["--urls=http://127.0.0.1:0"]);
+        await using var app = SiteApplication.Build([
+            "--urls=http://127.0.0.1:0",
+            .. SiteTestConfiguration.PrivacyArguments,
+        ]);
 
         try
         {
