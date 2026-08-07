@@ -23,6 +23,7 @@ public sealed class PageHelpButtonTests
     [Arguments("/queues", "Play with viewers", "viewer-page link becomes available")]
     [Arguments("/moments", "Moments", "shareable recap in a new tab")]
     [Arguments("/overlays/sources", "Overlays", "require both Overlays and Guessing game")]
+    [Arguments("/automations/events", "Twitch events", "no Twitch subscription is created")]
     public void FeatureRoute_RendersOneButtonAndOpensRouteSpecificHelp(
         string path,
         string title,
@@ -67,6 +68,7 @@ public sealed class PageHelpButtonTests
             .ToArray();
 
         routes.ShouldBe([
+            "/automations/events",
             "/custom-commands/settings",
             "/guessing",
             "/guessing/settings",

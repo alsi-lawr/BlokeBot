@@ -285,14 +285,9 @@ internal sealed partial class EventSubChannelSession(
         }
 
         foreach (
-            var operation in new[]
-            {
-                subscription.ShoutoutSubscriptions,
-                subscription.RaidSubscriptions,
-                subscription.PollSubscriptions,
-                subscription.RewardRedemptionSubscriptions,
-                subscription.PredictionSubscriptions,
-            }
+            var operation in _operationSubscriptionKinds.Select(kind =>
+                GetOperationState(subscription, kind)
+            )
         )
         {
             var active = operation switch

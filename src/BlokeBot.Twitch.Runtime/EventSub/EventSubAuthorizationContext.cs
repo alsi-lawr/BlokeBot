@@ -5,6 +5,9 @@ internal enum EventSubBroadcasterOperationKind
     Polls,
     RewardRedemptions,
     Predictions,
+    AutomationSubscriptions,
+    AutomationCheers,
+    AutomationHypeTrain,
 }
 
 public abstract record EventSubAuthorizationContext
@@ -62,4 +65,13 @@ public abstract record EventSubAuthorizationContext
 
     internal static EventSubAuthorizationContext PredictionsAuthority { get; } =
         new Broadcaster(EventSubBroadcasterOperationKind.Predictions);
+
+    internal static EventSubAuthorizationContext AutomationSubscriptionsAuthority { get; } =
+        new Broadcaster(EventSubBroadcasterOperationKind.AutomationSubscriptions);
+
+    internal static EventSubAuthorizationContext AutomationCheersAuthority { get; } =
+        new Broadcaster(EventSubBroadcasterOperationKind.AutomationCheers);
+
+    internal static EventSubAuthorizationContext AutomationHypeTrainAuthority { get; } =
+        new Broadcaster(EventSubBroadcasterOperationKind.AutomationHypeTrain);
 }

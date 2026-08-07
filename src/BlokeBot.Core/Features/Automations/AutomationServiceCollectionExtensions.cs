@@ -8,6 +8,7 @@ public static class AutomationServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotAutomations(this IServiceCollection services)
     {
         _ = services.AddAutomationCatalogModule<CoreAutomationCatalogModule>();
+        _ = services.AddAutomationCatalogModule<TwitchEventAutomationCatalogModule>();
         services.TryAddSingleton<AutomationDefinitionCatalog>();
         services.TryAddSingleton(static serviceProvider => new AutomationCatalogService(
             serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),
@@ -24,6 +25,14 @@ public static class AutomationServiceCollectionExtensions
             >()
         );
         services.TryAddSingleton<AutomationRunQueryService>();
+        services.TryAddSingleton<TwitchEventAutomationRuntime>();
+        services.TryAddSingleton<TwitchEventSourceReadinessService>();
+        _ = services.AddSingleton<ITwitchEventAutomationObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<TwitchEventAutomationRuntime>()
+        );
+        services.TryAddSingleton<IAutomationEventSubRequirementSource>(static serviceProvider =>
+            serviceProvider.GetRequiredService<TwitchEventAutomationRuntime>()
+        );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
                 IHostFeatureChangeObserver,
@@ -31,10 +40,19 @@ public static class AutomationServiceCollectionExtensions
             >()
         );
         services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IHostFeatureChangeObserver,
+                AutomationEventSubReconciliationObserver
+            >()
+        );
+        services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, AutomationCatalogStartupService>()
         );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IHostedService, AutomationRuntimeWorker>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, AutomationEventReceiptCleanupWorker>()
         );
         return services;
     }

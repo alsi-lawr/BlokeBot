@@ -46,8 +46,43 @@ public sealed class AutomationRuntimeService(
         CancellationToken cancellationToken
     ) => DispatchCoreAsync(trigger, claim, onCommitted, cancellationToken);
 
-    private async Task<CustomCommandAutomationAdmissionOutcome> DispatchCoreAsync(
+    internal async Task<AutomationDispatchOutcome> DispatchTwitchEventAsync(
+        AutomationContext context,
+        Func<AutomationConfiguration, bool> matches,
+        CancellationToken cancellationToken
+    )
+    {
+        var dispatch = await DispatchCoreAsync(context, matches, null, null, cancellationToken);
+        return dispatch switch
+        {
+            CustomCommandAutomationAdmissionOutcome.Dispatched dispatched => dispatched.Dispatch,
+            _ => throw new InvalidOperationException(
+                "A Twitch event dispatch cannot reject a custom-command invocation claim."
+            ),
+        };
+    }
+
+    private Task<CustomCommandAutomationAdmissionOutcome> DispatchCoreAsync(
         AutomationTrigger trigger,
+        Func<
+            BlokeBotDbContext,
+            CancellationToken,
+            Task<CustomCommandInvocationClaimOutcome>
+        >? claim,
+        Action? onCommitted,
+        CancellationToken cancellationToken
+    ) =>
+        DispatchCoreAsync(
+            trigger.Context,
+            configuration => Equals(configuration, trigger.SourceConfiguration),
+            claim,
+            onCommitted,
+            cancellationToken
+        );
+
+    private async Task<CustomCommandAutomationAdmissionOutcome> DispatchCoreAsync(
+        AutomationContext context,
+        Func<AutomationConfiguration, bool> matches,
         Func<
             BlokeBotDbContext,
             CancellationToken,
@@ -64,7 +99,7 @@ public sealed class AutomationRuntimeService(
             .Include(static flow => flow.Nodes)
             .Include(static flow => flow.Edges)
             .Where(flow =>
-                flow.HostId == trigger.Context.HostId.Value
+                flow.HostId == context.HostId.Value
                 && flow.IsEnabled
                 && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
             )
@@ -74,8 +109,7 @@ public sealed class AutomationRuntimeService(
         foreach (var flow in flows)
         {
             var source = flow.Nodes.SingleOrDefault(node =>
-                node.DefinitionId == trigger.Context.Event.SourceDefinitionId.Value
-                && IsSource(flow, node)
+                node.DefinitionId == context.Event.SourceDefinitionId.Value && IsSource(flow, node)
             );
             if (source is null)
             {
@@ -83,10 +117,7 @@ public sealed class AutomationRuntimeService(
             }
 
             var check = catalog.ValidatePersistedDefinition(Definition(source));
-            if (
-                check is AutomationConfigurationCheck.Valid valid
-                && Equals(valid.Configuration, trigger.SourceConfiguration)
-            )
+            if (check is AutomationConfigurationCheck.Valid valid && matches(valid.Configuration))
             {
                 matching.Add((flow, source));
             }
@@ -102,7 +133,7 @@ public sealed class AutomationRuntimeService(
             $"""
             UPDATE hosts
             SET EnabledFeatures = EnabledFeatures
-            WHERE Id = {trigger.Context.HostId.Value};
+            WHERE Id = {context.HostId.Value};
             """,
             cancellationToken
         );
@@ -113,7 +144,7 @@ public sealed class AutomationRuntimeService(
 
         var host = await db
             .Hosts.AsNoTracking()
-            .Where(value => value.Id == trigger.Context.HostId.Value)
+            .Where(value => value.Id == context.HostId.Value)
             .Select(static value => new { value.EnabledFeatures, value.AutomationGeneration })
             .SingleAsync(cancellationToken);
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
@@ -148,9 +179,9 @@ public sealed class AutomationRuntimeService(
                 VALUES
                     ({runId}, {flow.Id}, {flow.HostId}, {host.AutomationGeneration},
                      {(long)requiredFeatures}, {AutomationContextSchema.CurrentVersion},
-                     {trigger.Context.Event.SourceDefinitionId.Value},
-                     {trigger.Context.Event.OccurrenceId},
-                     {AutomationRuntimeSerialization.SerializeContext(trigger.Context)},
+                     {context.Event.SourceDefinitionId.Value},
+                     {context.Event.OccurrenceId},
+                     {AutomationRuntimeSerialization.SerializeContext(context)},
                      {AutomationRuntimeSerialization.SerializeDefinition(flow)},
                      {"Running"}, {now}, NULL, NULL);
                 """,
@@ -161,9 +192,8 @@ public sealed class AutomationRuntimeService(
                 var duplicate = await db.AutomationFlowRuns.AnyAsync(
                     value =>
                         value.FlowId == flow.Id
-                        && value.SourceDefinitionId
-                            == trigger.Context.Event.SourceDefinitionId.Value
-                        && value.SourceOccurrenceId == trigger.Context.Event.OccurrenceId,
+                        && value.SourceDefinitionId == context.Event.SourceDefinitionId.Value
+                        && value.SourceOccurrenceId == context.Event.OccurrenceId,
                     cancellationToken
                 );
                 if (duplicate)
@@ -294,6 +324,40 @@ public sealed class AutomationRuntimeService(
         }
 
         return commandIds;
+    }
+
+    internal async Task<IReadOnlySet<string>> EnabledSourceDefinitionIdsAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        var gate = await GateAsync(hostId, cancellationToken);
+        if (gate is not AutomationRuntimeGate.Enabled)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var flows = await db
+            .AutomationFlows.AsNoTracking()
+            .Include(static flow => flow.Nodes)
+            .Include(static flow => flow.Edges)
+            .Where(flow =>
+                flow.HostId == hostId.Value
+                && flow.IsEnabled
+                && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
+            )
+            .ToArrayAsync(cancellationToken);
+        var definitionIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var flow in flows)
+        {
+            foreach (var node in flow.Nodes.Where(node => IsSource(flow, node)))
+            {
+                _ = definitionIds.Add(node.DefinitionId);
+            }
+        }
+
+        return definitionIds;
     }
 
     public async Task<AutomationResumeOutcome> ResumeAsync(

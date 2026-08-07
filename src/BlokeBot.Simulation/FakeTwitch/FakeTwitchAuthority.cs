@@ -53,7 +53,10 @@ public sealed record FakeTwitchScenarioDefinition
                 "channel:read:redemptions",
                 "channel:manage:redemptions",
                 "channel:read:predictions",
-                "channel:manage:predictions"
+                "channel:manage:predictions",
+                "channel:read:subscriptions",
+                "bits:read",
+                "channel:read:hype_train"
             ),
         };
 }

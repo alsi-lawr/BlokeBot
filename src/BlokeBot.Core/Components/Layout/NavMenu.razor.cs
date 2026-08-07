@@ -15,6 +15,7 @@ public partial class NavMenu
     private const string _guessingOpenStorageKey = "blokebot.sidebar.guessing.open";
     private const string _pointsOpenStorageKey = "blokebot.sidebar.points.open";
     private const string _customCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
+    private const string _automationsOpenStorageKey = "blokebot.sidebar.automations.open";
     private const string _nativeTwitchOpenStorageKey = "blokebot.sidebar.nativetwitch.open";
 
     private readonly string _rootId = $"navigation-{Guid.NewGuid():N}";
@@ -22,6 +23,7 @@ public partial class NavMenu
     private bool _guessingOpen = true;
     private bool _pointsOpen = true;
     private bool _customCommandsOpen = true;
+    private bool _automationsOpen = true;
     private bool _nativeTwitchOpen = true;
     private bool _routeHelpActive;
     private IDisposable? _hostedChannelSubscription;
@@ -71,6 +73,11 @@ public partial class NavMenu
                 _customCommandsOpen = await _module.InvokeAsync<bool>(
                     "readBoolean",
                     _customCommandsOpenStorageKey,
+                    true
+                );
+                _automationsOpen = await _module.InvokeAsync<bool>(
+                    "readBoolean",
+                    _automationsOpenStorageKey,
                     true
                 );
                 _nativeTwitchOpen = await _module.InvokeAsync<bool>(
@@ -140,6 +147,7 @@ public partial class NavMenu
                 NavigationGroup.Guessing => _guessingOpen,
                 NavigationGroup.Points => _pointsOpen,
                 NavigationGroup.CustomCommands => _customCommandsOpen,
+                NavigationGroup.Automations => _automationsOpen,
                 NavigationGroup.NativeTwitch => _nativeTwitchOpen,
                 _ => throw new UnreachableException(),
             },
@@ -187,6 +195,10 @@ public partial class NavMenu
             case NavigationGroup.CustomCommands:
                 _customCommandsOpen = !_customCommandsOpen;
                 await PersistGroupAsync(_customCommandsOpenStorageKey, _customCommandsOpen);
+                break;
+            case NavigationGroup.Automations:
+                _automationsOpen = !_automationsOpen;
+                await PersistGroupAsync(_automationsOpenStorageKey, _automationsOpen);
                 break;
             case NavigationGroup.NativeTwitch:
                 _nativeTwitchOpen = !_nativeTwitchOpen;
@@ -272,6 +284,7 @@ public partial class NavMenu
         Guessing,
         Points,
         CustomCommands,
+        Automations,
         NativeTwitch,
     }
 }

@@ -158,7 +158,14 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
         internal void SetNativeTwitchEnabled(string channel, bool enabled) =>
             _nativeTwitchFeatures[channel] = enabled
-                ? Enum.GetValues<EventSubOperationSubscriptionKind>().ToHashSet()
+                ?
+                [
+                    EventSubOperationSubscriptionKind.Shoutouts,
+                    EventSubOperationSubscriptionKind.Raids,
+                    EventSubOperationSubscriptionKind.Polls,
+                    EventSubOperationSubscriptionKind.RewardRedemptions,
+                    EventSubOperationSubscriptionKind.Predictions,
+                ]
                 : [];
 
         internal void SetNativeTwitchFeatureEnabled(

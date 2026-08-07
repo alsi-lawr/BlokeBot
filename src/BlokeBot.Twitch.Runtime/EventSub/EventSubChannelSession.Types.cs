@@ -61,6 +61,24 @@ internal sealed record ActiveEventSubSubscription
 
     internal EventSubOperationSubscriptionState PredictionSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationStreamSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationFollowSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationSubscriberSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationCheerSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationHypeTrainSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState AutomationChatNotificationSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
 }
 
 internal enum EventSubOperationSubscriptionKind
@@ -70,4 +88,10 @@ internal enum EventSubOperationSubscriptionKind
     Polls,
     RewardRedemptions,
     Predictions,
+    AutomationStream,
+    AutomationFollows,
+    AutomationSubscriptions,
+    AutomationCheers,
+    AutomationHypeTrain,
+    AutomationChatNotifications,
 }

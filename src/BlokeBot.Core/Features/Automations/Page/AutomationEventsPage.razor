@@ -1,0 +1,116 @@
+@page "/automations/events"
+@using BlokeBot.Core.Features.Automations
+@using BlokeBot.Eventing
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject TwitchEventSourceReadinessService _readiness
+@inject EventBus<AppEventKind> _events
+
+<PageTitle>BlokeBot | Twitch events</PageTitle>
+
+<DashboardPage Kicker="Automations"
+               Title="Twitch events"
+               Description="Start automations from Twitch activity such as going live, follows, subscriptions, cheers, raids, and Hype Trains."
+               Width="DashboardPageWidth.Wide"
+               data-automation-events-page>
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure"
+                   Title="Twitch events could not load"
+                   Description="Try again. Your saved automations have not changed.">
+            <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
+    }
+    else if (_loading)
+    {
+        <PageState Kind="PageStateKind.Loading"
+                   Title="Loading Twitch events"
+                   Description="Checking event sources and Twitch approvals." />
+    }
+    else if (Host is null)
+    {
+        <PageState Kind="PageStateKind.Empty"
+                   Title="Choose a channel"
+                   Description="Choose a channel to see its Twitch event sources." />
+    }
+    else if (_outcome is TwitchEventSourceReadinessOutcome.FeatureDisabled)
+    {
+        <PageState Kind="PageStateKind.Unavailable"
+                   Title="Automations are off"
+                   Description="Saved automations and their history are retained, but Twitch events do not start flows while Automations is off. Suppressed events are not replayed when you turn it back on.">
+            <Actions>
+                <a class="btn-primary" href="/host#chat-tools" data-automation-events-channel-setup>Open Channel setup</a>
+            </Actions>
+        </PageState>
+    }
+    else if (_outcome is TwitchEventSourceReadinessOutcome.Available available)
+    {
+        @if (RequiresReconnect(available))
+        {
+            <PageState Kind="PageStateKind.Unavailable"
+                       Title="Connect this channel again"
+                       Description="@ReconnectDescription(available)">
+                <Actions>
+                    <AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition"
+                                     Url="/oauth/broadcaster/start"
+                                     PopupName="blokebot-broadcaster-oauth"
+                                     OpeningText="Opening..."
+                                     OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton>
+                </Actions>
+            </PageState>
+        }
+
+        <TaskPanel Title="Event sources"
+                   Description="Each source shows the Twitch approval it needs and whether an enabled automation flow uses it today.">
+            <div class="grid gap-3" data-automation-event-sources>
+                @foreach (var source in available.Sources)
+                {
+                    <article class="surface-row rounded-lg p-4"
+                             @key="source.DefinitionId.Value"
+                             data-automation-event-source="@source.DefinitionId.Value"
+                             data-source-state="@StateToken(source.State)">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <strong class="text-slate-950">@source.Name</strong>
+                                <p class="mt-1 text-sm text-muted-foreground">@source.Description</p>
+                            </div>
+                            <span class="@BadgeClass(source.State)" data-source-readiness>@StateLabel(source.State)</span>
+                        </div>
+                        <dl class="mt-3 grid gap-1 text-sm text-muted-foreground">
+                            <div class="flex flex-wrap gap-2">
+                                <dt class="font-semibold text-slate-900">Twitch subscription</dt>
+                                <dd><code>@source.SubscriptionTypes</code></dd>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <dt class="font-semibold text-slate-900">Required approval</dt>
+                                <dd data-source-scopes>@ScopesLabel(source)</dd>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <dt class="font-semibold text-slate-900">Used by enabled flows</dt>
+                                <dd data-source-in-use="@source.UsedByEnabledFlow.ToString().ToLowerInvariant()">
+                                    @(source.UsedByEnabledFlow ? "Yes — its Twitch subscription follows the bot runtime." : "Not yet.")
+                                </dd>
+                            </div>
+                        </dl>
+                        @if (source.State is TwitchEventSourceReadinessState.MissingScopes missing)
+                        {
+                            <p class="mt-3 text-sm text-amber-700" role="status" data-source-missing-scopes>
+                                Reconnect to Twitch to approve @FormatScopes(missing.Scopes). Until then this source stays inactive and starts no flows.
+                            </p>
+                        }
+                        else if (source.State is TwitchEventSourceReadinessState.BroadcasterNotConnected)
+                        {
+                            <p class="mt-3 text-sm text-amber-700" role="status" data-source-missing-scopes>
+                                Connect this channel's Twitch integration to activate this source.
+                            </p>
+                        }
+                    </article>
+                }
+            </div>
+            <p class="mt-4 text-sm text-muted-foreground" data-automation-events-editor-note>
+                These sources start every enabled automation flow connected to them. Tools for building and editing flows arrive in a later release.
+            </p>
+        </TaskPanel>
+    }
+</DashboardPage>

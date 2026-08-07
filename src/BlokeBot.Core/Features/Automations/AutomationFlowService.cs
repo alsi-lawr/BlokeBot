@@ -13,7 +13,8 @@ public sealed class AutomationFlowService(
     AutomationCatalogService catalog,
     AutomationExpressionService expressions,
     IOverlayCueAdmissionService overlayCues,
-    TimeProvider clock
+    TimeProvider clock,
+    IEventSubChannelReconciliationTrigger? eventSub = null
 )
 {
     public async Task<AutomationFlowSaveOutcome> SaveAsync(
@@ -80,6 +81,7 @@ public sealed class AutomationFlowService(
         db.AutomationFlowEdges.AddRange(draft.Edges.Select(edge => Persist(flow.Id, edge)));
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowSaveOutcome.Saved(new(flow.Id));
     }
 
@@ -139,7 +141,17 @@ public sealed class AutomationFlowService(
         flow.IsEnabled = enabled;
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         _ = await db.SaveChangesAsync(cancellationToken);
+        await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowEnableOutcome.Updated();
+    }
+
+    private async Task ReconcileEventSubAsync(CancellationToken cancellationToken)
+    {
+        // Enabled-flow changes alter which EventSub subscriptions the host runtime needs.
+        if (eventSub is not null)
+        {
+            await eventSub.ReconcileAsync(cancellationToken);
+        }
     }
 
     internal async Task<AutomationGraphValidation> ValidateAsync(

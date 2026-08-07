@@ -41,6 +41,7 @@
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
+                    var showAutomations = FeatureIsVisible(session, selection, HostFeatureFlags.Automations);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
                     var showRequestBoards = FeatureIsVisible(session, selection, HostFeatureFlags.RequestBoards);
                     var showPlayQueues = FeatureIsVisible(session, selection, HostFeatureFlags.PlayWithViewers);
@@ -462,6 +463,49 @@
                                      aria-current="@CurrentRoute("custom-commands/settings")"
                                      @onclick="NotifyNavigatedAsync">
                                 Settings
+                            </NavLink>
+                        </div>
+                    </div>
+                }
+
+                @if (showAutomations)
+                {
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="automations"
+                         data-open="@GroupIsOpen(NavigationGroup.Automations).ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Automations"
+                                aria-describedby="@RouteHelpReference("automations-group")"
+                                aria-controls="@GroupBodyId(NavigationGroup.Automations)"
+                                aria-expanded="@GroupIsOpen(NavigationGroup.Automations).ToString().ToLowerInvariant()"
+                                aria-current="@CurrentGroup("automations")"
+                                data-current="@GroupIsCurrent("automations").ToString().ToLowerInvariant()"
+                                @onclick="() => ToggleGroupAsync(NavigationGroup.Automations)"
+                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Automations, args)">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sky-700">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M13 2 4 14h6l-1 8 9-12h-6z" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0 flex-1">Automations</span>
+                            <span class="nav-menu__badge" aria-label="1 destination">1</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @RouteHelp("automations-group", "Automations")
+                        <div id="@GroupBodyId(NavigationGroup.Automations)"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!GroupIsOpen(NavigationGroup.Automations))">
+                            <p class="nav-menu__flyout-title">Automations</p>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     href="automations/events"
+                                     aria-label="Twitch events"
+                                     aria-current="@CurrentRoute("automations/events")"
+                                     @onclick="NotifyNavigatedAsync">
+                                Twitch events
                             </NavLink>
                         </div>
                     </div>

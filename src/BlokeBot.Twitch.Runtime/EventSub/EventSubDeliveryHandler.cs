@@ -27,7 +27,8 @@ internal sealed class EventSubDeliveryHandler(
     IEnumerable<IPollEventObserver>? pollObservers = null,
     IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null,
     IEnumerable<IPredictionEventObserver>? predictionObservers = null,
-    IEnumerable<IIncomingRaidEventObserver>? incomingRaidObservers = null
+    IEnumerable<IIncomingRaidEventObserver>? incomingRaidObservers = null,
+    IEnumerable<ITwitchEventAutomationObserver>? automationObservers = null
 ) : IEventSubDeliveryHandler
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -48,6 +49,10 @@ internal sealed class EventSubDeliveryHandler(
     private readonly IIncomingRaidEventObserver[] _incomingRaidObservers =
     [
         .. incomingRaidObservers ?? [],
+    ];
+    private readonly ITwitchEventAutomationObserver[] _automationObservers =
+    [
+        .. automationObservers ?? [],
     ];
 
     internal async Task DispatchChatMessageAsync(
@@ -126,6 +131,66 @@ internal sealed class EventSubDeliveryHandler(
             case EventSubNotification.RewardRedemption { Event: var redemption }:
                 await DispatchRewardRedemptionAsync(redemption, cancellationToken);
                 break;
+            case EventSubNotification.StreamOnline { Event: var streamOnline }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.StreamOnlineAsync(streamOnline, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.StreamOffline { Event: var streamOffline }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.StreamOfflineAsync(streamOffline, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.Follow { Event: var follow }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.FollowReceivedAsync(follow, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.Subscription { Event: var subscription }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.SubscriptionReceivedAsync(subscription, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.SubscriptionGift { Event: var gift }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.SubscriptionGiftReceivedAsync(gift, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.Cheer { Event: var cheer }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.CheerReceivedAsync(cheer, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.HypeTrain { Event: var hypeTrain }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.HypeTrainChangedAsync(hypeTrain, token),
+                    cancellationToken
+                );
+                break;
+            case EventSubNotification.ChatNotification { Event: var chatNotification }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) =>
+                        observer.ChatNotificationReceivedAsync(chatNotification, token),
+                    cancellationToken
+                );
+                break;
+        }
+    }
+
+    private async Task NotifyAutomationObserversAsync(
+        Func<ITwitchEventAutomationObserver, CancellationToken, Task> notify,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _automationObservers)
+        {
+            await notify(observer, cancellationToken);
         }
     }
 
@@ -200,6 +265,11 @@ internal sealed class EventSubDeliveryHandler(
         CancellationToken cancellationToken
     )
     {
+        // Automation observers gate on their own feature switch, not on Shoutouts.
+        await NotifyAutomationObserversAsync(
+            (observer, token) => observer.IncomingRaidReceivedAsync(incomingRaid, token),
+            cancellationToken
+        );
         if (
             !await nativeTwitch.IsEnabledAsync(
                 incomingRaid.ToBroadcasterUserLogin,

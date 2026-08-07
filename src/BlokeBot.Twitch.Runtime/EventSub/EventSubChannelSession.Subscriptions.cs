@@ -4,6 +4,21 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed partial class EventSubChannelSession
 {
+    private static readonly EventSubOperationSubscriptionKind[] _operationSubscriptionKinds =
+    [
+        EventSubOperationSubscriptionKind.Shoutouts,
+        EventSubOperationSubscriptionKind.Raids,
+        EventSubOperationSubscriptionKind.Polls,
+        EventSubOperationSubscriptionKind.RewardRedemptions,
+        EventSubOperationSubscriptionKind.Predictions,
+        EventSubOperationSubscriptionKind.AutomationStream,
+        EventSubOperationSubscriptionKind.AutomationFollows,
+        EventSubOperationSubscriptionKind.AutomationSubscriptions,
+        EventSubOperationSubscriptionKind.AutomationCheers,
+        EventSubOperationSubscriptionKind.AutomationHypeTrain,
+        EventSubOperationSubscriptionKind.AutomationChatNotifications,
+    ];
+
     private ValueTask<EventSubChannelReconciliationOutcome> ReconcileAsync(
         string channel,
         EventSubChannelReconciliationTarget target,
@@ -234,16 +249,7 @@ internal sealed partial class EventSubChannelSession
         CancellationToken cancellationToken
     )
     {
-        foreach (
-            var kind in new[]
-            {
-                EventSubOperationSubscriptionKind.Shoutouts,
-                EventSubOperationSubscriptionKind.Raids,
-                EventSubOperationSubscriptionKind.Polls,
-                EventSubOperationSubscriptionKind.RewardRedemptions,
-                EventSubOperationSubscriptionKind.Predictions,
-            }
-        )
+        foreach (var kind in _operationSubscriptionKinds)
         {
             var enabled = await operations.NativeTwitchFeatureIsEnabledAsync(
                 channel,
@@ -483,16 +489,7 @@ internal sealed partial class EventSubChannelSession
     )
     {
         pendingDeletions.Begin(subscription);
-        foreach (
-            var kind in new[]
-            {
-                EventSubOperationSubscriptionKind.Shoutouts,
-                EventSubOperationSubscriptionKind.Raids,
-                EventSubOperationSubscriptionKind.Polls,
-                EventSubOperationSubscriptionKind.RewardRedemptions,
-                EventSubOperationSubscriptionKind.Predictions,
-            }
-        )
+        foreach (var kind in _operationSubscriptionKinds)
         {
             var operationDeletion = await EnsureOperationSubscriptionAbsentAsync(
                 subscription,
@@ -638,6 +635,18 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.RewardRedemptions =>
                 subscription.RewardRedemptionSubscriptions,
             EventSubOperationSubscriptionKind.Predictions => subscription.PredictionSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationStream =>
+                subscription.AutomationStreamSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationFollows =>
+                subscription.AutomationFollowSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationSubscriptions =>
+                subscription.AutomationSubscriberSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationCheers =>
+                subscription.AutomationCheerSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationHypeTrain =>
+                subscription.AutomationHypeTrainSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationChatNotifications =>
+                subscription.AutomationChatNotificationSubscriptions,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -670,6 +679,30 @@ internal sealed partial class EventSubChannelSession
             {
                 PredictionSubscriptions = state,
             },
+            EventSubOperationSubscriptionKind.AutomationStream => subscription with
+            {
+                AutomationStreamSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.AutomationFollows => subscription with
+            {
+                AutomationFollowSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.AutomationSubscriptions => subscription with
+            {
+                AutomationSubscriberSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.AutomationCheers => subscription with
+            {
+                AutomationCheerSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.AutomationHypeTrain => subscription with
+            {
+                AutomationHypeTrainSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.AutomationChatNotifications => subscription with
+            {
+                AutomationChatNotificationSubscriptions = state,
+            },
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -690,6 +723,16 @@ internal sealed partial class EventSubChannelSession
                 EventSubAuthorizationContext.RewardRedemptionsAuthority,
             EventSubOperationSubscriptionKind.Predictions =>
                 EventSubAuthorizationContext.PredictionsAuthority,
+            EventSubOperationSubscriptionKind.AutomationStream
+            or EventSubOperationSubscriptionKind.AutomationFollows
+            or EventSubOperationSubscriptionKind.AutomationChatNotifications =>
+                EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
+            EventSubOperationSubscriptionKind.AutomationSubscriptions =>
+                EventSubAuthorizationContext.AutomationSubscriptionsAuthority,
+            EventSubOperationSubscriptionKind.AutomationCheers =>
+                EventSubAuthorizationContext.AutomationCheersAuthority,
+            EventSubOperationSubscriptionKind.AutomationHypeTrain =>
+                EventSubAuthorizationContext.AutomationHypeTrainAuthority,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -709,6 +752,14 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.RewardRedemptions =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
             EventSubOperationSubscriptionKind.Predictions =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            EventSubOperationSubscriptionKind.AutomationStream
+            or EventSubOperationSubscriptionKind.AutomationFollows
+            or EventSubOperationSubscriptionKind.AutomationChatNotifications =>
+                AccessTokenUnavailableReason.MissingRefreshToken,
+            EventSubOperationSubscriptionKind.AutomationSubscriptions
+            or EventSubOperationSubscriptionKind.AutomationCheers
+            or EventSubOperationSubscriptionKind.AutomationHypeTrain =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."

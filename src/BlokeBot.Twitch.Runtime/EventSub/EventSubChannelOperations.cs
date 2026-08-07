@@ -12,7 +12,8 @@ internal sealed class EventSubChannelOperations(
     IPublicChatMessageSender sender,
     IBotChannelLifecycleNotifier lifecycle,
     INativeTwitchFeatureStateProvider nativeTwitch,
-    IBroadcasterAccountProvider? broadcasters = null
+    IBroadcasterAccountProvider? broadcasters = null,
+    IAutomationEventSubRequirementSource? automationRequirements = null
 ) : IEventSubChannelOperations
 {
     public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
@@ -40,56 +41,122 @@ internal sealed class EventSubChannelOperations(
         CancellationToken cancellationToken,
         EventSubOperationSubscriptionKind? operationKind = null
     ) =>
-        operationKind is EventSubOperationSubscriptionKind.Raids
-            ? CreateConfiguredBotRaidSubscriptionAsync(
+        operationKind switch
+        {
+            EventSubOperationSubscriptionKind.Raids => CreateConfiguredBotRaidSubscriptionAsync(
                 channel,
                 authorization,
                 account,
                 cancellationToken
-            )
-            : authorization.Match(
-                _ =>
-                    CreateConfiguredBotSubscriptionsAsync(
+            ),
+            EventSubOperationSubscriptionKind.AutomationStream =>
+                CreateAutomationStreamSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    cancellationToken
+                ),
+            EventSubOperationSubscriptionKind.AutomationFollows =>
+                CreateAutomationBotConditionSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    [("channel.follow", "2", "moderator_user_id")],
+                    cancellationToken
+                ),
+            EventSubOperationSubscriptionKind.AutomationChatNotifications =>
+                CreateAutomationBotConditionSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    [("channel.chat.notification", "1", "user_id")],
+                    cancellationToken
+                ),
+            _ => CreateAuthorizedSubscriptionAsync(
+                channel,
+                authorization,
+                account,
+                cancellationToken
+            ),
+        };
+
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreateAuthorizedSubscriptionAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        CancellationToken cancellationToken
+    ) =>
+        authorization.Match(
+            _ =>
+                CreateConfiguredBotSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    cancellationToken
+                ),
+            _ =>
+                CreateConfiguredBotOperationSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    cancellationToken
+                ),
+            broadcaster =>
+                broadcaster.Operation switch
+                {
+                    EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
                         channel,
                         authorization,
                         account,
                         cancellationToken
                     ),
-                _ =>
-                    CreateConfiguredBotOperationSubscriptionsAsync(
-                        channel,
-                        authorization,
-                        account,
-                        cancellationToken
-                    ),
-                broadcaster =>
-                    broadcaster.Operation switch
-                    {
-                        EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
+                    EventSubBroadcasterOperationKind.RewardRedemptions =>
+                        CreateRewardRedemptionSubscriptionsAsync(
                             channel,
                             authorization,
                             account,
                             cancellationToken
                         ),
-                        EventSubBroadcasterOperationKind.RewardRedemptions =>
-                            CreateRewardRedemptionSubscriptionsAsync(
-                                channel,
-                                authorization,
-                                account,
-                                cancellationToken
-                            ),
-                        EventSubBroadcasterOperationKind.Predictions =>
-                            CreatePredictionSubscriptionsAsync(
-                                channel,
-                                authorization,
-                                account,
-                                cancellationToken
-                            ),
-                        _ => throw new UnreachableException(
-                            "Unknown broadcaster EventSub operation kind."
+                    EventSubBroadcasterOperationKind.Predictions =>
+                        CreatePredictionSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            cancellationToken
                         ),
-                    }
-            );
+                    EventSubBroadcasterOperationKind.AutomationSubscriptions =>
+                        CreateBroadcasterOperationSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            [("channel.subscribe", "1"), ("channel.subscription.gift", "1")],
+                            cancellationToken
+                        ),
+                    EventSubBroadcasterOperationKind.AutomationCheers =>
+                        CreateBroadcasterOperationSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            [("channel.cheer", "1")],
+                            cancellationToken
+                        ),
+                    EventSubBroadcasterOperationKind.AutomationHypeTrain =>
+                        CreateBroadcasterOperationSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            [
+                                ("channel.hype_train.begin", "2"),
+                                ("channel.hype_train.progress", "2"),
+                                ("channel.hype_train.end", "2"),
+                            ],
+                            cancellationToken
+                        ),
+                    _ => throw new UnreachableException(
+                        "Unknown broadcaster EventSub operation kind."
+                    ),
+                }
+        );
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
         string channel,
@@ -118,24 +185,88 @@ internal sealed class EventSubChannelOperations(
         );
     }
 
-    public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
+    public async ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
         string channel,
         EventSubOperationSubscriptionKind kind,
         CancellationToken cancellationToken
-    )
-    {
-        var feature = kind switch
+    ) =>
+        kind switch
         {
-            EventSubOperationSubscriptionKind.Shoutouts
-            or EventSubOperationSubscriptionKind.Raids => NativeTwitchFeature.Shoutouts,
-            EventSubOperationSubscriptionKind.Polls => NativeTwitchFeature.Polls,
+            EventSubOperationSubscriptionKind.Shoutouts => await nativeTwitch.IsEnabledAsync(
+                channel,
+                NativeTwitchFeature.Shoutouts,
+                cancellationToken
+            ),
+            // One channel.raid subscription serves both automatic shoutouts and automation flows.
+            EventSubOperationSubscriptionKind.Raids => await nativeTwitch.IsEnabledAsync(
+                channel,
+                NativeTwitchFeature.Shoutouts,
+                cancellationToken
+            )
+                || await AutomationRequiresAsync(
+                    channel,
+                    AutomationEventSubRequirement.IncomingRaids,
+                    cancellationToken
+                ),
+            EventSubOperationSubscriptionKind.Polls => await nativeTwitch.IsEnabledAsync(
+                channel,
+                NativeTwitchFeature.Polls,
+                cancellationToken
+            ),
             EventSubOperationSubscriptionKind.RewardRedemptions =>
-                NativeTwitchFeature.RewardsAndRedemptions,
-            EventSubOperationSubscriptionKind.Predictions => NativeTwitchFeature.Predictions,
+                await nativeTwitch.IsEnabledAsync(
+                    channel,
+                    NativeTwitchFeature.RewardsAndRedemptions,
+                    cancellationToken
+                ),
+            EventSubOperationSubscriptionKind.Predictions => await nativeTwitch.IsEnabledAsync(
+                channel,
+                NativeTwitchFeature.Predictions,
+                cancellationToken
+            ),
+            EventSubOperationSubscriptionKind.AutomationStream => await AutomationRequiresAsync(
+                channel,
+                AutomationEventSubRequirement.Stream,
+                cancellationToken
+            ),
+            EventSubOperationSubscriptionKind.AutomationFollows => await AutomationRequiresAsync(
+                channel,
+                AutomationEventSubRequirement.Follows,
+                cancellationToken
+            ),
+            EventSubOperationSubscriptionKind.AutomationSubscriptions =>
+                await AutomationRequiresAsync(
+                    channel,
+                    AutomationEventSubRequirement.Subscriptions,
+                    cancellationToken
+                ),
+            EventSubOperationSubscriptionKind.AutomationCheers => await AutomationRequiresAsync(
+                channel,
+                AutomationEventSubRequirement.Cheers,
+                cancellationToken
+            ),
+            EventSubOperationSubscriptionKind.AutomationHypeTrain => await AutomationRequiresAsync(
+                channel,
+                AutomationEventSubRequirement.HypeTrain,
+                cancellationToken
+            ),
+            EventSubOperationSubscriptionKind.AutomationChatNotifications =>
+                await AutomationRequiresAsync(
+                    channel,
+                    AutomationEventSubRequirement.ChatNotifications,
+                    cancellationToken
+                ),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
-        return nativeTwitch.IsEnabledAsync(channel, feature, cancellationToken);
-    }
+
+    private ValueTask<bool> AutomationRequiresAsync(
+        string channel,
+        AutomationEventSubRequirement requirement,
+        CancellationToken cancellationToken
+    ) =>
+        automationRequirements is null
+            ? ValueTask.FromResult(false)
+            : automationRequirements.RequiresAsync(channel, requirement, cancellationToken);
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(
         string channel,
@@ -281,7 +412,11 @@ internal sealed class EventSubChannelOperations(
             channel,
             authorization,
             account,
-            ["channel.poll.begin", "channel.poll.progress", "channel.poll.end"],
+            [
+                ("channel.poll.begin", "1"),
+                ("channel.poll.progress", "1"),
+                ("channel.poll.end", "1"),
+            ],
             ct
         );
 
@@ -296,8 +431,8 @@ internal sealed class EventSubChannelOperations(
             authorization,
             account,
             [
-                "channel.channel_points_custom_reward_redemption.add",
-                "channel.channel_points_custom_reward_redemption.update",
+                ("channel.channel_points_custom_reward_redemption.add", "1"),
+                ("channel.channel_points_custom_reward_redemption.update", "1"),
             ],
             ct
         );
@@ -313,19 +448,91 @@ internal sealed class EventSubChannelOperations(
             authorization,
             account,
             [
-                "channel.prediction.begin",
-                "channel.prediction.progress",
-                "channel.prediction.lock",
-                "channel.prediction.end",
+                ("channel.prediction.begin", "1"),
+                ("channel.prediction.progress", "1"),
+                ("channel.prediction.lock", "1"),
+                ("channel.prediction.end", "1"),
             ],
             ct
         );
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateAutomationStreamSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        CancellationToken ct
+    ) =>
+        await CreateBroadcasterOperationSubscriptionsAsync(
+            channel,
+            authorization,
+            account,
+            [("stream.online", "1"), ("stream.offline", "1")],
+            ct
+        );
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateAutomationBotConditionSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        IReadOnlyList<(string Type, string Version, string BotConditionKey)> subscriptionTypes,
+        CancellationToken ct
+    )
+    {
+        var resolution = await identities.ResolveAsync(
+            channel,
+            account.Login,
+            account.AccessToken,
+            ct
+        );
+        return await resolution.Match<ValueTask<EventSubSubscriptionSetupOutcome>>(
+            async resolved =>
+            {
+                var ids = new List<string>();
+                try
+                {
+                    foreach (var (type, version, botConditionKey) in subscriptionTypes)
+                    {
+                        ids.Add(
+                            await CreateAsync(
+                                type,
+                                version,
+                                new Dictionary<string, string>
+                                {
+                                    ["broadcaster_user_id"] = resolved.BroadcasterId,
+                                    [botConditionKey] = resolved.BotUserId,
+                                },
+                                ct
+                            )
+                        );
+                    }
+                    return new EventSubSubscriptionSetupOutcome.Created(
+                        CreateActive(channel, authorization, account, ids)
+                    );
+                }
+                catch (Exception exception) when (ids.Count > 0)
+                {
+                    return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
+                        CreateActive(channel, authorization, account, ids),
+                        exception
+                    );
+                }
+            },
+            static _ =>
+                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.MissingChannel()
+                ),
+            static _ =>
+                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.MissingBot()
+                )
+        );
+    }
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateBroadcasterOperationSubscriptionsAsync(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
-        IReadOnlyList<string> subscriptionTypes,
+        IReadOnlyList<(string Type, string Version)> subscriptionTypes,
         CancellationToken ct
     )
     {
@@ -342,11 +549,12 @@ internal sealed class EventSubChannelOperations(
         var ids = new List<string>();
         try
         {
-            foreach (var type in subscriptionTypes)
+            foreach (var (type, version) in subscriptionTypes)
             {
                 ids.Add(
                     await CreateAsync(
                         type,
+                        version,
                         new Dictionary<string, string> { ["broadcaster_user_id"] = broadcasterId },
                         ct
                     )
@@ -432,10 +640,17 @@ internal sealed class EventSubChannelOperations(
         string type,
         IReadOnlyDictionary<string, string> condition,
         CancellationToken cancellationToken
+    ) => CreateAsync(type, "1", condition, cancellationToken);
+
+    private Task<string> CreateAsync(
+        string type,
+        string version,
+        IReadOnlyDictionary<string, string> condition,
+        CancellationToken cancellationToken
     ) =>
         subscriptions.CreateAsync(
             settings.Identity.ClientId,
-            new EventSubSubscriptionRequest(type, "1", condition),
+            new EventSubSubscriptionRequest(type, version, condition),
             cancellationToken
         );
 
