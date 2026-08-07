@@ -393,7 +393,7 @@ public sealed class ViewerQueueOverlayTests
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("partyChange");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("readyOutcome");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("selectedNext");
-        var dashboard = File.ReadAllText(SourcePath("Features/Overlays/OverlaysPage.razor"));
+        var dashboard = File.ReadAllText(SourcePath("Features/Overlays/OverlaySourcesPanel.razor"));
         dashboard.ShouldContain("Viewer Queue");
         dashboard.ShouldContain("Current party rows");
         dashboard.ShouldContain("Next rows");

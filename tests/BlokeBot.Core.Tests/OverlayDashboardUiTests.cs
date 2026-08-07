@@ -170,11 +170,12 @@ public sealed class OverlayDashboardUiTests
     [Test]
     public void DashboardSource_UsesWideSingleEditorOpaquePreviewAndExplicitSafetyCopy()
     {
-        var source = File.ReadAllText(SourcePath("OverlaysPage.razor"));
-        var code = File.ReadAllText(SourcePath("OverlaysPage.razor.cs"));
-        var styles = File.ReadAllText(SourcePath("OverlaysPage.razor.css"));
+        var source = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
+        var code = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.cs"));
+        var styles = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.css"));
+        var parent = File.ReadAllText(SourcePath("OverlaysPage.razor"));
 
-        source.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
+        parent.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
         source.ShouldContain("data-overlay-editor");
         source.ShouldContain("New overlay — not saved");
         source.ShouldContain("1920");

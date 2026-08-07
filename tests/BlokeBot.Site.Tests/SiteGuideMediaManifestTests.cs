@@ -182,22 +182,21 @@ public sealed class SiteGuideMediaManifestTests
             overlays.ShouldNotContain("Cue-V1");
             overlays.ShouldNotContain("diagnostic presence");
             overlays.ShouldNotContain("live client");
-
-            var cues = await client.GetStringAsync("/overlays/cues");
-            cues.ShouldContain("Current topic: <strong>Cues</strong>");
-            cues.ShouldContain("uploaded media, online media and web pages");
-            cues.ShouldContain("Play after the current cue");
-            cues.ShouldContain("Play an overlay cue");
-            cues.ShouldContain("main command word");
-            cues.ShouldContain("media/laptop-dark-overlay-cues.png");
-            cues.ShouldNotContain("Cue-V1");
-
-            var media = await client.GetStringAsync("/overlays/media");
-            media.ShouldContain("Current topic: <strong>Media library</strong>");
-            media.ShouldContain("image, audio or video file");
-            media.ShouldContain("private channel storage");
-            media.ShouldContain("Replace file");
-            media.ShouldContain("media/phone-light-overlay-media.png");
+            overlays.ShouldContain("id=\"cues\"");
+            overlays.ShouldContain("uploaded media, online media and web pages");
+            overlays.ShouldContain("Play after the current cue");
+            overlays.ShouldContain("Play an overlay cue");
+            overlays.ShouldContain("main command word");
+            overlays.ShouldContain("media/laptop-dark-overlay-cues.png");
+            overlays.ShouldContain("id=\"media\"");
+            overlays.ShouldContain("image, audio or video file");
+            overlays.ShouldContain("private channel storage");
+            overlays.ShouldContain("Replace file");
+            overlays.ShouldContain("media/phone-light-overlay-media.png");
+            overlays.ShouldContain("/overlays#cues");
+            overlays.ShouldContain("/overlays#media");
+            overlays.ShouldNotContain("overlays/cues");
+            overlays.ShouldNotContain("overlays/media");
 
             foreach (
                 var source in SiteGuideCatalog
@@ -361,7 +360,7 @@ public sealed class SiteGuideMediaManifestTests
             )
         )
         {
-            registered.ShouldContain($"/{link.Href.TrimStart('/')}", link.Label);
+            registered.ShouldContain($"/{link.Href.Split('#')[0].TrimStart('/')}", link.Label);
         }
     }
 

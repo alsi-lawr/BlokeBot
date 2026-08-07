@@ -1,18 +1,10 @@
-@page "/overlays/cues"
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Persistence.Models
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject OverlayCueService _cues
 @inject OverlayCuePlaybackService _playback
 @inject HostFeatureService _features
 
-<PageTitle>BlokeBot | Overlay cues</PageTitle>
-
-<DashboardPage Kicker="Stream presentation" Title="Cues" Description="Build reusable scenes and try them on a Cue player Browser Source." Width="DashboardPageWidth.Wide">
-    <ChildContent>
-        <OverlaySectionTabs />
         <ApplicationCardCollection Owner="dashboard-page-cards">
             @if (_loading)
             {
@@ -36,7 +28,7 @@
                 <section class="card cue-workspace__inventory p-5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div><h2 class="text-lg font-semibold text-slate-950">Saved cues</h2><p class="mt-1 text-sm text-muted-foreground">Choose a cue to edit, or start a new one.</p></div>
-                        <div class="flex gap-2"><a class="btn-secondary" href="overlays/media">Manage media</a><button class="btn-secondary" type="button" @onclick="NewCue">New cue</button></div>
+                        <div class="flex gap-2"><a class="btn-secondary" href="overlays#media">Manage media</a><button class="btn-secondary" type="button" @onclick="NewCue">New cue</button></div>
                     </div>
                     <div class="mt-4 grid gap-2" aria-label="Saved cues">
                         @foreach (var cue in _items)
@@ -111,17 +103,15 @@
                             </article>
                         }
                     </div>
-                    @if (_assets.Count == 0) { <p class="mt-3 text-sm text-muted-foreground">Upload media on the <a class="font-semibold text-blue-700 underline" href="overlays/media">Media tab</a> before adding uploaded content.</p> }
+                    @if (_assets.Count == 0) { <p class="mt-3 text-sm text-muted-foreground">Upload media on the <a class="font-semibold text-blue-700 underline" href="overlays#media">Media tab</a> before adding uploaded content.</p> }
                     @if (_selected is not null) { <button class="btn-secondary mt-4" type="button" @onclick="DeleteAsync">Delete cue</button> }
                 </section>
                 </div>
                 <section class="card p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Test playback</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Choose an enabled Cue player Browser Source, then play the saved cue as it will appear in OBS.</p>
-                    <div class="mt-4 flex flex-wrap items-end gap-3"><div class="min-w-64 flex-1"><label class="label" for="cue-target">Cue player</label><select id="cue-target" class="input mt-2" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select></div><a class="btn-secondary" href="overlays/sources">Manage Browser Sources</a><button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || _busy)" @onclick="PlayAsync">Play test cue</button></div>
+                    <div class="mt-4 flex flex-wrap items-end gap-3"><div class="min-w-64 flex-1"><label class="label" for="cue-target">Cue player</label><select id="cue-target" class="input mt-2" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select></div><a class="btn-secondary" href="overlays#sources">Manage Browser Sources</a><button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || _busy)" @onclick="PlayAsync">Play test cue</button></div>
                     @if (_target is { } targetId) { <div class="mt-4 aspect-video overflow-hidden rounded-xl bg-slate-950"><iframe class="size-full" src="@($"/overlays/preview/{targetId:D}")" title="Cue player preview" referrerpolicy="no-referrer"></iframe></div> }
                 </section>
             }
         </ApplicationCardCollection>
-    </ChildContent>
-</DashboardPage>

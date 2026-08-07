@@ -1,21 +1,10 @@
-@page "/overlays/media"
 @using BlokeBot.Core.Features.HostedChannels
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject OverlayCueService _media
 @inject OverlayCuePlaybackService _playback
 @inject HostFeatureService _features
 @inject Microsoft.Extensions.Options.IOptions<BlokeBotOptions> _options
 
-<PageTitle>BlokeBot | Media library</PageTitle>
-
-<DashboardPage Kicker="Stream presentation"
-               Title="Media library"
-               Description="Upload and manage the media used by cues."
-               Width="DashboardPageWidth.Wide">
-    <ChildContent>
-        <OverlaySectionTabs />
         <ApplicationCardCollection Owner="dashboard-page-cards">
             @if (_loading)
             {
@@ -37,7 +26,7 @@
                              role="@(_failed ? "alert" : "status")">@_feedback</section>
                 }
                 <section class="card p-5">
-                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold text-slate-950">Upload media</h2><p class="mt-1 text-sm text-muted-foreground">Uploads stay in private channel storage. @ByteLabel(_items.Sum(value => value.ByteLength)) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used.</p></div><a class="btn-secondary" href="overlays/cues">Back to Cues</a></div>
+                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold text-slate-950">Upload media</h2><p class="mt-1 text-sm text-muted-foreground">Uploads stay in private channel storage. @ByteLabel(_items.Sum(value => value.ByteLength)) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used.</p></div><a class="btn-secondary" href="overlays#cues">Back to Cues</a></div>
                     <div class="mt-4 grid gap-3"><Field Id="media-name" Label="Media name" @bind-Value="_name" /><FileDropInput Label="Media file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="_busy" OnChange="UploadAsync" /></div>
                 </section>
                 <section class="card p-5">
@@ -65,5 +54,3 @@
                 </section>
             }
         </ApplicationCardCollection>
-    </ChildContent>
-</DashboardPage>

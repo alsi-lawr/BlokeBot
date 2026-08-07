@@ -42,6 +42,7 @@ internal static class UiTestContextFactory
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.Services.AddSingleton(BlokeBotBuildIdentity.Current);
         _ = context.Services.AddSingleton<UiFaultTelemetry>();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
         _ = context.Services.AddSingleton<HostFeatureService>();
         _ = context.Services.AddBlokeBotAlerts();

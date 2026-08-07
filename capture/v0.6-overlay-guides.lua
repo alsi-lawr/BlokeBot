@@ -75,42 +75,42 @@ local server = viset.process.start({
 
 local views = {
   ["sources"] = {
-    path = "/overlays/sources",
+    fragment = "#sources",
     selected = "Channel event feed",
     scroll = "[data-overlay-tabs]",
     ready = "[data-overlay-editor]",
   },
   ["guessing"] = {
-    path = "/overlays/sources",
+    fragment = "#sources",
     selected = "Guessing round",
     scroll = "[aria-labelledby='overlay-preview-title']",
     ready = "[data-draft-type='guessing']",
   },
   ["giveaway"] = {
-    path = "/overlays/sources",
+    fragment = "#sources",
     selected = "Points giveaway",
     scroll = "[aria-labelledby='overlay-preview-title']",
     ready = "[data-draft-type='giveaway']",
   },
   ["event-feed"] = {
-    path = "/overlays/sources",
+    fragment = "#sources",
     selected = "Channel event feed",
     scroll = "[data-overlay-editor]",
     ready = "[data-event-feed-kind-settings]",
   },
   ["viewer-queue"] = {
-    path = "/overlays/sources",
+    fragment = "#sources",
     selected = "Viewer queue",
     scroll = "[aria-labelledby='overlay-preview-title']",
     ready = "[data-draft-type='viewerqueue']",
   },
   ["cues"] = {
-    path = "/overlays/cues",
+    fragment = "#cues",
     scroll = "[data-card-owner='cue-workspace-columns']",
     ready = "[data-cue-editor]",
   },
   ["media"] = {
-    path = "/overlays/media",
+    fragment = "#media",
     scroll = "main",
     ready = "#media-name",
   },
@@ -128,7 +128,8 @@ local succeeded, failure = pcall(function()
   viset.page.navigate(base_url .. "/simulation/login?view=overlays&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
-      location.pathname === "/overlays/sources"
+      location.pathname === "/overlays"
+        && location.hash === "#sources"
         && document.body.innerText.includes("Sample Channel")
         && document.querySelector("[data-overlay-editor]") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
@@ -153,14 +154,25 @@ local succeeded, failure = pcall(function()
     ]=])
   )
 
-  if expected.path ~= "/overlays/sources" then
-    viset.page.navigate(base_url .. expected.path .. "?simulationTheme=" .. theme)
+  if expected.fragment ~= "#sources" then
+    viset.page.evaluate(
+      viset.javascript([=[
+        ({ tabId }) => {
+          const tab = document.getElementById(tabId);
+          if (!tab) throw new Error(`Overlay tab not found: ${tabId}`);
+          tab.click();
+          return true;
+        }
+      ]=]),
+      { tabId = "overlays-" .. expected.fragment:sub(2) .. "-tab" }
+    )
     viset.page.wait_for(
       viset.javascript(([=[
-        location.pathname === %q
+        location.pathname === "/overlays"
+          && location.hash === %q
           && document.body.innerText.includes("Sample Channel")
           && getComputedStyle(document.querySelector("main")).opacity === "1"
-      ]=]):format(expected.path)),
+      ]=]):format(expected.fragment)),
       "30s"
     )
     viset.sleep("750ms")
@@ -226,6 +238,11 @@ local succeeded, failure = pcall(function()
     )
   end
 
+  local no_overflow = [[
+    document.documentElement.scrollWidth <= window.innerWidth &&
+      document.body.scrollWidth <= window.innerWidth
+  ]]
+  viset.page.wait_for(viset.javascript(no_overflow), "10s")
   viset.page.evaluate(
     viset.javascript([=[
       ({ selector }) => {
@@ -239,6 +256,7 @@ local succeeded, failure = pcall(function()
     { selector = expected.scroll }
   )
   viset.sleep("500ms")
+  viset.page.wait_for(viset.javascript(no_overflow), "10s")
   viset.snapshot()
 end)
 

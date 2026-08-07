@@ -22,7 +22,10 @@ public sealed class PageHelpButtonTests
     [Arguments("/requests", "Request boards", "public board link becomes available")]
     [Arguments("/queues", "Play with viewers", "viewer-page link becomes available")]
     [Arguments("/moments", "Moments", "shareable recap in a new tab")]
-    [Arguments("/overlays/sources", "Overlays", "require both Overlays and Guessing game")]
+    [Arguments("/overlays", "Overlays", "require both Overlays and Guessing game")]
+    [Arguments("/overlays#sources", "Overlays", "require both Overlays and Guessing game")]
+    [Arguments("/overlays#cues", "Cues", "Use Media library to upload or replace cue media")]
+    [Arguments("/overlays#media", "Media library", "cannot be deleted; edit the cue first")]
     [Arguments("/automations/events", "Twitch events", "no Twitch subscription is created")]
     public void FeatureRoute_RendersOneButtonAndOpensRouteSpecificHelp(
         string path,
@@ -31,6 +34,7 @@ public sealed class PageHelpButtonTests
     )
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
 
         var cut = context.Render<PageHelpButton>();
@@ -73,9 +77,7 @@ public sealed class PageHelpButtonTests
             "/guessing",
             "/guessing/settings",
             "/moments",
-            "/overlays/cues",
-            "/overlays/media",
-            "/overlays/sources",
+            "/overlays",
             "/points",
             "/points/settings",
             "/queues",
@@ -93,6 +95,7 @@ public sealed class PageHelpButtonTests
     public void ShoutoutsHelp_CoversTheAcceptedAutomaticRaidContract()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context
             .Services.GetRequiredService<NavigationManager>()
             .NavigateTo("/twitch-operations/shoutouts");
@@ -123,6 +126,7 @@ public sealed class PageHelpButtonTests
     public void CustomCommandsHelp_ExplainsAutomationRuntimeAndInheritedSwitches()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context
             .Services.GetRequiredService<NavigationManager>()
             .NavigateTo("/custom-commands/settings");
@@ -174,6 +178,7 @@ public sealed class PageHelpButtonTests
     public void OpenHelp_RouteChangeClosesThePanelAndSelectsTheNewRouteContent()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("/twitch-operations/shoutouts");
         var cut = context.Render<PageHelpButton>();
@@ -192,6 +197,7 @@ public sealed class PageHelpButtonTests
     public void UnmappedRoute_DoesNotRenderAHelpButton()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/alerts");
 
         var cut = context.Render<PageHelpButton>();
@@ -203,6 +209,7 @@ public sealed class PageHelpButtonTests
     public void ExistingMappedRoute_RetainsItsHelpButtonAndContent()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/");
         var cut = context.Render<PageHelpButton>();
 
@@ -216,6 +223,7 @@ public sealed class PageHelpButtonTests
     public void ChannelSetupHelp_DistinguishesConnectionsAndExplainsIntegrationControls()
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/host");
         var cut = context.Render<PageHelpButton>();
 
@@ -231,6 +239,7 @@ public sealed class PageHelpButtonTests
     private static string OpenHelpFor(string path)
     {
         using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
         var cut = context.Render<PageHelpButton>();
         cut.Find("button[aria-label='Page help']").Click();

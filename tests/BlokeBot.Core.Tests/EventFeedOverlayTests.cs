@@ -528,7 +528,7 @@ public sealed class EventFeedOverlayTests
         stylesheet.ShouldContain("font-size: 32px");
         stylesheet.ShouldContain("line-height: 44px");
 
-        var dashboard = File.ReadAllText(SourcePath("OverlaysPage.razor"));
+        var dashboard = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
         dashboard.ShouldContain("Event feed sample event");
         dashboard.ShouldContain("Point award");
         dashboard.ShouldContain("Guessing winner");

@@ -237,7 +237,7 @@ public sealed class GuessingOverlayTests
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("style.setProperty");
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("api.twitch.tv");
 
-        var dashboard = File.ReadAllText(SourcePath("OverlaysPage.razor"));
+        var dashboard = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
         dashboard.ShouldContain("Enum.GetValues<GuessingOverlaySampleState>()");
         dashboard.ShouldContain("data-overlay-disabled-recovery");
         dashboard.ShouldContain("Turn Guessing game on in Channel setup");

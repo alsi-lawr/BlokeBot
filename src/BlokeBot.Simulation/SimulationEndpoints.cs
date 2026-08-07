@@ -33,8 +33,12 @@ internal static class SimulationEndpoints
                     )
                         ? "dark"
                         : "light";
+                    var path = SimulationViewCatalog.PathFor(view);
+                    var fragmentIndex = path.IndexOf('#');
                     var returnUrl =
-                        $"{SimulationViewCatalog.PathFor(view)}?simulationTheme={selectedTheme}";
+                        fragmentIndex < 0
+                            ? $"{path}?simulationTheme={selectedTheme}"
+                            : $"{path[..fragmentIndex]}?simulationTheme={selectedTheme}{path[fragmentIndex..]}";
                     return Results.Redirect(
                         $"/auth/login?start=true&returnUrl={Uri.EscapeDataString(returnUrl)}"
                     );

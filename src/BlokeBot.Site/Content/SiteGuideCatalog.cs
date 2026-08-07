@@ -19,8 +19,8 @@ internal static class SiteGuideCatalog
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
                 GuideLink("Browser Sources", "overlays"),
-                GuideLink("Cues", "overlays/cues"),
-                GuideLink("Media library", "overlays/media"),
+                GuideLink("Cues", "overlays#cues"),
+                GuideLink("Media library", "overlays#media"),
             ]
         ),
         new(
@@ -70,7 +70,7 @@ internal static class SiteGuideCatalog
 
     private static SiteLink GuideLink(string label, string href)
     {
-        _ = Get($"/{href}");
+        _ = Get($"/{href.Split('#')[0]}");
         return new(label, href);
     }
 
@@ -394,7 +394,7 @@ internal static class SiteGuideCatalog
                         "Choose the channel you intend to show on stream. The owner or a permitted moderator can manage its Browser Sources.",
                         "Open Channel setup, turn on Overlays and save. Guessing, Points and Play with viewers must also be on before their matching Browser Sources can preview or display.",
                         "Use broadcasting software with web Browser Sources, such as OBS Studio.",
-                        "Open Overlays under Chat tools. Sources, Cues and Media are separate tabs at /overlays/sources, /overlays/cues and /overlays/media in BlokeBot.",
+                        "Open Overlays under Chat tools. Sources, Cues and Media are fragment-addressed tabs of one page at /overlays#sources, /overlays#cues and /overlays#media in BlokeBot.",
                     ],
                 },
                 new SiteGuideSection
@@ -528,33 +528,24 @@ internal static class SiteGuideCatalog
                         "Rename keeps the private URL. Disable stops display while retaining setup. Rotate revokes the old URL. Delete permanently removes the source.",
                     ],
                 },
-            ],
-            Next =
-            [
-                new SiteLink("Build reusable Cues", "overlays/cues"),
-                new SiteLink("Manage Cue media", "overlays/media"),
-                new SiteLink("Troubleshoot the bot", "troubleshooting"),
-            ],
-        };
-
-        yield return new SiteGuidePage
-        {
-            Route = "/overlays/cues",
-            Eyebrow = "Stream presentation · Cues",
-            Title = "Build and trigger reusable Cues",
-            Summary =
-                "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlay-cues.png",
-                LightPhoneSource: "media/phone-light-overlay-cues.png",
-                DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
-                LightLaptopSource: "media/laptop-light-overlay-cues.png",
-                PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
-                LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
-                "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
-            ),
-            Sections =
-            [
+                new SiteGuideSection
+                {
+                    Heading = "Build and trigger reusable Cues",
+                    Anchor = "cues",
+                    Paragraphs =
+                    [
+                        "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
+                    ],
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-cues.png",
+                        LightPhoneSource: "media/phone-light-overlay-cues.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
+                        LightLaptopSource: "media/laptop-light-overlay-cues.png",
+                        PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
+                        LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
+                        "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
+                    ),
+                },
                 new SiteGuideSection
                 {
                     Heading = "Prepare a Cue player",
@@ -562,7 +553,7 @@ internal static class SiteGuideCatalog
                     [
                         "Turn on Overlays in Channel setup.",
                         "On Sources, create an enabled Cue player Browser Source, copy its private URL and add it to OBS at 1920 × 1080.",
-                        "Open Cues at /overlays/cues and choose the saved Cue player under Test playback.",
+                        "Open Cues at /overlays#cues and choose the saved Cue player under Test playback.",
                     ],
                     Note =
                         "If Overlays is off, Cue editing and playback are paused while saved Cues remain. Re-enabling does not play Cue requests that were missed while the feature was off.",
@@ -616,39 +607,30 @@ internal static class SiteGuideCatalog
                         "If the layer layout is wrong, correct its timing, order or percentage geometry, save, and run one new test.",
                     ],
                 },
-            ],
-            Next =
-            [
-                new SiteLink("Manage the Media library", "overlays/media"),
-                new SiteLink("Manage Browser Sources", "overlays"),
-                new SiteLink("Create Custom Commands", "commands"),
-            ],
-        };
-
-        yield return new SiteGuidePage
-        {
-            Route = "/overlays/media",
-            Eyebrow = "Stream presentation · Media library",
-            Title = "Manage media for Cues",
-            Summary =
-                "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlay-media.png",
-                LightPhoneSource: "media/phone-light-overlay-media.png",
-                DarkLaptopSource: "media/laptop-dark-overlay-media.png",
-                LightLaptopSource: "media/laptop-light-overlay-media.png",
-                PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
-                LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
-                "Media stays in the selected channel's private storage and is available to its Cues."
-            ),
-            Sections =
-            [
+                new SiteGuideSection
+                {
+                    Heading = "Manage media for Cues",
+                    Anchor = "media",
+                    Paragraphs =
+                    [
+                        "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
+                    ],
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-overlay-media.png",
+                        LightPhoneSource: "media/phone-light-overlay-media.png",
+                        DarkLaptopSource: "media/laptop-dark-overlay-media.png",
+                        LightLaptopSource: "media/laptop-light-overlay-media.png",
+                        PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
+                        LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
+                        "Media stays in the selected channel's private storage and is available to its Cues."
+                    ),
+                },
                 new SiteGuideSection
                 {
                     Heading = "Upload accepted browser media",
                     Steps =
                     [
-                        "Turn on Overlays, choose the channel and open Media at /overlays/media.",
+                        "Turn on Overlays, choose the channel and open Media at /overlays#media.",
                         "Enter a clear Media name, then drag an image, audio or video file onto the Media file area, or choose it with the standard file picker.",
                         "Wait for the upload result and confirm the saved file appears under Saved media.",
                         "Open Cues, add Uploaded media and choose the saved name.",
@@ -681,8 +663,8 @@ internal static class SiteGuideCatalog
             ],
             Next =
             [
-                new SiteLink("Build reusable Cues", "overlays/cues"),
-                new SiteLink("Manage Browser Sources", "overlays"),
+                new SiteLink("Create Custom Commands", "commands"),
+                new SiteLink("Troubleshoot the bot", "troubleshooting"),
             ],
         };
 

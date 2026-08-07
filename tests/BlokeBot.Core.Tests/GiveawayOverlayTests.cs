@@ -265,7 +265,7 @@ public sealed class GiveawayOverlayTests
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("setInterval");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("animation !== \"winner\"");
 
-        var dashboard = File.ReadAllText(SourcePath("OverlaysPage.razor"));
+        var dashboard = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
         dashboard.ShouldContain("Enum.GetValues<GiveawayOverlaySampleState>()");
         dashboard.ShouldContain("Entrant count");
         dashboard.ShouldContain("Close-time countdown");
@@ -275,7 +275,8 @@ public sealed class GiveawayOverlayTests
         var help = File.ReadAllText(
             Path.GetFullPath(
                 Path.Combine(
-                    Path.GetDirectoryName(SourcePath("OverlaysPage.razor")).ShouldNotBeNull(),
+                    Path.GetDirectoryName(SourcePath("OverlaySourcesPanel.razor"))
+                        .ShouldNotBeNull(),
                     "..",
                     "..",
                     "Components",

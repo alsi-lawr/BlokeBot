@@ -45,6 +45,7 @@ public static class BlokeBotApplication
         _ = builder.Services.AddHttpContextAccessor();
         _ = builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);
         _ = builder.Services.AddSingleton<UiFaultTelemetry>();
+        _ = builder.Services.AddScoped<DashboardFragmentState>();
 
         _ = builder
             .Services.AddOptions<BlokeBotOptions>()
