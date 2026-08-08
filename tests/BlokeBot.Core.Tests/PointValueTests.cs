@@ -64,4 +64,38 @@ public sealed class PointValueTests : PointsTestBase
         DescribeParse(PointAmountArgumentParser.ParseAbsolute("50%"))
             .ShouldBe("Error:InvalidFormat");
     }
+
+    [Test]
+    public void DisplayedAmounts_ParsingTheBotsOwnOutput_RoundTripsToTheDisplayedValue()
+    {
+        BigInteger[] magnitudes =
+        [
+            1,
+            999,
+            1234,
+            9999,
+            12345,
+            999999,
+            1250000,
+            BigInteger.Parse("3700000000000", CultureInfo.InvariantCulture),
+            BigInteger.Pow(10, 15) * 12,
+            PointAmount.MaximumValue,
+        ];
+        foreach (var magnitude in magnitudes)
+        {
+            var displayed = new PointAmount(magnitude).ToDisplayString();
+            var parsed = PointAmount.ParseAbsolute(displayed);
+
+            parsed.ToDisplayString().ShouldBe(displayed, $"round trip failed for {magnitude}");
+        }
+
+        PointAmount.ParseAbsolute("50k").Value.ShouldBe(new BigInteger(50000));
+        PointAmount.ParseAbsolute("1.5K").Value.ShouldBe(new BigInteger(1500));
+        PointAmount.ParseAbsolute("1,234").Value.ShouldBe(new BigInteger(1234));
+        PointAmount.ParseAbsolute("1.2 x 10^15").Value.ShouldBe(BigInteger.Pow(10, 14) * 12);
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("1.2345K"))
+            .ShouldBe("Error:InvalidFormat");
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("50Q"))
+            .ShouldBe("Error:InvalidFormat");
+    }
 }

@@ -74,22 +74,36 @@ public sealed class PointBalanceService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
+        var entries = await db
             .PointLedgerEntries.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Take(count)
+            .ToListAsync(ct);
+        return entries
             .Select(x => new PointLedgerEntryView(
                 x.CreatedAtUtc,
                 x.Kind,
                 x.Login,
-                x.Delta,
-                x.BalanceAfter,
+                FormatSignedDelta(x.Delta),
+                PointAmount.ParseAbsolute(x.BalanceAfter).ToDisplayString(),
                 x.ActorLogin,
                 x.CounterpartyLogin,
                 x.Note
             ))
-            .ToListAsync(ct);
+            .ToList();
+    }
+
+    private static string FormatSignedDelta(string delta)
+    {
+        var value = BigInteger.Parse(delta, CultureInfo.InvariantCulture);
+        var display = new PointAmount(BigInteger.Abs(value)).ToDisplayString();
+        return value.Sign switch
+        {
+            < 0 => $"-{display}",
+            > 0 => $"+{display}",
+            _ => display,
+        };
     }
 
     public PointMutationIO Add(
