@@ -44,7 +44,6 @@
                                         Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
                                         Clear="@ClearBotAccountAuthorizationAsync"
                                         Refresh="@RefreshBotAccountAuthorizationAsync"
-                                        Collapsible="true"
                                         InitiallyOpen="true" />
 
         <SiteAccessSection State="@_state"
