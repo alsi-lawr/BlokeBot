@@ -138,7 +138,8 @@ public sealed class HelixClient(
         }
         catch (Exception exception)
             when (exception
-                    is HttpRequestException
+                    is OperationCanceledException
+                        or HttpRequestException
                         or IOException
                         or JsonException
                         or TimeoutException

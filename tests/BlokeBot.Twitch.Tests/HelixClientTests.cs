@@ -194,6 +194,38 @@ public sealed class HelixClientTests
     }
 
     [Test]
+    public async Task Chatters_ClientTimeoutIsUnavailableButCallerCancellationPropagates()
+    {
+        var timeoutFactory = new ScriptedHttpClientFactory();
+        timeoutFactory.Respond(_ => throw new TaskCanceledException("Simulated client timeout."));
+        var timeoutClient = new HelixClient(
+            timeoutFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var timeoutOutcome = await timeoutClient.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = timeoutOutcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+
+        var callerFactory = RespondingWith("""{"data":[],"pagination":{}}""");
+        var callerClient = new HelixClient(
+            callerFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
+            callerClient.GetChattersAsync(Context(), "channel-id", "bot-id", cancellation.Token)
+        );
+    }
+
+    [Test]
     public async Task ChannelInformation_LoadingRaiderMetadata_ReturnsTypedGameAndTitle()
     {
         var factory = new ScriptedHttpClientFactory();
@@ -618,6 +650,7 @@ public sealed class HelixClientTests
                 CancellationToken cancellationToken
             )
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 responses.Count.ShouldBeGreaterThan(0);
                 return Task.FromResult(responses.Dequeue()(request));
             }
