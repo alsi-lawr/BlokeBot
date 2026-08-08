@@ -1,0 +1,35 @@
+@{
+    RenderFragment content =
+        @<text>
+            <span class="relative grid place-items-center @ThumbnailClass">@Thumbnail</span>
+            <span class="block px-3 pt-2.5 pb-3">
+                <span class="flex items-center gap-1">
+                    <span class="min-w-0 truncate font-bold text-slate-950">@Name</span>
+                    @if (Selected is true)
+                    {
+                        <span class="shrink-0 font-extrabold text-emerald-700" aria-hidden="true">✓</span>
+                    }
+                </span>
+                @if (Subline is { Length: > 0 } subline)
+                {
+                    <span class="mt-0.5 block text-xs text-muted-foreground">@subline</span>
+                }
+                @if (Actions is not null)
+                {
+                    <span class="mt-2 flex flex-wrap gap-2">@Actions</span>
+                }
+            </span>
+        </text>;
+}
+@if (Selected is { } selected)
+{
+    <button type="button"
+            class="@_selectableClass"
+            data-thumbnail-card
+            aria-pressed="@(selected ? "true" : "false")"
+            @onclick="OnSelect">@content</button>
+}
+else
+{
+    <div class="@_tileClass" data-thumbnail-card>@content</div>
+}

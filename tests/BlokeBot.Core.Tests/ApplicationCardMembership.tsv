@@ -26,11 +26,11 @@ card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|146|incl
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|46|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|52|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|58|included|channel-setup-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|36|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|42|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|50|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|89|included|moment-candidate-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|96|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|37|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|43|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|138|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|164|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|170|included|moment-candidate-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|15|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|21|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|27|included|public-moment-page-cards

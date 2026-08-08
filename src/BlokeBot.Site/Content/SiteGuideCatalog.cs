@@ -838,7 +838,7 @@ internal static class SiteGuideCatalog
                 DarkLaptopSource: "media/community/laptop-dark-moments.png",
                 LightLaptopSource: "media/community/laptop-light-moments.png",
                 PhoneAlt: "The Sample Channel stream recap on a narrow screen, showing an approved Community clutch save and a recorded vote.",
-                LaptopAlt: "The Sample Channel Moments moderator page, showing live capture settings and an approved Community clutch save.",
+                LaptopAlt: "The Sample Channel Moments moderator page, showing the narrated capture settings stages and an approved Community clutch save in the clip gallery.",
                 "Moderators work at /moments; approved entries appear in channel, stream and weekly recaps."
             ),
             Sections =

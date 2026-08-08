@@ -18,6 +18,18 @@ public sealed class MomentCommandModule(
         _ = commands.Map(FixedChatCommandRoutes.Clip, CaptureAsync);
     }
 
+    /// <summary>
+    /// What chat sees for a first capture. Shared with the settings preview so the two cannot drift.
+    /// </summary>
+    internal static string CapturedReply(Guid publicId) =>
+        $"Captured moment {publicId:N} for moderator review.";
+
+    /// <summary>
+    /// What chat sees when a capture lands inside the merge window of an existing moment.
+    /// </summary>
+    internal static string JoinedReply(Guid publicId) =>
+        $"Added your capture to moment {publicId:N}.";
+
     private async ValueTask CaptureAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
@@ -74,8 +86,8 @@ public sealed class MomentCommandModule(
             result.Match(
                 succeeded =>
                     succeeded.WasIdempotent
-                        ? $"Added your capture to moment {succeeded.Value.PublicId:N}."
-                        : $"Captured moment {succeeded.Value.PublicId:N} for moderator review.",
+                        ? JoinedReply(succeeded.Value.PublicId)
+                        : CapturedReply(succeeded.Value.PublicId),
                 rejected => rejected.Reason.Message
             ),
             ct

@@ -15,7 +15,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentUiTests
 {
     [Test]
-    public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndUsesSemanticSettingsAlignment()
+    public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndEveryCaptureSetting()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database);
@@ -41,25 +41,13 @@ public sealed class MomentUiTests
             recap.GetAttribute("target").ShouldBe("_blank");
             recap.GetAttribute("rel").ShouldBe("noopener");
             _ = recap.Closest(".page-header__actions").ShouldNotBeNull();
-            _ = page.Find("#moment-marker-fallback").ShouldNotBeNull();
-            page.Find("label[for='moment-marker-fallback']")
+            var marker = page.Find("#moment-marker-fallback");
+            marker.GetAttribute("role").ShouldBe("switch");
+            page.Find($"#{marker.GetAttribute("aria-labelledby")}")
                 .TextContent.ShouldContain("Use a stream marker");
-            page.Find(".moment-setting-toggle").ClassList.ShouldContain("grid-rows-[auto_1fr]");
-            var captureSettings = page.FindAll(
-                "#moment-settings-heading + .grid > :is(.space-y-2, .moment-setting-toggle)"
-            );
-            captureSettings.Count.ShouldBe(4);
-            captureSettings.ShouldAllBe(setting => setting.Children[0].ClassList.Contains("label"));
-            captureSettings
-                .Select(setting => setting.QuerySelector("input, select").ShouldNotBeNull().Id)
-                .ShouldBe([
-                    "moment-window",
-                    "moment-reward-policy",
-                    "moment-reward-amount",
-                    "moment-marker-fallback",
-                ]);
-            page.Find("#moment-reward-policy")
-                .QuerySelectorAll("option")
+            _ = page.Find("#moment-window").ShouldNotBeNull();
+            _ = page.Find("#moment-reward-amount").ShouldNotBeNull();
+            page.FindAll(".studio-segmented[aria-label='Point reward'] button")
                 .Select(option => option.TextContent)
                 .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
             page.Markup.ShouldNotContain("pt-6");
