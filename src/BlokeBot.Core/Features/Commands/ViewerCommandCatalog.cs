@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
@@ -45,7 +46,8 @@ public sealed record ViewerCommandCatalogSnapshot(
 public sealed class ViewerCommandCatalogService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IHostStreamLivenessProvider streams,
-    IOverlayCueAdmissionService overlayCues
+    IOverlayCueAdmissionService overlayCues,
+    ICustomCommandAutomationRuntime automations
 )
 {
     public async Task<ViewerCommandCatalogSnapshot> LoadForHostAsync(
@@ -151,17 +153,27 @@ public sealed class ViewerCommandCatalogService(
                 .Select(value => value.IsOpen)
                 .ToArrayAsync(ct)
             : [];
-        var customCommands = enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
-            ? await db
-                .CustomCommands.AsNoTracking()
-                .AsSplitQuery()
-                .Include(value => value.Action)
-                .Include(value => value.Aliases)
-                .Include(value => value.AllowedUsers)
-                .Where(value => value.HostId == hostId)
-                .ToArrayAsync(ct)
-            : [];
-        var availableCueActions = await AvailableCueActionsAsync(hostId, customCommands, ct);
+        var customCommands =
+            viewer is null || enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
+                ? await db
+                    .CustomCommands.AsNoTracking()
+                    .AsSplitQuery()
+                    .Include(value => value.Action)
+                    .Include(value => value.Aliases)
+                    .Include(value => value.AllowedUsers)
+                    .Where(value => value.HostId == hostId)
+                    .ToArrayAsync(ct)
+                : [];
+        var availableCueActions = enabledFeatures.Contains(
+            HostFeatureFlags.CustomCommands | HostFeatureFlags.Overlays
+        )
+            ? await AvailableCueActionsAsync(hostId, customCommands, ct)
+            : new HashSet<CueActionIdentity>();
+        var availableAutomationCommands = enabledFeatures.Contains(
+            HostFeatureFlags.CustomCommands | HostFeatureFlags.Automations
+        )
+            ? await automations.AvailableCommandIdsAsync(new(hostId), ct)
+            : new HashSet<int>();
 
         HostStreamLivenessOutcome liveness = new HostStreamLivenessOutcome.Offline();
         if (enabledFeatures.Contains(HostFeatureFlags.Moments))
@@ -249,7 +261,7 @@ public sealed class ViewerCommandCatalogService(
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Clip));
         }
 
-        if (enabledFeatures.Contains(HostFeatureFlags.CustomCommands))
+        if (viewer is null || enabledFeatures.Contains(HostFeatureFlags.CustomCommands))
         {
             foreach (var command in customCommands)
             {
@@ -263,7 +275,12 @@ public sealed class ViewerCommandCatalogService(
                     continue;
                 }
 
-                var availability = CustomAvailability(command, availableCueActions);
+                var availability = CustomAvailability(
+                    command,
+                    enabledFeatures,
+                    availableCueActions,
+                    availableAutomationCommands
+                );
                 if (
                     viewer is not null
                     && (
@@ -300,7 +317,8 @@ public sealed class ViewerCommandCatalogService(
                         appAliases,
                         customCommands,
                         enabledFeatures,
-                        availableCueActions
+                        availableCueActions,
+                        availableAutomationCommands
                     )
                 )
                 {
@@ -321,7 +339,8 @@ public sealed class ViewerCommandCatalogService(
                     appAliases,
                     customCommands,
                     enabledFeatures,
-                    availableCueActions
+                    availableCueActions,
+                    availableAutomationCommands
                 )
             )
             {
@@ -384,7 +403,8 @@ public sealed class ViewerCommandCatalogService(
         IReadOnlyList<AppAlias> appAliases,
         IReadOnlyList<CustomCommand> customCommands,
         HostFeatureFlags enabledFeatures,
-        IReadOnlySet<CueActionIdentity> availableCueActions
+        IReadOnlySet<CueActionIdentity> availableCueActions,
+        IReadOnlySet<int> availableAutomationCommands
     )
     {
         if (candidate.FixedRoute)
@@ -422,16 +442,31 @@ public sealed class ViewerCommandCatalogService(
                 )
             );
         return customOwner is not null
-            && IsCustomActionAvailable(customOwner.Command.Action, availableCueActions)
+            && IsCustomActionAvailable(
+                customOwner.Command,
+                enabledFeatures,
+                availableCueActions,
+                availableAutomationCommands
+            )
             && candidate.CustomCommandId == customOwner.Command.Id;
     }
 
     private static bool IsCustomActionAvailable(
-        CustomCommandAction action,
-        IReadOnlySet<CueActionIdentity> availableCueActions
+        CustomCommand command,
+        HostFeatureFlags enabledFeatures,
+        IReadOnlySet<CueActionIdentity> availableCueActions,
+        IReadOnlySet<int> availableAutomationCommands
     ) =>
-        action is not OverlayCueCustomCommandAction cue
-        || availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId));
+        command.Action switch
+        {
+            OverlayCueCustomCommandAction cue => enabledFeatures.Contains(
+                HostFeatureFlags.CustomCommands | HostFeatureFlags.Overlays
+            ) && availableCueActions.Contains(new(cue.TargetOverlayPublicId, cue.CuePublicId)),
+            AutomationCustomCommandAction => enabledFeatures.Contains(
+                HostFeatureFlags.CustomCommands | HostFeatureFlags.Automations
+            ) && availableAutomationCommands.Contains(command.Id),
+            _ => enabledFeatures.Contains(HostFeatureFlags.CustomCommands),
+        };
 
     private static string CustomAccessSummary(CustomCommand command) =>
         CustomCommandAccessPolicy.Describe(
@@ -442,10 +477,17 @@ public sealed class ViewerCommandCatalogService(
 
     private static ViewerCommandCatalogAvailability CustomAvailability(
         CustomCommand command,
-        IReadOnlySet<CueActionIdentity> availableCueActions
+        HostFeatureFlags enabledFeatures,
+        IReadOnlySet<CueActionIdentity> availableCueActions,
+        IReadOnlySet<int> availableAutomationCommands
     ) =>
-        command.Enabled
-            ? IsCustomActionAvailable(command.Action, availableCueActions)
+        command.Enabled && enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
+            ? IsCustomActionAvailable(
+                command,
+                enabledFeatures,
+                availableCueActions,
+                availableAutomationCommands
+            )
                 ? ViewerCommandCatalogAvailability.Available
                 : ViewerCommandCatalogAvailability.ActionUnavailable
             : ViewerCommandCatalogAvailability.TurnedOff;

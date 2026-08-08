@@ -49,6 +49,7 @@ public partial class CustomCommandSettingsPage
     private string? _loadFailureMessage;
     private bool _featureEnabled;
     private bool _overlaysEnabled;
+    private bool _automationsEnabled;
     private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
     private string? _cueTestOutcome;
     private bool _isLoading = true;
@@ -127,6 +128,13 @@ public partial class CustomCommandSettingsPage
             && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Overlays,
+                CancellationToken.None
+            );
+        _automationsEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Automations,
                 CancellationToken.None
             );
         _cueCatalog =
@@ -1468,8 +1476,16 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             CustomCommandActionKind.OverlayCue => "Play an overlay cue",
+            CustomCommandActionKind.Automation => "Run automation flow",
             _ => "Choose what happens",
         };
+
+    private IEnumerable<CustomCommandActionKind> ActionKinds(CustomCommandEditor command) =>
+        _actionKinds.Where(action =>
+            action != CustomCommandActionKind.Automation
+            || _automationsEnabled
+            || command.ActionKind == CustomCommandActionKind.Automation
+        );
 
     private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy) =>
         policy switch

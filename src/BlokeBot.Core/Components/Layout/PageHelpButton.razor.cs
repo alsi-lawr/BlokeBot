@@ -545,6 +545,9 @@ public partial class PageHelpButton
                     "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, cue playback, testing, chat replies, cooldowns, one-time viewer use, and viewer-catalog listing are paused.",
                     "Turning either switch back on restores the saved cue setup without replaying commands that were suppressed while it was off.",
                     "Test cue checks the selected cue and Browser Source without sending chat, starting a cooldown, or consuming a one-time viewer use.",
+                    "Run automation flow is a runtime foundation. It starts every enabled flow whose Custom command source is connected to the command; visual flow building and editing are not available here.",
+                    "Automation commands inherit both the Custom commands and Automations switches. If either is off, flow starts, downstream actions, cooldowns, one-time viewer use, and viewer-catalog listing stay paused.",
+                    "Turning both switches back on restores the saved command and flow history without replaying work suppressed while either switch was off.",
                 ]
             ),
             new(

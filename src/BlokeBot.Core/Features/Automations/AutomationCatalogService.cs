@@ -47,6 +47,15 @@ public sealed class AutomationCatalogService
         CancellationToken cancellationToken
     ) => ValidatePersistedAsync(hostId, persisted, cancellationToken);
 
+    internal AutomationConfigurationCheck ValidatePersistedDefinition(
+        PersistedAutomationNodeDefinition persisted
+    ) =>
+        ValidateEnabledPersisted(
+            new(persisted.TypeId),
+            new(persisted.SchemaVersion),
+            persisted.Configuration
+        );
+
     public async Task<AutomationConfigurationCheck> ValidateBeforeExecutionAsync(
         AutomationHostId requestedHostId,
         AutomationContext context,

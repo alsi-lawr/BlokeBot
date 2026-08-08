@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -22,18 +23,41 @@ public sealed class AutomationRuntimeService(
         CancellationToken cancellationToken
     )
     {
+        var dispatch = await DispatchCoreAsync(trigger, null, null, cancellationToken);
+        return dispatch switch
+        {
+            CustomCommandAutomationAdmissionOutcome.Dispatched dispatched => dispatched.Dispatch,
+            CustomCommandAutomationAdmissionOutcome.AlreadyUsed =>
+                throw new InvalidOperationException(
+                    "A generic automation dispatch cannot reject a custom-command invocation claim."
+                ),
+            _ => throw new InvalidOperationException("Unknown automation admission outcome."),
+        };
+    }
+
+    internal Task<CustomCommandAutomationAdmissionOutcome> DispatchCustomCommandAsync(
+        AutomationTrigger trigger,
+        Func<
+            BlokeBotDbContext,
+            CancellationToken,
+            Task<CustomCommandInvocationClaimOutcome>
+        >? claim,
+        Action onCommitted,
+        CancellationToken cancellationToken
+    ) => DispatchCoreAsync(trigger, claim, onCommitted, cancellationToken);
+
+    private async Task<CustomCommandAutomationAdmissionOutcome> DispatchCoreAsync(
+        AutomationTrigger trigger,
+        Func<
+            BlokeBotDbContext,
+            CancellationToken,
+            Task<CustomCommandInvocationClaimOutcome>
+        >? claim,
+        Action? onCommitted,
+        CancellationToken cancellationToken
+    )
+    {
         await EnsureInitializedAsync(cancellationToken);
-        var gate = await GateAsync(trigger.Context.HostId, cancellationToken);
-        if (gate is AutomationRuntimeGate.HostNotFound)
-        {
-            return new(AutomationDispatchStatus.HostNotFound, []);
-        }
-
-        if (gate is not AutomationRuntimeGate.Enabled enabled)
-        {
-            return new(AutomationDispatchStatus.FeatureDisabled, []);
-        }
-
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var flows = await db
             .AutomationFlows.AsNoTracking()
@@ -58,12 +82,7 @@ public sealed class AutomationRuntimeService(
                 continue;
             }
 
-            var check = await catalog.ValidatePersistedBeforeExecutionAsync(
-                trigger.Context.HostId,
-                trigger.Context,
-                Definition(source),
-                cancellationToken
-            );
+            var check = catalog.ValidatePersistedDefinition(Definition(source));
             if (
                 check is AutomationConfigurationCheck.Valid valid
                 && Equals(valid.Configuration, trigger.SourceConfiguration)
@@ -73,23 +92,46 @@ public sealed class AutomationRuntimeService(
             }
         }
 
-        if (matching.Count == 0)
-        {
-            return new(AutomationDispatchStatus.NoMatchingFlow, []);
-        }
-
         var accepted = ImmutableArray.CreateBuilder<AutomationRunId>();
         var duplicateCount = 0;
         var blockedCount = 0;
         await using var dispatchTransaction = await db.Database.BeginTransactionAsync(
             cancellationToken
         );
+        var hostExists = await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            UPDATE hosts
+            SET EnabledFeatures = EnabledFeatures
+            WHERE Id = {trigger.Context.HostId.Value};
+            """,
+            cancellationToken
+        );
+        if (hostExists == 0)
+        {
+            return Dispatched(AutomationDispatchStatus.HostNotFound);
+        }
+
+        var host = await db
+            .Hosts.AsNoTracking()
+            .Where(value => value.Id == trigger.Context.HostId.Value)
+            .Select(static value => new { value.EnabledFeatures, value.AutomationGeneration })
+            .SingleAsync(cancellationToken);
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
+        {
+            return Dispatched(AutomationDispatchStatus.FeatureDisabled);
+        }
+
+        if (matching.Count == 0)
+        {
+            return Dispatched(AutomationDispatchStatus.NoMatchingFlow);
+        }
+
         foreach (var (flow, source) in matching)
         {
             var requiredFeatures = AutomationRequiredFeatures.ForDefinitions(
                 flow.Nodes.Select(static node => node.DefinitionId)
             );
-            if (!enabled.Features.Contains(requiredFeatures))
+            if (!host.EnabledFeatures.Contains(requiredFeatures))
             {
                 blockedCount++;
                 continue;
@@ -103,21 +145,14 @@ public sealed class AutomationRuntimeService(
                     (Id, FlowId, HostId, AutomationGeneration, RequiredFeatures,
                      ContextSchemaVersion, SourceDefinitionId, SourceOccurrenceId, ContextJson,
                      DefinitionJson, Status, StartedAtUtc, CompletedAtUtc, ExecutionLeaseId)
-                SELECT {runId}, {flow.Id}, {flow.HostId}, {enabled.Generation},
-                       {(long)requiredFeatures}, {AutomationContextSchema.CurrentVersion},
-                       {trigger.Context.Event.SourceDefinitionId.Value},
-                       {trigger.Context.Event.OccurrenceId},
-                       {AutomationRuntimeSerialization.SerializeContext(trigger.Context)},
-                       {AutomationRuntimeSerialization.SerializeDefinition(flow)},
-                       {"Running"}, {now}, NULL, NULL
-                WHERE EXISTS (
-                    SELECT 1 FROM hosts
-                    WHERE Id = {flow.HostId}
-                      AND (EnabledFeatures & {(long)HostFeatureFlags.Automations})
-                          = {(long)HostFeatureFlags.Automations}
-                      AND AutomationGeneration = {enabled.Generation}
-                      AND (EnabledFeatures & {(long)requiredFeatures}) = {(long)requiredFeatures}
-                );
+                VALUES
+                    ({runId}, {flow.Id}, {flow.HostId}, {host.AutomationGeneration},
+                     {(long)requiredFeatures}, {AutomationContextSchema.CurrentVersion},
+                     {trigger.Context.Event.SourceDefinitionId.Value},
+                     {trigger.Context.Event.OccurrenceId},
+                     {AutomationRuntimeSerialization.SerializeContext(trigger.Context)},
+                     {AutomationRuntimeSerialization.SerializeDefinition(flow)},
+                     {"Running"}, {now}, NULL, NULL);
                 """,
                 cancellationToken
             );
@@ -171,21 +206,94 @@ public sealed class AutomationRuntimeService(
             _ = await db.SaveChangesAsync(cancellationToken);
             accepted.Add(new(runId));
         }
+
+        if (accepted.Count == 0)
+        {
+            return Dispatched(
+                duplicateCount == matching.Count ? AutomationDispatchStatus.Duplicate
+                : blockedCount > 0 ? AutomationDispatchStatus.FeatureDisabled
+                : AutomationDispatchStatus.NoMatchingFlow
+            );
+        }
+
+        if (
+            claim is not null
+            && await claim(db, cancellationToken) is CustomCommandInvocationClaimOutcome.AlreadyUsed
+        )
+        {
+            return new CustomCommandAutomationAdmissionOutcome.AlreadyUsed();
+        }
+
         await dispatchTransaction.CommitAsync(cancellationToken);
+        onCommitted?.Invoke();
 
         foreach (var runId in accepted)
         {
             _ = await ResumeAsync(runId, cancellationToken);
         }
 
-        return accepted.Count > 0
-            ? new(AutomationDispatchStatus.Accepted, accepted.ToImmutable())
-            : new(
-                duplicateCount == matching.Count ? AutomationDispatchStatus.Duplicate
-                    : blockedCount > 0 ? AutomationDispatchStatus.FeatureDisabled
-                    : AutomationDispatchStatus.NoMatchingFlow,
-                []
-            );
+        return new CustomCommandAutomationAdmissionOutcome.Dispatched(
+            new(AutomationDispatchStatus.Accepted, accepted.ToImmutable())
+        );
+
+        static CustomCommandAutomationAdmissionOutcome Dispatched(
+            AutomationDispatchStatus status
+        ) => new CustomCommandAutomationAdmissionOutcome.Dispatched(new(status, []));
+    }
+
+    internal async Task<IReadOnlySet<int>> AvailableCustomCommandIdsAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        var gate = await GateAsync(hostId, cancellationToken);
+        if (
+            gate is not AutomationRuntimeGate.Enabled enabled
+            || !enabled.Features.Contains(HostFeatureFlags.CustomCommands)
+        )
+        {
+            return new HashSet<int>();
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var flows = await db
+            .AutomationFlows.AsNoTracking()
+            .Include(static flow => flow.Nodes)
+            .Include(static flow => flow.Edges)
+            .Where(flow =>
+                flow.HostId == hostId.Value
+                && flow.IsEnabled
+                && flow.SchemaVersion == AutomationFlowSchema.CurrentVersion
+            )
+            .ToArrayAsync(cancellationToken);
+        var commandIds = new HashSet<int>();
+        foreach (var flow in flows)
+        {
+            foreach (
+                var source in flow.Nodes.Where(node =>
+                    node.DefinitionId == AutomationDefinitionIds.CustomCommandSource.Value
+                    && IsSource(flow, node)
+                )
+            )
+            {
+                var check = await catalog.ValidatePersistedForSaveAsync(
+                    hostId,
+                    Definition(source),
+                    cancellationToken
+                );
+                if (
+                    check is AutomationConfigurationCheck.Valid
+                    {
+                        Configuration: CustomCommandSourceConfiguration configuration,
+                    }
+                )
+                {
+                    _ = commandIds.Add(configuration.CommandId.Value);
+                }
+            }
+        }
+
+        return commandIds;
     }
 
     public async Task<AutomationResumeOutcome> ResumeAsync(

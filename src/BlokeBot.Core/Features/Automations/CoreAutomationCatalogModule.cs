@@ -66,7 +66,8 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         new("actor"),
                         "Viewer",
                         "The viewer who used the command.",
-                        AutomationPortValueType.Actor
+                        AutomationPortValueType.Actor,
+                        AutomationDataSensitivity.Sensitive
                     ),
                     new(
                         new("arguments"),
@@ -86,6 +87,12 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         "Event time",
                         "When the command was received.",
                         AutomationPortValueType.Timestamp
+                    ),
+                    new(
+                        new("stream"),
+                        "Stream",
+                        "The active stream identity, when the channel is live.",
+                        AutomationPortValueType.Stream
                     ),
                 ],
                 [

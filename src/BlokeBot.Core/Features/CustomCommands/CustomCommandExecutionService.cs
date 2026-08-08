@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
@@ -18,6 +19,7 @@ public sealed class CustomCommandExecutionService(
     CustomCommandInvocationClaimStore claims,
     IHostStreamLivenessProvider streams,
     IOverlayCueAdmissionService overlayCues,
+    ICustomCommandAutomationRuntime automations,
     TimeProvider clock
 )
 {
@@ -38,7 +40,14 @@ public sealed class CustomCommandExecutionService(
         var host = await db
             .Hosts.AsNoTracking()
             .Where(x => x.Login == hostLogin)
-            .Select(x => new { x.Id, x.EnabledFeatures })
+            .Select(x => new BotHost
+            {
+                Id = x.Id,
+                TwitchUserId = x.TwitchUserId,
+                Login = x.Login,
+                DisplayName = x.DisplayName,
+                EnabledFeatures = x.EnabledFeatures,
+            })
             .SingleOrDefaultAsync(ct);
         if (host is null || !HasCustomCommands(host.EnabledFeatures))
         {
@@ -70,6 +79,13 @@ public sealed class CustomCommandExecutionService(
         }
 
         var cueAction = command.Action as OverlayCueCustomCommandAction;
+        var automationAction = command.Action as AutomationCustomCommandAction;
+        if (automationAction is not null && !HasAutomations(host.EnabledFeatures))
+        {
+            return new CustomCommandExecutionOutcome.Automation(
+                new(AutomationDispatchStatus.FeatureDisabled, [])
+            );
+        }
         if (cueAction is not null && !HasOverlays(host.EnabledFeatures))
         {
             return new CustomCommandExecutionOutcome.OverlayCue(
@@ -88,8 +104,10 @@ public sealed class CustomCommandExecutionService(
             }
         }
 
-        var replyId = command.Action.ReplyIdForArgumentCount(args.Count);
-        if (replyId is null && cueAction is null)
+        var replyId = automationAction is null
+            ? command.Action.ReplyIdForArgumentCount(args.Count)
+            : null;
+        if (replyId is null && cueAction is null && automationAction is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
@@ -104,6 +122,63 @@ public sealed class CustomCommandExecutionService(
             return new CustomCommandExecutionOutcome.Handled();
         }
 
+        if (automationAction is not null)
+        {
+            var automationStreamRequired = RequiresStream(command.InvocationLimit);
+            var automationStream = await StreamIdAsync(true, hostLogin, ct);
+            if (automationStreamRequired && automationStream is StreamIdentity.Offline)
+            {
+                return new CustomCommandExecutionOutcome.StreamOffline();
+            }
+
+            if (
+                automationStreamRequired
+                && automationStream is StreamIdentity.Unavailable streamUnavailable
+            )
+            {
+                return new CustomCommandExecutionOutcome.StreamUnavailable(
+                    streamUnavailable.Failure
+                );
+            }
+
+            // Bot-authored commands must be allowed to trigger custom commands too.
+            var trigger = new AutomationTrigger(
+                CustomCommandAutomationContext.Create(
+                    host,
+                    command,
+                    alias,
+                    context.Message,
+                    args,
+                    automationStream is StreamIdentity.Available live ? live.StreamId : null,
+                    clock.GetUtcNow()
+                ),
+                new CustomCommandSourceConfiguration(new(command.Id))
+            );
+            var automation = await automations.DispatchAsync(
+                new(
+                    trigger,
+                    command.Id,
+                    command.CooldownScope,
+                    context.Message.Login,
+                    Cooldown(command),
+                    command.InvocationLimit == CustomCommandInvocationLimit.Unlimited
+                        ? null
+                        : ClaimRequest(host.Id, command, context.Message, automationStream)
+                ),
+                ct
+            );
+            return automation switch
+            {
+                CustomCommandAutomationDispatchOutcome.Dispatched dispatched =>
+                    new CustomCommandExecutionOutcome.Automation(dispatched.Dispatch),
+                CustomCommandAutomationDispatchOutcome.Cooldown =>
+                    new CustomCommandExecutionOutcome.Cooldown(),
+                CustomCommandAutomationDispatchOutcome.AlreadyUsed =>
+                    new CustomCommandExecutionOutcome.AlreadyUsed(),
+                _ => throw new UnreachableException("Unknown automation dispatch outcome."),
+            };
+        }
+
         if (
             !cooldowns.TryRecord(
                 command.Id,
@@ -116,13 +191,14 @@ public sealed class CustomCommandExecutionService(
             return new CustomCommandExecutionOutcome.Cooldown();
         }
 
-        var streamId = await StreamIdAsync(command.InvocationLimit, hostLogin, ct);
-        if (streamId is StreamIdentity.Offline)
+        var streamRequired = RequiresStream(command.InvocationLimit);
+        var streamId = await StreamIdAsync(streamRequired, hostLogin, ct);
+        if (streamRequired && streamId is StreamIdentity.Offline)
         {
             return new CustomCommandExecutionOutcome.StreamOffline();
         }
 
-        if (streamId is StreamIdentity.Unavailable unavailable)
+        if (streamRequired && streamId is StreamIdentity.Unavailable unavailable)
         {
             return new CustomCommandExecutionOutcome.StreamUnavailable(unavailable.Failure);
         }
@@ -153,7 +229,7 @@ public sealed class CustomCommandExecutionService(
         }
 
         var selectedMessage = SelectMessage(messageEntry);
-        if (selectedMessage is null && cueAction is null)
+        if (selectedMessage is null && cueAction is null && automationAction is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
@@ -278,18 +354,12 @@ public sealed class CustomCommandExecutionService(
         };
 
     private async Task<StreamIdentity> StreamIdAsync(
-        CustomCommandInvocationLimit limit,
+        bool required,
         string hostLogin,
         CancellationToken ct
     )
     {
-        if (
-            limit
-            is not (
-                CustomCommandInvocationLimit.OncePerStream
-                or CustomCommandInvocationLimit.OncePerStreamPerUser
-            )
-        )
+        if (!required)
         {
             return new StreamIdentity.NotRequired();
         }
@@ -387,6 +457,14 @@ public sealed class CustomCommandExecutionService(
 
     private static bool HasOverlays(HostFeatureFlags features) =>
         (features & HostFeatureFlags.Overlays) == HostFeatureFlags.Overlays;
+
+    private static bool HasAutomations(HostFeatureFlags features) =>
+        (features & HostFeatureFlags.Automations) == HostFeatureFlags.Automations;
+
+    private static bool RequiresStream(CustomCommandInvocationLimit limit) =>
+        limit
+            is CustomCommandInvocationLimit.OncePerStream
+                or CustomCommandInvocationLimit.OncePerStreamPerUser;
 
     private abstract record StreamIdentity
     {

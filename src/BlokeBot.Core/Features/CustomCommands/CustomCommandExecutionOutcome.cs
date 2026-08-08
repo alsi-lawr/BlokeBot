@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 
@@ -15,7 +16,8 @@ public abstract record CustomCommandExecutionOutcome
         Func<AlreadyUsed, TResult> alreadyUsed,
         Func<StreamOffline, TResult> streamOffline,
         Func<StreamUnavailable, TResult> streamUnavailable,
-        Func<OverlayCue, TResult> overlayCue
+        Func<OverlayCue, TResult> overlayCue,
+        Func<Automation, TResult> automation
     ) =>
         this switch
         {
@@ -26,6 +28,7 @@ public abstract record CustomCommandExecutionOutcome
             StreamOffline value => streamOffline(value),
             StreamUnavailable value => streamUnavailable(value),
             OverlayCue value => overlayCue(value),
+            Automation value => automation(value),
             _ => throw new UnreachableException("Unknown custom-command execution outcome."),
         };
 
@@ -43,5 +46,8 @@ public abstract record CustomCommandExecutionOutcome
         : CustomCommandExecutionOutcome;
 
     public sealed record OverlayCue(OverlayCueAdmissionOutcome Admission)
+        : CustomCommandExecutionOutcome;
+
+    public sealed record Automation(AutomationDispatchOutcome Dispatch)
         : CustomCommandExecutionOutcome;
 }

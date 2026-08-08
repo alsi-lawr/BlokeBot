@@ -62,13 +62,15 @@ public abstract record CustomCommandActionValue
     public TResult Match<TResult>(
         Func<Message, TResult> message,
         Func<Counter, TResult> counter,
-        Func<OverlayCue, TResult> overlayCue
+        Func<OverlayCue, TResult> overlayCue,
+        Func<Automation, TResult> automation
     ) =>
         this switch
         {
             Message value => message(value),
             Counter value => counter(value),
             OverlayCue value => overlayCue(value),
+            Automation value => automation(value),
             _ => throw new UnreachableException("Unknown custom command action value."),
         };
 
@@ -90,6 +92,11 @@ public abstract record CustomCommandActionValue
         OverlayCueQueuePolicy QueuePolicy,
         OverlayCueReplyOrder ReplyOrder
     ) : CustomCommandActionValue
+    {
+        public override CustomCommandReplyRoutes ReplyRoutes => Routes;
+    }
+
+    public sealed record Automation(CustomCommandReplyRoutes Routes) : CustomCommandActionValue
     {
         public override CustomCommandReplyRoutes ReplyRoutes => Routes;
     }

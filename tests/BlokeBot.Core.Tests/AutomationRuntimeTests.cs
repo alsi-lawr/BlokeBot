@@ -845,6 +845,59 @@ public sealed class AutomationRuntimeTests
             .Runs.ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task CustomCommandAdapter_Dispatching_StartsEveryMatchingEnabledSourceOwnedFlow()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var firstSource = Node("custom-command", """{"custom-command-id":7}""");
+        var secondSource = Node("custom-command", """{"custom-command-id":7}""");
+        var otherSource = Node("custom-command", """{"custom-command-id":8}""");
+        var first = await fixture.SaveAsync([firstSource], []);
+        var second = await fixture.SaveAsync([secondSource], []);
+        var disabled = await fixture.SaveAsync([otherSource], []);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var flow = await db.AutomationFlows.SingleAsync(value => value.Id == disabled.Value);
+            flow.IsEnabled = false;
+            _ = await db.SaveChangesAsync();
+        }
+
+        var available = await fixture.Runtime.AvailableCustomCommandIdsAsync(
+            new(fixture.HostId),
+            CancellationToken.None
+        );
+        available.ShouldBe(new HashSet<int> { 7 });
+        var outcome = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        outcome.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        outcome.RunIds.Length.ShouldBe(2);
+        await using var verify = await fixture.Database.CreateDbContextAsync();
+        var runs = await verify.AutomationFlowRuns.AsNoTracking().ToArrayAsync();
+        runs.Length.ShouldBe(2);
+        runs.Select(static run => run.FlowId)
+            .ToHashSet()
+            .SetEquals([first.Value, second.Value])
+            .ShouldBeTrue();
+        runs.ShouldAllBe(run =>
+            run.HostId == fixture.HostId && run.Status == AutomationFlowRunStatus.Completed
+        );
+
+        await fixture.Features.DisableAsync(
+            fixture.HostId,
+            HostFeatureFlags.CustomCommands,
+            CancellationToken.None
+        );
+        (
+            await fixture.Runtime.AvailableCustomCommandIdsAsync(
+                new(fixture.HostId),
+                CancellationToken.None
+            )
+        ).ShouldBeEmpty();
+    }
+
     private static RecordingChatSender InterruptFirstSend(TaskCompletionSource entered) =>
         new(
             null,

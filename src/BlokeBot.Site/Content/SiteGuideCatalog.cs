@@ -1293,9 +1293,9 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-custom-commands.png",
                 DarkLaptopSource: "media/laptop-dark-custom-commands.png",
                 LightLaptopSource: "media/laptop-light-custom-commands.png",
-                PhoneAlt: "Custom commands settings showing saved replies and a hydration reminder.",
-                LaptopAlt: "Custom commands settings showing saved replies and a hydration reminder.",
-                "Replies are reusable messages that commands and scheduled messages can send."
+                PhoneAlt: "Custom command editor with Run automation flow selected and the runtime foundation explanation.",
+                LaptopAlt: "Custom command editor with Run automation flow selected and the runtime foundation explanation.",
+                "Run automation flow connects a command to existing source-owned flows without adding a second flow picker."
             ),
             Sections =
             [
@@ -1325,6 +1325,16 @@ internal static class SiteGuideCatalog
                         "Scheduled chat sends a saved reply on a timer, after chat activity or once a week.",
                         "Twitch announcement uses Twitch's coloured announcement surface. The bot must currently be a moderator and authorised for announcements.",
                         "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Connect an existing automation flow",
+                    Bullets =
+                    [
+                        "Run automation flow is a runtime foundation: the command starts every enabled flow whose Custom command source is already connected to it.",
+                        "Visual flow building and editing are not available in this release. The command does not contain a second flow selection.",
+                        "Custom commands and Automations must both be on. Turning either off retains the command and flow history, pauses all downstream actions and does not replay suppressed work when re-enabled.",
                     ],
                 },
             ],

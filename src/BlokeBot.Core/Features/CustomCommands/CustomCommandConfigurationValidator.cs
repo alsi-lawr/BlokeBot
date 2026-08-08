@@ -254,7 +254,9 @@ public static class CustomCommandConfigurationValidator
                 names[index],
                 editor.Action.ReplyRoutes,
                 messageIds,
-                editor.Action is not OverlayCueCustomCommandActionEditor,
+                editor.Action
+                    is MessageCustomCommandActionEditor
+                        or CounterCustomCommandActionEditor,
                 errors
             );
 
@@ -319,6 +321,9 @@ public static class CustomCommandConfigurationValidator
                     cue,
                     replyRoutes,
                     errors
+                ),
+                AutomationCustomCommandActionEditor => new CustomCommandActionValue.Automation(
+                    replyRoutes
                 ),
                 _ => InvalidAction(editor.Id, names[index], replyRoutes, errors),
             };

@@ -118,6 +118,23 @@ public sealed class PageHelpButtonTests
     }
 
     [Test]
+    public void CustomCommandsHelp_ExplainsAutomationRuntimeAndInheritedSwitches()
+    {
+        using var context = new BunitContext();
+        context
+            .Services.GetRequiredService<NavigationManager>()
+            .NavigateTo("/custom-commands/settings");
+        var cut = context.Render<PageHelpButton>();
+
+        cut.Find("button[aria-label='Page help']").Click();
+
+        cut.Markup.ShouldContain("Run automation flow is a runtime foundation");
+        cut.Markup.ShouldContain("visual flow building and editing are not available here");
+        cut.Markup.ShouldContain("both the Custom commands and Automations switches");
+        cut.Markup.ShouldContain("without replaying work suppressed");
+    }
+
+    [Test]
     public void SignedInHelp_UsesTaskLanguageAndPreservesPrivacyAndOrderingFacts()
     {
         var host = OpenHelpFor("/host");

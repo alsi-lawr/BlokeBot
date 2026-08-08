@@ -10,6 +10,7 @@ public sealed partial class BlokeBotDbContext
 
     private static readonly string[] _customCommandActionTypes =
     [
+        AutomationCustomCommandAction.Discriminator,
         CounterCustomCommandAction.Discriminator,
         MessageCustomCommandAction.Discriminator,
         OverlayCueCustomCommandAction.Discriminator,
@@ -209,7 +210,7 @@ public sealed partial class BlokeBotDbContext
                     );
                     _ = t.HasCheckConstraint(
                         "CK_custom_command_actions_Payload",
-                        "(ActionType = 'Message' AND CounterId IS NULL "
+                        "(ActionType IN ('Message', 'Automation') AND CounterId IS NULL "
                             + "AND TargetOverlayPublicId IS NULL AND CuePublicId IS NULL "
                             + "AND QueuePolicy IS NULL AND ReplyOrder IS NULL) OR "
                             + "(ActionType = 'Counter' AND CounterId IS NOT NULL "
@@ -224,6 +225,9 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasKey(static x => x.CustomCommandId);
             _ = b.Property<string>("ActionType").HasMaxLength(32);
             _ = b.HasDiscriminator<string>("ActionType")
+                .HasValue<AutomationCustomCommandAction>(
+                    AutomationCustomCommandAction.Discriminator
+                )
                 .HasValue<MessageCustomCommandAction>(MessageCustomCommandAction.Discriminator)
                 .HasValue<CounterCustomCommandAction>(CounterCustomCommandAction.Discriminator)
                 .HasValue<OverlayCueCustomCommandAction>(

@@ -429,13 +429,38 @@
                                                 @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))"
                                                 @ref="_controls[CommandActionFieldId(command)]"
                                                 @bind="command.ActionKind">
-                                            @foreach (var action in _actionKinds)
+                                            @foreach (var action in ActionKinds(command))
                                             {
-                                                <option value="@action">@ActionKindLabel(action)</option>
+                                                <option value="@action"
+                                                        disabled="@(action == CustomCommandActionKind.Automation && !_automationsEnabled)">
+                                                    @ActionKindLabel(action)
+                                                </option>
                                             }
                                         </select>
                                         @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
+                                    @if (command.Action is AutomationCustomCommandActionEditor)
+                                    {
+                                        <div class="surface-muted col-span-full space-y-2 p-3"
+                                             data-automation-command>
+                                            @if (_automationsEnabled)
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Connected automations</p>
+                                                <p class="text-sm text-muted-foreground">
+                                                    This command starts every enabled automation flow connected to it. Tools for building and editing automations arrive in a later release.
+                                                </p>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Automations are off</p>
+                                                <p class="text-sm text-muted-foreground" role="status">
+                                                    This setup is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-primary underline" href="/host#chat-tools">Channel setup</a>.
+                                                </p>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
                                     <div class="space-y-2 col-span-full">
                                         <span class="label">Replies by argument count</span>
                                         <div class="grid gap-3 md:grid-cols-3">
@@ -496,6 +521,7 @@
                                             }
                                         </p>
                                     </div>
+                                    }
                                     @if (command.Action is OverlayCueCustomCommandActionEditor cueAction)
                                     {
                                         <div class="surface-muted col-span-full grid gap-3 p-3 md:grid-cols-2"
