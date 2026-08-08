@@ -231,25 +231,7 @@ dotnet_diagnostic.IDE0320.severity = none
 
 [src/BlokeBot.Persistence/Migrations/*.cs]
 charset = utf-8-bom
-# EF migration source is generated from migration identifiers and provider templates.
-dotnet_diagnostic.IDE0053.severity = none
-dotnet_diagnostic.IDE0161.severity = none
-dotnet_diagnostic.IDE1006.severity = none
-dotnet_diagnostic.IDE0046.severity = none
-dotnet_diagnostic.IDE0047.severity = none
-dotnet_diagnostic.IDE0048.severity = none
-dotnet_diagnostic.IDE0004.severity = none
-dotnet_diagnostic.IDE0078.severity = none
-dotnet_diagnostic.IDE0100.severity = none
-dotnet_diagnostic.IDE0320.severity = none
-dotnet_diagnostic.IDE0300.severity = none
-dotnet_diagnostic.IDE0303.severity = none
-dotnet_diagnostic.IDE0058.severity = none
-dotnet_diagnostic.CA1725.severity = none
-dotnet_diagnostic.CA1036.severity = none
-dotnet_diagnostic.CA1001.severity = none
-dotnet_diagnostic.CA1305.severity = none
-dotnet_diagnostic.CA1310.severity = none
-dotnet_diagnostic.CA1805.severity = none
-dotnet_diagnostic.CS8019.severity = none
-dotnet_diagnostic.IDE0005.severity = none
+# EF migrations are generated historical artifacts. New analyzer rules must not
+# turn them into maintained warning-cleanup work.
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

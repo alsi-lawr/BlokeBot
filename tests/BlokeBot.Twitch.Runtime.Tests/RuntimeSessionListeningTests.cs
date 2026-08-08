@@ -5,10 +5,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestBase
 {
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task TerminalListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect(
-        ChatRuntime runtime
-    )
+    public async Task TerminalListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new InvalidOperationException("terminal protocol failure");
@@ -23,7 +20,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Terminal,
             attempt: 1,
             failure
@@ -31,10 +28,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task UnexpectedListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect(
-        ChatRuntime runtime
-    )
+    public async Task UnexpectedListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new ApplicationException("unexpected listening defect");
@@ -49,7 +43,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
             harness
                 .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>(),
-            runtime,
+            ChatRuntime.Irc,
             RuntimeSessionFailureClassification.Unexpected,
             attempt: 1,
             failure
@@ -57,10 +51,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
     }
 
     [Test]
-    [Arguments(ChatRuntime.Irc)]
-    public async Task ListeningAndCleanupFailure_RunningRuntime_ReportsCombinedUnhealthyWithoutHostFault(
-        ChatRuntime runtime
-    )
+    public async Task ListeningAndCleanupFailure_RunningRuntime_ReportsCombinedUnhealthyWithoutHostFault()
     {
         var harness = CreateRunnerHarness(attemptLimit: 3);
         var listeningFailure = new IOException("established session disconnected");
@@ -83,7 +74,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
         var report = harness
             .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
-        report.Runtime.ShouldBe(runtime);
+        report.Runtime.ShouldBe(ChatRuntime.Irc);
         report.Classification.ShouldBe(RuntimeSessionFailureClassification.Unexpected);
         report.Attempt.ShouldBe(1);
         var combined = report.Exception.ShouldBeOfType<AggregateException>();

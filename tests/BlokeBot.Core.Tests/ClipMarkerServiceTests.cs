@@ -55,7 +55,8 @@ public sealed class ClipMarkerServiceTests
         state.Markers.ShouldBeEmpty();
         _ = clip.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
         _ = marker.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
-        http.ClipPosts.ShouldBe(0);
+        http.OneClipPosts.ShouldBe(0);
+        http.TwoClipPosts.ShouldBe(0);
         http.MarkerPosts.ShouldBe(0);
         http.ClipGets.ShouldBe(0);
         await using (var verifyDisabled = await dbFactory.CreateDbContextAsync())
@@ -271,7 +272,8 @@ public sealed class ClipMarkerServiceTests
         _ = retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
         _ = wrongMarkerHost.ShouldBeOfType<ClipMarkerOperationOutcome.InvalidRequest>();
         _ = marker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerCreated>();
-        http.ClipPosts.ShouldBe(2);
+        http.OneClipPosts.ShouldBe(1);
+        http.TwoClipPosts.ShouldBe(1);
         http.MarkerPosts.ShouldBe(2);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
@@ -370,7 +372,7 @@ public sealed class ClipMarkerServiceTests
         _ = retriedClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
         _ = firstMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
         _ = retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
-        http.ClipPosts.ShouldBe(1);
+        http.OneClipPosts.ShouldBe(1);
         http.MarkerPosts.ShouldBe(1);
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.TwitchClips.CountAsync()).ShouldBe(1);
@@ -411,7 +413,7 @@ public sealed class ClipMarkerServiceTests
                         or ClipMarkerOperationOutcome.ClipAmbiguous
             )
             .ShouldBeTrue();
-        http.ClipPosts.ShouldBe(1);
+        http.OneClipPosts.ShouldBe(1);
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.TwitchClips.CountAsync()).ShouldBe(1);
     }
@@ -480,7 +482,9 @@ public sealed class ClipMarkerServiceTests
 
     private sealed class ClipMarkerHttpClientFactory : IHttpClientFactory
     {
-        internal int ClipPosts { get; private set; }
+        internal int OneClipPosts { get; private set; }
+
+        internal int TwoClipPosts { get; private set; }
 
         internal int ClipGets { get; private set; }
 
@@ -498,9 +502,25 @@ public sealed class ClipMarkerServiceTests
             {
                 switch (request.RequestUri!.AbsolutePath, request.Method.Method)
                 {
-                    case ("/helix/clips", "POST") when owner.ClipPosts++ == 0:
+                    case ("/helix/clips", "POST")
+                        when request.RequestUri.Query.Contains(
+                            "broadcaster_id=one-id",
+                            StringComparison.Ordinal
+                        ):
+                        lock (owner)
+                        {
+                            owner.OneClipPosts++;
+                        }
                         throw new HttpRequestException("ambiguous clip post");
-                    case ("/helix/clips", "POST"):
+                    case ("/helix/clips", "POST")
+                        when request.RequestUri.Query.Contains(
+                            "broadcaster_id=two-id",
+                            StringComparison.Ordinal
+                        ):
+                        lock (owner)
+                        {
+                            owner.TwoClipPosts++;
+                        }
                         return Json(
                             """{"data":[{"id":"clip-id","edit_url":"https://twitch.test/edit"}]}"""
                         );

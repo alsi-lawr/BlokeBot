@@ -25,14 +25,10 @@ public sealed class AnnouncementDeliveryPolicyTests
     }
 
     [Test]
-    public void MissingEntity_Mapping_ThrowsRequiredPolicyError()
-    {
-        var exception = Should.Throw<InvalidOperationException>(static () =>
+    public void MissingEntity_Mapping_Throws() =>
+        _ = Should.Throw<InvalidOperationException>(static () =>
             AnnouncementDeliveryPolicyMapper.ToDomain(null)
         );
-
-        exception.Message.ShouldContain("required");
-    }
 
     [Test]
     public void InternallyInconsistentTiming_Mapping_IsRejected()

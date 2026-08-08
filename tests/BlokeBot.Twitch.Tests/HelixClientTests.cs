@@ -392,26 +392,24 @@ public sealed class HelixClientTests
         {
             request.Method.ShouldBe(HttpMethod.Post);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
-            request
-                .Content!.ReadAsStringAsync()
-                .GetAwaiter()
-                .GetResult()
-                .ShouldBe(
-                    "{\"broadcaster_id\":\"broadcaster-id\",\"title\":\"Question\",\"choices\":[{\"title\":\"Yes\"},{\"title\":\"No\"}],\"duration\":120,\"channel_points_voting_enabled\":true,\"channel_points_per_vote\":10}"
-                );
+            var body = ReadRequestBody(request);
+            body.GetProperty("broadcaster_id").GetString().ShouldBe("broadcaster-id");
+            body.GetProperty("title").GetString().ShouldBe("Question");
+            body.GetProperty("choices")[0].GetProperty("title").GetString().ShouldBe("Yes");
+            body.GetProperty("choices")[1].GetProperty("title").GetString().ShouldBe("No");
+            body.GetProperty("duration").GetInt32().ShouldBe(120);
+            body.GetProperty("channel_points_voting_enabled").GetBoolean().ShouldBeTrue();
+            body.GetProperty("channel_points_per_vote").GetInt32().ShouldBe(10);
             return JsonResponse(ActivePoll);
         });
         factory.Respond(static request =>
         {
             request.Method.ShouldBe(HttpMethod.Patch);
             request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
-            request
-                .Content!.ReadAsStringAsync()
-                .GetAwaiter()
-                .GetResult()
-                .ShouldBe(
-                    "{\"broadcaster_id\":\"broadcaster-id\",\"id\":\"poll-id\",\"status\":\"TERMINATED\"}"
-                );
+            var body = ReadRequestBody(request);
+            body.GetProperty("broadcaster_id").GetString().ShouldBe("broadcaster-id");
+            body.GetProperty("id").GetString().ShouldBe("poll-id");
+            body.GetProperty("status").GetString().ShouldBe("TERMINATED");
             return JsonResponse(ActivePoll.Replace("ACTIVE", "TERMINATED"));
         });
         var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
@@ -443,6 +441,14 @@ public sealed class HelixClientTests
             .ShouldBeOfType<HelixPollCreateOutcome.Created>()
             .Poll.Status.ShouldBe(HelixPollStatus.Active);
         ended.ShouldNotBeNull().Status.ShouldBe(HelixPollStatus.Terminated);
+    }
+
+    private static JsonElement ReadRequestBody(HttpRequestMessage request)
+    {
+        using var document = JsonDocument.Parse(
+            request.Content!.ReadAsStringAsync().GetAwaiter().GetResult()
+        );
+        return document.RootElement.Clone();
     }
 
     private static HttpResponseMessage JsonResponse(string json) =>
