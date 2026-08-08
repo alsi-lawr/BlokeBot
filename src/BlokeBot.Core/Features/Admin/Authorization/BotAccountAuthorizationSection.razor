@@ -53,6 +53,12 @@
                     <p class="mt-2 truncate text-sm font-semibold text-slate-900">@_authorizedAccountText</p>
                     <p class="mt-1 text-xs font-medium text-slate-500">Set to use @_configuredAccountText</p>
                     <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
+                    @if (_connectedChatterScopeMissing)
+                    {
+                        <p class="mt-1 text-xs font-bold text-amber-700">
+                            Missing Twitch access: Read connected chatters (moderator:read:chatters).
+                        </p>
+                    }
                     @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
                     {
                         <p class="mt-1 text-xs font-bold text-slate-500">@DisabledMessage</p>

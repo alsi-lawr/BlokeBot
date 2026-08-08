@@ -170,6 +170,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             UnavailableCustomCommandStreamLivenessProvider
         >();
         _ = services.AddSingleton<CustomMessageSelector>();
+        services.TryAddSingleton<
+            IMessageLibraryRandomSource,
+            CryptographicMessageLibraryRandomSource
+        >();
+        services.TryAddSingleton<IMessageLibraryChatterSource, MessageLibraryChatterSource>();
         _ = services.AddSingleton<CustomCommandTemplateRenderer>();
         _ = services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         _ = services.AddSingleton<CustomCommandConfigurationService>();

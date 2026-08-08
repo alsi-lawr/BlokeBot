@@ -46,6 +46,9 @@ internal static class UiTestContextFactory
         _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
         _ = context.Services.AddSingleton<HostFeatureService>();
         _ = context.Services.AddBlokeBotAlerts();
+        _ = context.Services.AddSingleton<IMessageLibraryChatterSource>(
+            new UnavailableMessageLibraryChatterSource()
+        );
         _ = context.Services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         _ = context.Services.AddSingleton<ITwitchAnnouncementReadinessProvider>(
             new UnavailableTwitchAnnouncementReadinessProvider()

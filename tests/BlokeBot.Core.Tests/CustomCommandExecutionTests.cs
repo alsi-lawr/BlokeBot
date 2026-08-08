@@ -280,6 +280,53 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
+    public async Task RandomReply_Dispatching_RendersAfterVariantSelection()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "choose",
+            ["{random_from|first|second}"],
+            CustomMessageSelectionMode.First
+        );
+        await using var services = BuildServices(
+            dbFactory,
+            random: new FixedRandomSource(index: 1)
+        );
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("viewer", "streamer", "!choose"),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(["second"]);
+    }
+
+    [Test]
+    public async Task FeatureOff_RandomViewerCommand_DoesNotReadChatters()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer", HostFeatureFlags.Points);
+        _ = await SeedCommandAsync(dbFactory, hostId, "choose", ["{random_viewer}"]);
+        var chatters = new CountingChatterSource();
+        await using var services = BuildServices(dbFactory, chatters: chatters);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("viewer", "streamer", "!choose"),
+            static (_, _) => ValueTask.CompletedTask,
+            CancellationToken.None
+        );
+
+        chatters.CallCount.ShouldBe(0);
+    }
+
+    [Test]
     public async Task ConfiguredMessageSelectionModes_Dispatching_UseExpectedVariantsAndRotation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -1197,7 +1244,9 @@ public sealed class CustomCommandExecutionTests
         IOverlayCueAdmissionService? overlayCues = null,
         ICustomCommandAutomationRuntime? automations = null,
         IPublicChatMessageSender? publicChat = null,
-        bool realAutomations = false
+        bool realAutomations = false,
+        IMessageLibraryRandomSource? random = null,
+        IMessageLibraryChatterSource? chatters = null
     )
     {
         var services = new ServiceCollection();
@@ -1233,6 +1282,13 @@ public sealed class CustomCommandExecutionTests
                 automations ?? new UnavailableCustomCommandAutomationRuntime()
             );
         }
+        if (random is not null)
+        {
+            _ = services.AddSingleton(random);
+        }
+        _ = services.AddSingleton<IMessageLibraryChatterSource>(
+            chatters ?? new UnavailableMessageLibraryChatterSource()
+        );
         _ = services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         if (realAutomations)
         {
@@ -1412,6 +1468,27 @@ public sealed class CustomCommandExecutionTests
             events.Add($"reply:{response.Message}");
             return ValueTask.CompletedTask;
         };
+
+    private sealed class FixedRandomSource(int index) : IMessageLibraryRandomSource
+    {
+        public int Next(int exclusiveMaximum) => index;
+
+        public int NextInclusive(int minimum, int maximum) => minimum;
+    }
+
+    private sealed class CountingChatterSource : IMessageLibraryChatterSource
+    {
+        public int CallCount { get; private set; }
+
+        public Task<ImmutableArray<HelixChatter>> GetAsync(
+            MessageLibraryRenderHost host,
+            CancellationToken cancellationToken
+        )
+        {
+            CallCount++;
+            return Task.FromResult(ImmutableArray<HelixChatter>.Empty);
+        }
+    }
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,

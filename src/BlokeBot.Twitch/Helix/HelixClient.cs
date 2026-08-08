@@ -66,6 +66,88 @@ public sealed class HelixClient(
             : new HelixPredictionEligibilityOutcome.Ineligible();
     }
 
+    public async Task<HelixChattersOutcome> GetChattersAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string moderatorId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (string.IsNullOrWhiteSpace(broadcasterId) || string.IsNullOrWhiteSpace(moderatorId))
+        {
+            return new HelixChattersOutcome.Unavailable();
+        }
+
+        var chatters = ImmutableArray.CreateBuilder<HelixChatter>();
+        var chatterIds = new HashSet<string>(StringComparer.Ordinal);
+        var cursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        try
+        {
+            do
+            {
+                using var request = HelixRequest.Create(
+                    HttpMethod.Get,
+                    ChattersUri(broadcasterId, moderatorId, cursor),
+                    context
+                );
+                using var response = await _http.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new HelixChattersOutcome.Unavailable();
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<ChattersResponse>(
+                    _jsonOptions,
+                    cancellationToken
+                );
+                if (payload is null || payload.Data.IsDefault || payload.Pagination is null)
+                {
+                    return new HelixChattersOutcome.Unavailable();
+                }
+
+                foreach (var chatter in payload.Data)
+                {
+                    if (
+                        string.IsNullOrWhiteSpace(chatter.UserId)
+                        || string.IsNullOrWhiteSpace(chatter.Login)
+                        || string.IsNullOrWhiteSpace(chatter.DisplayName)
+                    )
+                    {
+                        return new HelixChattersOutcome.Unavailable();
+                    }
+
+                    if (chatterIds.Add(chatter.UserId))
+                    {
+                        chatters.Add(new(chatter.UserId, chatter.Login, chatter.DisplayName));
+                    }
+                }
+
+                cursor = payload.Pagination.Cursor;
+                if (!string.IsNullOrWhiteSpace(cursor) && !cursors.Add(cursor))
+                {
+                    return new HelixChattersOutcome.Unavailable();
+                }
+            } while (!string.IsNullOrWhiteSpace(cursor));
+
+            return new HelixChattersOutcome.Complete(chatters.ToImmutable());
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception
+                    is HttpRequestException
+                        or IOException
+                        or JsonException
+                        or TimeoutException
+            )
+        {
+            return new HelixChattersOutcome.Unavailable();
+        }
+    }
+
     public async Task<IReadOnlyList<HelixUser>> GetUsersByLoginAsync(
         HelixRequestContext context,
         IEnumerable<string?> logins,
@@ -1261,6 +1343,22 @@ public sealed class HelixClient(
         return $"{endpointPolicy.HelixEndpoint("moderation/channels").AbsoluteUri}?{QueryString.Create(query)}";
     }
 
+    private string ChattersUri(string broadcasterId, string moderatorId, string? cursor)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["broadcaster_id"] = broadcasterId,
+            ["moderator_id"] = moderatorId,
+            ["first"] = "1000",
+        };
+        if (!string.IsNullOrWhiteSpace(cursor))
+        {
+            query["after"] = cursor;
+        }
+
+        return $"{endpointPolicy.HelixEndpoint("chat/chatters").AbsoluteUri}?{QueryString.Create(query)}";
+    }
+
     private sealed record UsersResponse
     {
         [JsonPropertyName("data")]
@@ -1274,6 +1372,27 @@ public sealed class HelixClient(
 
         [JsonPropertyName("pagination")]
         public Pagination Pagination { get; init; } = new();
+    }
+
+    private sealed record ChattersResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<ChatterItem> Data { get; init; }
+
+        [JsonPropertyName("pagination")]
+        public required Pagination Pagination { get; init; }
+    }
+
+    private sealed record ChatterItem
+    {
+        [JsonPropertyName("user_id")]
+        public required string UserId { get; init; }
+
+        [JsonPropertyName("user_login")]
+        public required string Login { get; init; }
+
+        [JsonPropertyName("user_name")]
+        public required string DisplayName { get; init; }
     }
 
     private sealed record StreamResponse

@@ -8,6 +8,41 @@ namespace BlokeBot.Core.Tests;
 public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedulerTestBase
 {
     [Test]
+    public async Task SafeRetry_ReusesFirstRenderedRandomMessage()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        _ = await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["{random_from|First|Second}"],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        var random = new CountingRandomSource();
+        var sender = new ScriptedAnnouncementSender(
+            new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                new AnnouncementEnqueueFailureType("Busy")
+            ),
+            new AnnouncementEnqueueOutcome.Accepted()
+        );
+        var scheduler = CreateScheduler(dbFactory, clock, sender, random: random);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+        clock.SetUtcNow(now.AddSeconds(2));
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Calls.Select(static call => call.Message).ShouldBe(["First", "First"]);
+        random.CallCount.ShouldBe(1);
+    }
+
+    [Test]
     public async Task NativeRateLimit_RunningTick_PersistsRetryResultAndRetainsSelectedMessage()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -333,5 +368,18 @@ public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedule
             AnnouncementOccurrenceStatus.TerminalMissingMessage
         );
         blankAnnouncement.OccurrenceAttemptCount.ShouldBe(0);
+    }
+
+    private sealed class CountingRandomSource : IMessageLibraryRandomSource
+    {
+        public int CallCount { get; private set; }
+
+        public int Next(int exclusiveMaximum)
+        {
+            CallCount++;
+            return CallCount - 1;
+        }
+
+        public int NextInclusive(int minimum, int maximum) => minimum;
     }
 }

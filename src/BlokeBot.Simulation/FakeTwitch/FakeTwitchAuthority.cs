@@ -39,6 +39,7 @@ public sealed record FakeTwitchScenarioDefinition
                 "user:read:chat",
                 "user:write:chat",
                 "user:read:moderated_channels",
+                "moderator:read:chatters",
                 "moderator:read:followers",
                 "moderator:manage:announcements",
                 "moderator:manage:chat_messages",
@@ -948,6 +949,10 @@ public static class FakeTwitchHostingExtensions
             "/helix/chat/settings",
             (HttpRequest request) => ChatSettings(authority, request)
         );
+        _ = app.MapGet(
+            "/helix/chat/chatters",
+            (HttpRequest request) => Chatters(authority, request)
+        );
         _ = app.MapPost(
             "/helix/eventsub/subscriptions",
             (HttpRequest request) => SubscribeAsync(authority, request)
@@ -1312,6 +1317,46 @@ public static class FakeTwitchHostingExtensions
                             unique_chat_mode = false,
                         },
                     },
+                }
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static IResult Chatters(FakeTwitchAuthority authority, HttpRequest request)
+    {
+        try
+        {
+            var bot = authority.RequireUserToken(request, "moderator:read:chatters");
+            var channel = authority.Definition.AuthorizedUser;
+            return Results.Json(
+                new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            user_id = bot.Id,
+                            user_login = bot.Login,
+                            user_name = bot.DisplayName,
+                        },
+                        new
+                        {
+                            user_id = channel.Id,
+                            user_login = channel.Login,
+                            user_name = channel.DisplayName,
+                        },
+                        new
+                        {
+                            user_id = "3000",
+                            user_login = "simulationviewer",
+                            user_name = "Simulation Viewer",
+                        },
+                    },
+                    pagination = new { },
                 }
             );
         }

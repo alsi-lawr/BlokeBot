@@ -201,6 +201,10 @@
                                                 @onclick="() => AddVariant(entry)">Add message</button>
                                         @(ValidationMessageFor(AddMessageVariantControlId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.VariantText)))
                                     </div>
+                                    <p class="text-xs leading-5 text-muted-foreground">
+                                        Pick fresh values with <code>{random_from|one|two}</code>,
+                                        <code>{random_between|1|10}</code>, or <code>{random_viewer}</code>.
+                                    </p>
                                     @for (var i = 0; i < entry.Variants.Count; i++)
                                     {
                                         var index = i;

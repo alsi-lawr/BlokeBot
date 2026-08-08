@@ -209,6 +209,20 @@ public static class CustomCommandConfigurationValidator
                         )
                     );
                 }
+                else if (MessageLibraryRandomTokenParser.Validate(text) is { } randomTokenError)
+                {
+                    AddError(
+                        errors,
+                        randomTokenError,
+                        new(
+                            CustomCommandSettingsTab.MessageLibrary,
+                            CustomCommandValidationEntityKind.Variant,
+                            editor.Id,
+                            CustomCommandValidationFieldKind.VariantText,
+                            variant.Id
+                        )
+                    );
+                }
 
                 variants.Add(new CustomMessageVariantValue(variant.Id, text));
             }

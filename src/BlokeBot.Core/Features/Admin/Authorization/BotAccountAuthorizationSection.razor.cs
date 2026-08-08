@@ -63,6 +63,10 @@ public partial class BotAccountAuthorizationSection
 
     private string? _collapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
 
+    private bool _connectedChatterScopeMissing =>
+        Status?.MissingScopes.Contains(Scopes.ModeratorReadChatters, StringComparer.Ordinal)
+        == true;
+
     private string _bodyClass =>
         Disabled
             ? "grid gap-4 p-5 opacity-60 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"

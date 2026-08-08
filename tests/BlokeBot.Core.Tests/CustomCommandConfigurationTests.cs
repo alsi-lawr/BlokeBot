@@ -539,6 +539,28 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
+    public void MalformedRandomToken_Validating_TargetsExactMessageVariant()
+    {
+        var configuration = ConfigurationWithCommands();
+        var entry = configuration.MessageEntries.Single();
+        var variant = entry.Variants.Single();
+        variant.Text = "{random_between|10|1}";
+
+        var error = ValidationErrors(configuration).Single();
+
+        error.Message.ShouldBe("random_between needs the lower number first.");
+        error.Target.ShouldBe(
+            new(
+                CustomCommandSettingsTab.MessageLibrary,
+                CustomCommandValidationEntityKind.Variant,
+                entry.Id,
+                CustomCommandValidationFieldKind.VariantText,
+                variant.Id
+            )
+        );
+    }
+
+    [Test]
     public void CommandValidation_Validating_TargetsCommandControls()
     {
         var draft = ConfigurationWithCommands(("Command", string.Empty));
