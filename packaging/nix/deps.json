@@ -1,5 +1,20 @@
 [
   {
+    "pname": "Antlr4.Runtime.Standard",
+    "version": "4.13.1",
+    "hash": "sha256-lvqRdOTY4JRmjhK0tMKtI4zbAgDbyeBAHxTwpzDEyZE="
+  },
+  {
+    "pname": "Cel",
+    "version": "0.3.3",
+    "hash": "sha256-hqbZy+oNEEOVHyE6iDTfTySjoa+xzwTBrjj1h2N+anE="
+  },
+  {
+    "pname": "Google.Protobuf",
+    "version": "3.25.2",
+    "hash": "sha256-Gj1zF6FpQ5c9I2TYJLYB3trEuzuboMYXL2t7auxyOZo="
+  },
+  {
     "pname": "Humanizer.Core",
     "version": "2.14.1",
     "hash": "sha256-EXvojddPu+9JKgOG9NSQgUTfWq1RpOYw7adxDPKDJ6o="
@@ -413,5 +428,10 @@
     "pname": "System.Threading.RateLimiting",
     "version": "8.0.0",
     "hash": "sha256-KOEWEt6ZthvZHJ2Wp70d9nBhBrPqobGQDi2twlKYh/w="
+  },
+  {
+    "pname": "TimeZoneConverter",
+    "version": "7.0.0",
+    "hash": "sha256-CMEdkQxUYIQFloGHNxpu6MUZ+vpIv5sfphz/u+8DnL8="
   }
 ]
