@@ -59,7 +59,15 @@ public sealed class MessageLibraryRandomTokenTests
     [Arguments("{random_between|1}", "random_between needs exactly two whole numbers.")]
     [Arguments("{random_between|2|1}", "random_between needs the lower number first.")]
     [Arguments("{random_viewer|one}", "random_viewer does not take values.")]
+    [Arguments("{random_from", "Random message tokens need a closing brace.")]
+    [Arguments("{random_between", "Random message tokens need a closing brace.")]
     [Arguments("{random_viewer", "Random message tokens need a closing brace.")]
+    [Arguments("{random_from|one", "Random message tokens need a closing brace.")]
+    [Arguments("{random_between|1|2", "Random message tokens need a closing brace.")]
+    [Arguments("{random_viewer|one", "Random message tokens need a closing brace.")]
+    [Arguments("{random_fromage", null)]
+    [Arguments("{random_betweenish", null)]
+    [Arguments("{random_viewer_notes", null)]
     public void Validation_OnlyRejectsMalformedRecognizedTokens(string template, string? error) =>
         MessageLibraryRandomTokenParser.Validate(template).ShouldBe(error);
 

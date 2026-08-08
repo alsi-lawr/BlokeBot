@@ -561,6 +561,18 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
+    [Arguments("{random_fromage")]
+    [Arguments("{random_betweenish")]
+    [Arguments("{random_viewer_notes")]
+    public void UnknownRandomPrefixCollision_Validating_DoesNotBlockSave(string text)
+    {
+        var configuration = ConfigurationWithCommands();
+        configuration.MessageEntries.Single().Variants.Single().Text = text;
+
+        ValidationErrors(configuration).ShouldBeEmpty();
+    }
+
+    [Test]
     public void CommandValidation_Validating_TargetsCommandControls()
     {
         var draft = ConfigurationWithCommands(("Command", string.Empty));

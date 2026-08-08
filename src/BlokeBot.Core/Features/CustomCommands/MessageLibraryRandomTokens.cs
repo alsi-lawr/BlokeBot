@@ -271,9 +271,17 @@ internal static class MessageLibraryRandomTokenParser
     }
 
     private static bool IsRecognizedPrefix(ReadOnlySpan<char> value) =>
-        value.StartsWith("random_from", StringComparison.OrdinalIgnoreCase)
-        || value.StartsWith("random_between", StringComparison.OrdinalIgnoreCase)
-        || value.StartsWith("random_viewer", StringComparison.OrdinalIgnoreCase);
+        IsTokenNameOrValue(value, "random_from")
+        || IsTokenNameOrValue(value, "random_between")
+        || IsTokenNameOrValue(value, "random_viewer");
+
+    private static bool IsTokenNameOrValue(ReadOnlySpan<char> value, ReadOnlySpan<char> name) =>
+        value.Equals(name, StringComparison.OrdinalIgnoreCase)
+        || (
+            value.Length > name.Length
+            && value[name.Length] == '|'
+            && value[..name.Length].Equals(name, StringComparison.OrdinalIgnoreCase)
+        );
 
     private static bool IsName(string value, string expected) =>
         string.Equals(value, expected, StringComparison.OrdinalIgnoreCase);
