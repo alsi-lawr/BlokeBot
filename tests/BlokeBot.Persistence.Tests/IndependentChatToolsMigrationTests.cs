@@ -75,7 +75,10 @@ public sealed class IndependentChatToolsMigrationTests
                         | HostFeatureFlags.ClipsAndMarkers
                         | HostFeatureFlags.RewardsAndRedemptions
                 ),
-                Host("unknown", HostFeatureFlags.NativeTwitchFeatures | (HostFeatureFlags)4096UL)
+                Host(
+                    "automation",
+                    HostFeatureFlags.NativeTwitchFeatures | HostFeatureFlags.Automations
+                )
             );
             _ = await latest.SaveChangesAsync();
             await latest.GetService<IMigrator>().MigrateAsync(_viewerCommandCatalog);
@@ -87,7 +90,7 @@ public sealed class IndependentChatToolsMigrationTests
                 .Hosts.OrderBy(static value => value.Id)
                 .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
-        ).ShouldBe([31L, 0L, 0L, 0L, 4104L]);
+        ).ShouldBe([4127L, 0L, 0L, 0L, 4104L]);
         (await ReadDefaultAsync(downgraded.Database.GetDbConnection())).ShouldBe("31");
     }
 

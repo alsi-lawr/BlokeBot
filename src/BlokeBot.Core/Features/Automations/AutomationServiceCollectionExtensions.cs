@@ -1,0 +1,30 @@
+using BlokeBot.Core.Features.HostedChannels;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace BlokeBot.Core.Features.Automations;
+
+public static class AutomationServiceCollectionExtensions
+{
+    public static IServiceCollection AddBlokeBotAutomations(this IServiceCollection services)
+    {
+        _ = services.AddAutomationCatalogModule<CoreAutomationCatalogModule>();
+        services.TryAddSingleton<AutomationDefinitionCatalog>();
+        services.TryAddSingleton(static serviceProvider => new AutomationCatalogService(
+            serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),
+            serviceProvider.GetRequiredService<HostFeatureService>()
+        ));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, AutomationCatalogStartupService>()
+        );
+        return services;
+    }
+
+    public static IServiceCollection AddAutomationCatalogModule<TModule>(
+        this IServiceCollection services
+    )
+        where TModule : class, IAutomationCatalogModule
+    {
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAutomationCatalogModule, TModule>());
+        return services;
+    }
+}

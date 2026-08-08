@@ -6,6 +6,7 @@ public static class HostFeatureCatalog
 {
     public static IReadOnlyList<HostFeatureFlags> Features { get; } =
     [
+        HostFeatureFlags.Automations,
         HostFeatureFlags.Shoutouts,
         HostFeatureFlags.Polls,
         HostFeatureFlags.ClipsAndMarkers,
@@ -22,6 +23,12 @@ public static class HostFeatureCatalog
 
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
         [
+            new(
+                HostFeatureFlags.Automations,
+                "Automations",
+                "Connect channel events to chat, overlays, conditions, and delays.",
+                enabledFeatures.Contains(HostFeatureFlags.Automations)
+            ),
             new(
                 HostFeatureFlags.Shoutouts,
                 "Shoutouts",
