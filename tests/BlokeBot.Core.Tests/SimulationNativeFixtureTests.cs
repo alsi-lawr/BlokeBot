@@ -30,7 +30,7 @@ public sealed class SimulationNativeFixtureTests
 
     [Test]
     public void OverlayAliasResolvesToTheDeterministicDashboardRoute() =>
-        SimulationViewCatalog.PathFor("overlays").ShouldBe("/overlays/sources");
+        SimulationViewCatalog.PathFor("overlays").ShouldBe("/overlays#sources");
 
     [Test]
     public async Task OfflineSimulationSeedsAutomaticConfigurationOutcomesAndLocalDelivery()

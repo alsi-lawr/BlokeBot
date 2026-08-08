@@ -214,7 +214,7 @@
     {
       "file": "laptop-dark-custom-commands.png",
       "capture": "capture/screenshots.lua",
-      "route": "/custom-commands/settings",
+      "route": "/custom-commands/settings#commands",
       "simulationAlias": "/simulation/login?view=custom-commands&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:custom-commands",
       "theme": "dark",
@@ -222,7 +222,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
     },
     {
       "file": "laptop-dark-guessing-leaderboard.png",
@@ -240,7 +240,7 @@
     {
       "file": "laptop-dark-guessing-workflow.webp",
       "capture": "capture/guessing-workflow.lua",
-      "route": "/guessing",
+      "route": "/guessing#live",
       "simulationAlias": "/simulation/login?view=guessing&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:guessing-workflow",
       "theme": "dark",
@@ -248,7 +248,7 @@
       "format": "webp",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /guessing; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
+      "semanticReadiness": "path /guessing#live; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
     },
     {
       "file": "laptop-dark-home-scroll.webp",
@@ -344,7 +344,7 @@
     {
       "file": "laptop-dark-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/cues",
+      "route": "/overlays#cues",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-cues",
       "theme": "dark",
@@ -352,12 +352,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-event-feed.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-event-feed",
       "theme": "dark",
@@ -365,12 +365,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-giveaway.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-giveaway",
       "theme": "dark",
@@ -378,12 +378,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-guessing.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-guessing",
       "theme": "dark",
@@ -391,12 +391,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-media.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/media",
+      "route": "/overlays#media",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-media",
       "theme": "dark",
@@ -404,12 +404,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-sources.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-sources",
       "theme": "dark",
@@ -417,12 +417,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-viewer-queue.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-viewer-queue",
       "theme": "dark",
@@ -430,7 +430,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-points-settings.png",
@@ -513,7 +513,7 @@
     {
       "file": "laptop-light-custom-commands.png",
       "capture": "capture/screenshots.lua",
-      "route": "/custom-commands/settings",
+      "route": "/custom-commands/settings#commands",
       "simulationAlias": "/simulation/login?view=custom-commands&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:custom-commands",
       "theme": "light",
@@ -521,7 +521,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
     },
     {
       "file": "laptop-light-guessing-leaderboard.png",
@@ -539,7 +539,7 @@
     {
       "file": "laptop-light-guessing-workflow.webp",
       "capture": "capture/guessing-workflow.lua",
-      "route": "/guessing",
+      "route": "/guessing#live",
       "simulationAlias": "/simulation/login?view=guessing&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:guessing-workflow",
       "theme": "light",
@@ -547,7 +547,7 @@
       "format": "webp",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /guessing; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
+      "semanticReadiness": "path /guessing#live; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
     },
     {
       "file": "laptop-light-home-scroll.webp",
@@ -643,7 +643,7 @@
     {
       "file": "laptop-light-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/cues",
+      "route": "/overlays#cues",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-cues",
       "theme": "light",
@@ -651,12 +651,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-event-feed.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-event-feed",
       "theme": "light",
@@ -664,12 +664,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-giveaway.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-giveaway",
       "theme": "light",
@@ -677,12 +677,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-guessing.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-guessing",
       "theme": "light",
@@ -690,12 +690,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-media.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/media",
+      "route": "/overlays#media",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-media",
       "theme": "light",
@@ -703,12 +703,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-sources.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-sources",
       "theme": "light",
@@ -716,12 +716,12 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-viewer-queue.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-viewer-queue",
       "theme": "light",
@@ -729,7 +729,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-points-settings.png",
@@ -812,7 +812,7 @@
     {
       "file": "phone-dark-custom-commands.png",
       "capture": "capture/screenshots.lua",
-      "route": "/custom-commands/settings",
+      "route": "/custom-commands/settings#commands",
       "simulationAlias": "/simulation/login?view=custom-commands&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:custom-commands",
       "theme": "dark",
@@ -820,7 +820,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
     },
     {
       "file": "phone-dark-guessing-leaderboard.png",
@@ -838,7 +838,7 @@
     {
       "file": "phone-dark-guessing-workflow.webp",
       "capture": "capture/guessing-workflow.lua",
-      "route": "/guessing",
+      "route": "/guessing#live",
       "simulationAlias": "/simulation/login?view=guessing&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:guessing-workflow",
       "theme": "dark",
@@ -846,7 +846,7 @@
       "format": "webp",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /guessing; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
+      "semanticReadiness": "path /guessing#live; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
     },
     {
       "file": "phone-dark-home-scroll.webp",
@@ -942,7 +942,7 @@
     {
       "file": "phone-dark-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/cues",
+      "route": "/overlays#cues",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-cues",
       "theme": "dark",
@@ -950,12 +950,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-event-feed.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-event-feed",
       "theme": "dark",
@@ -963,12 +963,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-giveaway.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-giveaway",
       "theme": "dark",
@@ -976,12 +976,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-guessing.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-guessing",
       "theme": "dark",
@@ -989,12 +989,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-media.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/media",
+      "route": "/overlays#media",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-media",
       "theme": "dark",
@@ -1002,12 +1002,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-sources.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-sources",
       "theme": "dark",
@@ -1015,12 +1015,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-viewer-queue.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=dark",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-viewer-queue",
       "theme": "dark",
@@ -1028,7 +1028,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-points-settings.png",
@@ -1111,7 +1111,7 @@
     {
       "file": "phone-light-custom-commands.png",
       "capture": "capture/screenshots.lua",
-      "route": "/custom-commands/settings",
+      "route": "/custom-commands/settings#commands",
       "simulationAlias": "/simulation/login?view=custom-commands&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:custom-commands",
       "theme": "light",
@@ -1119,7 +1119,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
     },
     {
       "file": "phone-light-guessing-leaderboard.png",
@@ -1137,7 +1137,7 @@
     {
       "file": "phone-light-guessing-workflow.webp",
       "capture": "capture/guessing-workflow.lua",
-      "route": "/guessing",
+      "route": "/guessing#live",
       "simulationAlias": "/simulation/login?view=guessing&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:guessing-workflow",
       "theme": "light",
@@ -1145,7 +1145,7 @@
       "format": "webp",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /guessing; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
+      "semanticReadiness": "path /guessing#live; Sample Channel; Run a round; real History, Leaderboard and Live transitions"
     },
     {
       "file": "phone-light-home-scroll.webp",
@@ -1241,7 +1241,7 @@
     {
       "file": "phone-light-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/cues",
+      "route": "/overlays#cues",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-cues",
       "theme": "light",
@@ -1249,12 +1249,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-event-feed.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-event-feed",
       "theme": "light",
@@ -1262,12 +1262,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-giveaway.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-giveaway",
       "theme": "light",
@@ -1275,12 +1275,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-guessing.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-guessing",
       "theme": "light",
@@ -1288,12 +1288,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-media.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/media",
+      "route": "/overlays#media",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-media",
       "theme": "light",
@@ -1301,12 +1301,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-sources.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-sources",
       "theme": "light",
@@ -1314,12 +1314,12 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-viewer-queue.png",
       "capture": "capture/v0.6-overlay-guides.lua",
-      "route": "/overlays/sources",
+      "route": "/overlays#sources",
       "simulationAlias": "/simulation/login?view=overlays&theme=light",
       "scenario": "fresh-simulation-process:ready-fixture:v0.6-overlay-viewer-queue",
       "theme": "light",
@@ -1327,7 +1327,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays/sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-points-settings.png",

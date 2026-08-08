@@ -12,24 +12,33 @@
         if (item.Href is null)
         {
             <button @key="item.Key"
+                    id="@TabIdFor(item)"
                     class="@TabClass(active)"
                     type="button"
                     role="tab"
                     aria-selected="@(active ? "true" : "false")"
-                    @onclick="() => SelectAsync(item)">
+                    aria-controls="@PanelIdFor(item)"
+                    tabindex="@TabIndexFor(item)"
+                    @ref="_tabElements[item.Key]"
+                    @onclick="() => SelectAsync(item)"
+                    @onkeydown="args => HandleKeyDownAsync(args, item)">
                 @item.Label
             </button>
         }
         else
         {
-            <NavLink @key="item.Key"
-                     class="@TabClass(active)"
-                     href="@item.Href"
-                     Match="NavLinkMatch.All"
-                     role="tab"
-                     aria-selected="@(active ? "true" : "false")">
+            <a @key="item.Key"
+               id="@TabIdFor(item)"
+               class="@TabClass(active)"
+               href="@item.Href"
+               role="tab"
+               aria-selected="@(active ? "true" : "false")"
+               aria-controls="@PanelIdFor(item)"
+               tabindex="@TabIndexFor(item)"
+               @ref="_tabElements[item.Key]"
+               @onkeydown="args => HandleKeyDownAsync(args, item)">
                 @item.Label
-            </NavLink>
+            </a>
         }
     }
 </nav>

@@ -18,6 +18,7 @@
 @inject EventBus<AppEventKind> _events
 @inject IPublicChatMessageSender _chat
 @inject ToastService _toasts
+@inject NavigationManager _navigation
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
@@ -43,14 +44,20 @@
     else
     {
 
-        <SegmentedTabs id="live"
+        <SegmentedTabs Id="guessing"
+                       OwnsFragment
                        AriaLabel="Guessing dashboard view"
                        Items="_dashboardTabs"
-                       ActiveKey="@DashboardTabKey(_activeTab)"
+                       ActiveKey="@KeyForTab(_activeTab)"
                        ActiveKeyChanged="ActivateTabAsync" />
 
         @if (_activeTab == DashboardTab.Live)
         {
+            <div id="guessing-live-panel"
+                 class="space-y-6"
+                 role="tabpanel"
+                 aria-labelledby="guessing-live-tab"
+                 tabindex="0">
             @if (_state is null)
             {
                 <ApplicationCardCollection Owner="guessing-dashboard-cards">
@@ -72,11 +79,16 @@
                     <GuessVotesTable Votes="_state.Votes" />
                 </div>
             }
+            </div>
         }
         else if (_activeTab == DashboardTab.History)
         {
+            <div id="guessing-history-panel"
+                 role="tabpanel"
+                 aria-labelledby="guessing-history-tab"
+                 tabindex="0">
             <ApplicationCardCollection Owner="guessing-dashboard-cards">
-            <section id="history" class="card">
+            <section class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Recent rounds</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Past rounds for this channel.</p>
@@ -121,11 +133,16 @@
                 }
             </section>
             </ApplicationCardCollection>
+            </div>
         }
         else
         {
+            <div id="guessing-leaderboard-panel"
+                 role="tabpanel"
+                 aria-labelledby="guessing-leaderboard-tab"
+                 tabindex="0">
             <ApplicationCardCollection Owner="guessing-dashboard-cards">
-            <section id="leaderboard" class="card">
+            <section class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
@@ -233,6 +250,7 @@
                 }
             </section>
             </ApplicationCardCollection>
+            </div>
         }
     }
 </div>

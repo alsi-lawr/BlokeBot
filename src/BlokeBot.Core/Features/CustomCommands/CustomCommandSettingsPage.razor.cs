@@ -1,12 +1,12 @@
 using System.Globalization;
 using System.Text;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
@@ -21,6 +21,12 @@ public partial class CustomCommandSettingsPage
     }
 
     private sealed record CustomCommandEditorSelection(CustomCommandEditorKind Kind, int Id);
+
+    private static readonly IReadOnlyList<SegmentedTabItem> _settingsTabs =
+    [
+        new("commands", "Commands"),
+        new("message-library", "Message Library"),
+    ];
 
     private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
@@ -58,7 +64,6 @@ public partial class CustomCommandSettingsPage
     private CustomCommandSettingsTab _activeTab;
     private CustomCommandConfigurationValidationTarget? _focusTarget;
     private long _fieldFocusRequest;
-    private CustomCommandSettingsTab? _pendingTabFocus;
     private string? _pendingControlFocusId;
     private string? _editorFocusControlId;
     private long _replySectionOpenRequest;
@@ -73,8 +78,6 @@ public partial class CustomCommandSettingsPage
     private int? _announcementAdvancedEntityId;
     private long _timeZoneSectionOpenRequest;
     private readonly Dictionary<string, ElementReference> _controls = [];
-    private ElementReference _commandsTab;
-    private ElementReference _messageLibraryTab;
     private int? _pendingResetAllCommandId;
     private CustomCommandEditorSelection? _selectedEditor;
 
@@ -146,7 +149,7 @@ public partial class CustomCommandSettingsPage
             : null;
         _nextTemporaryId = -1;
         _validationErrors = [];
-        _activeTab = CustomCommandSettingsTab.Commands;
+        _activeTab = TabForKey(SegmentedTabs.CanonicalKey(_navigation, _settingsTabs));
         _focusTarget = null;
         _pendingResetAllCommandId = null;
         _cueTestOutcome = null;
@@ -272,16 +275,6 @@ public partial class CustomCommandSettingsPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_pendingTabFocus is { } tab)
-        {
-            _pendingTabFocus = null;
-            await (
-                tab == CustomCommandSettingsTab.Commands
-                    ? _commandsTab.FocusAsync()
-                    : _messageLibraryTab.FocusAsync()
-            );
-        }
-
         if (
             _pendingControlFocusId is { } controlId
             && _controls.TryGetValue(controlId, out var control)
@@ -292,41 +285,31 @@ public partial class CustomCommandSettingsPage
         }
     }
 
-    private void ActivateTab(CustomCommandSettingsTab tab)
+    private static CustomCommandSettingsTab TabForKey(string key) =>
+        key == "message-library"
+            ? CustomCommandSettingsTab.MessageLibrary
+            : CustomCommandSettingsTab.Commands;
+
+    private static string KeyForTab(CustomCommandSettingsTab tab) =>
+        tab == CustomCommandSettingsTab.MessageLibrary ? "message-library" : "commands";
+
+    private void HandleTabKeyChanged(string key)
     {
-        _activeTab = tab;
+        _activeTab = TabForKey(key);
         EnsureEditorSelection();
     }
 
-    private void HandleTabKeyDown(KeyboardEventArgs args, CustomCommandSettingsTab currentTab)
+    private void SwitchTab(CustomCommandSettingsTab tab)
     {
-        var tab = args.Key switch
-        {
-            "ArrowLeft" or "ArrowUp" => PreviousTab(currentTab),
-            "ArrowRight" or "ArrowDown" => NextTab(currentTab),
-            "Home" => CustomCommandSettingsTab.Commands,
-            "End" => CustomCommandSettingsTab.MessageLibrary,
-            _ => currentTab,
-        };
-        if (tab == currentTab && args.Key is not ("Home" or "End"))
+        if (_activeTab == tab)
         {
             return;
         }
 
         _activeTab = tab;
-        EnsureEditorSelection();
-        _pendingTabFocus = tab;
+        var uri = _navigation.ToAbsoluteUri(_navigation.Uri);
+        _navigation.NavigateTo(uri.GetLeftPart(UriPartial.Query) + "#" + KeyForTab(tab));
     }
-
-    private static CustomCommandSettingsTab PreviousTab(CustomCommandSettingsTab tab) =>
-        tab == CustomCommandSettingsTab.Commands
-            ? CustomCommandSettingsTab.MessageLibrary
-            : CustomCommandSettingsTab.Commands;
-
-    private static CustomCommandSettingsTab NextTab(CustomCommandSettingsTab tab) =>
-        tab == CustomCommandSettingsTab.MessageLibrary
-            ? CustomCommandSettingsTab.Commands
-            : CustomCommandSettingsTab.MessageLibrary;
 
     private void SelectValidationEditor(CustomCommandConfigurationValidationTarget target)
     {
@@ -545,7 +528,7 @@ public partial class CustomCommandSettingsPage
 
     private void FocusValidationTarget(CustomCommandConfigurationValidationTarget target)
     {
-        _activeTab = target.Tab;
+        SwitchTab(target.Tab);
         SelectValidationEditor(target);
         OpenValidationSection(target);
         _focusTarget = target;
@@ -967,13 +950,6 @@ public partial class CustomCommandSettingsPage
             _ => null,
         };
 
-    private string TabClass(CustomCommandSettingsTab tab) =>
-        tab == _activeTab
-            ? "segmented-motion__tab segmented-motion__tab--active"
-            : "segmented-motion__tab";
-
-    private int TabIndex(CustomCommandSettingsTab tab) => _activeTab == tab ? 0 : -1;
-
     private void AddMessageEntry()
     {
         if (_config is null)
@@ -995,7 +971,7 @@ public partial class CustomCommandSettingsPage
             ],
         };
         _config.MessageEntries.Add(entry);
-        _activeTab = CustomCommandSettingsTab.MessageLibrary;
+        SwitchTab(CustomCommandSettingsTab.MessageLibrary);
         SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry));
     }
 
@@ -1093,7 +1069,7 @@ public partial class CustomCommandSettingsPage
             },
         };
         _config.Commands.Add(command);
-        _activeTab = CustomCommandSettingsTab.Commands;
+        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command));
     }
 
@@ -1323,7 +1299,7 @@ public partial class CustomCommandSettingsPage
 
         var counter = new CustomCounterEditor { Id = NextTemporaryId(), Name = "New counter" };
         _config.Counters.Add(counter);
-        _activeTab = CustomCommandSettingsTab.Commands;
+        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter));
     }
 
@@ -1368,7 +1344,7 @@ public partial class CustomCommandSettingsPage
             Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
         };
         _config.Announcements.Add(announcement);
-        _activeTab = CustomCommandSettingsTab.Commands;
+        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(
             CustomCommandEditorKind.ScheduledMessage,
             announcement.Id,

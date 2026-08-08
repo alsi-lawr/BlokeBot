@@ -14,6 +14,7 @@
 @inject CustomCommandExecutionService _execution
 @inject IOverlayCueAdmissionService _overlayCues
 @inject ICustomCommandViewerResolver _viewers
+@inject NavigationManager _navigation
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
@@ -92,31 +93,12 @@
             </ApplicationCardCollection>
         }
 
-        <div class="segmented-motion @(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "segmented-motion--second" : string.Empty)"
-             role="tablist"
-             aria-label="Custom command settings">
-            <span class="segmented-motion__indicator" aria-hidden="true"></span>
-            <button id="custom-command-commands-tab"
-                    class="@TabClass(CustomCommandSettingsTab.Commands)"
-                    type="button"
-                    role="tab"
-                    aria-selected="@(_activeTab == CustomCommandSettingsTab.Commands ? "true" : "false")"
-                    aria-controls="custom-command-commands-panel"
-                    tabindex="@TabIndex(CustomCommandSettingsTab.Commands)"
-                    @ref="_commandsTab"
-                    @onclick="() => ActivateTab(CustomCommandSettingsTab.Commands)"
-                    @onkeydown="args => HandleTabKeyDown(args, CustomCommandSettingsTab.Commands)">Commands</button>
-            <button id="custom-command-message-library-tab"
-                    class="@TabClass(CustomCommandSettingsTab.MessageLibrary)"
-                    type="button"
-                    role="tab"
-                    aria-selected="@(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "true" : "false")"
-                    aria-controls="custom-command-message-library-panel"
-                    tabindex="@TabIndex(CustomCommandSettingsTab.MessageLibrary)"
-                    @ref="_messageLibraryTab"
-                    @onclick="() => ActivateTab(CustomCommandSettingsTab.MessageLibrary)"
-                    @onkeydown="args => HandleTabKeyDown(args, CustomCommandSettingsTab.MessageLibrary)">Message Library</button>
-        </div>
+        <SegmentedTabs Id="custom-command"
+                       OwnsFragment
+                       AriaLabel="Custom command settings"
+                       Items="_settingsTabs"
+                       ActiveKey="@KeyForTab(_activeTab)"
+                       ActiveKeyChanged="HandleTabKeyChanged" />
 
         <div id="custom-command-message-library-panel"
              class="settings-disclosure-stack"

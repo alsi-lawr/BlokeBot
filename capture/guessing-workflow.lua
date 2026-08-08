@@ -85,6 +85,13 @@ local succeeded, failure = pcall(function()
     ]=]),
     "20s"
   )
+  viset.page.wait_for(
+    viset.javascript([=[
+      document.documentElement.scrollWidth <= window.innerWidth &&
+        document.body.scrollWidth <= window.innerWidth
+    ]=]),
+    "10s"
+  )
   viset.sleep("350ms")
 
   local click = viset.javascript([=[
@@ -103,17 +110,17 @@ local succeeded, failure = pcall(function()
   recording:during("233ms", function()
     viset.page.evaluate(click, { label = "History" })
   end)
-  viset.page.wait_for("Boolean(document.querySelector('#history'))", "10s")
+  viset.page.wait_for("Boolean(document.querySelector('#guessing-history-panel'))", "10s")
   recording:during("333ms")
   recording:during("233ms", function()
     viset.page.evaluate(click, { label = "Leaderboard" })
   end)
-  viset.page.wait_for("Boolean(document.querySelector('#leaderboard'))", "10s")
+  viset.page.wait_for("Boolean(document.querySelector('#guessing-leaderboard-panel'))", "10s")
   recording:during("267ms")
   recording:during("600ms", function()
     viset.page.evaluate(viset.javascript([=[
         window.blokeBotCaptureScroll = (() => {
-          const target = document.querySelector("#leaderboard");
+          const target = document.querySelector("#guessing-leaderboard-panel");
           return {
             start: window.scrollY,
             end: target ? target.getBoundingClientRect().top + window.scrollY : window.scrollY,

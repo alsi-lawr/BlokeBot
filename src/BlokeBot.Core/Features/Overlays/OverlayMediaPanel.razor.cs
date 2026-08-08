@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace BlokeBot.Core.Features.Overlays;
 
-public partial class MediaLibraryPage
+public partial class OverlayMediaPanel
 {
     private IReadOnlyList<OverlayMediaAssetView> _items = [];
     private Guid? _previewTarget;

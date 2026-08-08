@@ -85,11 +85,11 @@ public sealed class OverlayAppearanceTests
     }
 
     [Test]
-    public void DashboardSource_SeparatesPagesAndUsesCompactSemanticControls()
+    public void DashboardSource_SeparatesPanelsAndUsesCompactSemanticControls()
     {
-        var overlays = Source("OverlaysPage.razor");
-        var cues = Source("CuesPage.razor");
-        var media = Source("MediaLibraryPage.razor");
+        var overlays = Source("OverlaySourcesPanel.razor");
+        var cues = Source("OverlayCuesPanel.razor");
+        var media = Source("OverlayMediaPanel.razor");
 
         overlays.ShouldNotContain("type=\"checkbox\"");
         cues.ShouldNotContain("type=\"checkbox\"");
@@ -101,9 +101,9 @@ public sealed class OverlayAppearanceTests
         overlays.ShouldContain("Advanced styling");
         overlays.ShouldContain("data-appearance-editor");
         overlays.ShouldContain("value => value is not GiveawayOverlaySampleState.Idle");
-        cues.ShouldContain("@page \"/overlays/cues\"");
-        cues.ShouldContain("href=\"overlays/media\"");
-        media.ShouldContain("@page \"/overlays/media\"");
+        cues.ShouldNotContain("@page");
+        cues.ShouldContain("href=\"overlays#media\"");
+        media.ShouldNotContain("@page");
         media.ShouldContain("UploadAsync");
         cues.ShouldContain("data-card-owner=\"cue-workspace-columns\"");
         cues.ShouldContain("<div class=\"cue-workspace\"");
@@ -128,7 +128,7 @@ public sealed class OverlayAppearanceTests
         media.ShouldNotContain("MP3", Case.Insensitive);
         media.ShouldNotContain("MP4", Case.Insensitive);
 
-        var editor = Source("OverlaysPage.razor.js");
+        var editor = Source("OverlaySourcesPanel.razor.js");
         editor.ShouldContain("setPointerCapture");
         editor.ShouldContain("event.shiftKey ? 10 : 1");
         editor.ShouldContain("\"ArrowLeft\"");
@@ -144,7 +144,7 @@ public sealed class OverlayAppearanceTests
         cues.ShouldNotContain("textarea");
         cues.ShouldNotContain("Cue-V1");
 
-        var cueStyles = Source("CuesPage.razor.css");
+        var cueStyles = Source("OverlayCuesPanel.razor.css");
         cueStyles.ShouldContain(".cue-workspace > .card");
         cueStyles.ShouldContain("box-shadow: none;");
         cueStyles.ShouldContain("align-items: stretch;");
@@ -158,7 +158,7 @@ public sealed class OverlayAppearanceTests
     [Test]
     public void DashboardDraft_IsCoalescedIdentityBoundAndUnavailableToTopLevelSources()
     {
-        var editor = Source("OverlaysPage.razor.js");
+        var editor = Source("OverlaySourcesPanel.razor.js");
         var browserSource = OverlayBrowserSourceAssets.JavaScript;
 
         editor.ShouldContain("requestAnimationFrame");
@@ -202,7 +202,7 @@ public sealed class OverlayAppearanceTests
     [Test]
     public void DashboardDraft_RevalidatesSelectedAndResetCssAndResendsAfterEveryPreviewLoad()
     {
-        var editor = Source("OverlaysPage.razor.js");
+        var editor = Source("OverlaySourcesPanel.razor.js");
 
         editor.ShouldContain("activeFrame.dataset.overlayId");
         editor.ShouldContain("editor.dataset.renderedCss");
@@ -222,7 +222,7 @@ public sealed class OverlayAppearanceTests
         editor.ShouldContain("(!dotNetBusy && pendingForDotNet === null)");
         editor.ShouldContain("paint(geometry, false)");
         editor.ShouldContain("if (!notifyDotNet) return;");
-        Source("OverlaysPage.razor").ShouldContain("@key=\"_previewUrl\"");
+        Source("OverlaySourcesPanel.razor").ShouldContain("@key=\"_previewUrl\"");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain(
             "kind: \"blokebot-dashboard-draft-ready\""
         );
@@ -231,7 +231,7 @@ public sealed class OverlayAppearanceTests
     [Test]
     public async Task DashboardDraft_RevealsOnlyLoadedValidatedCurrentSelectionAfterAcknowledgement()
     {
-        var editor = Source("OverlaysPage.razor.js");
+        var editor = Source("OverlaySourcesPanel.razor.js");
         var harness = $$"""
             import assert from "node:assert/strict";
 
@@ -621,7 +621,7 @@ public sealed class OverlayAppearanceTests
     [Test]
     public void SpatialEditor_ExposesBodyMovementAllEdgesAndAllCornersWithoutSolidHandles()
     {
-        var source = Source("OverlaysPage.razor");
+        var source = Source("OverlaySourcesPanel.razor");
 
         source.ShouldContain("data-selection-line");
         source.ShouldContain("overlay-selection-dashes");
@@ -649,16 +649,18 @@ public sealed class OverlayAppearanceTests
     [Test]
     public void DashboardPreviews_AvoidIneffectiveSandboxPairsAndRootLocalRoutes()
     {
-        var sources = Source("OverlaysPage.razor");
-        var cues = Source("CuesPage.razor");
-        var tabs = Source("OverlaySectionTabs.razor.cs");
+        var sources = Source("OverlaySourcesPanel.razor");
+        var cues = Source("OverlayCuesPanel.razor");
+        var parent = Source("OverlaysPage.razor");
+        var parentCode = Source("OverlaysPage.razor.cs");
 
         sources.ShouldNotContain("allow-scripts allow-same-origin");
         cues.ShouldNotContain("allow-scripts allow-same-origin");
-        tabs.ShouldContain("\"/overlays/sources\"");
-        tabs.ShouldContain("\"/overlays/cues\"");
-        tabs.ShouldContain("\"/overlays/media\"");
-        tabs.ShouldNotContain("\"file:");
+        parent.ShouldContain("@page \"/overlays\"");
+        parentCode.ShouldContain("new(\"sources\", \"Sources\")");
+        parentCode.ShouldContain("new(\"cues\", \"Cues\")");
+        parentCode.ShouldContain("new(\"media\", \"Media\")");
+        parentCode.ShouldNotContain("\"file:");
     }
 
     private static string Source(string fileName) =>

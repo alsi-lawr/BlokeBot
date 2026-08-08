@@ -18,6 +18,8 @@ internal sealed record SiteGuideSection
 {
     internal required string Heading { get; init; }
 
+    internal string? Anchor { get; init; }
+
     internal SiteMedia? Media { get; init; }
 
     internal IReadOnlyList<string> Paragraphs { get; init; } = [];

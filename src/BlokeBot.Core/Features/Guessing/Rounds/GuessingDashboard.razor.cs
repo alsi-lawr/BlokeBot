@@ -73,6 +73,7 @@ public partial class GuessingDashboard
         _ = await LoadPageContextAsync();
         await LoadFeatureStateAsync();
         await LoadAsync();
+        await ActivateTabAsync(TabForKey(SegmentedTabs.CanonicalKey(_navigation, _dashboardTabs)));
     }
 
     private async Task ActivateTabAsync(DashboardTab tab)
@@ -284,25 +285,23 @@ public partial class GuessingDashboard
 
     private Task StopGuessingAsync() => RunAsync(() => _rounds.StopGuessing(HostId));
 
-    private static string DashboardTabKey(DashboardTab tab) =>
-        tab switch
+    private static DashboardTab TabForKey(string key) =>
+        key switch
         {
-            DashboardTab.Live => "live",
-            DashboardTab.History => "history",
-            DashboardTab.Leaderboard => "leaderboard",
-            _ => throw new ArgumentOutOfRangeException(nameof(tab), tab, null),
+            "history" => DashboardTab.History,
+            "leaderboard" => DashboardTab.Leaderboard,
+            _ => DashboardTab.Live,
         };
 
-    private Task ActivateTabAsync(string tab) =>
-        ActivateTabAsync(
-            tab switch
-            {
-                "live" => DashboardTab.Live,
-                "history" => DashboardTab.History,
-                "leaderboard" => DashboardTab.Leaderboard,
-                _ => throw new ArgumentOutOfRangeException(nameof(tab), tab, null),
-            }
-        );
+    private static string KeyForTab(DashboardTab tab) =>
+        tab switch
+        {
+            DashboardTab.History => "history",
+            DashboardTab.Leaderboard => "leaderboard",
+            _ => "live",
+        };
+
+    private Task ActivateTabAsync(string tab) => ActivateTabAsync(TabForKey(tab));
 
     private async Task RunAsync(Func<IO<GuessingOperationOutcome, Never>> operation)
     {

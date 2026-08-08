@@ -4,8 +4,6 @@
 @page "/connect"
 @page "/tools"
 @page "/overlays"
-@page "/overlays/cues"
-@page "/overlays/media"
 @page "/community/request-boards"
 @page "/community/play-with-viewers"
 @page "/community/moments"
@@ -56,7 +54,7 @@
 
         @foreach (var section in _page.Sections)
         {
-            <section>
+            <section id="@section.Anchor">
                 <h2>@section.Heading</h2>
 
                 @if (section.Media is { } sectionMedia)

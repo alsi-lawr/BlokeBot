@@ -2,7 +2,7 @@ using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;
 
-public partial class CuesPage
+public partial class OverlayCuesPanel
 {
     private IReadOnlyList<OverlayCueView> _items = [];
     private IReadOnlyList<OverlayMediaAssetView> _assets = [];

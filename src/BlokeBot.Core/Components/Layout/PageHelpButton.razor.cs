@@ -6,7 +6,7 @@ public partial class PageHelpButton
 {
     private bool _isOpen;
 
-    private HelpPage? _currentHelp => HelpForPath(_currentPath);
+    private HelpPage? _currentHelp => HelpForLocation(_currentPath, _currentFragment);
 
     private string _currentPath
     {
@@ -18,9 +18,34 @@ public partial class PageHelpButton
         }
     }
 
-    protected override void OnInitialized() => _navigation.LocationChanged += OnLocationChanged;
+    // Same-page fragment pushes never raise LocationChanged on the server, so the
+    // fragment-owned tab state is the authority whenever it describes the current path.
+    private string _currentFragment =>
+        string.Equals(_fragments.Path, _currentAbsolutePath, StringComparison.Ordinal)
+        && _fragments.Fragment is { } fragment
+            ? fragment
+            : _navigation.ToAbsoluteUri(_navigation.Uri).Fragment.TrimStart('#');
 
-    public void Dispose() => _navigation.LocationChanged -= OnLocationChanged;
+    private string _currentAbsolutePath => _navigation.ToAbsoluteUri(_navigation.Uri).AbsolutePath;
+
+    protected override void OnInitialized()
+    {
+        _navigation.LocationChanged += OnLocationChanged;
+        _fragments.Changed += OnFragmentChanged;
+    }
+
+    public void Dispose()
+    {
+        _navigation.LocationChanged -= OnLocationChanged;
+        _fragments.Changed -= OnFragmentChanged;
+    }
+
+    private void OnFragmentChanged() =>
+        _ = InvokeAsync(() =>
+        {
+            _isOpen = false;
+            StateHasChanged();
+        });
 
     private void Close() => _isOpen = false;
 
@@ -33,7 +58,7 @@ public partial class PageHelpButton
             StateHasChanged();
         });
 
-    private static HelpPage? HelpForPath(string path) =>
+    private static HelpPage? HelpForLocation(string path, string fragment) =>
         path switch
         {
             "/" => _homeHelp,
@@ -47,9 +72,12 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
-            "/overlays/sources" => _overlaysHelp,
-            "/overlays/cues" => _cuesHelp,
-            "/overlays/media" => _mediaLibraryHelp,
+            "/overlays" => fragment switch
+            {
+                "cues" => _cuesHelp,
+                "media" => _mediaLibraryHelp,
+                _ => _overlaysHelp,
+            },
             "/twitch-operations/shoutouts" => _shoutoutsHelp,
             "/twitch-operations/polls" => _pollsHelp,
             "/twitch-operations/clips-markers" => _clipsMarkersHelp,
@@ -59,7 +87,7 @@ public partial class PageHelpButton
         };
 
     internal static bool HasUsefulHelpForPath(string path) =>
-        HelpForPath(path) is { } help
+        HelpForLocation(path, string.Empty) is { } help
         && !string.IsNullOrWhiteSpace(help.Title)
         && help.Sections.Count > 0
         && help.Sections.All(static section =>

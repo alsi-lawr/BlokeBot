@@ -14,8 +14,6 @@ internal static class SiteRoutes
         "/connect",
         "/tools",
         "/overlays",
-        "/overlays/cues",
-        "/overlays/media",
         "/community/request-boards",
         "/community/play-with-viewers",
         "/community/moments",
