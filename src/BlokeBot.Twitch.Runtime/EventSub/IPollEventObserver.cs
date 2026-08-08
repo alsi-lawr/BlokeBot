@@ -14,7 +14,15 @@ public sealed record EventSubPollEvent(
     string Status,
     DateTimeOffset StartedAt,
     DateTimeOffset? EndsAt,
-    string MessageId
+    string MessageId,
+    EventSubPollStage Stage
 );
+
+public enum EventSubPollStage
+{
+    Begin,
+    Progress,
+    End,
+}
 
 public sealed record EventSubPollChoice(string Id, string Title, int Votes, int ChannelPointsVotes);

@@ -42,6 +42,45 @@ public static class AutomationDefinitionIds
     public static AutomationDefinitionId FulfilRedemptionAction { get; } = new("fulfil-redemption");
 
     public static AutomationDefinitionId CancelRedemptionAction { get; } = new("cancel-redemption");
+
+    public static AutomationDefinitionId ShoutoutSentSource { get; } = new("shoutout-sent");
+
+    public static AutomationDefinitionId ShoutoutReceivedSource { get; } = new("shoutout-received");
+
+    public static AutomationDefinitionId PollStartedSource { get; } = new("poll-started");
+
+    public static AutomationDefinitionId PollProgressedSource { get; } = new("poll-progressed");
+
+    public static AutomationDefinitionId PollEndedSource { get; } = new("poll-ended");
+
+    public static AutomationDefinitionId PredictionStartedSource { get; } =
+        new("prediction-started");
+
+    public static AutomationDefinitionId PredictionProgressedSource { get; } =
+        new("prediction-progressed");
+
+    public static AutomationDefinitionId PredictionLockedSource { get; } = new("prediction-locked");
+
+    public static AutomationDefinitionId PredictionEndedSource { get; } = new("prediction-ended");
+
+    public static AutomationDefinitionId SendShoutoutAction { get; } = new("send-shoutout");
+
+    public static AutomationDefinitionId StartPollAction { get; } = new("start-poll");
+
+    public static AutomationDefinitionId EndPollAction { get; } = new("end-poll");
+
+    public static AutomationDefinitionId CreateClipAction { get; } = new("create-clip");
+
+    public static AutomationDefinitionId CreateMarkerAction { get; } = new("create-marker");
+
+    public static AutomationDefinitionId StartPredictionAction { get; } = new("start-prediction");
+
+    public static AutomationDefinitionId LockPredictionAction { get; } = new("lock-prediction");
+
+    public static AutomationDefinitionId CancelPredictionAction { get; } = new("cancel-prediction");
+
+    public static AutomationDefinitionId ResolvePredictionAction { get; } =
+        new("resolve-prediction");
 }
 
 internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule

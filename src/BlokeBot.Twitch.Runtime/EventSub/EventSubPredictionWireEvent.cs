@@ -46,6 +46,13 @@ internal sealed record EventSubPredictionWireEvent
             "channel.prediction.end" when Status is "resolved" or "canceled" => Status,
             _ => null,
         };
+        var stage = subscriptionType switch
+        {
+            "channel.prediction.begin" => EventSubPredictionStage.Begin,
+            "channel.prediction.progress" => EventSubPredictionStage.Progress,
+            "channel.prediction.lock" => EventSubPredictionStage.Lock,
+            _ => EventSubPredictionStage.End,
+        };
         return status is null
             ? null
             : new(
@@ -59,7 +66,8 @@ internal sealed record EventSubPredictionWireEvent
                 LocksAt ?? LockedAt,
                 EndedAt,
                 WinningOutcomeId,
-                messageId
+                messageId,
+                stage
             );
     }
 

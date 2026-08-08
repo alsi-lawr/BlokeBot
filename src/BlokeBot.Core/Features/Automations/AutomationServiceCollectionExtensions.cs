@@ -9,6 +9,7 @@ public static class AutomationServiceCollectionExtensions
     {
         _ = services.AddAutomationCatalogModule<CoreAutomationCatalogModule>();
         _ = services.AddAutomationCatalogModule<TwitchEventAutomationCatalogModule>();
+        _ = services.AddAutomationCatalogModule<NativeOperationAutomationCatalogModule>();
         services.TryAddSingleton<AutomationDefinitionCatalog>();
         services.TryAddSingleton(static serviceProvider => new AutomationCatalogService(
             serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),

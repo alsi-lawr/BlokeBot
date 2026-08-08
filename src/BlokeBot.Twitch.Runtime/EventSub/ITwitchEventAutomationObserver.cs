@@ -44,6 +44,12 @@ public interface ITwitchEventAutomationObserver
         EventSubRewardRedemptionEvent redemption,
         CancellationToken cancellation
     );
+
+    Task ShoutoutOccurredAsync(EventSubShoutoutEvent shoutout, CancellationToken cancellation);
+
+    Task PollChangedAsync(EventSubPollEvent poll, CancellationToken cancellation);
+
+    Task PredictionChangedAsync(EventSubPredictionEvent prediction, CancellationToken cancellation);
 }
 
 /// <summary>
@@ -76,6 +82,24 @@ public enum AutomationEventSubRequirement
     /// automation diagnostics metadata and is never consulted for subscription creation.
     /// </summary>
     Redemptions,
+
+    /// <summary>
+    /// Subscription lifecycle owned by the Shoutouts feature; diagnostics metadata only, never
+    /// consulted for subscription creation.
+    /// </summary>
+    Shoutouts,
+
+    /// <summary>
+    /// Subscription lifecycle owned by the Polls feature; diagnostics metadata only, never
+    /// consulted for subscription creation.
+    /// </summary>
+    Polls,
+
+    /// <summary>
+    /// Subscription lifecycle owned by the Predictions feature; diagnostics metadata only, never
+    /// consulted for subscription creation.
+    /// </summary>
+    Predictions,
 }
 
 public sealed record EventSubStreamOnlineEvent(

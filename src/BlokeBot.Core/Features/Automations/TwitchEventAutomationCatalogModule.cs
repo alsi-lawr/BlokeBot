@@ -21,6 +21,8 @@ public static class TwitchEventAutomationSources
     public const string HypeTrainScope = "channel:read:hype_train";
     public const string RedemptionsReadScope = "channel:read:redemptions";
     public const string RedemptionsManageScope = "channel:manage:redemptions";
+    public const string PollsReadScope = "channel:read:polls";
+    public const string PredictionsReadScope = "channel:read:predictions";
 
     public static ImmutableArray<TwitchEventAutomationSourceDescriptor> All { get; } =
     [
@@ -98,6 +100,66 @@ public static class TwitchEventAutomationSources
             AutomationEventSubRequirement.Redemptions,
             [RedemptionsReadScope, RedemptionsManageScope],
             "channel.channel_points_custom_reward_redemption.add"
+        ),
+        // The shoutout EventSub subscription lifecycle is owned by the Shoutouts feature and uses
+        // the configured bot account's moderator scopes rather than the broadcaster grant, so no
+        // broadcaster scopes are listed here.
+        new(
+            AutomationDefinitionIds.ShoutoutSentSource,
+            AutomationEventSubRequirement.Shoutouts,
+            [],
+            "channel.shoutout.create"
+        ),
+        new(
+            AutomationDefinitionIds.ShoutoutReceivedSource,
+            AutomationEventSubRequirement.Shoutouts,
+            [],
+            "channel.shoutout.receive"
+        ),
+        // The poll and prediction EventSub subscription lifecycles are owned by their Native
+        // Twitch features; these descriptors only surface the subscription type and the
+        // broadcaster read scope each subscription needs.
+        new(
+            AutomationDefinitionIds.PollStartedSource,
+            AutomationEventSubRequirement.Polls,
+            [PollsReadScope],
+            "channel.poll.begin"
+        ),
+        new(
+            AutomationDefinitionIds.PollProgressedSource,
+            AutomationEventSubRequirement.Polls,
+            [PollsReadScope],
+            "channel.poll.progress"
+        ),
+        new(
+            AutomationDefinitionIds.PollEndedSource,
+            AutomationEventSubRequirement.Polls,
+            [PollsReadScope],
+            "channel.poll.end"
+        ),
+        new(
+            AutomationDefinitionIds.PredictionStartedSource,
+            AutomationEventSubRequirement.Predictions,
+            [PredictionsReadScope],
+            "channel.prediction.begin"
+        ),
+        new(
+            AutomationDefinitionIds.PredictionProgressedSource,
+            AutomationEventSubRequirement.Predictions,
+            [PredictionsReadScope],
+            "channel.prediction.progress"
+        ),
+        new(
+            AutomationDefinitionIds.PredictionLockedSource,
+            AutomationEventSubRequirement.Predictions,
+            [PredictionsReadScope],
+            "channel.prediction.lock"
+        ),
+        new(
+            AutomationDefinitionIds.PredictionEndedSource,
+            AutomationEventSubRequirement.Predictions,
+            [PredictionsReadScope],
+            "channel.prediction.end"
         ),
     ];
 

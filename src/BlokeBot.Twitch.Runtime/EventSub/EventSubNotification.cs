@@ -93,7 +93,9 @@ internal abstract record EventSubNotification
             ),
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
-                    ? new Poll(poll.ToDomain(envelope.Metadata.MessageId))
+                    ? new Poll(
+                        poll.ToDomain(PollStage(subscriptionType), envelope.Metadata.MessageId)
+                    )
                     : new Unknown(),
             "channel.prediction.begin"
             or "channel.prediction.progress"
@@ -176,6 +178,14 @@ internal abstract record EventSubNotification
         Func<TEvent, EventSubNotification> create
     )
         where TEvent : class => normalized is null ? new Unknown() : create(normalized);
+
+    private static EventSubPollStage PollStage(string subscriptionType) =>
+        subscriptionType switch
+        {
+            "channel.poll.begin" => EventSubPollStage.Begin,
+            "channel.poll.progress" => EventSubPollStage.Progress,
+            _ => EventSubPollStage.End,
+        };
 
     private static EventSubHypeTrainStage HypeTrainStage(string subscriptionType) =>
         subscriptionType switch

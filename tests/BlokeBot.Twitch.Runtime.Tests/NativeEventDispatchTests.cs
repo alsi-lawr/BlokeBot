@@ -51,7 +51,8 @@ public sealed class NativeEventDispatchTests
             null,
             null,
             null,
-            "prediction-message"
+            "prediction-message",
+            EventSubPredictionStage.Begin
         );
 
         await session.DispatchRewardRedemptionAsync(redemption, CancellationToken.None);

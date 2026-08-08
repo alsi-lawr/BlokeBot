@@ -16,7 +16,7 @@ internal static class AutomationRequiredFeatures
                         "play-overlay-cue" => HostFeatureFlags.Overlays,
                         "reward-redemption" or "fulfil-redemption" or "cancel-redemption" =>
                             HostFeatureFlags.RewardsAndRedemptions,
-                        _ => HostFeatureFlags.None,
+                        _ => NativeOperationAutomations.BackingFeature(definitionId),
                     }
                 )
         );

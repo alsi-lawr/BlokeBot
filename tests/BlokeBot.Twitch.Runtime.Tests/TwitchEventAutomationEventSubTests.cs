@@ -380,6 +380,168 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
     }
 
     [Test]
+    [Arguments("channel.poll.begin", EventSubPollStage.Begin)]
+    [Arguments("channel.poll.progress", EventSubPollStage.Progress)]
+    [Arguments("channel.poll.end", EventSubPollStage.End)]
+    public void PollEnvelopes_ParsingTypedNotifications_MapStageTitleAndVotes(
+        string subscriptionType,
+        EventSubPollStage expectedStage
+    )
+    {
+        var poll = Parse(
+                $$"""
+                {
+                  "subscription": { "type": "{{subscriptionType}}", "version": "1" },
+                  "event": {
+                    "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                    "id": "poll-1", "title": "Favourite game?",
+                    "choices": [
+                      { "id": "yes", "title": "Yes", "votes": 3, "channel_points_votes": 1 }
+                    ],
+                    "started_at": "2026-08-07T11:59:00Z"
+                  }
+                }
+                """
+            )
+            .ShouldBeOfType<EventSubNotification.Poll>()
+            .Event;
+        poll.Stage.ShouldBe(expectedStage);
+        poll.PollId.ShouldBe("poll-1");
+        poll.Title.ShouldBe("Favourite game?");
+        poll.Choices.ShouldHaveSingleItem().Votes.ShouldBe(3);
+        poll.MessageId.ShouldBe("automation-message-1");
+    }
+
+    [Test]
+    public async Task ShoutoutEvents_ReachAutomationObserversOnlyBehindTheShoutoutsGate()
+    {
+        var observer = new RecordingAutomationObserver();
+        var shoutoutObserver = new RecordingShoutoutObserver();
+        var gate = new SingleFeatureGate(NativeTwitchFeature.Shoutouts);
+        var handler = new EventSubDeliveryHandler(
+            null!,
+            null!,
+            gate,
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                EventSubMessageObserverBoundary,
+                ChatMessage,
+                ChatObserverDeadLetter
+            >(BotObserverBoundaries.EventSubMessages),
+            shoutoutObservers: [shoutoutObserver],
+            automationObservers: [observer]
+        );
+        var envelope = Envelope(
+            """
+            {
+              "subscription": { "type": "channel.shoutout.create", "version": "1" },
+              "event": {
+                "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                "from_broadcaster_user_id": "host-id", "from_broadcaster_user_login": "host_login",
+                "to_broadcaster_user_id": "partner-id", "to_broadcaster_user_login": "partner",
+                "viewer_count": 42, "started_at": "2026-08-07T11:59:00Z"
+              }
+            }
+            """
+        );
+
+        gate.Enabled = false;
+        await handler.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+        observer.Deliveries.ShouldBeEmpty();
+        shoutoutObserver.Deliveries.ShouldBe(0);
+
+        gate.Enabled = true;
+        await handler.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+        observer.Deliveries.ShouldBe(["shoutout-sent"]);
+        shoutoutObserver.Deliveries.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PollAndPredictionEvents_ReachAutomationObserversOnlyBehindTheirParentGates()
+    {
+        var observer = new RecordingAutomationObserver();
+        var pollGate = new SingleFeatureGate(NativeTwitchFeature.Polls);
+        var pollHandler = new EventSubDeliveryHandler(
+            null!,
+            null!,
+            pollGate,
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                EventSubMessageObserverBoundary,
+                ChatMessage,
+                ChatObserverDeadLetter
+            >(BotObserverBoundaries.EventSubMessages),
+            automationObservers: [observer]
+        );
+        var pollEnvelope = Envelope(
+            """
+            {
+              "subscription": { "type": "channel.poll.end", "version": "1" },
+              "event": {
+                "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                "id": "poll-1", "title": "Favourite game?",
+                "choices": [{ "id": "yes", "title": "Yes", "votes": 3, "channel_points_votes": 1 }],
+                "status": "completed", "started_at": "2026-08-07T11:59:00Z"
+              }
+            }
+            """
+        );
+
+        pollGate.Enabled = false;
+        await pollHandler.DispatchNotificationAsync(pollEnvelope, "{}", CancellationToken.None);
+        observer.Deliveries.ShouldBeEmpty();
+
+        pollGate.Enabled = true;
+        await pollHandler.DispatchNotificationAsync(pollEnvelope, "{}", CancellationToken.None);
+        observer.Deliveries.ShouldBe(["poll-end"]);
+
+        var predictionGate = new SingleFeatureGate(NativeTwitchFeature.Predictions);
+        var predictionHandler = new EventSubDeliveryHandler(
+            null!,
+            null!,
+            predictionGate,
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                EventSubMessageObserverBoundary,
+                ChatMessage,
+                ChatObserverDeadLetter
+            >(BotObserverBoundaries.EventSubMessages),
+            automationObservers: [observer]
+        );
+        var predictionEnvelope = Envelope(
+            """
+            {
+              "subscription": { "type": "channel.prediction.lock", "version": "1" },
+              "event": {
+                "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                "id": "prediction-1", "title": "Will we win?",
+                "outcomes": [
+                  { "id": "yes", "title": "Yes", "color": "blue", "users": 1, "channel_points": 100 }
+                ],
+                "started_at": "2026-08-07T11:58:00Z", "locked_at": "2026-08-07T11:59:00Z"
+              }
+            }
+            """
+        );
+
+        predictionGate.Enabled = false;
+        await predictionHandler.DispatchNotificationAsync(
+            predictionEnvelope,
+            "{}",
+            CancellationToken.None
+        );
+        observer.Deliveries.ShouldBe(["poll-end"]);
+
+        predictionGate.Enabled = true;
+        await predictionHandler.DispatchNotificationAsync(
+            predictionEnvelope,
+            "{}",
+            CancellationToken.None
+        );
+        observer.Deliveries.ShouldBe(["poll-end", "prediction-lock"]);
+    }
+
+    [Test]
     public async Task AutomationSubscriptionLifecycle_FollowsRequirementsAndAuthorities()
     {
         var operations = new ScriptedChannelOperations();
@@ -507,6 +669,20 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         ) => ValueTask.FromResult(false);
     }
 
+    private sealed class RecordingShoutoutObserver : IShoutoutEventObserver
+    {
+        internal int Deliveries { get; private set; }
+
+        public Task ShoutoutReceivedAsync(
+            EventSubShoutoutEvent shoutout,
+            CancellationToken cancellationToken
+        )
+        {
+            Deliveries++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingRaidObserver : IIncomingRaidEventObserver
     {
         internal int Deliveries { get; private set; }
@@ -572,6 +748,19 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
             EventSubRewardRedemptionEvent redemption,
             CancellationToken cancellation
         ) => Record("reward-redemption");
+
+        public Task ShoutoutOccurredAsync(
+            EventSubShoutoutEvent shoutout,
+            CancellationToken cancellation
+        ) => Record($"shoutout-{shoutout.Direction.ToString().ToLowerInvariant()}");
+
+        public Task PollChangedAsync(EventSubPollEvent poll, CancellationToken cancellation) =>
+            Record($"poll-{poll.Stage.ToString().ToLowerInvariant()}");
+
+        public Task PredictionChangedAsync(
+            EventSubPredictionEvent prediction,
+            CancellationToken cancellation
+        ) => Record($"prediction-{prediction.Stage.ToString().ToLowerInvariant()}");
 
         private Task Record(string kind)
         {

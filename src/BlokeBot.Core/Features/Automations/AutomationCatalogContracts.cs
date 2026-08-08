@@ -221,6 +221,52 @@ public sealed record FulfilRedemptionActionConfiguration : AutomationConfigurati
 
 public sealed record CancelRedemptionActionConfiguration : AutomationConfiguration;
 
+public sealed record ShoutoutSentSourceConfiguration : AutomationConfiguration;
+
+public sealed record ShoutoutReceivedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PollStartedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PollProgressedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PollEndedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PredictionStartedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PredictionProgressedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PredictionLockedSourceConfiguration : AutomationConfiguration;
+
+public sealed record PredictionEndedSourceConfiguration : AutomationConfiguration;
+
+public sealed record SendShoutoutActionConfiguration : AutomationConfiguration;
+
+public sealed record StartPollActionConfiguration(
+    string Title,
+    string Choices,
+    int DurationSeconds,
+    int? ChannelPointsPerVote
+) : AutomationConfiguration;
+
+public sealed record EndPollActionConfiguration : AutomationConfiguration;
+
+public sealed record CreateClipActionConfiguration(bool HasDelay) : AutomationConfiguration;
+
+public sealed record CreateMarkerActionConfiguration(string Description) : AutomationConfiguration;
+
+public sealed record StartPredictionActionConfiguration(
+    string Title,
+    string Outcomes,
+    int WindowSeconds
+) : AutomationConfiguration;
+
+public sealed record LockPredictionActionConfiguration : AutomationConfiguration;
+
+public sealed record CancelPredictionActionConfiguration : AutomationConfiguration;
+
+public sealed record ResolvePredictionActionConfiguration(string WinningOutcomeId)
+    : AutomationConfiguration;
+
 public sealed record SendChatActionConfiguration(string Message) : AutomationConfiguration;
 
 public sealed record PlayOverlayCueActionConfiguration(
