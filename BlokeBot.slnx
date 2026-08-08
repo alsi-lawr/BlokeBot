@@ -50,7 +50,6 @@
     <File Path="capture/media-manifest.json" />
     <File Path="capture/README.md" />
     <File Path="capture/screenshots.lua" />
-    <File Path="capture/twitch-operations.lua" />
     <File Path="capture/v0.5-guides.lua" />
   </Folder>
   <Folder Name="/Viset/.viset/">

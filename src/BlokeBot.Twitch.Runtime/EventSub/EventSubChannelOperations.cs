@@ -16,6 +16,46 @@ internal sealed class EventSubChannelOperations(
     IAutomationEventSubRequirementSource? automationRequirements = null
 ) : IEventSubChannelOperations
 {
+    private static readonly IReadOnlyDictionary<
+        EventSubBroadcasterOperationKind,
+        IReadOnlyList<(string Type, string Version)>
+    > _broadcasterOperationSubscriptions = new Dictionary<
+        EventSubBroadcasterOperationKind,
+        IReadOnlyList<(string Type, string Version)>
+    >
+    {
+        [EventSubBroadcasterOperationKind.Polls] =
+        [
+            ("channel.poll.begin", "1"),
+            ("channel.poll.progress", "1"),
+            ("channel.poll.end", "1"),
+        ],
+        [EventSubBroadcasterOperationKind.RewardRedemptions] =
+        [
+            ("channel.channel_points_custom_reward_redemption.add", "1"),
+            ("channel.channel_points_custom_reward_redemption.update", "1"),
+        ],
+        [EventSubBroadcasterOperationKind.Predictions] =
+        [
+            ("channel.prediction.begin", "1"),
+            ("channel.prediction.progress", "1"),
+            ("channel.prediction.lock", "1"),
+            ("channel.prediction.end", "1"),
+        ],
+        [EventSubBroadcasterOperationKind.AutomationSubscriptions] =
+        [
+            ("channel.subscribe", "1"),
+            ("channel.subscription.gift", "1"),
+        ],
+        [EventSubBroadcasterOperationKind.AutomationCheers] = [("channel.cheer", "1")],
+        [EventSubBroadcasterOperationKind.AutomationHypeTrain] =
+        [
+            ("channel.hype_train.begin", "2"),
+            ("channel.hype_train.progress", "2"),
+            ("channel.hype_train.end", "2"),
+        ],
+    };
+
     public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
         string channel,
         EventSubAuthorizationContext authorization
@@ -102,60 +142,18 @@ internal sealed class EventSubChannelOperations(
                     cancellationToken
                 ),
             broadcaster =>
-                broadcaster.Operation switch
-                {
-                    EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
+                _broadcasterOperationSubscriptions.TryGetValue(
+                    broadcaster.Operation,
+                    out var subscriptionTypes
+                )
+                    ? CreateBroadcasterOperationSubscriptionsAsync(
                         channel,
                         authorization,
                         account,
+                        subscriptionTypes,
                         cancellationToken
-                    ),
-                    EventSubBroadcasterOperationKind.RewardRedemptions =>
-                        CreateRewardRedemptionSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            cancellationToken
-                        ),
-                    EventSubBroadcasterOperationKind.Predictions =>
-                        CreatePredictionSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            cancellationToken
-                        ),
-                    EventSubBroadcasterOperationKind.AutomationSubscriptions =>
-                        CreateBroadcasterOperationSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            [("channel.subscribe", "1"), ("channel.subscription.gift", "1")],
-                            cancellationToken
-                        ),
-                    EventSubBroadcasterOperationKind.AutomationCheers =>
-                        CreateBroadcasterOperationSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            [("channel.cheer", "1")],
-                            cancellationToken
-                        ),
-                    EventSubBroadcasterOperationKind.AutomationHypeTrain =>
-                        CreateBroadcasterOperationSubscriptionsAsync(
-                            channel,
-                            authorization,
-                            account,
-                            [
-                                ("channel.hype_train.begin", "2"),
-                                ("channel.hype_train.progress", "2"),
-                                ("channel.hype_train.end", "2"),
-                            ],
-                            cancellationToken
-                        ),
-                    _ => throw new UnreachableException(
-                        "Unknown broadcaster EventSub operation kind."
-                    ),
-                }
+                    )
+                    : throw new UnreachableException("Unknown broadcaster EventSub operation kind.")
         );
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
@@ -268,190 +266,33 @@ internal sealed class EventSubChannelOperations(
             ? ValueTask.FromResult(false)
             : automationRequirements.RequiresAsync(channel, requirement, cancellationToken);
 
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(
-        string channel,
-        EventSubAuthorizationContext authorization,
-        BotAccount account,
-        CancellationToken ct
-    )
-    {
-        var resolution = await identities.ResolveAsync(
-            channel,
-            account.Login,
-            account.AccessToken,
-            ct
-        );
-        return await resolution.Match(
-            resolved => CreateChatSubscriptionsAsync(channel, authorization, account, resolved, ct),
-            static _ =>
-                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
-                    new EventSubSubscriptionSetupOutcome.MissingChannel()
-                ),
-            static _ =>
-                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
-                    new EventSubSubscriptionSetupOutcome.MissingBot()
-                )
-        );
-    }
-
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateChatSubscriptionsAsync(
-        string channel,
-        EventSubAuthorizationContext authorization,
-        BotAccount account,
-        ChatIdentityResolution.Resolved resolved,
-        CancellationToken ct
-    )
-    {
-        var ids = new List<string>();
-        try
-        {
-            ids.Add(
-                await CreateAsync(
-                    "channel.chat.message",
-                    new Dictionary<string, string>
-                    {
-                        ["broadcaster_user_id"] = resolved.BroadcasterId,
-                        ["user_id"] = resolved.BotUserId,
-                    },
-                    ct
-                )
-            );
-            return new EventSubSubscriptionSetupOutcome.Created(
-                CreateActive(channel, authorization, account, ids)
-            );
-        }
-        catch (Exception exception) when (ids.Count > 0)
-        {
-            return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
-                CreateActive(channel, authorization, account, ids),
-                exception
-            );
-        }
-    }
-
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotOperationSubscriptionsAsync(
-        string channel,
-        EventSubAuthorizationContext authorization,
-        BotAccount account,
-        CancellationToken ct
-    )
-    {
-        var resolution = await identities.ResolveAsync(
-            channel,
-            account.Login,
-            account.AccessToken,
-            ct
-        );
-        return await resolution.Match(
-            resolved =>
-                CreateShoutoutSubscriptionsAsync(channel, authorization, account, resolved, ct),
-            static _ =>
-                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
-                    new EventSubSubscriptionSetupOutcome.MissingChannel()
-                ),
-            static _ =>
-                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
-                    new EventSubSubscriptionSetupOutcome.MissingBot()
-                )
-        );
-    }
-
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateShoutoutSubscriptionsAsync(
-        string channel,
-        EventSubAuthorizationContext authorization,
-        BotAccount account,
-        ChatIdentityResolution.Resolved resolved,
-        CancellationToken ct
-    )
-    {
-        var ids = new List<string>();
-        try
-        {
-            ids.Add(
-                await CreateAsync(
-                    "channel.shoutout.create",
-                    new Dictionary<string, string>
-                    {
-                        ["broadcaster_user_id"] = resolved.BroadcasterId,
-                        ["moderator_user_id"] = resolved.BotUserId,
-                    },
-                    ct
-                )
-            );
-            ids.Add(
-                await CreateAsync(
-                    "channel.shoutout.receive",
-                    new Dictionary<string, string>
-                    {
-                        ["broadcaster_user_id"] = resolved.BroadcasterId,
-                        ["moderator_user_id"] = resolved.BotUserId,
-                    },
-                    ct
-                )
-            );
-            return new EventSubSubscriptionSetupOutcome.Created(
-                CreateActive(channel, authorization, account, ids)
-            );
-        }
-        catch (Exception exception) when (ids.Count > 0)
-        {
-            return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
-                CreateActive(channel, authorization, account, ids),
-                exception
-            );
-        }
-    }
-
-    private ValueTask<EventSubSubscriptionSetupOutcome> CreatePollSubscriptionsAsync(
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
         CancellationToken ct
     ) =>
-        CreateBroadcasterOperationSubscriptionsAsync(
+        CreateBotConditionSubscriptionsAsync(
             channel,
             authorization,
             account,
-            [
-                ("channel.poll.begin", "1"),
-                ("channel.poll.progress", "1"),
-                ("channel.poll.end", "1"),
-            ],
+            [("channel.chat.message", "1", "user_id")],
             ct
         );
 
-    private ValueTask<EventSubSubscriptionSetupOutcome> CreateRewardRedemptionSubscriptionsAsync(
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotOperationSubscriptionsAsync(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
         CancellationToken ct
     ) =>
-        CreateBroadcasterOperationSubscriptionsAsync(
+        CreateBotConditionSubscriptionsAsync(
             channel,
             authorization,
             account,
             [
-                ("channel.channel_points_custom_reward_redemption.add", "1"),
-                ("channel.channel_points_custom_reward_redemption.update", "1"),
-            ],
-            ct
-        );
-
-    private ValueTask<EventSubSubscriptionSetupOutcome> CreatePredictionSubscriptionsAsync(
-        string channel,
-        EventSubAuthorizationContext authorization,
-        BotAccount account,
-        CancellationToken ct
-    ) =>
-        CreateBroadcasterOperationSubscriptionsAsync(
-            channel,
-            authorization,
-            account,
-            [
-                ("channel.prediction.begin", "1"),
-                ("channel.prediction.progress", "1"),
-                ("channel.prediction.lock", "1"),
-                ("channel.prediction.end", "1"),
+                ("channel.shoutout.create", "1", "moderator_user_id"),
+                ("channel.shoutout.receive", "1", "moderator_user_id"),
             ],
             ct
         );
@@ -470,7 +311,22 @@ internal sealed class EventSubChannelOperations(
             ct
         );
 
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateAutomationBotConditionSubscriptionsAsync(
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreateAutomationBotConditionSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        IReadOnlyList<(string Type, string Version, string BotConditionKey)> subscriptionTypes,
+        CancellationToken ct
+    ) =>
+        CreateBotConditionSubscriptionsAsync(
+            channel,
+            authorization,
+            account,
+            subscriptionTypes,
+            ct
+        );
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateBotConditionSubscriptionsAsync(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
@@ -484,39 +340,26 @@ internal sealed class EventSubChannelOperations(
             account.AccessToken,
             ct
         );
-        return await resolution.Match<ValueTask<EventSubSubscriptionSetupOutcome>>(
-            async resolved =>
-            {
-                var ids = new List<string>();
-                try
-                {
-                    foreach (var (type, version, botConditionKey) in subscriptionTypes)
-                    {
-                        ids.Add(
-                            await CreateAsync(
-                                type,
-                                version,
-                                new Dictionary<string, string>
-                                {
-                                    ["broadcaster_user_id"] = resolved.BroadcasterId,
-                                    [botConditionKey] = resolved.BotUserId,
-                                },
-                                ct
-                            )
-                        );
-                    }
-                    return new EventSubSubscriptionSetupOutcome.Created(
-                        CreateActive(channel, authorization, account, ids)
-                    );
-                }
-                catch (Exception exception) when (ids.Count > 0)
-                {
-                    return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
-                        CreateActive(channel, authorization, account, ids),
-                        exception
-                    );
-                }
-            },
+        return await resolution.Match(
+            resolved =>
+                CreateSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    subscriptionTypes,
+                    (subscription, token) =>
+                        CreateAsync(
+                            subscription.Type,
+                            subscription.Version,
+                            new Dictionary<string, string>
+                            {
+                                ["broadcaster_user_id"] = resolved.BroadcasterId,
+                                [subscription.BotConditionKey] = resolved.BotUserId,
+                            },
+                            token
+                        ),
+                    ct
+                ),
             static _ =>
                 ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
                     new EventSubSubscriptionSetupOutcome.MissingChannel()
@@ -541,24 +384,39 @@ internal sealed class EventSubChannelOperations(
             account.AccessToken,
             ct
         );
-        if (string.IsNullOrWhiteSpace(broadcasterId))
-        {
-            return new EventSubSubscriptionSetupOutcome.MissingChannel();
-        }
+        return string.IsNullOrWhiteSpace(broadcasterId)
+            ? new EventSubSubscriptionSetupOutcome.MissingChannel()
+            : await CreateSubscriptionsAsync(
+                channel,
+                authorization,
+                account,
+                subscriptionTypes,
+                (subscription, token) =>
+                    CreateAsync(
+                        subscription.Type,
+                        subscription.Version,
+                        new Dictionary<string, string> { ["broadcaster_user_id"] = broadcasterId },
+                        token
+                    ),
+                ct
+            );
+    }
 
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionsAsync<TSubscription>(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        IReadOnlyList<TSubscription> subscriptionTypes,
+        Func<TSubscription, CancellationToken, Task<string>> createAsync,
+        CancellationToken ct
+    )
+    {
         var ids = new List<string>();
         try
         {
-            foreach (var (type, version) in subscriptionTypes)
+            foreach (var subscription in subscriptionTypes)
             {
-                ids.Add(
-                    await CreateAsync(
-                        type,
-                        version,
-                        new Dictionary<string, string> { ["broadcaster_user_id"] = broadcasterId },
-                        ct
-                    )
-                );
+                ids.Add(await createAsync(subscription, ct));
             }
             return new EventSubSubscriptionSetupOutcome.Created(
                 CreateActive(channel, authorization, account, ids)

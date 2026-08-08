@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Eventing;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Overlays;
 
@@ -118,7 +119,17 @@ internal sealed class OverlayLiveCoordinator(
         }
     }
 
-    public ValueTask GuessingChangedAsync(int hostId, CancellationToken cancellationToken)
+    public ValueTask GuessingChangedAsync(int hostId, CancellationToken cancellationToken) =>
+        OverlayTypeChangedAsync(hostId, OverlayType.Guessing, cancellationToken);
+
+    public ValueTask GiveawayChangedAsync(int hostId, CancellationToken cancellationToken) =>
+        OverlayTypeChangedAsync(hostId, OverlayType.Giveaway, cancellationToken);
+
+    private ValueTask OverlayTypeChangedAsync(
+        int hostId,
+        OverlayType type,
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         ResolvedOverlayInstance[] instances;
@@ -128,32 +139,7 @@ internal sealed class OverlayLiveCoordinator(
                 .Values.Where(connection =>
                     connection.IsActive
                     && connection.Instance.HostId == hostId
-                    && connection.Instance.Type == BlokeBot.Persistence.Models.OverlayType.Guessing
-                )
-                .Select(connection => connection.Instance)
-                .DistinctBy(instance => instance.OverlayId)
-                .ToArray();
-        }
-
-        foreach (var instance in instances)
-        {
-            QueuePublication(instance, OverlayLivePublicationKind.State);
-        }
-
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask GiveawayChangedAsync(int hostId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ResolvedOverlayInstance[] instances;
-        lock (_connectionsGate)
-        {
-            instances = _connections
-                .Values.Where(connection =>
-                    connection.IsActive
-                    && connection.Instance.HostId == hostId
-                    && connection.Instance.Type == BlokeBot.Persistence.Models.OverlayType.Giveaway
+                    && connection.Instance.Type == type
                 )
                 .Select(connection => connection.Instance)
                 .DistinctBy(instance => instance.OverlayId)

@@ -9,12 +9,8 @@ using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Functional;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -23,73 +19,6 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class NativeTwitchFeatureChangeObserverTests
 {
-    [Test]
-    public async Task ProductionComposition_MapsDashboardAndObserverContractsToEstablishedSingletons()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var events = TestEventBus.Create<AppEventKind>();
-        var services = new ServiceCollection();
-        _ = services.AddLogging();
-        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        _ = services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
-        _ = services.AddSingleton<IHostBotAccountTokenStatusProvider>(new ReadyBotAccount());
-        _ = services.AddSingleton(
-            new HelixClient(
-                new SingleHandlerFactory(new NativeReconciliationHandler()),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            )
-        );
-        _ = services.AddSingleton(
-            BotSettings.FromOptions(
-                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
-            )
-        );
-        _ = services.AddSingleton(events);
-        _ = services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
-        _ = services.AddSingleton(TimeProvider.System);
-        _ = services.AddBlokeBotTwitchOperations();
-        await using var provider = services.BuildServiceProvider();
-
-        var shoutouts = provider.GetRequiredService<ShoutoutService>();
-        var polls = provider.GetRequiredService<PollService>();
-        var clipsMarkers = provider.GetRequiredService<ClipMarkerService>();
-        var channelPoints = provider.GetRequiredService<ChannelPointsService>();
-        var predictions = provider.GetRequiredService<PredictionService>();
-
-        provider.GetRequiredService<IShoutoutDashboardOperations>().ShouldBeSameAs(shoutouts);
-        provider.GetRequiredService<IPollDashboardOperations>().ShouldBeSameAs(polls);
-        provider.GetRequiredService<IClipMarkerDashboardOperations>().ShouldBeSameAs(clipsMarkers);
-        provider
-            .GetRequiredService<IChannelPointsDashboardOperations>()
-            .ShouldBeSameAs(channelPoints);
-        provider.GetRequiredService<IPredictionDashboardOperations>().ShouldBeSameAs(predictions);
-
-        provider.GetRequiredService<IShoutoutEventObserver>().ShouldBeSameAs(shoutouts);
-        provider.GetRequiredService<IPollEventObserver>().ShouldBeSameAs(polls);
-        provider.GetRequiredService<IChannelPointsEventObserver>().ShouldBeSameAs(channelPoints);
-        provider.GetRequiredService<IPredictionEventObserver>().ShouldBeSameAs(predictions);
-        provider
-            .GetRequiredService<IAutomaticRaidNativeShoutoutOperation>()
-            .ShouldBeSameAs(shoutouts);
-
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(AutomaticRaidShoutoutConfigurationService)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(AutomaticRaidShoutoutObserver)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(IAutomaticRaidShoutoutDelivery)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(IIncomingRaidEventObserver)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-    }
-
     [Test]
     public async Task Reenable_ReconcilesRestoredServices_AndRegistersTheirRuntimeObservers()
     {

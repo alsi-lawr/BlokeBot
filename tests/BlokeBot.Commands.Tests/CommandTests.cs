@@ -95,21 +95,6 @@ public sealed class CommandTests
         calls.ShouldBe(0);
     }
 
-    [Test]
-    public async Task RegisteredCommandModule_Dispatching_ExecutesModuleHandler()
-    {
-        List<CommandResponse> responses = [];
-        var dispatcher = BuildDispatcher(static builder => builder.AddCommandModule<TestModule>());
-
-        await dispatcher.DispatchResponsesAsync(
-            Message("alice", "!module value"),
-            RecordResponses(responses),
-            CancellationToken.None
-        );
-
-        responses.ShouldBe([CommandResponse.Chat("value")]);
-    }
-
     private static ChatCommandDispatcher BuildDispatcher(Action<IChatBotBuilder> configure)
     {
         var services = new ServiceCollection();

@@ -39,7 +39,7 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-            var showcase = await client.GetAsync("/blokebot/media/laptop-light-home-scroll.webp");
+            var showcase = await client.GetAsync("/blokebot/blokebot-mark.svg");
             showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
         finally

@@ -309,19 +309,14 @@ public sealed class ChannelPointsService(
         return new ChannelPointsOperationOutcome.RedemptionUpdated();
     }
 
-    public async Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken)
-    {
-        var login = Login.Normalize(channel);
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var hostId = await db
-            .Hosts.Where(x => x.Login == login)
-            .Select(x => (int?)x.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (hostId is { } id)
-        {
-            await ReconcileAsync(id, cancellationToken);
-        }
-    }
+    public Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken) =>
+        NativeTwitchReconciliation.ReconcileChannelAsync(
+            dbFactory,
+            channel,
+            ReconcileAsync,
+            cancellationToken,
+            queryEmptyLogin: true
+        );
 
     public async Task ReconcileAsync(int hostId, CancellationToken cancellationToken) =>
         await ReconcileCoreAsync(hostId, cancellationToken);

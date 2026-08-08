@@ -14,83 +14,49 @@ public partial class OverlayCuesPanel
     private bool _cueEnabled = true;
     private OverlayCueQueuePolicy _policy = OverlayCueQueuePolicy.Enqueue;
     private List<CueLayerDraft> _layers = [CueLayerDraft.New(CueLayerKind.WebPage)];
-    private bool _enabled;
-    private bool _loading = true;
-    private bool _busy;
-    private bool _failed;
-    private string _feedback = string.Empty;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task LoadAsync() => LoadAsync(null);
+
+    private Task LoadAsync(Guid? selectedId) =>
+        LoadOverlayAsync(() => LoadCuesAsync(selectedId), "Cues could not load. Try again.");
+
+    private async Task LoadCuesAsync(Guid? selectedId)
     {
-        _ = await LoadPageContextAsync();
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync(Guid? selectedId = null)
-    {
-        _loading = true;
-        try
+        var cueResult = await _cues.ListCuesAsync(PageContext.Session, CancellationToken.None);
+        if (cueResult is OverlayCueResult<IReadOnlyList<OverlayCueView>>.Rejected cueRejected)
         {
-            _enabled =
-                Host is not null
-                && await _features.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.Overlays,
-                    CancellationToken.None
-                );
-            if (!_enabled)
-            {
-                return;
-            }
-
-            var cueResult = await _cues.ListCuesAsync(PageContext.Session, CancellationToken.None);
-            if (cueResult is OverlayCueResult<IReadOnlyList<OverlayCueView>>.Rejected cueRejected)
-            {
-                Fail(cueRejected.Reason.Message);
-                return;
-            }
-            _items = ((OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded)cueResult).Value;
-
-            var assetResult = await _cues.ListAssetsAsync(
-                PageContext.Session,
-                CancellationToken.None
-            );
-            if (
-                assetResult
-                is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Rejected assetRejected
-            )
-            {
-                Fail(assetRejected.Reason.Message);
-                return;
-            }
-            _assets = (
-                (OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded)assetResult
-            ).Value;
-
-            var item = selectedId is null
-                ? _items.FirstOrDefault()
-                : _items.FirstOrDefault(value => value.Id == selectedId);
-            if (item is not null)
-            {
-                SelectCue(item);
-            }
-            else if (_selected is not null)
-            {
-                NewCue();
-            }
-
-            _catalog = await _playback.QueryCatalogAsync(HostId, CancellationToken.None);
-            _target ??= _catalog.Targets.FirstOrDefault()?.Id;
+            Fail(cueRejected.Reason.Message);
+            return;
         }
-        catch (Exception exception)
+        _items = ((OverlayCueResult<IReadOnlyList<OverlayCueView>>.Succeeded)cueResult).Value;
+
+        var assetResult = await _cues.ListAssetsAsync(PageContext.Session, CancellationToken.None);
+        if (
+            assetResult
+            is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Rejected assetRejected
+        )
         {
-            ReportUiFault(nameof(LoadAsync), exception);
-            Fail("Cues could not load. Try again.");
+            Fail(assetRejected.Reason.Message);
+            return;
         }
-        finally
+        _assets = (
+            (OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded)assetResult
+        ).Value;
+
+        var item = selectedId is null
+            ? _items.FirstOrDefault()
+            : _items.FirstOrDefault(value => value.Id == selectedId);
+        if (item is not null)
         {
-            _loading = false;
+            SelectCue(item);
         }
+        else if (_selected is not null)
+        {
+            NewCue();
+        }
+
+        _catalog = await _playback.QueryCatalogAsync(HostId, CancellationToken.None);
+        _target ??= _catalog.Targets.FirstOrDefault()?.Id;
     }
 
     private void NewCue()
@@ -101,7 +67,7 @@ public partial class OverlayCuesPanel
         _cueEnabled = true;
         _policy = OverlayCueQueuePolicy.Enqueue;
         _layers = [CueLayerDraft.New(CueLayerKind.WebPage)];
-        _feedback = string.Empty;
+        Feedback = string.Empty;
     }
 
     private void SelectCue(OverlayCueView cue)
@@ -251,35 +217,6 @@ public partial class OverlayCuesPanel
                 Fail("The cue could not play. Check that the cue and target are enabled.");
             }
         });
-    }
-
-    private async Task RunAsync(Func<Task> operation)
-    {
-        if (_busy)
-        {
-            return;
-        }
-        _busy = true;
-        try
-        {
-            await RunSelectedHostMutationAsync(HostId, operation);
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    private void Success(string message)
-    {
-        _feedback = message;
-        _failed = false;
-    }
-
-    private void Fail(string message)
-    {
-        _feedback = message;
-        _failed = true;
     }
 
     private static string PolicyLabel(OverlayCueQueuePolicy policy) =>

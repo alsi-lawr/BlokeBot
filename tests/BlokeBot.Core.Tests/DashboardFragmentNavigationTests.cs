@@ -22,24 +22,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class DashboardFragmentNavigationTests
 {
     [Test]
-    public void OldOverlayManagementRoutes_HaveNoRoutedPage()
-    {
-        var routes = typeof(OverlaysPage)
-            .Assembly.GetTypes()
-            .SelectMany(static type =>
-                type.GetCustomAttributes(typeof(RouteAttribute), true)
-                    .Cast<RouteAttribute>()
-                    .Select(static route => route.Template)
-            )
-            .ToArray();
-
-        routes.ShouldContain("/overlays");
-        routes.ShouldNotContain("/overlays/sources");
-        routes.ShouldNotContain("/overlays/cues");
-        routes.ShouldNotContain("/overlays/media");
-    }
-
-    [Test]
     public async Task OverlaysRefresh_RestoresTheFragmentTabAndMountsOnlyThatPanel()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

@@ -201,7 +201,7 @@ public sealed class PlayQueueCommandModule(
         CancellationToken ct
     )
     {
-        var hostLogin = PlayQueueInput.NormalizeLogin(context.Message.Channel);
+        var hostLogin = CommunityInput.NormalizeLogin(context.Message.Channel);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()

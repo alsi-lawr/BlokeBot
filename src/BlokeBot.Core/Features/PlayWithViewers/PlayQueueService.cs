@@ -32,10 +32,9 @@ public sealed class PlayQueueService(
             return Rejected<PlayQueueSummary>(rejection);
         }
 
-        var slug = PlayQueueInput.NormalizeSlug(command.Slug);
+        var slug = CommunityInput.NormalizeSlug(command.Slug);
         return await MutateAsync<PlayQueueSummary>(
             hostId,
-            slug,
             async (db, now) =>
             {
                 if (!await db.Hosts.AnyAsync(host => host.Id == hostId, ct))
@@ -178,8 +177,8 @@ public sealed class PlayQueueService(
             );
         }
 
-        var login = PlayQueueInput.NormalizeLogin(command.Viewer.Login);
-        if (!PlayQueueInput.IsValidLogin(login))
+        var login = CommunityInput.NormalizeLogin(command.Viewer.Login);
+        if (!CommunityInput.IsValidLogin(login))
         {
             return Task.FromResult<PlayQueueResult<PublicPlayQueueEntryView>>(
                 Rejected<PublicPlayQueueEntryView>(
@@ -197,10 +196,9 @@ public sealed class PlayQueueService(
             );
         }
 
-        var slug = PlayQueueInput.NormalizeSlug(queueSlug);
+        var slug = CommunityInput.NormalizeSlug(queueSlug);
         return MutateAsync<PublicPlayQueueEntryView>(
             hostId,
-            slug,
             async (db, now) =>
             {
                 var queue = await LoadQueueAsync(db, hostId, slug, ct);
@@ -585,13 +583,12 @@ public sealed class PlayQueueService(
     ) =>
         MutateAsync<PlayQueueSummary>(
             hostId,
-            PlayQueueInput.NormalizeSlug(queueSlug),
             async (db, now) =>
             {
                 var queue = await LoadQueueAsync(
                     db,
                     hostId,
-                    PlayQueueInput.NormalizeSlug(queueSlug),
+                    CommunityInput.NormalizeSlug(queueSlug),
                     ct
                 );
                 if (queue is null)
@@ -626,7 +623,7 @@ public sealed class PlayQueueService(
             },
             ct,
             (db, now) =>
-                ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
+                ConvergeQueueAsync(db, hostId, CommunityInput.NormalizeSlug(queueSlug), now, ct)
         );
 
     public Task<PlayQueueResult<PlayQueueSelection>> SelectPartyAsync(
@@ -637,13 +634,12 @@ public sealed class PlayQueueService(
     ) =>
         MutateAsync<PlayQueueSelection>(
             hostId,
-            PlayQueueInput.NormalizeSlug(queueSlug),
             async (db, now) =>
             {
                 var queue = await LoadQueueAsync(
                     db,
                     hostId,
-                    PlayQueueInput.NormalizeSlug(queueSlug),
+                    CommunityInput.NormalizeSlug(queueSlug),
                     ct
                 );
                 if (queue is null)
@@ -737,7 +733,7 @@ public sealed class PlayQueueService(
             },
             ct,
             (db, now) =>
-                ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
+                ConvergeQueueAsync(db, hostId, CommunityInput.NormalizeSlug(queueSlug), now, ct)
         );
 
     public async Task<PublicPlayQueueSnapshot?> GetPublicPageAsync(
@@ -758,7 +754,7 @@ public sealed class PlayQueueService(
             return null;
         }
 
-        var normalizedHost = PlayQueueInput.NormalizeLogin(hostLogin);
+        var normalizedHost = CommunityInput.NormalizeLogin(hostLogin);
         await using var lookup = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await lookup
             .Hosts.Where(host => host.Login == normalizedHost)
@@ -768,7 +764,7 @@ public sealed class PlayQueueService(
             ? null
             : await ReadPageAsync(
                 hostId.Value,
-                PlayQueueInput.NormalizeSlug(queueSlug),
+                CommunityInput.NormalizeSlug(queueSlug),
                 async (db, queue) =>
                 {
                     var waiting = OrderedWaiting(queue.Entries)
@@ -796,7 +792,7 @@ public sealed class PlayQueueService(
     ) =>
         ReadPageAsync(
             hostId,
-            PlayQueueInput.NormalizeSlug(queueSlug),
+            CommunityInput.NormalizeSlug(queueSlug),
             async (db, queue) =>
             {
                 var waitingEntries = OrderedWaiting(queue.Entries).ToList();
@@ -873,7 +869,7 @@ public sealed class PlayQueueService(
         }
 
         var identity = PlayQueueInput.IdentityKey(viewer);
-        var login = PlayQueueInput.NormalizeLogin(viewer.Login);
+        var login = CommunityInput.NormalizeLogin(viewer.Login);
         var entry = page
             .Waiting.Concat(page.CurrentParty)
             .FirstOrDefault(value =>
@@ -973,7 +969,6 @@ public sealed class PlayQueueService(
     ) =>
         MutateAsync(
             hostId,
-            $"entry-{entryId}",
             async (db, now) =>
             {
                 var entry = await db
@@ -1015,10 +1010,9 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
-        var slug = PlayQueueInput.NormalizeSlug(queueSlug);
+        var slug = CommunityInput.NormalizeSlug(queueSlug);
         return MutateAsync(
             hostId,
-            slug,
             async (db, now) =>
             {
                 var queue = await LoadQueueAsync(db, hostId, slug, ct);
@@ -1053,7 +1047,7 @@ public sealed class PlayQueueService(
             return null;
         }
 
-        var gate = GateFor(hostId, slug);
+        var gate = GateFor(hostId);
         await gate.WaitAsync(ct);
         try
         {
@@ -1095,7 +1089,6 @@ public sealed class PlayQueueService(
 
     private async Task<PlayQueueResult<T>> MutateAsync<T>(
         int hostId,
-        string slug,
         Func<BlokeBotDbContext, DateTime, Task<PlayQueueResult<T>>> mutate,
         CancellationToken ct,
         Func<BlokeBotDbContext, DateTime, Task<bool>>? convergeBeforeMutation = null
@@ -1106,7 +1099,7 @@ public sealed class PlayQueueService(
             return Rejected<T>(new PlayQueueRejection.FeatureDisabled());
         }
 
-        var gate = GateFor(hostId, slug);
+        var gate = GateFor(hostId);
         await gate.WaitAsync(ct);
         try
         {
@@ -1372,7 +1365,7 @@ public sealed class PlayQueueService(
     )
     {
         var identity = PlayQueueInput.IdentityKey(viewer);
-        var login = PlayQueueInput.NormalizeLogin(viewer.Login);
+        var login = CommunityInput.NormalizeLogin(viewer.Login);
         return await db
             .PlayQueueEntries.Include(value => value.Values)
                 .ThenInclude(value => value.Field)
@@ -1668,13 +1661,13 @@ public sealed class PlayQueueService(
         ConfigurePlayQueueCommand command
     )
     {
-        var slug = PlayQueueInput.NormalizeSlug(command.Slug);
+        var slug = CommunityInput.NormalizeSlug(command.Slug);
         if (hostId <= 0)
         {
             return new PlayQueueRejection.Invalid("A host is required.");
         }
 
-        if (!PlayQueueInput.IsValidSlug(slug))
+        if (!CommunityInput.IsValidSlug(slug))
         {
             return new PlayQueueRejection.Invalid("Use a 1-48 character lowercase queue slug.");
         }
@@ -1723,7 +1716,7 @@ public sealed class PlayQueueService(
         {
             var key = PlayQueueInput.NormalizeKey(field.Key);
             if (
-                !PlayQueueInput.IsValidSlug(key)
+                !CommunityInput.IsValidSlug(key)
                 || !keys.Add(key)
                 || field.Label.Trim().Length is < 1 or > 100
             )
@@ -1949,11 +1942,8 @@ public sealed class PlayQueueService(
         );
     }
 
-    private SemaphoreSlim GateFor(int hostId, string slug)
-    {
-        _ = slug;
-        return _mutationGates[(hostId & int.MaxValue) % _mutationGates.Length];
-    }
+    private SemaphoreSlim GateFor(int hostId) =>
+        _mutationGates[(hostId & int.MaxValue) % _mutationGates.Length];
 
     private static SemaphoreSlim[] CreateGates() =>
         Enumerable.Range(0, _gateCount).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();

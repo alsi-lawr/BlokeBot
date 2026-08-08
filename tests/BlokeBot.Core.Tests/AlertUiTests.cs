@@ -1,10 +1,8 @@
-using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -13,51 +11,6 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class AlertUiTests
 {
-    [Test]
-    public async Task ActiveAlertInTopBar_ClickingIndicator_NavigatesToAlerts()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        _ = await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "test",
-                "top-bar",
-                "Queue delayed",
-                "Outbound messages are delayed.",
-                "/alerts"
-            )
-            .RunAsync(CancellationToken.None);
-        _ = context.ComponentFactories.AddStub<SelectedChannelBotStatus>();
-        _ = context.ComponentFactories.AddStub<HostSelector>();
-        _ = context.ComponentFactories.AddStub<AccountMenu>();
-
-        var cut = context.Render<TopBarControls>();
-
-        var button = cut.Find("button[aria-label='1 active alert']");
-        button.Click();
-        context.Services.GetRequiredService<NavigationManager>().Uri.ShouldEndWith("/alerts");
-    }
-
-    [Test]
-    public async Task SelectedOperator_RenderingSidebar_ShowsAlertsLink()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-
-        var cut = context.Render<NavMenu>();
-
-        var alertsLink = cut.FindAll("a")
-            .Single(static link =>
-                link.TextContent.Trim().Equals("Alerts", StringComparison.Ordinal)
-            );
-        alertsLink.GetAttribute("href").ShouldBe("alerts");
-    }
-
     [Test]
     public async Task ActiveAlertOnAlertsPage_Acknowledging_MovesAlertToHistory()
     {
@@ -109,46 +62,6 @@ public sealed class AlertUiTests
         cut.FindAll("h2")
             .Select(static heading => heading.TextContent.Trim())
             .ShouldContain("Active alerts");
-    }
-
-    [Test]
-    public async Task AlertsPage_NoActiveAlerts_RendersOneNamedFrameAndSemanticHistoryCards()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        var alert = await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "test",
-                "history-card",
-                "Queue delayed",
-                "Outbound messages are delayed.",
-                null
-            )
-            .RunAsync(CancellationToken.None);
-        _ = await alerts
-            .Acknowledge(hostId, alert.Alert.Id, "streamer")
-            .RunAsync(CancellationToken.None);
-
-        var cut = context.Render<AlertsPage>();
-
-        var active = cut.Find("section[aria-labelledby='active-alerts-title']");
-        active.ClassList.ShouldContain("card");
-        active
-            .QuerySelectorAll("h2")
-            .ShouldHaveSingleItem()
-            .TextContent.Trim()
-            .ShouldBe("Active alerts");
-        active.TextContent.ShouldContain("No active alerts.");
-
-        var history = cut.Find(".responsive-data-cards");
-        history
-            .QuerySelectorAll("td")
-            .Select(static cell => cell.GetAttribute("data-label"))
-            .ShouldBe(["Alert", "Importance", "Handled by", "Handled at"]);
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)

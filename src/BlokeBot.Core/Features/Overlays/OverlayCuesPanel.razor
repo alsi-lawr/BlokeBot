@@ -1,16 +1,15 @@
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Persistence.Models
-@inherits AuthenticatedPageComponent
+@inherits OverlayManagementPanelBase
 @inject OverlayCueService _cues
 @inject OverlayCuePlaybackService _playback
-@inject HostFeatureService _features
 
         <ApplicationCardCollection Owner="dashboard-page-cards">
-            @if (_loading)
+            @if (IsLoading)
             {
                 <div class="card p-8 text-sm text-muted-foreground" role="status">Loading cues...</div>
             }
-            else if (!_enabled)
+            else if (!OverlayEnabled)
             {
                 <div class="card p-8 text-sm text-muted-foreground" data-overlay-disabled-recovery>
                     Cues are paused because Overlays is off.
@@ -20,9 +19,9 @@
             }
             else
             {
-                @if (!string.IsNullOrWhiteSpace(_feedback))
+                @if (!string.IsNullOrWhiteSpace(Feedback))
                 {
-                    <section class="@(_failed ? "card bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card bg-blue-50 p-4 text-sm font-semibold text-slate-950")" role="@(_failed ? "alert" : "status")">@_feedback</section>
+                    <section class="@(HasFailed ? "card bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card bg-blue-50 p-4 text-sm font-semibold text-slate-950")" role="@(HasFailed ? "alert" : "status")">@Feedback</section>
                 }
                 <div class="cue-workspace" data-card-owner="cue-workspace-columns">
                 <section class="card cue-workspace__inventory p-5">
@@ -40,7 +39,7 @@
                     </div>
                 </section>
                 <section class="card cue-workspace__editor p-5" data-cue-editor>
-                    <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-slate-950">@(_selected is null ? "New cue" : "Edit cue")</h2><button class="btn-primary" type="button" disabled="@_busy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button></div>
+                    <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-slate-950">@(_selected is null ? "New cue" : "Edit cue")</h2><button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button></div>
                     <div class="mt-4 grid gap-4 md:grid-cols-3">
                         <Field Id="cue-name" Label="Cue name" @bind-Value="_name" />
                         <div><label class="label" for="cue-duration">Total duration (milliseconds)</label><input id="cue-duration" class="input mt-2" type="number" min="100" max="300000" @bind="_duration" /></div>
@@ -110,7 +109,7 @@
                 <section class="card p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Test playback</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Choose an enabled Cue player Browser Source, then play the saved cue as it will appear in OBS.</p>
-                    <div class="mt-4 flex flex-wrap items-end gap-3"><div class="min-w-64 flex-1"><label class="label" for="cue-target">Cue player</label><select id="cue-target" class="input mt-2" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select></div><a class="btn-secondary" href="overlays#sources">Manage Browser Sources</a><button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || _busy)" @onclick="PlayAsync">Play test cue</button></div>
+                    <div class="mt-4 flex flex-wrap items-end gap-3"><div class="min-w-64 flex-1"><label class="label" for="cue-target">Cue player</label><select id="cue-target" class="input mt-2" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select></div><a class="btn-secondary" href="overlays#sources">Manage Browser Sources</a><button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || IsBusy)" @onclick="PlayAsync">Play test cue</button></div>
                     @if (_target is { } targetId) { <div class="mt-4 aspect-video overflow-hidden rounded-xl bg-slate-950"><iframe class="size-full" src="@($"/overlays/preview/{targetId:D}")" title="Cue player preview" referrerpolicy="no-referrer"></iframe></div> }
                 </section>
             }

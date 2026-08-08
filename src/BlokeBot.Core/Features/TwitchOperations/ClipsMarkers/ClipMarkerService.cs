@@ -554,24 +554,13 @@ public sealed class ClipMarkerService(
             : MarkerOutcome(marker);
     }
 
-    public async Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken)
-    {
-        var login = Login.Normalize(channel);
-        if (login.Length == 0)
-        {
-            return;
-        }
-
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var hostId = await db
-            .Hosts.Where(host => host.Login == login)
-            .Select(host => (int?)host.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (hostId is { } id)
-        {
-            await ReconcileAsync(id, cancellationToken);
-        }
-    }
+    public Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken) =>
+        NativeTwitchReconciliation.ReconcileChannelAsync(
+            dbFactory,
+            channel,
+            ReconcileAsync,
+            cancellationToken
+        );
 
     public async Task ReconcileAsync(int hostId, CancellationToken cancellationToken)
     {

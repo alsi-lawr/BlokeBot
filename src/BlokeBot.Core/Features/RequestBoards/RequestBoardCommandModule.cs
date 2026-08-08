@@ -77,7 +77,7 @@ public sealed class RequestBoardCommandModule(
                 continue;
             }
 
-            var key = RequestBoardInput.NormalizeSlug(section[..separator]);
+            var key = CommunityInput.NormalizeSlug(section[..separator]);
             var value = section[(separator + 1)..].Trim();
             if (key == "category")
             {
@@ -145,7 +145,7 @@ public sealed class RequestBoardCommandModule(
         var board = boardList.SingleOrDefault(value =>
             string.Equals(
                 value.Slug,
-                RequestBoardInput.NormalizeSlug(args[0]),
+                CommunityInput.NormalizeSlug(args[0]),
                 StringComparison.Ordinal
             )
         );
@@ -312,7 +312,7 @@ public sealed class RequestBoardCommandModule(
 
     private async Task<int?> FindHostIdAsync(string channel, CancellationToken ct)
     {
-        var login = RequestBoardInput.NormalizeLogin(channel);
+        var login = CommunityInput.NormalizeLogin(channel);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db
             .Hosts.AsNoTracking()

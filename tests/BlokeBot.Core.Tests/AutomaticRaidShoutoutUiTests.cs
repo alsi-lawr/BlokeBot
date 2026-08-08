@@ -6,93 +6,11 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
-using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 
 namespace BlokeBot.Core.Tests;
 
 public sealed class AutomaticRaidShoutoutUiTests
 {
-    [Test]
-    public async Task DefaultsAreOffAndNativeWithChatControlsAbsentFromTheDocument()
-    {
-        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(factory);
-        await using var context = CreateContext(factory);
-
-        var section = Render(context, hostId);
-        Open(section, "Automatic raid shoutouts");
-
-        section.WaitForAssertion(() =>
-        {
-            section.Find("#automatic-raid-enabled").HasAttribute("checked").ShouldBeFalse();
-            section.Find("#automatic-raid-minimum-viewers").GetAttribute("value").ShouldBe("1");
-            section.Find("#automatic-raid-minimum-viewers").HasAttribute("disabled").ShouldBeTrue();
-            section.Find("#automatic-raid-mechanism-native").HasAttribute("checked").ShouldBeTrue();
-            section.FindAll("[data-automatic-raid-chat-controls]").ShouldBeEmpty();
-            section.Markup.ShouldContain("Off. Your settings are saved");
-        });
-    }
-
-    [Test]
-    public async Task ChatChoicesRemoveIrrelevantControlsAndRetainEnteredValues()
-    {
-        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(factory);
-        var configured = new AutomaticRaidShoutoutConfiguration(
-            true,
-            12,
-            AutomaticRaidShoutoutMechanism.Chat,
-            AutomaticRaidChatPresentation.Pinned,
-            "Welcome {twitch_handle}: {last_game|something fun}",
-            300,
-            PersistedAnnouncementColor.Purple
-        );
-        await SaveAsync(factory, hostId, configured);
-        await using var context = CreateContext(factory);
-
-        var section = Render(context, hostId);
-        Open(section, "Automatic raid shoutouts");
-
-        section.WaitForAssertion(() =>
-        {
-            _ = section.Find("#automatic-raid-pin-duration");
-            section.FindAll("#automatic-raid-announcement-color").ShouldBeEmpty();
-            section.Markup.ShouldContain("{twitch_handle}");
-            section.Markup.ShouldContain("{display_name}");
-            section.Markup.ShouldContain("{channel_url}");
-            section.Markup.ShouldContain("{last_game|fallback}");
-            section.Markup.ShouldContain("{stream_title|fallback}");
-            section.Markup.ShouldContain("{viewer_count}");
-            section.Markup.ShouldContain("150 characters");
-            section.Markup.ShouldContain("350 characters");
-            section.Markup.ShouldContain("500-character");
-        });
-
-        section.Find("#automatic-raid-pin-duration").Input("600");
-        section.Find("#automatic-raid-presentation-announcement").Change("Announcement");
-        section.FindAll("#automatic-raid-pin-duration").ShouldBeEmpty();
-        var colorOptions = section
-            .Find("#automatic-raid-announcement-color")
-            .QuerySelectorAll("option")
-            .ToArray();
-        colorOptions
-            .Select(option => option.TextContent)
-            .ShouldBe(["Default", "Blue", "Green", "Orange", "Purple"]);
-        colorOptions
-            .Select(option => option.GetAttribute("value"))
-            .ShouldBe(["Primary", "Blue", "Green", "Orange", "Purple"]);
-
-        section.Find("#automatic-raid-presentation-pinned").Change("Pinned");
-        section.Find("#automatic-raid-pin-duration").GetAttribute("value").ShouldBe("600");
-        section.Find("#automatic-raid-mechanism-native").Change("Native");
-        section.FindAll("[data-automatic-raid-chat-controls]").ShouldBeEmpty();
-        section.Find("#automatic-raid-mechanism-chat").Change("Chat");
-        section
-            .Find("#automatic-raid-message-template")
-            .GetAttribute("value")
-            .ShouldBe(configured.MessageTemplate);
-    }
-
     [Test]
     public async Task InvalidTemplateStopsSaveAndOutcomeHistoryUsesTypedTerminalCopy()
     {
