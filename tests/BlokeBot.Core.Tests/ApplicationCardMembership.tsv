@@ -16,12 +16,13 @@ card|src/BlokeBot.Core/Features/CustomCommands/CustomCommandSettingsPage.razor|6
 card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|24|included|guessing-settings-cards
 card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|30|included|guessing-settings-cards
 card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|36|included|guessing-settings-cards
-card|src/BlokeBot.Core/Features/Guessing/Configuration/GuessingSettings.razor|67|included|guessing-settings-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|35|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|41|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|64|included|guessing-dashboard-cards
-card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|91|included|guessing-dashboard-cards
-card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|145|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessVotesTable.razor|3|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/RoundOrchestrationPanel.razor|1|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|92|included|guessing-dashboard-cards
+card|src/BlokeBot.Core/Features/Guessing/Rounds/GuessingDashboard.razor|146|included|guessing-dashboard-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|46|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|52|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|58|included|channel-setup-cards
@@ -105,10 +106,6 @@ disclosure|src/BlokeBot.Core/Features/CustomCommands/CustomCommandSettingsPage.r
 disclosure|src/BlokeBot.Core/Features/CustomCommands/CustomCommandSettingsPage.razor|740|excluded|nested-custom-command-disclosures
 disclosure|src/BlokeBot.Core/Features/CustomCommands/CustomCommandSettingsPage.razor|853|included|custom-command-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/CustomCommands/CustomCommandSettingsPage.razor|879|included|custom-command-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/CommandAliasSettingsSection.razor|1|included|guessing-settings-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/GuessOptionsSettingsSection.razor|3|included|guessing-settings-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/ProfileSettingsSection.razor|1|included|guessing-settings-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/Guessing/Configuration/ReplySettingsSection.razor|1|included|guessing-settings-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|88|included|channel-setup-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|280|included|channel-setup-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|310|included|channel-setup-disclosure-cards

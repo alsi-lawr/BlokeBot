@@ -8,6 +8,8 @@
                 type="button"
                 class="studio-segmented__option"
                 aria-pressed="@(IsSelected(option) ? "true" : "false")"
+                aria-describedby="@(Disabled ? DisabledDescriptionId : null)"
+                disabled="@Disabled"
                 @onclick="() => ValueChanged.InvokeAsync(option.Value)">@option.Label</button>
     }
 </div>

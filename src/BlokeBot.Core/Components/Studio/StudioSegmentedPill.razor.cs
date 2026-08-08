@@ -23,6 +23,15 @@ public partial class StudioSegmentedPill<TValue>
     [Parameter]
     public EventCallback<TValue> ValueChanged { get; set; }
 
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Points the disabled options at the recovery text explaining what would re-enable them.
+    /// </summary>
+    [Parameter]
+    public string? DisabledDescriptionId { get; set; }
+
     private bool IsSelected(StudioSegmentedOption<TValue> option) =>
         EqualityComparer<TValue?>.Default.Equals(option.Value, Value);
 }

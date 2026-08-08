@@ -1,0 +1,19 @@
+<div class="studio-reply @(Open ? "studio-reply--open" : null)" data-reply="@Key">
+    <button type="button"
+            class="studio-reply__header"
+            aria-expanded="@(Open ? "true" : "false")"
+            aria-controls="@_bodyId"
+            @onclick="Toggle">
+        <span class="studio-reply__label">@Label</span>
+        <span class="studio-reply__excerpt">@Excerpt</span>
+        <span class="studio-reply__state" data-reply-state="@_state">@_state</span>
+        <span class="studio-reply__chevron" aria-hidden="true">›</span>
+    </button>
+    <div id="@_bodyId" class="studio-reply__body" inert="@(!Open)">
+        <div class="studio-reply__clip">
+            <div class="studio-reply__content">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,28 +1,45 @@
-<section class="guessing-task-surface">
+<section class="card">
     <div class="border-b border-slate-200 p-5">
         <h2 class="text-lg font-semibold text-slate-950">Run a round</h2>
         <p class="mt-1 text-sm text-muted-foreground">Start a round, stop new guesses, or pick the winner from here.</p>
     </div>
-    <div class="space-y-4 p-5">
-        <div class="grid gap-3 sm:grid-cols-2">
-            <button class="btn-primary" @onclick="InvokeStartRoundAsync">Start round</button>
-            <button class="btn-secondary" @onclick="InvokeStopGuessingAsync">Stop guessing</button>
+    <div class="studio-grid p-5">
+        <div class="studio-span-6">
+            <button class="btn-primary w-full" @onclick="InvokeStartRoundAsync">Start round</button>
         </div>
-        <div class="surface-muted rounded-lg p-4">
+        <div class="studio-span-6">
+            <button class="btn-secondary w-full" @onclick="InvokeStopGuessingAsync">Stop guessing</button>
+        </div>
+        <div class="studio-span-12 space-y-2">
             <label class="label" for="profile">Round type</label>
-            <select id="profile" class="input mt-2" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
+            <select id="profile" class="input" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
                 @foreach (var profile in State.Profiles)
                 {
                     <option value="@profile.Id">@profile.Name@(profile.IsDefault ? " (default)" : "")</option>
                 }
             </select>
         </div>
-        <div class="surface-muted rounded-lg p-4">
-            <label class="label" for="winner">Winner name</label>
-            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
-                <input id="winner" class="input" placeholder="winning answer" value="@WinnerName" @oninput="OnWinnerNameChanged" />
-                <button class="btn-primary sm:w-40" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
+        <div class="studio-span-12 space-y-2">
+            <label class="label" for="winner">Winner</label>
+            @if (_answerNames.Count > 0)
+            {
+                <div class="studio-chips" role="group" aria-label="Configured answers">
+                    @foreach (var answer in _answerNames)
+                    {
+                        <StudioChip @key="answer"
+                                    Label="@answer"
+                                    Pressed="@(string.Equals(WinnerName, answer, StringComparison.OrdinalIgnoreCase))"
+                                    PressedNote="Chosen as the winning answer"
+                                    ReleasedNote=""
+                                    PressedChanged="@(pressed => ChooseAnswerAsync(answer, pressed))" />
+                    }
+                </div>
+            }
+            <div class="studio-stepline">
+                <input id="winner" class="input min-w-0 flex-1" placeholder="winning answer" value="@WinnerName" @oninput="OnWinnerNameChanged" />
+                <button class="btn-primary" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
             </div>
+            <p class="text-xs text-muted-foreground">Tap an answer or type it — moderators can still declare the winner from chat.</p>
         </div>
     </div>
 </section>

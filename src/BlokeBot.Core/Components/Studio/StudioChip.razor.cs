@@ -24,10 +24,13 @@ public partial class StudioChip
     public EventCallback<bool> PressedChanged { get; set; }
 
     [Parameter]
-    public string PressedNote { get; set; } = "Allowed";
+    public string? PressedNote { get; set; } = "Allowed";
 
+    /// <summary>
+    /// Shown beside an unpressed chip. Selections whose unpressed state needs no words clear it.
+    /// </summary>
     [Parameter]
-    public string ReleasedNote { get; set; } = "Not allowed";
+    public string? ReleasedNote { get; set; } = "Not allowed";
 
     [Parameter]
     public EventCallback Remove { get; set; }

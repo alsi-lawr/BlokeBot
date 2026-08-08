@@ -10,11 +10,14 @@
         @if (pressed)
         {
             <span class="studio-chip__mark" aria-hidden="true">✓</span>
-            <span class="sr-only">@PressedNote</span>
+            @if (PressedNote is { Length: > 0 } pressedNote)
+            {
+                <span class="sr-only">@pressedNote</span>
+            }
         }
-        else
+        else if (ReleasedNote is { Length: > 0 } releasedNote)
         {
-            <span class="studio-chip__note">@ReleasedNote</span>
+            <span class="studio-chip__note">@releasedNote</span>
         }
     </button>
 }

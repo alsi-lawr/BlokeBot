@@ -1,0 +1,22 @@
+<span class="studio-stepper">
+    <button type="button"
+            class="studio-stepper__step"
+            data-action="decrement"
+            aria-label="@DecrementLabel"
+            @onclick="() => StepAsync(-1)">−</button>
+    <input id="@Id"
+           class="studio-stepper__value"
+           inputmode="numeric"
+           aria-label="@AriaLabel"
+           value="@Value"
+           @oninput="OnInput" />
+    @if (Unit is { Length: > 0 } unit)
+    {
+        <span class="studio-stepper__unit">@unit</span>
+    }
+    <button type="button"
+            class="studio-stepper__step"
+            data-action="increment"
+            aria-label="@IncrementLabel"
+            @onclick="() => StepAsync(1)">+</button>
+</span>

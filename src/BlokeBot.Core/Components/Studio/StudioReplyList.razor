@@ -1,0 +1,13 @@
+@if (Label is { Length: > 0 } label)
+{
+    <section class="studio-replies" aria-label="@label">
+        <p class="studio-replies__group">@label</p>
+        @ChildContent
+    </section>
+}
+else
+{
+    <div class="studio-replies">
+        @ChildContent
+    </div>
+}
