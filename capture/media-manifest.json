@@ -173,6 +173,19 @@
       "semanticReadiness": "path /admin; Sample Channel; body text: Channels using BlokeBot; main opacity 1"
     },
     {
+      "file": "laptop-dark-automation-events.png",
+      "capture": "capture/screenshots.lua",
+      "route": "/automations/events",
+      "simulationAlias": "/simulation/login?view=automation-events&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:automation-events",
+      "theme": "dark",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /automations/events; Sample Channel; all 21 automation event sources present and ready; Twitch subscription and required approval listed per source; main opacity 1"
+    },
+    {
       "file": "laptop-dark-channel-setup.png",
       "capture": "capture/screenshots.lua",
       "route": "/host",
@@ -196,7 +209,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "laptop-dark-chat-tools-enabled.png",
@@ -209,7 +222,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "laptop-dark-custom-commands.png",
@@ -352,7 +365,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all thirteen features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-event-feed.png",
@@ -365,7 +378,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-giveaway.png",
@@ -378,7 +391,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-guessing.png",
@@ -391,7 +404,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-media.png",
@@ -404,7 +417,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all thirteen features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-sources.png",
@@ -417,7 +430,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-viewer-queue.png",
@@ -430,7 +443,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-dark-points-settings.png",
@@ -456,7 +469,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "laptop-light-admin.png",
@@ -470,6 +483,19 @@
       "width": 1308,
       "height": 840,
       "semanticReadiness": "path /admin; Sample Channel; body text: Channels using BlokeBot; main opacity 1"
+    },
+    {
+      "file": "laptop-light-automation-events.png",
+      "capture": "capture/screenshots.lua",
+      "route": "/automations/events",
+      "simulationAlias": "/simulation/login?view=automation-events&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:automation-events",
+      "theme": "light",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /automations/events; Sample Channel; all 21 automation event sources present and ready; Twitch subscription and required approval listed per source; main opacity 1"
     },
     {
       "file": "laptop-light-channel-setup.png",
@@ -495,7 +521,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "laptop-light-chat-tools-enabled.png",
@@ -508,7 +534,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "laptop-light-custom-commands.png",
@@ -651,7 +677,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all thirteen features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-event-feed.png",
@@ -664,7 +690,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-giveaway.png",
@@ -677,7 +703,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-guessing.png",
@@ -690,7 +716,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-media.png",
@@ -703,7 +729,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all thirteen features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-sources.png",
@@ -716,7 +742,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-viewer-queue.png",
@@ -729,7 +755,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "laptop-light-points-settings.png",
@@ -755,7 +781,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "phone-dark-admin.png",
@@ -769,6 +795,19 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /admin; Sample Channel; body text: Channels using BlokeBot; main opacity 1"
+    },
+    {
+      "file": "phone-dark-automation-events.png",
+      "capture": "capture/screenshots.lua",
+      "route": "/automations/events",
+      "simulationAlias": "/simulation/login?view=automation-events&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:automation-events",
+      "theme": "dark",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /automations/events; Sample Channel; all 21 automation event sources present and ready; Twitch subscription and required approval listed per source; main opacity 1"
     },
     {
       "file": "phone-dark-channel-setup.png",
@@ -794,7 +833,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-dark-chat-tools-enabled.png",
@@ -807,7 +846,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-dark-custom-commands.png",
@@ -950,7 +989,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all thirteen features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-event-feed.png",
@@ -963,7 +1002,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-giveaway.png",
@@ -976,7 +1015,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-guessing.png",
@@ -989,7 +1028,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-media.png",
@@ -1002,7 +1041,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all thirteen features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-sources.png",
@@ -1015,7 +1054,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-viewer-queue.png",
@@ -1028,7 +1067,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-dark-points-settings.png",
@@ -1054,7 +1093,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "phone-light-admin.png",
@@ -1068,6 +1107,19 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /admin; Sample Channel; body text: Channels using BlokeBot; main opacity 1"
+    },
+    {
+      "file": "phone-light-automation-events.png",
+      "capture": "capture/screenshots.lua",
+      "route": "/automations/events",
+      "simulationAlias": "/simulation/login?view=automation-events&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:automation-events",
+      "theme": "light",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /automations/events; Sample Channel; all 21 automation event sources present and ready; Twitch subscription and required approval listed per source; main opacity 1"
     },
     {
       "file": "phone-light-channel-setup.png",
@@ -1093,7 +1145,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-light-chat-tools-enabled.png",
@@ -1106,7 +1158,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-light-custom-commands.png",
@@ -1249,7 +1301,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#cues; Sample Channel; all twelve features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#cues; Sample Channel; all thirteen features enabled; saved Raid celebration; saved-Cue inventory and task-facing content editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-event-feed.png",
@@ -1262,7 +1314,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Channel event feed; active event Preview and source settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-giveaway.png",
@@ -1275,7 +1327,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Points giveaway; active giveaway Preview and compact display controls; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-guessing.png",
@@ -1288,7 +1340,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Guessing round; live open-round Preview and appearance editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-media.png",
@@ -1301,7 +1353,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#media; Sample Channel; all twelve features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#media; Sample Channel; all thirteen features enabled; private channel media upload and saved-media workspace; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-sources.png",
@@ -1314,7 +1366,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Browser Sources; Preview-first workspace and task editor; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-overlay-viewer-queue.png",
@@ -1327,7 +1379,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /overlays#sources; Sample Channel; all twelve features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
+      "semanticReadiness": "path /overlays#sources; Sample Channel; all thirteen features enabled; saved Viewer queue; current safe public queue Preview and row settings; no private Browser Source URL or seeded access key; main opacity 1"
     },
     {
       "file": "phone-light-points-settings.png",
@@ -1353,7 +1405,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
+      "semanticReadiness": "path /host; all thirteen features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     }
   ]
 }

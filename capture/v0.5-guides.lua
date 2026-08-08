@@ -167,7 +167,7 @@ local succeeded, failure = pcall(function()
             ? ["Request boards", "Moments", "Points", "Custom commands"]
             : []);
           const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          return cards.length === 12
+          return cards.length === 13
             && cards.every(card => {
               const name = card.querySelector(".truncate")?.textContent.trim();
               return name
@@ -185,7 +185,7 @@ local succeeded, failure = pcall(function()
           : []);
         const hasRequestedState = () => {
           const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          return cards.length === 12
+          return cards.length === 13
             && cards.every(card => {
               const name = card.querySelector(".truncate")?.textContent.trim();
               return name
@@ -225,7 +225,7 @@ local succeeded, failure = pcall(function()
             : []);
           const target = document.querySelector("#chat-tools");
           const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          if (!target || cards.length !== 12) return false;
+          if (!target || cards.length !== 13) return false;
           const bounds = target.getBoundingClientRect();
           return bounds.top >= 0 && bounds.top < window.innerHeight
             && bounds.bottom > 0

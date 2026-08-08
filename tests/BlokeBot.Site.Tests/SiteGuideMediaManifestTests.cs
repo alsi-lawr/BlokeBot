@@ -28,13 +28,13 @@ public sealed class SiteGuideMediaManifestTests
     {
         var manifest = LoadManifest();
         manifest.Version.ShouldBe(1);
-        manifest.Assets.Count.ShouldBe(104);
-        manifest.Assets.Count(static asset => asset.Format == "png").ShouldBe(96);
+        manifest.Assets.Count.ShouldBe(108);
+        manifest.Assets.Count(static asset => asset.Format == "png").ShouldBe(100);
         manifest.Assets.Count(static asset => asset.Format == "webp").ShouldBe(8);
         manifest.Assets.Select(static asset => asset.File).ShouldBeUnique();
         var expectedCaptureCounts = new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["capture/screenshots.lua"] = 44,
+            ["capture/screenshots.lua"] = 48,
             ["capture/home-scroll.lua"] = 4,
             ["capture/guessing-workflow.lua"] = 4,
             ["capture/v0.5-guides.lua"] = 12,
@@ -223,7 +223,7 @@ public sealed class SiteGuideMediaManifestTests
             }
 
             var tools = await client.GetStringAsync("/tools");
-            tools.ShouldContain("all twelve Chat Tools features disabled");
+            tools.ShouldContain("all thirteen Chat Tools features disabled");
             tools.ShouldContain("Channels migrated from an earlier BlokeBot release");
             tools.ShouldContain("Disabling pauses the feature");
             tools.ShouldContain("does not replay commands");

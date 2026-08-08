@@ -42,6 +42,7 @@ view = [
   "home",
   "channel-setup",
   "custom-commands",
+  "automation-events",
   "guessing-leaderboard",
   "points-settings",
   "admin",
@@ -89,6 +90,14 @@ local readiness = {
   ["custom-commands"] = {
     path = "/custom-commands/settings",
     expression = [[document.body.innerText.includes("Scheduled messages")]],
+  },
+  ["automation-events"] = {
+    path = "/automations/events",
+    expression = [[(() => {
+      const cards = [...document.querySelectorAll("[data-automation-event-source]")];
+      return cards.length === 21
+        && cards.every(card => card.getAttribute("data-source-state") === "ready");
+    })()]],
   },
   ["guessing-leaderboard"] = {
     path = "/guessing/leaderboard/samplechannel",
