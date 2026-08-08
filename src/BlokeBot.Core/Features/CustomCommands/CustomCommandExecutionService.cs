@@ -57,13 +57,14 @@ public sealed class CustomCommandExecutionService(
 
         var command = await db
             .CustomCommands.Include(x => x.Action)
+            .Include(x => x.AllowedUsers)
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
 
-        if (command.ModeratorOnly && !ChatModeratorPolicy.IsModerator(context.Message))
+        if (!CustomCommandAccessPolicy.Allows(hostLogin, command, context.Message))
         {
             return new CustomCommandExecutionOutcome.Handled();
         }

@@ -10,7 +10,9 @@ public sealed class CustomCommand
 
     public bool Enabled { get; set; } = true;
 
-    public bool ModeratorOnly { get; set; }
+    public bool AllowEveryone { get; set; } = true;
+
+    public bool AllowModerators { get; set; }
 
     public int CooldownSeconds { get; set; }
 
@@ -27,4 +29,6 @@ public sealed class CustomCommand
     public CustomCommandAction Action { get; set; } = null!;
 
     public List<CustomCommandAlias> Aliases { get; set; } = [];
+
+    public List<CustomCommandAllowedUser> AllowedUsers { get; set; } = [];
 }

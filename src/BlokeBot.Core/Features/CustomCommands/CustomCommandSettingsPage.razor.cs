@@ -64,6 +64,8 @@ public partial class CustomCommandSettingsPage
     private long _commandSectionOpenRequest;
     private long _commandAdvancedOpenRequest;
     private int? _commandAdvancedEntityId;
+    private long _commandAccessOpenRequest;
+    private int? _commandAccessEntityId;
     private long _counterSectionOpenRequest;
     private long _announcementSectionOpenRequest;
     private long _announcementAdvancedOpenRequest;
@@ -142,6 +144,8 @@ public partial class CustomCommandSettingsPage
         _cueTestOutcome = null;
         _commandAdvancedEntityId = null;
         _commandAdvancedOpenRequest = 0;
+        _commandAccessEntityId = null;
+        _commandAccessOpenRequest = 0;
         _announcementAdvancedEntityId = null;
         _announcementAdvancedOpenRequest = 0;
         EnsureEditorSelection();
@@ -182,48 +186,81 @@ public partial class CustomCommandSettingsPage
             );
     }
 
-    private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command) =>
-        await RunSelectedHostMutationAsync(
-            HostId,
-            async () =>
-            {
-                var result = await _configuration
-                    .SaveConfiguration(HostId, command)
-                    .ExecuteAsync(CancellationToken.None);
-                await result.Match(
-                    async completed =>
-                    {
-                        _config = await _configuration.LoadConfigurationAsync(
-                            HostId,
-                            CancellationToken.None
-                        );
-                        _nextTemporaryId = -1;
-                        _validationErrors = [];
-                        _focusTarget = null;
-                        _commandAdvancedEntityId = null;
-                        _commandAdvancedOpenRequest = 0;
-                        _announcementAdvancedEntityId = null;
-                        _announcementAdvancedOpenRequest = 0;
-                        EnsureEditorSelection();
-                        _loadedConfigurationFingerprint = EditableConfigurationFingerprint(_config);
-                        _ = _toasts.Publish(
-                            new ToastRequest<SuccessToastStrategy>("Custom commands saved.")
-                        );
-                    },
-                    failure =>
-                    {
-                        _ = _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
-                        if (AliasCollisionTarget(failure) is { } target)
+    private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command)
+    {
+        try
+        {
+            await RunSelectedHostMutationAsync(
+                HostId,
+                async () =>
+                {
+                    var result = await _configuration
+                        .SaveConfiguration(HostId, command)
+                        .ExecuteAsync(CancellationToken.None);
+                    await result.Match(
+                        async completed =>
                         {
-                            _validationErrors = [new(failure.Message, target)];
-                            FocusValidationTarget(target);
-                        }
+                            _config = await _configuration.LoadConfigurationAsync(
+                                HostId,
+                                CancellationToken.None
+                            );
+                            _nextTemporaryId = -1;
+                            _validationErrors = [];
+                            _focusTarget = null;
+                            _commandAdvancedEntityId = null;
+                            _commandAdvancedOpenRequest = 0;
+                            _commandAccessEntityId = null;
+                            _commandAccessOpenRequest = 0;
+                            _announcementAdvancedEntityId = null;
+                            _announcementAdvancedOpenRequest = 0;
+                            EnsureEditorSelection();
+                            _loadedConfigurationFingerprint = EditableConfigurationFingerprint(
+                                _config
+                            );
+                            _ = _toasts.Publish(
+                                new ToastRequest<SuccessToastStrategy>("Custom commands saved.")
+                            );
+                        },
+                        failure =>
+                        {
+                            _ = _toasts.Publish(
+                                new ToastRequest<ErrorToastStrategy>(failure.Message)
+                            );
+                            SetAccessSaveFailure(failure.Message);
+                            if (AliasCollisionTarget(failure) is { } target)
+                            {
+                                _validationErrors = [new(failure.Message, target)];
+                                FocusValidationTarget(target);
+                            }
 
-                        return Task.CompletedTask;
-                    }
-                );
-            }
-        );
+                            return Task.CompletedTask;
+                        }
+                    );
+                }
+            );
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(nameof(SaveAsync), exception);
+            SetAccessSaveFailure("Try again without reloading the page.");
+            _ = _toasts.Publish(
+                new ToastRequest<ErrorToastStrategy>("Custom commands could not be saved.")
+            );
+        }
+    }
+
+    private void SetAccessSaveFailure(string message)
+    {
+        if (_config is null)
+        {
+            return;
+        }
+
+        foreach (var command in _config.Commands)
+        {
+            command.AllowedUserFeedback = $"Changes were not saved. {message}";
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -385,6 +422,9 @@ public partial class CustomCommandSettingsPage
     private long CommandAdvancedOpenRequest(int commandId) =>
         _commandAdvancedEntityId == commandId ? _commandAdvancedOpenRequest : 0;
 
+    private long CommandAccessOpenRequest(int commandId) =>
+        _commandAccessEntityId == commandId ? _commandAccessOpenRequest : 0;
+
     private long AnnouncementAdvancedOpenRequest(int announcementId) =>
         _announcementAdvancedEntityId == announcementId ? _announcementAdvancedOpenRequest : 0;
 
@@ -428,7 +468,14 @@ public partial class CustomCommandSettingsPage
             Append(result, command.Name);
             Append(result, command.Aliases);
             Append(result, command.Enabled);
-            Append(result, command.ModeratorOnly);
+            Append(result, command.AllowEveryone);
+            Append(result, command.AllowModerators);
+            foreach (var user in command.AllowedUsers)
+            {
+                Append(result, user.TwitchUserId);
+                Append(result, user.Login);
+                Append(result, user.DisplayName);
+            }
             Append(result, command.CooldownSeconds);
             Append(result, command.CooldownScope);
             Append(result, command.InvocationLimit);
@@ -524,6 +571,11 @@ public partial class CustomCommandSettingsPage
                 {
                     _commandAdvancedEntityId = target.EntityId;
                     _commandAdvancedOpenRequest++;
+                }
+                if (target.FieldKind == CustomCommandValidationFieldKind.AllowedUsers)
+                {
+                    _commandAccessEntityId = target.EntityId;
+                    _commandAccessOpenRequest++;
                 }
                 break;
             case {
@@ -679,8 +731,23 @@ public partial class CustomCommandSettingsPage
     private static string CommandEnabledToggleId(CustomCommandEditor command) =>
         $"command-{command.Id}-enabled";
 
-    private static string CommandModeratorOnlyToggleId(CustomCommandEditor command) =>
-        $"command-{command.Id}-moderator-only";
+    private static string CommandAccessLabelId(CustomCommandEditor command) =>
+        $"command-{command.Id}-access-label";
+
+    private static string CommandEveryoneAccessId(CustomCommandEditor command) =>
+        $"command-{command.Id}-access-everyone";
+
+    private static string CommandRestrictedAccessId(CustomCommandEditor command) =>
+        $"command-{command.Id}-access-restricted";
+
+    private static string CommandModeratorAccessId(CustomCommandEditor command) =>
+        $"command-{command.Id}-access-moderators";
+
+    private static string CommandSelectedUsersContentId(CustomCommandEditor command) =>
+        $"command-{command.Id}-selected-users";
+
+    private static string CommandAllowedUserFieldId(CustomCommandEditor command) =>
+        $"command-{command.Id}-allowed-user";
 
     private static string CommandCooldownScopeFieldId(CustomCommandEditor command) =>
         $"command-{command.Id}-cooldown-scope";
@@ -817,6 +884,10 @@ public partial class CustomCommandSettingsPage
                 EntityKind: CustomCommandValidationEntityKind.Reply,
                 FieldKind: CustomCommandValidationFieldKind.VariantText
             } => $"message-entry-{target.EntityId}-add-variant",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.AllowedUsers
+            } => $"command-{target.EntityId}-allowed-user",
             {
                 EntityKind: CustomCommandValidationEntityKind.Command,
                 FieldKind: CustomCommandValidationFieldKind.Cooldown
@@ -1023,6 +1094,87 @@ public partial class CustomCommandSettingsPage
         _ = (_config?.Commands.Remove(command));
         EnsureEditorSelection();
     }
+
+    private static void SetCommandAccess(CustomCommandEditor command, bool allowEveryone)
+    {
+        command.AllowEveryone = allowEveryone;
+        command.AllowedUserFeedback = null;
+    }
+
+    private static void ToggleModeratorAccess(CustomCommandEditor command)
+    {
+        command.AllowModerators = !command.AllowModerators;
+        command.AllowedUserFeedback = null;
+    }
+
+    private async Task AddAllowedUserAsync(CustomCommandEditor command)
+    {
+        var normalizedLogin = Login.Normalize(command.AllowedUserLoginDraft);
+        if (!IsValidTwitchLogin(normalizedLogin))
+        {
+            command.AllowedUserFeedback = "Enter a valid Twitch login.";
+            return;
+        }
+
+        command.AllowedUserLookupInProgress = true;
+        command.AllowedUserFeedback = "Looking up that Twitch account...";
+        try
+        {
+            var resolution = await _viewers.ResolveAsync(normalizedLogin, CancellationToken.None);
+            switch (resolution)
+            {
+                case CustomCommandViewerResolution.Found found
+                    when command.AllowedUsers.Any(user =>
+                        string.Equals(
+                            user.TwitchUserId,
+                            found.Viewer.TwitchUserId,
+                            StringComparison.Ordinal
+                        )
+                    ):
+                    command.AllowedUserFeedback = "That Twitch account is already selected.";
+                    break;
+                case CustomCommandViewerResolution.Found found:
+                    var displayName = string.IsNullOrWhiteSpace(found.Viewer.DisplayName)
+                        ? found.Viewer.Login
+                        : found.Viewer.DisplayName;
+                    command.AllowedUsers.Add(
+                        new(found.Viewer.TwitchUserId, found.Viewer.Login, displayName)
+                    );
+                    command.AllowedUserLoginDraft = string.Empty;
+                    command.AllowedUserFeedback = $"Added {displayName}.";
+                    break;
+                case CustomCommandViewerResolution.NotFound:
+                    command.AllowedUserFeedback = "No Twitch account matches that login.";
+                    break;
+                case CustomCommandViewerResolution.Unavailable:
+                    command.AllowedUserFeedback =
+                        "Twitch account lookup is unavailable. Try again later.";
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(nameof(AddAllowedUserAsync), exception);
+            command.AllowedUserFeedback = "Twitch account lookup is unavailable. Try again later.";
+        }
+        finally
+        {
+            command.AllowedUserLookupInProgress = false;
+        }
+    }
+
+    private static void RemoveAllowedUser(
+        CustomCommandEditor command,
+        CustomCommandAllowedUserEditor user
+    )
+    {
+        _ = command.AllowedUsers.Remove(user);
+        command.AllowedUserFeedback = $"Removed {user.DisplayName}.";
+    }
+
+    private static bool IsValidTwitchLogin(string login) =>
+        login.Length is > 0 and <= 25
+        && login.All(static character => char.IsAsciiLetterOrDigit(character) || character == '_');
 
     private Task TestCueAsync(OverlayCueCustomCommandActionEditor action) =>
         ObserveUiOperationAsync(
@@ -1267,6 +1419,18 @@ public partial class CustomCommandSettingsPage
         }
         return summaries.Count == 0 ? "Default settings" : string.Join(" · ", summaries);
     }
+
+    private static string CommandAccessSummary(CustomCommandEditor command) =>
+        CustomCommandAccessPolicy.Describe(
+            command.AllowEveryone,
+            command.AllowModerators,
+            command.AllowedUsers.Count
+        );
+
+    private static string SelectedUsersSummary(CustomCommandEditor command) =>
+        command.AllowedUsers.Count == 0
+            ? "Add specific Twitch accounts."
+            : CountLabel(command.AllowedUsers.Count, "selected person");
 
     private static string CountLabel(int count, string singular) =>
         $"{count} {(count == 1 ? singular : singular + "s")}";

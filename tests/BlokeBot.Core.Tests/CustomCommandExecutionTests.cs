@@ -41,11 +41,18 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task ModeratorOnlyCommand_DispatchingByRoles_AllowsModeratorAndStreamerOnly()
+    public async Task ModeratorGrant_DispatchingByRoles_AllowsModeratorAndStreamerOnly()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        _ = await SeedCommandAsync(dbFactory, hostId, "secret", ["Hi {user}"], moderatorOnly: true);
+        _ = await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "secret",
+            ["Hi {user}"],
+            allowEveryone: false,
+            allowModerators: true
+        );
         await using var services = BuildServices(dbFactory);
         var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
@@ -72,6 +79,170 @@ public sealed class CustomCommandExecutionTests
         );
 
         replies.ShouldBe(["Hi moderator", "Hi streamer"]);
+    }
+
+    [Test]
+    public async Task ComposableAccess_Dispatching_UsesStableSelectedIdAndIndependentGrants()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        _ = await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "trusted",
+            ["Hi {user}"],
+            allowEveryone: false,
+            allowModerators: true,
+            allowedUsers: [new("selected-id", "old_login", "Old name")]
+        );
+        await using var services = BuildServices(dbFactory);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await dispatcher.DispatchResponsesAsync(
+            Message(
+                "old_login",
+                "streamer",
+                "!trusted",
+                new Dictionary<string, string> { ["user-id"] = "different-id" }
+            ),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        await dispatcher.DispatchResponsesAsync(
+            Message("old_login", "streamer", "!trusted", new Dictionary<string, string>()),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        await dispatcher.DispatchResponsesAsync(
+            Message(
+                "renamed_login",
+                "streamer",
+                "!trusted",
+                new Dictionary<string, string> { ["user-id"] = "selected-id" }
+            ),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        await dispatcher.DispatchResponsesAsync(
+            Message(
+                "moderator",
+                "streamer",
+                "!trusted",
+                new Dictionary<string, string> { ["mod"] = "1", ["user-id"] = "moderator-id" }
+            ),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        await dispatcher.DispatchResponsesAsync(
+            Message("streamer", "streamer", "!trusted", new Dictionary<string, string>()),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(["Hi renamed_login", "Hi moderator", "Hi streamer"]);
+    }
+
+    [Test]
+    public async Task UnauthorizedSelectedUserCommand_Dispatching_MutatesNothingBeforeAuthorizedUse()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var seed = await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "trusted-counter",
+            ["Count {count}"],
+            allowEveryone: false,
+            allowedUsers: [new("selected-id", "viewer", "Viewer")],
+            cooldownSeconds: 30,
+            counterCommand: true,
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await dispatcher.DispatchResponsesAsync(
+            Message(
+                "viewer",
+                "streamer",
+                "!trusted-counter",
+                new Dictionary<string, string> { ["user-id"] = "wrong-id" }
+            ),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+        await using (var denied = await dbFactory.CreateDbContextAsync())
+        {
+            (
+                await denied
+                    .CustomCounters.Where(counter => counter.Id == seed.CounterId)
+                    .Select(counter => counter.Value)
+                    .SingleAsync()
+            ).ShouldBe(0);
+            (await denied.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
+        }
+
+        await dispatcher.DispatchResponsesAsync(
+            Message(
+                "renamed",
+                "streamer",
+                "!trusted-counter",
+                new Dictionary<string, string> { ["user-id"] = "selected-id" }
+            ),
+            RecordMessages(replies),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(["Count 1"]);
+        await using var accepted = await dbFactory.CreateDbContextAsync();
+        (
+            await accepted
+                .CustomCounters.Where(counter => counter.Id == seed.CounterId)
+                .Select(counter => counter.Value)
+                .SingleAsync()
+        ).ShouldBe(1);
+        (await accepted.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task UnauthorizedOverlayCueCommand_Dispatching_DoesNotResolveOrAdmitProviderWork()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var seed = await SeedCueCommandAsync(
+            dbFactory,
+            hostId,
+            "private-cue",
+            OverlayCueReplyOrder.Before,
+            cooldownSeconds: 30,
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using (var restrict = await dbFactory.CreateDbContextAsync())
+        {
+            var command = await restrict.CustomCommands.SingleAsync(value =>
+                value.Id == seed.CommandId
+            );
+            command.AllowEveryone = false;
+            _ = await restrict.SaveChangesAsync();
+        }
+        List<string> events = [];
+        var admissions = new RecordingCueAdmissions(events);
+        await using var services = BuildServices(dbFactory, overlayCues: admissions);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+
+        await dispatcher.DispatchResponsesAsync(
+            Message("viewer", "streamer", "!private-cue"),
+            RecordEvents(events),
+            CancellationToken.None
+        );
+
+        events.ShouldBeEmpty();
+        admissions.ReferenceRequests.ShouldBeEmpty();
+        admissions.Requests.ShouldBeEmpty();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -314,7 +485,8 @@ public sealed class CustomCommandExecutionTests
             hostId,
             "mod-only",
             ["reply"],
-            moderatorOnly: true,
+            allowEveryone: false,
+            allowModerators: true,
             cooldownSeconds: 30,
             invocationLimit: CustomCommandInvocationLimit.OncePerUser
         );
@@ -843,7 +1015,9 @@ public sealed class CustomCommandExecutionTests
         string alias,
         string[] variants,
         CustomMessageSelectionMode selectionMode = CustomMessageSelectionMode.Sequential,
-        bool moderatorOnly = false,
+        bool allowEveryone = true,
+        bool allowModerators = false,
+        IReadOnlyList<CustomCommandAllowedUserEditor>? allowedUsers = null,
         int cooldownSeconds = 0,
         CustomCommandCooldownScope cooldownScope = CustomCommandCooldownScope.Global,
         bool counterCommand = false,
@@ -889,7 +1063,19 @@ public sealed class CustomCommandExecutionTests
             HostId = hostId,
             Name = $"{alias}-command",
             Enabled = true,
-            ModeratorOnly = moderatorOnly,
+            AllowEveryone = allowEveryone,
+            AllowModerators = allowModerators,
+            AllowedUsers =
+                allowedUsers
+                    ?.Select(user => new CustomCommandAllowedUser
+                    {
+                        HostId = hostId,
+                        TwitchUserId = user.TwitchUserId,
+                        Login = user.Login,
+                        DisplayName = user.DisplayName,
+                    })
+                    .ToList()
+                ?? [],
             CooldownSeconds = cooldownSeconds,
             CooldownScope = cooldownScope,
             InvocationLimit = invocationLimit,

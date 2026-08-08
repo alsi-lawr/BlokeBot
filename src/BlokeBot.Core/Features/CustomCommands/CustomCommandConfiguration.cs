@@ -51,7 +51,17 @@ public sealed class CustomCommandEditor
 
     public bool Enabled { get; set; } = true;
 
-    public bool ModeratorOnly { get; set; }
+    public bool AllowEveryone { get; set; } = true;
+
+    public bool AllowModerators { get; set; }
+
+    public List<CustomCommandAllowedUserEditor> AllowedUsers { get; set; } = [];
+
+    public string AllowedUserLoginDraft { get; set; } = string.Empty;
+
+    public bool AllowedUserLookupInProgress { get; set; }
+
+    public string? AllowedUserFeedback { get; set; }
 
     public int CooldownSeconds { get; set; }
 
@@ -98,6 +108,12 @@ public sealed class CustomCommandEditor
         }
     }
 }
+
+public sealed record CustomCommandAllowedUserEditor(
+    string TwitchUserId,
+    string Login,
+    string DisplayName
+);
 
 public enum CustomCommandActionKind
 {

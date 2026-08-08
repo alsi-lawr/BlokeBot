@@ -34,8 +34,10 @@ public sealed class CustomCommandConfigurationService(
             .ToListAsync(ct);
         var commands = await db
             .CustomCommands.AsNoTracking()
+            .AsSplitQuery()
             .Include(x => x.Action)
             .Include(x => x.Aliases)
+            .Include(x => x.AllowedUsers)
             .Where(x => x.HostId == hostId)
             .OrderBy(x => x.Name)
             .ToListAsync(ct);

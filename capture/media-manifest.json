@@ -222,7 +222,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; body text: Scheduled messages; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings; Sample Channel; selected command access controls visible; moderator access focused; main opacity 1"
     },
     {
       "file": "laptop-dark-guessing-leaderboard.png",
@@ -521,7 +521,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; body text: Scheduled messages; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings; Sample Channel; selected command access controls visible; moderator access focused; main opacity 1"
     },
     {
       "file": "laptop-light-guessing-leaderboard.png",
@@ -820,7 +820,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; body text: Scheduled messages; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings; Sample Channel; selected command access controls visible; moderator access focused; main opacity 1"
     },
     {
       "file": "phone-dark-guessing-leaderboard.png",
@@ -1119,7 +1119,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings; Sample Channel; body text: Scheduled messages; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings; Sample Channel; selected command access controls visible; moderator access focused; main opacity 1"
     },
     {
       "file": "phone-light-guessing-leaderboard.png",

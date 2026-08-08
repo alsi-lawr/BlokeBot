@@ -47,6 +47,12 @@ public sealed record CustomCommandReplyRoutes(
     int? TwoArgumentMessageLibraryEntryId
 );
 
+public sealed record CustomCommandAllowedUserValue(
+    string TwitchUserId,
+    string Login,
+    string DisplayName
+);
+
 public abstract record CustomCommandActionValue
 {
     private CustomCommandActionValue() { }
@@ -96,7 +102,9 @@ public sealed record CustomCommandValue
         string name,
         IEnumerable<string> aliases,
         bool enabled,
-        bool moderatorOnly,
+        bool allowEveryone,
+        bool allowModerators,
+        IEnumerable<CustomCommandAllowedUserValue> allowedUsers,
         int cooldownSeconds,
         CustomCommandCooldownScope cooldownScope,
         CustomCommandInvocationLimit invocationLimit,
@@ -107,7 +115,9 @@ public sealed record CustomCommandValue
         Name = name;
         Aliases = Array.AsReadOnly(aliases.ToArray());
         Enabled = enabled;
-        ModeratorOnly = moderatorOnly;
+        AllowEveryone = allowEveryone;
+        AllowModerators = allowModerators;
+        AllowedUsers = Array.AsReadOnly(allowedUsers.ToArray());
         CooldownSeconds = cooldownSeconds;
         CooldownScope = cooldownScope;
         InvocationLimit = invocationLimit;
@@ -122,7 +132,11 @@ public sealed record CustomCommandValue
 
     public bool Enabled { get; }
 
-    public bool ModeratorOnly { get; }
+    public bool AllowEveryone { get; }
+
+    public bool AllowModerators { get; }
+
+    public IReadOnlyList<CustomCommandAllowedUserValue> AllowedUsers { get; }
 
     public int CooldownSeconds { get; }
 

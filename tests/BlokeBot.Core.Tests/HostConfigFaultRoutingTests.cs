@@ -927,7 +927,7 @@ public sealed class HostConfigFaultRoutingTests
     private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page) =>
         page.FindAll("button")
             .Single(static button =>
-                button.TextContent.Contains("Available viewer commands", StringComparison.Ordinal)
+                button.TextContent.Contains("Viewer command inventory", StringComparison.Ordinal)
             );
 
     private static IElement FindFeatureButton(

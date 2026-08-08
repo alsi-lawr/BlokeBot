@@ -144,6 +144,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasKey(static x => x.Id);
             _ = b.HasAlternateKey(static x => new { x.HostId, x.Id });
             _ = b.Property(static x => x.Name).HasMaxLength(128);
+            _ = b.Property(static x => x.AllowEveryone).HasDefaultValue(true);
             _ = b.Property(static x => x.CooldownScope)
                 .HasConversion(
                     static scope => PersistedEnumTokens<CustomCommandCooldownScope>.Format(scope),
@@ -166,6 +167,25 @@ public sealed partial class BlokeBotDbContext
                 .WithOne(static x => x.Command)
                 .HasForeignKey<CustomCommandAction>(static x => new { x.HostId, x.CustomCommandId })
                 .HasPrincipalKey<CustomCommand>(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        _ = modelBuilder.Entity<CustomCommandAllowedUser>(static b =>
+        {
+            _ = b.ToTable("custom_command_allowed_users");
+            _ = b.HasKey(static x => new
+            {
+                x.HostId,
+                x.CustomCommandId,
+                x.TwitchUserId,
+            });
+            _ = b.Property(static x => x.TwitchUserId).HasMaxLength(128);
+            _ = b.Property(static x => x.Login).HasMaxLength(128);
+            _ = b.Property(static x => x.DisplayName).HasMaxLength(128);
+            _ = b.HasOne(static x => x.Command)
+                .WithMany(static x => x.AllowedUsers)
+                .HasForeignKey(static x => new { x.HostId, x.CustomCommandId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

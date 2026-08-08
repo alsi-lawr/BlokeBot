@@ -135,7 +135,14 @@ public sealed class SimulationLaunchReadinessTests
         initialJson.ShouldContain("!enter");
         initialJson.ShouldContain("!welcome");
         initialJson.ShouldNotContain("!hello");
-        initialJson.ShouldNotContain("!modfixture");
+        var moderatorFixture = initial
+            .RootElement.GetProperty("entries")
+            .EnumerateArray()
+            .Single(entry => entry.GetProperty("name").GetString() == "!modfixture");
+        moderatorFixture
+            .GetProperty("accessSummary")
+            .GetString()
+            .ShouldBe("Moderators + 1 selected person");
         initialJson.ShouldContain("shadowed by another command");
 
         using var chatResponse = await client.PostAsync("/simulation/commands/chat", null);

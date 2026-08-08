@@ -140,11 +140,11 @@ local succeeded, failure = pcall(function()
           .find(candidate => candidate.querySelector(".disclosure-title")?.textContent.trim()
             === title);
         let commands = disclosure("Commands");
-        let available = disclosure("Available viewer commands");
+        let available = disclosure("Viewer command inventory");
         if (!available || !commands) throw new Error("Commands disclosures were not found.");
         available.click();
         await new Promise(resolve => setTimeout(resolve, 1000));
-        available = disclosure("Available viewer commands");
+        available = disclosure("Viewer command inventory");
         if (available?.getAttribute("aria-expanded") !== "true") {
           available?.click();
         }

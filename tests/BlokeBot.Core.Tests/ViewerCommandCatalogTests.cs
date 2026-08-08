@@ -100,9 +100,11 @@ public sealed class ViewerCommandCatalogTests
             references
         );
 
-        (await catalog.LoadForHostAsync(hostId, CancellationToken.None)).Names.ShouldBe([
-            "!message",
-        ]);
+        var overlaysOff = await catalog.LoadForHostAsync(hostId, CancellationToken.None);
+        overlaysOff.Names.ShouldBe(["!cue", "!message"]);
+        overlaysOff
+            .Entries.Single(entry => entry.Name == "!cue")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.ActionUnavailable);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
@@ -111,10 +113,11 @@ public sealed class ViewerCommandCatalogTests
         }
         references.Outcome = new OverlayCueReferenceOutcome.Available();
 
-        (await catalog.LoadForHostAsync(hostId, CancellationToken.None)).Names.ShouldBe([
-            "!cue",
-            "!message",
-        ]);
+        var overlaysOn = await catalog.LoadForHostAsync(hostId, CancellationToken.None);
+        overlaysOn.Names.ShouldBe(["!cue", "!message"]);
+        overlaysOn
+            .Entries.Single(entry => entry.Name == "!cue")
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.Available);
         references.Requests.Count.ShouldBe(2);
     }
 
@@ -148,16 +151,161 @@ public sealed class ViewerCommandCatalogTests
             "!request",
             "!requests",
             "!requestvote",
+            "!secret",
             "!wager",
             "!zeta",
         ]);
         snapshot.Names.ShouldNotContain("!alpha");
-        snapshot.Names.ShouldNotContain("!secret");
         snapshot
             .Names.Distinct(StringComparer.OrdinalIgnoreCase)
             .Count()
             .ShouldBe(snapshot.Names.Count);
         snapshot.Conflicts.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task CallerAccess_LoadingCatalog_HidesRestrictedCanonicalNamesFromOtherViewers()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedCatalogFixtureAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            _ = db.CustomCommands.Add(
+                new CustomCommand
+                {
+                    HostId = fixture.HostId,
+                    Name = "Selected",
+                    Enabled = true,
+                    AllowEveryone = false,
+                    Aliases =
+                    [
+                        new CustomCommandAlias { HostId = fixture.HostId, Alias = "selected" },
+                    ],
+                    AllowedUsers =
+                    [
+                        new CustomCommandAllowedUser
+                        {
+                            HostId = fixture.HostId,
+                            TwitchUserId = "selected-id",
+                            Login = "old_login",
+                            DisplayName = "Old name",
+                        },
+                    ],
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions()
+        );
+
+        var owner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
+        var viewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+        var moderator = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("moderator", "moderator-id", moderator: true),
+            CancellationToken.None
+        );
+        var selected = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("renamed_login", "selected-id"),
+            CancellationToken.None
+        );
+
+        owner.Names.ShouldContain("!secret");
+        owner.Names.ShouldContain("!selected");
+        owner.Entries.Single(entry => entry.Name == "!secret").AccessSummary.ShouldBe("Moderators");
+        owner
+            .Entries.Single(entry => entry.Name == "!selected")
+            .AccessSummary.ShouldBe("1 selected person");
+        owner.Entries.Single(entry => entry.Name == "!zeta").AccessSummary.ShouldBe("Everyone");
+        viewer.Names.ShouldNotContain("!secret");
+        viewer.Names.ShouldNotContain("!selected");
+        moderator.Names.ShouldContain("!secret");
+        moderator.Names.ShouldNotContain("!selected");
+        selected.Names.ShouldNotContain("!secret");
+        selected.Names.ShouldContain("!selected");
+        viewer.Names.ShouldContain("!zeta");
+        moderator.Names.ShouldContain("!zeta");
+        selected.Names.ShouldContain("!zeta");
+    }
+
+    [Test]
+    public async Task OwnerInventory_LoadingCatalog_ListsDisabledAndUnavailableWithoutViewerDisclosure()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedCatalogFixtureAsync(dbFactory);
+        var targetId = Guid.NewGuid();
+        var cueId = Guid.NewGuid();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var disabled = CatalogCommand(
+                fixture.HostId,
+                "disabled",
+                new MessageCustomCommandAction { HostId = fixture.HostId }
+            );
+            disabled.Enabled = false;
+            disabled.AllowEveryone = false;
+            disabled.AllowModerators = true;
+            var unavailable = CatalogCommand(
+                fixture.HostId,
+                "unavailable",
+                new OverlayCueCustomCommandAction
+                {
+                    HostId = fixture.HostId,
+                    TargetOverlayPublicId = targetId,
+                    CuePublicId = cueId,
+                    QueuePolicy = OverlayCueQueuePolicy.Enqueue,
+                    ReplyOrder = OverlayCueReplyOrder.After,
+                }
+            );
+            db.CustomCommands.AddRange(disabled, unavailable);
+            _ = await db.SaveChangesAsync();
+        }
+        var references = new RecordingCueAdmissions
+        {
+            Outcome = new OverlayCueReferenceOutcome.Disabled(OverlayCueReferencePart.Target),
+        };
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            references
+        );
+
+        var owner = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
+        var viewer = await catalog.LoadForViewerAsync(
+            "streamer",
+            Message("viewer", "viewer-id"),
+            CancellationToken.None
+        );
+
+        var disabledEntry = owner.Entries.Single(entry => entry.Name == "!disabled");
+        disabledEntry.AccessSummary.ShouldBe("Moderators");
+        disabledEntry.Availability.ShouldBe(ViewerCommandCatalogAvailability.TurnedOff);
+        var unavailableEntry = owner.Entries.Single(entry => entry.Name == "!unavailable");
+        unavailableEntry.AccessSummary.ShouldBe("Everyone");
+        unavailableEntry.Availability.ShouldBe(ViewerCommandCatalogAvailability.ActionUnavailable);
+        viewer.Names.ShouldNotContain("!disabled");
+        viewer.Names.ShouldNotContain("!unavailable");
+        viewer.Names.ShouldNotContain("!secret");
+        viewer.Conflicts.ShouldAllBe(static message =>
+            !message.Contains("disabled", StringComparison.OrdinalIgnoreCase)
+            && !message.Contains("unavailable", StringComparison.OrdinalIgnoreCase)
+            && !message.Contains("secret", StringComparison.OrdinalIgnoreCase)
+        );
+        viewer.UnavailableFeatures.ShouldAllBe(static message =>
+            !message.Contains("disabled", StringComparison.OrdinalIgnoreCase)
+            && !message.Contains("unavailable", StringComparison.OrdinalIgnoreCase)
+            && !message.Contains("secret", StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     private static CustomCommand CatalogCommand(
@@ -220,7 +368,7 @@ public sealed class ViewerCommandCatalogTests
     }
 
     [Test]
-    public async Task LegacyFixedRouteShadow_LoadingCatalog_OmitsCanonicalAndReportsConflict()
+    public async Task LegacyFixedRouteShadow_LoadingOwnerInventory_ListsUnavailableAndReportsConflict()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var fixture = await SeedCatalogFixtureAsync(dbFactory);
@@ -248,9 +396,11 @@ public sealed class ViewerCommandCatalogTests
         );
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
-        snapshot.Entries.ShouldNotContain(static entry =>
-            entry.Source == ViewerCommandCatalogSource.Custom && entry.Name == "!join"
-        );
+        snapshot
+            .Entries.Single(entry =>
+                entry.Source == ViewerCommandCatalogSource.Custom && entry.Name == "!join"
+            )
+            .Availability.ShouldBe(ViewerCommandCatalogAvailability.Shadowed);
         snapshot.Conflicts.ShouldContain(static message => message.Contains("!join"));
     }
 
@@ -271,7 +421,11 @@ public sealed class ViewerCommandCatalogTests
         await using var provider = services.BuildServiceProvider();
         var expected = await provider
             .GetRequiredService<ViewerCommandCatalogService>()
-            .LoadForHostAsync(fixture.HostId, CancellationToken.None);
+            .LoadForViewerAsync(
+                "streamer",
+                Message("viewer", string.Empty),
+                CancellationToken.None
+            );
         var responses = new List<CommandResponse>();
 
         await provider
@@ -339,7 +493,11 @@ public sealed class ViewerCommandCatalogTests
         await using var provider = services.BuildServiceProvider();
         var snapshot = await provider
             .GetRequiredService<ViewerCommandCatalogService>()
-            .LoadForHostAsync(fixture.HostId, CancellationToken.None);
+            .LoadForViewerAsync(
+                "streamer",
+                Message("viewer", string.Empty),
+                CancellationToken.None
+            );
         var expected = $"Available viewer commands: {string.Join(", ", snapshot.Names)}.";
         expected.Length.ShouldBeGreaterThan(500);
 
@@ -538,7 +696,8 @@ public sealed class ViewerCommandCatalogTests
                 HostId = host.Id,
                 Name = "Moderator",
                 Enabled = true,
-                ModeratorOnly = true,
+                AllowEveryone = false,
+                AllowModerators = true,
                 Aliases =
                 [
                     new CustomCommandAlias
@@ -583,6 +742,20 @@ public sealed class ViewerCommandCatalogTests
             Login = role == AuthRole.Streamer ? "streamer" : "moderator",
             State = new AuthSessionState.Selected(new BotHostSelection(host, [host])),
         };
+    }
+
+    private static ChatMessage Message(string login, string twitchUserId, bool moderator = false)
+    {
+        var tags = new Dictionary<string, string>();
+        if (twitchUserId.Length > 0)
+        {
+            tags["user-id"] = twitchUserId;
+        }
+        if (moderator)
+        {
+            tags["mod"] = "1";
+        }
+        return new(login, "streamer", "!commands", "raw", tags);
     }
 
     private sealed class StaticLivenessProvider(HostStreamLivenessOutcome outcome)

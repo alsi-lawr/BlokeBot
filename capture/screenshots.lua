@@ -140,7 +140,24 @@ local succeeded, failure = pcall(function()
       getComputedStyle(document.querySelector("main")).opacity === "1"
   ]=]):format(expected.path, expected.expression)
   viset.page.wait_for(viset.javascript(ready_expression), "20s")
-  if view == "native-shoutouts" then
+  if view == "custom-commands" then
+    viset.page.wait_for(
+      viset.javascript([[Boolean(document.querySelector("[data-command-access]"))]]),
+      "20s"
+    )
+    viset.page.evaluate(viset.javascript([=[
+      (() => {
+        const access = document.querySelector("[data-command-access]");
+        const moderators = access?.querySelector("[id$='-access-moderators']");
+        if (!access || !moderators) {
+          throw new Error("Selected command access controls were not found.");
+        }
+        moderators.focus({ preventScroll: true });
+        moderators.scrollIntoView({ block: "center" });
+        return true;
+      })()
+    ]=]))
+  elseif view == "native-shoutouts" then
     viset.sleep("350ms")
     viset.page.evaluate(viset.javascript([=[
       (() => {

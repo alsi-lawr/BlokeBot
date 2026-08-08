@@ -39,7 +39,7 @@ public sealed class ViewerCommandCatalogModule(
             return new CommandHandlingOutcome.Unhandled();
         }
 
-        var snapshot = await catalog.LoadForChannelAsync(hostLogin, ct);
+        var snapshot = await catalog.LoadForViewerAsync(hostLogin, context.Message, ct);
         var message =
             snapshot.Entries.Count == 0
                 ? "No viewer commands are currently available."
