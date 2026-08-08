@@ -127,6 +127,21 @@ public enum AutomationResumeStatus
 
 public sealed record AutomationResumeOutcome(AutomationResumeStatus Status);
 
+/// <summary>
+/// Observes automation flow runs reaching a terminal <see cref="AutomationResumeStatus.Completed"/>
+/// or <see cref="AutomationResumeStatus.Failed"/> outcome. The runtime may report the same terminal
+/// run more than once; implementations must be idempotent and must not throw. Invalidated and
+/// feature-disabled outcomes are never reported, so observers cause no effects for suppressed work.
+/// </summary>
+public interface IAutomationRunCompletionObserver
+{
+    Task RunFinishedAsync(
+        AutomationRunId runId,
+        AutomationResumeStatus status,
+        CancellationToken cancellationToken
+    );
+}
+
 public sealed record AutomationRunSummary(
     AutomationRunId Id,
     AutomationFlowId FlowId,

@@ -12,10 +12,15 @@ public sealed class AutomationRuntimeService(
     AutomationCatalogService catalog,
     AutomationExpressionService expressions,
     AutomationActionExecutor actions,
-    TimeProvider clock
+    TimeProvider clock,
+    IEnumerable<IAutomationRunCompletionObserver>? runCompletionObservers = null
 )
 {
     private readonly Lock _initializationGate = new();
+    private readonly IAutomationRunCompletionObserver[] _runCompletionObservers =
+    [
+        .. runCompletionObservers ?? [],
+    ];
     private Task? _initialization;
 
     public async Task<AutomationDispatchOutcome> DispatchAsync(
@@ -367,20 +372,33 @@ public sealed class AutomationRuntimeService(
     {
         await EnsureInitializedAsync(cancellationToken);
         var claim = await ClaimRunAsync(runId, cancellationToken);
+        AutomationResumeOutcome outcome;
         if (claim is AutomationRunClaim.Unavailable unavailable)
         {
-            return new(unavailable.Status);
+            outcome = new(unavailable.Status);
+        }
+        else
+        {
+            var leaseId = ((AutomationRunClaim.Owned)claim).LeaseId;
+            try
+            {
+                outcome = await ResumeOwnedAsync(runId, leaseId, cancellationToken);
+            }
+            finally
+            {
+                await ReleaseRunAsync(runId, leaseId, CancellationToken.None);
+            }
         }
 
-        var leaseId = ((AutomationRunClaim.Owned)claim).LeaseId;
-        try
+        if (outcome.Status is AutomationResumeStatus.Completed or AutomationResumeStatus.Failed)
         {
-            return await ResumeOwnedAsync(runId, leaseId, cancellationToken);
+            foreach (var observer in _runCompletionObservers)
+            {
+                await observer.RunFinishedAsync(runId, outcome.Status, cancellationToken);
+            }
         }
-        finally
-        {
-            await ReleaseRunAsync(runId, leaseId, CancellationToken.None);
-        }
+
+        return outcome;
     }
 
     internal Task InitializeAsync(CancellationToken cancellationToken) =>

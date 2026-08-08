@@ -30,12 +30,15 @@ public sealed class NativeEventDispatchTests
             "redemption-id",
             "reward-id",
             "Reward",
+            500,
             "viewer-id",
             "viewer",
+            "Viewer",
             "input",
             HelixRewardRedemptionStatus.Unfulfilled,
             DateTimeOffset.UtcNow,
-            "redemption-message"
+            "redemption-message",
+            true
         );
         var prediction = new EventSubPredictionEvent(
             "broadcaster-id",

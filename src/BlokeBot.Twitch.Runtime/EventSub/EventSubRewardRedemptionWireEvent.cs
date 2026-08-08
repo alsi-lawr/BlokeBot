@@ -22,6 +22,9 @@ internal sealed record EventSubRewardRedemptionWireEvent
     [JsonPropertyName("user_login")]
     public string UserLogin { get; init; } = string.Empty;
 
+    [JsonPropertyName("user_name")]
+    public string UserName { get; init; } = string.Empty;
+
     [JsonPropertyName("user_input")]
     public string UserInput { get; init; } = string.Empty;
 
@@ -31,15 +34,17 @@ internal sealed record EventSubRewardRedemptionWireEvent
     [JsonPropertyName("redeemed_at")]
     public DateTimeOffset RedeemedAt { get; init; }
 
-    public EventSubRewardRedemptionEvent ToDomain(string messageId) =>
+    public EventSubRewardRedemptionEvent ToDomain(string messageId, bool isNewRedemption) =>
         new(
             BroadcasterUserId,
             BroadcasterUserLogin,
             Id,
             Reward.Id,
             Reward.Title,
+            Reward.Cost,
             UserId,
             UserLogin,
+            UserName,
             UserInput,
             Status switch
             {
@@ -49,7 +54,8 @@ internal sealed record EventSubRewardRedemptionWireEvent
                 _ => HelixRewardRedemptionStatus.Unknown,
             },
             RedeemedAt,
-            messageId
+            messageId,
+            isNewRedemption
         );
 
     internal sealed record RedemptionRewardWire
@@ -59,5 +65,8 @@ internal sealed record EventSubRewardRedemptionWireEvent
 
         [JsonPropertyName("title")]
         public string Title { get; init; } = string.Empty;
+
+        [JsonPropertyName("cost")]
+        public int Cost { get; init; }
     }
 }

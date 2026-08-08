@@ -200,7 +200,7 @@ internal static class TwitchEventAutomationContext
             }
         );
 
-    private static AutomationContext Create(
+    internal static AutomationContext Create(
         BotHost host,
         AutomationDefinitionId definitionId,
         AutomationActor? actor,
@@ -226,7 +226,7 @@ internal static class TwitchEventAutomationContext
             new(variables)
         );
 
-    private static AutomationActor Actor(string userId, string login, string displayName) =>
+    internal static AutomationActor Actor(string userId, string login, string displayName) =>
         new(
             Bound(userId),
             Bound(login),
@@ -242,21 +242,21 @@ internal static class TwitchEventAutomationContext
             ? null
             : Actor(userId, login, displayName ?? string.Empty);
 
-    private static string Bound(string value) =>
+    internal static string Bound(string value) =>
         value.Length <= MaximumTextLength ? value : value[..MaximumTextLength];
 
-    private static AutomationVariable SafeText(string value) =>
+    internal static AutomationVariable SafeText(string value) =>
         new(new AutomationValue.Text(value), AutomationDataSensitivity.Safe);
 
-    private static AutomationVariable SafeNumber(int value) =>
+    internal static AutomationVariable SafeNumber(int value) =>
         new(new AutomationValue.Number(value), AutomationDataSensitivity.Safe);
 
     private static AutomationVariable SafeBoolean(bool value) =>
         new(new AutomationValue.Boolean(value), AutomationDataSensitivity.Safe);
 
-    private static AutomationVariable SafeTimestamp(DateTimeOffset value) =>
+    internal static AutomationVariable SafeTimestamp(DateTimeOffset value) =>
         new(new AutomationValue.Timestamp(value), AutomationDataSensitivity.Safe);
 
-    private static AutomationVariable SensitiveText(string value) =>
+    internal static AutomationVariable SensitiveText(string value) =>
         new(new AutomationValue.Text(value), AutomationDataSensitivity.Sensitive);
 }

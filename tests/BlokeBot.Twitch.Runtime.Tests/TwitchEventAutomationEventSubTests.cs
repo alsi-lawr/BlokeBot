@@ -209,6 +209,125 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
     }
 
     [Test]
+    public void RedemptionAddEnvelope_ParsingTypedNotification_MapsRewardViewerAndNewFlag()
+    {
+        var redemption = Parse(
+                """
+                {
+                  "subscription": {
+                    "type": "channel.channel_points_custom_reward_redemption.add",
+                    "version": "1"
+                  },
+                  "event": {
+                    "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                    "id": "redemption-1",
+                    "reward": { "id": "reward-1", "title": "Hydrate", "cost": 250 },
+                    "user_id": "viewer-id", "user_login": "viewer", "user_name": "Viewer",
+                    "user_input": "please", "status": "unfulfilled",
+                    "redeemed_at": "2026-08-07T11:59:30Z"
+                  }
+                }
+                """
+            )
+            .ShouldBeOfType<EventSubNotification.RewardRedemption>()
+            .Event;
+
+        redemption.MessageId.ShouldBe("automation-message-1");
+        redemption.RedemptionId.ShouldBe("redemption-1");
+        redemption.RewardId.ShouldBe("reward-1");
+        redemption.RewardTitle.ShouldBe("Hydrate");
+        redemption.RewardCost.ShouldBe(250);
+        redemption.UserId.ShouldBe("viewer-id");
+        redemption.UserLogin.ShouldBe("viewer");
+        redemption.UserName.ShouldBe("Viewer");
+        redemption.UserInput.ShouldBe("please");
+        redemption.Status.ShouldBe(HelixRewardRedemptionStatus.Unfulfilled);
+        redemption.IsNewRedemption.ShouldBeTrue();
+    }
+
+    [Test]
+    public void RedemptionUpdateEnvelope_ParsingTypedNotification_IsNeverANewRedemption()
+    {
+        var redemption = Parse(
+                """
+                {
+                  "subscription": {
+                    "type": "channel.channel_points_custom_reward_redemption.update",
+                    "version": "1"
+                  },
+                  "event": {
+                    "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                    "id": "redemption-1",
+                    "reward": { "id": "reward-1", "title": "Hydrate", "cost": 250 },
+                    "user_id": "viewer-id", "user_login": "viewer", "user_name": "Viewer",
+                    "user_input": "please", "status": "fulfilled",
+                    "redeemed_at": "2026-08-07T11:59:30Z"
+                  }
+                }
+                """
+            )
+            .ShouldBeOfType<EventSubNotification.RewardRedemption>()
+            .Event;
+
+        redemption.IsNewRedemption.ShouldBeFalse();
+        redemption.Status.ShouldBe(HelixRewardRedemptionStatus.Fulfilled);
+    }
+
+    [Test]
+    public async Task RewardRedemption_ReachesAutomationObserversOnlyBehindTheParentGate()
+    {
+        var observer = new RecordingAutomationObserver();
+        var channelPoints = new RecordingChannelPoints(() => observer.Deliveries.Count);
+        var gate = new SingleFeatureGate(NativeTwitchFeature.RewardsAndRedemptions);
+        var handler = new EventSubDeliveryHandler(
+            null!,
+            null!,
+            gate,
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                EventSubMessageObserverBoundary,
+                ChatMessage,
+                ChatObserverDeadLetter
+            >(BotObserverBoundaries.EventSubMessages),
+            channelPointsObservers: [channelPoints],
+            automationObservers: [observer]
+        );
+        var envelope = Envelope(
+            """
+            {
+              "subscription": {
+                "type": "channel.channel_points_custom_reward_redemption.add",
+                "version": "1"
+              },
+              "event": {
+                "broadcaster_user_id": "host-id", "broadcaster_user_login": "host_login",
+                "id": "redemption-1",
+                "reward": { "id": "reward-1", "title": "Hydrate", "cost": 250 },
+                "user_id": "viewer-id", "user_login": "viewer", "user_name": "Viewer",
+                "user_input": "please", "status": "unfulfilled",
+                "redeemed_at": "2026-08-07T11:59:30Z"
+              }
+            }
+            """
+        );
+
+        gate.Enabled = false;
+        await handler.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+
+        // The Rewards & redemptions parent gate blocks automation dispatch at delivery.
+        observer.Deliveries.ShouldBeEmpty();
+        channelPoints.Deliveries.ShouldBe(0);
+
+        gate.Enabled = true;
+        await handler.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+
+        // Channel Points observers persist the redemption before automation observers see it.
+        observer.Deliveries.ShouldBe(["reward-redemption"]);
+        channelPoints.Deliveries.ShouldBe(1);
+        channelPoints.DeliveredBeforeAutomation.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task AutomationNotifications_DispatchToAutomationObservers()
     {
         var observer = new RecordingAutomationObserver();
@@ -349,6 +468,36 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         return envelope;
     }
 
+    private sealed class SingleFeatureGate(NativeTwitchFeature feature)
+        : INativeTwitchFeatureStateProvider
+    {
+        internal bool Enabled { get; set; }
+
+        public ValueTask<bool> IsEnabledAsync(
+            string channel,
+            NativeTwitchFeature requested,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromResult(Enabled && requested == feature);
+    }
+
+    private sealed class RecordingChannelPoints(Func<int> automationDeliveries)
+        : IChannelPointsEventObserver
+    {
+        internal int Deliveries { get; private set; }
+
+        internal bool DeliveredBeforeAutomation { get; private set; }
+
+        public Task RedemptionReceivedAsync(
+            EventSubRewardRedemptionEvent redemption,
+            CancellationToken cancellationToken
+        )
+        {
+            Deliveries++;
+            DeliveredBeforeAutomation = automationDeliveries() == 0;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class DisabledNativeTwitchFeatures : INativeTwitchFeatureStateProvider
     {
         public ValueTask<bool> IsEnabledAsync(
@@ -418,6 +567,11 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
             EventSubChatNotificationEvent notification,
             CancellationToken cancellation
         ) => Record("chat-notification");
+
+        public Task RewardRedemptionReceivedAsync(
+            EventSubRewardRedemptionEvent redemption,
+            CancellationToken cancellation
+        ) => Record("reward-redemption");
 
         private Task Record(string kind)
         {

@@ -375,6 +375,29 @@ public sealed class AutomationFlowService(
             }
         }
 
+        if (valid.Configuration is RewardRedemptionSourceConfiguration { RewardId: { } rewardId })
+        {
+            // The reward filter is a reference resolved against this channel's known rewards,
+            // never free-text. Externally created rewards remain valid read-only triggers.
+            await using var rewardDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var known = await rewardDb
+                .TwitchCustomRewards.AsNoTracking()
+                .AnyAsync(
+                    reward => reward.HostId == hostId.Value && reward.ProviderRewardId == rewardId,
+                    cancellationToken
+                );
+            if (!known)
+            {
+                errors.Add(
+                    new(
+                        node.Id,
+                        "reward-reference-unavailable",
+                        "Choose a Custom Reward that exists on this channel."
+                    )
+                );
+            }
+        }
+
         if (!definitions.TryGetValue(definitionId, out var descriptor))
         {
             return;
