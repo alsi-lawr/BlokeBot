@@ -66,9 +66,18 @@ internal static class LoginPage
         </script>
         """;
 
-    public static string Render() => RenderPage();
+    public static string Render(string? privacyNoticeUrl = null) => RenderPage(privacyNoticeUrl);
 
-    private static string RenderPage() =>
+    private static string PrivacyFooter(string? privacyNoticeUrl) =>
+        string.IsNullOrWhiteSpace(privacyNoticeUrl)
+            ? string.Empty
+            : $"""
+                <p class="mt-6 text-center text-xs font-medium text-muted-foreground">
+                    <a class="text-link" href="{privacyNoticeUrl}">How BlokeBot handles your information</a>
+                </p>
+                """;
+
+    private static string RenderPage(string? privacyNoticeUrl) =>
         $$"""
             <!DOCTYPE html>
             <html lang="en">
@@ -117,6 +126,7 @@ internal static class LoginPage
                                 <button class="btn-secondary h-10 w-full" type="submit">View leaderboard</button>
                             </form>
                         </div>
+                        {{PrivacyFooter(privacyNoticeUrl)}}
                     </section>
                 </main>
                 {{_leaderboardScript}}

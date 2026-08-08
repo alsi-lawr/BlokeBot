@@ -25,7 +25,8 @@ export function readBoolean(key, fallback) {
 
 export function writeBoolean(key, value) {
     try {
-        window.localStorage.setItem(key, value ? "true" : "false");
+        if (window.localStorage.getItem("blokebot.preferences.disabled") !== "true")
+            window.localStorage.setItem(key, value ? "true" : "false");
     } catch {
     }
 

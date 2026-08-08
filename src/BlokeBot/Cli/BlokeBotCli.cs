@@ -46,6 +46,23 @@ internal static class BlokeBotCli
             _ = configuration
                 .AddCommand<BlokeBotServeCommand>("serve")
                 .WithDescription("Start the bot and dashboard.");
+            _ = configuration.AddBranch(
+                "privacy",
+                privacy =>
+                {
+                    privacy.SetDescription(
+                        "Fulfil verified privacy requests against this deployment's data."
+                    );
+                    _ = privacy
+                        .AddCommand<BlokeBotPrivacyExportCommand>("export")
+                        .WithDescription("Export the stored data for one Twitch identity as JSON.");
+                    _ = privacy
+                        .AddCommand<BlokeBotPrivacyEraseCommand>("erase")
+                        .WithDescription(
+                            "Delete or de-identify the stored data for one Twitch identity."
+                        );
+                }
+            );
         });
 
         var normalizedArguments = arguments.Count == 0 ? ["help"] : arguments;
@@ -67,11 +84,20 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               blokebot help
               blokebot version
               blokebot serve [--host HOST] [--port PORT] [--data-dir PATH] [--config PATH]
+              blokebot privacy export [--login LOGIN] [--user-id ID] [--host-id ID]
+                                      [--output FILE] [--data-dir PATH] [--config PATH]
+              blokebot privacy erase --confirm [--login LOGIN] [--user-id ID] [--host-id ID]
+                                     [--data-dir PATH] [--config PATH]
 
             Commands:
-              help     Show this help and exit.
-              version  Show version information and exit.
-              serve    Start the bot and dashboard.
+              help            Show this help and exit.
+              version         Show version information and exit.
+              serve           Start the bot and dashboard.
+              privacy export  Export one Twitch identity's stored data as JSON, for
+                              verified access and portability requests.
+              privacy erase   Delete that identity's rows and strip its identity from
+                              records kept for aggregate or audit integrity. Scope to
+                              one channel with --host-id. Safe to re-run.
 
             Serve options:
               --host HOST      Dashboard host. Default: 127.0.0.1.
@@ -86,6 +112,15 @@ internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
               ClientSecret TwitchBot__Identity__ClientSecret; keep this credential private.
               RedirectUri  TwitchBot__Identity__RedirectUri; the OAuth callback URL, which
                            must exactly match the callback registered with Twitch.
+
+            Required privacy configuration for online mode:
+              ControllerName BlokeBotPrivacy__ControllerName; who operates this deployment,
+                             as named in its privacy notice.
+              PrivacyContact BlokeBotPrivacy__PrivacyContact; a monitored email address for
+                             privacy requests.
+              NoticeUrl      BlokeBotPrivacy__NoticeUrl; the absolute HTTPS URL of this
+                             deployment's privacy notice. Every deployment supplies its own
+                             values; there are no defaults.
 
             State data defaults:
               Linux   $XDG_STATE_HOME/blokebot, or ~/.local/state/blokebot
@@ -143,6 +178,71 @@ internal sealed class BlokeBotServeCommand(IBlokeBotCommandRuntime runtime, IAns
                 settings.DataDirectory,
                 settings.ConfigurationPath
             ),
+            console,
+            cancellationToken
+        );
+}
+
+internal class BlokeBotPrivacyCommandSettings : CommandSettings
+{
+    [CommandOption("--login <LOGIN>")]
+    public string? Login { get; init; }
+
+    [CommandOption("--user-id <ID>")]
+    public string? UserId { get; init; }
+
+    [CommandOption("--host-id <ID>")]
+    public int? HostId { get; init; }
+
+    [CommandOption("--data-dir <PATH>")]
+    public string? DataDirectory { get; init; }
+
+    [CommandOption("--config <PATH>")]
+    public string? ConfigurationPath { get; init; }
+
+    internal BlokeBotPrivacyOptions ToOptions() =>
+        new(Login, UserId, HostId, DataDirectory, ConfigurationPath);
+}
+
+internal sealed class BlokeBotPrivacyExportSettings : BlokeBotPrivacyCommandSettings
+{
+    [CommandOption("--output <FILE>")]
+    public string? Output { get; init; }
+}
+
+internal sealed class BlokeBotPrivacyEraseSettings : BlokeBotPrivacyCommandSettings
+{
+    [CommandOption("--confirm")]
+    public bool Confirm { get; init; }
+}
+
+internal sealed class BlokeBotPrivacyExportCommand(IAnsiConsole console)
+    : AsyncCommand<BlokeBotPrivacyExportSettings>
+{
+    protected override Task<int> ExecuteAsync(
+        CommandContext context,
+        BlokeBotPrivacyExportSettings settings,
+        CancellationToken cancellationToken
+    ) =>
+        BlokeBotPrivacyActions.ExportAsync(
+            settings.ToOptions(),
+            settings.Output,
+            console,
+            cancellationToken
+        );
+}
+
+internal sealed class BlokeBotPrivacyEraseCommand(IAnsiConsole console)
+    : AsyncCommand<BlokeBotPrivacyEraseSettings>
+{
+    protected override Task<int> ExecuteAsync(
+        CommandContext context,
+        BlokeBotPrivacyEraseSettings settings,
+        CancellationToken cancellationToken
+    ) =>
+        BlokeBotPrivacyActions.EraseAsync(
+            settings.ToOptions(),
+            settings.Confirm,
             console,
             cancellationToken
         );

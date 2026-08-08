@@ -1,0 +1,559 @@
+@page "/privacy"
+@inject IOptions<BlokeBotSiteOptions> SiteOptions
+
+@code {
+    private string _controllerName =>
+        string.IsNullOrWhiteSpace(SiteOptions.Value.ControllerName)
+            ? "the operator of this deployment"
+            : SiteOptions.Value.ControllerName!;
+
+    private string _privacyContact =>
+        string.IsNullOrWhiteSpace(SiteOptions.Value.PrivacyContact)
+            ? "the configured privacy contact"
+            : SiteOptions.Value.PrivacyContact!;
+}
+
+<PageTitle>Privacy, Twitch data and browser storage — BlokeBot</PageTitle>
+
+<article class="article-shell privacy-page">
+    <header class="article-header">
+        <p class="eyebrow">Privacy notice</p>
+        <h1>How BlokeBot handles your information.</h1>
+        <p class="lede">
+            This is the single authoritative notice for the BlokeBot deployment operated by
+            <strong>@_controllerName</strong>. It covers the public help site, the channel dashboard,
+            the data BlokeBot receives from Twitch, the cookies and browser storage both origins use,
+            and how long everything is kept. Questions and privacy requests go to
+            <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a>.
+        </p>
+    </header>
+
+    <nav class="privacy-toc" aria-label="Notice sections">
+        <a href="privacy#information">Information BlokeBot handles</a>
+        <a href="privacy#sharing">Who sees what</a>
+        <a href="privacy#twitch">Twitch</a>
+        <a href="privacy#storage">Cookies &amp; browser storage</a>
+        <a href="privacy#retention">Retention &amp; deletion</a>
+        <a href="privacy#rights">Your rights &amp; contact</a>
+        <a href="privacy#security">Hosting &amp; security</a>
+        <a href="privacy#changes">Changes</a>
+    </nav>
+
+    <section aria-labelledby="information-heading">
+        <h2 id="information">
+            <span id="information-heading">Information BlokeBot handles</span>
+        </h2>
+        <p>
+            BlokeBot is a self-hostable Twitch channel toolkit. The controller for this deployment is
+            <strong>@_controllerName</strong>. Everything below describes what this deployment
+            actually collects and stores. There is no advertising, no behavioural tracking, no
+            analytics service and no sale of data.
+        </p>
+
+        <h3>Sign-in and account information</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                Your Twitch user ID, login name, display name, profile image address, and which
+                channels you moderate. When you sign in to the dashboard, Twitch asks you to approve
+                read access to your moderated-channel list; that is the only permission website
+                sign-in requests.
+            </dd>
+            <dt>Source and purpose</dt>
+            <dd>
+                Twitch, during OAuth sign-in. It identifies you and decides which channel dashboards
+                you may open. Signing in is required to use the dashboard; the help site and public
+                leaderboards need no account.
+            </dd>
+            <dt>Where it lives</dt>
+            <dd>
+                Your session identity travels in an encrypted browser cookie for at most eight hours.
+                BlokeBot does not create a separate account record for you when you sign in;
+                moderator authority is re-checked against Twitch rather than stored.
+            </dd>
+        </dl>
+
+        <h3>Channel records</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                For each hosted channel: the channel's Twitch ID, login, display name, profile image
+                address, enabled features, time zone, and every feature's configuration (commands,
+                replies, announcement schedules, guessing profiles, points settings, boards, queues,
+                overlays, automations, access lists).
+            </dd>
+            <dt>Source and purpose</dt>
+            <dd>
+                Created when the server admin adds the channel and the channel owner configures it.
+                Needed to run the tools that channel turned on.
+            </dd>
+            <dt>Lifecycle</dt>
+            <dd>
+                Kept while the channel is hosted. Removing the channel deletes its database records
+                and its uploaded overlay media directory.
+            </dd>
+        </dl>
+
+        <h3>Twitch authorizations</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                OAuth tokens for the bot account, an optional custom bot account, and the
+                broadcaster's channel permission, together with the granted scopes and grant times.
+                Token payloads are stored encrypted with server-held application keys.
+            </dd>
+            <dt>Purpose and lifecycle</dt>
+            <dd>
+                Required for chat, announcements, shoutouts, polls, predictions, clips, markers and
+                Channel Points features. Deleted when the connection is disconnected in the dashboard
+                or the channel is removed. See the <a class="text-link" href="privacy#twitch">Twitch
+                section</a> for what local disconnect does and does not revoke.
+            </dd>
+        </dl>
+
+        <h3>Viewer participation records</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                When viewers use a channel's enabled features, BlokeBot stores their Twitch login
+                (and, where Twitch supplies it, user ID and display name) together with the
+                participation itself: guesses, points balances and point history, giveaway entries
+                and wins, request-board submissions and votes including the text and links they
+                submit, play-queue entries and the answers given on joining, moment captures,
+                suggestions and votes, shoutout history, Channel Points redemptions including any
+                typed input, per-viewer command permissions and usage, and whisper recipients.
+            </dd>
+            <dt>Source and purpose</dt>
+            <dd>
+                The viewer's own chat messages and Twitch events in that channel. Used only to
+                operate the feature the channel enabled. Participating is voluntary; a viewer who
+                does not use a feature is not recorded by it.
+            </dd>
+            <dt>Lifecycle</dt>
+            <dd>
+                Kept while the channel is hosted and the information still serves the enabled
+                feature, subject to each feature's own limits (for example play-queue history has a
+                configurable retention window and outgoing chat records expire within seven days).
+                Deleted when the channel is removed or a verified privacy request asks for erasure.
+            </dd>
+        </dl>
+
+        <h3>Content and configuration records</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                Text and media the channel team writes or uploads: custom command responses, message
+                libraries, announcements, overlay names and appearance, uploaded overlay media
+                files, board and queue definitions, private moderator notes, and automation
+                configuration. These can contain personal information if the authors put it there.
+            </dd>
+            <dt>Lifecycle</dt>
+            <dd>
+                Kept while the channel is hosted; deleted with the channel, or individually through
+                the dashboard's own delete controls.
+            </dd>
+        </dl>
+
+        <h3>Event and diagnostic records</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                Feature event history (for example board, queue, moment and overlay events),
+                automation run records including the triggering event context, delivery receipts,
+                and operator-facing alerts. Application logs record operational events and errors.
+            </dd>
+            <dt>Purpose and lifecycle</dt>
+            <dd>
+                Powers dashboards, recent-event views and troubleshooting. Application log files are
+                deleted after at most fourteen days. Logs are written to exclude secrets and
+                authorization values; see <a class="text-link" href="privacy#security">hosting and
+                security</a>.
+            </dd>
+        </dl>
+
+        <h3>Network information</h3>
+        <dl class="kv-list">
+            <dt>What</dt>
+            <dd>
+                Like every web service, the servers and reverse proxy see your IP address and
+                request metadata while handling requests. BlokeBot does not store visitor IP
+                addresses in its database.
+            </dd>
+            <dt>Lifecycle</dt>
+            <dd>
+                Connection handling and service journals are operational copies bounded to the
+                retention windows in <a class="text-link" href="privacy#retention">retention and
+                deletion</a>.
+            </dd>
+        </dl>
+    </section>
+
+    <section aria-labelledby="sharing-heading">
+        <h2 id="sharing"><span id="sharing-heading">Who sees what</span></h2>
+        <ul class="check-list">
+            <li>
+                <strong>Twitch chat.</strong> Replies, announcements, shoutouts, polls, predictions
+                and other bot output are sent to Twitch and visible to everyone in that channel,
+                under Twitch's own terms and privacy notice.
+            </li>
+            <li>
+                <strong>Public leaderboards.</strong> Guessing and points leaderboards are public
+                pages that show participating viewers' names and standings for a channel, without
+                requiring sign-in.
+            </li>
+            <li>
+                <strong>Overlays.</strong> A channel's stream overlays can display participant
+                names, queue entries, events and moments to everyone watching the stream.
+            </li>
+            <li>
+                <strong>The channel team.</strong> The channel owner, its moderators and the server
+                admin can see that channel's records in the dashboard, including private moderator
+                notes.
+            </li>
+            <li>
+                <strong>Nobody else.</strong> There is no advertising network, analytics provider,
+                or data sale. Infrastructure providers that process data on the controller's behalf
+                are listed under <a class="text-link" href="privacy#security">hosting and
+                security</a>.
+            </li>
+        </ul>
+        <p>
+            Third-party requests your browser makes: the dashboard shows Twitch profile images
+            served from Twitch's image servers, and a channel's overlay configuration can point the
+            overlay page at media or pages on hosts that channel chose. Your browser contacts those
+            hosts directly when it loads such a page.
+        </p>
+    </section>
+
+    <section aria-labelledby="twitch-heading">
+        <h2 id="twitch"><span id="twitch-heading">Twitch</span></h2>
+        <p>
+            BlokeBot is an independent service and is not affiliated with, sponsored by, or endorsed
+            by Twitch. It exists to give a Twitch channel chat commands, games, points, giveaways,
+            queues, overlays and moderation tools through one dashboard.
+        </p>
+        <h3>The permissions BlokeBot asks for, in plain language</h3>
+        <ul class="check-list">
+            <li>
+                <strong>Website sign-in.</strong> Confirms who you are and lets BlokeBot see which
+                channels you moderate, so it can offer you the right dashboards.
+            </li>
+            <li>
+                <strong>Bot account.</strong> Lets the bot account read and send chat, make
+                announcements, manage its own chat messages, read followers and moderated channels,
+                and send or manage shoutouts in channels that authorized it.
+            </li>
+            <li>
+                <strong>Custom bot account.</strong> Optionally, a channel can connect its own bot
+                account with the same chat permissions so messages come from a name the channel
+                owns.
+            </li>
+            <li>
+                <strong>Broadcaster permission.</strong> The channel owner grants the channel-level
+                permission that allows the bot to operate in their channel, and — where the channel
+                uses those features — the permissions behind polls, predictions, clips, markers and
+                Channel Points.
+            </li>
+        </ul>
+        <h3>What BlokeBot does with Twitch data</h3>
+        <p>
+            Everything BlokeBot knows about Twitch users comes from Twitch: identities (user ID,
+            login, display name, profile image), chat messages addressed to its commands, and events
+            Twitch delivers about the channel (raids, redemptions, follows and similar). It stores
+            what the sections above describe, displays it in the channel dashboard, on public
+            leaderboards and overlays, and sends feature output back to Twitch chat. It is retained
+            under the lifecycle rules in
+            <a class="text-link" href="privacy#retention">retention and deletion</a> and deleted on
+            channel removal or verified request through
+            <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a>.
+        </p>
+        <h3>Disconnecting BlokeBot versus revoking at Twitch</h3>
+        <p>
+            Disconnecting a bot, custom bot or broadcaster connection in the dashboard deletes the
+            OAuth tokens this deployment holds. It does <strong>not</strong> withdraw the
+            authorization recorded on Twitch's side. To revoke the grant itself, use
+            <a class="text-link" href="https://www.twitch.tv/settings/connections">Twitch's
+            Connections settings</a>. Twitch's own handling of your data is described in the
+            <a class="text-link" href="https://www.twitch.tv/p/legal/privacy-notice/">Twitch Privacy
+            Notice</a>.
+        </p>
+    </section>
+
+    <section aria-labelledby="storage-heading">
+        <h2 id="storage"><span id="storage-heading">Cookies and browser storage</span></h2>
+        <p>
+            This section is the complete inventory of what BlokeBot's two origins place in your
+            browser. All of it is first-party — set by BlokeBot itself, never by an advertising or
+            analytics provider. Browser storage is separate from the server-side records described
+            above: clearing your browser does not delete server records, and vice versa.
+        </p>
+
+        <h3>Cookies on the dashboard (bot.blokebot.com)</h3>
+        <dl class="kv-list">
+            <dt>BlokeBot.Auth</dt>
+            <dd>
+                Your encrypted sign-in session (who you are, your role, your selected channel).
+                Essential for authentication. HttpOnly; Secure over HTTPS; expires after eight hours
+                and is not extended by activity. Exempt from consent as strictly necessary.
+            </dd>
+            <dt>BlokeBot.AuthState</dt>
+            <dd>
+                A random value that protects sign-in against cross-site request forgery. Essential
+                security cookie. HttpOnly; SameSite=Lax; Secure over HTTPS; lives ten minutes during
+                sign-in. Strictly necessary.
+            </dd>
+            <dt>BlokeBot.AuthReturnUrl</dt>
+            <dd>
+                The page to return you to after sign-in; only set when you arrived on a specific
+                dashboard page. HttpOnly; SameSite=Lax; Secure over HTTPS; lives ten minutes during
+                sign-in. Strictly necessary.
+            </dd>
+            <dt>BlokeBot.ChannelBotState</dt>
+            <dd>
+                The same kind of forgery protection for connecting a channel's custom bot account.
+                HttpOnly; SameSite=Lax; Secure over HTTPS; scoped to the connection flow; lives ten
+                minutes. Strictly necessary.
+            </dd>
+        </dl>
+        <p>
+            Signing in also sets the framework's antiforgery cookie
+            (<code>.AspNetCore.Antiforgery.*</code>), which protects submitted forms against
+            cross-site request forgery — a session-lifetime, HttpOnly, strictly necessary security
+            cookie. The help site sets no cookies at all.
+        </p>
+
+        <h3>Saved preferences (localStorage)</h3>
+        <dl class="kv-list">
+            <dt>blokebot.theme — both origins</dt>
+            <dd>
+                "light" or "dark". Remembers your appearance choice; until you choose, both sites
+                follow your system setting. Kept until you clear it or turn preference saving off.
+            </dd>
+            <dt>blokebot.sidebar.guessing.open, blokebot.sidebar.points.open,
+                blokebot.sidebar.customcommands.open, blokebot.sidebar.automations.open,
+                blokebot.sidebar.nativetwitch.open — dashboard</dt>
+            <dd>
+                "true" or "false". Remember which navigation groups you left open.
+            </dd>
+            <dt>blokebot.shell.rail.v1 — dashboard</dt>
+            <dd>
+                Whether you prefer the full navigation rail or the compact icon rail.
+            </dd>
+            <dt>blokebot.preferences.disabled — both origins</dt>
+            <dd>
+                Only exists after you turn preference saving off. It is the single flag that honours
+                that choice and is the minimum needed to remember it.
+            </dd>
+        </dl>
+        <p>
+            The preference keys adapt each site's appearance to your choice. UK privacy rules exempt
+            this kind of storage from consent provided you get clear information — this inventory —
+            and a simple, free way to object. That control is right here:
+        </p>
+
+        <div class="privacy-preference-control" data-preference-control hidden>
+            <h3 id="preferences">Preference saving on this site</h3>
+            <p>
+                Status: <strong data-preference-status>checking…</strong>
+            </p>
+            <p data-preference-description-enabled>
+                Turning this off immediately deletes this site's saved appearance preferences from
+                your browser and stops new ones from being stored. Signing in and every feature keep
+                working; the site simply follows your system appearance instead.
+            </p>
+            <p data-preference-description-disabled hidden>
+                Preference saving is off. This site is not storing appearance preferences in your
+                browser. Turn it back on if you want your theme choice remembered again.
+            </p>
+            <button class="button button-secondary" type="button" data-preference-toggle></button>
+            <p>
+                The dashboard has the same control: open the account menu in the top-right corner
+                and use <em>Stop saving view preferences</em>. Each origin's control governs that
+                origin's storage.
+            </p>
+        </div>
+        <noscript>
+            <p class="doc-note">
+                Preference saving only happens with JavaScript enabled, so with scripts off there is
+                nothing to object to. You can also clear or block this site's storage in your
+                browser settings at any time.
+            </p>
+        </noscript>
+
+        <p>
+            Because everything above is either strictly necessary security storage or an exempt
+            appearance preference with this objection control, neither site shows a consent banner —
+            there is nothing to consent to. If BlokeBot ever wanted to add storage or third-party
+            technology outside these exemptions, it would have to ask first; the codebase carries a
+            repository check that fails when unreviewed browser storage appears.
+        </p>
+    </section>
+
+    <section aria-labelledby="retention-heading">
+        <h2 id="retention"><span id="retention-heading">Retention and deletion</span></h2>
+        <p>
+            BlokeBot keeps product history for a channel's lifecycle rather than deleting it on a
+            timer: guessing, points, request, queue, moment, command and automation history stays
+            useful for as long as the channel is hosted and the feature is in use. The bounds are:
+        </p>
+        <ul class="check-list">
+            <li>
+                <strong>Channel removal.</strong> Removing a hosted channel stops its bot, deletes
+                its database records — including its viewers' participation records — and removes its
+                uploaded overlay media directory from disk.
+            </li>
+            <li>
+                <strong>Verified privacy requests.</strong> Erasure requests through
+                <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a> delete a
+                viewer's records across every feature; see
+                <a class="text-link" href="privacy#rights">your rights</a>.
+            </li>
+            <li>
+                <strong>Feature-specific windows.</strong> Some records expire on their own: for
+                example, outgoing chat delivery records within seven days, and play-queue history
+                after the channel's configured number of days.
+            </li>
+            <li>
+                <strong>Logs.</strong> Application log files and service journals are limited to
+                fourteen days.
+            </li>
+            <li>
+                <strong>Backups.</strong> The database is snapshotted on the server on a rolling
+                schedule keeping 48 hourly, 14 daily and 8 weekly snapshots. Data deleted from the
+                live database therefore ages out of every backup within eight weeks. One-off
+                pre-release database backups expire automatically within the same eight-week
+                horizon.
+            </li>
+        </ul>
+        <p class="doc-note">
+            Deletion is immediate in the live system but not retroactive in existing snapshots:
+            already-taken backups are not rewritten, and their copies disappear as the snapshot
+            schedule ages them out, at most eight weeks later.
+        </p>
+    </section>
+
+    <section aria-labelledby="rights-heading">
+        <h2 id="rights"><span id="rights-heading">Your rights and how to use them</span></h2>
+        <p>
+            For data attributable to your Twitch identity you can ask to access it, receive an
+            export of it, correct it, restrict how it is used, object to how it is used, or have it
+            erased. Where anything relies on consent you can withdraw that consent. Send requests to
+            <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a> — this address
+            is monitored and is the route for every privacy request. There is no charge.
+        </p>
+        <ul class="check-list">
+            <li>
+                <strong>Verification.</strong> To protect the very data you are asking about,
+                requests must be verifiable — most simply by writing from a channel or route that
+                proves control of the Twitch account concerned, or by responding to a verification
+                whisper or message. Only the minimum correspondence needed to fulfil and evidence
+                the request is kept.
+            </li>
+            <li>
+                <strong>What erasure does.</strong> Records that exist only about you — guesses,
+                balances, entries, submissions, votes, queue entries, redemptions and the like — are
+                deleted outright. Records that must survive for non-personal integrity, such as the
+                point ledger's arithmetic or moderation audit trails, keep their numbers but lose
+                your Twitch ID, login, display name, submitted text, links and notes, with no lookup
+                kept that could re-identify them.
+            </li>
+            <li>
+                <strong>What remains temporarily.</strong> Erased data can persist in existing
+                backups until the snapshot schedule ages it out (at most eight weeks), and bot
+                messages already sent to Twitch chat live under Twitch's rules, not BlokeBot's.
+            </li>
+            <li>
+                <strong>Complaints.</strong> If you are unhappy with how a request was handled you
+                can complain to your data protection authority — in the UK, the Information
+                Commissioner's Office (ico.org.uk).
+            </li>
+        </ul>
+        <p>
+            BlokeBot makes no automated decisions about you with legal or similarly significant
+            effects. Automations send chat messages and update overlays according to rules the
+            channel owner configured.
+        </p>
+    </section>
+
+    <section aria-labelledby="security-heading">
+        <h2 id="security"><span id="security-heading">Hosting, providers and security</span></h2>
+        <p>
+            The official deployment (www.blokebot.com and bot.blokebot.com) runs on a single server
+            leased from Hetzner, which processes the hosted data as infrastructure provider. Its
+            backups are stored on the same server. Namecheap provides DNS and forwards mail sent to
+            the privacy address to the controller's monitored mailbox. Twitch is the platform the
+            service is built on. No other processor receives the data.
+        </p>
+        <p>
+            Connections to both origins use HTTPS. Stored Twitch tokens are encrypted with
+            server-held application keys, overlay pages are reachable only through unguessable
+            per-overlay keys the server stores as digests, and application, proxy and diagnostic
+            logging is written to exclude OAuth codes and state values, overlay access keys,
+            authorization and cookie values, tokens, webhook secrets and raw event payloads. No
+            internet service can promise absolute security; what is described here is what this
+            deployment actually does. Self-hosted copies are operated by whoever runs them, and
+            their operators name themselves and their contact in their own deployment's copy of this
+            notice.
+        </p>
+    </section>
+
+    <section aria-labelledby="changes-heading">
+        <h2 id="changes"><span id="changes-heading">Changes to this notice</span></h2>
+        <p>
+            This page is the only maintained copy of the notice and always describes the current
+            release. Material changes update this page and are called out in the release notes.
+            Last updated: August 2026.
+        </p>
+    </section>
+</article>
+
+<script>
+    (() => {
+        const flagKey = "blokebot.preferences.disabled";
+        const preferenceKeys = ["blokebot.theme"];
+        const control = document.querySelector("[data-preference-control]");
+        if (!control)
+            return;
+
+        const status = control.querySelector("[data-preference-status]");
+        const toggle = control.querySelector("[data-preference-toggle]");
+        const enabledText = control.querySelector("[data-preference-description-enabled]");
+        const disabledText = control.querySelector("[data-preference-description-disabled]");
+
+        const enabled = () => {
+            try {
+                return window.localStorage.getItem(flagKey) !== "true";
+            } catch {
+                return false;
+            }
+        };
+
+        const render = () => {
+            const on = enabled();
+            status.textContent = on ? "preference saving is on" : "preference saving is off";
+            toggle.textContent = on
+                ? "Stop saving preferences on this device"
+                : "Turn preference saving back on";
+            enabledText.hidden = !on;
+            disabledText.hidden = on;
+        };
+
+        toggle.addEventListener("click", () => {
+            try {
+                if (enabled()) {
+                    window.localStorage.setItem(flagKey, "true");
+                    for (const key of preferenceKeys)
+                        window.localStorage.removeItem(key);
+                } else {
+                    window.localStorage.removeItem(flagKey);
+                }
+            } catch {
+            }
+
+            render();
+        });
+
+        render();
+        control.hidden = false;
+    })();
+</script>

@@ -17,6 +17,7 @@ public sealed class SitePathBaseTests
         await using var app = SiteApplication.Build([
             "--urls=http://127.0.0.1:0",
             "--BlokeBotSite:PathBase=/blokebot",
+            .. SiteTestConfiguration.PrivacyArguments,
         ]);
 
         try

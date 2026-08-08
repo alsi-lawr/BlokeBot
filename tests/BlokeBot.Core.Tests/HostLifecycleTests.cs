@@ -1,8 +1,11 @@
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -10,67 +13,129 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostLifecycleTests
 {
     [Test]
-    public async Task HostWithOwnedGraph_Removing_CascadesHostDataAndPreservesSiteData()
+    public async Task HostWithOwnedGraphAndMedia_Removing_CascadesHostDataAndPreservesSiblings()
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostedChannelGraphAsync(dbFactory);
-        var events = TestEventBus.Create<AppEventKind>();
-        var eventCount = 0;
-        _ = events.Subscribe(
-            AppEventKind.HostedChannelsChanged,
-            ObserverIdentity.Named("Test.HostRemoval"),
-            (_, _) =>
-            {
-                eventCount++;
-                return ValueTask.CompletedTask;
-            }
-        );
-        var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
+        var stateDirectory = TemporaryDirectory();
+        try
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostedChannelGraphAsync(dbFactory, "streamer");
+            var siblingId = await SeedHostedChannelGraphAsync(dbFactory, "sibling");
+            var databasePath = Path.Combine(stateDirectory, "blokebot.db");
+            var removedMedia = SeedMediaDirectory(databasePath, hostId);
+            var siblingMedia = SeedMediaDirectory(databasePath, siblingId);
+            var events = TestEventBus.Create<AppEventKind>();
+            var eventCount = 0;
+            _ = events.Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostRemoval"),
+                (_, _) =>
+                {
+                    eventCount++;
+                    return ValueTask.CompletedTask;
+                }
+            );
+            var service = Service(dbFactory, events, databasePath);
 
-        var removed = await service.RemoveAsync(hostId, CancellationToken.None);
+            var result = await service.RemoveAsync(hostId, CancellationToken.None);
 
-        removed.ShouldBeTrue();
-        eventCount.ShouldBe(1);
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.Hosts.CountAsync()).ShouldBe(0);
-        (await db.HostModAccessSettings.CountAsync()).ShouldBe(0);
-        (await db.HostModAccessEntries.CountAsync()).ShouldBe(0);
-        (await db.CommandAliases.CountAsync()).ShouldBe(0);
-        (await db.Profiles.CountAsync()).ShouldBe(0);
-        (await db.ReplySettings.CountAsync()).ShouldBe(0);
-        (await db.GuessOptions.CountAsync()).ShouldBe(0);
-        (await db.Rounds.CountAsync()).ShouldBe(0);
-        (await db.Votes.CountAsync()).ShouldBe(0);
-        (await db.PointsSettings.CountAsync()).ShouldBe(0);
-        (await db.PointBalances.CountAsync()).ShouldBe(0);
-        (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
-        (await db.PointsGiveaways.CountAsync()).ShouldBe(0);
-        (await db.PointsGiveawayEntrants.CountAsync()).ShouldBe(0);
-        (await db.PointsGiveawayWinners.CountAsync()).ShouldBe(0);
-        (await db.SiteAccessEntries.CountAsync()).ShouldBe(1);
+            result.Removed.ShouldBeTrue();
+            _ = result.Media.ShouldBeOfType<HostMediaCleanup.Removed>();
+            eventCount.ShouldBe(1);
+            Directory.Exists(removedMedia).ShouldBeFalse();
+            Directory.Exists(siblingMedia).ShouldBeTrue();
+            File.Exists(Path.Combine(siblingMedia, "asset.bin")).ShouldBeTrue();
+            await using var db = await dbFactory.CreateDbContextAsync();
+            (await db.Hosts.CountAsync()).ShouldBe(1);
+            (await db.Hosts.SingleAsync()).Id.ShouldBe(siblingId);
+            (await db.HostModAccessEntries.CountAsync()).ShouldBe(1);
+            (await db.HostModAccessEntries.SingleAsync()).HostId.ShouldBe(siblingId);
+            (await db.CommandAliases.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.Profiles.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.Rounds.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.Votes.CountAsync()).ShouldBe(1);
+            (await db.PointBalances.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.PointLedgerEntries.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.PointsGiveaways.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+            (await db.PointsGiveawayEntrants.CountAsync()).ShouldBe(1);
+            (await db.PointsGiveawayWinners.CountAsync()).ShouldBe(1);
+            (await db.SiteAccessEntries.CountAsync()).ShouldBe(1);
+        }
+        finally
+        {
+            ResetPermissions(stateDirectory);
+            Directory.Delete(stateDirectory, recursive: true);
+        }
     }
 
     [Test]
-    public async Task MissingHost_Removing_ReturnsFalseWithoutEvent()
+    public async Task MissingHostWithLeftoverMedia_Removing_IsIdempotentAndStillCleansMedia()
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var events = TestEventBus.Create<AppEventKind>();
-        var eventCount = 0;
-        _ = events.Subscribe(
-            AppEventKind.HostedChannelsChanged,
-            ObserverIdentity.Named("Test.MissingHostRemoval"),
-            (_, _) =>
-            {
-                eventCount++;
-                return ValueTask.CompletedTask;
-            }
-        );
-        var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
+        var stateDirectory = TemporaryDirectory();
+        try
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var databasePath = Path.Combine(stateDirectory, "blokebot.db");
+            var leftover = SeedMediaDirectory(databasePath, 123);
+            var events = TestEventBus.Create<AppEventKind>();
+            var eventCount = 0;
+            _ = events.Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.MissingHostRemoval"),
+                (_, _) =>
+                {
+                    eventCount++;
+                    return ValueTask.CompletedTask;
+                }
+            );
+            var service = Service(dbFactory, events, databasePath);
 
-        var removed = await service.RemoveAsync(123, CancellationToken.None);
+            var first = await service.RemoveAsync(123, CancellationToken.None);
+            var second = await service.RemoveAsync(123, CancellationToken.None);
 
-        removed.ShouldBeFalse();
-        eventCount.ShouldBe(0);
+            first.Removed.ShouldBeFalse();
+            _ = first.Media.ShouldBeOfType<HostMediaCleanup.Removed>();
+            second.Removed.ShouldBeFalse();
+            _ = second.Media.ShouldBeOfType<HostMediaCleanup.NotPresent>();
+            eventCount.ShouldBe(0);
+            Directory.Exists(leftover).ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(stateDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task UndeletableMedia_Removing_ReportsFailedDirectoryInsteadOfClaimingSuccess()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var stateDirectory = TemporaryDirectory();
+        try
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostedChannelGraphAsync(dbFactory, "streamer");
+            var databasePath = Path.Combine(stateDirectory, "blokebot.db");
+            var media = SeedMediaDirectory(databasePath, hostId);
+            File.SetUnixFileMode(media, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            var service = Service(dbFactory, TestEventBus.Create<AppEventKind>(), databasePath);
+
+            var result = await service.RemoveAsync(hostId, CancellationToken.None);
+
+            result.Removed.ShouldBeTrue();
+            var failed = result.Media.ShouldBeOfType<HostMediaCleanup.Failed>();
+            failed.Directory.ShouldBe(media);
+            Directory.Exists(media).ShouldBeTrue();
+        }
+        finally
+        {
+            ResetPermissions(stateDirectory);
+            Directory.Delete(stateDirectory, recursive: true);
+        }
     }
 
     [Test]
@@ -107,25 +172,77 @@ public sealed class HostLifecycleTests
         eventCount.ShouldBe(1);
     }
 
-    private static async Task<int> SeedHostedChannelGraphAsync(SqliteBlokeBotDbFactory dbFactory)
+    private static BotHostRemovalService Service(
+        SqliteBlokeBotDbFactory dbFactory,
+        EventBus<AppEventKind> events,
+        string databasePath
+    ) =>
+        new(
+            dbFactory,
+            new HostedChannelChangeNotifier(events),
+            Options.Create(new BlokeBotOptions { DatabasePath = databasePath }),
+            NullLogger<BotHostRemovalService>.Instance
+        );
+
+    private static string SeedMediaDirectory(string databasePath, int hostId)
+    {
+        var directory = OverlayMediaDirectory.HostDirectory(databasePath, hostId);
+        _ = Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "asset.bin"), "media");
+        return directory;
+    }
+
+    private static void ResetPermissions(string root)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        foreach (
+            var directory in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories)
+        )
+        {
+            File.SetUnixFileMode(
+                directory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            );
+        }
+    }
+
+    private static string TemporaryDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"blokebot-host-removal-{Guid.NewGuid():N}");
+        _ = Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static async Task<int> SeedHostedChannelGraphAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        string login
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
             EnabledFeatures = HostFeatureFlags.All,
-            Login = "streamer",
-            DisplayName = "Streamer",
+            Login = login,
+            DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,
         };
         _ = db.Hosts.Add(host);
-        _ = db.SiteAccessEntries.Add(
-            new SiteAccessEntry
-            {
-                Login = "viewer",
-                Kind = AccessListEntryKind.Whitelist,
-                CreatedAtUtc = DateTime.UtcNow,
-            }
-        );
+        if (!await db.SiteAccessEntries.AnyAsync())
+        {
+            _ = db.SiteAccessEntries.Add(
+                new SiteAccessEntry
+                {
+                    Login = "viewer",
+                    Kind = AccessListEntryKind.Whitelist,
+                    CreatedAtUtc = DateTime.UtcNow,
+                }
+            );
+        }
+
         _ = await db.SaveChangesAsync();
 
         _ = db.HostModAccessSettings.Add(new HostModAccessSettings { HostId = host.Id });

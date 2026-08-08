@@ -8,6 +8,7 @@ internal static class BlokeBotHostLogging
 {
     internal const long FileSizeLimitBytes = 25 * 1024 * 1024;
     internal const int RetainedFileCountLimit = 14;
+    internal static readonly TimeSpan RetainedFileTimeLimit = TimeSpan.FromDays(14);
     internal const string ConsoleOutputTemplate =
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}";
 
@@ -50,6 +51,7 @@ internal static class BlokeBotHostLogging
                 fileSizeLimitBytes: FileSizeLimitBytes,
                 rollOnFileSizeLimit: true,
                 retainedFileCountLimit: RetainedFileCountLimit,
+                retainedFileTimeLimit: RetainedFileTimeLimit,
                 shared: false
             );
     }

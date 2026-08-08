@@ -1067,6 +1067,80 @@ main {
   margin: 0;
 }
 
+.privacy-page h2 {
+  margin: 3rem 0 1rem;
+  font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+}
+
+.privacy-page h3 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.privacy-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.privacy-toc a {
+  padding: 0.4rem 0.85rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.privacy-toc a:hover,
+.privacy-toc a:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand-strong);
+}
+
+.kv-list {
+  margin: 0 0 1.5rem;
+  padding: 1.1rem 1.25rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--surface-raised);
+}
+
+.kv-list dt {
+  margin-top: 1rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  overflow-wrap: anywhere;
+}
+
+.kv-list dt:first-child {
+  margin-top: 0;
+}
+
+.kv-list dd {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+}
+
+.privacy-preference-control {
+  margin: 1.75rem 0;
+  padding: 1.25rem 1.4rem;
+  border: 0.0625rem solid var(--line-strong);
+  border-radius: 0.9rem;
+  background: var(--surface-soft);
+}
+
+.privacy-preference-control h3 {
+  margin-top: 0;
+}
+
+.privacy-preference-control p:last-child {
+  margin-bottom: 0;
+}
+
 .next-panel {
   margin-top: 3rem;
   padding: 1.5rem;

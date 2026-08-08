@@ -48,11 +48,16 @@ in
         TwitchBot__Identity__BotUsername = "my-bot";
         TwitchBot__Identity__ClientId = "public-client-id";
         TwitchBot__Identity__RedirectUri = "https://bot.example.com/oauth/callback";
+        BlokeBotPrivacy__ControllerName = "Example Streaming Collective";
+        BlokeBotPrivacy__PrivacyContact = "privacy@example.com";
+        BlokeBotPrivacy__NoticeUrl = "https://www.example.com/privacy";
       };
       description = ''
         Non-secret ASP.NET Core environment settings for BlokeBot. These values
         are stored in the world-readable Nix store; use environmentFile for
-        credentials and other secrets.
+        credentials and other secrets. Online deployments must supply the
+        BlokeBotPrivacy controller name, monitored privacy contact, and
+        privacy-notice URL; there are no defaults.
       '';
     };
 
@@ -102,6 +107,33 @@ in
       default = null;
       example = "https://bot.example.com";
       description = "Optional BlokeBot dashboard URL shown by the public site.";
+    };
+
+    controllerName = lib.mkOption {
+      type = lib.types.str;
+      example = "Example Streaming Collective";
+      description = ''
+        Who operates this deployment, as named in its privacy notice. Required;
+        the site refuses to start without it and there is no default.
+      '';
+    };
+
+    privacyContact = lib.mkOption {
+      type = lib.types.str;
+      example = "privacy@example.com";
+      description = ''
+        Monitored email address for privacy requests, shown on the privacy
+        notice. Required; there is no default.
+      '';
+    };
+
+    privacyNoticeUrl = lib.mkOption {
+      type = lib.types.str;
+      example = "https://www.example.com/privacy";
+      description = ''
+        Absolute HTTPS URL of this deployment's privacy notice page. Required;
+        there is no default.
+      '';
     };
   };
 
@@ -171,6 +203,9 @@ in
         environment = {
           ASPNETCORE_ENVIRONMENT = "Production";
           ASPNETCORE_URLS = "http://${siteCfg.listenAddress}:${toString siteCfg.port}";
+          BlokeBotSite__ControllerName = siteCfg.controllerName;
+          BlokeBotSite__PrivacyContact = siteCfg.privacyContact;
+          BlokeBotSite__PrivacyNoticeUrl = siteCfg.privacyNoticeUrl;
         }
         // lib.optionalAttrs (siteCfg.pathBase != null) {
           BlokeBotSite__PathBase = siteCfg.pathBase;

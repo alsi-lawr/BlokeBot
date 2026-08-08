@@ -1,13 +1,41 @@
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Options;
+using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Components.Layout;
 
 public partial class AccountMenu
 {
+    private bool _preferencesEnabled = true;
+
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
+
+    [Inject]
+    private IJSRuntime _js { get; set; } = default!;
+
+    [Inject]
+    private IOptions<PrivacyNoticeOptions> _privacy { get; set; } = default!;
+
+    private string? _noticeUrl => _privacy.Value.NoticeUri?.ToString();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _preferencesEnabled = await _js.InvokeAsync<bool>("blokeBotPreferences.enabled");
+        StateHasChanged();
+    }
+
+    private async Task TogglePreferenceSavingAsync() =>
+        _preferencesEnabled = await _js.InvokeAsync<bool>(
+            _preferencesEnabled ? "blokeBotPreferences.disable" : "blokeBotPreferences.enable"
+        );
 
     private BotHostSelection? _selection =>
         Session.State.Match<BotHostSelection?>(
