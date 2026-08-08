@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using BlokeBot.Core.Features.Alerts;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -11,11 +9,10 @@ namespace BlokeBot.Core.Features.TwitchOperations.Predictions;
 
 public sealed class PredictionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IHostBroadcasterTokenStatusProvider broadcasters,
+    BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts,
     ILogger<PredictionService> logger,
     NativeTwitchFeatureGate nativeTwitch
 ) : IPredictionEventObserver, IPredictionDashboardOperations, IPredictionAutomationOperations
@@ -32,16 +29,15 @@ public sealed class PredictionService(
 
     internal PredictionService(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
-        IHostBroadcasterTokenStatusProvider broadcasters,
+        BroadcasterOperationAuthorization broadcasterAuthorization,
         HelixClient helix,
         BotSettings settings,
         EventBus<AppEventKind> events,
-        DurableAlertService alerts,
         ILogger<PredictionService> logger,
         NativeTwitchFeatureGate nativeTwitch,
         TimeProvider timeProvider
     )
-        : this(dbFactory, broadcasters, helix, settings, events, alerts, logger, nativeTwitch)
+        : this(dbFactory, broadcasterAuthorization, helix, settings, events, logger, nativeTwitch)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
         ProgressTimeProvider = timeProvider;
@@ -294,7 +290,7 @@ public sealed class PredictionService(
         CancellationToken cancellationToken
     )
     {
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PredictionOperationOutcome.NotReady(_notReadyMessage);
@@ -443,7 +439,7 @@ public sealed class PredictionService(
             return Disabled();
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PredictionOperationOutcome.NotReady(_notReadyMessage);
@@ -572,7 +568,7 @@ public sealed class PredictionService(
             return;
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return;
@@ -800,7 +796,7 @@ public sealed class PredictionService(
             return new PredictionAuthorizationReadiness.Disabled();
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(
@@ -871,35 +867,6 @@ public sealed class PredictionService(
                 "Twitch eligibility could not be checked right now."
             ),
         };
-
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken) =>
-        await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        )
-            is TokenStatus.Ready ready
-            ? ready.AccessToken
-            : await MissingTokenAsync(hostId, cancellationToken);
-
-    private async Task<string?> MissingTokenAsync(int hostId, CancellationToken cancellationToken)
-    {
-        await AlertAsync(hostId, cancellationToken);
-        return null;
-    }
-
-    private async Task AlertAsync(int hostId, CancellationToken cancellationToken) =>
-        await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "twitch-broadcaster-authorization",
-                "reauthorize-v1",
-                "Reconnect Twitch integration",
-                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
-                "/twitch-operations"
-            )
-            .ExecuteAsync(cancellationToken);
 
     private async Task ChangedAsync(CancellationToken cancellationToken) =>
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);

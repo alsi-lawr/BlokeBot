@@ -1,63 +1,20 @@
 using System.Diagnostics;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
 
 public partial class PredictionsPage
 {
-    private PredictionDashboardState? _state;
     private string _title = string.Empty;
     private string _outcomes = string.Empty;
     private string _window = "60";
-    private bool _nativeTwitchEnabled;
-    private bool _loading = true;
-    private bool _loadFailed;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _ = TrackSubscription(
-            _events.SubscribeForComponentRefresh(
-                [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
-                InvokeAsync,
-                LoadAsync,
-                StateHasChanged
-            )
-        );
-        await LoadAsync();
-    }
+    protected override HostFeatureFlags Feature => HostFeatureFlags.Predictions;
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _loadFailed = false;
-        try
-        {
-            _ = await LoadPageContextAsync();
-            _nativeTwitchEnabled =
-                HostId != 0
-                && await _nativeTwitch.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.Predictions,
-                    CancellationToken.None
-                );
-            _state = _nativeTwitchEnabled
-                ? await _predictions.LoadAsync(HostId, CancellationToken.None)
-                : null;
-        }
-        catch (Exception exception)
-        {
-            _state = null;
-            _nativeTwitchEnabled = false;
-            _loadFailed = true;
-            ReportUiFault(nameof(LoadAsync), exception);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+    protected override async Task<PredictionDashboardState?> LoadStateAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => await _predictions.LoadAsync(hostId, cancellationToken);
 
     private async Task SaveTemplateAsync()
     {
@@ -118,19 +75,6 @@ public partial class PredictionsPage
         await MutateAsync(async hostId => Publish(await operation(hostId, confirmed)));
     }
 
-    private async Task MutateAsync(Func<int, Task> operation)
-    {
-        var hostId = HostId;
-        await RunSelectedHostMutationAsync(
-            hostId,
-            async () =>
-            {
-                await operation(hostId);
-                await LoadAsync();
-            }
-        );
-    }
-
     private void Publish(PredictionOperationOutcome outcome)
     {
         var (message, success) = outcome switch
@@ -174,16 +118,6 @@ public partial class PredictionsPage
             ),
             _ => throw new UnreachableException(),
         };
-        if (success)
-        {
-            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
-        }
-        else
-        {
-            Warn(message);
-        }
+        Publish(message, success);
     }
-
-    private void Warn(string message) =>
-        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
 }

@@ -1,67 +1,24 @@
 using System.Diagnostics;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
 
 public partial class ClipsMarkersPage
 {
-    private ClipMarkerDashboardState? _state;
     private bool _clipHasDelay;
     private string _markerDescription = string.Empty;
-    private bool _nativeTwitchEnabled;
-    private bool _loading = true;
-    private bool _loadFailed;
 
     private bool _hasAttentionRequired =>
-        _state?.PendingClips.Count > 0
-        || _state?.Results.Any(static clip => clip.Status == "Ambiguous") == true
-        || _state?.Markers.Any(static marker => marker.Status == "Ambiguous") == true;
+        State?.PendingClips.Count > 0
+        || State?.Results.Any(static clip => clip.Status == "Ambiguous") == true
+        || State?.Markers.Any(static marker => marker.Status == "Ambiguous") == true;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _ = TrackSubscription(
-            _events.SubscribeForComponentRefresh(
-                [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
-                InvokeAsync,
-                LoadAsync,
-                StateHasChanged
-            )
-        );
-        await LoadAsync();
-    }
+    protected override HostFeatureFlags Feature => HostFeatureFlags.ClipsAndMarkers;
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _loadFailed = false;
-        try
-        {
-            _ = await LoadPageContextAsync();
-            _nativeTwitchEnabled =
-                HostId != 0
-                && await _nativeTwitch.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.ClipsAndMarkers,
-                    CancellationToken.None
-                );
-            _state = _nativeTwitchEnabled
-                ? await _clipsMarkers.LoadAsync(HostId, CancellationToken.None)
-                : null;
-        }
-        catch (Exception exception)
-        {
-            _state = null;
-            _nativeTwitchEnabled = false;
-            _loadFailed = true;
-            ReportUiFault(nameof(LoadAsync), exception);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+    protected override async Task<ClipMarkerDashboardState?> LoadStateAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => await _clipsMarkers.LoadAsync(hostId, cancellationToken);
 
     private Task CreateClipAsync() =>
         MutateAsync(hostId =>
@@ -83,18 +40,8 @@ public partial class ClipsMarkersPage
             _clipsMarkers.RetryMarkerAsync(hostId, attempt, CancellationToken.None)
         );
 
-    private async Task MutateAsync(Func<int, Task<ClipMarkerOperationOutcome>> operation)
-    {
-        var hostId = HostId;
-        await RunSelectedHostMutationAsync(
-            hostId,
-            async () =>
-            {
-                Publish(await operation(hostId));
-                await LoadAsync();
-            }
-        );
-    }
+    private Task MutateAsync(Func<int, Task<ClipMarkerOperationOutcome>> operation) =>
+        MutateAsync(async hostId => Publish(await operation(hostId)));
 
     private void Publish(ClipMarkerOperationOutcome outcome)
     {
@@ -145,13 +92,6 @@ public partial class ClipsMarkersPage
             ),
             _ => throw new UnreachableException(),
         };
-        if (success)
-        {
-            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
-        }
-        else
-        {
-            _ = _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
-        }
+        Publish(message, success);
     }
 }

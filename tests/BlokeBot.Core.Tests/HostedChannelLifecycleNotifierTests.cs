@@ -46,7 +46,10 @@ public sealed class HostedChannelLifecycleNotifierTests
             CreatePollService(dbFactory, http, events),
             new ClipMarkerService(
                 dbFactory,
-                new ReadyBroadcasterProvider(),
+                new BroadcasterOperationAuthorization(
+                    new ReadyBroadcasterProvider(),
+                    new DurableAlertService(dbFactory, TimeProvider.System, events)
+                ),
                 new HelixClient(
                     new PollHttpClientFactory(),
                     global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
@@ -55,7 +58,6 @@ public sealed class HostedChannelLifecycleNotifierTests
                     new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
                 ),
                 events,
-                new DurableAlertService(dbFactory, TimeProvider.System, events),
                 TimeProvider.System,
                 new NativeTwitchFeatureGate(dbFactory)
             )
@@ -125,13 +127,15 @@ public sealed class HostedChannelLifecycleNotifierTests
     ) =>
         new PollService(
             dbFactory,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(dbFactory, TimeProvider.System, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
             new NativeTwitchFeatureGate(dbFactory)
         );
 

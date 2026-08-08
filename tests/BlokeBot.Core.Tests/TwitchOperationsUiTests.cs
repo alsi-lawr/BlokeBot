@@ -11,7 +11,9 @@ using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
+using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Polls.Page;
+using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
 using BlokeBot.Core.Features.TwitchOperations.Shared;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -404,6 +406,142 @@ public sealed class TwitchOperationsUiTests
         );
     }
 
+    [Test]
+    public async Task PollsAndPredictionsRoutes_RenderReadyDashboardsAndDisabledRecovery()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(
+            dbFactory,
+            host.Id,
+            host.Login
+        );
+        await using var context = testContext.Context;
+        ConfigureServices(context, dbFactory);
+        _ = context.Services.AddSingleton<IPollDashboardOperations>(
+            new StaticPollOperations(
+                new PollDashboardState(new PollAuthorizationReadiness.Ready(), null, [], [])
+            )
+        );
+        _ = context.Services.AddSingleton<IPredictionDashboardOperations>(
+            new StaticPredictionOperations(
+                new PredictionDashboardState(
+                    new PredictionAuthorizationReadiness.Ready(),
+                    null,
+                    [],
+                    []
+                )
+            )
+        );
+
+        var polls = context.Render<PollsPage>();
+        polls.WaitForAssertion(() =>
+        {
+            _ = polls.Find("[data-native-route='polls']");
+            _ = polls.Find("#poll-title");
+        });
+
+        var predictions = context.Render<PredictionsPage>();
+        predictions.WaitForAssertion(() =>
+        {
+            _ = predictions.Find("[data-native-route='predictions']");
+            _ = predictions.Find("#prediction-title");
+        });
+
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var stored = await db.Hosts.SingleAsync(x => x.Id == host.Id);
+            stored.EnabledFeatures =
+                HostFeatureFlags.All & ~(HostFeatureFlags.Polls | HostFeatureFlags.Predictions);
+            _ = await db.SaveChangesAsync();
+        }
+
+        var disabledPolls = context.Render<PollsPage>();
+        disabledPolls.WaitForAssertion(() =>
+        {
+            disabledPolls.Markup.ShouldContain("Polls is turned off");
+            disabledPolls.FindAll("#poll-title").ShouldBeEmpty();
+        });
+        var disabledPredictions = context.Render<PredictionsPage>();
+        disabledPredictions.WaitForAssertion(() =>
+        {
+            disabledPredictions.Markup.ShouldContain("Predictions is turned off");
+            disabledPredictions.FindAll("#prediction-title").ShouldBeEmpty();
+        });
+    }
+
+    private sealed class StaticPollOperations(PollDashboardState state) : IPollDashboardOperations
+    {
+        public Task<PollDashboardState> LoadAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(state);
+
+        public Task<PollOperationOutcome> SaveTemplateAsync(
+            int hostId,
+            PollTemplateDraft draft,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PollOperationOutcome> StartAsync(
+            int hostId,
+            int templateId,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PollOperationOutcome> EndAsync(
+            int hostId,
+            bool confirmedExternal,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+    }
+
+    private sealed class StaticPredictionOperations(PredictionDashboardState state)
+        : IPredictionDashboardOperations
+    {
+        public Task<PredictionDashboardState> LoadAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(state);
+
+        public Task<PredictionOperationOutcome> SaveTemplateAsync(
+            int hostId,
+            PredictionTemplateDraft draft,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PredictionOperationOutcome> DeleteTemplateAsync(
+            int hostId,
+            int templateId,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PredictionOperationOutcome> StartAsync(
+            int hostId,
+            int templateId,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PredictionOperationOutcome> LockAsync(
+            int hostId,
+            bool confirmed,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PredictionOperationOutcome> CancelAsync(
+            int hostId,
+            bool confirmed,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+
+        public Task<PredictionOperationOutcome> ResolveAsync(
+            int hostId,
+            string winningOutcomeId,
+            bool confirmed,
+            CancellationToken cancellationToken
+        ) => throw new NotSupportedException();
+    }
+
     private static void ConfigureServices(BunitContext context, SqliteBlokeBotDbFactory dbFactory)
     {
         var events = TestEventBus.Create<AppEventKind>();
@@ -437,14 +575,13 @@ public sealed class TwitchOperationsUiTests
         _ = context.Services.AddSingleton(
             new ClipMarkerService(
                 dbFactory,
-                new ReadyBroadcasterProvider(),
+                new BroadcasterOperationAuthorization(new ReadyBroadcasterProvider(), alerts),
                 new HelixClient(
                     new RejectingHttpClientFactory(),
                     global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
                 ),
                 settings,
                 events,
-                alerts,
                 TimeProvider.System,
                 nativeTwitch
             )

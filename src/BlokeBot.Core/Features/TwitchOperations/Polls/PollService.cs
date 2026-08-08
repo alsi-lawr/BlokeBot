@@ -1,7 +1,5 @@
 using System.Text.Json;
-using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -11,11 +9,10 @@ namespace BlokeBot.Core.Features.TwitchOperations.Polls;
 
 public sealed class PollService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IHostBroadcasterTokenStatusProvider broadcasters,
+    BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts,
     NativeTwitchFeatureGate nativeTwitch
 ) : IPollEventObserver, IPollDashboardOperations, IPollAutomationOperations
 {
@@ -204,7 +201,7 @@ public sealed class PollService(
         CancellationToken cancellationToken
     )
     {
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
@@ -278,7 +275,7 @@ public sealed class PollService(
             return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new PollOperationOutcome.NotReady(
@@ -356,7 +353,7 @@ public sealed class PollService(
             return;
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return;
@@ -404,44 +401,6 @@ public sealed class PollService(
             await TrimResultsAsync(db, hostId, cancellationToken);
             _ = await db.SaveChangesAsync(cancellationToken);
         }
-        _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
-    }
-
-    public async Task RecordProviderUpdateAsync(
-        int hostId,
-        HelixPoll poll,
-        CancellationToken cancellationToken
-    )
-    {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Polls, cancellationToken))
-        {
-            return;
-        }
-
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        if (
-            !await db.Hosts.AnyAsync(
-                host =>
-                    host.Id == hostId
-                    && (host.EnabledFeatures & HostFeatureFlags.Polls) == HostFeatureFlags.Polls,
-                cancellationToken
-            )
-        )
-        {
-            return;
-        }
-
-        var upsert = Upsert(db, hostId, poll, true);
-        if (!upsert.Changed)
-        {
-            return;
-        }
-
-        if (upsert.Poll.Status is not TwitchPollStatus.Active)
-        {
-            await TrimResultsAsync(db, hostId, cancellationToken);
-        }
-        _ = await db.SaveChangesAsync(cancellationToken);
         _ = await events.PublishAsync(AppEventKind.TwitchOperationsChanged, cancellationToken);
     }
 
@@ -506,55 +465,12 @@ public sealed class PollService(
     private async Task<PollAuthorizationReadiness> ReadinessAsync(
         int hostId,
         CancellationToken cancellationToken
-    )
-    {
-        var status = await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        );
-        if (status is TokenStatus.Ready)
-        {
-            return new PollAuthorizationReadiness.Ready();
-        }
-
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
-        return new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
-            "Reconnect the selected channel's Twitch integration."
-        );
-    }
-
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken)
-    {
-        var status = await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        );
-        if (status is TokenStatus.Ready ready)
-        {
-            return ready.AccessToken;
-        }
-
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
-        return null;
-    }
-
-    private async Task EnsureBroadcasterAuthorizationAlertAsync(
-        int hostId,
-        CancellationToken cancellationToken
     ) =>
-        await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "twitch-broadcaster-authorization",
-                "reauthorize-v1",
-                "Reconnect Twitch integration",
-                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
-                "/twitch-operations"
+        await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken) is null
+            ? new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
+                "Reconnect the selected channel's Twitch integration."
             )
-            .ExecuteAsync(cancellationToken);
+            : new PollAuthorizationReadiness.Ready();
 
     private static bool ArchiveMissingActivePoll(BlokeBotDbContext db, int hostId)
     {

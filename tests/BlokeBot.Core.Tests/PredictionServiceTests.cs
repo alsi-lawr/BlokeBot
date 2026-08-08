@@ -129,7 +129,7 @@ public sealed class PredictionServiceTests
     }
 
     [Test]
-    public async Task ProductionRegistration_UsesSystemTimeAndPreservesPublicConstruction()
+    public async Task ProductionRegistration_UsesSystemTimeAndAliasesTheEventObserver()
     {
         var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = TestEventBus.Create<AppEventKind>();
@@ -158,11 +158,6 @@ public sealed class PredictionServiceTests
 
         service.ProgressTimeProvider.ShouldBeSameAs(TimeProvider.System);
         provider.GetRequiredService<IPredictionEventObserver>().ShouldBeSameAs(service);
-        typeof(PredictionService)
-            .GetConstructors()
-            .ShouldHaveSingleItem()
-            .GetParameters()
-            .Length.ShouldBe(8);
     }
 
     [Test]
@@ -344,21 +339,19 @@ public sealed class PredictionServiceTests
         return timeProvider is null
             ? new PredictionService(
                 database,
-                broadcasters,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
                 helix,
                 settings,
                 events,
-                alerts,
                 logger,
                 nativeTwitch
             )
             : new PredictionService(
                 database,
-                broadcasters,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
                 helix,
                 settings,
                 events,
-                alerts,
                 logger,
                 nativeTwitch,
                 timeProvider

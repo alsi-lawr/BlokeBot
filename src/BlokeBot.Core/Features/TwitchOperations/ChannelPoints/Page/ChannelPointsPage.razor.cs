@@ -1,14 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 
 public partial class ChannelPointsPage
 {
-    private ChannelPointsDashboardState? _state;
     private string? _editingRewardId;
     private string _rewardTitle = string.Empty;
     private string _rewardPrompt = string.Empty;
@@ -24,53 +21,13 @@ public partial class ChannelPointsPage
     private string _rewardBackgroundColor = string.Empty;
     private bool _rewardEnabled = true;
     private bool _rewardPaused;
-    private bool _nativeTwitchEnabled;
-    private bool _loading = true;
-    private bool _loadFailed;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _ = TrackSubscription(
-            _events.SubscribeForComponentRefresh(
-                [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
-                InvokeAsync,
-                LoadAsync,
-                StateHasChanged
-            )
-        );
-        await LoadAsync();
-    }
+    protected override HostFeatureFlags Feature => HostFeatureFlags.RewardsAndRedemptions;
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _loadFailed = false;
-        try
-        {
-            _ = await LoadPageContextAsync();
-            _nativeTwitchEnabled =
-                HostId != 0
-                && await _nativeTwitch.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.RewardsAndRedemptions,
-                    CancellationToken.None
-                );
-            _state = _nativeTwitchEnabled
-                ? await _channelPoints.LoadAsync(HostId, CancellationToken.None)
-                : null;
-        }
-        catch (Exception exception)
-        {
-            _state = null;
-            _nativeTwitchEnabled = false;
-            _loadFailed = true;
-            ReportUiFault(nameof(LoadAsync), exception);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+    protected override async Task<ChannelPointsDashboardState?> LoadStateAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => await _channelPoints.LoadAsync(hostId, cancellationToken);
 
     private async Task SaveRewardAsync()
     {
@@ -195,19 +152,6 @@ public partial class ChannelPointsPage
             )
         );
 
-    private async Task MutateAsync(Func<int, Task> operation)
-    {
-        var hostId = HostId;
-        await RunSelectedHostMutationAsync(
-            hostId,
-            async () =>
-            {
-                await operation(hostId);
-                await LoadAsync();
-            }
-        );
-    }
-
     private ChannelPointsRewardDraft Draft(int cost) =>
         new(
             _rewardTitle,
@@ -278,16 +222,6 @@ public partial class ChannelPointsPage
             ),
             _ => throw new UnreachableException(),
         };
-        if (success)
-        {
-            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
-        }
-        else
-        {
-            Warn(message);
-        }
+        Publish(message, success);
     }
-
-    private void Warn(string message) =>
-        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
 }

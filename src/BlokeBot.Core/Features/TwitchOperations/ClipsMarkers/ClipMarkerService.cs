@@ -1,6 +1,4 @@
-using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -11,11 +9,10 @@ namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 
 public sealed class ClipMarkerService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IHostBroadcasterTokenStatusProvider broadcasters,
+    BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
 ) : IClipMarkerDashboardOperations
@@ -125,7 +122,7 @@ public sealed class ClipMarkerService(
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new ClipMarkerOperationOutcome.NotReady(
@@ -328,7 +325,7 @@ public sealed class ClipMarkerService(
             );
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return new ClipMarkerOperationOutcome.NotReady(
@@ -651,7 +648,7 @@ public sealed class ClipMarkerService(
 
         try
         {
-            var token = await ReadyTokenAsync(hostId, reconciliationToken);
+            var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, reconciliationToken);
             if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, reconciliationToken))
             {
                 return;
@@ -945,55 +942,12 @@ public sealed class ClipMarkerService(
     private async Task<ClipMarkerAuthorizationReadiness> ReadinessAsync(
         int hostId,
         CancellationToken cancellationToken
-    )
-    {
-        var status = await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        );
-        if (status is TokenStatus.Ready)
-        {
-            return new ClipMarkerAuthorizationReadiness.Ready();
-        }
-
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
-        return new ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization(
-            "Reconnect the selected channel's Twitch integration."
-        );
-    }
-
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken)
-    {
-        var status = await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        );
-        if (status is TokenStatus.Ready ready)
-        {
-            return ready.AccessToken;
-        }
-
-        await EnsureBroadcasterAuthorizationAlertAsync(hostId, cancellationToken);
-        return null;
-    }
-
-    private async Task EnsureBroadcasterAuthorizationAlertAsync(
-        int hostId,
-        CancellationToken cancellationToken
     ) =>
-        await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "twitch-broadcaster-authorization",
-                "reauthorize-v1",
-                "Reconnect Twitch integration",
-                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
-                "/twitch-operations"
+        await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken) is null
+            ? new ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization(
+                "Reconnect the selected channel's Twitch integration."
             )
-            .ExecuteAsync(cancellationToken);
+            : new ClipMarkerAuthorizationReadiness.Ready();
 
     private async Task<ClipMarkerOperationOutcome> CompleteClipAsync(
         BlokeBotDbContext db,

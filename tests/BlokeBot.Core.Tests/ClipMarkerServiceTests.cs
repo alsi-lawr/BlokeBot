@@ -427,13 +427,15 @@ public sealed class ClipMarkerServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         return new(
             dbFactory,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(dbFactory, timeProvider, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, timeProvider, events),
             timeProvider,
             new NativeTwitchFeatureGate(dbFactory)
         );

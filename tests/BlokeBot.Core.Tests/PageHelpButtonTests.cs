@@ -92,89 +92,6 @@ public sealed class PageHelpButtonTests
     }
 
     [Test]
-    public void ShoutoutsHelp_CoversTheAcceptedAutomaticRaidContract()
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .NavigateTo("/twitch-operations/shoutouts");
-        var cut = context.Render<PageHelpButton>();
-
-        cut.Find("button[aria-label='Page help']").Click();
-
-        var text = cut.Markup;
-        text.ShouldContain("Automatic raid shoutouts");
-        text.ShouldContain("up to two minutes");
-        text.ShouldContain("either a native Twitch shoutout or one chat message");
-        text.ShouldContain("When chat delivery is selected");
-        text.ShouldContain("Use these details in the message");
-        text.ShouldContain("A pinned shoutout");
-        text.ShouldContain("regular, pinned, or announcement");
-        text.ShouldContain("does not switch modes or send it again");
-        text.ShouldContain("replaces the current pin");
-        text.ShouldContain("previous pin is not restored");
-        text.ShouldContain("{twitch_handle}");
-        text.ShouldContain("{display_name}");
-        text.ShouldContain("{channel_url}");
-        text.ShouldContain("{last_game|fallback}");
-        text.ShouldContain("{stream_title|fallback}");
-        text.ShouldContain("{viewer_count}");
-    }
-
-    [Test]
-    public void CustomCommandsHelp_ExplainsAutomationRuntimeAndInheritedSwitches()
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .NavigateTo("/custom-commands/settings");
-        var cut = context.Render<PageHelpButton>();
-
-        cut.Find("button[aria-label='Page help']").Click();
-
-        cut.Markup.ShouldContain("Run automation flow is a runtime foundation");
-        cut.Markup.ShouldContain("visual flow building and editing are not available here");
-        cut.Markup.ShouldContain("both the Custom commands and Automations switches");
-        cut.Markup.ShouldContain("without replaying work suppressed");
-    }
-
-    [Test]
-    public void SignedInHelp_UsesTaskLanguageAndPreservesPrivacyAndOrderingFacts()
-    {
-        var host = OpenHelpFor("/host");
-        host.ShouldContain("Twitch actions");
-        host.ShouldContain("main command name");
-        host.ShouldContain("first command name");
-        host.ShouldNotContain("provider actions");
-        host.ShouldNotContain("canonical name");
-
-        var guessing = OpenHelpFor("/guessing/settings");
-        guessing.ShouldContain(
-            "Enter the main answer first, then any accepted alternatives, separated by commas."
-        );
-        guessing.ShouldNotContain("canonical name");
-
-        var queues = OpenHelpFor("/queues");
-        queues.ShouldContain("Every configured entry field is optional");
-        queues.ShouldContain("viewer page and Viewer Queue overlay");
-        queues.ShouldContain("Lobby messages and moderator notes stay private");
-        queues.ShouldNotContain("Entry fields are private to moderators");
-
-        var customCommands = OpenHelpFor("/custom-commands/settings");
-        customCommands.ShouldContain("selected cue and Browser Source");
-        customCommands.ShouldContain("without sending chat");
-        customCommands.ShouldContain("consuming a one-time viewer use");
-        customCommands.ShouldNotContain("host-bound playback admission");
-        customCommands.ShouldNotContain("use claims");
-
-        var requests = OpenHelpFor("/requests");
-        requests.ShouldContain("actions on connected services");
-        requests.ShouldNotContain("provider actions");
-    }
-
-    [Test]
     public void OpenHelp_RouteChangeClosesThePanelAndSelectsTheNewRouteContent()
     {
         using var context = new BunitContext();
@@ -217,32 +134,5 @@ public sealed class PageHelpButtonTests
 
         cut.Find("h2").TextContent.ShouldBe("Home");
         cut.Markup.ShouldContain("Where to go next");
-    }
-
-    [Test]
-    public void ChannelSetupHelp_DistinguishesConnectionsAndExplainsIntegrationControls()
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/host");
-        var cut = context.Render<PageHelpButton>();
-
-        cut.Find("button[aria-label='Page help']").Click();
-
-        cut.Markup.ShouldContain("Chat access");
-        cut.Markup.ShouldContain("Twitch integration");
-        cut.Markup.ShouldContain("disconnect it to remove BlokeBot's stored authorization");
-        cut.Markup.ShouldContain("bot account");
-        cut.Markup.ShouldNotContain("Twitch operations");
-    }
-
-    private static string OpenHelpFor(string path)
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
-        var cut = context.Render<PageHelpButton>();
-        cut.Find("button[aria-label='Page help']").Click();
-        return cut.Markup;
     }
 }

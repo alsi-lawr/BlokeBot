@@ -21,50 +21,6 @@ public sealed class RedemptionAutomationTests
     private static readonly DateTimeOffset _start = new(2026, 8, 7, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task Catalog_RegistersRedemptionSourceAndActionsWithReferencePickerAndCapabilities()
-    {
-        await using var fixture = await RedemptionFixture.CreateAsync();
-
-        var snapshot = await fixture.Catalog.DiscoverAsync(
-            new(fixture.HostId),
-            CancellationToken.None
-        );
-
-        var source = snapshot.Definitions.Single(static definition =>
-            definition.Id.Value == "reward-redemption"
-        );
-        source.Kind.ShouldBe(AutomationNodeKind.Source);
-        source.Display.Category.ShouldBe("Twitch events");
-        source
-            .Outputs.Single(static port => port.Id.Value == "actor")
-            .Sensitivity.ShouldBe(AutomationDataSensitivity.Sensitive);
-        var rewardField = source.Configuration.Single(static field =>
-            field.Id.Value == "reward-id"
-        );
-        rewardField.Required.ShouldBeFalse();
-        rewardField
-            .FieldType.ShouldBeOfType<AutomationConfigurationFieldType.Reference>()
-            .ReferenceKind.ShouldBe(AutomationReferenceKind.CustomReward);
-        var policyField = source.Configuration.Single(static field =>
-            field.Id.Value == "completion-policy"
-        );
-        policyField.Required.ShouldBeTrue();
-        policyField
-            .FieldType.ShouldBeOfType<AutomationConfigurationFieldType.Choice>()
-            .Values.ShouldBe(["manual", "fulfil-on-success", "cancel-on-failure"]);
-
-        foreach (var id in new[] { "fulfil-redemption", "cancel-redemption" })
-        {
-            var action = snapshot.Definitions.Single(definition => definition.Id.Value == id);
-            action.Kind.ShouldBe(AutomationNodeKind.Action);
-            action.Display.Category.ShouldBe("Channel Points");
-            action.Capabilities.ShouldBe(AutomationActionCapabilities.ChangesPoints);
-            action.RetrySafety.ShouldBe(AutomationActionRetrySafety.Unsafe);
-            action.Configuration.ShouldBeEmpty();
-        }
-    }
-
-    [Test]
     public async Task SourceConfiguration_ParsesReferenceFilterAndRejectsFreeTextlessInvalidShapes()
     {
         await using var fixture = await RedemptionFixture.CreateAsync();

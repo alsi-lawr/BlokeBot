@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using BlokeBot.Persistence.Models;
+using static BlokeBot.Core.Features.Automations.AutomationConfigurationJson;
 
 namespace BlokeBot.Core.Features.Automations;
 
@@ -750,37 +751,4 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 ),
             _ => AutomationValidationResult.Valid,
         };
-
-    private static bool TryReadString(JsonElement json, string propertyName, out string value)
-    {
-        value = string.Empty;
-        if (
-            json.ValueKind != JsonValueKind.Object
-            || !json.TryGetProperty(propertyName, out var property)
-            || property.ValueKind != JsonValueKind.String
-        )
-        {
-            return false;
-        }
-
-        value = property.GetString() ?? string.Empty;
-        return true;
-    }
-
-    private static bool TryReadInt32(JsonElement json, string propertyName, out int value)
-    {
-        value = 0;
-        return json.ValueKind == JsonValueKind.Object
-            && json.TryGetProperty(propertyName, out var property)
-            && property.TryGetInt32(out value);
-    }
-
-    private static AutomationConfigurationParseResult Parsed(
-        AutomationConfiguration configuration
-    ) => new AutomationConfigurationParseResult.Parsed(configuration);
-
-    private static AutomationConfigurationParseResult Invalid(string fieldId, string message) =>
-        new AutomationConfigurationParseResult.Invalid([
-            new(new AutomationValidationTarget.Field(new(fieldId)), message),
-        ]);
 }

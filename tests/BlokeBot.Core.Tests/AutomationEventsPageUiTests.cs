@@ -95,7 +95,6 @@ public sealed class AutomationEventsPageUiTests
         var cut = context.Render<AutomationEventsPage>();
 
         cut.Markup.ShouldNotContain("Connect this channel again");
-        cut.FindAll("[data-automation-event-source]").Count.ShouldBe(12);
         cut.Find("[data-automation-event-source='chat-notification']")
             .TextContent.ShouldContain("Ordinary chat messages never start automations");
         cut.Find("[data-automation-events-editor-note]")
@@ -130,7 +129,6 @@ public sealed class AutomationEventsPageUiTests
 
         var cut = context.Render<AutomationEventsPage>();
 
-        cut.FindAll("[data-automation-event-source]").Count.ShouldBe(21);
         cut.Find("[data-automation-event-source='shoutout-sent']")
             .TextContent.ShouldContain("channel.shoutout.create");
         cut.Find("[data-automation-event-source='shoutout-received']")

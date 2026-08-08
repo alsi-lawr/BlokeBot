@@ -1,65 +1,22 @@
 using System.Diagnostics;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Polls.Page;
 
 public partial class PollsPage
 {
-    private PollDashboardState? _state;
     private string _title = string.Empty;
     private string _choices = string.Empty;
     private string _duration = "60";
     private bool _channelPointsVotingEnabled;
     private string _channelPointsPerVote = string.Empty;
-    private bool _nativeTwitchEnabled;
-    private bool _loading = true;
-    private bool _loadFailed;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _ = TrackSubscription(
-            _events.SubscribeForComponentRefresh(
-                [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
-                InvokeAsync,
-                LoadAsync,
-                StateHasChanged
-            )
-        );
-        await LoadAsync();
-    }
+    protected override HostFeatureFlags Feature => HostFeatureFlags.Polls;
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _loadFailed = false;
-        try
-        {
-            _ = await LoadPageContextAsync();
-            _nativeTwitchEnabled =
-                HostId != 0
-                && await _nativeTwitch.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.Polls,
-                    CancellationToken.None
-                );
-            _state = _nativeTwitchEnabled
-                ? await _polls.LoadAsync(HostId, CancellationToken.None)
-                : null;
-        }
-        catch (Exception exception)
-        {
-            _state = null;
-            _nativeTwitchEnabled = false;
-            _loadFailed = true;
-            ReportUiFault(nameof(LoadAsync), exception);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+    protected override async Task<PollDashboardState?> LoadStateAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => await _polls.LoadAsync(hostId, cancellationToken);
 
     private async Task SaveTemplateAsync()
     {
@@ -105,23 +62,10 @@ public partial class PollsPage
     private async Task EndPollAsync()
     {
         var confirmed =
-            _state?.ActivePoll?.IsExternallyStarted != true
+            State?.ActivePoll?.IsExternallyStarted != true
             || await _js.InvokeAsync<bool>("confirm", ["End the externally started Twitch poll?"]);
         await MutateAsync(async hostId =>
             Publish(await _polls.EndAsync(hostId, confirmed, CancellationToken.None))
-        );
-    }
-
-    private async Task MutateAsync(Func<int, Task> operation)
-    {
-        var hostId = HostId;
-        await RunSelectedHostMutationAsync(
-            hostId,
-            async () =>
-            {
-                await operation(hostId);
-                await LoadAsync();
-            }
         );
     }
 
@@ -152,16 +96,6 @@ public partial class PollsPage
             ),
             _ => throw new UnreachableException(),
         };
-        if (success)
-        {
-            _ = _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
-        }
-        else
-        {
-            Warn(message);
-        }
+        Publish(message, success);
     }
-
-    private void Warn(string message) =>
-        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
 }

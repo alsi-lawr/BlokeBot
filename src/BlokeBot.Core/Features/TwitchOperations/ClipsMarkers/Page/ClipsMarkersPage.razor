@@ -3,14 +3,10 @@
 @using BlokeBot.Core.Features.TwitchOperations
 @using BlokeBot.Core.Features.TwitchOperations.Shared
 @using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
-@using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
-@inherits AuthenticatedPageComponent
+@inherits NativeOperationPage<ClipMarkerDashboardState>
 @inject IClipMarkerDashboardOperations _clipsMarkers
-@inject ToastService _toasts
-@inject NativeTwitchFeatureGate _nativeTwitch
-@inject EventBus<AppEventKind> _events
 
 <PageTitle>BlokeBot | Clips &amp; markers</PageTitle>
 
@@ -21,30 +17,30 @@
                data-native-route="clips-markers">
     <NativeTwitchToolSwitcher HostId="@HostId" />
 
-    @if (_loadFailed)
+    @if (LoadFailed)
     {
         <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" Description="Try again. Any earlier attempts are still saved.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
-    else if (_loading)
+    else if (Loading)
     {
         <PageState Kind="PageStateKind.Loading" Title="Loading clips and markers" Description="Getting recent clips, markers, and unfinished attempts." />
     }
-    else if (!_nativeTwitchEnabled || _state?.Authorization is ClipMarkerAuthorizationReadiness.Disabled)
+    else if (!NativeTwitchEnabled || State?.Authorization is ClipMarkerAuthorizationReadiness.Disabled)
     {
         <NativeTwitchUnavailable FeatureName="Clips &amp; markers" />
     }
-    else if (_state is not null)
+    else if (State is not null)
     {
-        @if (_state.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+        @if (State.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
         {
             <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can create clips and markers for this channel.">
                 <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
 
-        @if (_state.Authorization is ClipMarkerAuthorizationReadiness.Ready)
+        @if (State.Authorization is ClipMarkerAuthorizationReadiness.Ready)
         {
         <TaskPanel Title="Create a clip" Description="Save the current live moment as a clip you can share.">
             <div class="field-row native-primary-row">
@@ -66,14 +62,14 @@
 
         <CollapsibleSection Title="Clips and markers" Description="Open completed clips or check anything Twitch is still preparing." InitiallyOpen="@_hasAttentionRequired">
             <div class="p-4">
-                @if (_state.PendingClips.Count == 0 && _state.Results.Count == 0 && _state.Markers.Count == 0)
+                @if (State.PendingClips.Count == 0 && State.Results.Count == 0 && State.Markers.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No clip or marker attempts yet.</p>
                 }
                 else
                 {
                     <div class="phone-card-list" data-native-history="clips-markers">
-                        @foreach (var clip in _state.PendingClips)
+                        @foreach (var clip in State.PendingClips)
                         {
                             <article class="surface-row rounded-lg p-4" @key="clip.Attempt">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -82,7 +78,7 @@
                                 </div>
                             </article>
                         }
-                        @foreach (var clip in _state.Results)
+                        @foreach (var clip in State.Results)
                         {
                             <article class="surface-row rounded-lg p-4" @key="clip.Attempt">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -104,7 +100,7 @@
                                 </div>
                             </article>
                         }
-                        @foreach (var marker in _state.Markers)
+                        @foreach (var marker in State.Markers)
                         {
                             <article class="surface-row rounded-lg p-4" @key="marker.Attempt">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
