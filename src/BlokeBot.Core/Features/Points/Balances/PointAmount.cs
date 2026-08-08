@@ -88,19 +88,81 @@ public readonly record struct PointAmount : IComparable<PointAmount>
         var text = (value ?? string.Empty).Trim();
         return BigInteger.TryParse(
             text,
-            NumberStyles.None,
+            NumberStyles.AllowThousands,
             CultureInfo.InvariantCulture,
             out var parsed
-        ) switch
+        )
+            ? parsed > MaximumValue
+                ? Result<PointAmount, PointAmountParseError>.Error(
+                    PointAmountParseError.AmountOutOfRange
+                )
+                : Result<PointAmount, PointAmountParseError>.Success(new PointAmount(parsed))
+            : ParseCompactNotation(text);
+    }
+
+    private static Result<PointAmount, PointAmountParseError> ParseCompactNotation(string text)
+    {
+        var scientificSplit = text.Split(['x', 'X'], 2);
+        if (scientificSplit.Length == 2)
         {
-            false => Result<PointAmount, PointAmountParseError>.Error(
+            var exponentText = scientificSplit[1].Trim();
+            return
+                exponentText.StartsWith("10^", StringComparison.Ordinal)
+                && int.TryParse(
+                    exponentText["10^".Length..],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var exponent
+                )
+                && exponent <= 100
+                ? ScaleMantissa(scientificSplit[0].Trim(), exponent)
+                : Result<PointAmount, PointAmountParseError>.Error(
+                    PointAmountParseError.InvalidFormat
+                );
+        }
+
+        var suffixIndex =
+            text.Length == 0
+                ? -1
+                : Array.FindIndex(
+                    _compactSuffixes,
+                    suffix => suffix.Length == 1 && char.ToUpperInvariant(text[^1]) == suffix[0]
+                );
+        return suffixIndex > 0
+            ? ScaleMantissa(text[..^1].Trim(), suffixIndex * 3)
+            : Result<PointAmount, PointAmountParseError>.Error(PointAmountParseError.InvalidFormat);
+    }
+
+    private static Result<PointAmount, PointAmountParseError> ScaleMantissa(
+        string mantissa,
+        int exponent
+    )
+    {
+        var parts = mantissa.Split('.', 2);
+        var integerDigits = parts[0];
+        var fractionDigits = (parts.Length == 2 ? parts[1] : string.Empty).TrimEnd('0');
+        if (
+            integerDigits.Length == 0
+            || !integerDigits.All(char.IsAsciiDigit)
+            || !fractionDigits.All(char.IsAsciiDigit)
+            || fractionDigits.Length > exponent
+        )
+        {
+            return Result<PointAmount, PointAmountParseError>.Error(
                 PointAmountParseError.InvalidFormat
-            ),
-            true when parsed > MaximumValue => Result<PointAmount, PointAmountParseError>.Error(
+            );
+        }
+
+        var combined = BigInteger.Parse(
+            integerDigits + fractionDigits,
+            CultureInfo.InvariantCulture
+        );
+        var scaled = combined * BigInteger.Pow(10, exponent - fractionDigits.Length);
+        return scaled > MaximumValue
+            ? Result<PointAmount, PointAmountParseError>.Error(
                 PointAmountParseError.AmountOutOfRange
-            ),
-            _ => Result<PointAmount, PointAmountParseError>.Success(new PointAmount(parsed)),
-        };
+            )
+            : Result<PointAmount, PointAmountParseError>.Success(new PointAmount(scaled));
     }
 
     private static string FormatForDisplay(BigInteger value, int significantFigures)
