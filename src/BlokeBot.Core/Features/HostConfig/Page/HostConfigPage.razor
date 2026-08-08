@@ -3,6 +3,7 @@
 @using BlokeBot.Eventing
 @using BlokeBot.Core.Features.AccessLists
 @using BlokeBot.Core.Features.Admin.Authorization
+@using BlokeBot.Core.Features.Admin.SiteAccess
 @using BlokeBot.Core.Features.HostConfig.Access
 @using BlokeBot.Core.Features.HostConfig.StartupMessage
 @using BlokeBot.Core.Features.Commands
@@ -423,7 +424,6 @@
                                             EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
                                             Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
                                             Refresh="LoadAsync"
-                                            Collapsible="true"
                                             InitiallyOpen="true" />
         </div>
 
@@ -508,21 +508,25 @@
                 </div>
 
                 <div class="grid gap-5 lg:grid-cols-2">
-                    <HostAccessList Title="Allowed mods"
-                                    Entries="_whitelistEntries"
-                                    NewLogin="@_newWhitelistLogin"
-                                    NewLoginChanged="value => _newWhitelistLogin = value"
-                                    Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
-                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)"
-                                    Disabled="@(!_state.ModAccess.ModsEnabled || _state.ModAccess.AllowModsByDefault)" />
+                    <AccessList Title="Allowed mods"
+                                Entries="_whitelistEntries"
+                                Placeholder="mod username"
+                                EmptyText="No mods added."
+                                NewLogin="@_newWhitelistLogin"
+                                NewLoginChanged="value => _newWhitelistLogin = value"
+                                Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
+                                Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)"
+                                Disabled="@(!_state.ModAccess.ModsEnabled || _state.ModAccess.AllowModsByDefault)" />
 
-                    <HostAccessList Title="Blocked mods"
-                                    Entries="_blacklistEntries"
-                                    NewLogin="@_newBlacklistLogin"
-                                    NewLoginChanged="value => _newBlacklistLogin = value"
-                                    Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"
-                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Blacklist, login)"
-                                    Disabled="@(!_state.ModAccess.ModsEnabled || !_state.ModAccess.AllowModsByDefault)" />
+                    <AccessList Title="Blocked mods"
+                                Entries="_blacklistEntries"
+                                Placeholder="mod username"
+                                EmptyText="No mods added."
+                                NewLogin="@_newBlacklistLogin"
+                                NewLoginChanged="value => _newBlacklistLogin = value"
+                                Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"
+                                Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Blacklist, login)"
+                                Disabled="@(!_state.ModAccess.ModsEnabled || !_state.ModAccess.AllowModsByDefault)" />
                 </div>
             </div>
         </CollapsibleSection>

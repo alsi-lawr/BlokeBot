@@ -25,9 +25,6 @@ public partial class BotAccountAuthorizationSection
     public bool Disabled { get; set; }
 
     [Parameter]
-    public bool Collapsible { get; set; }
-
-    [Parameter]
     public bool InitiallyOpen { get; set; } = true;
 
     [Parameter]
@@ -63,8 +60,6 @@ public partial class BotAccountAuthorizationSection
         Status?.ConfiguredBotLogin is { Length: > 0 } login
             ? $"@{login}"
             : ConfiguredAccountFallbackText;
-
-    private string _sectionClass => Disabled ? "card bot-account-section--disabled" : "card";
 
     private string? _collapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
 
