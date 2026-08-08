@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Persistence;
@@ -5,22 +6,6 @@ using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Guessing.Profiles;
-
-internal sealed record GuessingReplySettings(
-    string RoundStartedReply,
-    string RoundAlreadyOpenReply,
-    string NoOpenRoundReply,
-    string GuessingStoppedReply,
-    string GuessingAlreadyStoppedReply,
-    string GuessingClosedReply,
-    string InvalidGuessReply,
-    string GuessUsageReply,
-    string AvailableGuessesReply,
-    string WinUsageReply,
-    string ModeratorOnlyReply,
-    string WinnerReply,
-    string NoWinnersReply
-);
 
 internal sealed record GuessingReplySettingsResolution(
     int ProfileId,

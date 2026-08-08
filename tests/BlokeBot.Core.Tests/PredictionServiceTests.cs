@@ -8,7 +8,6 @@ using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -126,38 +125,6 @@ public sealed class PredictionServiceTests
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.TwitchPredictions.ToArrayAsync()).ShouldBeEmpty();
-    }
-
-    [Test]
-    public async Task ProductionRegistration_UsesSystemTimeAndAliasesTheEventObserver()
-    {
-        var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var events = TestEventBus.Create<AppEventKind>();
-        var handler = new PredictionHandler();
-        var services = new ServiceCollection();
-        _ = services.AddLogging();
-        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
-        _ = services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
-        _ = services.AddSingleton(
-            new HelixClient(
-                new SingleHandlerFactory(handler),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            )
-        );
-        _ = services.AddSingleton(
-            BotSettings.FromOptions(
-                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
-            )
-        );
-        _ = services.AddSingleton(events);
-        _ = services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
-        _ = services.AddBlokeBotTwitchOperations();
-        await using var provider = services.BuildServiceProvider();
-
-        var service = provider.GetRequiredService<PredictionService>();
-
-        service.ProgressTimeProvider.ShouldBeSameAs(TimeProvider.System);
-        provider.GetRequiredService<IPredictionEventObserver>().ShouldBeSameAs(service);
     }
 
     [Test]

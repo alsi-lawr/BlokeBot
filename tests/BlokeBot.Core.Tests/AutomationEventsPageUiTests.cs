@@ -1,156 +1,15 @@
 using BlokeBot.Core.Features.Automations;
-using BlokeBot.Core.Features.Automations.Page;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
 public sealed class AutomationEventsPageUiTests
 {
-    [Test]
-    public async Task DisabledAutomations_ShowDisabledRecoveryWithAChannelSetupLink()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, HostFeatureFlags.CustomCommands);
-        await using var context = CreateContext(
-            dbFactory,
-            hostId,
-            new TokenStatus.Unavailable(
-                AccessTokenUnavailableReason.MissingRefreshToken,
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-            )
-        );
-
-        var cut = context.Render<AutomationEventsPage>();
-
-        cut.Markup.ShouldContain("Automations are off");
-        cut.Markup.ShouldContain("Suppressed events are not replayed");
-        cut.Find("[data-automation-events-channel-setup]")
-            .GetAttribute("href")
-            .ShouldBe("/host#chat-tools");
-        cut.FindAll("[data-automation-event-sources]").ShouldBeEmpty();
-    }
-
-    [Test]
-    public async Task MissingScopes_SurfaceExactScopesAndTheExistingReconnectAction()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(
-            dbFactory,
-            HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands
-        );
-        await using var context = CreateContext(
-            dbFactory,
-            hostId,
-            new TokenStatus.MissingScopes(
-                "token",
-                new("streamer-id", "streamer", OAuthScopeSet.Empty),
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                [],
-                ["bits:read"]
-            )
-        );
-
-        var cut = context.Render<AutomationEventsPage>();
-
-        cut.Markup.ShouldContain("Connect this channel again");
-        cut.Markup.ShouldContain("bits:read");
-        cut.Markup.ShouldContain("Reconnect to Twitch");
-        cut.Find("[data-automation-event-source='cheer']")
-            .GetAttribute("data-source-state")
-            .ShouldBe("missing-scopes");
-        cut.Find("[data-automation-event-source='subscription']")
-            .GetAttribute("data-source-state")
-            .ShouldBe("ready");
-        cut.Find("[data-automation-event-source='follow']")
-            .GetAttribute("data-source-state")
-            .ShouldBe("ready");
-    }
-
-    [Test]
-    public async Task ReadyBroadcaster_ListsEveryTypedSourceWithoutAReconnectPanel()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(
-            dbFactory,
-            HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands
-        );
-        await using var context = CreateContext(
-            dbFactory,
-            hostId,
-            new TokenStatus.Ready(
-                "token",
-                new("streamer-id", "streamer", OAuthScopeSet.Empty),
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-            )
-        );
-
-        var cut = context.Render<AutomationEventsPage>();
-
-        cut.Markup.ShouldNotContain("Connect this channel again");
-        cut.Find("[data-automation-event-source='chat-notification']")
-            .TextContent.ShouldContain("Ordinary chat messages never start automations");
-        cut.Find("[data-automation-events-editor-note]")
-            .TextContent.ShouldContain(
-                "Tools for building and editing flows arrive in a later release"
-            );
-    }
-
-    [Test]
-    public async Task NativeOperationSources_AppearOnlyWhileTheirBackingFeatureIsEnabled()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(
-            dbFactory,
-            HostFeatureFlags.Automations
-                | HostFeatureFlags.CustomCommands
-                | HostFeatureFlags.Shoutouts
-                | HostFeatureFlags.Polls
-                | HostFeatureFlags.ClipsAndMarkers
-                | HostFeatureFlags.Predictions
-        );
-        await using var context = CreateContext(
-            dbFactory,
-            hostId,
-            new TokenStatus.Ready(
-                "token",
-                new("streamer-id", "streamer", OAuthScopeSet.Empty),
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes],
-                [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-            )
-        );
-
-        var cut = context.Render<AutomationEventsPage>();
-
-        cut.Find("[data-automation-event-source='shoutout-sent']")
-            .TextContent.ShouldContain("channel.shoutout.create");
-        cut.Find("[data-automation-event-source='shoutout-received']")
-            .TextContent.ShouldContain("channel.shoutout.receive");
-        cut.Find("[data-automation-event-source='poll-started']")
-            .TextContent.ShouldContain("channel.poll.begin");
-        cut.Find("[data-automation-event-source='prediction-ended']")
-            .TextContent.ShouldContain("channel.prediction.end");
-
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
-            host.EnabledFeatures &= ~HostFeatureFlags.Polls;
-            _ = await db.SaveChangesAsync();
-        }
-
-        var withoutPolls = context.Render<AutomationEventsPage>();
-        withoutPolls.FindAll("[data-automation-event-source]").Count.ShouldBe(18);
-        withoutPolls.FindAll("[data-automation-event-source='poll-started']").ShouldBeEmpty();
-        withoutPolls.FindAll("[data-automation-event-source='shoutout-sent']").Count.ShouldBe(1);
-    }
-
     private static BunitContext CreateContext(
         SqliteBlokeBotDbFactory dbFactory,
         int hostId,

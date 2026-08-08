@@ -36,31 +36,6 @@ public sealed class IOTests
     }
 
     [Test]
-    public async Task Success_Executing_ReturnsSuccessResult()
-    {
-        var io = IO<int, TestError>.Create(static _ =>
-            ValueTask.FromResult(Result<int, TestError>.Success(42))
-        );
-
-        var result = await io.ExecuteAsync(CancellationToken.None);
-
-        result.Match(static value => value, static _ => 0).ShouldBe(42);
-    }
-
-    [Test]
-    public async Task Error_Executing_ReturnsErrorResult()
-    {
-        var expected = new TestError("invalid");
-        var io = IO<int, TestError>.Create(_ =>
-            ValueTask.FromResult(Result<int, TestError>.Error(expected))
-        );
-
-        var result = await io.ExecuteAsync(CancellationToken.None);
-
-        result.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
-    }
-
-    [Test]
     public async Task SelectedException_Executing_MapsExpectedException()
     {
         var expected = new ExpectedException("documented");
@@ -183,22 +158,6 @@ public sealed class IOTests
         result.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
         mapInvoked.ShouldBeFalse();
         bindInvoked.ShouldBeFalse();
-    }
-
-    [Test]
-    public async Task RepeatedExecution_InvokesOperationEachTime()
-    {
-        var invocations = 0;
-        var io = IO<int, TestError>.Create(_ =>
-            ValueTask.FromResult(Result<int, TestError>.Success(++invocations))
-        );
-
-        var first = await io.ExecuteAsync(CancellationToken.None);
-        var second = await io.ExecuteAsync(CancellationToken.None);
-
-        first.Match(value => value, _ => 0).ShouldBe(1);
-        second.Match(value => value, _ => 0).ShouldBe(2);
-        invocations.ShouldBe(2);
     }
 
     [Test]

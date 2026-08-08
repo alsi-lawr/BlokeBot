@@ -47,8 +47,7 @@ Simulation fixture provides the approved, voted moment shown in both moments cap
 Queue, Cues and Media in light and dark laptop and phone frames without exposing a private Browser
 Source URL. The animated captures use real page controls and scrolling.
 
-The final matrix is 108 generated assets: 100 PNG and 8 WebP. `twitch-operations.lua` is not
-manifest-owned and is not part of this regeneration. Generated files go directly to
+The final matrix is 108 generated assets: 100 PNG and 8 WebP. Generated files go directly to
 `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
 
 ## Editor support

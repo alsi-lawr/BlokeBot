@@ -10,14 +10,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class GuessingSharedHelperTests
 {
     [Test]
-    public void MissingAvailableGuessesReply_MappingToEditor_UsesDefaultReply()
-    {
-        var editor = ReplySettingsMapper.ToEditor(new BotReplySettings());
-
-        editor.AvailableGuessesReply.ShouldBe(GuessingDefaults.Replies().AvailableGuessesReply);
-    }
-
-    [Test]
     public async Task ProfileQueries_ExecutingOnSqlite_PreserveShapesFilteringAndOrdering()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

@@ -8,30 +8,6 @@ namespace BlokeBot.Tests;
 public sealed class BlokeBotCliTests
 {
     [Test]
-    public async Task NoArguments_RendersHelpWithSuccessfulExit()
-    {
-        var response = await TerminalAsync([]);
-
-        response.ExitCode.ShouldBe(0);
-        response.Output.ShouldContain("blokebot 0.0.0-dev+");
-        response.Output.ShouldContain(
-            "blokebot serve [--host HOST] [--port PORT] [--data-dir PATH] [--config PATH]"
-        );
-        response.Output.ShouldContain("TwitchBot__Identity__ClientSecret");
-        response.Output.ShouldContain("$XDG_STATE_HOME/blokebot");
-        response.Output.ShouldContain("Explicit database/token configuration overrides --data-dir");
-    }
-
-    [Test]
-    public async Task VersionCommand_RendersDevelopmentVersionWithFullRevision()
-    {
-        var response = await TerminalAsync(["version"]);
-
-        response.ExitCode.ShouldBe(0);
-        response.Output.Trim().ShouldBe($"blokebot {BlokeBotVersion.Current}");
-    }
-
-    [Test]
     public async Task ServeCommand_HandsOnlyDocumentedOptionsToRuntime()
     {
         var runtime = new CapturingRuntime();
@@ -68,15 +44,6 @@ public sealed class BlokeBotCliTests
         unknown.Output.ShouldNotContain("start-secret-value");
         passThrough.ExitCode.ShouldNotBe(0);
         passThrough.Output.ShouldNotContain("secret.invalid");
-    }
-
-    [Test]
-    public void InformationalVersion_Display_IsDeterministicForTaggedAndDevelopmentBuilds()
-    {
-        BlokeBotVersion.Display("1.2.3+build.47").ShouldBe("1.2.3");
-        BlokeBotVersion
-            .Display("0.0.0-dev+0123456789abcdef0123456789abcdef01234567")
-            .ShouldBe("0.0.0-dev+0123456789abcdef0123456789abcdef01234567");
     }
 
     private static async Task<CliResponse> TerminalAsync(

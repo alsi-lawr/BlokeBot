@@ -41,7 +41,7 @@ public sealed class RequestBoardService(
             return Rejected<RequestBoardSummary>(validation);
         }
 
-        var slug = RequestBoardInput.NormalizeSlug(command.Slug);
+        var slug = CommunityInput.NormalizeSlug(command.Slug);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (!await db.Hosts.AnyAsync(host => host.Id == hostId, ct))
@@ -111,7 +111,7 @@ public sealed class RequestBoardService(
                         new RequestBoardField
                         {
                             Position = position,
-                            Key = RequestBoardInput.NormalizeSlug(field.Key),
+                            Key = CommunityInput.NormalizeSlug(field.Key),
                             Label = field.Label.Trim(),
                             Kind = field.Kind,
                             IsRequired = field.IsRequired,
@@ -165,46 +165,24 @@ public sealed class RequestBoardService(
             );
         }
 
-        var login = RequestBoardInput.NormalizeLogin(command.SubmitterLogin);
-        if (!RequestBoardInput.IsValidLogin(login))
-        {
-            return Rejected<PublicRequestSubmissionView>(
+        var login = CommunityInput.NormalizeLogin(command.SubmitterLogin);
+        return !CommunityInput.IsValidLogin(login)
+            ? Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.Invalid("A valid Twitch login is required.")
+            )
+            : await ExecuteWithCollisionRecoveryAsync(
+                RetryGateFor(_submissionRetryGates, HashCode.Combine(hostId, command.OperationId)),
+                () => SubmitAttemptAsync(hostId, boardSlug, command, login, ct),
+                () =>
+                    LoadCommittedSubmissionRetryAsync(
+                        hostId,
+                        boardSlug,
+                        command.OperationId,
+                        login,
+                        ct
+                    ),
+                ct
             );
-        }
-
-        var retryGate = RetryGateFor(
-            _submissionRetryGates,
-            HashCode.Combine(hostId, command.OperationId)
-        );
-        await retryGate.WaitAsync(ct);
-        try
-        {
-            try
-            {
-                return await SubmitAttemptAsync(hostId, boardSlug, command, login, ct);
-            }
-            catch (Exception exception) when (IsRetryCollision(exception))
-            {
-                var committed = await LoadCommittedSubmissionRetryAsync(
-                    hostId,
-                    boardSlug,
-                    command.OperationId,
-                    login,
-                    ct
-                );
-                if (committed is not null)
-                {
-                    return committed;
-                }
-
-                throw;
-            }
-        }
-        finally
-        {
-            _ = retryGate.Release();
-        }
     }
 
     private async Task<RequestBoardResult<PublicRequestSubmissionView>> SubmitAttemptAsync(
@@ -232,7 +210,7 @@ public sealed class RequestBoardService(
                     && !await db.RequestBoards.AnyAsync(
                         board =>
                             board.Id == existing.BoardId
-                            && board.Slug == RequestBoardInput.NormalizeSlug(boardSlug),
+                            && board.Slug == CommunityInput.NormalizeSlug(boardSlug),
                         ct
                     )
                 ) || !string.Equals(existing.SubmitterLogin, login, StringComparison.Ordinal)
@@ -247,7 +225,7 @@ public sealed class RequestBoardService(
                 );
         }
 
-        var slug = RequestBoardInput.NormalizeSlug(boardSlug);
+        var slug = CommunityInput.NormalizeSlug(boardSlug);
         var board = await db
             .RequestBoards.Include(value => value.Fields)
             .SingleOrDefaultAsync(value => value.HostId == hostId && value.Slug == slug, ct);
@@ -401,40 +379,17 @@ public sealed class RequestBoardService(
             );
         }
 
-        var login = RequestBoardInput.NormalizeLogin(voterLogin);
-        if (!RequestBoardInput.IsValidLogin(login))
-        {
-            return Rejected<PublicRequestSubmissionView>(
+        var login = CommunityInput.NormalizeLogin(voterLogin);
+        return !CommunityInput.IsValidLogin(login)
+            ? Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.Invalid("A valid Twitch login is required.")
+            )
+            : await ExecuteWithCollisionRecoveryAsync(
+                RetryGateFor(_voteRetryGates, HashCode.Combine(hostId, submissionId, login)),
+                () => VoteAttemptAsync(hostId, submissionId, login, ct),
+                () => LoadCommittedVoteRetryAsync(hostId, submissionId, login, ct),
+                ct
             );
-        }
-
-        var retryGate = RetryGateFor(
-            _voteRetryGates,
-            HashCode.Combine(hostId, submissionId, login)
-        );
-        await retryGate.WaitAsync(ct);
-        try
-        {
-            try
-            {
-                return await VoteAttemptAsync(hostId, submissionId, login, ct);
-            }
-            catch (Exception exception) when (IsRetryCollision(exception))
-            {
-                var committed = await LoadCommittedVoteRetryAsync(hostId, submissionId, login, ct);
-                if (committed is not null)
-                {
-                    return committed;
-                }
-
-                throw;
-            }
-        }
-        finally
-        {
-            _ = retryGate.Release();
-        }
     }
 
     private async Task<RequestBoardResult<PublicRequestSubmissionView>> VoteAttemptAsync(
@@ -642,7 +597,7 @@ public sealed class RequestBoardService(
             );
         }
 
-        var login = RequestBoardInput.NormalizeLogin(submitterLogin);
+        var login = CommunityInput.NormalizeLogin(submitterLogin);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var submission = await db
@@ -831,8 +786,8 @@ public sealed class RequestBoardService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var normalizedHost = RequestBoardInput.NormalizeLogin(hostLogin);
-        var normalizedSlug = RequestBoardInput.NormalizeSlug(boardSlug);
+        var normalizedHost = CommunityInput.NormalizeLogin(hostLogin);
+        var normalizedSlug = CommunityInput.NormalizeSlug(boardSlug);
         var board = await db
             .RequestBoards.AsNoTracking()
             .Include(value => value.Fields)
@@ -903,7 +858,7 @@ public sealed class RequestBoardService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var normalizedSlug = RequestBoardInput.NormalizeSlug(boardSlug);
+        var normalizedSlug = CommunityInput.NormalizeSlug(boardSlug);
         var board = await db
             .RequestBoards.AsNoTracking()
             .Include(value => value.Fields)
@@ -1006,7 +961,7 @@ public sealed class RequestBoardService(
         {
             null => null,
             { } value
-                when value.Board?.Slug != RequestBoardInput.NormalizeSlug(boardSlug)
+                when value.Board?.Slug != CommunityInput.NormalizeSlug(boardSlug)
                     || !string.Equals(
                         value.SubmitterLogin,
                         submitterLogin,
@@ -1213,13 +1168,13 @@ public sealed class RequestBoardService(
         ConfigureRequestBoardCommand command
     )
     {
-        var slug = RequestBoardInput.NormalizeSlug(command.Slug);
+        var slug = CommunityInput.NormalizeSlug(command.Slug);
         if (hostId <= 0)
         {
             return new RequestBoardRejection.Invalid("A host is required.");
         }
 
-        if (!RequestBoardInput.IsValidSlug(slug))
+        if (!CommunityInput.IsValidSlug(slug))
         {
             return new RequestBoardRejection.Invalid(
                 "Board slug must be 1-48 lowercase letters, numbers, or hyphens."
@@ -1277,9 +1232,9 @@ public sealed class RequestBoardService(
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in command.Fields)
         {
-            var key = RequestBoardInput.NormalizeSlug(field.Key);
+            var key = CommunityInput.NormalizeSlug(field.Key);
             if (
-                !RequestBoardInput.IsValidSlug(key)
+                !CommunityInput.IsValidSlug(key)
                 || !keys.Add(key)
                 || string.IsNullOrWhiteSpace(field.Label)
                 || field.Label.Trim().Length > 100
@@ -1565,7 +1520,7 @@ public sealed class RequestBoardService(
         return left.Length == requested.Count
             && left.Zip(requested)
                 .All(static pair =>
-                    pair.First.Key == RequestBoardInput.NormalizeSlug(pair.Second.Key)
+                    pair.First.Key == CommunityInput.NormalizeSlug(pair.Second.Key)
                     && pair.First.Label == pair.Second.Label.Trim()
                     && pair.First.Kind == pair.Second.Kind
                     && pair.First.IsRequired == pair.Second.IsRequired
@@ -1715,6 +1670,38 @@ public sealed class RequestBoardService(
 
     private static SemaphoreSlim RetryGateFor(SemaphoreSlim[] gates, int hash) =>
         gates[(int)((uint)hash % (uint)gates.Length)];
+
+    private static async Task<T> ExecuteWithCollisionRecoveryAsync<T>(
+        SemaphoreSlim gate,
+        Func<Task<T>> attempt,
+        Func<Task<T?>> loadCommitted,
+        CancellationToken ct
+    )
+        where T : class
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            try
+            {
+                return await attempt();
+            }
+            catch (Exception exception) when (IsRetryCollision(exception))
+            {
+                var committed = await loadCommitted();
+                if (committed is not null)
+                {
+                    return committed;
+                }
+
+                throw;
+            }
+        }
+        finally
+        {
+            _ = gate.Release();
+        }
+    }
 
     private static bool IsRetryCollision(Exception exception) =>
         exception switch

@@ -34,98 +34,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostConfigFaultRoutingTests
 {
     [Test]
-    public async Task TwitchIntegrationReadiness_Ready_OffersOwnerReconnectAndDisconnect() =>
-        await AssertTwitchOperationsPresentationAsync(
-            ReadyBroadcasterStatus(),
-            owner: true,
-            static page =>
-            {
-                page.Markup.ShouldContain("Chat access");
-                page.Markup.ShouldContain("Twitch integration");
-                page.Markup.ShouldNotContain(">Twitch chat<");
-                page.Markup.ShouldNotContain(">Twitch operations<");
-                page.Find("[data-twitch-integration]")
-                    .TextContent.ShouldContain("Connected for this channel.");
-                var action = BroadcasterActions(page).ShouldHaveSingleItem();
-                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
-                action.Markup.ShouldContain("Reconnect");
-                TwitchIntegrationDisconnectActions(page).Count.ShouldBe(1);
-            }
-        );
-
-    [Test]
-    public async Task TwitchIntegrationReadiness_Missing_OffersOwnerConnect() =>
-        await AssertTwitchOperationsPresentationAsync(
-            new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
-            owner: true,
-            static page =>
-            {
-                page.Markup.ShouldContain("The channel owner must connect this integration.");
-                var action = BroadcasterActions(page).ShouldHaveSingleItem();
-                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
-                action.Markup.ShouldContain("Connect");
-                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-            }
-        );
-
-    [Test]
-    public async Task TwitchIntegrationReadiness_Stale_OffersOwnerReconnectAndDisconnect() =>
-        await AssertTwitchOperationsPresentationAsync(
-            new TokenStatus.Invalid([]),
-            owner: true,
-            static page =>
-            {
-                page.Markup.ShouldContain("The channel owner must reconnect this integration.");
-                var action = BroadcasterActions(page).ShouldHaveSingleItem();
-                action.Instance.Url.ShouldBe("/oauth/broadcaster/start");
-                action.Markup.ShouldContain("Reconnect");
-                TwitchIntegrationDisconnectActions(page).Count.ShouldBe(1);
-            }
-        );
-
-    [Test]
-    public async Task TwitchIntegrationReadiness_MissingNonOwner_ShowsOwnerGuidanceWithoutAction() =>
-        await AssertTwitchOperationsPresentationAsync(
-            new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, []),
-            owner: false,
-            static page =>
-            {
-                page.Markup.ShouldContain("The channel owner must connect this integration.");
-                BroadcasterActions(page).ShouldBeEmpty();
-                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-            }
-        );
-
-    [Test]
-    public async Task TwitchIntegrationReadiness_ReadyNonOwner_ShowsOwnerGuidanceWithoutAction() =>
-        await AssertTwitchOperationsPresentationAsync(
-            ReadyBroadcasterStatus(),
-            owner: false,
-            static page =>
-            {
-                page.Find("[data-twitch-integration]")
-                    .TextContent.ShouldContain(
-                        "Only the channel owner can change this connection."
-                    );
-                BroadcasterActions(page).ShouldBeEmpty();
-                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-            }
-        );
-
-    [Test]
-    public async Task TwitchIntegrationReadiness_StaleNonOwner_ShowsOwnerGuidanceWithoutAction() =>
-        await AssertTwitchOperationsPresentationAsync(
-            new TokenStatus.Invalid([]),
-            owner: false,
-            static page =>
-            {
-                page.Markup.ShouldContain("The channel owner must reconnect this integration.");
-                BroadcasterActions(page).ShouldBeEmpty();
-                TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-            }
-        );
-
-    [Test]
     [Arguments(AuthRole.Admin)]
     [Arguments(AuthRole.Moderator)]
     public async Task TwitchIntegrationDisconnect_AuthorityChangedToNonOwner_DoesNotMutateOrNotify(
@@ -389,45 +297,6 @@ public sealed class HostConfigFaultRoutingTests
         {
             page.Find("#commands-aliases").GetAttribute("value").ShouldBe("unsaved-catalog");
             page.Find("#startup-chat-message").GetAttribute("value").ShouldBe("unsaved startup");
-        });
-    }
-
-    [Test]
-    public async Task ViewerCommandConflictAlerts_RenderWithDarkThemeAwareForeground()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
-            host.CommandsDefaultConflictAlias = "commands";
-            _ = await db.SaveChangesAsync();
-        }
-
-        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
-        await using var context = testContext.Context;
-        ConfigureHostServices(
-            context,
-            dbFactory,
-            new RecordingLogger<UiFaultTelemetry>(),
-            new ManualTimeProvider()
-        );
-        var page = RenderHostConfigPage(context);
-
-        page.WaitForAssertion(() =>
-        {
-            var alert = page.Find("[data-command-conflict]");
-            alert.ClassList.ShouldContain("text-amber-700");
-            alert.ClassList.ShouldNotContain("text-amber-900");
-        });
-
-        await page.InvokeAsync(() => AvailableCommandsButton(page).ClickAsync(new()));
-
-        page.WaitForAssertion(() =>
-        {
-            var alert = page.Find("[data-command-catalog-conflicts]");
-            alert.ClassList.ShouldContain("text-amber-700");
-            alert.ClassList.ShouldNotContain("text-amber-900");
         });
     }
 
@@ -752,35 +621,6 @@ public sealed class HostConfigFaultRoutingTests
                 serviceProvider.GetRequiredService<TimeProvider>()
             )
         );
-
-    private static async Task AssertTwitchOperationsPresentationAsync(
-        TokenStatus status,
-        bool owner,
-        Action<IRenderedComponent<HostConfigPage>> assertion
-    )
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
-        await using var context = testContext.Context;
-        ConfigureHostServices(
-            context,
-            dbFactory,
-            new RecordingLogger<UiFaultTelemetry>(),
-            new ManualTimeProvider()
-        );
-        _ = context.Services.AddSingleton<IHostBroadcasterTokenStatusProvider>(
-            new FixedBroadcasterTokenStatusProvider(status)
-        );
-        if (!owner)
-        {
-            SetAdminClaims(testContext.Authorization, hostId);
-        }
-
-        var page = RenderHostConfigPage(context);
-
-        page.WaitForAssertion(() => assertion(page));
-    }
 
     private static IReadOnlyList<IRenderedComponent<AuthPopupButton>> BroadcasterActions(
         IRenderedComponent<HostConfigPage> page

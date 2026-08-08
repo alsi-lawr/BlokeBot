@@ -28,7 +28,7 @@ public partial class PublicRequestBoardPage
     protected override async Task OnParametersSetAsync()
     {
         var authentication = await _authenticationState;
-        _viewerLogin = RequestBoardInput.NormalizeLogin(
+        _viewerLogin = CommunityInput.NormalizeLogin(
             AuthenticatedSession.FromPrincipal(authentication.User).Login
         );
         await LoadAsync();

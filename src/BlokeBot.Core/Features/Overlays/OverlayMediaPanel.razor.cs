@@ -1,4 +1,3 @@
-using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -8,54 +7,20 @@ public partial class OverlayMediaPanel
     private IReadOnlyList<OverlayMediaAssetView> _items = [];
     private Guid? _previewTarget;
     private string _name = "Stream media";
-    private bool _enabled;
-    private bool _loading = true;
-    private bool _busy;
-    private bool _failed;
-    private string _feedback = string.Empty;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _ = await LoadPageContextAsync();
-        await LoadAsync();
-    }
+    protected override Task LoadAsync() =>
+        LoadOverlayAsync(LoadMediaAsync, "Media could not load. Try again.");
 
-    private async Task LoadAsync()
+    private async Task LoadMediaAsync()
     {
-        _loading = true;
-        try
+        var result = await _media.ListAssetsAsync(PageContext.Session, CancellationToken.None);
+        if (result is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded succeeded)
         {
-            _enabled =
-                Host is not null
-                && await _features.IsEnabledAsync(
-                    HostId,
-                    HostFeatureFlags.Overlays,
-                    CancellationToken.None
-                );
-            if (!_enabled)
-            {
-                return;
-            }
-            var result = await _media.ListAssetsAsync(PageContext.Session, CancellationToken.None);
-            if (
-                result is OverlayCueResult<IReadOnlyList<OverlayMediaAssetView>>.Succeeded succeeded
-            )
-            {
-                _items = succeeded.Value;
-            }
-            _previewTarget = (await _playback.QueryCatalogAsync(HostId, CancellationToken.None))
-                .Targets.FirstOrDefault()
-                ?.Id;
+            _items = succeeded.Value;
         }
-        catch (Exception exception)
-        {
-            ReportUiFault(nameof(LoadAsync), exception);
-            Fail("Media could not load. Try again.");
-        }
-        finally
-        {
-            _loading = false;
-        }
+        _previewTarget = (await _playback.QueryCatalogAsync(HostId, CancellationToken.None))
+            .Targets.FirstOrDefault()
+            ?.Id;
     }
 
     private Task UploadAsync(InputFileChangeEventArgs args) =>
@@ -120,35 +85,6 @@ public partial class OverlayMediaPanel
             Success("Media deleted.");
             await LoadAsync();
         });
-
-    private async Task RunAsync(Func<Task> operation)
-    {
-        if (_busy)
-        {
-            return;
-        }
-        _busy = true;
-        try
-        {
-            await RunSelectedHostMutationAsync(HostId, operation);
-        }
-        finally
-        {
-            _busy = false;
-        }
-    }
-
-    private void Success(string message)
-    {
-        _feedback = message;
-        _failed = false;
-    }
-
-    private void Fail(string message)
-    {
-        _feedback = message;
-        _failed = true;
-    }
 
     private static string ByteLabel(long value) =>
         value >= 1024 * 1024 ? $"{value / (1024m * 1024m):0.##} MB" : $"{value / 1024m:0.##} KB";

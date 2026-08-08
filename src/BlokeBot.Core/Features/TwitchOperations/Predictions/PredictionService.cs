@@ -537,23 +537,13 @@ public sealed class PredictionService(
         return new PredictionOperationOutcome.Updated(View(prediction));
     }
 
-    public async Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken)
-    {
-        var login = Login.Normalize(channel);
-        if (login.Length == 0)
-        {
-            return;
-        }
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var hostId = await db
-            .Hosts.Where(x => x.Login == login)
-            .Select(x => (int?)x.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (hostId is { } id)
-        {
-            await ReconcileAsync(id, cancellationToken);
-        }
-    }
+    public Task ReconcileChannelAsync(string channel, CancellationToken cancellationToken) =>
+        NativeTwitchReconciliation.ReconcileChannelAsync(
+            dbFactory,
+            channel,
+            ReconcileAsync,
+            cancellationToken
+        );
 
     public async Task ReconcileAsync(int hostId, CancellationToken cancellationToken)
     {

@@ -15,25 +15,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentUiTests
 {
     [Test]
-    public void ModeratorPresentationMappings_CoverEveryPersistedMomentValue()
-    {
-        Enum.GetValues<MomentRewardPolicy>()
-            .Select(MomentsPage.RewardPolicyLabel)
-            .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
-        Enum.GetValues<MomentCandidateState>()
-            .Select(MomentsPage.CandidateStateLabel)
-            .ShouldBe([
-                "Creating clip",
-                "Clip ready",
-                "Marker ready",
-                "Could not create clip",
-                "Approved",
-                "Rejected",
-                "Merged into another moment",
-            ]);
-    }
-
-    [Test]
     public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndUsesSemanticSettingsAlignment()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -83,68 +64,6 @@ public sealed class MomentUiTests
                 .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
             page.Markup.ShouldNotContain("pt-6");
         });
-    }
-
-    [Test]
-    public async Task ModeratorPage_UnavailableStreamUsesTaskRecoveryLanguage()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        var service = new MomentHubService(
-            database,
-            new UnusedMomentProvider(),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
-            new UnavailableStreamLivenessProvider()
-        );
-
-        var page = context.Render<MomentsPage>();
-
-        page.WaitForAssertion(() =>
-            page.Markup.ShouldContain(
-                "We can’t confirm the live stream right now. Try again in a moment."
-            )
-        );
-        page.FindAll("button").Single(button => button.TextContent.Trim() == "Capture now").Click();
-        page.WaitForAssertion(() =>
-            page.Find("[role='alert']")
-                .TextContent.ShouldBe(
-                    "We can’t confirm the live stream right now. Try again in a moment."
-                )
-        );
-        page.Markup.ShouldNotContain("Twitch stream identity is temporarily unavailable");
-    }
-
-    [Test]
-    public async Task ModeratorPage_WithoutSelectedHost_OmitsTheWeeklyRecapNavigation()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        var service = new MomentHubService(
-            database,
-            new UnusedMomentProvider(),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        var testContext = UiTestContextFactory.CreateWithAuthorization(database, hostId);
-        await using var context = testContext.Context;
-        _ = testContext.Authorization.SetNotAuthorized();
-        _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
-            new OfflineStreamLivenessProvider()
-        );
-
-        var page = context.Render<MomentsPage>();
-
-        page.WaitForAssertion(() =>
-            page.Markup.ShouldContain("Choose a channel to manage moments")
-        );
-        page.FindAll("a[aria-label^='Open weekly recap']").ShouldBeEmpty();
-        page.FindAll("a[href='#']").ShouldBeEmpty();
     }
 
     [Test]

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

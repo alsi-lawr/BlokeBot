@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -56,551 +55,326 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
-        _ = app.MapGet(
-                "/overlay/{accessKey}",
-                static async (
-                    HttpContext context,
-                    string accessKey,
-                    OverlayInstanceResolver resolver,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPrivateBrowserSourceHeaders(context.Response);
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    return resolution is OverlayResolutionResult.Resolved
-                        ? Results.Text(
-                            OverlayBrowserSourceDocument.Render(
-                                context.Request.PathBase,
-                                $"/overlay/{Uri.EscapeDataString(accessKey)}/state",
-                                $"/overlay/{Uri.EscapeDataString(accessKey)}/events",
-                                $"/overlay/{Uri.EscapeDataString(accessKey)}/media",
-                                $"/overlay/{Uri.EscapeDataString(accessKey)}/cue-complete",
-                                $"/overlay/{Uri.EscapeDataString(accessKey)}/appearance.css",
-                                OverlayBrowserSourceCredentials.Omit,
-                                liveEnabled: true
-                            ),
-                            "text/html"
-                        )
-                        : Unavailable();
-                }
-            )
-            .AllowAnonymous();
-        _ = app.MapGet(
-                "/overlay/{accessKey}/appearance.css",
-                static async (
-                    HttpContext context,
-                    string accessKey,
-                    OverlayInstanceResolver resolver,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPrivateBrowserSourceHeaders(context.Response);
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    return resolution is OverlayResolutionResult.Resolved resolved
-                        ? Results.Text(AppearanceCss(resolved.Instance.Configuration), "text/css")
-                        : Unavailable();
-                }
-            )
-            .AllowAnonymous();
-        _ = app.MapGet(
-                "/overlay/{accessKey}/events",
-                static async (
-                    HttpContext context,
-                    string accessKey,
-                    OverlayInstanceResolver resolver,
-                    OverlayLiveCoordinator live,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPrivateBrowserSourceHeaders(context.Response);
-                    var resolvedGeneration = live.Generation;
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayResolutionResult.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
+        MapBrowserSourceRoutes(app, OverlaySourceKind.Public);
+        MapBrowserSourceRoutes(app, OverlaySourceKind.Preview);
+    }
 
-                    var opened = await OpenLiveSafelyAsync(
-                        live,
-                        resolved.Instance,
-                        resolvedGeneration,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    return opened is OverlayLiveOpenResult.Opened connected
-                        ? new OverlayLiveStreamResult(live, connected.Connection)
-                        : Unavailable();
-                }
-            )
-            .AllowAnonymous();
-        _ = app.MapGet(
-                "/overlay/{accessKey}/state",
-                static async (
+    private static void MapBrowserSourceRoutes(WebApplication app, OverlaySourceKind source)
+    {
+        var routes = source switch
+        {
+            OverlaySourceKind.Public => app.MapGroup("/overlay/{accessKey}").AllowAnonymous(),
+            OverlaySourceKind.Preview => app.MapGroup("/overlays/preview/{overlayId:guid}")
+                .RequireAuthorization("HostSelected"),
+            _ => throw new ArgumentOutOfRangeException(nameof(source)),
+        };
+        _ = routes.MapGet(
+            "",
+            (HttpContext context, CancellationToken ct) => DocumentAsync(context, source, ct)
+        );
+        _ = routes.MapGet(
+            "/appearance.css",
+            (HttpContext context, CancellationToken ct) => AppearanceAsync(context, source, ct)
+        );
+        _ = routes.MapGet(
+            "/events",
+            (HttpContext context, OverlayLiveCoordinator live, CancellationToken ct) =>
+                EventsAsync(context, source, live, ct)
+        );
+        _ = routes.MapGet(
+            "/state",
+            (HttpContext context, IOverlayStateProvider states, CancellationToken ct) =>
+                StateAsync(context, source, states, ct)
+        );
+        _ = routes.MapGet(
+            "/media/{assetId:guid}/{contentRevision:int}",
+            (
+                HttpContext context,
+                Guid assetId,
+                int contentRevision,
+                OverlayCueService cues,
+                CancellationToken ct
+            ) => MediaAsync(context, source, assetId, contentRevision, cues, ct)
+        );
+        _ = routes
+            .MapPost(
+                "/cue-complete/{runId:guid}",
+                (
                     HttpContext context,
-                    string accessKey,
-                    OverlayInstanceResolver resolver,
-                    IOverlayStateProvider stateProvider,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPrivateBrowserSourceHeaders(context.Response);
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayResolutionResult.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
-
-                    var projection = await ProjectSafelyAsync(
-                        stateProvider,
-                        resolved.Instance,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    return projection switch
-                    {
-                        OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
-                        OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
-                            guessing.Snapshot
-                        ),
-                        OverlaySnapshotProjection.CuePlayerV1 player => Results.Json(
-                            player.Snapshot
-                        ),
-                        OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(
-                            giveaway.Snapshot
-                        ),
-                        OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
-                        OverlaySnapshotProjection.ViewerQueueV1 queue => Results.Json(
-                            queue.Snapshot
-                        ),
-                        _ => Unavailable(),
-                    };
-                }
-            )
-            .AllowAnonymous();
-        _ = app.MapGet(
-                "/overlay/{accessKey}/media/{assetId:guid}/{contentRevision:int}",
-                static async (
-                    HttpContext context,
-                    string accessKey,
-                    Guid assetId,
-                    int contentRevision,
-                    OverlayInstanceResolver resolver,
-                    OverlayCueService cues,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayResolutionResult.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
-                    var content = await cues.ResolveContentAsync(
-                        resolved.Instance.HostId,
-                        assetId,
-                        contentRevision,
-                        cancellationToken
-                    );
-                    return content is null ? Unavailable() : MediaFile(context, content);
-                }
-            )
-            .AllowAnonymous();
-        _ = app.MapPost(
-                "/overlay/{accessKey}/cue-complete/{runId:guid}",
-                static async (
-                    HttpContext context,
-                    string accessKey,
                     Guid runId,
-                    OverlayInstanceResolver resolver,
                     OverlayCuePlaybackService playback,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPrivateBrowserSourceHeaders(context.Response);
-                    var resolution = await ResolveSafelyAsync(
-                        resolver,
-                        accessKey,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayResolutionResult.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
-                    _ = await playback.CompleteAsync(
-                        resolved.Instance.HostId,
-                        resolved.Instance.OverlayId,
-                        runId,
-                        cancellationToken
-                    );
-                    return Results.NoContent();
-                }
+                    CancellationToken ct
+                ) => CueCompletedAsync(context, source, runId, playback, ct)
             )
-            .DisableAntiforgery()
-            .AllowAnonymous();
+            .DisableAntiforgery();
+    }
 
-        _ = app.MapGet(
-                "/overlays/preview/{overlayId:guid}",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPreviewHeaders(context.Response);
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
+    private static async Task<IResult> DocumentAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        CancellationToken ct
+    )
+    {
+        ApplySourceHeaders(context.Response, source);
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        if (resolved is null)
+        {
+            return Unavailable();
+        }
 
-                    var encodedId = Uri.EscapeDataString(overlayId.ToString("D"));
-                    var representative = string.Equals(
-                        context.Request.Query["mode"],
-                        "representative",
-                        StringComparison.Ordinal
-                    );
-                    var suffix = representative ? "?mode=representative" : string.Empty;
-                    if (representative)
-                    {
-                        var sampleValue = context.Request.Query["sample"];
-                        if (
-                            resolved.Instance.Type is OverlayType.Guessing
-                            && TryParseSample(sampleValue, out var sample)
-                        )
-                        {
-                            suffix =
-                                $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(sample))}";
-                        }
-                        else if (
-                            resolved.Instance.Type is OverlayType.Giveaway
-                            && TryParseGiveawaySample(sampleValue, out var giveawaySample)
-                        )
-                        {
-                            suffix =
-                                $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(giveawaySample))}";
-                        }
-                        else if (
-                            resolved.Instance.Type is OverlayType.EventFeed
-                            && TryParseEventFeedSample(sampleValue, out var eventKind)
-                        )
-                        {
-                            suffix =
-                                $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(eventKind))}";
-                        }
-                        else if (
-                            resolved.Instance.Type is OverlayType.ViewerQueue
-                            && TryParseViewerQueueSample(sampleValue, out var queueSample)
-                        )
-                        {
-                            suffix =
-                                $"?mode=representative&sample={Uri.EscapeDataString(SampleToken(queueSample))}";
-                        }
-                    }
-                    return Results.Text(
-                        OverlayBrowserSourceDocument.Render(
-                            context.Request.PathBase,
-                            $"/overlays/preview/{encodedId}/state{suffix}",
-                            $"/overlays/preview/{encodedId}/events",
-                            $"/overlays/preview/{encodedId}/media",
-                            $"/overlays/preview/{encodedId}/cue-complete",
-                            $"/overlays/preview/{encodedId}/appearance.css",
-                            OverlayBrowserSourceCredentials.SameOrigin,
-                            liveEnabled: !representative
-                        ),
-                        "text/html"
-                    );
-                }
-            )
-            .RequireAuthorization("HostSelected");
-        _ = app.MapGet(
-                "/overlays/preview/{overlayId:guid}/appearance.css",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPreviewHeaders(context.Response);
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    return resolution is OverlayPreviewResolution.Resolved resolved
-                        ? Results.Text(AppearanceCss(resolved.Instance.Configuration), "text/css")
-                        : Unavailable();
-                }
-            )
-            .RequireAuthorization("HostSelected");
-        _ = app.MapGet(
-                "/overlays/preview/{overlayId:guid}/state",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    IOverlayStateProvider stateProvider,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPreviewHeaders(context.Response);
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
+        var sourcePath = source switch
+        {
+            OverlaySourceKind.Public =>
+                $"/overlay/{Uri.EscapeDataString((string)context.Request.RouteValues["accessKey"]!)}",
+            OverlaySourceKind.Preview =>
+                $"/overlays/preview/{Guid.Parse((string)context.Request.RouteValues["overlayId"]!).ToString("D")}",
+            _ => throw new ArgumentOutOfRangeException(nameof(source)),
+        };
+        var representative =
+            source is OverlaySourceKind.Preview
+            && string.Equals(
+                context.Request.Query["mode"],
+                "representative",
+                StringComparison.Ordinal
+            );
+        var stateSuffix = representative
+            ? RepresentativeSuffix(context, resolved.Type)
+            : string.Empty;
+        return Results.Text(
+            OverlayBrowserSourceDocument.Render(
+                context.Request.PathBase,
+                $"{sourcePath}/state{stateSuffix}",
+                $"{sourcePath}/events",
+                $"{sourcePath}/media",
+                $"{sourcePath}/cue-complete",
+                $"{sourcePath}/appearance.css",
+                source is OverlaySourceKind.Public
+                    ? OverlayBrowserSourceCredentials.Omit
+                    : OverlayBrowserSourceCredentials.SameOrigin,
+                liveEnabled: !representative
+            ),
+            "text/html"
+        );
+    }
 
-                    var representative = string.Equals(
-                        context.Request.Query["mode"],
-                        "representative",
-                        StringComparison.Ordinal
-                    );
-                    OverlaySnapshotProjection projection;
-                    if (
-                        representative
-                        && resolved.Instance.Type is OverlayType.Guessing
-                        && TryParseSample(context.Request.Query["sample"], out var sample)
-                    )
-                    {
-                        projection = await ProjectSampleSafelyAsync(
-                            stateProvider,
-                            resolved.Instance,
-                            sample,
-                            context.RequestServices,
-                            cancellationToken
-                        );
-                    }
-                    else if (
-                        representative
-                        && resolved.Instance.Type is OverlayType.EventFeed
-                        && TryParseEventFeedSample(
-                            context.Request.Query["sample"],
-                            out var eventKind
-                        )
-                    )
-                    {
-                        projection = await ProjectSampleSafelyAsync(
-                            stateProvider,
-                            resolved.Instance,
-                            eventKind,
-                            context.RequestServices,
-                            cancellationToken
-                        );
-                    }
-                    else if (
-                        representative
-                        && resolved.Instance.Type is OverlayType.ViewerQueue
-                        && TryParseViewerQueueSample(
-                            context.Request.Query["sample"],
-                            out var queueSample
-                        )
-                    )
-                    {
-                        projection = await ProjectSampleSafelyAsync(
-                            stateProvider,
-                            resolved.Instance,
-                            queueSample,
-                            context.RequestServices,
-                            cancellationToken
-                        );
-                    }
-                    else if (
-                        representative
-                        && resolved.Instance.Type is OverlayType.Giveaway
-                        && TryParseGiveawaySample(
-                            context.Request.Query["sample"],
-                            out var giveawaySample
-                        )
-                    )
-                    {
-                        projection = await ProjectSampleSafelyAsync(
-                            stateProvider,
-                            resolved.Instance,
-                            giveawaySample,
-                            context.RequestServices,
-                            cancellationToken
-                        );
-                    }
-                    else
-                    {
-                        projection = await ProjectSafelyAsync(
-                            stateProvider,
-                            resolved.Instance,
-                            context.RequestServices,
-                            cancellationToken
-                        );
-                    }
-                    return projection switch
-                    {
-                        OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
-                        OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(
-                            guessing.Snapshot
-                        ),
-                        OverlaySnapshotProjection.CuePlayerV1 player => Results.Json(
-                            player.Snapshot
-                        ),
-                        OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(
-                            giveaway.Snapshot
-                        ),
-                        OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
-                        OverlaySnapshotProjection.ViewerQueueV1 queue => Results.Json(
-                            queue.Snapshot
-                        ),
-                        _ => Unavailable(),
-                    };
-                }
-            )
-            .RequireAuthorization("HostSelected");
-        _ = app.MapGet(
-                "/overlays/preview/{overlayId:guid}/media/{assetId:guid}/{contentRevision:int}",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    Guid assetId,
-                    int contentRevision,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    OverlayCueService cues,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
-                    var content = await cues.ResolveContentAsync(
-                        resolved.Instance.HostId,
-                        assetId,
-                        contentRevision,
-                        cancellationToken
-                    );
-                    return content is null ? Unavailable() : MediaFile(context, content);
-                }
-            )
-            .RequireAuthorization("HostSelected");
-        _ = app.MapPost(
-                "/overlays/preview/{overlayId:guid}/cue-complete/{runId:guid}",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    Guid runId,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    OverlayCuePlaybackService playback,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPreviewHeaders(context.Response);
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
-                    _ = await playback.CompleteAsync(
-                        resolved.Instance.HostId,
-                        resolved.Instance.OverlayId,
-                        runId,
-                        cancellationToken
-                    );
-                    return Results.NoContent();
-                }
-            )
-            .DisableAntiforgery()
-            .RequireAuthorization("HostSelected");
-        _ = app.MapGet(
-                "/overlays/preview/{overlayId:guid}/events",
-                static async (
-                    HttpContext context,
-                    Guid overlayId,
-                    OverlayInstanceService overlays,
-                    [FromServices] HostFeatureService features,
-                    OverlayLiveCoordinator live,
-                    CancellationToken cancellationToken
-                ) =>
-                {
-                    ApplyPreviewHeaders(context.Response);
-                    var resolvedGeneration = live.Generation;
-                    var resolution = await ResolvePreviewSafelyAsync(
-                        context,
-                        overlayId,
-                        overlays,
-                        features,
-                        cancellationToken
-                    );
-                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
-                    {
-                        return Unavailable();
-                    }
+    private static string RepresentativeSuffix(HttpContext context, OverlayType type)
+    {
+        var sample = context.Request.Query["sample"];
+        var sampleToken = type switch
+        {
+            OverlayType.Guessing when TryParseSample(sample, out var value) => SampleToken(value),
+            OverlayType.Giveaway when TryParseGiveawaySample(sample, out var value) => SampleToken(
+                value
+            ),
+            OverlayType.EventFeed when TryParseEventFeedSample(sample, out var value) =>
+                SampleToken(value),
+            OverlayType.ViewerQueue when TryParseViewerQueueSample(sample, out var value) =>
+                SampleToken(value),
+            _ => null,
+        };
+        return sampleToken is null
+            ? "?mode=representative"
+            : $"?mode=representative&sample={Uri.EscapeDataString(sampleToken)}";
+    }
 
-                    var opened = await OpenLiveSafelyAsync(
-                        live,
-                        resolved.Instance,
-                        resolvedGeneration,
-                        context.RequestServices,
-                        cancellationToken
-                    );
-                    return opened is OverlayLiveOpenResult.Opened connected
-                        ? new OverlayLiveStreamResult(live, connected.Connection)
-                        : Unavailable();
-                }
+    private static async Task<IResult> AppearanceAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        CancellationToken ct
+    )
+    {
+        ApplySourceHeaders(context.Response, source);
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        return resolved is null
+            ? Unavailable()
+            : Results.Text(AppearanceCss(resolved.Configuration), "text/css");
+    }
+
+    private static async Task<IResult> EventsAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        OverlayLiveCoordinator live,
+        CancellationToken ct
+    )
+    {
+        ApplySourceHeaders(context.Response, source);
+        var resolvedGeneration = live.Generation;
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        if (resolved is null)
+        {
+            return Unavailable();
+        }
+
+        var opened = await OpenLiveSafelyAsync(
+            live,
+            resolved,
+            resolvedGeneration,
+            context.RequestServices,
+            ct
+        );
+        return opened is OverlayLiveOpenResult.Opened connected
+            ? new OverlayLiveStreamResult(live, connected.Connection)
+            : Unavailable();
+    }
+
+    private static async Task<IResult> StateAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        IOverlayStateProvider stateProvider,
+        CancellationToken ct
+    )
+    {
+        ApplySourceHeaders(context.Response, source);
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        if (resolved is null)
+        {
+            return Unavailable();
+        }
+
+        var projection =
+            source is OverlaySourceKind.Preview
+            && string.Equals(
+                context.Request.Query["mode"],
+                "representative",
+                StringComparison.Ordinal
             )
-            .RequireAuthorization("HostSelected");
+                ? await ProjectRepresentativeSafelyAsync(context, stateProvider, resolved, ct)
+                : await ProjectSafelyAsync(stateProvider, resolved, context.RequestServices, ct);
+        return Snapshot(projection);
+    }
+
+    private static Task<OverlaySnapshotProjection> ProjectRepresentativeSafelyAsync(
+        HttpContext context,
+        IOverlayStateProvider stateProvider,
+        ResolvedOverlayInstance instance,
+        CancellationToken ct
+    ) =>
+        (instance.Type, context.Request.Query["sample"].ToString()) switch
+        {
+            (OverlayType.Guessing, var sample) when TryParseSample(sample, out var value) =>
+                ProjectSampleSafelyAsync(
+                    stateProvider,
+                    instance,
+                    value,
+                    context.RequestServices,
+                    ct
+                ),
+            (OverlayType.Giveaway, var sample) when TryParseGiveawaySample(sample, out var value) =>
+                ProjectSampleSafelyAsync(
+                    stateProvider,
+                    instance,
+                    value,
+                    context.RequestServices,
+                    ct
+                ),
+            (OverlayType.EventFeed, var sample)
+                when TryParseEventFeedSample(sample, out var value) => ProjectSampleSafelyAsync(
+                stateProvider,
+                instance,
+                value,
+                context.RequestServices,
+                ct
+            ),
+            (OverlayType.ViewerQueue, var sample)
+                when TryParseViewerQueueSample(sample, out var value) => ProjectSampleSafelyAsync(
+                stateProvider,
+                instance,
+                value,
+                context.RequestServices,
+                ct
+            ),
+            _ => ProjectSafelyAsync(stateProvider, instance, context.RequestServices, ct),
+        };
+
+    private static IResult Snapshot(OverlaySnapshotProjection projection) =>
+        projection switch
+        {
+            OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
+            OverlaySnapshotProjection.GuessingV1 guessing => Results.Json(guessing.Snapshot),
+            OverlaySnapshotProjection.CuePlayerV1 player => Results.Json(player.Snapshot),
+            OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(giveaway.Snapshot),
+            OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
+            OverlaySnapshotProjection.ViewerQueueV1 queue => Results.Json(queue.Snapshot),
+            _ => Unavailable(),
+        };
+
+    private static async Task<IResult> MediaAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        Guid assetId,
+        int contentRevision,
+        OverlayCueService cues,
+        CancellationToken ct
+    )
+    {
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        if (resolved is null)
+        {
+            return Unavailable();
+        }
+
+        var content = await cues.ResolveContentAsync(resolved.HostId, assetId, contentRevision, ct);
+        return content is null ? Unavailable() : MediaFile(context, content);
+    }
+
+    private static async Task<IResult> CueCompletedAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        Guid runId,
+        OverlayCuePlaybackService playback,
+        CancellationToken ct
+    )
+    {
+        ApplySourceHeaders(context.Response, source);
+        var resolved = await ResolveSourceSafelyAsync(context, source, ct);
+        if (resolved is null)
+        {
+            return Unavailable();
+        }
+
+        _ = await playback.CompleteAsync(resolved.HostId, resolved.OverlayId, runId, ct);
+        return Results.NoContent();
+    }
+
+    private static async Task<ResolvedOverlayInstance?> ResolveSourceSafelyAsync(
+        HttpContext context,
+        OverlaySourceKind source,
+        CancellationToken ct
+    ) =>
+        source switch
+        {
+            OverlaySourceKind.Public => await ResolveSafelyAsync(
+                context.RequestServices.GetRequiredService<OverlayInstanceResolver>(),
+                (string)context.Request.RouteValues["accessKey"]!,
+                context.RequestServices,
+                ct
+            )
+                is OverlayResolutionResult.Resolved resolved
+                ? resolved.Instance
+                : null,
+            OverlaySourceKind.Preview => await ResolvePreviewSafelyAsync(
+                context,
+                Guid.Parse((string)context.Request.RouteValues["overlayId"]!),
+                context.RequestServices.GetRequiredService<OverlayInstanceService>(),
+                context.RequestServices.GetRequiredService<HostFeatureService>(),
+                ct
+            )
+                is OverlayPreviewResolution.Resolved resolved
+                ? resolved.Instance
+                : null,
+            _ => throw new ArgumentOutOfRangeException(nameof(source)),
+        };
+
+    private static void ApplySourceHeaders(HttpResponse response, OverlaySourceKind source)
+    {
+        if (source is OverlaySourceKind.Preview)
+        {
+            ApplyPreviewHeaders(response);
+        }
+        else
+        {
+            ApplyPrivateBrowserSourceHeaders(response);
+        }
     }
 
     private static async Task<OverlayPreviewResolution> ResolvePreviewSafelyAsync(
@@ -1183,6 +957,12 @@ internal static class OverlayBrowserSourceEndpoints
                 live.Close(connection);
             }
         }
+    }
+
+    private enum OverlaySourceKind
+    {
+        Public,
+        Preview,
     }
 
     private sealed class OverlayBrowserSourceLog;

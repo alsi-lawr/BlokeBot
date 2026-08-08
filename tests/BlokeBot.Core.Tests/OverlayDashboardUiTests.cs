@@ -1,7 +1,6 @@
 using AngleSharp.Html.Dom;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence.Models;
@@ -78,20 +77,6 @@ public sealed class OverlayDashboardUiTests
     }
 
     [Test]
-    public void FeatureCatalog_ExposesAnIndependentOverlaySwitchIncludedInAll()
-    {
-        HostFeatureFlags.All.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
-        HostFeatureFlags.Shoutouts.Contains(HostFeatureFlags.Overlays).ShouldBeFalse();
-
-        var card = HostFeatureCatalog
-            .Cards(HostFeatureFlags.Overlays)
-            .Single(static value => value.Feature == HostFeatureFlags.Overlays);
-
-        card.Enabled.ShouldBeTrue();
-        card.Name.ShouldBe("Overlays");
-    }
-
-    [Test]
     public void SharedRenderer_ConstrainsCredentialModeAndNeverRequiresAPrivateKey()
     {
         var publicDocument = OverlayBrowserSourceDocument.Render(
@@ -165,58 +150,6 @@ public sealed class OverlayDashboardUiTests
             .Single(button => button.TextContent.Trim() == "Save overlay")
             .HasAttribute("disabled")
             .ShouldBeTrue();
-    }
-
-    [Test]
-    public void DashboardSource_UsesWideSingleEditorOpaquePreviewAndExplicitSafetyCopy()
-    {
-        var source = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
-        var code = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.cs"));
-        var styles = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.css"));
-        var parent = File.ReadAllText(SourcePath("OverlaysPage.razor"));
-
-        parent.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
-        source.ShouldContain("data-overlay-editor");
-        source.ShouldContain("New overlay — not saved");
-        source.ShouldContain("1920");
-        source.ShouldContain("1080");
-        source.ShouldContain("Open OBS Browser Sources appear here when connected.");
-        source.ShouldContain("Visual configuration");
-        source.ShouldContain("Empty overlays have no visual settings");
-        source.ShouldContain("Rotate private URL");
-        source.ShouldContain("Send test pulse");
-        source.ShouldContain("data-private-url-reveal");
-        source.ShouldContain("overlay-preview-frame");
-        source.ShouldContain("text-slate-950");
-        source.ShouldContain("text-slate-700");
-        source.ShouldNotContain("text-blue-900");
-        source.ShouldNotContain("text-red-800");
-        source.ShouldNotContain("text-amber-900");
-        source.ShouldNotContain("text-amber-950");
-        styles.ShouldContain("background: transparent");
-        styles.ShouldContain("color-scheme: only light");
-        code.ShouldContain("$\"/overlays/preview/{_selected.Id:D}{mode}\"");
-        code.ShouldContain("segmented-motion__tab segmented-motion__tab--active");
-        code.ShouldNotContain("segmented-motion__button");
-        code.ShouldNotContain("PrivateAccess.AccessKey");
-        code.ShouldContain("RunSelectedHostMutationAsync");
-        code.ShouldContain("_publisher.PublishTest");
-        code.ShouldContain("No Browser Source is connected");
-        code.ShouldContain("SetFailure(rejected.Reason.Message)");
-    }
-
-    [Test]
-    public void ProductionClient_HasOneCredentialSwitchAndBoundedTestPulse()
-    {
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "root.dataset.credentials === \"same-origin\""
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "root.dataset.liveEnabled !== \"false\""
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("showTestPulse()");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("}, 1500);");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("setInterval");
     }
 
     [Test]

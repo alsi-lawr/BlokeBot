@@ -12,6 +12,12 @@ public abstract record OverlayConfiguration
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
+    private static readonly JsonSerializerOptions _strictJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
 
     private OverlayConfiguration() { }
 
@@ -176,14 +182,7 @@ public abstract record OverlayConfiguration
     {
         try
         {
-            var dto = root.Deserialize<EventFeedConfigurationDto>(
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = false,
-                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-                }
-            );
+            var dto = root.Deserialize<EventFeedConfigurationDto>(_strictJsonOptions);
             if (
                 dto is null
                 || dto.SchemaVersion != 1
@@ -238,14 +237,7 @@ public abstract record OverlayConfiguration
     {
         try
         {
-            var dto = root.Deserialize<ViewerQueueConfigurationDto>(
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = false,
-                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-                }
-            );
+            var dto = root.Deserialize<ViewerQueueConfigurationDto>(_strictJsonOptions);
             return dto is null || dto.SchemaVersion != 1 || dto.Appearance is null
                 ? new OverlayConfigurationParseResult.Invalid(
                     "A Viewer Queue configuration must contain schemaVersion 1, a saved queue, current and next row counts from 0 to 12, and appearance."
@@ -318,14 +310,7 @@ public abstract record OverlayConfiguration
         }
         try
         {
-            var dto = property.Value.Deserialize<OverlayAppearanceDto>(
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = false,
-                    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-                }
-            );
+            var dto = property.Value.Deserialize<OverlayAppearanceDto>(_strictJsonOptions);
             appearance = dto is null ? throw new ArgumentException() : ParseAppearance(dto);
             return true;
         }

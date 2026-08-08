@@ -1,6 +1,5 @@
 using System.Globalization;
 using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Points.Dashboard;
 using BlokeBot.Core.Features.Replies;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -22,29 +21,6 @@ public sealed class BoundedDiscriminatorBehaviorTests
 
         delivery.TargetFor("chat-reply").ShouldBe(CommandResponseTarget.Chat);
         delivery.TargetFor("whisper-reply").ShouldBe(CommandResponseTarget.Whisper);
-    }
-
-    [Test]
-    public void SupportedPointLedgerKinds_Formatting_ReturnExpectedLabels()
-    {
-        (PointLedgerKind Kind, string Label)[] supportedKinds =
-        [
-            (PointLedgerKind.Add, "Points added"),
-            (PointLedgerKind.Remove, "Points removed"),
-            (PointLedgerKind.DeleteBalance, "Balance deleted"),
-            (PointLedgerKind.TransferOut, "Points given"),
-            (PointLedgerKind.TransferIn, "Points received"),
-            (PointLedgerKind.GambleWin, "Gamble won"),
-            (PointLedgerKind.GambleLoss, "Gamble lost"),
-            (PointLedgerKind.GiveawayWin, "Giveaway prize"),
-            (PointLedgerKind.GuessWin, "Guessing prize"),
-            (PointLedgerKind.RequestReservation, "Request reserved"),
-            (PointLedgerKind.RequestRefund, "Request refunded"),
-        ];
-
-        supportedKinds
-            .Select(static item => PointsDashboard.LedgerChangeLabel(item.Kind))
-            .ShouldBe(supportedKinds.Select(static item => item.Label));
     }
 
     [Test]

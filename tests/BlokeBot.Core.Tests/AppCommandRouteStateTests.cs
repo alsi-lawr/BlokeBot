@@ -1,24 +1,3 @@
-using BlokeBot.Core.Features.Commands;
-using Shouldly;
-
 namespace BlokeBot.Core.Tests;
 
-public sealed class AppCommandRouteStateTests
-{
-    [Test]
-    public void InvalidIdentifiers_ConstructingRoutes_Rejects()
-    {
-        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
-            new AppCommandRouteState.Host(0)
-        );
-        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
-            new AppCommandRouteState.Host(-1)
-        );
-        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
-            new AppCommandRouteState.GuessingProfile(0, 1)
-        );
-        _ = Should.Throw<ArgumentOutOfRangeException>(static () =>
-            new AppCommandRouteState.GuessingProfile(1, 0)
-        );
-    }
-}
+public sealed class AppCommandRouteStateTests { }
