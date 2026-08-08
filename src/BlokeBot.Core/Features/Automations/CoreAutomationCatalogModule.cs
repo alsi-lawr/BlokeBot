@@ -148,6 +148,15 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 [_completeOutput],
                 [
                     new(
+                        new("target-id"),
+                        "Cue player",
+                        "The Cue player Browser Source that receives the cue.",
+                        new AutomationConfigurationFieldType.Reference(
+                            AutomationReferenceKind.OverlayTarget
+                        ),
+                        true
+                    ),
+                    new(
                         new("cue-id"),
                         "Cue",
                         "The saved overlay cue to play.",
@@ -192,7 +201,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         new("expression"),
                         "Expression",
                         "The expression that decides which branch continues.",
-                        new AutomationConfigurationFieldType.Text(2_000, true),
+                        new AutomationConfigurationFieldType.Text(null, true),
                         true,
                         AutomationDataSensitivity.Sensitive
                     ),
@@ -220,8 +229,8 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         "Duration",
                         "How long the automation waits.",
                         new AutomationConfigurationFieldType.Duration(
-                            TimeSpan.FromSeconds(1),
-                            TimeSpan.FromHours(24)
+                            TimeSpan.FromMilliseconds(1),
+                            null
                         ),
                         true
                     ),
@@ -244,9 +253,12 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("message", "Enter a chat message.");
 
     private static AutomationConfigurationParseResult ParseOverlayCue(JsonElement json) =>
-        TryReadString(json, "cue-id", out var cueId) && Guid.TryParse(cueId, out var parsed)
-            ? Parsed(new PlayOverlayCueActionConfiguration(new(parsed)))
-            : Invalid("cue-id", "Choose a valid overlay cue.");
+        TryReadString(json, "target-id", out var targetId)
+        && Guid.TryParse(targetId, out var parsedTarget)
+        && TryReadString(json, "cue-id", out var cueId)
+        && Guid.TryParse(cueId, out var parsedCue)
+            ? Parsed(new PlayOverlayCueActionConfiguration(new(parsedTarget), new(parsedCue)))
+            : Invalid("target-id", "Choose a Cue player and a saved cue.");
 
     private static AutomationConfigurationParseResult ParseCondition(JsonElement json) =>
         TryReadString(json, "expression", out var expression)
@@ -254,8 +266,14 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("expression", "Enter a condition expression.");
 
     private static AutomationConfigurationParseResult ParseDelay(JsonElement json) =>
-        TryReadInt32(json, "duration-milliseconds", out var milliseconds)
-            ? Parsed(new DelayControlConfiguration(TimeSpan.FromMilliseconds(milliseconds)))
+        TryReadInt64(json, "duration-milliseconds", out var milliseconds)
+        && milliseconds >= TimeSpan.MinValue.Ticks / TimeSpan.TicksPerMillisecond
+        && milliseconds <= TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerMillisecond
+            ? Parsed(
+                new DelayControlConfiguration(
+                    TimeSpan.FromTicks(milliseconds * TimeSpan.TicksPerMillisecond)
+                )
+            )
             : Invalid("duration-milliseconds", "Enter a whole-number delay in milliseconds.");
 
     private static AutomationValidationResult ValidateCustomCommand(
@@ -287,11 +305,11 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
     private static AutomationValidationResult ValidateOverlayCue(
         PlayOverlayCueActionConfiguration configuration
     ) =>
-        configuration.CueId.Value != Guid.Empty
+        configuration.TargetId.Value != Guid.Empty && configuration.CueId.Value != Guid.Empty
             ? AutomationValidationResult.Valid
             : AutomationValidationResult.Invalid(
-                new AutomationValidationTarget.Field(new("cue-id")),
-                "Choose a valid overlay cue."
+                new AutomationValidationTarget.Field(new("target-id")),
+                "Choose a Cue player and a saved cue."
             );
 
     private static AutomationValidationResult ValidateCondition(
@@ -303,22 +321,17 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 new AutomationValidationTarget.Field(new("expression")),
                 "Enter a condition expression."
             ),
-            { Length: > 2_000 } => AutomationValidationResult.Invalid(
-                new AutomationValidationTarget.Field(new("expression")),
-                "Condition expressions cannot exceed 2,000 characters."
-            ),
             _ => AutomationValidationResult.Valid,
         };
 
     private static AutomationValidationResult ValidateDelay(
         DelayControlConfiguration configuration
     ) =>
-        configuration.Duration >= TimeSpan.FromSeconds(1)
-        && configuration.Duration <= TimeSpan.FromHours(24)
+        configuration.Duration > TimeSpan.Zero
             ? AutomationValidationResult.Valid
             : AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Field(new("duration-milliseconds")),
-                "Choose a delay from one second to 24 hours."
+                "Choose a delay longer than zero."
             );
 
     private static bool TryReadString(JsonElement json, string propertyName, out string value)
@@ -343,6 +356,14 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
         return json.ValueKind == JsonValueKind.Object
             && json.TryGetProperty(propertyName, out var property)
             && property.TryGetInt32(out value);
+    }
+
+    private static bool TryReadInt64(JsonElement json, string propertyName, out long value)
+    {
+        value = 0;
+        return json.ValueKind == JsonValueKind.Object
+            && json.TryGetProperty(propertyName, out var property)
+            && property.TryGetInt64(out value);
     }
 
     private static AutomationConfigurationParseResult Parsed(
