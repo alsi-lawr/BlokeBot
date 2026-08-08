@@ -114,6 +114,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<AutomationFlowEdge> AutomationFlowEdges => Set<AutomationFlowEdge>();
     public DbSet<AutomationFlowRun> AutomationFlowRuns => Set<AutomationFlowRun>();
     public DbSet<AutomationNodeRun> AutomationNodeRuns => Set<AutomationNodeRun>();
+    public DbSet<AutomationEventReceipt> AutomationEventReceipts => Set<AutomationEventReceipt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

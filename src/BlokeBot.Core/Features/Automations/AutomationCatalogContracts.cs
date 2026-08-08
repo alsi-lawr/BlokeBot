@@ -107,6 +107,8 @@ public abstract record AutomationConfigurationFieldType
     public sealed record Duration(TimeSpan Minimum, TimeSpan? Maximum)
         : AutomationConfigurationFieldType;
 
+    public sealed record Number(long Minimum, long? Maximum) : AutomationConfigurationFieldType;
+
     public sealed record Reference(AutomationReferenceKind ReferenceKind)
         : AutomationConfigurationFieldType;
 
@@ -179,6 +181,27 @@ public sealed record AutomationValidationResult(ImmutableArray<AutomationValidat
 public abstract record AutomationConfiguration;
 
 public sealed record CustomCommandSourceConfiguration(AutomationCustomCommandId CommandId)
+    : AutomationConfiguration;
+
+public sealed record StreamOnlineSourceConfiguration : AutomationConfiguration;
+
+public sealed record StreamOfflineSourceConfiguration : AutomationConfiguration;
+
+public sealed record FollowSourceConfiguration : AutomationConfiguration;
+
+public sealed record SubscriptionSourceConfiguration : AutomationConfiguration;
+
+public sealed record SubscriptionGiftSourceConfiguration(int MinimumGiftCount)
+    : AutomationConfiguration;
+
+public sealed record CheerSourceConfiguration(int MinimumBits) : AutomationConfiguration;
+
+public sealed record IncomingRaidSourceConfiguration(int MinimumViewerCount)
+    : AutomationConfiguration;
+
+public sealed record HypeTrainSourceConfiguration : AutomationConfiguration;
+
+public sealed record ChatNotificationSourceConfiguration(string NoticeType)
     : AutomationConfiguration;
 
 public sealed record SendChatActionConfiguration(string Message) : AutomationConfiguration;

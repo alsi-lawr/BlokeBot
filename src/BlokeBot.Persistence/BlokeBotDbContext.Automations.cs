@@ -73,6 +73,24 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        _ = modelBuilder.Entity<AutomationEventReceipt>(static b =>
+        {
+            _ = b.ToTable("automation_event_receipts");
+            _ = b.HasKey(static x => new
+            {
+                x.HostId,
+                x.SourceDefinitionId,
+                x.ProviderMessageId,
+            });
+            _ = b.Property(static x => x.SourceDefinitionId).HasMaxLength(96);
+            _ = b.Property(static x => x.ProviderMessageId).HasMaxLength(128);
+            _ = b.HasIndex(static x => x.ExpiresAtUtc);
+            _ = b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(static x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         _ = modelBuilder.Entity<AutomationNodeRun>(static b =>
         {
             _ = b.ToTable("automation_node_runs");

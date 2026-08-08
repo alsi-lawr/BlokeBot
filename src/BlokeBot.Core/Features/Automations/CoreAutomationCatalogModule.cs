@@ -13,6 +13,29 @@ public static class AutomationDefinitionIds
     public static AutomationDefinitionId ConditionControl { get; } = new("condition");
 
     public static AutomationDefinitionId DelayControl { get; } = new("delay");
+
+    public static AutomationDefinitionId StreamOnlineSource { get; } = new("stream-online");
+
+    public static AutomationDefinitionId StreamOfflineSource { get; } = new("stream-offline");
+
+    public static AutomationDefinitionId FollowSource { get; } = new("follow");
+
+    public static AutomationDefinitionId SubscriptionSource { get; } = new("subscription");
+
+    public static AutomationDefinitionId SubscriptionGiftSource { get; } = new("subscription-gift");
+
+    public static AutomationDefinitionId CheerSource { get; } = new("cheer");
+
+    public static AutomationDefinitionId IncomingRaidSource { get; } = new("incoming-raid");
+
+    public static AutomationDefinitionId HypeTrainBeginSource { get; } = new("hype-train-begin");
+
+    public static AutomationDefinitionId HypeTrainProgressSource { get; } =
+        new("hype-train-progress");
+
+    public static AutomationDefinitionId HypeTrainEndSource { get; } = new("hype-train-end");
+
+    public static AutomationDefinitionId ChatNotificationSource { get; } = new("chat-notification");
 }
 
 internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule

@@ -19,6 +19,24 @@ internal abstract record EventSubNotification
 
     internal sealed record Prediction(EventSubPredictionEvent Event) : EventSubNotification;
 
+    internal sealed record StreamOnline(EventSubStreamOnlineEvent Event) : EventSubNotification;
+
+    internal sealed record StreamOffline(EventSubStreamOfflineEvent Event) : EventSubNotification;
+
+    internal sealed record Follow(EventSubFollowEvent Event) : EventSubNotification;
+
+    internal sealed record Subscription(EventSubSubscriptionEvent Event) : EventSubNotification;
+
+    internal sealed record SubscriptionGift(EventSubSubscriptionGiftEvent Event)
+        : EventSubNotification;
+
+    internal sealed record Cheer(EventSubCheerEvent Event) : EventSubNotification;
+
+    internal sealed record HypeTrain(EventSubHypeTrainEvent Event) : EventSubNotification;
+
+    internal sealed record ChatNotification(EventSubChatNotificationEvent Event)
+        : EventSubNotification;
+
     internal sealed record Unknown : EventSubNotification;
 
     internal static EventSubNotification Parse(
@@ -89,9 +107,77 @@ internal abstract record EventSubNotification
                 payload.Deserialize<EventSubRewardRedemptionWireEvent>(options) is { } redemption
                     ? new RewardRedemption(redemption.ToDomain(envelope.Metadata.MessageId))
                     : new Unknown(),
+            "stream.online" => payload.Deserialize<EventSubStreamOnlineWireEvent>(options)
+                is { } streamOnline
+                ? Normalized(
+                    streamOnline.ToDomain(envelope.Metadata),
+                    static value => new StreamOnline(value)
+                )
+                : new Unknown(),
+            "stream.offline" => payload.Deserialize<EventSubStreamOfflineWireEvent>(options)
+                is { } streamOffline
+                ? Normalized(
+                    streamOffline.ToDomain(envelope.Metadata),
+                    static value => new StreamOffline(value)
+                )
+                : new Unknown(),
+            "channel.follow" => payload.Deserialize<EventSubFollowWireEvent>(options) is { } follow
+                ? Normalized(follow.ToDomain(envelope.Metadata), static value => new Follow(value))
+                : new Unknown(),
+            "channel.subscribe" => payload.Deserialize<EventSubSubscriptionWireEvent>(options)
+                is { } subscriber
+                ? Normalized(
+                    subscriber.ToDomain(envelope.Metadata),
+                    static value => new Subscription(value)
+                )
+                : new Unknown(),
+            "channel.subscription.gift" => payload.Deserialize<EventSubSubscriptionGiftWireEvent>(
+                options
+            )
+                is { } gift
+                ? Normalized(
+                    gift.ToDomain(envelope.Metadata),
+                    static value => new SubscriptionGift(value)
+                )
+                : new Unknown(),
+            "channel.cheer" => payload.Deserialize<EventSubCheerWireEvent>(options) is { } cheer
+                ? Normalized(cheer.ToDomain(envelope.Metadata), static value => new Cheer(value))
+                : new Unknown(),
+            "channel.hype_train.begin"
+            or "channel.hype_train.progress"
+            or "channel.hype_train.end" => payload.Deserialize<EventSubHypeTrainWireEvent>(options)
+                is { } hypeTrain
+                ? Normalized(
+                    hypeTrain.ToDomain(HypeTrainStage(subscriptionType), envelope.Metadata),
+                    static value => new HypeTrain(value)
+                )
+                : new Unknown(),
+            "channel.chat.notification" => payload.Deserialize<EventSubChatNotificationWireEvent>(
+                options
+            )
+                is { } notification
+                ? Normalized(
+                    notification.ToDomain(envelope.Metadata),
+                    static value => new ChatNotification(value)
+                )
+                : new Unknown(),
             _ => new Unknown(),
         };
     }
+
+    private static EventSubNotification Normalized<TEvent>(
+        TEvent? normalized,
+        Func<TEvent, EventSubNotification> create
+    )
+        where TEvent : class => normalized is null ? new Unknown() : create(normalized);
+
+    private static EventSubHypeTrainStage HypeTrainStage(string subscriptionType) =>
+        subscriptionType switch
+        {
+            "channel.hype_train.begin" => EventSubHypeTrainStage.Begin,
+            "channel.hype_train.progress" => EventSubHypeTrainStage.Progress,
+            _ => EventSubHypeTrainStage.End,
+        };
 
     private static EventSubNotification ParseIncomingRaid(
         JsonElement payload,

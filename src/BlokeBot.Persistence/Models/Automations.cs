@@ -76,6 +76,20 @@ public sealed class AutomationFlowRun
     public List<AutomationNodeRun> NodeRuns { get; set; } = [];
 }
 
+/// <summary>
+/// A short-lived Twitch EventSub delivery receipt. A row has deduplication authority for exactly
+/// ten minutes from <see cref="ClaimedAtUtc"/>; at <see cref="ExpiresAtUtc"/> it is dead and only
+/// awaits physical cleanup. Nothing beyond this bounded window is retained.
+/// </summary>
+public sealed class AutomationEventReceipt
+{
+    public int HostId { get; set; }
+    public string SourceDefinitionId { get; set; } = string.Empty;
+    public string ProviderMessageId { get; set; } = string.Empty;
+    public DateTime ClaimedAtUtc { get; set; }
+    public DateTime ExpiresAtUtc { get; set; }
+}
+
 public sealed class AutomationNodeRun
 {
     public long Id { get; set; }

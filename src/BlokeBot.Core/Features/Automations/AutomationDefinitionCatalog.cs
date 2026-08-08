@@ -209,6 +209,8 @@ internal sealed class AutomationDefinitionCatalog
                 AutomationConfigurationFieldType.Duration duration => duration.Minimum
                     > TimeSpan.Zero
                     && (duration.Maximum is null || duration.Maximum >= duration.Minimum),
+                AutomationConfigurationFieldType.Number number => number.Maximum is null
+                    || number.Maximum >= number.Minimum,
                 AutomationConfigurationFieldType.Reference reference => Enum.IsDefined(
                     reference.ReferenceKind
                 ),

@@ -38,6 +38,9 @@ public sealed class HostBroadcasterAuthorizationService(
         "channel:manage:redemptions",
         "channel:read:predictions",
         "channel:manage:predictions",
+        "channel:read:subscriptions",
+        "bits:read",
+        "channel:read:hype_train",
     ];
 
     public async Task<HostBroadcasterAuthorizationOutcome> AuthorizeAsync(
