@@ -2,7 +2,16 @@ using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Components.Studio;
 
-public sealed record StudioSegmentedOption<TValue>(TValue Value, string Label, string? Id = null);
+/// <summary>
+/// One choice in a <see cref="StudioSegmentedPill{TValue}"/>. <paramref name="Disabled"/> withdraws
+/// this choice alone, for a value whose dependency is unmet while its siblings stay selectable.
+/// </summary>
+public sealed record StudioSegmentedOption<TValue>(
+    TValue Value,
+    string Label,
+    string? Id = null,
+    bool Disabled = false
+);
 
 /// <summary>
 /// The rounded pill segmented control: a small set of mutually exclusive choices pressed in place.
@@ -34,4 +43,6 @@ public partial class StudioSegmentedPill<TValue>
 
     private bool IsSelected(StudioSegmentedOption<TValue> option) =>
         EqualityComparer<TValue?>.Default.Equals(option.Value, Value);
+
+    private bool IsDisabled(StudioSegmentedOption<TValue> option) => Disabled || option.Disabled;
 }

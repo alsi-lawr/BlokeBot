@@ -88,73 +88,101 @@
                     <h2 class="text-lg font-semibold text-slate-950">Viewer points</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
                 </div>
-                <div class="grid gap-4 p-5 md:grid-cols-2">
-                    <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
-                    <div class="flex items-end">
+                <div class="border-b border-slate-200 p-5">
+                    <div class="studio-stepline">
+                        <input id="points-dashboard-lookup-login"
+                               class="input min-w-0 flex-1"
+                               placeholder="username"
+                               aria-label="Find viewer"
+                               value="@_lookupLogin"
+                               @oninput="args => _lookupLogin = args.Value?.ToString() ?? string.Empty" />
                         <button class="btn-secondary" @onclick="LookupAsync">Search</button>
                     </div>
                     @if (_lookupResult is not null)
                     {
-                        <div class="surface-muted rounded-lg p-4 md:col-span-2">
-                            <p class="text-sm font-bold text-slate-950">@_lookupResult.Login</p>
-                            <p class="mt-1 text-sm text-muted-foreground">@_lookupResult.Balance.ToDisplayString() points</p>
+                        <div class="surface-muted mt-3 rounded-lg p-4">
+                            <span class="text-sm font-bold text-slate-950">@_lookupResult.Login</span>
+                            <span class="text-sm text-muted-foreground"> · @_lookupResult.Balance.ToDisplayString() points</span>
                         </div>
                     }
                 </div>
-                <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
-                    <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Move points</h3>
-                        <Field Id="points-dashboard-give-from" Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
-                        <Field Id="points-dashboard-give-to" Label="To viewer" @bind-Value="_giveTo" Placeholder="to username" />
-                        <Field Id="points-dashboard-give-amount" Label="Amount" @bind-Value="_giveAmount" Placeholder="100, 50%, all" />
-                        <button class="btn-secondary" @onclick="GiveAsync">Move points</button>
+                <div class="space-y-4 p-5">
+                    <div class="studio-stepline">
+                        <span class="label">Adjust points</span>
+                        <StudioSegmentedPill TValue="PointsAdjustment"
+                                             AriaLabel="Adjust points"
+                                             Options="_adjustmentOptions"
+                                             Value="_adjustment"
+                                             ValueChanged="@(choice => _adjustment = choice)" />
                     </div>
-                    <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Add points</h3>
-                        <Field Id="points-dashboard-add-login" Label="Viewer" @bind-Value="_addLogin" Placeholder="username" />
-                        <Field Id="points-dashboard-add-amount" Label="Amount" @bind-Value="_addAmount" Placeholder="100" />
-                        <button class="btn-secondary" @onclick="AddAsync">Add points</button>
-                    </div>
-                    <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Take away points</h3>
-                        <Field Id="points-dashboard-remove-login" Label="Viewer" @bind-Value="_removeLogin" Placeholder="username" />
-                        <Field Id="points-dashboard-remove-amount" Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
-                        <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
-                    </div>
+                    @if (_adjustment is PointsAdjustment.Move)
+                    {
+                        <div class="space-y-3" data-adjustment="move">
+                            <Field Id="points-dashboard-give-from" Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
+                            <Field Id="points-dashboard-give-to" Label="To viewer" @bind-Value="_giveTo" Placeholder="to username" />
+                            <Field Id="points-dashboard-give-amount" Label="Amount" @bind-Value="_giveAmount" Placeholder="100, 50%, all" />
+                            <p class="text-xs text-muted-foreground">Numbers, a percentage of their balance, or "all".</p>
+                            <button class="btn-secondary" @onclick="GiveAsync">Move points</button>
+                        </div>
+                    }
+                    else if (_adjustment is PointsAdjustment.Add)
+                    {
+                        <div class="space-y-3" data-adjustment="add">
+                            <Field Id="points-dashboard-add-login" Label="Viewer" @bind-Value="_addLogin" Placeholder="username" />
+                            <Field Id="points-dashboard-add-amount" Label="Amount" @bind-Value="_addAmount" Placeholder="100" />
+                            <button class="btn-secondary" @onclick="AddAsync">Add points</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-3" data-adjustment="take-away">
+                            <Field Id="points-dashboard-remove-login" Label="Viewer" @bind-Value="_removeLogin" Placeholder="username" />
+                            <Field Id="points-dashboard-remove-amount" Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
+                            <p class="text-xs text-muted-foreground">Numbers, a percentage of their balance, or "all".</p>
+                            <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
+                        </div>
+                    }
                 </div>
             </section>
         </div>
 
         <section class="card">
-            <div class="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">@_giveawaySummary</p>
-                </div>
+            <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
+                <span class="@_giveawayPillClass">
+                    <span class="@_giveawayDotClass"></span>
+                    <span class="status-pill__label">@_giveawayStateText</span>
+                </span>
+                @if (_giveawaySummary is { Length: > 0 } summary)
+                {
+                    <p class="text-sm text-muted-foreground">@summary</p>
+                }
+                <span class="flex-1"></span>
                 <div class="flex flex-wrap gap-2">
                     <button class="btn-primary" @onclick="StartGiveawayAsync">Start</button>
                     <button class="btn-secondary" disabled="@(_state.ActiveGiveaway is null)" @onclick="EndGiveawayAsync">End</button>
                     <button class="btn-secondary" disabled="@(_state.ActiveGiveaway is null)" @onclick="CancelGiveawayAsync">Cancel</button>
                 </div>
             </div>
-            <div class="grid gap-5 p-5 lg:grid-cols-2">
-                <div>
-                    <h3 class="text-sm font-bold text-slate-950">People who joined</h3>
-                    <div class="scroll-panel scroll-panel--tag-cloud mt-3 flex flex-wrap gap-2 pr-2">
+            <div class="studio-grid p-5">
+                <div class="studio-span-6">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">People who joined</h3>
+                    <div class="studio-chips scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
                         @foreach (var entrant in _state.ActiveGiveaway?.Entrants ?? [])
                         {
-                            <span @key="entrant" class="motion-list__item surface-row rounded-full px-2.5 py-1 text-xs font-semibold text-slate-700">@entrant</span>
+                            <span @key="entrant" class="studio-chip">@entrant</span>
                         }
                     </div>
                 </div>
-                <div>
-                    <h3 class="text-sm font-bold text-slate-950">Winners</h3>
-                    <div class="scroll-panel scroll-panel--tag-cloud mt-3 flex flex-wrap gap-2 pr-2">
+                <div class="studio-span-6">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">Winners</h3>
+                    <div class="studio-chips scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
                         @foreach (var winner in _state.ActiveGiveaway?.Winners ?? [])
                         {
-                            <span @key="winner" class="motion-list__item rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">@winner.Login: @winner.Payout.ToDisplayString()</span>
+                            <span @key="winner" class="studio-chip border-transparent bg-emerald-50 text-emerald-700">@winner.Login · @winner.Payout.ToDisplayString()</span>
                         }
                     </div>
+                    <p class="mt-2 text-xs text-muted-foreground">Winners appear here when the giveaway ends.</p>
                 </div>
             </div>
         </section>

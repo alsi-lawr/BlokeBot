@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
@@ -35,6 +36,17 @@ public partial class PointsEligibilitySelector
 
     private bool _followerEligibilityAvailable => _status?.IsModerator == true;
 
+    private IReadOnlyList<StudioSegmentedOption<PointsEligibilityMode>> _options =>
+        [
+            new(PointsEligibilityMode.Everyone, "Everyone"),
+            new(PointsEligibilityMode.Subscribers, "Subscribers"),
+            new(
+                PointsEligibilityMode.Followers,
+                "Followers",
+                Disabled: !_followerEligibilityAvailable
+            ),
+        ];
+
     private string _followerEligibilityTitle =>
         IsBackgroundLoading switch
         {
@@ -51,19 +63,8 @@ public partial class PointsEligibilitySelector
             },
         };
 
-    private async Task OnEligibilityChangedAsync(ChangeEventArgs args)
+    private async Task OnEligibilityChangedAsync(PointsEligibilityMode mode)
     {
-        if (
-            !Enum.TryParse<PointsEligibilityMode>(
-                args.Value?.ToString(),
-                ignoreCase: true,
-                out var mode
-            )
-        )
-        {
-            return;
-        }
-
         if (mode == PointsEligibilityMode.Followers && !_followerEligibilityAvailable)
         {
             return;

@@ -8,6 +8,8 @@
            class="studio-stepper__value"
            inputmode="numeric"
            aria-label="@AriaLabel"
+           aria-invalid="@(Invalid ? "true" : "false")"
+           aria-describedby="@(Invalid ? InvalidDescriptionId : null)"
            value="@Value"
            @oninput="OnInput" />
     @if (Unit is { Length: > 0 } unit)

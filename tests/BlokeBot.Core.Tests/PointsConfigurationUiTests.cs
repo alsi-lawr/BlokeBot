@@ -29,6 +29,7 @@ public sealed class PointsConfigurationUiTests
         page.Find("#duration").GetAttribute("value").ShouldBe("0");
         page.Find("#winnerCount").GetAttribute("value").ShouldBe("0");
         page.Find("#cooldown").GetAttribute("value").ShouldBe("299");
+        page.Find("[data-stage='gambling']").ClassList.ShouldNotContain("studio-stage--open");
 
         page.FindAll("button")
             .Single(button => button.TextContent.Trim() == "Save changes")
@@ -37,6 +38,7 @@ public sealed class PointsConfigurationUiTests
         page.WaitForAssertion(() =>
             page.Find("#gamblingCooldown").GetAttribute("aria-invalid").ShouldBe("true")
         );
+        page.Find("[data-stage='gambling']").ClassList.ShouldContain("studio-stage--open");
         context.JSInterop.Invocations.ShouldContain(invocation =>
             invocation.Identifier == "focusElement"
             && invocation.Arguments.OfType<string>().SingleOrDefault() == "gamblingCooldown"
@@ -83,11 +85,11 @@ public sealed class PointsConfigurationUiTests
             persisted.GiveawayCooldownSeconds.ShouldBe(299);
         }
 
-        page.Find("#gamblingCooldown").Change("0");
-        page.Find("#duration").Change("1");
-        page.Find("#winnerCount").Change("1");
+        page.Find("#gamblingCooldown").Input("0");
+        page.Find("#duration").Input("1");
+        page.Find("#winnerCount").Input("1");
         page.Find("#cooldown")
-            .Change(
+            .Input(
                 PointsConfigurationValidator.MinimumGiveawayCooldownSeconds.ToString(
                     CultureInfo.InvariantCulture
                 )

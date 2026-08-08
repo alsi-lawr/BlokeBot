@@ -37,6 +37,19 @@ public partial class StudioStepper
     [Parameter]
     public string? Unit { get; set; }
 
+    /// <summary>
+    /// Marks the typed value as rejected by the surface's own validator. Stepping never sets this,
+    /// because stepping cannot leave the allowed range.
+    /// </summary>
+    [Parameter]
+    public bool Invalid { get; set; }
+
+    /// <summary>
+    /// Points an invalid value at the message saying why it was rejected.
+    /// </summary>
+    [Parameter]
+    public string? InvalidDescriptionId { get; set; }
+
     [Parameter]
     public string DecrementLabel { get; set; } = "Less";
 

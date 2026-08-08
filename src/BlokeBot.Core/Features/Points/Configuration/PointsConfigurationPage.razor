@@ -1,7 +1,6 @@
 @page "/points/settings"
 @using BlokeBot.Eventing
 @using BlokeBot.Core.Features.HostedChannels
-@using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
@@ -38,149 +37,261 @@
     }
     else
     {
-        var gamblingCooldownError = _validationErrors
-            .OfType<PointsConfigurationValidationError.NegativeGamblingCooldown>()
-            .FirstOrDefault();
-        var giveawayDurationError = _validationErrors
-            .OfType<PointsConfigurationValidationError.GiveawayDurationBelowMinimum>()
-            .FirstOrDefault();
-        var giveawayWinnerCountError = _validationErrors
-            .OfType<PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum>()
-            .FirstOrDefault();
-        var giveawayCooldownError = _validationErrors
-            .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
-            .FirstOrDefault();
-
-        <div class="settings-disclosure-stack" data-card-owner="points-settings-disclosure-cards settings-disclosure-cards">
-        <CollapsibleSection Title="General"
-                            Description="What points are called and how gambling works."
-                            InitiallyOpen="true"
-                            OpenRequest="@_generalFocusRequest"
-                            FocusElementId="@_validationFocusId"
-                            FocusRequest="@_generalFocusRequest">
-            <div class="grid gap-4 p-4 md:grid-cols-3">
-                <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
-                <div class="space-y-2">
-                    <label class="label" for="winRate">Chance of winning (%)</label>
-                    <input id="winRate" class="input" type="number" min="0" max="100" @bind="_config.GamblingWinRatePercent" />
+        <div class="settings-disclosure-stack">
+            <StudioStage Key="point-name"
+                         Number="1"
+                         Title="What points are called"
+                         Summary="@LabelSummary()"
+                         Open="@IsStageOpen(PointsStage.Label)"
+                         OpenChanged="@(open => SetStage(PointsStage.Label, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-6">
+                        <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
+                        <p class="mt-1 text-xs text-muted-foreground">Used in every bot message via {label}. Blank falls back to "points".</p>
+                    </div>
+                    <div class="studio-span-12">
+                        <StudioChatPreview Lines="BalancePreviewLines()" />
+                    </div>
                 </div>
-                <div class="space-y-2">
-                    <label class="label" for="gamblingCooldown">Wait between gambles (seconds)</label>
-                    <input id="gamblingCooldown"
-                           class="input"
-                           type="number"
-                           min="0"
-                           aria-invalid="@(gamblingCooldownError is null ? "false" : "true")"
-                           aria-describedby="@(gamblingCooldownError is null ? null : "gamblingCooldown-error")"
-                           @bind="_config.GamblingCooldownSeconds" />
-                    @if (gamblingCooldownError is not null)
+            </StudioStage>
+
+            <StudioStage Key="gambling"
+                         Number="2"
+                         Title="Gambling"
+                         Summary="@GamblingSummary()"
+                         Open="@IsStageOpen(PointsStage.Gambling)"
+                         FocusElementId="@_validationFocusId"
+                         FocusRequest="@_gamblingFocusRequest"
+                         OpenChanged="@(open => SetStage(PointsStage.Gambling, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="winRate">Chance of winning</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="winRate"
+                                           AriaLabel="Chance of winning"
+                                           Unit="%"
+                                           Step="5"
+                                           Minimum="0"
+                                           Maximum="100"
+                                           Value="@Whole(_config.GamblingWinRatePercent)"
+                                           ValueChanged="@(value => SetWinRate(value))" />
+                        </div>
+                        <p class="text-xs text-muted-foreground">0–100%. A win pays out the wagered amount; a loss takes it.</p>
+                    </div>
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="gamblingCooldown">Wait between gambles</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="gamblingCooldown"
+                                           AriaLabel="Wait between gambles in seconds"
+                                           Unit="seconds"
+                                           Step="15"
+                                           Minimum="0"
+                                           Invalid="@(_gamblingCooldownError is not null)"
+                                           InvalidDescriptionId="gamblingCooldown-error"
+                                           Value="@Whole(_config.GamblingCooldownSeconds)"
+                                           ValueChanged="@(value => SetGamblingCooldown(value))" />
+                            <span class="text-xs text-muted-foreground">@GamblingCooldownHint()</span>
+                        </div>
+                        @if (_gamblingCooldownError is not null)
+                        {
+                            <p id="gamblingCooldown-error" class="text-sm font-semibold text-red-700">@_gamblingCooldownError.Message</p>
+                        }
+                    </div>
+                    <div class="studio-span-12">
+                        <StudioChatPreview Lines="GamblePreviewLines()" />
+                    </div>
+                </div>
+            </StudioStage>
+
+            <StudioStage Key="giveaways"
+                         Number="3"
+                         Title="Giveaways"
+                         Summary="@GiveawaysSummary()"
+                         Open="@IsStageOpen(PointsStage.Giveaways)"
+                         FocusElementId="@_validationFocusId"
+                         FocusRequest="@_giveawaysFocusRequest"
+                         OpenChanged="@(open => SetStage(PointsStage.Giveaways, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="duration">Time to enter</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="duration"
+                                           AriaLabel="Time to enter in seconds"
+                                           Unit="seconds"
+                                           Step="30"
+                                           Minimum="1"
+                                           Invalid="@(_giveawayDurationError is not null)"
+                                           InvalidDescriptionId="duration-error"
+                                           Value="@Whole(_config.GiveawayDurationSeconds)"
+                                           ValueChanged="@(value => SetGiveawayDuration(value))" />
+                            <span class="text-xs text-muted-foreground">= @DurationProse.Format(_config.GiveawayDurationSeconds)</span>
+                        </div>
+                        @if (_giveawayDurationError is not null)
+                        {
+                            <p id="duration-error" class="text-sm font-semibold text-red-700">@_giveawayDurationError.Message</p>
+                        }
+                    </div>
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="winnerCount">Number of winners</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="winnerCount"
+                                           AriaLabel="Number of winners"
+                                           Unit="@(_config.GiveawayWinnerCount == 1 ? "winner" : "winners")"
+                                           Step="1"
+                                           Minimum="1"
+                                           Invalid="@(_giveawayWinnerCountError is not null)"
+                                           InvalidDescriptionId="winnerCount-error"
+                                           Value="@Whole(_config.GiveawayWinnerCount)"
+                                           ValueChanged="@(value => SetGiveawayWinnerCount(value))" />
+                        </div>
+                        @if (_giveawayWinnerCountError is not null)
+                        {
+                            <p id="winnerCount-error" class="text-sm font-semibold text-red-700">@_giveawayWinnerCountError.Message</p>
+                        }
+                    </div>
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="points-giveaway-minimum-payout">Prize range</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="points-giveaway-minimum-payout"
+                                           AriaLabel="Smallest prize"
+                                           DecrementLabel="Smaller minimum"
+                                           IncrementLabel="Larger minimum"
+                                           Step="10"
+                                           Minimum="0"
+                                           Maximum="@Bound(_config.GiveawayMaximumPayout)"
+                                           @bind-Value="_config.GiveawayMinimumPayout" />
+                            <span class="text-sm font-bold text-muted-foreground" aria-hidden="true">–</span>
+                            <StudioStepper Id="points-giveaway-maximum-payout"
+                                           AriaLabel="Largest prize"
+                                           DecrementLabel="Smaller maximum"
+                                           IncrementLabel="Larger maximum"
+                                           Unit="@PointLabel()"
+                                           Step="10"
+                                           Minimum="@Bound(_config.GiveawayMinimumPayout)"
+                                           Maximum="@PointAmount.MaximumValue"
+                                           @bind-Value="_config.GiveawayMaximumPayout" />
+                        </div>
+                        <p class="text-xs text-muted-foreground">Each winner gets a random prize in this range. Prizes step by 10; type any whole amount up to 10^100.</p>
+                    </div>
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="cooldown">Wait between giveaways</label>
+                        <div class="studio-stepline">
+                            <StudioStepper Id="cooldown"
+                                           AriaLabel="Wait between giveaways in seconds"
+                                           Unit="seconds"
+                                           Step="60"
+                                           Minimum="@PointsConfigurationValidator.MinimumGiveawayCooldownSeconds"
+                                           Invalid="@(_giveawayCooldownError is not null)"
+                                           InvalidDescriptionId="cooldown-error"
+                                           Value="@Whole(_config.GiveawayCooldownSeconds)"
+                                           ValueChanged="@(value => SetGiveawayCooldown(value))" />
+                            <span class="text-xs text-muted-foreground">minimum @DurationProse.Format(PointsConfigurationValidator.MinimumGiveawayCooldownSeconds)</span>
+                        </div>
+                        @if (_giveawayCooldownError is not null)
+                        {
+                            <p id="cooldown-error" class="text-sm font-semibold text-red-700">@_giveawayCooldownError.Message</p>
+                        }
+                    </div>
+                    <div class="studio-span-12">
+                        <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="_config.GiveawayEligibility" />
+                    </div>
+                </div>
+            </StudioStage>
+
+            <StudioStage Key="chat-commands"
+                         Number="4"
+                         Title="Chat commands"
+                         Summary="@CommandsSummary()"
+                         Open="@IsStageOpen(PointsStage.Commands)"
+                         OpenChanged="@(open => SetStage(PointsStage.Commands, open))">
+                <div class="studio-grid">
+                    @foreach (var field in _aliasFields)
                     {
-                        <p id="gamblingCooldown-error" class="text-sm font-semibold text-red-700">@gamblingCooldownError.Message</p>
+                        <div class="studio-span-4 space-y-2" @key="field.Kind">
+                            <label class="label" for="@field.FieldId">@field.Label</label>
+                            <div class="studio-chips">
+                                @foreach (var word in AliasWords(field))
+                                {
+                                    <StudioChip @key="word"
+                                                Label="@($"!{word}")"
+                                                RemoveLabel="@($"Remove !{word} from {field.Label}")"
+                                                RemoveAction="remove-command-word"
+                                                Remove="@(() => RemoveAliasWord(field, word))" />
+                                }
+                                <input id="@field.FieldId"
+                                       class="studio-chip-input"
+                                       placeholder="+ word"
+                                       aria-label="@($"Add a {field.Label} command word")"
+                                       value="@AliasDraft(field.Kind)"
+                                       @oninput="args => SetAliasDraft(field.Kind, args.Value?.ToString() ?? string.Empty)"
+                                       @onkeydown="args => AddAliasWordOnEnter(field, args)"
+                                       @onblur="() => AddAliasWord(field)" />
+                            </div>
+                        </div>
                     }
+                    <p class="studio-span-12 text-xs text-muted-foreground">Each command word can only be used once in this channel. Type a word and press Enter to add it.</p>
                 </div>
-            </div>
-        </CollapsibleSection>
+            </StudioStage>
 
-        <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="true">
-            <div class="grid gap-4 p-4 md:grid-cols-2">
-                <Field Id="points-aliases" Label="Balance" @bind-Value="_config.Aliases.PointsAliases" Placeholder="points" />
-                <Field Id="points-give-aliases" Label="Give" @bind-Value="_config.Aliases.GivePointsAliases" Placeholder="givepoints" />
-                <Field Id="points-add-aliases" Label="Add" @bind-Value="_config.Aliases.AddPointsAliases" Placeholder="addpoints" />
-                <Field Id="points-remove-aliases" Label="Remove" @bind-Value="_config.Aliases.RemovePointsAliases" Placeholder="removepoints" />
-                <Field Id="points-gamble-aliases" Label="Gamble" @bind-Value="_config.Aliases.GambleAliases" Placeholder="gamble" />
-                <Field Id="points-giveaway-aliases" Label="Start giveaway" @bind-Value="_config.Aliases.GiveawayAliases" Placeholder="giveaway" />
-                <Field Id="points-join-giveaway-aliases" Label="Join giveaway" @bind-Value="_config.Aliases.JoinAliases" Placeholder="join" />
-                <Field Id="points-end-giveaway-aliases" Label="End giveaway" @bind-Value="_config.Aliases.EndGiveawayAliases" Placeholder="endgiveaway" />
-                <Field Id="points-cancel-giveaway-aliases" Label="Cancel giveaway" @bind-Value="_config.Aliases.CancelGiveawayAliases" Placeholder="cancelgiveaway" />
-            </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection Title="Giveaways"
-                            Description="Prizes, timing, and who can enter."
-                            InitiallyOpen="true"
-                            OpenRequest="@_giveawaysFocusRequest"
-                            FocusElementId="@_validationFocusId"
-                            FocusRequest="@_giveawaysFocusRequest">
-            <div class="grid gap-4 p-4 md:grid-cols-3">
-                <div class="space-y-2">
-                    <label class="label" for="duration">Time to enter (seconds)</label>
-                    <input id="duration"
-                           class="input"
-                           type="number"
-                           min="1"
-                           aria-invalid="@(giveawayDurationError is null ? "false" : "true")"
-                           aria-describedby="@(giveawayDurationError is null ? null : "duration-error")"
-                           @bind="_config.GiveawayDurationSeconds" />
-                    @if (giveawayDurationError is not null)
-                    {
-                        <p id="duration-error" class="text-sm font-semibold text-red-700">@giveawayDurationError.Message</p>
-                    }
-                </div>
-                <Field Id="points-giveaway-minimum-payout" Label="Smallest prize" @bind-Value="_config.GiveawayMinimumPayout" Placeholder="10" />
-                <Field Id="points-giveaway-maximum-payout" Label="Largest prize" @bind-Value="_config.GiveawayMaximumPayout" Placeholder="100" />
-                <div class="space-y-2">
-                    <label class="label" for="winnerCount">Number of winners</label>
-                    <input id="winnerCount"
-                           class="input"
-                           type="number"
-                           min="1"
-                           aria-invalid="@(giveawayWinnerCountError is null ? "false" : "true")"
-                           aria-describedby="@(giveawayWinnerCountError is null ? null : "winnerCount-error")"
-                           @bind="_config.GiveawayWinnerCount" />
-                    @if (giveawayWinnerCountError is not null)
-                    {
-                        <p id="winnerCount-error" class="text-sm font-semibold text-red-700">@giveawayWinnerCountError.Message</p>
-                    }
-                </div>
-                <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="_config.GiveawayEligibility" />
-                <div class="space-y-2">
-                    <label class="label" for="cooldown">Wait between giveaways (seconds)</label>
-                    <input id="cooldown"
-                           class="input"
-                           type="number"
-                           min="@PointsConfigurationValidator.MinimumGiveawayCooldownSeconds"
-                           aria-invalid="@(giveawayCooldownError is null ? "false" : "true")"
-                           aria-describedby="@(giveawayCooldownError is null ? null : "cooldown-error")"
-                           @bind="_config.GiveawayCooldownSeconds" />
-                    @if (giveawayCooldownError is not null)
-                    {
-                        <p id="cooldown-error" class="text-sm font-semibold text-red-700">@giveawayCooldownError.Message</p>
-                    }
-                </div>
-            </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false">
-            <div class="scroll-panel scroll-panel--settings grid gap-4 p-4 md:grid-cols-2">
-                <TextAreaField Id="points-balance-reply" Label="Balance" @bind-Value="_config.Replies.BalanceReply" />
-                <TextAreaField Id="points-other-balance-reply" Label="Another viewer's balance" @bind-Value="_config.Replies.OtherBalanceReply" />
-                <TextAreaField Id="points-transfer-reply" Label="Points given" @bind-Value="_config.Replies.TransferReply" />
-                <TextAreaField Id="points-add-reply" Label="Moderator adds points" @bind-Value="_config.Replies.AddReply" />
-                <TextAreaField Id="points-remove-reply" Label="Moderator removes points" @bind-Value="_config.Replies.RemoveReply" />
-                <TextAreaField Id="points-invalid-amount-reply" Label="Amount not understood" @bind-Value="_config.Replies.InvalidAmountReply" />
-                <TextAreaField Id="points-insufficient-balance-reply" Label="Not enough points" @bind-Value="_config.Replies.InsufficientBalanceReply" />
-                <TextAreaField Id="points-moderator-only-reply" Label="Only moderators can use this" @bind-Value="_config.Replies.ModeratorOnlyReply" />
-                <TextAreaField Id="points-gambling-win-reply" Label="Gamble win" @bind-Value="_config.Replies.GamblingWinReply" />
-                <TextAreaField Id="points-gambling-loss-reply" Label="Gamble loss" @bind-Value="_config.Replies.GamblingLoseReply" />
-                <TextAreaField Id="points-giveaway-started-reply" Label="Giveaway started" @bind-Value="_config.Replies.GiveawayStartedReply" />
-                <TextAreaField Id="points-giveaway-status-reply" Label="Giveaway status" @bind-Value="_config.Replies.GiveawayUpdateReply" />
-                <TextAreaField Id="points-giveaway-joined-reply" Label="Giveaway joined" @bind-Value="_config.Replies.GiveawayJoinedReply" />
-                <TextAreaField Id="points-giveaway-already-joined-reply" Label="Already joined" @bind-Value="_config.Replies.GiveawayAlreadyJoinedReply" />
-                <TextAreaField Id="points-giveaway-ended-reply" Label="Giveaway ended" @bind-Value="_config.Replies.GiveawayEndedReply" />
-                <TextAreaField Id="points-giveaway-no-entrants-reply" Label="No one joined" @bind-Value="_config.Replies.GiveawayNoEntrantsReply" />
-                <TextAreaField Id="points-giveaway-cancelled-reply" Label="Cancelled" @bind-Value="_config.Replies.GiveawayCancelledReply" />
-                <TextAreaField Id="points-giveaway-active-reply" Label="Giveaway already running" @bind-Value="_config.Replies.GiveawayAlreadyActiveReply" />
-                <TextAreaField Id="points-giveaway-not-running-reply" Label="No giveaway running" @bind-Value="_config.Replies.GiveawayNotActiveReply" />
-                <TextAreaField Id="points-giveaway-cooldown-reply" Label="Giveaway used too recently" @bind-Value="_config.Replies.GiveawayCooldownReply" />
-                <TextAreaField Id="points-stream-offline-reply" Label="Stream is offline" @bind-Value="_config.Replies.StreamOfflineReply" />
-                <TextAreaField Id="points-not-eligible-reply" Label="Viewer cannot enter" @bind-Value="_config.Replies.NotEligibleReply" />
-                <TextAreaField Id="points-follower-unavailable-reply" Label="Follower check unavailable" @bind-Value="_config.Replies.FollowerEligibilityUnavailableReply" />
-            </div>
-        </CollapsibleSection>
-
-        <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
-                                      WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
-                                      Options="_whisperReplyOptions" />
+            <StudioStage Key="bot-replies"
+                         Number="5"
+                         Title="Bot replies"
+                         Summary="@RepliesSummary()"
+                         Open="@IsStageOpen(PointsStage.Replies)"
+                         OpenChanged="@(open => SetStage(PointsStage.Replies, open))">
+                <p class="mb-3 text-xs text-muted-foreground">Every message the bot can send, grouped by what it is about. Open a row to change its wording or, where private delivery is possible, send it as a whisper instead.</p>
+                @if (!_config.WhisperResponsesEnabled)
+                {
+                    <p id="reply-delivery-whisper-recovery" class="mb-3 text-sm font-medium text-muted-foreground">Private replies need a connected custom bot. <a class="font-semibold text-primary underline" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
+                }
+                @foreach (var group in _replyGroups)
+                {
+                    <StudioReplyList @key="group.Label" Label="@group.Label">
+                        @foreach (var field in group.Fields)
+                        {
+                            <StudioReplyRow @key="field.Key"
+                                            Key="@field.Key"
+                                            Label="@field.Label"
+                                            Excerpt="@field.Read(_config.Replies)"
+                                            Customised="@IsCustomised(field)"
+                                            Whispered="@IsWhispered(field)"
+                                            Open="@IsReplyOpen(field.Key)"
+                                            OpenChanged="@(open => SetReplyOpen(field.Key, open))">
+                                <textarea class="input min-h-16 resize-y"
+                                          id="@($"points-{field.Key}-reply")"
+                                          aria-label="@field.Label"
+                                          value="@field.Read(_config.Replies)"
+                                          @oninput="args => field.Write(_config.Replies, args.Value?.ToString() ?? string.Empty)"></textarea>
+                                @if (field.ChatOnlyNote is { Length: > 0 } note)
+                                {
+                                    <p class="text-xs text-muted-foreground">@note</p>
+                                }
+                                else
+                                {
+                                    <div class="studio-stepline">
+                                        <span class="text-xs text-muted-foreground">Delivery</span>
+                                        <StudioSegmentedPill TValue="bool"
+                                                             AriaLabel="@($"{field.Label} delivery")"
+                                                             Options="_deliveryOptions"
+                                                             Value="@IsWhispered(field)"
+                                                             Disabled="@(!_config.WhisperResponsesEnabled)"
+                                                             DisabledDescriptionId="reply-delivery-whisper-recovery"
+                                                             ValueChanged="@(whisper => SetReplyWhispered(field, whisper))" />
+                                    </div>
+                                }
+                                @if (field.Key == "balance")
+                                {
+                                    <StudioChatPreview Lines="BalancePreviewLines()" />
+                                }
+                                else if (field.Key == "giveaway-started")
+                                {
+                                    <StudioChatPreview Lines="GiveawayStartedPreviewLines()" />
+                                }
+                            </StudioReplyRow>
+                        }
+                    </StudioReplyList>
+                }
+            </StudioStage>
         </div>
     }
 </div>

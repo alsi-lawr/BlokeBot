@@ -321,7 +321,7 @@ public partial class GuessingSettings
         }
 
         var duration = _config.Pin.DurationSeconds is { } seconds
-            ? $"Pinned for {DurationProse(seconds)}"
+            ? $"Pinned for {DurationProse.Format(seconds)}"
             : "Pinned until the stream ends";
         return _config.Pin.UnpinWhenRoundStops
             ? $"{duration} · removed when the round stops"
@@ -330,22 +330,8 @@ public partial class GuessingSettings
 
     private string PinDurationHint() =>
         ParsePinDuration(_pinDurationDraft) is { } seconds
-            ? $"= {DurationProse(seconds)} · allowed range 30 s – 30 min"
+            ? $"= {DurationProse.Format(seconds)} · allowed range 30 s – 30 min"
             : "Allowed range 30 s – 30 min";
-
-    private static string DurationProse(int seconds)
-    {
-        var minutes = seconds / 60;
-        var remainder = seconds % 60;
-        return (minutes, remainder) switch
-        {
-            (0, _) => $"{seconds.ToString(CultureInfo.CurrentCulture)} seconds",
-            (_, 0) when minutes == 1 => "1 minute",
-            (_, 0) => $"{minutes.ToString(CultureInfo.CurrentCulture)} minutes",
-            _ =>
-                $"{minutes.ToString(CultureInfo.CurrentCulture)} min {remainder.ToString(CultureInfo.CurrentCulture)} s",
-        };
-    }
 
     private bool IsCustomised(GuessingReplyField field) =>
         _config is not null

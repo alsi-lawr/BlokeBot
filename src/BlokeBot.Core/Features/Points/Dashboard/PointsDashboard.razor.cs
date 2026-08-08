@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -8,6 +10,16 @@ namespace BlokeBot.Core.Features.Points.Dashboard;
 
 public partial class PointsDashboard
 {
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<PointsAdjustment>
+    > _adjustmentOptions =
+    [
+        new(PointsAdjustment.Move, "Move"),
+        new(PointsAdjustment.Add, "Add"),
+        new(PointsAdjustment.TakeAway, "Take away"),
+    ];
+
+    private PointsAdjustment _adjustment = PointsAdjustment.Move;
     private bool _featureEnabled;
     private PointsDashboardState? _state;
     private PointBalanceEntry? _lookupResult;
@@ -20,10 +32,29 @@ public partial class PointsDashboard
     private string _removeLogin = string.Empty;
     private string _removeAmount = string.Empty;
 
+    private enum PointsAdjustment
+    {
+        Move,
+        Add,
+        TakeAway,
+    }
+
     private string _giveawaySummary =>
+        _state?.ActiveGiveaway is not { } giveaway
+            ? string.Empty
+            : $"Runs until {giveaway.EndsAtUtc.ToLocalTime():HH:mm} · {giveaway.Entrants.Length.ToString(CultureInfo.CurrentCulture)} people joined";
+
+    private string _giveawayStateText => _state?.ActiveGiveaway is null ? "not running" : "running";
+
+    private string _giveawayPillClass =>
         _state?.ActiveGiveaway is null
-            ? "No giveaway running."
-            : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Length} people joined.";
+            ? "status-pill surface-muted text-muted-foreground ring-1 ring-slate-200"
+            : "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+
+    private string _giveawayDotClass =>
+        _state?.ActiveGiveaway is null
+            ? "status-pill__dot bg-slate-400"
+            : "status-pill__dot bg-emerald-500";
 
     internal static string LedgerChangeLabel(PointLedgerKind kind) =>
         kind switch
