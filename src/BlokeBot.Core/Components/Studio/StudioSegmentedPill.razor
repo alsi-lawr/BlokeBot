@@ -1,0 +1,13 @@
+@typeparam TValue
+
+<div class="studio-segmented" role="group" aria-label="@AriaLabel">
+    @foreach (var option in Options)
+    {
+        <button @key="option.Value"
+                id="@option.Id"
+                type="button"
+                class="studio-segmented__option"
+                aria-pressed="@(IsSelected(option) ? "true" : "false")"
+                @onclick="() => ValueChanged.InvokeAsync(option.Value)">@option.Label</button>
+    }
+</div>

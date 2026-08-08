@@ -10,7 +10,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class ApplicationCardLayoutTests
 {
     private const int _baselineCardAuthoringSiteCount = 97;
-    private const int _baselineDisclosureAuthoringSiteCount = 41;
+    private const int _baselineDisclosureAuthoringSiteCount = 35;
 
     private static readonly Regex _cardClassToken = new(
         """(?<![-\w])card(?![-\w])""",
@@ -58,7 +58,7 @@ public sealed class ApplicationCardLayoutTests
                 entry.Kind is CardAuthoringKind.Disclosure
                 && entry.Membership is CardMembership.Excluded
             )
-            .ShouldBe(6);
+            .ShouldBe(4);
 
         var concreteOwners = FindConcreteOwners(repositoryRoot);
         classifications

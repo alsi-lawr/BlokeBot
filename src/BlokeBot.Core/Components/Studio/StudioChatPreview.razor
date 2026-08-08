@@ -1,0 +1,21 @@
+<div class="studio-chat" data-chat-preview>
+    <p class="studio-chat__heading">@Heading</p>
+    <div class="studio-chat__log">
+        @foreach (var line in Lines)
+        {
+            <p @key="line"
+               class="studio-chat__line @LineModifier(line)"
+               data-chat-line="@LineKind(line)">
+                @if (line.Badge is { Length: > 0 } badge)
+                {
+                    <span class="studio-chat__badge">@badge</span>
+                }
+                @if (line.Speaker is { Length: > 0 } speaker)
+                {
+                    <span class="studio-chat__name" style="color: @line.SpeakerColour">@speaker</span>
+                }
+                <span class="@(line.Monospace ? "studio-chat__message--mono" : null)">@line.Message</span>
+            </p>
+        }
+    </div>
+</div>

@@ -1,0 +1,19 @@
+<section class="studio-stage @(Open ? "studio-stage--open" : null)" data-stage="@Key">
+    <button type="button"
+            class="studio-stage__header"
+            aria-expanded="@(Open ? "true" : "false")"
+            aria-controls="@_bodyId"
+            @onclick="Toggle">
+        <span class="studio-stage__number" aria-hidden="true">@Number</span>
+        <span class="studio-stage__title">@Title</span>
+        <span class="studio-stage__summary">@Summary</span>
+        <span class="studio-stage__chevron" aria-hidden="true">›</span>
+    </button>
+    <div id="@_bodyId" class="studio-stage__body" inert="@(!Open)">
+        <div class="studio-stage__clip">
+            <div class="studio-stage__content">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+</section>

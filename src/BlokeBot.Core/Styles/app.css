@@ -6,6 +6,7 @@
 @import "./layout/topbar.css";
 @import "./components/page-context.css";
 @import "./components/segmented-controls.css";
+@import "./components/studio.css";
 @import "./features/home-and-feature-cards.css";
 @import "./features/points-dashboard.css";
 @import "./features/responsive-data-cards.css";

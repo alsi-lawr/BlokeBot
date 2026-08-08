@@ -225,8 +225,12 @@ public sealed class SegmentedTabsTests
         navigation.Uri.ShouldEndWith("/guessing");
     }
 
+    /// <summary>
+    /// Custom commands owns the same fragment contract through its studio rail rather than a tab
+    /// strip, so the assertion is that exactly one implementation of fragment ownership exists.
+    /// </summary>
     [Test]
-    public void MajorDashboards_UseTheSharedComponentWithoutDuplicateTabMarkup()
+    public void FragmentOwningPages_ShareOneImplementationWithoutDuplicateTabMarkup()
     {
         var root = RepositoryRoot();
         var guessing = File.ReadAllText(
@@ -253,17 +257,28 @@ public sealed class SegmentedTabsTests
                 "CustomCommandSettingsPage.razor"
             )
         );
+        var customCommandsCode = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src",
+                "BlokeBot.Core",
+                "Features",
+                "CustomCommands",
+                "CustomCommandSettingsPage.razor.cs"
+            )
+        );
 
         guessing.ShouldContain("<SegmentedTabs");
         overlays.ShouldContain("<SegmentedTabs");
-        customCommands.ShouldContain("<SegmentedTabs");
         guessing.ShouldContain("OwnsFragment");
         overlays.ShouldContain("OwnsFragment");
-        customCommands.ShouldContain("OwnsFragment");
         guessing.ShouldNotContain("segmented-motion__indicator");
         overlays.ShouldNotContain("segmented-motion__indicator");
         customCommands.ShouldNotContain("segmented-motion__indicator");
         customCommands.ShouldNotContain("role=\"tablist\"");
+        customCommands.ShouldContain("<StudioRail");
+        customCommandsCode.ShouldContain("DashboardFragmentOwner");
+        customCommandsCode.ShouldNotContain("UriPartial");
     }
 
     [Test]

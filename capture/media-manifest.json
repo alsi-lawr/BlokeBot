@@ -235,7 +235,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; studio rail item current; Viewers will see preview showing the bot reply; main opacity 1"
     },
     {
       "file": "laptop-dark-guessing-leaderboard.png",
@@ -547,7 +547,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; studio rail item current; Viewers will see preview showing the bot reply; main opacity 1"
     },
     {
       "file": "laptop-light-guessing-leaderboard.png",
@@ -859,7 +859,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; studio rail item current; Viewers will see preview showing the bot reply; main opacity 1"
     },
     {
       "file": "phone-dark-guessing-leaderboard.png",
@@ -1171,7 +1171,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; Run automation flow selected; connected-automations explanation visible; no flow picker; action control focused; main opacity 1"
+      "semanticReadiness": "path /custom-commands/settings#commands; Sample Channel; studio rail item current; Viewers will see preview showing the bot reply; main opacity 1"
     },
     {
       "file": "phone-light-guessing-leaderboard.png",

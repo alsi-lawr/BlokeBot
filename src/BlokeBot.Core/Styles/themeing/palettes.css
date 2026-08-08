@@ -16,6 +16,9 @@ html {
     --app-text-strong: #0f172a;
     --app-text-medium: #334155;
     --app-text-muted: #64748b;
+    --app-affirmative: #047857;
+    --app-affirmative-surface: #d1fae5;
+    --app-affirmative-dot: #10b981;
     --app-primary-button-bg: rgb(241 245 249 / 0.92);
     --app-primary-button-border: rgb(203 213 225 / 0.95);
     --app-primary-button-fg: #334155;
@@ -102,6 +105,9 @@ html[data-theme="dark"] {
     --app-text-strong: rgb(232 230 227);
     --app-text-medium: rgb(205 201 196);
     --app-text-muted: rgb(158 152 146);
+    --app-affirmative: #34d399;
+    --app-affirmative-surface: rgb(16 185 129 / 0.18);
+    --app-affirmative-dot: #34d399;
     --app-primary-button-bg: rgb(52 56 58);
     --app-primary-button-border: rgb(82 86 89 / 0.76);
     --app-primary-button-fg: rgb(232 230 227);

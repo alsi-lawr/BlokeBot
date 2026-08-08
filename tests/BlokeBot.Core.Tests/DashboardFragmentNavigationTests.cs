@@ -212,15 +212,8 @@ public sealed class DashboardFragmentNavigationTests
 
         page.WaitForAssertion(() =>
         {
-            page.Find("#custom-command-message-library-tab")
-                .GetAttribute("aria-selected")
-                .ShouldBe("true");
-            page.Find("#custom-command-message-library-panel")
-                .GetAttribute("hidden")
-                .ShouldBeNull();
-            _ = page.Find("#custom-command-commands-panel")
-                .GetAttribute("hidden")
-                .ShouldNotBeNull();
+            page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
+            page.Find("[data-empty-inspector]").TextContent.Trim().ShouldBe("No replies yet.");
         });
     }
 
@@ -239,24 +232,26 @@ public sealed class DashboardFragmentNavigationTests
         {
             navigation.Uri.ShouldEndWith("/custom-commands/settings#commands");
             navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeTrue();
-            page.Find("#custom-command-commands-tab")
-                .GetAttribute("aria-selected")
-                .ShouldBe("true");
+            page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("commands");
         });
 
-        page.Find("#custom-command-message-library-tab").Click();
+        page.Find("button[data-action='add-reply']").Click();
 
         page.WaitForAssertion(() =>
         {
             navigation.Uri.ShouldEndWith("/custom-commands/settings#message-library");
             navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
+            page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
+            _ = page.Find("[data-selected-editor='reply']").ShouldNotBeNull();
         });
 
         navigation.NavigateTo("/custom-commands/settings#commands");
 
         page.WaitForAssertion(() =>
-            page.Find("#custom-command-commands-tab").GetAttribute("aria-selected").ShouldBe("true")
-        );
+        {
+            page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("commands");
+            page.FindAll("[data-selected-editor='reply']").ShouldBeEmpty();
+        });
     }
 
     private static BunitContext CreateOverlayContext(SqliteBlokeBotDbFactory database, int hostId)

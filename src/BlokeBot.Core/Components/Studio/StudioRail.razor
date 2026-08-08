@@ -1,0 +1,52 @@
+<aside class="studio-rail scroll-panel" aria-label="@AriaLabel">
+    <input type="search"
+           class="studio-rail__search"
+           placeholder="@SearchPlaceholder"
+           aria-label="@AriaLabel"
+           @bind="_search"
+           @bind:event="oninput" />
+
+    @foreach (var group in Groups)
+    {
+        var items = Matching(group).ToArray();
+        <div class="studio-rail__group">
+            <p class="studio-rail__group-label">@group.Label</p>
+            @if (group.Add is { } add)
+            {
+                <button type="button"
+                        class="btn-secondary h-7 px-2 text-xs"
+                        data-action="@add.Action"
+                        aria-label="@add.Label"
+                        disabled="@add.Disabled"
+                        @onclick="add.Invoke">+ Add</button>
+            }
+        </div>
+        @if (items.Length == 0)
+        {
+            <p class="studio-rail__empty">@EmptyLabel(group)</p>
+        }
+        @foreach (var item in items)
+        {
+            <button @key="item.Key"
+                    type="button"
+                    class="studio-rail__item"
+                    data-action="@item.Action"
+                    aria-current="@(item.Selected ? "true" : "false")"
+                    aria-controls="@item.ControlsId"
+                    @onclick="item.Select">
+                <span class="studio-rail__dot @(item.On ? "studio-rail__dot--on" : null)" aria-hidden="true"></span>
+                <span id="@item.LabelId"
+                      class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
+                @if (item.Meta is { Length: > 0 } meta)
+                {
+                    <span class="studio-rail__meta">@meta</span>
+                }
+            </button>
+        }
+    }
+
+    @if (Footer is not null)
+    {
+        <div class="studio-rail__footer">@Footer</div>
+    }
+</aside>

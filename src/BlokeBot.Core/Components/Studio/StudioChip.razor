@@ -1,0 +1,38 @@
+@if (Pressed is { } pressed)
+{
+    <button id="@Id"
+            type="button"
+            class="studio-chip studio-chip--pressable"
+            data-selected="@(pressed ? "true" : "false")"
+            aria-pressed="@(pressed ? "true" : "false")"
+            @onclick="Toggle">
+        <span>@Label</span>
+        @if (pressed)
+        {
+            <span class="studio-chip__mark" aria-hidden="true">✓</span>
+            <span class="sr-only">@PressedNote</span>
+        }
+        else
+        {
+            <span class="studio-chip__note">@ReleasedNote</span>
+        }
+    </button>
+}
+else
+{
+    <span id="@Id" class="studio-chip" @attributes="AdditionalAttributes">
+        <span>@Label</span>
+        @if (Note is { Length: > 0 } note)
+        {
+            <span class="studio-chip__note">@note</span>
+        }
+        @if (Remove.HasDelegate)
+        {
+            <button type="button"
+                    class="studio-chip__remove"
+                    data-action="@RemoveAction"
+                    aria-label="@RemoveLabel"
+                    @onclick="Remove">✕</button>
+        }
+    </span>
+}
