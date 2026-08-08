@@ -25,6 +25,12 @@ public sealed record StudioRailItem
 
     public string? Meta { get; init; }
 
+    /// <summary>
+    /// A muted second line under the label, for entries whose state needs prose the one-line
+    /// label-plus-meta form cannot carry.
+    /// </summary>
+    public string? Sub { get; init; }
+
     public bool Monospace { get; init; }
 
     public bool On { get; init; }

@@ -265,7 +265,9 @@ public sealed class GiveawayOverlayTests
         OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("setInterval");
         OverlayBrowserSourceAssets.JavaScript.ShouldContain("animation !== \"winner\"");
 
-        var dashboard = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
+        var dashboard =
+            File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"))
+            + File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.cs"));
         dashboard.ShouldContain("Enum.GetValues<GiveawayOverlaySampleState>()");
         dashboard.ShouldContain("Entrant count");
         dashboard.ShouldContain("Close-time countdown");

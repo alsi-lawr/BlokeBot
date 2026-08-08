@@ -1,9 +1,14 @@
+using System.Globalization;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Overlays;
 
 public partial class OverlayCuesPanel
 {
+    private readonly HashSet<CueStage> _openStages = [CueStage.Content];
+    private readonly HashSet<CueLayerDraft> _openLayers = [];
     private IReadOnlyList<OverlayCueView> _items = [];
     private IReadOnlyList<OverlayMediaAssetView> _assets = [];
     private OverlayCueAdmissionCatalog _catalog = new([], []);
@@ -68,6 +73,8 @@ public partial class OverlayCuesPanel
         _policy = OverlayCueQueuePolicy.Enqueue;
         _layers = [CueLayerDraft.New(CueLayerKind.WebPage)];
         Feedback = string.Empty;
+        _openLayers.Clear();
+        _ = _openLayers.Add(_layers[0]);
     }
 
     private void SelectCue(OverlayCueView cue)
@@ -78,13 +85,16 @@ public partial class OverlayCuesPanel
         _cueEnabled = cue.IsEnabled;
         _policy = cue.QueuePolicy;
         _layers = cue.Configuration.Layers.Select(CueLayerDraft.FromLayer).ToList();
+        _openLayers.Clear();
     }
 
     private void AddLayer(CueLayerKind kind)
     {
         if (_layers.Count < OverlayCueConfiguration.MaximumLayerCount)
         {
-            _layers.Add(CueLayerDraft.New(kind));
+            var layer = CueLayerDraft.New(kind);
+            _layers.Add(layer);
+            _ = _openLayers.Add(layer);
         }
     }
 
@@ -219,6 +229,123 @@ public partial class OverlayCuesPanel
         });
     }
 
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        [
+            new(
+                $"Saved cues · {_items.Count}",
+                [
+                    .. _items.Select(cue => new StudioRailItem
+                    {
+                        Key = cue.Id.ToString("D"),
+                        Label = cue.Name,
+                        Sub = $"{(cue.IsEnabled ? "On" : "Off")} · {PolicyLabel(cue.QueuePolicy)}",
+                        On = cue.IsEnabled,
+                        Selected = _selected?.Id == cue.Id,
+                        Select = EventCallback.Factory.Create(this, () => SelectCue(cue)),
+                    }),
+                ],
+                EmptyMessage: "No saved cues yet."
+            ),
+        ];
+
+    private bool IsStageOpen(CueStage stage) => _openStages.Contains(stage);
+
+    private void SetStage(CueStage stage, bool open) =>
+        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
+
+    private void ToggleLayer(CueLayerDraft layer) =>
+        _ = _openLayers.Add(layer) || _openLayers.Remove(layer);
+
+    private static string LayerBodyId(int index) => $"cue-layer-body-{index}";
+
+    private static string LayerRowClass(bool open) =>
+        open
+            ? "rounded-[14px] border border-[var(--app-focus-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-sm)]"
+            : "rounded-[14px] border border-[var(--app-control-border)] bg-[var(--app-control-bg)]";
+
+    private string HeaderStats() =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{_layers.Count} content {(_layers.Count == 1 ? "layer" : "layers")} · {DurationLabel(_duration)}"
+        );
+
+    private string BasicsSummary() => $"{DurationLabel(_duration)} · {PolicyLabel(_policy)}";
+
+    private string ContentSummary()
+    {
+        var kinds = string.Join(
+            ", ",
+            _layers.Select(layer => KindLabel(layer.Kind).ToLowerInvariant()).Distinct()
+        );
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{_layers.Count} {(_layers.Count == 1 ? "layer" : "layers")} · {kinds}"
+        );
+    }
+
+    private string TestSummary() =>
+        _catalog.Targets.FirstOrDefault(target => target.Id == _target) is { } chosen
+            ? $"Target: {chosen.Name}"
+            : "Choose a Cue player";
+
+    private static string DurationLabel(int milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"{milliseconds / 1000m:0.###} s");
+
+    private static string KindLabel(CueLayerKind kind) =>
+        kind switch
+        {
+            CueLayerKind.UploadedMedia => "Uploaded media",
+            CueLayerKind.OnlineMedia => "Online media",
+            _ => "Web page",
+        };
+
+    private string LayerGlyph(CueLayerDraft layer) =>
+        layer.Kind switch
+        {
+            CueLayerKind.WebPage => "🌐",
+            CueLayerKind.OnlineMedia => layer.MediaKind is OverlayCueMediaKind.Audio ? "🔊" : "🎬",
+            _ => UploadedAsset(layer) is { } asset
+                ? OverlayMediaTypes.Kind(asset.ContentType) switch
+                {
+                    OverlayCueMediaKind.Image => "🖼",
+                    OverlayCueMediaKind.Audio => "🔊",
+                    _ => "🎬",
+                }
+                : "🎬",
+        };
+
+    private string LayerTitle(CueLayerDraft layer) =>
+        layer.Kind switch
+        {
+            CueLayerKind.UploadedMedia => UploadedAsset(layer)?.Name ?? "Choose media",
+            _ => string.IsNullOrWhiteSpace(layer.Address) ? KindLabel(layer.Kind) : layer.Address,
+        };
+
+    private static string LayerSummary(CueLayerDraft layer)
+    {
+        var timing = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{KindLabel(layer.Kind)} · {layer.StartMilliseconds} – {layer.StartMilliseconds + layer.DurationMilliseconds} ms"
+        );
+        return layer.Kind is CueLayerKind.WebPage
+            ? timing
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{timing} · {layer.VolumePercent:0.#}% volume · {FitSummary(layer.Fit)}"
+            );
+    }
+
+    private static string FitSummary(OverlayCueFitMode fit) =>
+        fit switch
+        {
+            OverlayCueFitMode.Cover => "fill and crop",
+            OverlayCueFitMode.Fill => "stretch to fill",
+            _ => "show all",
+        };
+
+    private OverlayMediaAssetView? UploadedAsset(CueLayerDraft layer) =>
+        _assets.FirstOrDefault(asset => asset.Id == layer.AssetId);
+
     private static string PolicyLabel(OverlayCueQueuePolicy policy) =>
         policy switch
         {
@@ -239,6 +366,13 @@ public partial class OverlayCuesPanel
             .Replace("mediaKind", "media type", StringComparison.Ordinal)
             .Replace("zIndex", "stacking order", StringComparison.Ordinal)
             .Replace("rectangle", "position and size", StringComparison.Ordinal);
+
+    private enum CueStage
+    {
+        Basics,
+        Content,
+        Test,
+    }
 
     private enum CueLayerKind
     {

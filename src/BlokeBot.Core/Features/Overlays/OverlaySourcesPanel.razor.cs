@@ -1,6 +1,8 @@
 using System.Globalization;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -8,6 +10,9 @@ namespace BlokeBot.Core.Features.Overlays;
 public partial class OverlaySourcesPanel
 {
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly HashSet<OverlaySourceStage> _openStages = [OverlaySourceStage.PositionLook];
+    private bool _cssFoldOpen;
+    private bool _obsFoldOpen;
     private IReadOnlyList<OverlayInstanceView> _instances = [];
     private OverlayInstanceView? _selected;
     private Guid? _selectedId;
@@ -117,6 +122,187 @@ public partial class OverlaySourcesPanel
     private OverlayEventFeedKind _eventFeedPreviewSample = OverlayEventFeedKind.PointAward;
     private ViewerQueueOverlaySampleState _viewerQueuePreviewSample =
         ViewerQueueOverlaySampleState.Open;
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<OverlayPreviewMode>
+    > _previewModeOptions =
+    [
+        new(OverlayPreviewMode.Live, "Live"),
+        new(OverlayPreviewMode.Representative, "Representative"),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<GuessingOverlaySampleState?>
+    > _guessingSampleOptions =
+    [
+        .. Enum.GetValues<GuessingOverlaySampleState>()
+            .Select(sample => new StudioSegmentedOption<GuessingOverlaySampleState?>(
+                sample,
+                SampleLabel(sample)
+            )),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<GiveawayOverlaySampleState?>
+    > _giveawaySampleOptions =
+    [
+        .. Enum.GetValues<GiveawayOverlaySampleState>()
+            .Where(sample => sample is not GiveawayOverlaySampleState.Idle)
+            .Select(sample => new StudioSegmentedOption<GiveawayOverlaySampleState?>(
+                sample,
+                SampleLabel(sample)
+            )),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<OverlayEventFeedKind?>
+    > _eventFeedSampleOptions =
+    [
+        .. Enum.GetValues<OverlayEventFeedKind>()
+            .Select(sample => new StudioSegmentedOption<OverlayEventFeedKind?>(
+                sample,
+                EventKindLabel(sample)
+            )),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<ViewerQueueOverlaySampleState?>
+    > _viewerQueueSampleOptions =
+    [
+        .. Enum.GetValues<ViewerQueueOverlaySampleState>()
+            .Select(sample => new StudioSegmentedOption<ViewerQueueOverlaySampleState?>(
+                sample,
+                SampleLabel(sample)
+            )),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<OverlayEventFeedPriority>
+    > _priorityOptions =
+    [
+        new(OverlayEventFeedPriority.Normal, "Normal"),
+        new(OverlayEventFeedPriority.High, "High"),
+    ];
+
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        [
+            new(
+                $"Browser Sources · {_instances.Count} saved",
+                [
+                    .. _instances.Select(overlay => new StudioRailItem
+                    {
+                        Key = overlay.Id.ToString("D"),
+                        Label = overlay.Name,
+                        Sub = RailSub(overlay),
+                        On = overlay.IsEnabled,
+                        Selected = !_isCreating && overlay.Id == _selectedId,
+                        Select = EventCallback.Factory.Create(this, () => SelectOverlay(overlay)),
+                    }),
+                ],
+                EmptyMessage: "No saved overlays yet."
+            ),
+        ];
+
+    private string RailSub(OverlayInstanceView overlay) =>
+        $"{TypeLabel(overlay.Type)} · {(overlay.IsEnabled ? "" : "disabled · ")}{(
+            OtherConnectionCount(overlay) > 0 ? "connected" : "not connected"
+        )}";
+
+    private bool IsStageOpen(OverlaySourceStage stage) => _openStages.Contains(stage);
+
+    private void SetStage(OverlaySourceStage stage, bool open) =>
+        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
+
+    private string BasicsSummary()
+    {
+        var name = _draftName.Trim();
+        return name.Length == 0 ? TypeLabel(_draftType) : $"{name} · {TypeLabel(_draftType)}";
+    }
+
+    private string PositionSummary() =>
+        _selected?.Type is OverlayType.Empty or OverlayType.CuePlayer
+            ? "Live preview"
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{_appearanceWidth} × {_appearanceHeight} at {_appearanceX}, {_appearanceY} · {(
+                    string.IsNullOrWhiteSpace(_appearanceCss) ? "no custom CSS" : "custom CSS"
+                )}"
+            );
+
+    private string WhatItShowsSummary() =>
+        _draftType switch
+        {
+            OverlayType.Guessing when !_guessingFeatureEnabled => "Paused — Guessing game is off",
+            OverlayType.Guessing => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{(_draftShowGuessCount ? "Guess count shown" : "Guess count hidden")} · result {_draftResultDurationSeconds} s"
+            ),
+            OverlayType.Giveaway when !_pointsFeatureEnabled => "Paused — Points is off",
+            OverlayType.Giveaway => _draftGiveawayTitle.Trim() is { Length: > 0 } title
+                ? title
+                : "Points giveaway",
+            OverlayType.EventFeed => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{EventFeedKindSummary()} · up to {_eventFeedCapacity} cards"
+            ),
+            OverlayType.ViewerQueue when !_playWithViewersFeatureEnabled =>
+                "Paused — Play with viewers is off",
+            OverlayType.ViewerQueue when _queueOptions.Count == 0 => "Create a queue first",
+            OverlayType.ViewerQueue => _queueOptions
+                .FirstOrDefault(queue => queue.Id == _viewerQueueId)
+                ?.Name
+                ?? "Viewer Queue",
+            OverlayType.CuePlayer => "Receives reusable cue layers",
+            _ => "No visual settings",
+        };
+
+    private string EventFeedKindSummary()
+    {
+        string[] kinds =
+        [
+            .. new[]
+            {
+                (_pointEventEnabled, "Point awards"),
+                (_guessEventEnabled, "guessing winners"),
+                (_giveawayEventEnabled, "giveaway winners"),
+            }
+                .Where(kind => kind.Item1)
+                .Select(kind => kind.Item2),
+        ];
+        return kinds.Length switch
+        {
+            0 => "No event kinds on",
+            3 => "All event kinds on",
+            _ => string.Join(" + ", kinds),
+        };
+    }
+
+    private string DeliverySummary()
+    {
+        if (_selected is null)
+        {
+            return string.Empty;
+        }
+
+        var connections = OtherConnectionCount(_selected) switch
+        {
+            0 => "No Browser Source connected",
+            1 => "1 Browser Source connected",
+            var count => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{count} Browser Sources connected"
+            ),
+        };
+        return _selected.IsEnabled ? $"{connections} · URL private" : $"Disabled · {connections}";
+    }
+
+    private static string KindCardClass(bool enabled) =>
+        enabled
+            ? "rounded-[14px] border border-[var(--app-focus-border)] bg-[var(--app-surface-solid)] p-4 shadow-[var(--app-shadow-sm)]"
+            : "rounded-[14px] border border-[var(--app-control-border)] bg-[var(--app-control-bg)] p-4";
+
+    private static string KindTitleClass(bool enabled) =>
+        enabled ? "font-bold text-slate-950" : "font-bold text-muted-foreground";
 
     private string _presenceLabel
     {
@@ -266,6 +452,8 @@ public partial class OverlaySourcesPanel
         _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
         LoadAppearance(DefaultAppearance(_draftType));
         _revealedBrowserSourceUrl = null;
+        _openStages.Clear();
+        _ = _openStages.Add(OverlaySourceStage.Basics);
         if (setFeedback)
         {
             SetSuccess(
@@ -337,6 +525,8 @@ public partial class OverlaySourcesPanel
         {
             _feedback = string.Empty;
             _operationFailed = false;
+            _openStages.Clear();
+            _ = _openStages.Add(OverlaySourceStage.PositionLook);
         }
     }
 
@@ -367,6 +557,7 @@ public partial class OverlaySourcesPanel
                         var revealedUrl = AbsoluteUrl(succeeded.Value.PrivateAccess.RelativeUrl);
                         await LoadAsync(succeeded.Value.Instance.Id);
                         _revealedBrowserSourceUrl = revealedUrl;
+                        _ = _openStages.Add(OverlaySourceStage.Delivery);
                         SetSuccess("Overlay created. Copy the private Browser Source URL now.");
                     },
                     rejected =>
@@ -526,6 +717,7 @@ public partial class OverlaySourcesPanel
                     var revealedUrl = AbsoluteUrl(succeeded.Value.PrivateAccess.RelativeUrl);
                     await LoadAsync(succeeded.Value.Instance.Id);
                     _revealedBrowserSourceUrl = revealedUrl;
+                    _ = _openStages.Add(OverlaySourceStage.Delivery);
                     SetSuccess(
                         "Private URL rotated. Copy the replacement now and update every OBS source."
                     );
@@ -849,12 +1041,6 @@ public partial class OverlaySourcesPanel
         _operationFailed = true;
     }
 
-    private static string CountLabel(int count) =>
-        count == 1 ? "1 saved overlay" : $"{count} saved overlays";
-
-    private static string CueCountLabel(int count) =>
-        count == 1 ? "1 saved cue" : $"{count} saved cues";
-
     private static string UpdatedLabel(OverlayInstanceView overlay) =>
         $"updated {overlay.UpdatedAtUtc:yyyy-MM-dd HH:mm} UTC";
 
@@ -1004,14 +1190,17 @@ public partial class OverlaySourcesPanel
         base.Dispose(disposing);
     }
 
-    private string PreviewButtonClass(OverlayPreviewMode mode) =>
-        _previewMode == mode
-            ? "segmented-motion__tab segmented-motion__tab--active"
-            : "segmented-motion__tab";
-
     private enum OverlayPreviewMode
     {
         Live,
         Representative,
+    }
+
+    private enum OverlaySourceStage
+    {
+        Basics,
+        PositionLook,
+        WhatItShows,
+        Delivery,
     }
 }

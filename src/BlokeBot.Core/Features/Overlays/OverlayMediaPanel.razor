@@ -25,29 +25,54 @@
                              role="@(HasFailed ? "alert" : "status")">@Feedback</section>
                 }
                 <section class="card p-5">
-                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold text-slate-950">Upload media</h2><p class="mt-1 text-sm text-muted-foreground">Uploads stay in private channel storage. @ByteLabel(_items.Sum(value => value.ByteLength)) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used.</p></div><a class="btn-secondary" href="overlays#cues">Back to Cues</a></div>
-                    <div class="mt-4 grid gap-3"><Field Id="media-name" Label="Media name" @bind-Value="_name" /><FileDropInput Label="Media file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="IsBusy" OnChange="UploadAsync" /></div>
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                        <FileDropInput Label="Media file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="IsBusy" OnChange="UploadAsync" />
+                        <div class="grid content-start gap-4">
+                            <Field Id="media-name" Label="Media name" @bind-Value="_name" />
+                            <div>
+                                <p class="text-sm font-semibold text-slate-950">Storage</p>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-surface-muted)]">
+                                    <div class="h-full rounded-full bg-[var(--app-affirmative-dot)]" style="@StorageMeterStyle()" data-storage-meter></div>
+                                </div>
+                                <p class="mt-1 text-xs text-muted-foreground">@ByteLabel(UsedBytes()) of @ByteLabel(_options.Value.Overlays.Media.MaximumHostStorageBytes) used. Uploads stay in private channel storage.</p>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 <section class="card p-5">
-                    <h2 class="text-lg font-semibold text-slate-950">Saved media</h2>
+                    <div class="flex flex-wrap items-baseline gap-3">
+                        <h2 class="text-lg font-semibold text-slate-950">Saved media</h2>
+                        <span class="text-sm text-muted-foreground">@SavedMediaNote()</span>
+                    </div>
                     @if (_items.Count == 0) { <p class="mt-4 text-sm text-muted-foreground">No media uploaded yet.</p> }
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         @foreach (var asset in _items)
                         {
-                            <article class="control-surface rounded-lg p-4" @key="asset.Id">
-                                <p class="font-semibold text-slate-950">@asset.Name</p>
-                                <p class="mt-1 text-xs text-muted-foreground">@OverlayMediaTypes.Label(asset.ContentType) · @ByteLabel(asset.ByteLength)</p>
-                                @if (_previewTarget is { } target)
-                                {
-                                    var url = $"/overlays/preview/{target:D}/media/{asset.Id:D}/{asset.ContentRevision}";
-                                    <div class="mt-3 rounded-lg bg-slate-950 p-2">
-                                        @if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Image) { <img class="max-h-64 w-full object-contain" src="@url" alt="@asset.Name" /> }
-                                        else if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Video) { <video class="max-h-64 w-full" controls preload="metadata" src="@url"></video> }
-                                        else { <audio class="w-full" controls preload="metadata" src="@url"></audio> }
-                                    </div>
-                                }
-                                <div class="mt-3 grid gap-2"><FileDropInput Label="Replace file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Disabled="IsBusy" OnChange="@(args => ReplaceAsync(asset, args))" /><button class="btn-secondary justify-self-end" type="button" disabled="IsBusy" @onclick="() => DeleteAsync(asset)">Delete</button></div>
-                            </article>
+                            <StudioThumbnailCard @key="asset.Id"
+                                                 Name="@asset.Name"
+                                                 Subline="@($"{OverlayMediaTypes.Label(asset.ContentType)} · {ByteLabel(asset.ByteLength)}")"
+                                                 ThumbnailClass="@ThumbnailClass(asset)">
+                                <Thumbnail>
+                                    @if (_previewTarget is { } target)
+                                    {
+                                        var url = $"/overlays/preview/{target:D}/media/{asset.Id:D}/{asset.ContentRevision}";
+                                        @if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Image) { <img class="size-full object-contain" src="@url" alt="@asset.Name" /> }
+                                        else if (OverlayMediaTypes.Kind(asset.ContentType) is OverlayCueMediaKind.Video) { <video class="size-full object-contain" controls preload="metadata" src="@url"></video> }
+                                        else { <audio class="w-full px-3" controls preload="metadata" src="@url"></audio> }
+                                    }
+                                    else
+                                    {
+                                        <span aria-hidden="true">@ThumbnailGlyph(asset)</span>
+                                    }
+                                    <span class="status-pill absolute top-2 left-2 bg-slate-100 text-slate-600 ring-1 ring-slate-200">
+                                        <span class="status-pill__label">@OverlayMediaTypes.Label(asset.ContentType)</span>
+                                    </span>
+                                </Thumbnail>
+                                <Actions>
+                                    <FileDropInput Label="Replace file" Accept="@OverlayMediaTypes.AcceptedBrowserMedia" Compact Disabled="IsBusy" OnChange="@(args => ReplaceAsync(asset, args))" />
+                                    <button class="btn-secondary" type="button" disabled="@IsBusy" @onclick="() => DeleteAsync(asset)">Delete</button>
+                                </Actions>
+                            </StudioThumbnailCard>
                         }
                     </div>
                 </section>

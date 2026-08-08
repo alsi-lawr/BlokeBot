@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -88,4 +89,40 @@ public partial class OverlayMediaPanel
 
     private static string ByteLabel(long value) =>
         value >= 1024 * 1024 ? $"{value / (1024m * 1024m):0.##} MB" : $"{value / 1024m:0.##} KB";
+
+    private long UsedBytes() => _items.Sum(asset => asset.ByteLength);
+
+    private string StorageMeterStyle()
+    {
+        var maximum = _options.Value.Overlays.Media.MaximumHostStorageBytes;
+        var percent = maximum <= 0 ? 0m : Math.Clamp(UsedBytes() * 100m / maximum, 0m, 100m);
+        return string.Create(CultureInfo.InvariantCulture, $"width: {percent:0.#}%");
+    }
+
+    private string SavedMediaNote()
+    {
+        var count = _items.Count == 1 ? "1 file" : $"{_items.Count} files";
+        return _previewTarget is null
+            ? count
+            : $"{count} · previews play through your enabled Cue player";
+    }
+
+    private string ThumbnailClass(OverlayMediaAssetView asset) =>
+        OverlayMediaTypes.Kind(asset.ContentType) switch
+        {
+            OverlayCueMediaKind.Audio =>
+                "aspect-[16/10] bg-[var(--app-surface-muted)] text-2xl text-muted-foreground",
+            _ when _previewTarget is not null => "aspect-[16/10] bg-slate-950",
+            OverlayCueMediaKind.Image =>
+                "aspect-[16/10] bg-linear-to-br from-slate-800 to-slate-600 text-2xl text-white",
+            _ => "aspect-[16/10] bg-linear-to-br from-slate-700 to-slate-900 text-2xl text-white",
+        };
+
+    private static string ThumbnailGlyph(OverlayMediaAssetView asset) =>
+        OverlayMediaTypes.Kind(asset.ContentType) switch
+        {
+            OverlayCueMediaKind.Image => "🖼",
+            OverlayCueMediaKind.Audio => "♪",
+            _ => "▶",
+        };
 }
