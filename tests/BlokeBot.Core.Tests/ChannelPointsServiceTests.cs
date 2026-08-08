@@ -44,13 +44,15 @@ public sealed class ChannelPointsServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         var service = new ChannelPointsService(
             dbFactory,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(dbFactory, TimeProvider.System, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
             TimeProvider.System,
             new NativeTwitchFeatureGate(dbFactory)
         );
@@ -342,13 +344,15 @@ public sealed class ChannelPointsServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         return new(
             dbFactory,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(dbFactory, TimeProvider.System, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
             TimeProvider.System,
             new NativeTwitchFeatureGate(dbFactory)
         );

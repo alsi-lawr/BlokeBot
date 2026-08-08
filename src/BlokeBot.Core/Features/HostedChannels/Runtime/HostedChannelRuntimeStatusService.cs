@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -10,8 +9,7 @@ namespace BlokeBot.Core.Features.HostedChannels.Runtime;
 
 public sealed class HostedChannelRuntimeStatusService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    ChannelBotAuthorizationService channelBotAuthorization,
-    HostBotStatusService botStatus
+    ChannelBotAuthorizationService channelBotAuthorization
 )
 {
     public async Task<IReadOnlyList<string>> LoadConnectableChannelLoginsAsync(CancellationToken ct)
@@ -52,45 +50,6 @@ public sealed class HostedChannelRuntimeStatusService(
             .Select(host => host.Host.Login)
             .ToArray();
     }
-
-    public IO<Option<HostedChannelRuntimeStatus>, Never> LoadHostStatus(int hostId) =>
-        IO<Option<HostedChannelRuntimeStatus>, Never>.Create(async ct =>
-        {
-            var fieldsResult = await LoadHostRuntimeFields(hostId).ExecuteAsync(ct);
-            var fields = fieldsResult.Match(value => value, _ => throw new UnreachableException());
-            return await fields.Match(
-                async host =>
-                {
-                    var statusResult = await botStatus.GetStatus(host.Login).ExecuteAsync(ct);
-                    var status = statusResult.Match(
-                        value => value,
-                        _ => throw new UnreachableException()
-                    );
-                    return Result<Option<HostedChannelRuntimeStatus>, Never>.Success(
-                        Option<HostedChannelRuntimeStatus>.Some(
-                            new HostedChannelRuntimeStatus(
-                                host.ChannelBotAuthorizedAtUtc != null,
-                                channelBotAuthorization.IsCurrent(
-                                    host.ChannelBotAuthorizedAtUtc,
-                                    host.ChannelBotAuthorizedScopes
-                                ),
-                                status,
-                                HostedChannelRuntimeLifecycle.FromPersistence(
-                                    host.BotRuntimeState,
-                                    host.BotRuntimeStateChangedAtUtc
-                                )
-                            )
-                        )
-                    );
-                },
-                () =>
-                    Task.FromResult(
-                        Result<Option<HostedChannelRuntimeStatus>, Never>.Success(
-                            Option<HostedChannelRuntimeStatus>.None
-                        )
-                    )
-            );
-        });
 
     public IO<Option<HostedChannelRuntimeSummary>, Never> LoadHostRuntimeSummary(int hostId) =>
         IO<Option<HostedChannelRuntimeSummary>, Never>.Create(async ct =>

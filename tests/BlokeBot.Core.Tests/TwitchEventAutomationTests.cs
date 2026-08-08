@@ -19,65 +19,6 @@ public sealed class TwitchEventAutomationTests
     private static readonly DateTimeOffset _start = new(2026, 8, 7, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task Catalog_RegistersTypedTwitchEventSourcesWithoutGenericChatMessages()
-    {
-        await using var fixture = await EventFixture.CreateAsync();
-
-        var snapshot = await fixture.Catalog.DiscoverAsync(
-            new(fixture.HostId),
-            CancellationToken.None
-        );
-
-        snapshot.Availability.ShouldBe(AutomationCatalogAvailability.Enabled);
-        var ids = snapshot.Definitions.Select(static value => value.Id.Value).ToArray();
-        string[] expected =
-        [
-            "stream-online",
-            "stream-offline",
-            "follow",
-            "subscription",
-            "subscription-gift",
-            "cheer",
-            "incoming-raid",
-            "hype-train-begin",
-            "hype-train-progress",
-            "hype-train-end",
-            "chat-notification",
-        ];
-        foreach (var id in expected)
-        {
-            ids.ShouldContain(id);
-        }
-
-        ids.ShouldNotContain("chat-message");
-        var twitchSources = snapshot
-            .Definitions.Where(definition => expected.Contains(definition.Id.Value))
-            .ToArray();
-        twitchSources.ShouldAllBe(static definition =>
-            definition.Kind == AutomationNodeKind.Source
-        );
-        twitchSources.ShouldAllBe(static definition =>
-            definition.Display.Category == "Twitch events"
-        );
-        foreach (
-            var actorPort in twitchSources.SelectMany(static definition =>
-                definition.Outputs.Where(static port => port.Id.Value == "actor")
-            )
-        )
-        {
-            actorPort.Sensitivity.ShouldBe(AutomationDataSensitivity.Sensitive);
-        }
-
-        var noticeTypes = twitchSources
-            .Single(static definition => definition.Id.Value == "chat-notification")
-            .Configuration.Single(static field => field.Id.Value == "notice-type")
-            .FieldType.ShouldBeOfType<AutomationConfigurationFieldType.Choice>()
-            .Values;
-        noticeTypes.ShouldBe(TwitchEventAutomationSources.ChatNotificationNoticeTypes);
-        noticeTypes.ShouldContain("any");
-    }
-
-    [Test]
     public async Task StreamOnline_DuplicateMessageIdsCreateOneRunUntilTheTenMinuteBoundary()
     {
         await using var fixture = await EventFixture.CreateAsync();

@@ -181,33 +181,6 @@ internal sealed class OverlayCuePlaybackService(
         }
     }
 
-    public OverlayCueAdmissionOutcome ReadOutcome(int hostId, Guid targetOverlayId, Guid runId)
-    {
-        var identity = new OverlayTargetIdentity(hostId, targetOverlayId);
-        if (!_targets.TryGetValue(identity, out var state))
-        {
-            return new OverlayCueAdmissionOutcome.Missing();
-        }
-        lock (state.Gate)
-        {
-            if (state.Active.ContainsKey(runId))
-            {
-                return new OverlayCueAdmissionOutcome.Running(runId);
-            }
-            var pending = state.Pending.FirstOrDefault(value => value.Plan.RunId == runId);
-            var queued = pending is not null;
-            return queued switch
-            {
-                true => new OverlayCueAdmissionOutcome.Queued(runId),
-                false when state.Expired.Contains(runId) =>
-                    new OverlayCueAdmissionOutcome.Expired(),
-                false when state.Cancelled.Contains(runId) =>
-                    new OverlayCueAdmissionOutcome.ParentDisabledOrCancelled(),
-                _ => new OverlayCueAdmissionOutcome.Missing(),
-            };
-        }
-    }
-
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _changesSubscription = events.Subscribe(

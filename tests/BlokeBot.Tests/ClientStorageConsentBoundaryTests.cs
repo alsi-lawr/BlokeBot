@@ -69,7 +69,13 @@ public sealed partial class ClientStorageConsentBoundaryTests
                 }
             }
 
-            if (!content.Contains("localStorage", StringComparison.Ordinal))
+            // Storage keys can be carried as constants through JSInterop by files that never
+            // mention localStorage themselves, so those files are scanned too.
+            var touchesClientStorageSurface =
+                content.Contains("localStorage", StringComparison.Ordinal)
+                || content.Contains("JSInterop", StringComparison.Ordinal)
+                || content.Contains("IJSRuntime", StringComparison.Ordinal);
+            if (!touchesClientStorageSurface)
             {
                 continue;
             }

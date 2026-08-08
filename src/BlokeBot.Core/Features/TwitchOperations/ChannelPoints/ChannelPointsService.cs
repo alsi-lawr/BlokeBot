@@ -1,5 +1,3 @@
-using BlokeBot.Core.Features.Alerts;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -9,11 +7,10 @@ namespace BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 
 public sealed class ChannelPointsService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IHostBroadcasterTokenStatusProvider broadcasters,
+    BroadcasterOperationAuthorization broadcasterAuthorization,
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
 ) : IChannelPointsEventObserver, IChannelPointsDashboardOperations
@@ -26,13 +23,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return new(new ChannelPointsAuthorizationReadiness.Disabled(), [], [], []);
         }
@@ -77,13 +68,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -97,13 +82,7 @@ public sealed class ChannelPointsService(
         {
             return NotReady();
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -140,13 +119,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -169,13 +142,7 @@ public sealed class ChannelPointsService(
         {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -227,13 +194,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -257,13 +218,7 @@ public sealed class ChannelPointsService(
         {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -291,13 +246,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -329,13 +278,7 @@ public sealed class ChannelPointsService(
         var status = fulfill
             ? HelixRewardRedemptionStatus.Fulfilled
             : HelixRewardRedemptionStatus.Canceled;
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return Disabled();
         }
@@ -357,13 +300,7 @@ public sealed class ChannelPointsService(
             : TwitchRewardRedemptionStatus.Canceled;
         redemption.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         _ = await db.SaveChangesAsync(cancellationToken);
-        if (
-            await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (await EnabledAsync(hostId, cancellationToken))
         {
             _ = await TrimTerminalAsync(db, hostId, cancellationToken);
             _ = await db.SaveChangesAsync(cancellationToken);
@@ -394,13 +331,7 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return new ChannelPointsReconciliationOutcome.Incomplete();
         }
@@ -420,13 +351,7 @@ public sealed class ChannelPointsService(
         {
             return ReconciliationFailure(allRewards);
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return new ChannelPointsReconciliationOutcome.Incomplete();
         }
@@ -441,13 +366,7 @@ public sealed class ChannelPointsService(
         {
             return ReconciliationFailure(manageableRewards);
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return new ChannelPointsReconciliationOutcome.Incomplete();
         }
@@ -463,13 +382,7 @@ public sealed class ChannelPointsService(
         {
             return redemptions;
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return new ChannelPointsReconciliationOutcome.Incomplete();
         }
@@ -576,18 +489,12 @@ public sealed class ChannelPointsService(
         CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.RewardsAndRedemptions,
-                cancellationToken
-            )
-        )
+        if (!await EnabledAsync(hostId, cancellationToken))
         {
             return null;
         }
 
-        var token = await ReadyTokenAsync(hostId, cancellationToken);
+        var token = await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken);
         if (token is null)
         {
             return null;
@@ -610,39 +517,21 @@ public sealed class ChannelPointsService(
         int hostId,
         CancellationToken cancellationToken
     ) =>
-        await ReadyTokenAsync(hostId, cancellationToken) is null
+        await broadcasterAuthorization.ReadyTokenAsync(hostId, cancellationToken) is null
             ? new ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization(
                 "Reconnect the selected broadcaster with Twitch Channel Points permissions."
             )
             : new ChannelPointsAuthorizationReadiness.Ready();
 
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken cancellationToken)
-    {
-        var status = await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            cancellationToken
-        );
-        if (status is TokenStatus.Ready ready)
-        {
-            return ready.AccessToken;
-        }
-        _ = await alerts
-            .Create(
-                hostId,
-                DurableAlertSeverity.Warning,
-                "twitch-broadcaster-authorization",
-                "reauthorize-v1",
-                "Reconnect Twitch integration",
-                "Reconnect the selected channel's Twitch integration and approve all requested permissions.",
-                "/twitch-operations"
-            )
-            .ExecuteAsync(cancellationToken);
-        return null;
-    }
-
     private static ChannelPointsOperationOutcome Disabled() =>
         new ChannelPointsOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+
+    private Task<bool> EnabledAsync(int hostId, CancellationToken cancellationToken) =>
+        nativeTwitch.IsEnabledAsync(
+            hostId,
+            HostFeatureFlags.RewardsAndRedemptions,
+            cancellationToken
+        );
 
     private static Task<bool> HostIsEnabledAsync(
         BlokeBotDbContext db,
@@ -712,13 +601,7 @@ public sealed class ChannelPointsService(
                 {
                     return new ChannelPointsReconciliationOutcome.Incomplete();
                 }
-                if (
-                    !await nativeTwitch.IsEnabledAsync(
-                        hostId,
-                        HostFeatureFlags.RewardsAndRedemptions,
-                        cancellationToken
-                    )
-                )
+                if (!await EnabledAsync(hostId, cancellationToken))
                 {
                     return new ChannelPointsReconciliationOutcome.Incomplete();
                 }
@@ -765,13 +648,7 @@ public sealed class ChannelPointsService(
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }
-            if (
-                !await nativeTwitch.IsEnabledAsync(
-                    hostId,
-                    HostFeatureFlags.RewardsAndRedemptions,
-                    cancellationToken
-                )
-            )
+            if (!await EnabledAsync(hostId, cancellationToken))
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }
@@ -820,13 +697,7 @@ public sealed class ChannelPointsService(
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }
-            if (
-                !await nativeTwitch.IsEnabledAsync(
-                    hostId,
-                    HostFeatureFlags.RewardsAndRedemptions,
-                    cancellationToken
-                )
-            )
+            if (!await EnabledAsync(hostId, cancellationToken))
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }

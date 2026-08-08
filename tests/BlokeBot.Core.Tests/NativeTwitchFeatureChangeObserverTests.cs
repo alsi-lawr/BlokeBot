@@ -121,34 +121,38 @@ public sealed class NativeTwitchFeatureChangeObserverTests
         var gate = new NativeTwitchFeatureGate(database);
         var observer = new NativeTwitchFeatureChangeObserver(
             new EventSubChannelReconciliationTrigger(null!),
-            new PollService(database, broadcasters, helix, settings, events, alerts, gate),
-            new ClipMarkerService(
+            new PollService(
                 database,
-                broadcasters,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
                 helix,
                 settings,
                 events,
-                alerts,
+                gate
+            ),
+            new ClipMarkerService(
+                database,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
+                helix,
+                settings,
+                events,
                 TimeProvider.System,
                 gate
             ),
             new ChannelPointsService(
                 database,
-                broadcasters,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
                 helix,
                 settings,
                 events,
-                alerts,
                 TimeProvider.System,
                 gate
             ),
             new PredictionService(
                 database,
-                broadcasters,
+                new BroadcasterOperationAuthorization(broadcasters, alerts),
                 helix,
                 settings,
                 events,
-                alerts,
                 NullLogger<PredictionService>.Instance,
                 gate
             )

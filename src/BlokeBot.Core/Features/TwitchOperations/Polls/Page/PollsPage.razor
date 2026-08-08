@@ -3,15 +3,11 @@
 @using BlokeBot.Core.Features.TwitchOperations
 @using BlokeBot.Core.Features.TwitchOperations.Shared
 @using BlokeBot.Core.Features.TwitchOperations.Polls
-@using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
-@inherits AuthenticatedPageComponent
+@inherits NativeOperationPage<PollDashboardState>
 @inject IPollDashboardOperations _polls
-@inject ToastService _toasts
-@inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
-@inject EventBus<AppEventKind> _events
 
 <PageTitle>BlokeBot | Polls</PageTitle>
 
@@ -22,33 +18,33 @@
                data-native-route="polls">
     <NativeTwitchToolSwitcher HostId="@HostId" />
 
-    @if (_loadFailed)
+    @if (LoadFailed)
     {
         <PageState Kind="PageStateKind.Failure" Title="Polls could not load" Description="Try again. Your saved questions have not changed.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
-    else if (_loading)
+    else if (Loading)
     {
         <PageState Kind="PageStateKind.Loading" Title="Loading polls" Description="Getting saved questions and the poll running now." />
     }
-    else if (!_nativeTwitchEnabled || _state?.Authorization is PollAuthorizationReadiness.Disabled)
+    else if (!NativeTwitchEnabled || State?.Authorization is PollAuthorizationReadiness.Disabled)
     {
         <NativeTwitchUnavailable FeatureName="Polls" />
     }
-    else if (_state is not null)
+    else if (State is not null)
     {
-        @if (_state.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+        @if (State.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
         {
             <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can start and end polls for this channel.">
                 <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
 
-        @if (_state.Authorization is PollAuthorizationReadiness.Ready)
+        @if (State.Authorization is PollAuthorizationReadiness.Ready)
         {
         <TaskPanel Title="Run a poll" Description="Start a saved question, watch the votes, or end voting early.">
-            @if (_state.ActivePoll is { } poll)
+            @if (State.ActivePoll is { } poll)
             {
                 <article class="surface-row rounded-lg p-4" data-active-poll>
                     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -70,14 +66,14 @@
                     </ul>
                 </article>
             }
-            else if (_state.Templates.Count == 0)
+            else if (State.Templates.Count == 0)
             {
                 <PageState Kind="PageStateKind.Empty" Title="No poll templates yet" Description="Save a template below, then return here to start it." />
             }
             else
             {
                 <div class="phone-card-list" data-poll-templates>
-                    @foreach (var template in _state.Templates)
+                    @foreach (var template in State.Templates)
                     {
                         <article class="surface-row rounded-lg p-4" @key="template.Id">
                             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -94,7 +90,7 @@
         </TaskPanel>
 
         <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
-        <CollapsibleSection Title="New poll template" Description="Save a question and choices to reuse later." InitiallyOpen="@(_state.Templates.Count == 0)">
+        <CollapsibleSection Title="New poll template" Description="Save a question and choices to reuse later." InitiallyOpen="@(State.Templates.Count == 0)">
             <div class="form-grid p-4">
                 <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Question" />
                 <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_choices" Placeholder="Yes&#10;No" />
@@ -115,14 +111,14 @@
 
         <CollapsibleSection Title="Recent results" Description="Review polls that finished or were ended early." InitiallyOpen="false">
             <div class="p-4">
-                @if (_state.Results.Count == 0)
+                @if (State.Results.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No poll results yet.</p>
                 }
                 else
                 {
                     <div class="phone-card-list" data-native-history="polls">
-                        @foreach (var result in _state.Results)
+                        @foreach (var result in State.Results)
                         {
                             <article class="surface-row rounded-lg p-4" @key="result.ProviderPollId">
                                 <div class="flex flex-wrap items-start justify-between gap-2"><strong>@result.Title</strong><span class="text-sm text-muted-foreground">@result.Status</span></div>

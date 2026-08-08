@@ -53,12 +53,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         );
     }
 
-    public async Task<string> AvailableGuessesReplyAsync(
-        string hostLogin,
-        AppCommandRouteState route,
-        CancellationToken ct
-    ) => (await AvailableGuessesResponseAsync(hostLogin, route, ct)).Message;
-
     public async Task<CommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
         AppCommandRouteState route,
@@ -83,12 +77,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             resolution.Settings.ModeratorOnlyReply
         );
     }
-
-    public async Task<string> ModeratorOnlyReplyAsync(
-        string hostLogin,
-        AppCommandRouteState route,
-        CancellationToken ct
-    ) => (await ModeratorOnlyResponseAsync(hostLogin, route, ct)).Message;
 
     public async Task<CommandResponse> UsageResponseAsync(
         string hostLogin,
@@ -134,14 +122,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             )
         );
     }
-
-    public async Task<string> UsageReplyAsync(
-        string hostLogin,
-        GuessCommandKind kind,
-        string command,
-        AppCommandRouteState route,
-        CancellationToken ct
-    ) => (await UsageResponseAsync(hostLogin, kind, command, route, ct)).Message;
 
     private static Task<GuessingReplySettingsResolution> LoadReplySettingsAsync(
         BlokeBotDbContext db,

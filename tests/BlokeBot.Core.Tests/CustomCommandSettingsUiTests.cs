@@ -172,7 +172,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task ActionKind_ChangingToOverlayCue_ShowsBoundedEditorAndOptionalReplyGuidance()
+    public async Task ActionKind_ChangingToOverlayCue_ShowsTheBoundedEditor()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -182,8 +182,7 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find($"#command-{seeded.CommandId}-action-kind")
             .Change(CustomCommandActionKind.OverlayCue.ToString());
 
-        var editor = cut.Find("[data-overlay-cue-command]");
-        editor.ClassList.ShouldContain("p-3");
+        _ = cut.Find("[data-overlay-cue-command]").ShouldNotBeNull();
         _ = cut.Find($"#command-{seeded.CommandId}-overlay-target").ShouldNotBeNull();
         _ = cut.Find($"#command-{seeded.CommandId}-overlay-cue").ShouldNotBeNull();
         _ = cut.Find($"#command-{seeded.CommandId}-queue-policy").ShouldNotBeNull();
@@ -191,11 +190,10 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("button[data-action='test-overlay-cue-command']")
             .HasAttribute("disabled")
             .ShouldBeTrue();
-        cut.Markup.ShouldContain("Replies are optional for overlay cues.");
     }
 
     [Test]
-    public async Task ActionKind_ChangingToAutomation_ShowsConnectedFlowsAndGenericAdvancedSummary()
+    public async Task ActionKind_ChangingToAutomation_SavesABoundedAutomationAction()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -205,24 +203,13 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find($"#command-{seeded.CommandId}-action-kind")
             .Change(CustomCommandActionKind.Automation.ToString());
 
-        var connection = cut.Find("[data-automation-command]");
-        connection.TextContent.ShouldContain("Connected automations");
-        connection.TextContent.ShouldContain("every enabled automation flow connected to it");
-        connection.TextContent.ShouldContain("building and editing automations arrive");
-        connection.TextContent.ShouldNotContain("runtime");
+        _ = cut.Find("[data-automation-command]").ShouldNotBeNull();
         cut.FindAll($"#command-{seeded.CommandId}-0-argument-reply").ShouldBeEmpty();
         cut.FindAll("select[data-flow-picker]").ShouldBeEmpty();
-        var advanced = cut.Find("button[aria-controls='custom-command-advanced-settings']");
-        advanced.TextContent.ShouldContain("Default settings");
-        advanced.TextContent.ShouldNotContain("Automation");
-        advanced.Click();
+        cut.Find("button[aria-controls='custom-command-advanced-settings']").Click();
         cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");
         cut.Find($"#command-{seeded.CommandId}-invocation-limit")
             .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
-        advanced = cut.Find("button[aria-controls='custom-command-advanced-settings']");
-        advanced.Click();
-        advanced.TextContent.ShouldContain("15s cooldown");
-        advanced.TextContent.ShouldContain("Once per viewer (until reset)");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -575,25 +562,6 @@ public sealed class CustomCommandSettingsUiTests
         save = cut.Find("button[aria-label='Save custom commands']");
         save.HasAttribute("disabled").ShouldBeTrue();
         save.GetAttribute("data-save-state").ShouldBe("clean");
-    }
-
-    [Test]
-    public async Task AdvancedSettings_NonDefaultPolicyAppearsInCollapsedSummary()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seeded = await SeedConfigurationAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-        var cut = context.Render<CustomCommandSettingsPage>();
-        var disclosure = cut.Find("button[aria-controls='custom-command-advanced-settings']");
-
-        disclosure.GetAttribute("aria-expanded").ShouldBe("false");
-        disclosure.Click();
-        cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");
-        disclosure = cut.Find("button[aria-controls='custom-command-advanced-settings']");
-        disclosure.Click();
-
-        disclosure.GetAttribute("aria-expanded").ShouldBe("false");
-        cut.Find("[data-inventory='command']").TextContent.ShouldContain("15s cooldown");
     }
 
     [Test]

@@ -184,11 +184,14 @@ public sealed class PollServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         var service = new PollService(
             dbFactory,
-            new StaticBroadcasterProvider(
-                new TokenStatus.Unavailable(
-                    AccessTokenUnavailableReason.MissingRefreshToken,
-                    [.. HostBroadcasterAuthorizationService.MilestoneScopes]
-                )
+            new BroadcasterOperationAuthorization(
+                new StaticBroadcasterProvider(
+                    new TokenStatus.Unavailable(
+                        AccessTokenUnavailableReason.MissingRefreshToken,
+                        [.. HostBroadcasterAuthorizationService.MilestoneScopes]
+                    )
+                ),
+                new DurableAlertService(dbFactory, TimeProvider.System, events)
             ),
             new HelixClient(
                 new PollHttpClientFactory(),
@@ -198,7 +201,6 @@ public sealed class PollServiceTests
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
             new NativeTwitchFeatureGate(dbFactory)
         );
 
@@ -311,13 +313,15 @@ public sealed class PollServiceTests
         var events = TestEventBus.Create<AppEventKind>();
         return new(
             dbFactory,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(dbFactory, TimeProvider.System, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events),
             new NativeTwitchFeatureGate(dbFactory)
         );
     }

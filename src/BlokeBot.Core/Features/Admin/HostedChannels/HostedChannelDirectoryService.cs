@@ -43,13 +43,6 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
             .ToArray();
     }
 
-    public async Task<IReadOnlySet<int>> LoadHostedChannelIdsAsync(CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var ids = await db.Hosts.AsNoTracking().Select(x => x.Id).ToArrayAsync(ct);
-        return ids.ToHashSet();
-    }
-
     public IO<Option<BotHostChoice>, Never> LoadHostChoice(int hostId, AuthRole role) =>
         IO<Option<BotHostChoice>, Never>.Create(async ct =>
         {

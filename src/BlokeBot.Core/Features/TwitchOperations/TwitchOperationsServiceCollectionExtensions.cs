@@ -1,6 +1,4 @@
-using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
@@ -19,6 +17,7 @@ public static class TwitchOperationsServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotTwitchOperations(this IServiceCollection services)
     {
         _ = services.AddSingleton<NativeTwitchFeatureGate>();
+        _ = services.AddSingleton<BroadcasterOperationAuthorization>();
         _ = services.AddSingleton<INativeTwitchFeatureStateProvider>(static provider =>
             provider.GetRequiredService<NativeTwitchFeatureGate>()
         );
@@ -61,11 +60,10 @@ public static class TwitchOperationsServiceCollectionExtensions
         );
         _ = services.AddSingleton(static provider => new PredictionService(
             provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
-            provider.GetRequiredService<IHostBroadcasterTokenStatusProvider>(),
+            provider.GetRequiredService<BroadcasterOperationAuthorization>(),
             provider.GetRequiredService<HelixClient>(),
             provider.GetRequiredService<BotSettings>(),
             provider.GetRequiredService<EventBus<AppEventKind>>(),
-            provider.GetRequiredService<DurableAlertService>(),
             provider.GetRequiredService<ILogger<PredictionService>>(),
             provider.GetRequiredService<NativeTwitchFeatureGate>(),
             TimeProvider.System

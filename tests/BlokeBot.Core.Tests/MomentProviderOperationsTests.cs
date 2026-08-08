@@ -164,13 +164,15 @@ public sealed class MomentProviderOperationsTests
         var events = TestEventBus.Create<AppEventKind>();
         var clips = new ClipMarkerService(
             database,
-            new ReadyBroadcasterProvider(),
+            new BroadcasterOperationAuthorization(
+                new ReadyBroadcasterProvider(),
+                new DurableAlertService(database, clock, events)
+            ),
             new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(database, clock, events),
             clock,
             new NativeTwitchFeatureGate(database)
         );
