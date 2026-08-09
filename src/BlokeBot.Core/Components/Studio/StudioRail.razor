@@ -34,20 +34,19 @@
                     aria-current="@(item.Selected ? "true" : "false")"
                     aria-controls="@item.ControlsId"
                     @onclick="item.Select">
+                <span class="studio-rail__dot @(item.On ? "studio-rail__dot--on" : null)" aria-hidden="true"></span>
                 @if (item.Sub is { Length: > 0 } sub)
                 {
-                    // The dot is duplicated into both branches and the second span out-dented so
-                    // the whitespace between them stays an interior text node whose bytes match
-                    // the rail before the Sub extension.
-                    <span class="studio-rail__dot @(item.On ? "studio-rail__dot--on" : null)" aria-hidden="true"></span>
-                <span class="min-w-0 flex-1"><span id="@item.LabelId"
-                        class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span><span class="block text-xs font-normal text-muted-foreground">@sub</span></span>
+                    <span class="min-w-0 flex-1">
+                        <span id="@item.LabelId"
+                              class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
+                        <span class="block text-xs font-normal text-muted-foreground">@sub</span>
+                    </span>
                 }
                 else
                 {
-                    <span class="studio-rail__dot @(item.On ? "studio-rail__dot--on" : null)" aria-hidden="true"></span>
-                <span id="@item.LabelId"
-                      class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
+                    <span id="@item.LabelId"
+                          class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
                 }
                 @if (item.Meta is { Length: > 0 } meta)
                 {
