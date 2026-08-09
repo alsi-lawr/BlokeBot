@@ -60,6 +60,172 @@ public sealed class HelixClientTests
     }
 
     [Test]
+    public async Task Chatters_TwoCompletePages_ReturnsUniqueIdentitySnapshot()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(static request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Get);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/chatters");
+            request.RequestUri.Query.ShouldContain("broadcaster_id=channel-id");
+            request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
+            request.RequestUri.Query.ShouldContain("first=1000");
+            request.RequestUri.Query.ShouldNotContain("after=");
+            request.Headers.GetValues("Client-Id").Single().ShouldBe("client");
+            request.Headers.Authorization!.Parameter.ShouldBe("token");
+            return JsonResponse(
+                """
+                {
+                  "data": [
+                    {"user_id":"one-id","user_login":"one","user_name":"One"}
+                  ],
+                  "pagination":{"cursor":"next"}
+                }
+                """
+            );
+        });
+        factory.Respond(static request =>
+        {
+            request.RequestUri!.Query.ShouldContain("after=next");
+            return JsonResponse(
+                """
+                {
+                  "data": [
+                    {"user_id":"one-id","user_login":"one","user_name":"One"},
+                    {"user_id":"two-id","user_login":"two","user_name":"Two"}
+                  ],
+                  "pagination":{}
+                }
+                """
+            );
+        });
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var outcome = await client.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        outcome
+            .ShouldBeOfType<HelixChattersOutcome.Complete>()
+            .Chatters.Select(static chatter => chatter.DisplayName)
+            .ShouldBe(["One", "Two"]);
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.Unauthorized)]
+    [Arguments(HttpStatusCode.Forbidden)]
+    [Arguments(HttpStatusCode.TooManyRequests)]
+    [Arguments(HttpStatusCode.InternalServerError)]
+    public async Task Chatters_FailedResponse_IsUnavailable(HttpStatusCode status)
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => new HttpResponseMessage(status));
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var outcome = await client.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+    }
+
+    [Test]
+    public async Task Chatters_LaterPageFails_DiscardsFirstPage()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ =>
+            JsonResponse(
+                """{"data":[{"user_id":"one-id","user_login":"one","user_name":"One"}],"pagination":{"cursor":"next"}}"""
+            )
+        );
+        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var outcome = await client.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+    }
+
+    [Test]
+    public async Task Chatters_RepeatedCursor_IsUnavailable()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => JsonResponse("""{"data":[],"pagination":{"cursor":"same"}}"""));
+        factory.Respond(_ => JsonResponse("""{"data":[],"pagination":{"cursor":"same"}}"""));
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var outcome = await client.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+    }
+
+    [Test]
+    public async Task Chatters_MalformedIdentity_IsUnavailable()
+    {
+        var factory = RespondingWith(
+            """{"data":[{"user_id":"one-id","user_name":"One"}],"pagination":{}}"""
+        );
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var outcome = await client.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = outcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+    }
+
+    [Test]
+    public async Task Chatters_ClientTimeoutIsUnavailableButCallerCancellationPropagates()
+    {
+        var timeoutFactory = new ScriptedHttpClientFactory();
+        timeoutFactory.Respond(_ => throw new TaskCanceledException("Simulated client timeout."));
+        var timeoutClient = new HelixClient(
+            timeoutFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+
+        var timeoutOutcome = await timeoutClient.GetChattersAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        _ = timeoutOutcome.ShouldBeOfType<HelixChattersOutcome.Unavailable>();
+
+        var callerFactory = RespondingWith("""{"data":[],"pagination":{}}""");
+        var callerClient = new HelixClient(
+            callerFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
+            callerClient.GetChattersAsync(Context(), "channel-id", "bot-id", cancellation.Token)
+        );
+    }
+
+    [Test]
     public async Task ChannelInformation_LoadingRaiderMetadata_ReturnsTypedGameAndTitle()
     {
         var factory = new ScriptedHttpClientFactory();
@@ -484,6 +650,7 @@ public sealed class HelixClientTests
                 CancellationToken cancellationToken
             )
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 responses.Count.ShouldBeGreaterThan(0);
                 return Task.FromResult(responses.Dequeue()(request));
             }

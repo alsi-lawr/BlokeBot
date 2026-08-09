@@ -1,6 +1,6 @@
 namespace BlokeBot.Core.Features.CustomCommands;
 
-public sealed class CustomCommandModule(CustomCommandExecutionService execution)
+internal sealed class CustomCommandModule(CustomCommandExecutionService execution)
     : IChatCommandModule
 {
     public void AddCommands(IChatCommandBuilder commands) => commands.MapDynamic(ExecuteAsync);

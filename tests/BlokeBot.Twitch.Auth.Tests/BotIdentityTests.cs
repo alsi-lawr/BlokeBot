@@ -6,6 +6,10 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class BotIdentityTests
 {
     [Test]
+    public void DefaultIdentityScopes_IncludeConnectedChatterAccess() =>
+        new BotIdentityOptions().Scopes.ShouldContain(Scopes.ModeratorReadChatters);
+
+    [Test]
     public void MutableScopes_MappingIdentity_NormalizesAndCopiesValues()
     {
         string[] scopes = [" User:Bot ", "chat:read", "CHAT:READ"];

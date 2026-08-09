@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
-public sealed class CustomCommandExecutionService(
+internal sealed class CustomCommandExecutionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IOptions<BlokeBotOptions> options,
     CustomCommandCooldownStore cooldowns,
@@ -239,7 +239,14 @@ public sealed class CustomCommandExecutionService(
 
         var reply = selectedMessage is null
             ? null
-            : templates.Render(selectedMessage, context, args, count);
+            : await templates.RenderCommandAsync(
+                selectedMessage,
+                new(host.Id, host.Login, host.TwitchUserId ?? string.Empty),
+                context,
+                args,
+                count,
+                ct
+            );
         if (
             cueAction is not null
             && reply is not null

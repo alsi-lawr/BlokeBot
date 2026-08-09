@@ -13,13 +13,19 @@ public abstract class CustomAnnouncementSchedulerTestBase
         SqliteBlokeBotDbFactory dbFactory,
         TimeProvider clock,
         ICustomAnnouncementSender sender,
-        ILogger<CustomAnnouncementScheduler>? logger = null
+        ILogger<CustomAnnouncementScheduler>? logger = null,
+        IMessageLibraryRandomSource? random = null,
+        IMessageLibraryChatterSource? chatters = null
     ) =>
         new CustomAnnouncementScheduler(
             dbFactory,
             sender,
             new TimeProviderCustomAnnouncementTickScheduler(clock),
             new CustomMessageSelector(),
+            new CustomCommandTemplateRenderer(
+                random ?? new CryptographicMessageLibraryRandomSource(),
+                chatters ?? new UnavailableMessageLibraryChatterSource()
+            ),
             Options.Create(
                 new BlokeBotOptions
                 {

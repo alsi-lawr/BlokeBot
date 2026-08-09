@@ -13,6 +13,7 @@ internal sealed class CustomAnnouncementScheduler(
     ICustomAnnouncementSender sender,
     ICustomAnnouncementTickScheduler scheduler,
     CustomMessageSelector messageSelector,
+    CustomCommandTemplateRenderer templates,
     IOptions<BlokeBotOptions> options,
     ILogger<CustomAnnouncementScheduler> log
 ) : BackgroundService
@@ -33,7 +34,9 @@ internal sealed class CustomAnnouncementScheduler(
             select new
             {
                 AnnouncementId = announcement.Id,
+                HostId = host.Id,
                 HostLogin = host.Login,
+                TwitchUserId = host.TwitchUserId ?? string.Empty,
                 host.TimeZoneId,
                 host.BotRuntimeState,
                 host.BotRuntimeStateChangedAtUtc,
@@ -42,7 +45,9 @@ internal sealed class CustomAnnouncementScheduler(
         var candidates = candidateRows
             .Select(row => new AnnouncementCandidate(
                 row.AnnouncementId,
+                row.HostId,
                 row.HostLogin,
+                row.TwitchUserId,
                 row.TimeZoneId,
                 HostedChannelRuntimeLifecycle
                     .FromPersistence(row.BotRuntimeState, row.BotRuntimeStateChangedAtUtc)
@@ -212,7 +217,7 @@ internal sealed class CustomAnnouncementScheduler(
             return;
         }
 
-        var message = announcement.OccurrenceStatus switch
+        var selectedMessage = announcement.OccurrenceStatus switch
         {
             AnnouncementOccurrenceStatus.Pending => SelectMessage(
                 announcement.MessageLibraryEntry,
@@ -226,6 +231,15 @@ internal sealed class CustomAnnouncementScheduler(
                 "Only pending or retry-scheduled occurrences can enqueue."
             ),
         };
+        var message =
+            announcement.OccurrenceStatus == AnnouncementOccurrenceStatus.Pending
+            && selectedMessage is not null
+                ? await templates.RenderScheduledAsync(
+                    selectedMessage,
+                    new(candidate.HostId, candidate.HostLogin, candidate.TwitchUserId),
+                    cancellationToken
+                )
+                : selectedMessage;
         if (string.IsNullOrWhiteSpace(message))
         {
             CompleteOccurrence(
@@ -581,7 +595,9 @@ internal sealed class CustomAnnouncementScheduler(
 
     private sealed record AnnouncementCandidate(
         int AnnouncementId,
+        int HostId,
         string HostLogin,
+        string TwitchUserId,
         string? TimeZoneId,
         HostedChannelRuntimeLifecycle.Started Runtime
     );
