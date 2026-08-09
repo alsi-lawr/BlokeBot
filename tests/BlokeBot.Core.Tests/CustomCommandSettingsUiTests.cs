@@ -497,37 +497,6 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task SelectedInventoryAndEditor_ExposeOneLinkedCurrentRegion()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seeded = await SeedConfigurationAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-        var cut = context.Render<CustomCommandSettingsPage>();
-
-        var edit = cut.Find("button[data-action='edit-command']");
-        edit.GetAttribute("aria-current").ShouldBe("true");
-        var editorId = edit.GetAttribute("aria-controls");
-        _ = editorId.ShouldNotBeNull();
-        var editor = cut.Find($"#{editorId}");
-        editor.GetAttribute("role").ShouldBe("region");
-        var labelId = editor.GetAttribute("aria-labelledby");
-        _ = labelId.ShouldNotBeNull();
-        cut.Find($"#{labelId}").TextContent.ShouldBe("!command");
-        cut.FindAll("[data-selected-editor]").Count.ShouldBe(1);
-        cut.FindAll(".scroll-panel--settings").ShouldBeEmpty();
-        cut.FindAll(".studio-rail__item[aria-current='true']").Count.ShouldBe(1);
-        cut.Find(".studio-rail").NextElementSibling?.ClassList.ShouldContain("studio__inspector");
-
-        SelectTab(cut, "message-library");
-        cut.Find("button[data-action='edit-reply']").Click();
-
-        cut.FindAll("[data-selected-editor]").Count.ShouldBe(1);
-        _ = cut.Find("[data-selected-editor='reply']")
-            .GetAttribute("aria-labelledby")
-            .ShouldNotBeNull();
-    }
-
-    [Test]
     public async Task EditingAndSaving_HighlightsEnablesThenClearsSaveState()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

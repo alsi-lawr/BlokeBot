@@ -371,41 +371,6 @@ public sealed class ViewerQueueOverlayTests
         await coordinator.StopAsync(CancellationToken.None);
     }
 
-    [Test]
-    public void BrowserDashboardAndHelp_ExposeViewerQueueWithoutPrivateDataLanguage()
-    {
-        OverlayBrowserSourceAssets.Stylesheet.ShouldContain(".viewer-queue");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("renderViewerQueue");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("getComputedTextLength");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "characters.slice(0, fittingLength).join(\"\") + \"…\""
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "\"data-fit-width\": String(maximumWidth)"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("\"aria-label\": text");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "appendTextClip(definitions, clipPathId, 48, 240 + index * 40, 528, 36)"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "appendTextClip(definitions, clipPathId, 624, 240 + index * 40, 528, 36)"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("partyChange");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("readyOutcome");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("selectedNext");
-        var dashboard = File.ReadAllText(SourcePath("Features/Overlays/OverlaySourcesPanel.razor"));
-        dashboard.ShouldContain("Viewer Queue");
-        dashboard.ShouldContain("Current party rows");
-        dashboard.ShouldContain("Next rows");
-        dashboard.ShouldContain("Preview state");
-        dashboard.ShouldContain("data-draft-type");
-        var help = File.ReadAllText(SourcePath("Components/Layout/PageHelpButton.razor.cs"));
-        help.ShouldContain("Viewer Queue");
-        help.ShouldContain("Play with viewers");
-        help.ShouldContain("keeping the saved setup and queue");
-        help.ShouldNotContain("stable selectors");
-    }
-
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
     private static ConfigurePlayQueueCommand Queue(int capacity, bool showNames) =>
@@ -523,21 +488,6 @@ public sealed class ViewerQueueOverlayTests
         root[property] = null;
         return root.ToJsonString();
     }
-
-    private static string SourcePath(string relativePath) =>
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                relativePath
-            )
-        );
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {

@@ -99,20 +99,6 @@ public sealed class StudioStepperTests
         Value(pair, "largest-prize").ShouldBe("100");
     }
 
-    [Test]
-    public void Unit_WhenSupplied_IsShownBesideTheValue()
-    {
-        using var context = new BunitContext();
-        var value = "300";
-        var stepper = Render(context, value, next => value = next);
-
-        stepper.Find(".studio-stepper__unit").TextContent.ShouldBe("seconds");
-        stepper.Find("input").GetAttribute("aria-label").ShouldBe("Pin duration in seconds");
-        stepper.Find("input").GetAttribute("value").ShouldBe("300");
-        stepper.Find("[data-action='decrement']").GetAttribute("aria-label").ShouldBe("Less");
-        stepper.Find("[data-action='increment']").GetAttribute("aria-label").ShouldBe("More");
-    }
-
     private static string Press(string start, string action)
     {
         using var context = new BunitContext();

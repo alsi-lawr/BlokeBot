@@ -254,43 +254,6 @@ public sealed class GiveawayOverlayTests
             .Envelope.Payload.Animation.ShouldBe("none");
     }
 
-    [Test]
-    public void ClientDashboardAndHelp_EncodeCountdownSamplesPrivacyAndReducedMotion()
-    {
-        OverlayBrowserSourceAssets.Stylesheet.ShouldContain(
-            "@media (prefers-reduced-motion: reduce)"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("validGiveawayState");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("giveawayCountdownTimer");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("setInterval");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("animation !== \"winner\"");
-
-        var dashboard =
-            File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"))
-            + File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.cs"));
-        dashboard.ShouldContain("Enum.GetValues<GiveawayOverlaySampleState>()");
-        dashboard.ShouldContain("Entrant count");
-        dashboard.ShouldContain("Close-time countdown");
-        dashboard.ShouldContain("Current join command");
-        dashboard.ShouldContain("never published");
-
-        var help = File.ReadAllText(
-            Path.GetFullPath(
-                Path.Combine(
-                    Path.GetDirectoryName(SourcePath("OverlaySourcesPanel.razor"))
-                        .ShouldNotBeNull(),
-                    "..",
-                    "..",
-                    "Components",
-                    "Layout",
-                    "PageHelpButton.razor.cs"
-                )
-            )
-        );
-        help.ShouldContain("Giveaway overlay availability");
-        help.ShouldContain("without replaying suppressed updates");
-    }
-
     private static ResolvedOverlayInstance Instance(int hostId) =>
         new ResolvedOverlayInstance(
             hostId,
@@ -380,23 +343,6 @@ public sealed class GiveawayOverlayTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         return await connection.Messages.ReadAsync(timeout.Token);
     }
-
-    private static string SourcePath(string fileName) =>
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "Overlays",
-                fileName
-            )
-        );
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

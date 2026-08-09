@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
@@ -148,30 +147,6 @@ public sealed class NativeTwitchFeatureChangeObserverTests
                     )
                 )
             );
-    }
-
-    private sealed class ReadyBotAccount : IHostBotAccountTokenStatusProvider
-    {
-        public Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
-            string channelLogin,
-            IEnumerable<string?> requiredScopes,
-            CancellationToken cancellationToken
-        )
-        {
-            var scopes = requiredScopes.OfType<string>().ToImmutableArray();
-            return Task.FromResult(
-                new ActiveBotAccountTokenStatus
-                {
-                    BotLogin = "bot",
-                    Status = new TokenStatus.Ready(
-                        "token",
-                        new TokenValidation("bot-id", "bot", OAuthScopeSet.Create(scopes)),
-                        scopes,
-                        scopes
-                    ),
-                }
-            );
-        }
     }
 
     private sealed class SingleHandlerFactory(HttpMessageHandler handler) : IHttpClientFactory

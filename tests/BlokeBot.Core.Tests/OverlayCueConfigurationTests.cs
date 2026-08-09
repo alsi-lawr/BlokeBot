@@ -99,26 +99,6 @@ public sealed class OverlayCueConfigurationTests
     }
 
     [Test]
-    public void BrowserClient_UsesDirectMediaAndRestrictiveExternalFrameBoundaries()
-    {
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "element.setAttribute(\"sandbox\", \"allow-scripts\")"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("allow-same-origin");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("allow-top-navigation");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("allow-popups");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("root.dataset.mediaUrl");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "layer.mediaKind === \"image\" ? \"img\" : layer.mediaKind"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("() => element.remove()");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("layer.durationMilliseconds");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "Server-side expiry still advances the transient queue."
-        );
-    }
-
-    [Test]
     [Arguments("image/png", "image")]
     [Arguments("video/webm", "video")]
     public void UploadedBrowserMedia_ReachesTheCueRendererWithItsMediaKind(

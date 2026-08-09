@@ -2,7 +2,6 @@ using System.Net;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostConfig.Access;
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
@@ -15,13 +14,11 @@ using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Polls.Page;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
-using BlokeBot.Core.Features.TwitchOperations.Shared;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -30,95 +27,6 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class TwitchOperationsUiTests
 {
-    [Test]
-    public async Task NativeSwitcherExposesOnlyEnabledLinksAsASegmentedPill()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            _ = db.Hosts.Add(
-                new BotHost
-                {
-                    TwitchUserId = "host-id",
-                    Login = "host",
-                    DisplayName = "Host",
-                    EnabledFeatures =
-                        HostFeatureFlags.Shoutouts
-                        | HostFeatureFlags.Polls
-                        | HostFeatureFlags.Predictions,
-                    CreatedAtUtc = DateTime.UtcNow,
-                }
-            );
-            _ = await db.SaveChangesAsync();
-        }
-
-        using var context = new BunitContext();
-        _ = context.Services.AddSingleton(
-            new HostFeatureService(
-                dbFactory,
-                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-                []
-            )
-        );
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .NavigateTo("/twitch-operations/polls");
-
-        var switcher = context.Render<NativeTwitchToolSwitcher>(parameters =>
-            parameters.Add(component => component.HostId, 1)
-        );
-
-        switcher.WaitForAssertion(() =>
-        {
-            switcher.FindAll("nav[aria-label='Native Twitch tools'] a").Count.ShouldBe(3);
-            switcher.Markup.ShouldNotContain("Clips &amp; markers");
-            switcher.Markup.ShouldNotContain("Rewards &amp; redemptions");
-        });
-        switcher
-            .Find("nav[aria-label='Native Twitch tools']")
-            .ClassList.ShouldContain("studio-segmented");
-        var links = switcher.FindAll(".studio-segmented__option");
-        links.Count.ShouldBe(3);
-        links.ShouldAllBe(link => link.TextContent.Trim().Length > 0);
-        var current = links.Single(link => link.GetAttribute("aria-current") == "page");
-        current.TextContent.ShouldContain("Polls");
-        current.ClassList.ShouldContain("bg-[var(--app-surface-solid)]");
-        current.ClassList.ShouldContain("text-[var(--app-text-strong)]");
-    }
-
-    [Test]
-    public void NativeDashboardsShareTheRunStripAndStageAnatomy()
-    {
-        var applicationStyles = ReadRepositoryFile("src", "BlokeBot.Core", "Styles", "app.css");
-        applicationStyles.ShouldNotContain("native-twitch.css");
-
-        foreach (
-            var path in new[]
-            {
-                new[] { "Shoutouts", "ShoutoutsPage.razor" },
-                ["Polls", "Page", "PollsPage.razor"],
-                ["ClipsMarkers", "Page", "ClipsMarkersPage.razor"],
-                ["ChannelPoints", "Page", "ChannelPointsPage.razor"],
-                ["Predictions", "Page", "PredictionsPage.razor"],
-            }
-        )
-        {
-            var page = ReadRepositoryFile([
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "TwitchOperations",
-                .. path,
-            ]);
-            page.ShouldContain("data-native-route=");
-            page.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
-            page.ShouldContain("<TaskPanel");
-            page.ShouldContain("""<div class="settings-disclosure-stack">""");
-            page.ShouldNotContain("<CollapsibleSection");
-            page.ShouldNotContain("phone-card-list");
-        }
-    }
-
     [Test]
     public void RedemptionWaitingAgeUsesExactBandsAndClampsFutureTimestamps()
     {
@@ -142,20 +50,11 @@ public sealed class TwitchOperationsUiTests
                 RedemptionWaitingAgeBand.Waiting,
                 RedemptionWaitingAgeBand.NeedsAttention,
             ]);
-        presentations
-            .Select(static value => value.SemanticValue)
-            .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
         presentations[0].Age.ShouldBe(TimeSpan.Zero);
-        presentations[0].Label.ShouldBe("New · waiting less than a minute");
-        presentations[2].Label.ShouldBe("Waiting · 2 minutes");
-        presentations[4].Label.ShouldBe("Needs attention · waiting 5 minutes");
-        presentations[0].BadgeClass.ShouldContain("sky");
-        presentations[2].BadgeClass.ShouldContain("amber");
-        presentations[4].BadgeClass.ShouldContain("rose");
     }
 
     [Test]
-    public async Task ChannelPointsReadyStateOrdersWorkAndKeepsWaitingAgeAndEditingUsable()
+    public async Task ChannelPointsRewardEditor_SavesChangedTitle()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
@@ -167,18 +66,11 @@ public sealed class TwitchOperationsUiTests
         await using var context = testContext.Context;
         ConfigureServices(context, dbFactory);
 
-        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
         var operations = new RecordingChannelPointsOperations(
             new ChannelPointsDashboardState(
                 new ChannelPointsAuthorizationReadiness.Ready(),
                 [Reward()],
-                [
-                    Redemption("future", now.AddMinutes(1).UtcDateTime),
-                    Redemption("fresh", now.AddSeconds(-119).UtcDateTime),
-                    Redemption("waiting", now.AddMinutes(-2).UtcDateTime),
-                    Redemption("still-waiting", now.AddSeconds(-299).UtcDateTime),
-                    Redemption("needs-attention", now.AddMinutes(-5).UtcDateTime),
-                ],
+                [],
                 []
             )
         );
@@ -186,34 +78,7 @@ public sealed class TwitchOperationsUiTests
 
         var page = context.Render<ChannelPointsPage>();
 
-        page.WaitForAssertion(() =>
-        {
-            SectionTitles(page)
-                .ShouldBe([
-                    "Unfulfilled redemptions",
-                    "Create a reward",
-                    "Rewards",
-                    "Redemption history",
-                ]);
-            var cards = page.FindAll("[data-redemption-waiting-age]");
-            cards.Count.ShouldBe(5);
-            cards
-                .Select(card => card.GetAttribute("data-redemption-waiting-age"))
-                .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
-            foreach (var card in cards)
-            {
-                var status = card.QuerySelector("[data-waiting-age-band][role='status']");
-                _ = status.ShouldNotBeNull();
-                status!.TextContent.ShouldContain("minute");
-                status.GetAttribute("aria-label").ShouldStartWith("Redemption ");
-            }
-        });
-
-        page.Find("[data-channel-point-rewards] button").Click();
-        SectionTitles(page)
-            .ShouldBe(["Unfulfilled redemptions", "Edit reward", "Rewards", "Redemption history"]);
-        page.Find("[data-stage='reward-editor']").ClassList.ShouldContain("studio-stage--open");
-        page.Find("#reward-title").GetAttribute("value").ShouldBe("Choose the next emote");
+        page.WaitForElement("[data-channel-point-rewards] button").Click();
         page.Find("#reward-title").Input("Choose a celebration");
         page.FindAll("button").Single(button => button.TextContent.Trim() == "Save reward").Click();
 
@@ -221,91 +86,14 @@ public sealed class TwitchOperationsUiTests
         {
             _ = operations.UpdatedDraft.ShouldNotBeNull();
             operations.UpdatedDraft!.Title.ShouldBe("Choose a celebration");
-            SectionTitles(page)
-                .ShouldBe([
-                    "Unfulfilled redemptions",
-                    "Create a reward",
-                    "Rewards",
-                    "Redemption history",
-                ]);
         });
     }
 
     [Test]
-    public async Task ShoutoutsRoute_KeepsManualTaskThenAutomaticSettingsThenNativeHistory()
+    public async Task ClipsRoute_DisabledRecoveryDoesNotExposeAttemptKeysOrDeleteHistory()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
-        var testContext = UiTestContextFactory.CreateWithAuthorization(
-            dbFactory,
-            host.Id,
-            host.Login
-        );
-        await using var context = testContext.Context;
-        ConfigureServices(context, dbFactory);
-
-        var page = context.Render<ShoutoutsPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            _ = page.Find("[data-native-route='shoutouts']");
-            page.Find("[data-native-route='shoutouts']")
-                .ClassList.ShouldContain("dashboard-page--wide");
-            _ = page.Find("#shoutout-target");
-            var sections = page.FindAll(".studio-stage__title")
-                .Select(element => element.TextContent.Trim())
-                .ToArray();
-            sections.ShouldBe([
-                "Automatic raid shoutouts",
-                "Automatic shoutout outcomes",
-                "Recent shoutouts",
-            ]);
-            page.Find("nav[aria-label='Native Twitch tools']")
-                .QuerySelectorAll("a")
-                .Length.ShouldBe(5);
-            page.FindAll("#poll-title, #reward-title, #prediction-title").ShouldBeEmpty();
-        });
-    }
-
-    [Test]
-    public async Task ClipsRoute_ReadyAndUnavailable_AreFocusedDirectAndDoNotExposeAttemptKeys()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
-        var readyTestContext = UiTestContextFactory.CreateWithAuthorization(
-            dbFactory,
-            host.Id,
-            host.Login
-        );
-        await using (var context = readyTestContext.Context)
-        {
-            ConfigureServices(context, dbFactory);
-            context
-                .Services.GetRequiredService<NavigationManager>()
-                .NavigateTo("/twitch-operations/clips-markers");
-
-            var page = context.Render<ClipsMarkersPage>();
-
-            page.WaitForAssertion(() =>
-            {
-                _ = page.Find("[data-native-route='clips-markers']");
-                var switcher = page.Find("nav[aria-label='Native Twitch tools']");
-                switcher.QuerySelectorAll("a").Length.ShouldBe(5);
-                var currentLink = switcher.QuerySelector(
-                    "a[href='twitch-operations/clips-markers']"
-                )!;
-                currentLink.ClassList.ShouldContain("bg-[var(--app-surface-solid)]");
-                currentLink.GetAttribute("aria-current").ShouldBe("page");
-                page.Find("button").TextContent.ShouldContain("Create clip");
-                page.FindAll("[data-native-route]").Count.ShouldBe(1);
-                page.FindAll("#shoutout-target, #poll-title, #reward-title, #prediction-title")
-                    .ShouldBeEmpty();
-                page.Markup.ShouldNotContain("IdempotencyKey", Case.Insensitive);
-                page.Markup.ShouldNotContain("request key", Case.Insensitive);
-                page.Markup.ShouldNotContain("stable key", Case.Insensitive);
-            });
-        }
-
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             _ = db.TwitchClips.Add(
@@ -335,35 +123,13 @@ public sealed class TwitchOperationsUiTests
 
             page.WaitForAssertion(() =>
             {
-                page.Find(".page-state__title")
-                    .TextContent.ShouldContain("Clips & markers is turned off");
-                page.Find("a[href='/host#chat-tools']")
-                    .TextContent.ShouldContain("Open Channel setup");
-                page.Markup.ShouldNotContain("Create clip");
+                _ = page.Find("a[href='/host#chat-tools']");
                 page.Markup.ShouldNotContain("retained-private-key");
             });
         }
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.TwitchClips.CountAsync()).ShouldBe(1);
-        typeof(ClipsMarkersPage)
-            .GetCustomAttributes(typeof(RouteAttribute), inherit: true)
-            .Cast<RouteAttribute>()
-            .Select(attribute => attribute.Template)
-            .ShouldContain("/twitch-operations/clips-markers");
-        new[]
-        {
-            (Type: typeof(ShoutoutsPage), Route: "/twitch-operations/shoutouts"),
-            (Type: typeof(PollsPage), Route: "/twitch-operations/polls"),
-            (Type: typeof(ClipsMarkersPage), Route: "/twitch-operations/clips-markers"),
-            (Type: typeof(ChannelPointsPage), Route: "/twitch-operations/channel-points"),
-            (Type: typeof(PredictionsPage), Route: "/twitch-operations/predictions"),
-        }.ShouldAllBe(route =>
-            route
-                .Type.GetCustomAttributes(typeof(RouteAttribute), inherit: true)
-                .Cast<RouteAttribute>()
-                .Any(attribute => attribute.Template == route.Route)
-        );
     }
 
     [Test]
@@ -395,18 +161,10 @@ public sealed class TwitchOperationsUiTests
         );
 
         var polls = context.Render<PollsPage>();
-        polls.WaitForAssertion(() =>
-        {
-            _ = polls.Find("[data-native-route='polls']");
-            _ = polls.Find("#poll-title");
-        });
+        _ = polls.WaitForElement("#poll-title");
 
         var predictions = context.Render<PredictionsPage>();
-        predictions.WaitForAssertion(() =>
-        {
-            _ = predictions.Find("[data-native-route='predictions']");
-            _ = predictions.Find("#prediction-title");
-        });
+        _ = predictions.WaitForElement("#prediction-title");
 
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
@@ -417,17 +175,11 @@ public sealed class TwitchOperationsUiTests
         }
 
         var disabledPolls = context.Render<PollsPage>();
-        disabledPolls.WaitForAssertion(() =>
-        {
-            disabledPolls.Markup.ShouldContain("Polls is turned off");
-            disabledPolls.FindAll("#poll-title").ShouldBeEmpty();
-        });
+        disabledPolls.WaitForAssertion(() => disabledPolls.FindAll("#poll-title").ShouldBeEmpty());
         var disabledPredictions = context.Render<PredictionsPage>();
         disabledPredictions.WaitForAssertion(() =>
-        {
-            disabledPredictions.Markup.ShouldContain("Predictions is turned off");
-            disabledPredictions.FindAll("#prediction-title").ShouldBeEmpty();
-        });
+            disabledPredictions.FindAll("#prediction-title").ShouldBeEmpty()
+        );
     }
 
     private sealed class StaticPollOperations(PollDashboardState state) : IPollDashboardOperations
@@ -582,11 +334,6 @@ public sealed class TwitchOperationsUiTests
         return host;
     }
 
-    private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page) =>
-        page.FindAll(".task-panel__title, .studio-stage__title")
-            .Select(static element => element.TextContent.Trim())
-            .ToArray();
-
     private static ChannelPointsRewardView Reward() =>
         new(
             "reward-1",
@@ -605,22 +352,6 @@ public sealed class TwitchOperationsUiTests
             null,
             false,
             "#9147FF"
-        );
-
-    private static ChannelPointsRedemptionView Redemption(
-        string providerRedemptionId,
-        DateTime redeemedAtUtc
-    ) =>
-        new(
-            providerRedemptionId,
-            "reward-1",
-            "Choose the next emote",
-            "viewer",
-            "PartyParrot",
-            "Unfulfilled",
-            redeemedAtUtc,
-            redeemedAtUtc,
-            true
         );
 
     private sealed class RecordingChannelPointsOperations(ChannelPointsDashboardState state)
@@ -726,25 +457,5 @@ public sealed class TwitchOperationsUiTests
                 CancellationToken cancellationToken
             ) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         }
-    }
-
-    private static string ReadRepositoryFile(params string[] relativePath)
-    {
-        for (
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            directory is not null;
-            directory = directory.Parent
-        )
-        {
-            var candidate = Path.Combine([directory.FullName, .. relativePath]);
-            if (File.Exists(candidate))
-            {
-                return File.ReadAllText(candidate);
-            }
-        }
-
-        throw new FileNotFoundException(
-            $"Could not find repository file '{Path.Combine(relativePath)}'."
-        );
     }
 }

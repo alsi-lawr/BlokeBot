@@ -69,8 +69,4 @@ public sealed class ValidationTests
     private static IReadOnlyList<TError> GetErrors<TValue, TError>(
         Validation<TValue, TError> validation
     ) => validation.Match<IReadOnlyList<TError>>(static _ => [], static errors => errors);
-
-    private sealed record AggregateError(string Message);
-
-    private sealed class TestException : Exception { }
 }

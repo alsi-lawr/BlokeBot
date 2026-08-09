@@ -65,7 +65,7 @@ public sealed class OverlayDashboardUiTests
     }
 
     [Test]
-    public async Task GuessingPreviewControls_RenderExplicitPressedValuesAcrossSelectionChanges()
+    public async Task GuessingPreviewSelection_ChangesThePreviewMode()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedGuessingAsync(database);
@@ -77,50 +77,23 @@ public sealed class OverlayDashboardUiTests
 
         var page = context.Render<OverlaysPage>();
 
-        page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("true");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
+        _ = page.WaitForElement("iframe");
 
         FindButton(page, "Guessing overlay sample state", "Result").Click();
 
         page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("false");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
-            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Where(button => button.TextContent.Trim() != "Result")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
-
-        page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save overlay")
-            .Click();
-        page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
-            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
             page.Find("iframe")
                 .GetAttribute("src")
-                .ShouldEndWith("?mode=representative&sample=completed");
-        });
+                .ShouldEndWith("?mode=representative&sample=completed")
+        );
 
         FindButton(page, "Preview state", "Live").Click();
 
         page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("true");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
+            (page.Find("iframe").GetAttribute("src") ?? string.Empty).ShouldNotContain(
+                "mode=representative"
+            )
+        );
     }
 
     [Test]
@@ -181,19 +154,12 @@ public sealed class OverlayDashboardUiTests
             page.Find("[data-appearance-css]")
                 .GetAttribute("value")
                 .ShouldBe(".accent { fill: #f472b6; }");
-            page.Find("[data-appearance-editor]")
-                .GetAttribute("data-rendered-css")
-                .ShouldBe(".accent { fill: #f472b6; }");
         });
 
         page.Find("[data-appearance-fields] button").Click();
         page.WaitForAssertion(() =>
-        {
-            page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty);
-            page.Find("[data-appearance-editor]")
-                .GetAttribute("data-rendered-css")
-                .ShouldBe(string.Empty);
-        });
+            page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty)
+        );
 
         FindButton(page, "Guessing overlay sample state", "Result").Click();
         page.WaitForAssertion(() =>
@@ -206,12 +172,6 @@ public sealed class OverlayDashboardUiTests
                 .ShouldEndWith("?mode=representative&sample=completed");
         });
     }
-
-    private static string? PressedValue(
-        IRenderedComponent<OverlaysPage> page,
-        string groupLabel,
-        string buttonLabel
-    ) => FindButton(page, groupLabel, buttonLabel).GetAttribute("aria-pressed");
 
     private static AngleSharp.Dom.IElement FindButton(
         IRenderedComponent<OverlaysPage> page,

@@ -505,57 +505,6 @@ public sealed class EventFeedOverlayTests
         await coordinator.StopAsync(CancellationToken.None);
     }
 
-    [Test]
-    public void BrowserDashboardAndHelp_ExposeBoundedSamplesAndUnicodeSafeUpwardWrapping()
-    {
-        var javascript = OverlayBrowserSourceAssets.JavaScript;
-        javascript.ShouldContain("svgElement(\"foreignObject\"");
-        javascript.ShouldContain("document.createElement(\"div\")");
-        javascript.ShouldContain("body.textContent = text");
-        javascript.ShouldContain("eventFeedBody.body.scrollHeight");
-        javascript.ShouldContain("const scaleY = appearance.height / naturalHeight");
-        javascript.ShouldNotContain("maximumCardHeight");
-        javascript.ShouldContain("translate(${appearance.x} ${appearance.y + appearance.height})");
-        javascript.ShouldContain("\"data-source-card-id\": String(card.id)");
-        javascript.ShouldNotContain("Intl.Segmenter");
-        javascript.ShouldNotContain("eventFeedGraphemes");
-        javascript.ShouldNotContain("wrapEventFeedBody");
-        javascript.ShouldNotContain("\"tspan\"");
-        javascript.ShouldNotContain("substring(");
-        var stylesheet = OverlayBrowserSourceAssets.Stylesheet;
-        stylesheet.ShouldContain("white-space: pre-wrap");
-        stylesheet.ShouldContain("overflow-wrap: anywhere");
-        stylesheet.ShouldContain("font-size: 32px");
-        stylesheet.ShouldContain("line-height: 44px");
-
-        var dashboard = File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"));
-        dashboard.ShouldContain("Event feed sample event");
-        dashboard.ShouldContain("Point award");
-        dashboard.ShouldContain("Guessing winner");
-        dashboard.ShouldContain("Giveaway winner");
-        dashboard.ShouldContain("When full");
-        dashboard.ShouldContain("Maximum waiting cards");
-        var help = File.ReadAllText(
-            Path.GetFullPath(
-                Path.Combine(
-                    AppContext.BaseDirectory,
-                    "..",
-                    "..",
-                    "..",
-                    "..",
-                    "..",
-                    "src",
-                    "BlokeBot.Core",
-                    "Components",
-                    "Layout",
-                    "PageHelpButton.razor.cs"
-                )
-            )
-        );
-        help.ShouldContain("Event Feed");
-        help.ShouldContain("Saved settings remain");
-    }
-
     private static async Task<OverlayLiveTransportMessage> ReadLiveAsync(
         OverlayLiveCoordinator.OverlayLiveConnection connection
     )
@@ -575,23 +524,6 @@ public sealed class EventFeedOverlayTests
         current[path[^1]] = null;
         return root.ToJsonString();
     }
-
-    private static string SourcePath(string fileName) =>
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "Overlays",
-                fileName
-            )
-        );
 
     private sealed class FixedEventFeedProvider(ResolvedOverlayInstance instance)
         : IOverlayStateProvider

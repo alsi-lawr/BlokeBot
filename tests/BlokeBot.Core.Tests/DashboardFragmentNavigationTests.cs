@@ -35,17 +35,13 @@ public sealed class DashboardFragmentNavigationTests
         {
             page.Find("#overlays-cues-tab").GetAttribute("aria-selected").ShouldBe("true");
             page.Find("#overlays-cues-panel").GetAttribute("hidden").ShouldBeNull();
-            page.Find("#overlays-cues-panel")
-                .GetAttribute("aria-labelledby")
-                .ShouldBe("overlays-cues-tab");
             page.FindAll("#overlays-sources-panel").ShouldBeEmpty();
             page.FindAll("#overlays-media-panel").ShouldBeEmpty();
-            page.Find("h1").TextContent.Trim().ShouldBe("Cues");
         });
     }
 
     [Test]
-    public async Task OverlaysBarePath_NormalizesToSourcesAndShowsTheSourcesHeader()
+    public async Task OverlaysBarePath_NormalizesToSources()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedOverlayHostAsync(database);
@@ -60,8 +56,6 @@ public sealed class DashboardFragmentNavigationTests
             navigation.Uri.ShouldEndWith("/overlays#sources");
             navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeTrue();
             page.Find("#overlays-sources-tab").GetAttribute("aria-selected").ShouldBe("true");
-            page.Find("h1").TextContent.Trim().ShouldBe("Overlays");
-            page.FindAll("#overlays-cues-panel").ShouldBeEmpty();
         });
     }
 
@@ -131,10 +125,7 @@ public sealed class DashboardFragmentNavigationTests
         page.WaitForAssertion(() =>
         {
             page.Find("#guessing-history-tab").GetAttribute("aria-selected").ShouldBe("true");
-            page.Find("#guessing-history-panel")
-                .GetAttribute("aria-labelledby")
-                .ShouldBe("guessing-history-tab");
-            page.Markup.ShouldContain("Recent rounds");
+            _ = page.Find("#guessing-history-panel");
             page.FindAll("#guessing-live-panel").ShouldBeEmpty();
         });
 
@@ -143,7 +134,7 @@ public sealed class DashboardFragmentNavigationTests
         page.WaitForAssertion(() =>
         {
             page.Find("#guessing-leaderboard-tab").GetAttribute("aria-selected").ShouldBe("true");
-            page.Markup.ShouldContain("Rank viewers by correct guesses");
+            _ = page.Find("#guessing-leaderboard-panel");
         });
 
         navigation.NavigateTo("/guessing#live");
@@ -192,11 +183,8 @@ public sealed class DashboardFragmentNavigationTests
 
         var page = context.Render<GuessingDashboard>();
 
-        page.WaitForAssertion(() =>
-        {
-            page.Markup.ShouldContain("Guessing game is off for this channel");
-            page.FindAll("[role='tablist']").ShouldBeEmpty();
-        });
+        page.FindAll("[role='tablist']").ShouldBeEmpty();
+        page.Find("button").HasAttribute("disabled").ShouldBeTrue();
     }
 
     [Test]

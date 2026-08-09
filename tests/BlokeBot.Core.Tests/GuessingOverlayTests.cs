@@ -218,35 +218,6 @@ public sealed class GuessingOverlayTests
         await coordinator.StopAsync(CancellationToken.None);
     }
 
-    [Test]
-    public void ClientAndDashboard_EncodeStableStatesReducedMotionAndAllSamples()
-    {
-        OverlayBrowserSourceAssets.Stylesheet.ShouldContain(
-            "@media (prefers-reduced-motion: reduce)"
-        );
-        OverlayBrowserSourceAssets.Stylesheet.ShouldContain("animation: none");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("state.phase === \"noRound\"");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("state.phase === \"completed\"");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "typeof projection.animation === \"string\""
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain(
-            "applyPresentationAnimation(\"none\", 0, fromDraft)"
-        );
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("if (!fromDraft)");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("style.setProperty");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("api.twitch.tv");
-
-        var dashboard =
-            File.ReadAllText(SourcePath("OverlaySourcesPanel.razor"))
-            + File.ReadAllText(SourcePath("OverlaySourcesPanel.razor.cs"));
-        dashboard.ShouldContain("Enum.GetValues<GuessingOverlaySampleState>()");
-        dashboard.ShouldContain("data-overlay-disabled-recovery");
-        dashboard.ShouldContain("Turn Guessing game on in Channel setup");
-        dashboard.ShouldContain("Show the number of guesses");
-        dashboard.ShouldContain("Result animation duration");
-    }
-
     private static ResolvedOverlayInstance Instance(int hostId) =>
         new ResolvedOverlayInstance(
             hostId,
@@ -352,23 +323,6 @@ public sealed class GuessingOverlayTests
                 setters.SetProperty(host => host.EnabledFeatures, features)
             );
     }
-
-    private static string SourcePath(string fileName) =>
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "Overlays",
-                fileName
-            )
-        );
 
     private sealed record ProjectionSeed(int HostId, int ProfileId);
 

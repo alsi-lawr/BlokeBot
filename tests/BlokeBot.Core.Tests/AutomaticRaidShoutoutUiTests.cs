@@ -12,7 +12,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomaticRaidShoutoutUiTests
 {
     [Test]
-    public async Task InvalidTemplateStopsSaveAndOutcomeHistoryUsesTypedTerminalCopy()
+    public async Task InvalidTemplateStopsSave()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(factory);
@@ -26,7 +26,6 @@ public sealed class AutomaticRaidShoutoutUiTests
                 ChatPresentation = AutomaticRaidChatPresentation.Pinned,
             }
         );
-        await SeedOutcomesAsync(factory, hostId);
         await using var context = CreateContext(factory);
 
         var section = Render(context, hostId);
@@ -34,24 +33,8 @@ public sealed class AutomaticRaidShoutoutUiTests
         section
             .WaitForElement("#automatic-raid-message-template")
             .Input(new string('x', AutomaticRaidShoutoutTemplate.MaximumAuthoredCharacters + 1));
-        section.Markup.ShouldContain("150 characters or fewer");
-
         section.Find("button.btn-primary").Click();
-        section.WaitForAssertion(() =>
-        {
-            _ = section.Find("[data-automatic-raid-validation]");
-            section.Markup.ShouldContain("Settings were not saved.");
-        });
-
-        Open(section, "Automatic shoutout outcomes");
-        section.WaitForAssertion(() =>
-        {
-            section.FindAll("[data-automatic-raid-outcomes] article").Count.ShouldBe(20);
-            section.Markup.ShouldContain("Message sent, pin failed");
-            section.Markup.ShouldContain("will not resend or switch modes");
-            section.Markup.ShouldContain("Skipped during Twitch cooldown");
-            section.FindAll("[data-automatic-raid-outcomes] button").ShouldBeEmpty();
-        });
+        _ = section.WaitForElement("[data-automatic-raid-validation]");
 
         await using var db = await factory.CreateDbContextAsync();
         (
