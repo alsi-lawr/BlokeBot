@@ -25,6 +25,8 @@ jobs:
         run: dotnet tool restore
       - name: Check C# formatting
         run: dotnet csharpier check .
+      - name: Test native smoke cleanup
+        run: python -m unittest discover -s packaging/smoke -p "test_*.py"
       - name: Build and test
         run: >-
           dotnet test BlokeBot.slnx
