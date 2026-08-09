@@ -18,6 +18,47 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostedChannelLifecycleNotifierTests
 {
     [Test]
+    public async Task InterruptedStop_ApplicationRestart_RecoversStoppedAndLeavesStartingResumable()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var changedAtUtc = DateTime.UtcNow.AddMinutes(-1);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.AddRange(
+                Host("stopping", BotChannelRuntimeState.Stopping, changedAtUtc),
+                Host("starting", BotChannelRuntimeState.Starting, changedAtUtc)
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        var events = TestEventBus.Create<AppEventKind>();
+        var notifications = 0;
+        _ = events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            ObserverIdentity.Named("Test.HostedChannelStopRecovery"),
+            (_, _) =>
+            {
+                notifications++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var lifecycle = new HostedChannelRuntimeLifecycleService(
+            dbFactory,
+            new HostedChannelChangeNotifier(events)
+        );
+
+        await lifecycle.RecoverInterruptedStopsAsync(CancellationToken.None);
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var states = await verify.Hosts.ToDictionaryAsync(host => host.Login);
+        states["stopping"].BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
+        states["stopping"].BotRuntimeStateChangedAtUtc!.Value.ShouldBeGreaterThan(changedAtUtc);
+        states["starting"].BotRuntimeState.ShouldBe(BotChannelRuntimeState.Starting);
+        states["starting"].BotRuntimeStateChangedAtUtc.ShouldBe(changedAtUtc);
+        notifications.ShouldBe(1);
+    }
+
+    [Test]
     public async Task HostedChannel_StartAndReconnect_ReconcilesExternalAndFormerlyLocalPolls()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -156,6 +197,21 @@ public sealed class HostedChannelLifecycleNotifierTests
         );
         _ = await db.SaveChangesAsync();
     }
+
+    private static BotHost Host(
+        string login,
+        BotChannelRuntimeState state,
+        DateTime changedAtUtc
+    ) =>
+        new()
+        {
+            Login = login,
+            DisplayName = login,
+            TwitchUserId = $"{login}-id",
+            BotRuntimeState = state,
+            BotRuntimeStateChangedAtUtc = changedAtUtc,
+            CreatedAtUtc = changedAtUtc,
+        };
 
     private static HttpResponseMessage PollResponse(string id, string status, int votes) =>
         new(HttpStatusCode.OK)

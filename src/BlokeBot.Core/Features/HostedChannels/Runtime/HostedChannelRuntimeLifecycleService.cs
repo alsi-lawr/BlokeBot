@@ -10,6 +10,28 @@ public sealed class HostedChannelRuntimeLifecycleService(
     HostedChannelChangeNotifier changes
 )
 {
+    public async Task RecoverInterruptedStopsAsync(CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var interrupted = await db
+            .Hosts.Where(host => host.BotRuntimeState == BotChannelRuntimeState.Stopping)
+            .ToArrayAsync(ct);
+        if (interrupted.Length == 0)
+        {
+            return;
+        }
+
+        var recoveredAtUtc = DateTime.UtcNow;
+        foreach (var host in interrupted)
+        {
+            host.BotRuntimeState = BotChannelRuntimeState.Stopped;
+            host.BotRuntimeStateChangedAtUtc = recoveredAtUtc;
+        }
+
+        _ = await db.SaveChangesAsync(ct);
+        _ = await changes.NotifyChangedAsync(ct);
+    }
+
     public async Task MarkStartedAsync(string channel, CancellationToken ct)
     {
         var normalized = LoginName.Parse(channel);

@@ -12,6 +12,7 @@ using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Core.Features.Moments;
@@ -172,10 +173,15 @@ public static class BlokeBotApplication
     public static async Task InitializeBlokeBotPersistenceAsync(
         this WebApplication app,
         CancellationToken cancellationToken
-    ) =>
+    )
+    {
         await app
             .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
             .InitializeAsync(cancellationToken);
+        await app
+            .Services.GetRequiredService<HostedChannelRuntimeLifecycleService>()
+            .RecoverInterruptedStopsAsync(cancellationToken);
+    }
 
     public static WebApplication UseBlokeBotCore(
         this WebApplication app,
