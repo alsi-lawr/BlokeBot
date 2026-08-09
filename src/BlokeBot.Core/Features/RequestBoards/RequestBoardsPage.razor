@@ -391,7 +391,9 @@
                                 </div>
                                 <div class="studio-span-8 space-y-2">
                                     <span class="label">When do viewers get points back?</span>
-                                    <StudioChoiceCards id="request-board-refunds" AriaLabel="When do viewers get points back?">
+                                    <StudioChoiceCards id="request-board-refunds"
+                                                       AriaLabel="When do viewers get points back?"
+                                                       Columns="StudioChoiceCardsColumns.TwoThenThree">
                                         @foreach (var choice in _refundChoices)
                                         {
                                             <StudioChoiceCard @key="choice.Policy"
