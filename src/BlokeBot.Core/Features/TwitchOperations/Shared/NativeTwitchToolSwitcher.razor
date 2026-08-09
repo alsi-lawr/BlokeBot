@@ -1,22 +1,22 @@
-<nav class="native-tool-switcher" aria-label="Native Twitch tools">
+<nav class="studio-segmented max-w-full flex-wrap" aria-label="Native Twitch tools">
     @if (_shoutouts)
     {
-    <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/shoutouts">Shoutouts</NavLink>
+    <NavLink class="studio-segmented__option text-center no-underline" ActiveClass="bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]" Match="NavLinkMatch.All" href="twitch-operations/shoutouts">Shoutouts</NavLink>
     }
     @if (_polls)
     {
-    <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/polls">Polls</NavLink>
+    <NavLink class="studio-segmented__option text-center no-underline" ActiveClass="bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]" Match="NavLinkMatch.All" href="twitch-operations/polls">Polls</NavLink>
     }
     @if (_clips)
     {
-    <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/clips-markers">Clips &amp; markers</NavLink>
+    <NavLink class="studio-segmented__option text-center no-underline" ActiveClass="bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]" Match="NavLinkMatch.All" href="twitch-operations/clips-markers">Clips &amp; markers</NavLink>
     }
     @if (_rewards)
     {
-    <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/channel-points">Rewards &amp; redemptions</NavLink>
+    <NavLink class="studio-segmented__option text-center no-underline" ActiveClass="bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]" Match="NavLinkMatch.All" href="twitch-operations/channel-points">Rewards &amp; redemptions</NavLink>
     }
     @if (_predictions)
     {
-    <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/predictions">Predictions</NavLink>
+    <NavLink class="studio-segmented__option text-center no-underline" ActiveClass="bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]" Match="NavLinkMatch.All" href="twitch-operations/predictions">Predictions</NavLink>
     }
 </nav>

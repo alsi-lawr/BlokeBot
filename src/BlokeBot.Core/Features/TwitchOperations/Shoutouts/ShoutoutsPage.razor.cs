@@ -6,6 +6,14 @@ namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 public partial class ShoutoutsPage
 {
     private string _targetLogin = string.Empty;
+    private bool _historyOpen;
+
+    private string _historySummary =>
+        State is not { History.Count: > 0 } history
+            ? "No shoutouts recorded yet"
+            : $"Sent {history.History.Count(item => item.Direction == ShoutoutDirection.Sent)}"
+                + $" · received {history.History.Count(item => item.Direction == ShoutoutDirection.Received)}"
+                + $" · last: @{history.History[0].TargetLogin} {history.History[0].OccurredAtUtc.ToLocalTime():MMM d}";
 
     private string _cooldownText =>
         State switch

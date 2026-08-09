@@ -156,16 +156,18 @@ local succeeded, failure = pcall(function()
     viset.sleep("350ms")
     viset.page.evaluate(viset.javascript([=[
       (() => {
-        const trigger = [...document.querySelectorAll(".disclosure-trigger")].find(
+        const trigger = [...document.querySelectorAll(".studio-stage__header")].find(
           candidate => candidate.textContent.includes("Automatic raid shoutouts")
         );
-        if (!trigger) throw new Error("Automatic raid shoutout disclosure was not found.");
+        if (!trigger) throw new Error("Automatic raid shoutout stage was not found.");
         trigger.click();
         return true;
       })()
     ]=]))
     viset.page.wait_for(
-      viset.javascript([[Boolean(document.querySelector("[data-automatic-raid-shoutouts]"))]]),
+      viset.javascript(
+        [[document.querySelector("[data-stage='automatic-raid']").classList.contains("studio-stage--open")]]
+      ),
       "20s"
     )
   end

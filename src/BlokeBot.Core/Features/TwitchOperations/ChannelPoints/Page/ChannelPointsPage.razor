@@ -47,125 +47,218 @@
         }
         else
         {
-            <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
-            <CollapsibleSection Title="Unfulfilled redemptions" Description="Fulfil a request or cancel it so Twitch refunds the viewer." InitiallyOpen="@(State.ActiveRedemptions.Count > 0)">
-                <div class="p-4">
-                    @if (State.ActiveRedemptions.Count == 0)
-                    {
-                        <p class="text-sm text-muted-foreground">No redemptions need attention.</p>
-                    }
-                    else
-                    {
-                        <div class="phone-card-list" data-active-redemptions>
-                            @foreach (var redemption in State.ActiveRedemptions)
-                            {
-                                var waitingAge = RedemptionWaitingAgePresentation.Create(redemption.RedeemedAtUtc, _timeProvider);
-                                <article class="surface-row rounded-lg p-4"
-                                         data-redemption-waiting-age="@waitingAge.SemanticValue"
-                                         @key="redemption.ProviderRedemptionId">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div class="min-w-0">
-                                            <strong>@redemption.RewardTitle</strong>
-                                            <p class="mt-1 text-sm text-muted-foreground">@redemption.UserLogin@if (!string.IsNullOrWhiteSpace(redemption.UserInput)) { <text> · @redemption.UserInput</text> }</p>
-                                        </div>
-                                        <div class="flex flex-wrap items-center justify-end gap-2">
-                                            <span class="@waitingAge.BadgeClass"
-                                                  data-waiting-age-band="@waitingAge.SemanticValue"
-                                                  role="status"
-                                                  aria-label="@waitingAge.AccessibleLabel">@waitingAge.Label</span>
-                                            @if (redemption.IsManageable)
-                                            {
-                                                <button class="btn-primary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button>
-                                                <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-sm text-muted-foreground">Read-only</span>
-                                            }
-                                        </div>
-                                    </div>
-                                </article>
-                            }
-                        </div>
-                    }
-                </div>
-            </CollapsibleSection>
+            <TaskPanel Title="Unfulfilled redemptions" Description="Fulfil a request or cancel it so Twitch refunds the viewer.">
+                @if (State.ActiveRedemptions.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No redemptions need attention.</p>
+                }
+                else
+                {
+                    <div class="grid gap-2" data-active-redemptions>
+                        @foreach (var redemption in State.ActiveRedemptions)
+                        {
+                            var waitingAge = RedemptionWaitingAgePresentation.Create(redemption.RedeemedAtUtc, _timeProvider);
+                            <NativeOperationRow @key="redemption.ProviderRedemptionId"
+                                                data-redemption-waiting-age="@waitingAge.SemanticValue"
+                                                Title="@redemption.RewardTitle">
+                                <ChildContent>@redemption.UserLogin@(string.IsNullOrWhiteSpace(redemption.UserInput) ? string.Empty : $" · {redemption.UserInput}")</ChildContent>
+                                <Actions>
+                                    <span class="@waitingAge.BadgeClass"
+                                          data-waiting-age-band="@waitingAge.SemanticValue"
+                                          role="status"
+                                          aria-label="@waitingAge.AccessibleLabel">@waitingAge.Label</span>
+                                    @if (redemption.IsManageable)
+                                    {
+                                        <button class="btn-primary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button>
+                                        <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-sm text-muted-foreground">Read-only</span>
+                                    }
+                                </Actions>
+                            </NativeOperationRow>
+                        }
+                    </div>
+                }
+            </TaskPanel>
 
-            <CollapsibleSection Title="Rewards" Description="Manage BlokeBot rewards. Rewards created elsewhere remain read-only." InitiallyOpen="@(State.Rewards.Count > 0)">
-                <div class="p-4">
+            <div class="settings-disclosure-stack">
+                <StudioStage Key="reward-editor"
+                             Number="1"
+                             Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")"
+                             Summary="@_editorSummary"
+                             Open="@IsStageOpen(ChannelPointsStage.Editor)"
+                             OpenChanged="@(open => SetStage(ChannelPointsStage.Editor, open))">
+                    <div class="studio-grid">
+                        <div class="studio-span-8">
+                            <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" MaxLength="45" />
+                            <p class="mt-1 text-xs text-muted-foreground">Up to 45 characters, shown on the reward tile.</p>
+                        </div>
+                        <div class="studio-span-4">
+                            <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
+                            <p class="mt-1 text-xs text-muted-foreground">1 to 1,000,000.</p>
+                        </div>
+                        <div class="studio-span-8">
+                            <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" MaxLength="200" />
+                            <p class="mt-1 text-xs text-muted-foreground">What viewers should send or do, up to 200 characters.</p>
+                        </div>
+                        <div class="studio-span-4">
+                            <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
+                            <p class="mt-1 text-xs text-muted-foreground">A #RRGGBB value, or blank for Twitch's default.</p>
+                        </div>
+                        <div class="studio-span-6 flex flex-wrap items-center gap-3">
+                            <button type="button"
+                                    id="reward-user-input"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_rewardUserInput ? "true" : "false")"
+                                    aria-label="Require viewer input"
+                                    @onclick="() => _rewardUserInput = !_rewardUserInput"></button>
+                            <span class="text-sm font-semibold text-[var(--app-text-strong)]">Require viewer input</span>
+                        </div>
+                        <div class="studio-span-6 flex flex-wrap items-center gap-3">
+                            <button type="button"
+                                    id="reward-queue-skip"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_rewardQueueSkip ? "true" : "false")"
+                                    aria-label="Skip request queue"
+                                    @onclick="() => _rewardQueueSkip = !_rewardQueueSkip"></button>
+                            <span class="text-sm font-semibold text-[var(--app-text-strong)]">Skip request queue</span>
+                        </div>
+                        <div class="studio-span-8 flex flex-wrap items-center gap-3">
+                            <button type="button"
+                                    id="reward-stream-limit"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_rewardMaxPerStreamEnabled ? "true" : "false")"
+                                    aria-label="Limit per stream"
+                                    @onclick="() => _rewardMaxPerStreamEnabled = !_rewardMaxPerStreamEnabled"></button>
+                            <span class="text-sm font-semibold text-[var(--app-text-strong)]">Limit per stream</span>
+                        </div>
+                        @if (_rewardMaxPerStreamEnabled)
+                        {
+                            <div class="studio-span-4">
+                                <Field Id="reward-stream-limit-value" Label="Maximum per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" />
+                            </div>
+                        }
+                        <div class="studio-span-8 flex flex-wrap items-center gap-3">
+                            <button type="button"
+                                    id="reward-user-stream-limit"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_rewardMaxPerUserPerStreamEnabled ? "true" : "false")"
+                                    aria-label="Limit per viewer per stream"
+                                    @onclick="() => _rewardMaxPerUserPerStreamEnabled = !_rewardMaxPerUserPerStreamEnabled"></button>
+                            <span class="text-sm font-semibold text-[var(--app-text-strong)]">Limit per viewer per stream</span>
+                        </div>
+                        @if (_rewardMaxPerUserPerStreamEnabled)
+                        {
+                            <div class="studio-span-4">
+                                <Field Id="reward-user-stream-limit-value" Label="Maximum per viewer" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" />
+                            </div>
+                        }
+                        <div class="studio-span-8 flex flex-wrap items-center gap-3">
+                            <button type="button"
+                                    id="reward-cooldown"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_rewardCooldownEnabled ? "true" : "false")"
+                                    aria-label="Use a global cooldown"
+                                    @onclick="() => _rewardCooldownEnabled = !_rewardCooldownEnabled"></button>
+                            <span class="text-sm font-semibold text-[var(--app-text-strong)]">Use a global cooldown</span>
+                        </div>
+                        @if (_rewardCooldownEnabled)
+                        {
+                            <div class="studio-span-4">
+                                <Field Id="reward-cooldown-seconds" Label="Cooldown in seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" />
+                                <p class="mt-1 text-xs text-muted-foreground">@CooldownProse()</p>
+                            </div>
+                        }
+                    </div>
+                    <div class="mt-4 rounded-[14px] border border-dashed border-[var(--app-control-border)] bg-[var(--app-surface-muted)] px-[1.05rem] py-[0.85rem]">
+                        <p class="mb-2 text-[0.72rem] font-bold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">Viewers will see — the reward tile</p>
+                        <div class="w-[8.5rem]">
+                            <div class="grid aspect-square place-items-end rounded-[10px] p-2" style="background: @PreviewTileColor()">
+                                <span class="rounded-md bg-[rgb(0_0_0_/_0.35)] px-2 py-0.5 text-xs font-bold text-white">@_rewardCost</span>
+                            </div>
+                            <p class="mt-1 text-center text-[0.78rem] font-semibold text-[var(--app-text-strong)]">@(_rewardTitle.Length > 0 ? _rewardTitle : "Your reward")</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                        @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
+                    </div>
+                </StudioStage>
+
+                <StudioStage Key="rewards-list"
+                             Number="2"
+                             Title="Rewards"
+                             Summary="@_rewardsSummary"
+                             Open="@IsStageOpen(ChannelPointsStage.Rewards)"
+                             OpenChanged="@(open => SetStage(ChannelPointsStage.Rewards, open))">
                     @if (State.Rewards.Count == 0)
                     {
                         <p class="text-sm text-muted-foreground">No rewards found.</p>
                     }
                     else
                     {
-                        <div class="phone-card-list" data-channel-point-rewards>
+                        <div class="grid gap-2" data-channel-point-rewards>
                             @foreach (var reward in State.Rewards)
                             {
-                                <article class="surface-row rounded-lg p-4" @key="reward.ProviderRewardId">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div class="min-w-0"><strong>@reward.Title</strong><p class="mt-1 text-sm text-muted-foreground">@reward.Cost Channel Points · @(reward.IsEnabled ? "Enabled" : "Disabled")@(reward.IsPaused ? " · Paused" : string.Empty)</p>@if (!string.IsNullOrWhiteSpace(reward.Prompt)) { <p class="mt-2 text-sm text-muted-foreground">@reward.Prompt</p> }</div>
+                                <NativeOperationRow @key="reward.ProviderRewardId" Title="@reward.Title">
+                                    <ChildContent>
+                                        @reward.Cost Channel Points · @(reward.IsEnabled ? "Enabled" : "Disabled")@(reward.IsPaused ? " · Paused" : string.Empty)
+                                        @if (!string.IsNullOrWhiteSpace(reward.Prompt))
+                                        {
+                                            <span class="mt-1 block">@reward.Prompt</span>
+                                        }
+                                    </ChildContent>
+                                    <Actions>
                                         @if (reward.IsManageable)
                                         {
-                                            <div class="flex flex-wrap gap-2"><button class="btn-secondary" @onclick="() => EditReward(reward)">Edit</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, !reward.IsEnabled, reward.IsPaused)">@(reward.IsEnabled ? "Disable" : "Enable")</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, reward.IsEnabled, !reward.IsPaused)">@(reward.IsPaused ? "Resume" : "Pause")</button><button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button></div>
+                                            <button class="btn-secondary" @onclick="() => EditReward(reward)">Edit</button>
+                                            <button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, !reward.IsEnabled, reward.IsPaused)">@(reward.IsEnabled ? "Disable" : "Enable")</button>
+                                            <button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, reward.IsEnabled, !reward.IsPaused)">@(reward.IsPaused ? "Resume" : "Pause")</button>
+                                            <button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button>
                                         }
                                         else
                                         {
                                             <span class="text-sm text-muted-foreground">Managed outside BlokeBot · read-only</span>
                                         }
-                                    </div>
-                                </article>
+                                    </Actions>
+                                </NativeOperationRow>
                             }
                         </div>
                     }
-                </div>
-            </CollapsibleSection>
-            </ApplicationCardCollection>
+                </StudioStage>
 
-            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
-                <div class="form-grid">
-                    <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
-                    <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
-                    <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
-                    <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
-                </div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-input"><input id="reward-user-input" type="checkbox" @bind="_rewardUserInput" />Require viewer input</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-queue-skip"><input id="reward-queue-skip" type="checkbox" @bind="_rewardQueueSkip" />Skip request queue</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-stream-limit"><input id="reward-stream-limit" type="checkbox" @bind="_rewardMaxPerStreamEnabled" />Limit per stream</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-stream-limit"><input id="reward-user-stream-limit" type="checkbox" @bind="_rewardMaxPerUserPerStreamEnabled" />Limit per viewer per stream</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Use a global cooldown</label>
-                </div>
-                <div class="form-grid mt-4">
-                    @if (_rewardMaxPerStreamEnabled) { <Field Id="reward-stream-limit-value" Label="Maximum per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" /> }
-                    @if (_rewardMaxPerUserPerStreamEnabled) { <Field Id="reward-user-stream-limit-value" Label="Maximum per viewer" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" /> }
-                    @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown in seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
-                </div>
-                <div class="mt-5 flex flex-wrap gap-3">
-                    <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
-                    @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
-                </div>
-            </TaskPanel>
-
-            <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
-            <CollapsibleSection Title="Redemption history" Description="Recently fulfilled and refunded redemptions." InitiallyOpen="false">
-                <div class="p-4">
+                <StudioStage Key="redemption-history"
+                             Number="3"
+                             Title="Redemption history"
+                             Summary="@_historySummary"
+                             Open="@IsStageOpen(ChannelPointsStage.History)"
+                             OpenChanged="@(open => SetStage(ChannelPointsStage.History, open))">
                     @if (State.History.Count == 0)
                     {
                         <p class="text-sm text-muted-foreground">No redemption history yet.</p>
                     }
                     else
                     {
-                        <div class="phone-card-list" data-native-history="channel-points">
+                        <div class="grid gap-2" data-native-history="channel-points">
                             @foreach (var redemption in State.History)
                             {
-                                <article class="surface-row rounded-lg p-4" @key="redemption.ProviderRedemptionId"><div class="flex flex-wrap items-start justify-between gap-2"><strong>@redemption.RewardTitle · @redemption.UserLogin</strong><span class="text-sm text-muted-foreground">@redemption.Status</span></div><p class="mt-2 text-xs text-muted-foreground">@redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p></article>
+                                <NativeOperationRow @key="redemption.ProviderRedemptionId"
+                                                    Title="@($"{redemption.RewardTitle} · {redemption.UserLogin}")"
+                                                    When="@redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")">
+                                    @redemption.Status
+                                </NativeOperationRow>
                             }
                         </div>
                     }
-                </div>
-            </CollapsibleSection>
-            </ApplicationCardCollection>
+                </StudioStage>
+            </div>
         }
     }
 </DashboardPage>

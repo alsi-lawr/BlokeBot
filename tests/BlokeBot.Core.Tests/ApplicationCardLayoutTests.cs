@@ -10,7 +10,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class ApplicationCardLayoutTests
 {
     private const int _baselineCardAuthoringSiteCount = 87;
-    private const int _baselineDisclosureAuthoringSiteCount = 26;
+    private const int _baselineDisclosureAuthoringSiteCount = 14;
 
     private static readonly Regex _cardClassToken = new(
         """(?<![-\w])card(?![-\w])""",
@@ -58,7 +58,7 @@ public sealed class ApplicationCardLayoutTests
                 entry.Kind is CardAuthoringKind.Disclosure
                 && entry.Membership is CardMembership.Excluded
             )
-            .ShouldBe(4);
+            .ShouldBe(3);
 
         var concreteOwners = FindConcreteOwners(repositoryRoot);
         classifications
@@ -131,16 +131,6 @@ public sealed class ApplicationCardLayoutTests
             "page-context.css"
         );
         pageContextStyles.ShouldNotContain(".settings-disclosure-stack {");
-
-        var nativeStyles = ReadRepositoryFile(
-            repositoryRoot,
-            "src",
-            "BlokeBot.Core",
-            "Styles",
-            "features",
-            "native-twitch.css"
-        );
-        nativeStyles.ShouldNotContain(".dashboard-page[data-native-route] {");
     }
 
     [Test]

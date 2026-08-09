@@ -352,7 +352,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
+      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "laptop-dark-overlay-cues.png",
@@ -664,7 +664,7 @@
       "format": "png",
       "width": 1308,
       "height": 840,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
+      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-cues.png",
@@ -976,7 +976,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
+      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "phone-dark-overlay-cues.png",
@@ -1288,7 +1288,7 @@
       "format": "png",
       "width": 462,
       "height": 956,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
+      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "phone-light-overlay-cues.png",

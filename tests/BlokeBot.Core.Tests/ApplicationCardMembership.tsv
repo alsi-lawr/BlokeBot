@@ -101,15 +101,3 @@ disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|341|e
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|430|included|channel-setup-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|471|included|channel-setup-disclosure-cards
 disclosure|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|540|included|channel-setup-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/ChannelPoints/Page/ChannelPointsPage.razor|51|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/ChannelPoints/Page/ChannelPointsPage.razor|94|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/ChannelPoints/Page/ChannelPointsPage.razor|151|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/ClipsMarkers/Page/ClipsMarkersPage.razor|56|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/ClipsMarkers/Page/ClipsMarkersPage.razor|63|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Polls/Page/PollsPage.razor|93|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Polls/Page/PollsPage.razor|112|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Predictions/Page/PredictionsPage.razor|84|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Predictions/Page/PredictionsPage.razor|97|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Shoutouts/AutomaticRaids/AutomaticRaidShoutoutSection.razor|6|included|native-dashboard-disclosure-cards
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Shoutouts/AutomaticRaids/AutomaticRaidShoutoutSection.razor|227|excluded|nested-automatic-raid-outcomes-disclosure
-disclosure|src/BlokeBot.Core/Features/TwitchOperations/Shoutouts/ShoutoutsPage.razor|49|included|native-dashboard-disclosure-cards

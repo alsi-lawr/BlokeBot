@@ -43,28 +43,35 @@
 
         @if (State.Authorization is PollAuthorizationReadiness.Ready)
         {
-        <TaskPanel Title="Run a poll" Description="Start a saved question, watch the votes, or end voting early.">
+        <TaskPanel Title="Run a poll" Description="Start a saved question. Twitch shows it to viewers and collects the votes.">
             @if (State.ActivePoll is { } poll)
             {
-                <article class="surface-row rounded-lg p-4" data-active-poll>
+                var totalVotes = poll.Choices.Sum(choice => choice.Votes);
+                <div data-active-poll>
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <strong class="text-slate-950">@poll.Title</strong>
-                            <p class="mt-1 text-sm text-muted-foreground">@poll.Status</p>
+                            <strong class="text-[var(--app-text-strong)]">@poll.Title</strong>
+                            <p class="mt-1 mb-3 text-sm text-muted-foreground">@poll.Status</p>
                         </div>
                         <button class="btn-secondary" @onclick="EndPollAsync">End poll</button>
                     </div>
-                    @if (poll.IsExternallyStarted)
-                    {
-                        <p class="mt-3 text-sm text-amber-700">This poll was started in Twitch. You will confirm before ending it.</p>
-                    }
-                    <ul class="mt-3 grid gap-2 text-sm">
+                    <div class="grid gap-[0.45rem]">
                         @foreach (var choice in poll.Choices)
                         {
-                            <li class="surface-muted rounded-md p-3" @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
+                            <div class="relative overflow-hidden rounded-lg border border-[var(--app-control-border)] px-[0.65rem] py-[0.38rem] text-[0.85rem]" @key="choice.Id">
+                                <span class="absolute inset-y-0 left-0 bg-[var(--app-affirmative-surface)]" style="width: @Percent(choice.Votes, totalVotes)%" aria-hidden="true"></span>
+                                <span class="relative flex flex-wrap justify-between gap-x-3 font-semibold text-[var(--app-text-strong)]">
+                                    <span>@choice.Title</span>
+                                    <span class="font-bold text-[var(--app-text-muted)]">@Percent(choice.Votes, totalVotes)% · @choice.Votes votes · @choice.ChannelPointsVotes Channel Points</span>
+                                </span>
+                            </div>
                         }
-                    </ul>
-                </article>
+                    </div>
+                    @if (poll.IsExternallyStarted)
+                    {
+                        <p class="form-help mt-3">This poll was started in Twitch. You will confirm before ending it.</p>
+                    }
+                </div>
             }
             else if (State.Templates.Count == 0)
             {
@@ -72,69 +79,142 @@
             }
             else
             {
-                <div class="phone-card-list" data-poll-templates>
+                <div class="grid gap-2" data-poll-templates>
                     @foreach (var template in State.Templates)
                     {
-                        <article class="surface-row rounded-lg p-4" @key="template.Id">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <strong class="text-slate-950">@template.Title</strong>
-                                    <p class="mt-1 text-sm text-muted-foreground">@string.Join(" · ", template.Choices) · @template.DurationSeconds seconds</p>
-                                </div>
+                        <NativeOperationRow @key="template.Id" Title="@template.Title">
+                            <ChildContent>@TemplateSummary(template)</ChildContent>
+                            <Actions>
                                 <button class="btn-primary" @onclick="() => StartPollAsync(template.Id)">Start poll</button>
-                            </div>
-                        </article>
+                            </Actions>
+                        </NativeOperationRow>
                     }
                 </div>
             }
         </TaskPanel>
 
-        <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
-        <CollapsibleSection Title="New poll template" Description="Save a question and choices to reuse later." InitiallyOpen="@(State.Templates.Count == 0)">
-            <div class="form-grid p-4">
-                <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Question" />
-                <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_choices" Placeholder="Yes&#10;No" />
-                <Field Id="poll-duration" Label="Duration in seconds" @bind-Value="_duration" Placeholder="60" />
-                <div class="space-y-3">
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="poll-channel-points-enabled">
-                        <input id="poll-channel-points-enabled" type="checkbox" @bind="_channelPointsVotingEnabled" />
-                        Enable Channel Points voting
-                    </label>
+        <div class="settings-disclosure-stack">
+            <StudioStage Key="poll-template"
+                         Number="1"
+                         Title="New poll template"
+                         Summary="@_editorSummary"
+                         Open="@IsStageOpen(PollStage.Template)"
+                         OpenChanged="@(open => SetStage(PollStage.Template, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-8">
+                        <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Which boss next?" MaxLength="60" />
+                        <p class="mt-1 text-xs text-muted-foreground">Up to 60 characters. Viewers see this at the top of the poll.</p>
+                    </div>
+                    <div class="studio-span-4 space-y-2">
+                        <span class="label">Voting stays open for</span>
+                        <StudioSegmentedPill TValue="int"
+                                             AriaLabel="Voting stays open for"
+                                             Options="_durationOptions"
+                                             Value="_durationChoice"
+                                             ValueChanged="SetDurationChoice"
+                                             Wrap />
+                        @if (_durationChoice == 0)
+                        {
+                            <Field Id="poll-duration" Label="Custom duration in seconds" @bind-Value="_duration" Placeholder="60" />
+                        }
+                        <p class="text-xs text-muted-foreground">Custom accepts 15–1800 seconds.</p>
+                    </div>
+                    <div class="studio-span-12 space-y-2">
+                        <span class="label">Choices</span>
+                        @for (var index = 0; index < _choices.Count; index++)
+                        {
+                            var choiceIndex = index;
+                            <div class="flex items-center gap-[0.6rem]" @key="choiceIndex" data-poll-choice-row>
+                                <input class="input flex-1"
+                                       maxlength="25"
+                                       aria-label="@($"Choice {choiceIndex + 1}")"
+                                       value="@_choices[choiceIndex]"
+                                       @oninput="args => _choices[choiceIndex] = args.Value?.ToString() ?? string.Empty" />
+                                <span class="min-w-[3.2em] text-right text-[0.72rem] text-muted-foreground">@($"{_choices[choiceIndex].Length}/25")</span>
+                                <button type="button"
+                                        class="cursor-pointer rounded-md px-[0.4rem] py-[0.2rem] font-bold text-[var(--app-text-muted)] hover:bg-[var(--app-control-hover)] hover:text-red-700"
+                                        aria-label="Remove choice"
+                                        disabled="@(_choices.Count <= 2)"
+                                        @onclick="() => _choices.RemoveAt(choiceIndex)">✕</button>
+                            </div>
+                        }
+                        <button type="button"
+                                class="btn-secondary"
+                                disabled="@(_choices.Count >= 5)"
+                                @onclick="@(() => _choices.Add(string.Empty))">+ Add choice</button>
+                        <p class="text-xs text-muted-foreground">2–5 choices, up to 25 characters each. The counters keep Twitch's limits visible while you type.</p>
+                    </div>
+                    <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                        <button type="button"
+                                id="poll-channel-points-enabled"
+                                class="studio-toggle"
+                                role="switch"
+                                aria-checked="@(_channelPointsVotingEnabled ? "true" : "false")"
+                                aria-label="Channel Points voting"
+                                @onclick="() => _channelPointsVotingEnabled = !_channelPointsVotingEnabled"></button>
+                        <span class="text-sm font-semibold text-[var(--app-text-strong)]">Let viewers buy extra votes with Channel Points</span>
+                    </div>
                     @if (_channelPointsVotingEnabled)
                     {
-                        <Field Id="poll-channel-points-per-vote" Label="Channel Points per vote" @bind-Value="_channelPointsPerVote" Placeholder="250" />
+                        <div class="studio-span-4">
+                            <Field Id="poll-channel-points-per-vote" Label="Channel Points per extra vote" @bind-Value="_channelPointsPerVote" Placeholder="250" />
+                            <p class="mt-1 text-xs text-muted-foreground">1 to 1,000,000.</p>
+                        </div>
                     }
                 </div>
-                <div class="self-end"><button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button></div>
-            </div>
-        </CollapsibleSection>
+                <div class="mt-4 rounded-[14px] border border-dashed border-[var(--app-control-border)] bg-[var(--app-surface-muted)] px-[1.05rem] py-[0.85rem]">
+                    <p class="mb-2 text-[0.72rem] font-bold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">Viewers will see — Twitch's poll panel, shown with sample votes</p>
+                    @if (PreviewChoices() is { Count: > 0 } previewChoices)
+                    {
+                        <div class="max-w-[29rem] rounded-[10px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] px-[0.95rem] py-[0.8rem]">
+                            <span class="text-[0.68rem] font-extrabold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">@PreviewKicker()</span>
+                            <p class="mt-1 mb-[0.6rem] font-bold text-[var(--app-text-strong)]">@(_title.Length > 0 ? _title : "Your question")</p>
+                            <div class="grid gap-[0.45rem]">
+                                @for (var index = 0; index < previewChoices.Count; index++)
+                                {
+                                    var percent = SamplePercent(index, previewChoices.Count);
+                                    <div class="relative overflow-hidden rounded-lg border border-[var(--app-control-border)] px-[0.65rem] py-[0.38rem] text-[0.85rem]" @key="index">
+                                        <span class="absolute inset-y-0 left-0 bg-[var(--app-affirmative-surface)]" style="width: @percent%" aria-hidden="true"></span>
+                                        <span class="relative flex flex-wrap justify-between gap-x-3 font-semibold text-[var(--app-text-strong)]">
+                                            <span>@previewChoices[index]</span>
+                                            <span class="font-bold text-[var(--app-text-muted)]">@percent%</span>
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-sm text-muted-foreground">Add choices to see the panel.</p>
+                    }
+                </div>
+                <div class="mt-4"><button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button></div>
+            </StudioStage>
 
-        <CollapsibleSection Title="Recent results" Description="Review polls that finished or were ended early." InitiallyOpen="false">
-            <div class="p-4">
+            <StudioStage Key="poll-results"
+                         Number="2"
+                         Title="Recent results"
+                         Summary="@_resultsSummary"
+                         Open="@IsStageOpen(PollStage.Results)"
+                         OpenChanged="@(open => SetStage(PollStage.Results, open))">
                 @if (State.Results.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No poll results yet.</p>
                 }
                 else
                 {
-                    <div class="phone-card-list" data-native-history="polls">
+                    <div class="grid gap-2" data-native-history="polls">
                         @foreach (var result in State.Results)
                         {
-                            <article class="surface-row rounded-lg p-4" @key="result.ProviderPollId">
-                                <div class="flex flex-wrap items-start justify-between gap-2"><strong>@result.Title</strong><span class="text-sm text-muted-foreground">@result.Status</span></div>
-                                <ul class="mt-3 grid gap-1 text-sm">
-                                    @foreach (var choice in result.Choices)
-                                    {
-                                        <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
-                                    }
-                                </ul>
-                            </article>
+                            <NativeOperationRow @key="result.ProviderPollId" Title="@result.Title" When="@ResultWhen(result)">
+                                @ResultProse(result)
+                            </NativeOperationRow>
                         }
                     </div>
                 }
-            </div>
-        </CollapsibleSection>
-        </ApplicationCardCollection>
+            </StudioStage>
+        </div>
         }
     }
 </DashboardPage>

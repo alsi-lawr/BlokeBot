@@ -182,7 +182,7 @@ public sealed class AutomaticRaidShoutoutUiTests
         string title
     ) =>
         section
-            .FindAll("button.disclosure-trigger")
+            .FindAll("button.studio-stage__header")
             .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
             .Click();
 

@@ -31,7 +31,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class TwitchOperationsUiTests
 {
     [Test]
-    public async Task NativeSwitcherExposesOnlyEnabledLinksAndSharedAtRestCurrentHoverAndFocusHooks()
+    public async Task NativeSwitcherExposesOnlyEnabledLinksAsASegmentedPill()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
@@ -74,69 +74,23 @@ public sealed class TwitchOperationsUiTests
             switcher.Markup.ShouldNotContain("Clips &amp; markers");
             switcher.Markup.ShouldNotContain("Rewards &amp; redemptions");
         });
-        var links = switcher.FindAll(".native-tool-switcher__link");
+        switcher
+            .Find("nav[aria-label='Native Twitch tools']")
+            .ClassList.ShouldContain("studio-segmented");
+        var links = switcher.FindAll(".studio-segmented__option");
+        links.Count.ShouldBe(3);
         links.ShouldAllBe(link => link.TextContent.Trim().Length > 0);
-        links
-            .Single(link => link.GetAttribute("aria-current") == "page")
-            .TextContent.ShouldContain("Polls");
-
-        var styles = ReadRepositoryFile(
-            "src",
-            "BlokeBot.Core",
-            "Styles",
-            "features",
-            "native-twitch.css"
-        );
-        styles.ShouldContain("background: var(--app-control-bg)");
-        styles.ShouldContain("align-items: center");
-        styles.ShouldContain("justify-content: center");
-        styles.ShouldContain("min-height: 3rem");
-        styles.ShouldContain(".native-tool-switcher__link:hover");
-        styles.ShouldContain(".native-tool-switcher__link:focus-visible");
-        styles.ShouldContain(".native-tool-switcher__link--current");
-        styles.ShouldContain("flex-wrap: wrap");
+        var current = links.Single(link => link.GetAttribute("aria-current") == "page");
+        current.TextContent.ShouldContain("Polls");
+        current.ClassList.ShouldContain("bg-[var(--app-surface-solid)]");
+        current.ClassList.ShouldContain("text-[var(--app-text-strong)]");
     }
 
     [Test]
-    public void NativeDashboardDisclosuresUseFiniteCardCollections()
+    public void NativeDashboardsShareTheRunStripAndStageAnatomy()
     {
-        var styles = ReadRepositoryFile(
-            "src",
-            "BlokeBot.Core",
-            "Styles",
-            "features",
-            "native-twitch.css"
-        );
-        styles.ShouldNotContain(".dashboard-page[data-native-route] {");
-
-        styles
-            .TrimEnd()
-            .ShouldEndWith(
-                """
-                .dashboard-page[data-native-route] .phone-card-list {
-                    display: grid;
-                }
-                """
-            );
-
-        var sharedPage = ReadRepositoryFile(
-            "src",
-            "BlokeBot.Core",
-            "Components",
-            "Layout",
-            "DashboardPage.razor"
-        );
-        sharedPage.ShouldNotContain("application-card-collection dashboard-page");
-
-        var sharedStyles = ReadRepositoryFile(
-            "src",
-            "BlokeBot.Core",
-            "Styles",
-            "components",
-            "application-card-layout.css"
-        );
-        sharedStyles.ShouldContain("--app-card-clearance: 12px");
-        sharedStyles.ShouldContain("gap: var(--app-card-clearance)");
+        var applicationStyles = ReadRepositoryFile("src", "BlokeBot.Core", "Styles", "app.css");
+        applicationStyles.ShouldNotContain("native-twitch.css");
 
         foreach (
             var path in new[]
@@ -158,9 +112,10 @@ public sealed class TwitchOperationsUiTests
             ]);
             page.ShouldContain("data-native-route=");
             page.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
-            page.ShouldContain(
-                """<ApplicationCardCollection Owner="native-dashboard-disclosure-cards">"""
-            );
+            page.ShouldContain("<TaskPanel");
+            page.ShouldContain("""<div class="settings-disclosure-stack">""");
+            page.ShouldNotContain("<CollapsibleSection");
+            page.ShouldNotContain("phone-card-list");
         }
     }
 
@@ -236,8 +191,8 @@ public sealed class TwitchOperationsUiTests
             SectionTitles(page)
                 .ShouldBe([
                     "Unfulfilled redemptions",
-                    "Rewards",
                     "Create a reward",
+                    "Rewards",
                     "Redemption history",
                 ]);
             var cards = page.FindAll("[data-redemption-waiting-age]");
@@ -256,7 +211,8 @@ public sealed class TwitchOperationsUiTests
 
         page.Find("[data-channel-point-rewards] button").Click();
         SectionTitles(page)
-            .ShouldBe(["Unfulfilled redemptions", "Rewards", "Edit reward", "Redemption history"]);
+            .ShouldBe(["Unfulfilled redemptions", "Edit reward", "Rewards", "Redemption history"]);
+        page.Find("[data-stage='reward-editor']").ClassList.ShouldContain("studio-stage--open");
         page.Find("#reward-title").GetAttribute("value").ShouldBe("Choose the next emote");
         page.Find("#reward-title").Input("Choose a celebration");
         page.FindAll("button").Single(button => button.TextContent.Trim() == "Save reward").Click();
@@ -268,8 +224,8 @@ public sealed class TwitchOperationsUiTests
             SectionTitles(page)
                 .ShouldBe([
                     "Unfulfilled redemptions",
-                    "Rewards",
                     "Create a reward",
+                    "Rewards",
                     "Redemption history",
                 ]);
         });
@@ -296,10 +252,14 @@ public sealed class TwitchOperationsUiTests
             page.Find("[data-native-route='shoutouts']")
                 .ClassList.ShouldContain("dashboard-page--wide");
             _ = page.Find("#shoutout-target");
-            var sections = page.FindAll(".disclosure-title")
+            var sections = page.FindAll(".studio-stage__title")
                 .Select(element => element.TextContent.Trim())
                 .ToArray();
-            sections.ShouldBe(["Automatic raid shoutouts", "Recent shoutouts"]);
+            sections.ShouldBe([
+                "Automatic raid shoutouts",
+                "Automatic shoutout outcomes",
+                "Recent shoutouts",
+            ]);
             page.Find("nav[aria-label='Native Twitch tools']")
                 .QuerySelectorAll("a")
                 .Length.ShouldBe(5);
@@ -334,7 +294,7 @@ public sealed class TwitchOperationsUiTests
                 var currentLink = switcher.QuerySelector(
                     "a[href='twitch-operations/clips-markers']"
                 )!;
-                currentLink.ClassList.ShouldContain("native-tool-switcher__link--current");
+                currentLink.ClassList.ShouldContain("bg-[var(--app-surface-solid)]");
                 currentLink.GetAttribute("aria-current").ShouldBe("page");
                 page.Find("button").TextContent.ShouldContain("Create clip");
                 page.FindAll("[data-native-route]").Count.ShouldBe(1);
@@ -623,7 +583,7 @@ public sealed class TwitchOperationsUiTests
     }
 
     private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page) =>
-        page.FindAll(".disclosure-title, .task-panel__title")
+        page.FindAll(".task-panel__title, .studio-stage__title")
             .Select(static element => element.TextContent.Trim())
             .ToArray();
 

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
@@ -27,13 +28,31 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         "A late-night challenge"
     );
 
+    private static readonly StudioSegmentedOption<AutomaticRaidChatPresentation>[] _presentationOptions =
+    [
+        new(
+            AutomaticRaidChatPresentation.Regular,
+            "Regular",
+            "automatic-raid-presentation-regular"
+        ),
+        new(AutomaticRaidChatPresentation.Pinned, "Pinned", "automatic-raid-presentation-pinned"),
+        new(
+            AutomaticRaidChatPresentation.Announcement,
+            "Announcement",
+            "automatic-raid-presentation-announcement"
+        ),
+    ];
+
     private AutomaticRaidShoutoutConfiguration _draft = AutomaticRaidShoutoutConfiguration.Defaults;
     private IReadOnlyList<AutomaticRaidShoutoutValidationError> _validationErrors = [];
     private IReadOnlyList<AutomaticRaidShoutoutOutcomeView> _outcomes = [];
+    private bool _settingsOpen;
+    private bool _outcomesOpen;
     private bool _loading = true;
     private bool _saving;
     private int _retainedPinDurationSeconds = 300;
     private bool _previewUsesFallback;
+    private int? _authoredCharacters;
     private string? _loadError;
     private string? _previewError;
     private string? _preview;
@@ -66,6 +85,36 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
             PersistedAnnouncementColor.Orange => "Orange",
             PersistedAnnouncementColor.Purple => "Purple",
             _ => throw new UnreachableException("Unknown Twitch announcement color."),
+        };
+
+    private string _settingsSummary =>
+        this switch
+        {
+            { _loading: true } => "Loading…",
+            { _loadError: not null } => "Unavailable",
+            { _draft.Enabled: false } => "Off · every setting stays saved",
+            _ => $"On · raids of {_draft.MinimumViewerCount}+ viewers · {MechanismProse(_draft)}",
+        };
+
+    private string _outcomesSummary =>
+        this switch
+        {
+            { _loading: true } => "Loading…",
+            { _outcomes.Count: 0 } => "No raids recorded yet",
+            _ =>
+                $"Last raid: {OutcomeTitle(_outcomes[0])} · @{_outcomes[0].SourceLogin}, {_outcomes[0].ViewerCount} viewers",
+        };
+
+    private static string MechanismProse(AutomaticRaidShoutoutConfiguration draft) =>
+        draft.Mechanism switch
+        {
+            AutomaticRaidShoutoutMechanism.Native => "native Twitch shoutout",
+            _ => draft.ChatPresentation switch
+            {
+                AutomaticRaidChatPresentation.Announcement => "announcement in chat",
+                AutomaticRaidChatPresentation.Pinned => "pinned chat message",
+                _ => "chat message",
+            },
         };
 
     private string _readinessText =>
@@ -125,6 +174,7 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         _saving = false;
         _retainedPinDurationSeconds = 300;
         _previewUsesFallback = false;
+        _authoredCharacters = null;
         _loadError = null;
         _previewError = null;
         _preview = null;
@@ -273,9 +323,9 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
     private bool IsCurrentHost(int hostId, long version) =>
         _loadedHostId == hostId && _hostVersion == version;
 
-    private void SetEnabled(ChangeEventArgs args)
+    private void ToggleEnabled()
     {
-        _draft = _draft with { Enabled = args.Value is true };
+        _draft = _draft with { Enabled = !_draft.Enabled };
         _saveStatus = null;
     }
 
@@ -326,11 +376,11 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         ClearError(AutomaticRaidShoutoutValidationField.PinDuration);
     }
 
-    private void SetPinUntilStreamEnd(ChangeEventArgs args)
+    private void TogglePinUntilStreamEnd()
     {
         _draft = _draft with
         {
-            PinDurationSeconds = args.Value is true ? null : _retainedPinDurationSeconds,
+            PinDurationSeconds = _pinUntilStreamEnd ? _retainedPinDurationSeconds : null,
         };
         ClearError(AutomaticRaidShoutoutValidationField.PinDuration);
     }
@@ -362,6 +412,7 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         _preview = null;
         _previewError = null;
         _previewUsesFallback = false;
+        _authoredCharacters = null;
         if (_draft.Mechanism != AutomaticRaidShoutoutMechanism.Chat)
         {
             return;
@@ -373,6 +424,7 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
                 _previewError = invalid.Message;
                 break;
             case AutomaticRaidTemplateParseOutcome.Valid valid:
+                _authoredCharacters = valid.Template.AuthoredCharacters;
                 switch (valid.Template.Render(_previewValues))
                 {
                     case AutomaticRaidTemplateRenderOutcome.Rendered rendered:
@@ -416,14 +468,38 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
         _saveStatus = null;
     }
 
-    private static string PresentationLabel(AutomaticRaidChatPresentation presentation) =>
-        presentation switch
-        {
-            AutomaticRaidChatPresentation.Regular => "Regular message",
-            AutomaticRaidChatPresentation.Pinned => "Pinned message",
-            AutomaticRaidChatPresentation.Announcement => "Announcement",
-            _ => throw new ArgumentOutOfRangeException(nameof(presentation)),
-        };
+    private IReadOnlyList<StudioChatLine> PreviewLines() =>
+        [
+            new()
+            {
+                Message =
+                    $"{_previewValues.DisplayName} is raiding with a party of {_previewValues.ViewerCount}",
+            },
+            new()
+            {
+                Speaker = "pixel_penny",
+                SpeakerColour = "#e91e63",
+                Message = "RAID HYPE",
+            },
+            new()
+            {
+                Speaker = "BlokeBot",
+                SpeakerColour = "#00ad6f",
+                Badge = _draft.ChatPresentation switch
+                {
+                    AutomaticRaidChatPresentation.Announcement => "ANNOUNCE",
+                    AutomaticRaidChatPresentation.Pinned => "PINNED",
+                    _ => "BOT",
+                },
+                Bot = true,
+                Message = _preview ?? string.Empty,
+            },
+        ];
+
+    private static string OutcomePillClass(AutomaticRaidShoutoutOutcomeView outcome) =>
+        outcome.ResultCode == AutomaticRaidShoutoutResultCode.Delivered
+            ? "status-pill bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
+            : "status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]";
 
     private static string OutcomeTitle(AutomaticRaidShoutoutOutcomeView outcome) =>
         outcome.ResultCode switch
