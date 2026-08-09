@@ -1313,11 +1313,11 @@ internal static class SiteGuideCatalog
                     Heading = "Add random values to saved replies",
                     Bullets =
                     [
-                        "{random_from|one|two} picks one trimmed value. Repeated values act as extra chances to pick that value.",
-                        "{random_between|1|10} picks a whole number and includes both end values. Equal end values always return that number.",
-                        "Each random token occurrence makes a fresh pick whenever a command or scheduled message begins.",
-                        "{random_viewer} picks from Twitch's connected chatters, not verified viewers. It excludes the active BlokeBot chat account.",
-                        "Connected chatter selection needs the active bot account to be a moderator with connected-chatter access. If Twitch cannot provide a complete list, the token becomes empty and the rest of the reply is kept.",
+                        "{random_from|one|two} picks one value.",
+                        "{random_between|1|10} picks an inclusive whole number.",
+                        "Each random token occurrence makes a fresh pick.",
+                        "{random_viewer} picks a connected Twitch chatter, not a verified viewer. The active bot account must be a moderator with connected-chatter access.",
+                        "If Twitch cannot return the complete chatter list, {random_viewer} becomes empty text.",
                     ],
                 },
                 new SiteGuideSection

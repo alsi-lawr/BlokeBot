@@ -561,11 +561,11 @@ public partial class PageHelpButton
                 "Replies",
                 "A reply is a saved message. Add more than one message when you want the bot to rotate through them or pick one at random.",
                 [
-                    "<code>{random_from|one|two}</code> picks one trimmed value. Repeating a value gives it another chance to be picked.",
-                    "<code>{random_between|1|10}</code> picks a whole number including both end values. Equal end values always return that number.",
-                    "Every random token occurrence makes a fresh pick for each command or scheduled message.",
-                    "<code>{random_viewer}</code> picks a connected chatter, not a verified viewer. It needs the active bot account to be a channel moderator with connected-chatter access.",
-                    "When Twitch cannot provide a complete connected-chatter list, <code>{random_viewer}</code> becomes empty and the rest of the reply is still sent.",
+                    "<code>{random_from|one|two}</code> picks one value.",
+                    "<code>{random_between|1|10}</code> picks an inclusive whole number.",
+                    "Each random token occurrence makes a fresh pick.",
+                    "<code>{random_viewer}</code> picks a connected Twitch chatter, not a verified viewer. The active bot account must be a moderator with connected-chatter access.",
+                    "If Twitch cannot return the complete chatter list, <code>{random_viewer}</code> becomes empty text.",
                 ]
             ),
             new(
