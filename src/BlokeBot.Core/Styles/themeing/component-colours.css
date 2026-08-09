@@ -1,14 +1,3 @@
-html[data-theme="dark"] .feature-toggle-card--disabled {
-    background: rgb(38 40 41 / 0.92);
-    border-color: rgb(82 86 89 / 0.48);
-    box-shadow: none;
-}
-
-html[data-theme="dark"] .feature-toggle-card--disabled .feature-toggle-card__icon {
-    background: rgb(31 33 34 / 0.92);
-    border-color: rgb(82 86 89 / 0.42);
-}
-
 html[data-theme="dark"] .app-blue-badge {
     --tw-ring-color: rgb(96 165 250 / 0.55);
     background: rgb(30 64 175 / 0.32);

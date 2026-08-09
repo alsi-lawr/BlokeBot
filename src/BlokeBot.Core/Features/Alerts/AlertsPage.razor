@@ -61,7 +61,7 @@
                 <div class="application-card-collection" data-card-owner="active-alert-cards">
                     @foreach (var alert in _state.Active)
                     {
-                        <article @key="alert.Id" class="card p-5">
+                        <article @key="alert.Id" class="card @SeverityRailClass(alert.Severity) p-5">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">

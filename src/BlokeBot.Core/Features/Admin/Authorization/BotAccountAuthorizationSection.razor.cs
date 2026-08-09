@@ -9,13 +9,6 @@ public partial class BotAccountAuthorizationSection
     public BotAccountAuthorizationStatus? Status { get; set; }
 
     [Parameter]
-    public string Title { get; set; } = "Bot account";
-
-    [Parameter]
-    public string Description { get; set; } =
-        "Connect the Twitch account BlokeBot uses for chat and stream checks.";
-
-    [Parameter]
     public string AuthorizeButtonText { get; set; } = "Connect bot account";
 
     [Parameter]
@@ -25,25 +18,10 @@ public partial class BotAccountAuthorizationSection
     public bool Disabled { get; set; }
 
     [Parameter]
-    public bool InitiallyOpen { get; set; } = true;
-
-    [Parameter]
     public string? DisabledMessage { get; set; }
 
     [Parameter]
     public string ConfiguredAccountFallbackText { get; set; } = "not set";
-
-    [Parameter]
-    public bool ShowEnableToggle { get; set; }
-
-    [Parameter]
-    public bool EnableToggleValue { get; set; }
-
-    [Parameter]
-    public string EnableToggleLabel { get; set; } = "Enable";
-
-    [Parameter]
-    public Func<bool, Task> EnableToggleChanged { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter, EditorRequired]
     public Func<Task> Clear { get; set; } = static () => Task.CompletedTask;
@@ -61,16 +39,14 @@ public partial class BotAccountAuthorizationSection
             ? $"@{login}"
             : ConfiguredAccountFallbackText;
 
-    private string? _collapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
-
     private bool _connectedChatterScopeMissing =>
         Status?.MissingScopes.Contains(Scopes.ModeratorReadChatters, StringComparer.Ordinal)
         == true;
 
-    private string _bodyClass =>
+    private string _containerClass =>
         Disabled
-            ? "grid gap-4 p-5 opacity-60 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
-            : "grid gap-4 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]";
+            ? "surface-muted rounded-lg p-4 opacity-60 grayscale-[45%]"
+            : "surface-muted rounded-lg p-4";
 
     private string _statusBadgeClass =>
         Status?.State switch
@@ -119,7 +95,4 @@ public partial class BotAccountAuthorizationSection
             BotAccountAuthorizationState.NotAuthorized => "Connect a Twitch account to continue.",
             _ => "Refresh to check this Twitch connection.",
         };
-
-    private async Task SetEnableToggleAsync(ChangeEventArgs args) =>
-        await EnableToggleChanged(args.Value is true);
 }

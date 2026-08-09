@@ -1,32 +1,44 @@
 @using BlokeBot.Core.Features.SiteAccess
 
 <div id="host-access">
-    <CollapsibleSection Title="Who can create channels"
-                        Description="Choose who is allowed to create a BlokeBot channel."
-                        InitiallyOpen="true">
-        <div class="space-y-5 p-5">
-            <label class="inline-flex items-center gap-3 text-sm font-semibold text-slate-800">
-                <input class="h-4 w-4" type="checkbox" checked="@State.WhitelistEnabled" @onchange="ToggleWhitelist" />
-                Only allow people on the approved list
-            </label>
-            <p class="text-sm text-muted-foreground">
-                @(State.WhitelistEnabled ? "Only approved Twitch users can create a channel." : "Any Twitch user can create a channel unless they are blocked.")
-            </p>
-
-            <div class="grid gap-5 lg:grid-cols-2">
+    <StudioStage Key="site-access"
+                 Number="2"
+                 Title="Who can create channels"
+                 Summary="@_stageSummary"
+                 Open="@_stageOpen"
+                 OpenChanged="open => _stageOpen = open">
+        <div class="studio-grid">
+            <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                <button type="button"
+                        id="site-access-whitelist-enabled"
+                        class="studio-toggle"
+                        role="switch"
+                        aria-checked="@(State.WhitelistEnabled ? "true" : "false")"
+                        aria-label="Only allow people on the approved list"
+                        @onclick="() => ToggleWhitelist(!State.WhitelistEnabled)"></button>
+                <span class="text-sm font-semibold text-[var(--app-text-strong)]">Only allow people on the approved list</span>
+                <span class="text-xs text-muted-foreground">
+                    @(State.WhitelistEnabled ? "Only approved Twitch users can create a channel." : "Any Twitch user can create a channel unless they are blocked.")
+                </span>
+            </div>
+            <div class="studio-span-6">
                 <AccessList Title="Approved people"
                             Entries="@WhitelistEntries"
                             Placeholder="twitch login"
                             EmptyText="No one added yet."
+                            DisabledText="Not used while the approved list is off — kept for when you switch."
                             Add="@AddWhitelist"
                             Remove="@RemoveWhitelist"
                             NewLogin="@NewWhitelistLogin"
                             NewLoginChanged="@OnWhitelistInput"
                             Disabled="@(!State.WhitelistEnabled)" />
+            </div>
+            <div class="studio-span-6">
                 <AccessList Title="Blocked people"
                             Entries="@BlacklistEntries"
                             Placeholder="twitch login"
                             EmptyText="No one added yet."
+                            DisabledText="Not used while the approved list is on — everyone not approved is already unable to create channels."
                             Add="@AddBlacklist"
                             Remove="@RemoveBlacklist"
                             NewLogin="@NewBlacklistLogin"
@@ -34,5 +46,5 @@
                             Disabled="@State.WhitelistEnabled" />
             </div>
         </div>
-    </CollapsibleSection>
+    </StudioStage>
 </div>

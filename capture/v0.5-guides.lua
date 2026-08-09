@@ -136,20 +136,21 @@ local succeeded, failure = pcall(function()
     )
     viset.page.evaluate(viset.javascript([=[
       (async () => {
-        const disclosure = title => [...document.querySelectorAll("button.disclosure-trigger")]
-          .find(candidate => candidate.querySelector(".disclosure-title")?.textContent.trim()
+        const stageHeader = title => [...document.querySelectorAll("button.studio-stage__header")]
+          .find(candidate => candidate.querySelector(".studio-stage__title")?.textContent.trim()
             === title);
-        let commands = disclosure("Commands");
-        let available = disclosure("Viewer command inventory");
-        if (!available || !commands) throw new Error("Commands disclosures were not found.");
-        available.click();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        available = disclosure("Viewer command inventory");
-        if (available?.getAttribute("aria-expanded") !== "true") {
-          available?.click();
+        const inventory = () => document.querySelector("[data-fold='command-inventory'] button");
+        const commands = stageHeader("Commands");
+        if (!commands || !inventory()) throw new Error("Commands disclosures were not found.");
+        if (commands.getAttribute("aria-expanded") !== "true") {
+          commands.click();
         }
-        commands = disclosure("Commands");
-        commands.closest("section").scrollIntoView({ block: "start" });
+        inventory().click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (inventory()?.getAttribute("aria-expanded") !== "true") {
+          inventory()?.click();
+        }
+        stageHeader("Commands").closest("section").scrollIntoView({ block: "start" });
         window.scrollBy(0, -12);
         return true;
       })()

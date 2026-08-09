@@ -1,14 +1,20 @@
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
-using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
     private static readonly TimeSpan _accessModeSaveDebounce = TimeSpan.FromMilliseconds(180);
+
+    private static readonly IReadOnlyList<StudioSegmentedOption<bool>> _accessModeOptions =
+    [
+        new(true, "All mods"),
+        new(false, "Allowed list only"),
+    ];
 
     private readonly SemaphoreSlim _allowModsByDefaultSaveGate = new(1, 1);
     private readonly HostModAccessSaveSequence _allowModsByDefaultSaves = new();
@@ -17,13 +23,19 @@ public partial class HostConfigPage
     private string _newWhitelistLogin = string.Empty;
     private IReadOnlyList<AccessListEntryProfile> _blacklistEntries = [];
     private IReadOnlyList<AccessListEntryProfile> _whitelistEntries = [];
-    private string _accessModeSegmentClass =>
-        _state?.ModAccess.AllowModsByDefault == false
-            ? "segmented-motion segmented-motion--second"
-            : "segmented-motion";
 
-    private static string AccessModeTabClass(bool active) =>
-        active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
+    private string _moderatorHelpStageSummary =>
+        _state?.ModAccess switch
+        {
+            null => string.Empty,
+            { ModsEnabled: false } => "Off",
+            { AllowModsByDefault: true, Blacklist.Count: 0 } => "On · all mods",
+            { AllowModsByDefault: true, Blacklist.Count: 1 } => "On · all mods except 1 blocked",
+            { AllowModsByDefault: true } access =>
+                $"On · all mods except {access.Blacklist.Count} blocked",
+            { Whitelist.Count: 1 } => "On · allowed list only, 1 mod",
+            var access => $"On · allowed list only, {access.Whitelist.Count} mods",
+        };
 
     private Task AddAccessAsync(int hostId, AccessListEntryKind kind) =>
         ObserveUiOperationAsync(
@@ -63,15 +75,16 @@ public partial class HostConfigPage
         await LoadCoreAsync();
     }
 
-    private Task SetModsEnabledAsync(int hostId, ChangeEventArgs args) =>
+    private Task SetModsEnabledAsync(int hostId, bool enabled) =>
         ObserveUiOperationAsync(
             nameof(SetModsEnabledAsync),
-            () => RunSelectedHostMutationAsync(hostId, () => SetModsEnabledCoreAsync(hostId, args))
+            () =>
+                RunSelectedHostMutationAsync(hostId, () => SetModsEnabledCoreAsync(hostId, enabled))
         );
 
-    private async Task SetModsEnabledCoreAsync(int hostId, ChangeEventArgs args)
+    private async Task SetModsEnabledCoreAsync(int hostId, bool enabled)
     {
-        if (args.Value is true)
+        if (enabled)
         {
             await _modAccess.EnableModeratorAccessAsync(hostId, CancellationToken.None);
         }

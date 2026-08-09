@@ -102,6 +102,14 @@ public partial class AlertsPage
             _ => "Information",
         };
 
+    private static string SeverityRailClass(DurableAlertSeverity severity) =>
+        severity switch
+        {
+            DurableAlertSeverity.Critical => "border-l-4 border-l-rose-500",
+            DurableAlertSeverity.Warning => "border-l-4 border-l-amber-500",
+            _ => "border-l-4 border-l-sky-500",
+        };
+
     private static string SeverityBadgeClass(DurableAlertSeverity severity) =>
         severity switch
         {

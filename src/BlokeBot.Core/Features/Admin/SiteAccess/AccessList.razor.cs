@@ -15,6 +15,9 @@ public partial class AccessList
     public bool Disabled { get; set; }
 
     [Parameter]
+    public string? DisabledText { get; set; }
+
+    [Parameter]
     public string EmptyText { get; set; } = string.Empty;
 
     [Parameter]
@@ -35,22 +38,10 @@ public partial class AccessList
     [Parameter]
     public string Title { get; set; } = string.Empty;
 
-    private string _containerClass =>
-        Disabled ? "surface-muted rounded-lg p-4 opacity-50" : "surface-muted rounded-lg p-4";
-
     private async Task OnInput(ChangeEventArgs args)
     {
         NewLogin = args.Value?.ToString() ?? string.Empty;
         await NewLoginChanged.InvokeAsync(NewLogin);
-    }
-
-    private string EntryRowClass(string entry)
-    {
-        const string BaseClass =
-            "motion-list__item surface-row flex items-center justify-between rounded-md px-3 py-2";
-        return _pendingRemovals.Contains(entry)
-            ? $"{BaseClass} motion-list__item--removing"
-            : BaseClass;
     }
 
     private async Task RemoveEntryAsync(string entry)

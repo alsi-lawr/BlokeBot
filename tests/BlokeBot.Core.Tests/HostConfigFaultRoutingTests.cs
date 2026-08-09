@@ -319,7 +319,8 @@ public sealed class HostConfigFaultRoutingTests
 
         page.WaitForAssertion(() =>
         {
-            var customBotToggle = page.Find("#custom-bot input[type='checkbox']");
+            var customBotToggle = page.Find("#custom-bot-enabled");
+            customBotToggle.GetAttribute("role").ShouldBe("switch");
             customBotToggle.GetAttribute("disabled").ShouldBeNull();
             page.Markup.ShouldContain("The channel owner must connect this Twitch account.");
             page.Markup.ShouldNotContain("/oauth/channel-bot/start");
@@ -339,7 +340,7 @@ public sealed class HostConfigFaultRoutingTests
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        var module = context.JSInterop.SetupModule("./Components/Studio/StudioStage.razor.js");
         _ = module.SetupVoid("focusElement", _ => true).SetVoidResult();
         var fragmentModule = context.JSInterop.SetupModule(
             "./Features/HostConfig/Page/HostConfigFragmentObserver.razor.js"
@@ -733,13 +734,9 @@ public sealed class HostConfigFaultRoutingTests
         await page.InvokeAsync(() => AssertAccessMode(page, allowModsByDefault: true));
         page.Markup.ShouldContain("allowedmod");
         page.Markup.ShouldContain("blockedmod");
-        var moderatorToggle = page.FindAll("label")
-            .Single(label =>
-                label.TextContent.Contains("Let moderators help", StringComparison.Ordinal)
-            )
-            .QuerySelector("input");
-        _ = moderatorToggle.ShouldNotBeNull();
-        moderatorToggle.HasAttribute("checked").ShouldBeTrue();
+        var moderatorToggle = page.Find("#moderator-help-enabled");
+        moderatorToggle.GetAttribute("role").ShouldBe("switch");
+        moderatorToggle.GetAttribute("aria-checked").ShouldBe("true");
         var toast = toasts.Current.ShouldHaveSingleItem();
         toast.Kind.ShouldBe(ToastKind.Error);
         toast.Title.ShouldBe("Mod help not saved");
@@ -796,12 +793,12 @@ public sealed class HostConfigFaultRoutingTests
     {
         page.FindAll("button")
             .Single(static button => button.TextContent.Trim() == "All mods")
-            .HasAttribute("aria-pressed")
-            .ShouldBe(allowModsByDefault);
+            .GetAttribute("aria-pressed")
+            .ShouldBe(allowModsByDefault ? "true" : "false");
         page.FindAll("button")
             .Single(static button => button.TextContent.Trim() == "Allowed list only")
-            .HasAttribute("aria-pressed")
-            .ShouldBe(!allowModsByDefault);
+            .GetAttribute("aria-pressed")
+            .ShouldBe(allowModsByDefault ? "false" : "true");
     }
 
     private static async Task DeleteHostAsync(SqliteBlokeBotDbFactory dbFactory, int hostId)

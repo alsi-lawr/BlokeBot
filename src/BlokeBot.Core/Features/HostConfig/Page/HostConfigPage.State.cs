@@ -12,6 +12,12 @@ public partial class HostConfigPage
     private long _botStatusFragmentRequest;
     private long _chatToolsFragmentRequest;
     private long _moderatorHelpFragmentRequest;
+    private bool _botStatusStageOpen = true;
+    private bool _startupMessageStageOpen;
+    private bool _commandsStageOpen;
+    private bool _botAccountStageOpen;
+    private bool _moderatorHelpStageOpen;
+    private bool _chatToolsStageOpen = true;
     private HostConfigState? _state;
 
     protected override async Task OnInitializedAsync()
@@ -147,12 +153,15 @@ public partial class HostConfigPage
         switch (Uri.UnescapeDataString(fragment))
         {
             case "bot-status":
+                _botStatusStageOpen = true;
                 _botStatusFragmentRequest++;
                 break;
             case "chat-tools":
+                _chatToolsStageOpen = true;
                 _chatToolsFragmentRequest++;
                 break;
             case "moderator-help":
+                _moderatorHelpStageOpen = true;
                 _moderatorHelpFragmentRequest++;
                 break;
         }

@@ -10,21 +10,6 @@
                 Description="Run Twitch chat games and points from one place. Set up your channel, choose the tools you want, and let the bot handle chat during stream." />
 
     <ApplicationCardCollection Owner="home-card-collection">
-    <AuthorizeView>
-        <Authorized Context="homeAuth">
-            @{
-                var selectedChannel = AuthenticatedSession
-                    .FromPrincipal(homeAuth.User)
-                    .State.Match<string?>(
-                        _ => null,
-                        selected => selected.Selection.Current.Login,
-                        _ => null
-                    );
-            }
-            <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
-        </Authorized>
-    </AuthorizeView>
-
     <section class="application-card-collection md:grid-cols-2" data-card-owner="home-card-grid">
         <HomeInfoCard Title="Set up your channel" Icon="@HomeInfoCardIcon.Channel" Href="/host">
             Connect the bot to your Twitch channel and keep your stream tools separate from everyone else's.
@@ -42,6 +27,25 @@
             Check whether the bot can chat in your stream, then start or stop it from your channel page.
         </HomeInfoCard>
     </section>
+
+    <AuthorizeView>
+        <Authorized Context="homeAuth">
+            @{
+                var selectedChannel = AuthenticatedSession
+                    .FromPrincipal(homeAuth.User)
+                    .State.Match<string?>(
+                        _ => null,
+                        selected => selected.Selection.Current.Login,
+                        _ => null
+                    );
+            }
+            <CollapsibleSection Title="Public leaderboard"
+                                Description="Jump to any channel's guessing or points leaderboard."
+                                InitiallyOpen="false">
+                <PublicLeaderboardPrompt ContainerClass="p-5" InitialChannel="@selectedChannel" />
+            </CollapsibleSection>
+        </Authorized>
+    </AuthorizeView>
 
     <section class="home-note rounded-lg p-5">
         <p class="text-sm leading-6 text-muted-foreground">BlokeBot is built around your Twitch channel: connect the bot, pick the chat tools you want, and choose who can help manage them.</p>

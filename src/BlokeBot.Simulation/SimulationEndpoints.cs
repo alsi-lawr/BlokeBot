@@ -1,4 +1,5 @@
 using BlokeBot.Commands;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Commands;
 
 namespace BlokeBot.Simulation;
@@ -94,6 +95,20 @@ internal static class SimulationEndpoints
                 ) =>
                 {
                     await scenario.SetFeatureAvailabilityAsync(state, ct);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        _ = app.MapPost(
+                "/simulation/commands/alerts/{state}",
+                static async (
+                    string state,
+                    SimulationCommandCatalogScenario scenario,
+                    DurableAlertService alerts,
+                    CancellationToken ct
+                ) =>
+                {
+                    await scenario.SetAlertsAsync(state, alerts, ct);
                     return Results.Ok();
                 }
             )

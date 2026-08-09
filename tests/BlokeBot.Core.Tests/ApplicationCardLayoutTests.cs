@@ -10,7 +10,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class ApplicationCardLayoutTests
 {
     private const int _baselineCardAuthoringSiteCount = 87;
-    private const int _baselineDisclosureAuthoringSiteCount = 14;
+    private const int _baselineDisclosureAuthoringSiteCount = 5;
 
     private static readonly Regex _cardClassToken = new(
         """(?<![-\w])card(?![-\w])""",
@@ -58,7 +58,7 @@ public sealed class ApplicationCardLayoutTests
                 entry.Kind is CardAuthoringKind.Disclosure
                 && entry.Membership is CardMembership.Excluded
             )
-            .ShouldBe(3);
+            .ShouldBe(2);
 
         var concreteOwners = FindConcreteOwners(repositoryRoot);
         classifications
@@ -216,7 +216,7 @@ public sealed class ApplicationCardLayoutTests
             "HostConfigPage.razor"
         );
         channelSetup.ShouldContain(
-            """<div class="application-card-collection p-3 sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">"""
+            """<div class="application-card-collection sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">"""
         );
     }
 

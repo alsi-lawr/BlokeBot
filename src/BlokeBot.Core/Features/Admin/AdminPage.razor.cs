@@ -7,7 +7,6 @@ using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
-using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Admin;
 
@@ -15,7 +14,22 @@ public partial class AdminPage
 {
     private SiteAccessAdminState? _state;
     private BotAccountAuthorizationStatus? _botAccountStatus;
+    private bool _botAccountStageOpen = true;
     private IReadOnlyList<HostedChannelAdminView> _hosts = [];
+
+    private string _botAccountStageSummary =>
+        _botAccountStatus?.State switch
+        {
+            BotAccountAuthorizationState.Ready
+                when _botAccountStatus.AuthorizedLogin is { Length: > 0 } authorizedLogin =>
+                $"Connected · @{authorizedLogin}",
+            BotAccountAuthorizationState.Ready => "Connected",
+            BotAccountAuthorizationState.Disabled => "Disabled",
+            BotAccountAuthorizationState.WrongAccount => "Wrong account connected",
+            BotAccountAuthorizationState.MissingScopes => "Needs more access",
+            BotAccountAuthorizationState.NotAuthorized => "Not connected",
+            _ => string.Empty,
+        };
     private IReadOnlyList<AccessListEntryProfile> _siteBlacklistEntries = [];
     private IReadOnlyList<AccessListEntryProfile> _siteWhitelistEntries = [];
     private bool _isBotAccount;
@@ -205,9 +219,9 @@ public partial class AdminPage
         await LoadAsync();
     }
 
-    private async Task ToggleWhitelistAsync(ChangeEventArgs args)
+    private async Task ToggleWhitelistAsync(bool enabled)
     {
-        await _siteAccess.SetWhitelistEnabledAsync(args.Value is true, CancellationToken.None);
+        await _siteAccess.SetWhitelistEnabledAsync(enabled, CancellationToken.None);
         await LoadAsync();
     }
 }

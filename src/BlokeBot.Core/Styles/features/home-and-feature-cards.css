@@ -6,59 +6,6 @@
         box-shadow: var(--app-shadow-sm);
     }
 
-    .feature-toggle-card {
-        align-items: start;
-        background: var(--app-surface);
-        border: 1px solid var(--app-border);
-        box-shadow: var(--app-shadow-sm);
-        color: inherit;
-        transition:
-            background-color 150ms ease,
-            border-color 150ms ease,
-            box-shadow 150ms ease,
-            transform 150ms ease;
-        width: 100%;
-    }
-
-    .feature-toggle-card:hover,
-    .feature-toggle-card:focus-visible {
-        border-color: var(--app-control-hover-border);
-        box-shadow: var(--app-shadow-surface);
-        outline: none;
-        transform: translateY(-1px);
-    }
-
-    .feature-toggle-card--disabled {
-        background: var(--app-surface-muted);
-        box-shadow: none;
-        color: var(--app-text-muted);
-    }
-
-    .feature-toggle-card__icon {
-        align-items: center;
-        background: var(--app-surface-muted);
-        border: 1px solid var(--app-border);
-        border-radius: 0.5rem;
-        display: inline-flex;
-        height: 2.25rem;
-        justify-content: center;
-        width: 2.25rem;
-    }
-
-    .bot-account-section--disabled {
-        background: var(--app-surface-muted);
-        border-color: var(--app-border);
-        filter: grayscale(0.45);
-    }
-
-    .bot-account-section--disabled .disclosure-trigger {
-        background: var(--app-surface-muted);
-    }
-
-    .bot-account-section--disabled .surface-muted {
-        background: color-mix(in srgb, var(--app-surface-muted) 82%, var(--app-border));
-    }
-
     .home-info-card {
         color: inherit;
         display: block;
@@ -96,12 +43,6 @@
     .home-info-card:focus-visible {
         outline: 3px solid color-mix(in srgb, var(--app-focus-border) 38%, transparent);
         outline-offset: 3px;
-    }
-
-    .home-info-card__header {
-        align-items: center;
-        display: flex;
-        gap: 0.75rem;
     }
 
     .home-info-card__icon {

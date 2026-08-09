@@ -10,7 +10,44 @@ public partial class HostConfigPage
     private bool _commandsDirty;
     private bool _commandsSaving;
     private bool _commandCatalogLoading;
+    private bool _commandInventoryOpen;
     private ViewerCommandCatalogSnapshot? _commandCatalog;
+
+    private string _commandsStageSummary
+    {
+        get
+        {
+            var aliases = _state?.Commands.Aliases;
+            if (string.IsNullOrWhiteSpace(aliases))
+            {
+                return "Catalog off";
+            }
+
+            var words = string.Join(
+                ", ",
+                aliases
+                    .Split(
+                        ',',
+                        StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
+                    )
+                    .Select(static word => $"!{word}")
+            );
+            return !string.IsNullOrWhiteSpace(_state?.Commands.ConflictAlias)
+                    ? $"{words} · conflict flagged"
+                : _commandCatalog is { } catalog
+                    ? $"{words} · {catalog.Entries.Count} viewer commands"
+                : words;
+        }
+    }
+
+    private async Task SetCommandInventoryOpenAsync(bool open)
+    {
+        _commandInventoryOpen = open;
+        if (open)
+        {
+            await RefreshCommandCatalogAsync();
+        }
+    }
 
     private void LoadCommandsDraft(int hostId, CommandsConfiguration configuration)
     {
