@@ -45,7 +45,9 @@ matching participant view on phones for request boards, play-with-viewers queues
 Simulation fixture provides the approved, voted moment shown in both moments captures.
 `v0.6-overlay-guides.lua` captures Browser Sources, Guessing, active Giveaway, Event feed, Viewer
 Queue, Cues and Media in light and dark laptop and phone frames without exposing a private Browser
-Source URL. The animated captures use real page controls and scrolling.
+Source URL. The animated captures use PNG screencast frames, high-quality lossy WebP output, real
+page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
+gesture.
 
 The final matrix is 108 generated assets: 100 PNG and 8 WebP. Generated files go directly to
 `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.

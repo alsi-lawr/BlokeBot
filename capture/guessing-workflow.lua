@@ -20,13 +20,12 @@ browser_arguments = [
 ]
 
 [webp]
-source = "jpeg_screencast"
-source_quality = 95
+source = "png_screencast"
 encoder = "libwebp_full"
 pipeline = "live"
 mode = "lossy"
-quality = 75
-method = 0
+quality = 100
+method = 4
 
 [devices.laptop]
 mobile = false

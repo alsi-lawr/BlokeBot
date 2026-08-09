@@ -20,13 +20,12 @@ browser_arguments = [
 ]
 
 [webp]
-source = "jpeg_screencast"
-source_quality = 95
+source = "png_screencast"
 encoder = "libwebp_full"
 pipeline = "live"
 mode = "lossy"
-quality = 75
-method = 0
+quality = 100
+method = 4
 
 [devices.laptop]
 mobile = false
@@ -76,6 +75,7 @@ local server = viset.process.start({
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
+  local device = viset.context.device
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   viset.page.wait_for(
@@ -87,7 +87,33 @@ local succeeded, failure = pcall(function()
   )
   viset.sleep("350ms")
 
-  viset.page.evaluate(viset.javascript("window.scrollTo(0, 0); true"))
+  viset.page.evaluate(
+    viset.javascript([=[
+      ({ touch }) => {
+        window.scrollTo(0, 0);
+        if (!touch) return true;
+        const indicator = document.createElement("div");
+        indicator.id = "blokebot-simulation-touch";
+        indicator.setAttribute("aria-hidden", "true");
+        indicator.style.cssText = [
+          "position:fixed",
+          "z-index:2147483647",
+          "width:42px",
+          "height:42px",
+          "border:2px solid rgba(255,255,255,0.92)",
+          "border-radius:999px",
+          "background:rgba(148,163,184,0.22)",
+          "box-shadow:0 0 0 2px rgba(15,23,42,0.68),0 4px 12px rgba(15,23,42,0.3)",
+          "opacity:0",
+          "pointer-events:none",
+          "transform:translate(-50%,-50%) scale(0.9)",
+        ].join(";");
+        document.body.append(indicator);
+        return true;
+      }
+    ]=]),
+    { touch = device.touch }
+  )
 
   local function gesture(start_ratio, end_ratio)
     local update = viset
@@ -99,6 +125,14 @@ local succeeded, failure = pcall(function()
 
         window.scrollTo(0, Math.round(maximum * ratio));
 
+        const indicator = document.querySelector("#blokebot-simulation-touch");
+        if (indicator) {
+          indicator.style.left = Math.round(window.innerWidth * 0.78) + "px";
+          indicator.style.top = Math.round(
+            window.innerHeight * (0.78 + (0.42 - 0.78) * frame.progress)
+          ) + "px";
+          indicator.style.opacity = "1";
+        }
       }
     ]=])
       :format(start_ratio, end_ratio - start_ratio)
@@ -108,6 +142,10 @@ local succeeded, failure = pcall(function()
       easing = "in_out_sine",
       update = viset.javascript(update),
     })
+    viset.page.evaluate(viset.javascript([=[
+        document.querySelector("#blokebot-simulation-touch")?.style.setProperty("opacity", "0");
+        true
+      ]=]))
   end
 
   local recording = viset.record()
