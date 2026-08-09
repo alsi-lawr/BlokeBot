@@ -28,7 +28,6 @@ public partial class HostConfigPage
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
                 HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
-                HostFeatureFlags.Automations => "feature-toggle-card__icon text-fuchsia-700",
                 HostFeatureFlags.Shoutouts
                 or HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
@@ -68,14 +67,6 @@ public partial class HostConfigPage
                     <path d="M4 12h10" />
                     <path d="M4 17h7" />
                     <path d="m16 14 3 3-3 3" />
-                </svg>
-                """,
-                HostFeatureFlags.Automations => """
-                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="6" cy="6" r="2" />
-                    <circle cx="18" cy="12" r="2" />
-                    <circle cx="6" cy="18" r="2" />
-                    <path d="M8 6h2a4 4 0 0 1 4 4v0M8 18h2a4 4 0 0 0 4-4v0" />
                 </svg>
                 """,
                 HostFeatureFlags.Shoutouts
@@ -193,7 +184,6 @@ public partial class HostConfigPage
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.CustomCommands => "Custom commands",
-            HostFeatureFlags.Automations => "Automations",
             HostFeatureFlags.Shoutouts => "Shoutouts",
             HostFeatureFlags.Polls => "Polls",
             HostFeatureFlags.ClipsAndMarkers => "Clips & markers",

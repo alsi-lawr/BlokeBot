@@ -35,7 +35,11 @@ public partial class CustomCommandSettingsPage
     private static readonly IReadOnlyList<CustomCommandInvocationLimit> _invocationLimits =
         Enum.GetValues<CustomCommandInvocationLimit>();
     private static readonly IReadOnlyList<CustomCommandActionKind> _actionKinds =
-        Enum.GetValues<CustomCommandActionKind>();
+    [
+        CustomCommandActionKind.Message,
+        CustomCommandActionKind.Counter,
+        CustomCommandActionKind.OverlayCue,
+    ];
     private static readonly IReadOnlyList<OverlayCueQueuePolicy> _cueQueuePolicies =
         Enum.GetValues<OverlayCueQueuePolicy>();
     private static readonly IReadOnlyList<OverlayCueReplyOrder> _cueReplyOrders =
@@ -55,7 +59,6 @@ public partial class CustomCommandSettingsPage
     private string? _loadFailureMessage;
     private bool _featureEnabled;
     private bool _overlaysEnabled;
-    private bool _automationsEnabled;
     private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
     private string? _cueTestOutcome;
     private bool _isLoading = true;
@@ -131,13 +134,6 @@ public partial class CustomCommandSettingsPage
             && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Overlays,
-                CancellationToken.None
-            );
-        _automationsEnabled =
-            HostId != 0
-            && await _features.IsEnabledAsync(
-                HostId,
-                HostFeatureFlags.Automations,
                 CancellationToken.None
             );
         _cueCatalog =
@@ -1452,16 +1448,14 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             CustomCommandActionKind.OverlayCue => "Play an overlay cue",
-            CustomCommandActionKind.Automation => "Run automation flow",
+            CustomCommandActionKind.Automation => "Saved action unavailable",
             _ => "Choose what happens",
         };
 
     private IEnumerable<CustomCommandActionKind> ActionKinds(CustomCommandEditor command) =>
-        _actionKinds.Where(action =>
-            action != CustomCommandActionKind.Automation
-            || _automationsEnabled
-            || command.ActionKind == CustomCommandActionKind.Automation
-        );
+        command.ActionKind == CustomCommandActionKind.Automation
+            ? [.. _actionKinds, CustomCommandActionKind.Automation]
+            : _actionKinds;
 
     private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy) =>
         policy switch

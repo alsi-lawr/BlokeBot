@@ -117,13 +117,7 @@ public sealed class NavMenuInventoryTests
             .ShouldBe(["home", "alerts", "host", "requests", "queues", "moments", "overlays"]);
         cut.FindAll("[data-nav-section]")
             .Select(static element => element.GetAttribute("data-nav-section"))
-            .ShouldBe([
-                "twitch-operations",
-                "guessing",
-                "points",
-                "custom-commands",
-                "automations",
-            ]);
+            .ShouldBe(["twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
             .ShouldAllBe(static button => button.GetAttribute("aria-expanded") == "false");
 
@@ -151,7 +145,6 @@ public sealed class NavMenuInventoryTests
             "points",
             "points/settings",
             "custom-commands/settings",
-            "automations/events",
         ]);
         cut.Find("a[href='twitch-operations/polls']").GetAttribute("aria-current").ShouldBe("page");
         cut.FindAll("nav a[href]")
@@ -196,14 +189,7 @@ public sealed class NavMenuInventoryTests
                     ? element.TextContent.Trim()
                     : element.GetAttribute("data-nav-section")
             )
-            .ShouldBe([
-                "Chat tools",
-                "twitch-operations",
-                "guessing",
-                "points",
-                "custom-commands",
-                "automations",
-            ]);
+            .ShouldBe(["Chat tools", "twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
             .ShouldAllBe(static button => button.GetAttribute("aria-expanded") == "true");
         cut.FindAll("[aria-describedby]").ShouldBeEmpty();
@@ -237,9 +223,6 @@ public sealed class NavMenuInventoryTests
         _ = module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
         _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.customcommands.open", true)
-            .SetResult(true);
-        _ = module
-            .Setup<bool>("readBoolean", "blokebot.sidebar.automations.open", true)
             .SetResult(true);
         _ = module
             .Setup<bool>("readBoolean", "blokebot.sidebar.nativetwitch.open", true)

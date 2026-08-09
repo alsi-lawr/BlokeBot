@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -20,6 +22,9 @@ OFFLINE_AUTH_MARKERS = (
     "An administrator needs to check the connection settings.",
 )
 OFFLINE_AUTH_STATUS = 503
+WINDOWS_SHARING_VIOLATION = 32
+CLEANUP_RETRY_INTERVAL_SECONDS = 0.1
+CLEANUP_RETRY_TIMEOUT_SECONDS = 5
 
 
 class NativeSmokeError(RuntimeError):
@@ -91,6 +96,34 @@ def _wait_for_offline_auth_surface(process: subprocess.Popen[bytes], url: str) -
     raise NativeSmokeError(f"Offline auth surface did not become ready: {last_error}")
 
 
+def _remove_data_directory(
+    data_directory: Path,
+    *,
+    remove: Callable[[Path], None] = shutil.rmtree,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    deadline: float | None = None
+    last_sharing_violation: PermissionError | None = None
+    while True:
+        if deadline is not None and monotonic() >= deadline:
+            raise last_sharing_violation
+        try:
+            remove(data_directory)
+            return
+        except PermissionError as error:
+            if getattr(error, "winerror", None) != WINDOWS_SHARING_VIOLATION:
+                raise
+            now = monotonic()
+            if deadline is None:
+                deadline = now + CLEANUP_RETRY_TIMEOUT_SECONDS
+            remaining = deadline - now
+            if remaining <= 0:
+                raise
+            last_sharing_violation = error
+            sleep(min(CLEANUP_RETRY_INTERVAL_SECONDS, remaining))
+
+
 def smoke(executable: Path, version: str) -> None:
     if not executable.is_file():
         raise NativeSmokeError(f"Published executable does not exist: {executable}")
@@ -106,7 +139,10 @@ def smoke(executable: Path, version: str) -> None:
             raise NativeSmokeError(f"Help output is missing {marker!r}")
 
     port = _available_port()
-    with tempfile.TemporaryDirectory(prefix="blokebot-native-smoke-") as data_directory:
+    data_directory = Path(tempfile.mkdtemp(prefix="blokebot-native-smoke-"))
+    process: subprocess.Popen[bytes] | None = None
+    process_has_exited = False
+    try:
         process = subprocess.Popen(
             [
                 str(executable),
@@ -116,7 +152,7 @@ def smoke(executable: Path, version: str) -> None:
                 "--port",
                 str(port),
                 "--data-dir",
-                data_directory,
+                str(data_directory),
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -131,6 +167,10 @@ def smoke(executable: Path, version: str) -> None:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=10)
+            process_has_exited = True
+    finally:
+        if process is None or process_has_exited:
+            _remove_data_directory(data_directory)
 
 
 def main(arguments: list[str] | None = None) -> int:

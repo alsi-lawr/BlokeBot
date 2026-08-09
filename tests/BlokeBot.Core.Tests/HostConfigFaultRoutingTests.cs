@@ -403,7 +403,11 @@ public sealed class HostConfigFaultRoutingTests
             var shoutouts = FindFeatureButton(page, "Shoutouts");
             shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
             shoutouts.TextContent.ShouldContain("manual and automatic raid shoutouts");
-            page.FindAll(".feature-toggle-card").Count.ShouldBe(13);
+            page.FindAll(".feature-toggle-card").Count.ShouldBe(12);
+            page.FindAll("#chat-tools button")
+                .ShouldNotContain(static button =>
+                    button.TextContent.Contains("Automations", StringComparison.Ordinal)
+                );
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
             _ = overlays.QuerySelector("svg").ShouldNotBeNull();
@@ -453,6 +457,7 @@ public sealed class HostConfigFaultRoutingTests
             .SingleAsync();
         enabled.Contains(HostFeatureFlags.Shoutouts).ShouldBeFalse();
         enabled.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
+        enabled.Contains(HostFeatureFlags.Automations).ShouldBeTrue();
     }
 
     [Test]

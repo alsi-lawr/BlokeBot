@@ -24,12 +24,6 @@ public static class HostFeatureCatalog
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
         [
             new(
-                HostFeatureFlags.Automations,
-                "Automations",
-                "Connect channel events to chat, overlays, conditions, and delays.",
-                enabledFeatures.Contains(HostFeatureFlags.Automations)
-            ),
-            new(
                 HostFeatureFlags.Shoutouts,
                 "Shoutouts",
                 "Send manual and automatic raid shoutouts.",
