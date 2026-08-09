@@ -418,7 +418,7 @@
                                             @foreach (var action in ActionKinds(command))
                                             {
                                                 <option value="@action"
-                                                        disabled="@(action == CustomCommandActionKind.Automation && !_automationsEnabled)">
+                                                        disabled="@(action == CustomCommandActionKind.Automation)">
                                                     @ActionKindLabel(action)
                                                 </option>
                                             }
@@ -428,21 +428,11 @@
                                     @if (command.Action is AutomationCustomCommandActionEditor)
                                     {
                                         <div class="surface-muted col-span-full space-y-2 p-3"
-                                             data-automation-command>
-                                            @if (_automationsEnabled)
-                                            {
-                                                <p class="text-sm font-semibold text-slate-900">Connected automations</p>
-                                                <p class="text-sm text-muted-foreground">
-                                                    This command starts every enabled automation flow connected to it. Tools for building and editing automations arrive in a later release.
-                                                </p>
-                                            }
-                                            else
-                                            {
-                                                <p class="text-sm font-semibold text-slate-900">Automations are off</p>
-                                                <p class="text-sm text-muted-foreground" role="status">
-                                                    This setup is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-primary underline" href="/host#chat-tools">Channel setup</a>.
-                                                </p>
-                                            }
+                                             data-unavailable-command-action>
+                                            <p class="text-sm font-semibold text-slate-900">Saved action unavailable</p>
+                                            <p class="text-sm text-muted-foreground" role="status">
+                                                This action cannot be changed in this release. Saving preserves it.
+                                            </p>
                                         </div>
                                     }
                                     else

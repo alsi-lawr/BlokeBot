@@ -54,14 +54,6 @@ internal static class SiteGuideCatalog
             ]
         ),
         new(
-            "Automations",
-            [
-                GuideLink("Overview", "automations"),
-                GuideLink("Twitch events", "automations/events"),
-                GuideLink("Actions", "automations/actions"),
-            ]
-        ),
-        new(
             "Help and administration",
             [
                 GuideLink("Troubleshooting", "troubleshooting"),
@@ -167,8 +159,8 @@ internal static class SiteGuideCatalog
                     [
                         "Home gives a short introduction and public leaderboard shortcut.",
                         "Channel setup contains connections, moderator access and feature switches.",
-                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points, Custom commands, Automations and Overlays feature.",
-                        "Expand Native Twitch to move between its five focused task pages; expand Automations for its Twitch events page.",
+                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points, Custom commands and Overlays feature.",
+                        "Expand Native Twitch to move between its five focused task pages.",
                     ],
                     Paragraphs =
                     [
@@ -305,16 +297,7 @@ internal static class SiteGuideCatalog
             Eyebrow = "Channel tools",
             Title = "Choose the tools your channel needs",
             Summary =
-                "Every Chat Tools feature is independently opt-in, so each channel can run only the tools it needs.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-chat-tools-all-disabled.png",
-                LightPhoneSource: "media/phone-light-chat-tools-all-disabled.png",
-                DarkLaptopSource: "media/laptop-dark-chat-tools-all-disabled.png",
-                LightLaptopSource: "media/laptop-light-chat-tools-all-disabled.png",
-                PhoneAlt: "Channel setup on a phone with all thirteen Chat Tools features off.",
-                LaptopAlt: "Channel setup with all thirteen Chat Tools features off and no Chat Tools destinations in navigation.",
-                "New channels begin with every Chat Tools feature off. Turn on only the features this channel will use."
-            ),
+                "Every available Chat Tools feature is independently opt-in, so each channel can run only the tools it needs.",
             Sections =
             [
                 new SiteGuideSection
@@ -322,7 +305,7 @@ internal static class SiteGuideCatalog
                     Heading = "Start with every tool off",
                     Paragraphs =
                     [
-                        "A new channel starts with all thirteen Chat Tools features disabled: Automations, Shoutouts, Polls, Clips & markers, Rewards & redemptions, Predictions, Request boards, Play with viewers, Moments, Overlays, Guessing game, Points and Custom commands.",
+                        "A new channel starts with all twelve available Chat Tools features disabled: Shoutouts, Polls, Clips & markers, Rewards & redemptions, Predictions, Request boards, Play with viewers, Moments, Overlays, Guessing game, Points and Custom commands.",
                         "Channels migrated from an earlier BlokeBot release keep their effective feature behavior. Review their switches after upgrading rather than assuming the new-channel default was applied.",
                     ],
                     Bullets =
@@ -337,15 +320,6 @@ internal static class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Turn on only what the channel needs",
-                    Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-chat-tools-enabled.png",
-                        LightPhoneSource: "media/phone-light-chat-tools-enabled.png",
-                        DarkLaptopSource: "media/laptop-dark-chat-tools-enabled.png",
-                        LightLaptopSource: "media/laptop-light-chat-tools-enabled.png",
-                        PhoneAlt: "Channel setup on a phone with representative Chat Tools features enabled.",
-                        LaptopAlt: "Channel setup with representative Chat Tools features enabled and only their destinations visible in navigation.",
-                        "Enabled switches add only their matching destinations and behavior; every other feature remains paused and hidden."
-                    ),
                     Steps =
                     [
                         "Choose the correct channel and open Channel setup.",
@@ -371,7 +345,6 @@ internal static class SiteGuideCatalog
                         new SiteLink("Public leaderboards", "leaderboards"),
                         new SiteLink("Native Twitch", "twitch-operations"),
                         new SiteLink("Overlays and Browser Sources", "overlays"),
-                        new SiteLink("Automations", "automations"),
                     ],
                 },
             ],
@@ -1280,15 +1253,6 @@ internal static class SiteGuideCatalog
             Title = "Create commands and scheduled messages",
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-custom-commands.png",
-                LightPhoneSource: "media/phone-light-custom-commands.png",
-                DarkLaptopSource: "media/laptop-dark-custom-commands.png",
-                LightLaptopSource: "media/laptop-light-custom-commands.png",
-                PhoneAlt: "Custom command editor with Run automation flow selected and the runtime foundation explanation.",
-                LaptopAlt: "Custom command editor with Run automation flow selected and the runtime foundation explanation.",
-                "Run automation flow connects a command to existing source-owned flows without adding a second flow picker."
-            ),
             Sections =
             [
                 new SiteGuideSection
@@ -1329,25 +1293,6 @@ internal static class SiteGuideCatalog
                         "Scheduled chat sends a saved reply on a timer, after chat activity or once a week.",
                         "Twitch announcement uses Twitch's coloured announcement surface. The bot must currently be a moderator and authorised for announcements.",
                         "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
-                    ],
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Connect an existing automation flow",
-                    Bullets =
-                    [
-                        "Run automation flow is a runtime foundation: the command starts every enabled flow whose Custom command source is already connected to it.",
-                        "Visual flow building and editing are not available in this release. The command does not contain a second flow selection.",
-                        "Custom commands and Automations must both be on. Turning either off retains the command and flow history, pauses all downstream actions and does not replay suppressed work when re-enabled.",
-                    ],
-                    Paragraphs =
-                    [
-                        "The Automations guide explains flows, conditions, delays, event data and every available action; this command action is only the chat entry point.",
-                    ],
-                    Links =
-                    [
-                        new SiteLink("Understand automations", "automations"),
-                        new SiteLink("See what automations can do", "automations/actions"),
                     ],
                 },
             ],

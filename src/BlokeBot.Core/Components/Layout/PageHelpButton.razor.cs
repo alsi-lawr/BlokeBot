@@ -67,7 +67,6 @@ public partial class PageHelpButton
             "/points" => _pointsDashboardHelp,
             "/points/settings" => _pointsSettingsHelp,
             "/custom-commands/settings" => _customCommandsHelp,
-            "/automations/events" => _automationEventsHelp,
             "/host" => _hostConfigHelp,
             "/requests" => _requestBoardsHelp,
             "/queues" => _playQueuesHelp,
@@ -580,46 +579,12 @@ public partial class PageHelpButton
                     "Overlay cue commands inherit both the Custom commands and Overlays switches. If either is off, cue playback, testing, chat replies, cooldowns, one-time viewer use, and viewer-catalog listing are paused.",
                     "Turning either switch back on restores the saved cue setup without replaying commands that were suppressed while it was off.",
                     "Test cue checks the selected cue and Browser Source without sending chat, starting a cooldown, or consuming a one-time viewer use.",
-                    "Run automation flow is a runtime foundation. It starts every enabled flow whose Custom command source is connected to the command; visual flow building and editing are not available here.",
-                    "Automation commands inherit both the Custom commands and Automations switches. If either is off, flow starts, downstream actions, cooldowns, one-time viewer use, and viewer-catalog listing stay paused.",
-                    "Turning both switches back on restores the saved command and flow history without replaying work suppressed while either switch was off.",
                 ]
             ),
             new(
                 "Scheduled messages",
                 "Choose a saved reply, then decide whether it should be sent on a timer, after enough chat activity, or once a week.",
                 []
-            ),
-        ]
-    );
-
-    private static readonly HelpPage _automationEventsHelp = new(
-        "Twitch events",
-        [
-            new(
-                "Turning this tool on or off",
-                "Automations are opt-in per channel. Use Channel setup to turn Automations on or off.",
-                [
-                    "While Automations is off, this page uses disabled recovery, Twitch events do not start flows, and no Twitch event subscriptions are kept for automations.",
-                    "Saved automations and their run history are retained. Turning Automations back on resumes from the current state without replaying events that were suppressed while it was off.",
-                ]
-            ),
-            new(
-                "Event sources and Twitch approval",
-                "Each source lists the Twitch EventSub subscription it uses and the exact approval it needs.",
-                [
-                    "Subscription, cheer, and Hype Train sources need this channel's Twitch integration with the listed permissions. Reconnect to Twitch to approve them.",
-                    "Until the missing permissions are approved, those sources stay inactive: no Twitch subscription is created and no flow starts.",
-                    "Chat notifications cover typed Twitch notices such as announcements and resubs. Ordinary chat messages never start automations.",
-                ]
-            ),
-            new(
-                "How events start flows",
-                "A ready source starts every enabled automation flow connected to it, subject to each source's own settings such as minimum Bits or raid viewers.",
-                [
-                    "Twitch can deliver the same event more than once. BlokeBot keeps a short-lived receipt so a repeated delivery inside ten minutes starts nothing extra.",
-                    "Tools for building and editing flows arrive in a later release.",
-                ]
             ),
         ]
     );

@@ -39,9 +39,9 @@ public sealed class HostFeatureTests
 
         await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
-        (await LoadFeaturesAsync(service, hostId)).ShouldBe(
-            HostFeatureFlags.All & ~HostFeatureFlags.Guessing
-        );
+        var afterVisibleFeatureDisabled = await LoadFeaturesAsync(service, hostId);
+        afterVisibleFeatureDisabled.ShouldBe(HostFeatureFlags.All & ~HostFeatureFlags.Guessing);
+        afterVisibleFeatureDisabled!.Value.Contains(HostFeatureFlags.Automations).ShouldBeTrue();
         publishCount.ShouldBe(1);
 
         await service.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
@@ -59,10 +59,18 @@ public sealed class HostFeatureTests
             .ShouldAllBe(static feature => !feature.Enabled);
         HostFeatureCatalog.Features.Count.ShouldBe(13);
         HostFeatureCatalog.Features.ShouldBeUnique();
+        HostFeatureCatalog.Features.ShouldContain(HostFeatureFlags.Automations);
         HostFeatureCatalog
-            .Cards(HostFeatureFlags.None)
+            .Cards(HostFeatureFlags.Automations)
+            .ShouldAllBe(static card => !card.Enabled);
+        HostFeatureCatalog
+            .Cards(HostFeatureFlags.All)
             .Select(static card => card.Feature)
-            .ShouldBe(HostFeatureCatalog.Features);
+            .ShouldBe(
+                HostFeatureCatalog.Features.Where(static feature =>
+                    feature != HostFeatureFlags.Automations
+                )
+            );
     }
 
     [Test]

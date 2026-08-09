@@ -193,49 +193,21 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task ActionKind_ChangingToAutomation_SavesABoundedAutomationAction()
+    public async Task AvailableActionChoices_ExcludeAutomationForANonAutomationCommand()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var cut = context.Render<CustomCommandSettingsPage>();
 
-        cut.Find($"#command-{seeded.CommandId}-action-kind")
-            .Change(CustomCommandActionKind.Automation.ToString());
-
-        _ = cut.Find("[data-automation-command]").ShouldNotBeNull();
-        cut.FindAll($"#command-{seeded.CommandId}-0-argument-reply").ShouldBeEmpty();
-        cut.FindAll("select[data-flow-picker]").ShouldBeEmpty();
-        cut.Find("button[aria-controls='custom-command-advanced-settings']").Click();
-        cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");
-        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
-            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
-        cut.Find("button[aria-label='Save custom commands']").Click();
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (
-            await db
-                .CustomCommandActions.OfType<AutomationCustomCommandAction>()
-                .CountAsync(action => action.CustomCommandId == seeded.CommandId)
-        ).ShouldBe(1);
+        cut.FindAll("option[value='Automation']").ShouldBeEmpty();
     }
 
     [Test]
-    public async Task AutomationsOff_RenderingActionChoice_HidesNewChoiceButRetainsStoredActionRecovery()
+    public async Task StoredAutomationAction_LoadingAndSaving_UsesUnavailableRepresentationAndPreservesIt()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var host = await db.Hosts.SingleAsync(value => value.Id == seeded.HostId);
-            host.EnabledFeatures &= ~HostFeatureFlags.Automations;
-            _ = await db.SaveChangesAsync();
-        }
-        await using (var context = UiTestContextFactory.Create(dbFactory, seeded.HostId))
-        {
-            var cut = context.Render<CustomCommandSettingsPage>();
-            cut.FindAll("option[value='Automation']").ShouldBeEmpty();
-        }
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var command = await db
@@ -247,16 +219,24 @@ public sealed class CustomCommandSettingsUiTests
             _ = await db.SaveChangesAsync();
         }
 
-        await using var retainedContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-        var retained = retainedContext.Render<CustomCommandSettingsPage>();
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
 
-        retained.FindAll("option[value='Automation']").Count.ShouldBe(1);
-        retained.Find("option[value='Automation']").HasAttribute("disabled").ShouldBeTrue();
-        var recovery = retained.Find("[data-automation-command]");
-        recovery.TextContent.ShouldContain("Automations are off");
-        recovery.TextContent.ShouldContain("setup is retained");
-        recovery.QuerySelector("a[href='/host#chat-tools']")!.TextContent.ShouldBe("Channel setup");
-        retained.FindAll("select[data-flow-picker]").ShouldBeEmpty();
+        cut.FindAll("option[value='Automation']").Count.ShouldBe(1);
+        var option = cut.Find("option[value='Automation']");
+        option.HasAttribute("disabled").ShouldBeTrue();
+        option.TextContent.ShouldBe("Saved action unavailable");
+        var unavailable = cut.Find("[data-unavailable-command-action]");
+        unavailable.TextContent.ShouldContain("Saving preserves it");
+        unavailable.QuerySelectorAll("a").ShouldBeEmpty();
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (
+            await verify
+                .CustomCommandActions.OfType<AutomationCustomCommandAction>()
+                .CountAsync(action => action.CustomCommandId == seeded.CommandId)
+        ).ShouldBe(1);
     }
 
     [Test]

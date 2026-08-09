@@ -1,4 +1,5 @@
 using BlokeBot.Core.Components.Layout;
+using BlokeBot.Core.Features.Automations.Page;
 using Bunit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
@@ -29,7 +30,6 @@ public sealed class PageHelpButtonTests
             .ToArray();
 
         routes.ShouldBe([
-            "/automations/events",
             "/custom-commands/settings",
             "/guessing",
             "/guessing/settings",
@@ -46,5 +46,14 @@ public sealed class PageHelpButtonTests
             "/twitch-operations/shoutouts",
         ]);
         routes.ShouldAllBe(static route => PageHelpButton.HasUsefulHelpForPath(route));
+    }
+
+    [Test]
+    public void WithdrawnAutomationEventsSurface_HasNoRouteOrPageHelp()
+    {
+        typeof(AutomationEventsPage)
+            .GetCustomAttributes(typeof(RouteAttribute), inherit: true)
+            .ShouldBeEmpty();
+        PageHelpButton.HasUsefulHelpForPath("/automations/events").ShouldBeFalse();
     }
 }
