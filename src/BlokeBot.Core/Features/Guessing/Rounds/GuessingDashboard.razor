@@ -68,7 +68,8 @@
             {
                 <LiveRoundSummary State="_state" RoundStartedText="@_roundStartedText" RoundStatusText="@_roundStatusText" />
 
-                <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
+                     data-card-owner="guessing-dashboard-cards">
                     <RoundOrchestrationPanel State="_state"
                                              StartRound="StartRoundAsync"
                                              StopGuessing="StopGuessingAsync"

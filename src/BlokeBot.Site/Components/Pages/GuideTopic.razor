@@ -24,7 +24,7 @@
 @page "/server-owners"
 @inject NavigationManager Navigation
 
-<PageTitle>@_page.Title — BlokeBot guide</PageTitle>
+<PageTitle>@_page.Title | BlokeBot guide</PageTitle>
 
 <div class="guide-layout">
     <GuideSidebar />
@@ -40,16 +40,18 @@
             <p class="lede">@_page.Summary</p>
         </header>
 
-        @if (_page.Media is { } media)
+        @if (_page.Media is not null)
         {
-            <DeviceShowcase
-                DarkPhoneSource="@media.DarkPhoneSource"
-                LightPhoneSource="@media.LightPhoneSource"
-                PhoneAlt="@media.PhoneAlt"
-                DarkLaptopSource="@media.DarkLaptopSource"
-                LightLaptopSource="@media.LightLaptopSource"
-                LaptopAlt="@media.LaptopAlt"
-                Caption="@media.Caption" />
+            <div style="display: contents">
+                <DeviceShowcase
+                    DarkPhoneSource="@_page.Media.DarkPhoneSource"
+                    LightPhoneSource="@_page.Media.LightPhoneSource"
+                    PhoneAlt="@_page.Media.PhoneAlt"
+                    DarkLaptopSource="@_page.Media.DarkLaptopSource"
+                    LightLaptopSource="@_page.Media.LightLaptopSource"
+                    LaptopAlt="@_page.Media.LaptopAlt"
+                    Caption="@_page.Media.Caption" />
+            </div>
         }
 
         @foreach (var section in _page.Sections)
@@ -57,16 +59,18 @@
             <section id="@section.Anchor">
                 <h2>@section.Heading</h2>
 
-                @if (section.Media is { } sectionMedia)
+                @if (section.Media is not null)
                 {
-                    <DeviceShowcase
-                        DarkPhoneSource="@sectionMedia.DarkPhoneSource"
-                        LightPhoneSource="@sectionMedia.LightPhoneSource"
-                        PhoneAlt="@sectionMedia.PhoneAlt"
-                        DarkLaptopSource="@sectionMedia.DarkLaptopSource"
-                        LightLaptopSource="@sectionMedia.LightLaptopSource"
-                        LaptopAlt="@sectionMedia.LaptopAlt"
-                        Caption="@sectionMedia.Caption" />
+                    <div style="display: contents">
+                        <DeviceShowcase
+                            DarkPhoneSource="@section.Media.DarkPhoneSource"
+                            LightPhoneSource="@section.Media.LightPhoneSource"
+                            PhoneAlt="@section.Media.PhoneAlt"
+                            DarkLaptopSource="@section.Media.DarkLaptopSource"
+                            LightLaptopSource="@section.Media.LightLaptopSource"
+                            LaptopAlt="@section.Media.LaptopAlt"
+                            Caption="@section.Media.Caption" />
+                    </div>
                 }
 
                 @foreach (var paragraph in section.Paragraphs)
@@ -104,14 +108,14 @@
                     </ul>
                 }
 
-                @if (section.Code is { } snippet)
+                @if (section.Code is not null)
                 {
-                    <pre class="code-block"><code>@snippet</code></pre>
+                    <pre class="code-block"><code>@section.Code</code></pre>
                 }
 
-                @if (section.Note is { } note)
+                @if (section.Note is not null)
                 {
-                    <aside class="doc-note"><p>@note</p></aside>
+                    <aside class="doc-note"><p>@section.Note</p></aside>
                 }
             </section>
         }

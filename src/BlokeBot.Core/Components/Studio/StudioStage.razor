@@ -1,0 +1,27 @@
+@inject IJSRuntime _js
+
+<section class="studio-stage min-w-0 rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] transition-[border-color,box-shadow] duration-200 ease-[ease] motion-reduce:duration-[1ms] @(Open ? "studio-stage--open shadow-[var(--app-shadow-sm)]" : null)" data-stage="@Key">
+    <button type="button"
+            class="studio-stage__header flex w-full cursor-pointer items-center gap-[0.85rem] rounded-[14px] px-[1.15rem] py-[0.9rem] text-left focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none"
+            aria-expanded="@(Open ? "true" : "false")"
+            aria-controls="@_bodyId"
+            @onclick="Toggle">
+        <span class="studio-stage__number inline-flex h-[1.65rem] w-[1.65rem] flex-none items-center justify-center rounded-full border text-[0.8rem] font-extrabold transition-[background-color,border-color,color] duration-200 ease-[ease] motion-reduce:duration-[1ms] @(Open
+                  ? "border-transparent bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
+                  : "border-[var(--app-control-border)] bg-[var(--app-surface-muted)] text-[var(--app-text-muted)]")"
+              aria-hidden="true">@Number</span>
+        <span class="studio-stage__title font-bold text-[var(--app-text-strong)]">@Title</span>
+        <span class="studio-stage__summary ml-auto min-w-0 text-right text-[0.8rem] text-[var(--app-text-muted)] wrap-anywhere transition-opacity duration-200 ease-[ease] motion-reduce:duration-[1ms] @(Open ? "opacity-0" : null)">@Summary</span>
+        <span class="studio-stage__chevron ml-[0.4rem] flex-none text-[var(--app-text-muted)] transition-transform duration-[250ms] ease-[ease] motion-reduce:duration-[1ms] @(Open ? "rotate-90" : null)" aria-hidden="true">›</span>
+    </button>
+    @* The spring animates grid-template-rows, so the clip child must own the overflow. *@
+    <div id="@_bodyId"
+         class="studio-stage__body grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:duration-[1ms] @(Open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")"
+         inert="@(!Open)">
+        <div class="studio-stage__clip min-w-0 overflow-hidden">
+            <div class="studio-stage__content pt-[0.3rem] pr-[1.15rem] pb-[1.2rem] pl-[3.4rem] max-md:pl-[1.15rem]">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+</section>

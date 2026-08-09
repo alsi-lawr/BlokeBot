@@ -1,13 +1,16 @@
+@using BlokeBot.Core.Features.TwitchOperations.Shared
 @using BlokeBot.Persistence.Models
 @using BlokeBot.Eventing
 @inject AutomaticRaidShoutoutConfigurationService _configuration
 @inject EventBus<AppEventKind> _events
 
-<CollapsibleSection Title="Automatic raid shoutouts"
-                    Description="Welcome qualifying incoming raids automatically."
-                    InitiallyOpen="false"
-                    ContentId="automatic-raid-shoutouts">
-    <div class="automatic-raid-settings p-4" data-automatic-raid-shoutouts>
+<StudioStage Key="automatic-raid"
+             Number="1"
+             Title="Automatic raid shoutouts"
+             Summary="@_settingsSummary"
+             Open="@_settingsOpen"
+             OpenChanged="@(open => _settingsOpen = open)">
+    <div data-automatic-raid-shoutouts>
         @if (_loading)
         {
             <p class="text-sm text-muted-foreground" role="status">Loading automatic raid shoutouts.</p>
@@ -21,237 +24,238 @@
         }
         else
         {
-            <div class="space-y-5">
-                <label class="flex items-start gap-3 text-sm font-semibold text-slate-900" for="automatic-raid-enabled">
-                    <input id="automatic-raid-enabled"
-                           class="mt-0.5 h-4 w-4"
-                           type="checkbox"
-                           checked="@_draft.Enabled"
-                           @onchange="SetEnabled" />
-                    <span>
-                        Enable automatic shoutouts on incoming raids
-                        <span class="mt-1 block font-normal text-muted-foreground">Off by default. Only raids at or above the viewer threshold are eligible.</span>
-                    </span>
-                </label>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div class="field space-y-2" data-field>
-                        <label class="label" for="automatic-raid-minimum-viewers">Minimum viewers</label>
-                        <input id="automatic-raid-minimum-viewers"
-                               class="input"
-                               type="number"
-                               min="1"
-                               value="@_draft.MinimumViewerCount"
-                               disabled="@(!_draft.Enabled)"
-                               aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
-                               aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
-                               @oninput="SetMinimumViewerCount" />
-                        @if (ErrorFor(AutomaticRaidShoutoutValidationField.MinimumViewerCount) is { } thresholdError)
-                        {
-                            <p id="automatic-raid-minimum-viewers-error" class="text-sm font-semibold text-red-700" role="alert">@thresholdError</p>
-                        }
-                    </div>
-
-                    <fieldset class="space-y-2" disabled="@(!_draft.Enabled)">
-                        <legend class="label">Shoutout mechanism</legend>
-                        <div class="flex flex-wrap gap-4">
-                            <label class="flex items-center gap-2 text-sm" for="automatic-raid-mechanism-native">
-                                <input id="automatic-raid-mechanism-native"
-                                       type="radio"
-                                       name="automatic-raid-mechanism"
-                                       value="Native"
-                                       checked="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Native)"
-                                       @onchange="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Native))" />
-                                Native Twitch shoutout
-                            </label>
-                            <label class="flex items-center gap-2 text-sm" for="automatic-raid-mechanism-chat">
-                                <input id="automatic-raid-mechanism-chat"
-                                       type="radio"
-                                       name="automatic-raid-mechanism"
-                                       value="Chat"
-                                       checked="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Chat)"
-                                       @onchange="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Chat))" />
-                                Chat message
-                            </label>
-                        </div>
-                    </fieldset>
-                </div>
-
-                @if (_draft.Mechanism == AutomaticRaidShoutoutMechanism.Chat)
-                {
-                    <div class="space-y-5" data-automatic-raid-chat-controls>
-                        <fieldset class="space-y-2" disabled="@(!_draft.Enabled)">
-                            <legend class="label">Chat presentation</legend>
-                            <div class="flex flex-wrap gap-4">
-                                @foreach (var presentation in Enum.GetValues<AutomaticRaidChatPresentation>())
-                                {
-                                    var inputId = $"automatic-raid-presentation-{presentation.ToString().ToLowerInvariant()}";
-                                    <label class="flex items-center gap-2 text-sm" for="@inputId">
-                                        <input id="@inputId"
-                                               type="radio"
-                                               name="automatic-raid-presentation"
-                                               value="@presentation"
-                                               checked="@(_draft.ChatPresentation == presentation)"
-                                               @onchange="@(() => SetPresentation(presentation))" />
-                                        @PresentationLabel(presentation)
-                                    </label>
-                                }
-                            </div>
-                        </fieldset>
-
-                        @if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Pinned)
-                        {
-                            <div class="max-w-sm space-y-3">
-                                <div class="field space-y-2" data-field>
-                                    <label class="label" for="automatic-raid-pin-duration">Pin duration in seconds</label>
-                                    <input id="automatic-raid-pin-duration"
-                                           class="input"
-                                           type="number"
-                                           min="30"
-                                           max="1800"
-                                           value="@_pinDurationValue"
-                                           disabled="@(!_draft.Enabled || _pinUntilStreamEnd)"
-                                           aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.PinDuration)"
-                                           aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.PinDuration)"
-                                           @oninput="SetPinDuration" />
-                                </div>
-                                <label class="flex items-center gap-2 text-sm" for="automatic-raid-pin-until-end">
-                                    <input id="automatic-raid-pin-until-end"
-                                           type="checkbox"
-                                           checked="@_pinUntilStreamEnd"
-                                           disabled="@(!_draft.Enabled)"
-                                           @onchange="SetPinUntilStreamEnd" />
-                                    Keep pinned until stream end
-                                </label>
-                                @if (ErrorFor(AutomaticRaidShoutoutValidationField.PinDuration) is { } pinError)
-                                {
-                                    <p id="automatic-raid-pin-duration-error" class="text-sm font-semibold text-red-700" role="alert">@pinError</p>
-                                }
-                            </div>
-                        }
-                        else if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Announcement)
-                        {
-                            <div class="field max-w-sm space-y-2" data-field>
-                                <label class="label" for="automatic-raid-announcement-color">Announcement color</label>
-                                <select id="automatic-raid-announcement-color"
-                                        class="input"
-                                        value="@_draft.AnnouncementColor"
-                                        disabled="@(!_draft.Enabled)"
-                                        aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
-                                        aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
-                                        @onchange="SetAnnouncementColor">
-                                    @foreach (var color in _announcementColors)
-                                    {
-                                        <option value="@color">@AnnouncementColorLabel(color)</option>
-                                    }
-                                </select>
-                                @if (ErrorFor(AutomaticRaidShoutoutValidationField.AnnouncementColor) is { } colorError)
-                                {
-                                    <p id="automatic-raid-announcement-color-error" class="text-sm font-semibold text-red-700" role="alert">@colorError</p>
-                                }
-                            </div>
-                        }
-
-                        <div class="field space-y-2" data-field>
-                            <label class="label" for="automatic-raid-message-template">Chat message</label>
-                            <textarea id="automatic-raid-message-template"
-                                      class="input min-h-28 resize-y"
-                                      value="@_draft.MessageTemplate"
-                                      disabled="@(!_draft.Enabled)"
-                                      aria-describedby="automatic-raid-template-guidance automatic-raid-template-budget automatic-raid-message-template-error"
-                                      aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MessageTemplate)"
-                                      @oninput="SetMessageTemplate"></textarea>
-                            <p id="automatic-raid-template-guidance" class="form-help">
-                                Tokens: <code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>,
-                                <code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, and <code>{viewer_count}</code>.
-                                Last game and stream title require a non-empty inline fallback.
-                            </p>
-                            <p id="automatic-raid-template-budget" class="form-help">
-                                Write up to 150 characters of text and fallbacks. BlokeBot reserves 350 characters for live values, for a 500-character rendered limit. Messages are never silently shortened.
-                            </p>
-                            @if (ErrorFor(AutomaticRaidShoutoutValidationField.MessageTemplate) is { } templateError)
-                            {
-                                <p id="automatic-raid-message-template-error" class="text-sm font-semibold text-red-700" role="alert">@templateError</p>
-                            }
-                        </div>
-
-                        <div class="surface-row rounded-lg p-4" aria-live="polite" data-automatic-raid-preview>
-                            <strong class="text-sm text-slate-950">Preview</strong>
-                            @if (_previewError is not null)
-                            {
-                                <p class="mt-2 text-sm font-semibold text-red-700" role="alert">@_previewError</p>
-                            }
-                            else
-                            {
-                                <p class="mt-2 break-words text-sm text-muted-foreground">@_preview</p>
-                                @if (_previewUsesFallback)
-                                {
-                                    <p class="mt-2 text-xs text-muted-foreground">Preview uses the inline fallback because Twitch may not supply the last game.</p>
-                                }
-                            }
-                        </div>
-                    </div>
-                }
-
-                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm" aria-live="polite" data-automatic-raid-readiness>
-                    <strong class="text-slate-950">Before a shoutout is sent</strong>
-                    <p class="mt-1 text-muted-foreground">@_readinessText</p>
-                </div>
-
-                @if (_validationErrors.Count > 0)
-                {
-                    <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-                         role="alert"
-                         aria-labelledby="automatic-raid-validation-title"
-                         data-automatic-raid-validation>
-                        <strong id="automatic-raid-validation-title">Check these automatic shoutout settings</strong>
-                        <ul class="mt-2 list-disc space-y-1 pl-5">
-                            @foreach (var error in _validationErrors)
-                            {
-                                <li>@error.Message</li>
-                            }
-                        </ul>
-                    </div>
-                }
-
-                <div class="flex flex-wrap items-center gap-3">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
                     <button type="button"
-                            class="btn-primary"
-                            disabled="@_saving"
-                            @onclick="SaveAsync">
-                        @(_saving ? "Saving…" : "Save automatic shoutouts")
-                    </button>
-                    <span class="text-sm text-muted-foreground" role="status" aria-live="polite">@_saveStatus</span>
+                            id="automatic-raid-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(_draft.Enabled ? "true" : "false")"
+                            aria-label="Automatic raid shoutouts"
+                            @onclick="ToggleEnabled"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Welcome qualifying incoming raids automatically</span>
+                    <span class="text-xs text-muted-foreground">Off keeps every setting saved; raids just stop triggering.</span>
                 </div>
 
-                <CollapsibleSection Title="Automatic shoutout outcomes"
-                                    Description="Newest retained results for incoming raids."
-                                    InitiallyOpen="false"
-                                    ContentId="automatic-raid-outcomes">
-                    <div class="automatic-raid-outcomes p-4">
-                        @if (_outcomes.Count == 0)
-                        {
-                            <p class="text-sm text-muted-foreground">No automatic raid shoutouts recorded yet.</p>
-                        }
-                        else
-                        {
-                            <div class="phone-card-list" data-automatic-raid-outcomes>
-                                @foreach (var outcome in _outcomes)
-                                {
-                                    <article class="surface-row rounded-lg p-4" @key="outcome.Id">
-                                        <div class="flex flex-wrap items-start justify-between gap-2">
-                                            <strong class="text-slate-950">@("@")@outcome.SourceLogin · @outcome.ViewerCount viewers</strong>
-                                            <span class="text-xs text-muted-foreground">@outcome.MessageTimestamp.ToLocalTime().ToString("MMM d, HH:mm")</span>
-                                        </div>
-                                        <p class="mt-2 text-sm font-semibold">@OutcomeTitle(outcome)</p>
-                                        <p class="mt-1 text-sm text-muted-foreground">@OutcomeDescription(outcome)</p>
-                                    </article>
-                                }
+                <div class="studio-span-4">
+                    <label class="label" for="automatic-raid-minimum-viewers">Minimum raid size</label>
+                    <input id="automatic-raid-minimum-viewers"
+                           class="input mt-2"
+                           type="number"
+                           min="1"
+                           value="@_draft.MinimumViewerCount"
+                           disabled="@(!_draft.Enabled)"
+                           aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
+                           aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
+                           @oninput="SetMinimumViewerCount" />
+                    <p class="mt-1 text-xs text-muted-foreground">Raids below this many viewers are ignored.</p>
+                    @if (ErrorFor(AutomaticRaidShoutoutValidationField.MinimumViewerCount) is { } thresholdError)
+                    {
+                        <p id="automatic-raid-minimum-viewers-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@thresholdError</p>
+                    }
+                </div>
+
+                <div class="studio-span-12 space-y-2">
+                    <span class="label">How the shoutout is sent</span>
+                    <StudioChoiceCards id="automatic-raid-mechanism"
+                                       AriaLabel="How the shoutout is sent"
+                                       Columns="StudioChoiceCardsColumns.Two">
+                        <StudioChoiceCard data-mechanism="native"
+                                          disabled="@(!_draft.Enabled)"
+                                          Icon="📣"
+                                          Title="Native Twitch shoutout"
+                                          Description="Twitch's own shoutout panel. Skipped silently if Twitch's cooldown is still active, never downgraded to chat."
+                                          Pressed="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Native)"
+                                          Select="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Native))" />
+                        <StudioChoiceCard data-mechanism="chat"
+                                          disabled="@(!_draft.Enabled)"
+                                          Icon="💬"
+                                          Title="Chat message"
+                                          Description="BlokeBot writes a message you compose: regular, pinned, or as an announcement."
+                                          Pressed="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Chat)"
+                                          Select="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Chat))" />
+                    </StudioChoiceCards>
+                </div>
+            </div>
+
+            @if (_draft.Mechanism == AutomaticRaidShoutoutMechanism.Chat)
+            {
+                <div class="studio-grid mt-4" data-automatic-raid-chat-controls>
+                    <div class="studio-span-12 space-y-2">
+                        <span class="label">Chat presentation</span>
+                        <StudioSegmentedPill TValue="AutomaticRaidChatPresentation"
+                                             AriaLabel="Chat presentation"
+                                             Options="_presentationOptions"
+                                             Value="_draft.ChatPresentation"
+                                             ValueChanged="SetPresentation"
+                                             Disabled="@(!_draft.Enabled)" />
+                    </div>
+
+                    @if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Pinned)
+                    {
+                        <div class="studio-span-4">
+                            <label class="label" for="automatic-raid-pin-duration">Pin duration in seconds</label>
+                            <input id="automatic-raid-pin-duration"
+                                   class="input mt-2"
+                                   type="number"
+                                   min="30"
+                                   max="1800"
+                                   value="@_pinDurationValue"
+                                   disabled="@(!_draft.Enabled || _pinUntilStreamEnd)"
+                                   aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.PinDuration)"
+                                   aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.PinDuration)"
+                                   @oninput="SetPinDuration" />
+                            <p class="mt-1 text-xs text-muted-foreground">30–1800 seconds.</p>
+                            @if (ErrorFor(AutomaticRaidShoutoutValidationField.PinDuration) is { } pinError)
+                            {
+                                <p id="automatic-raid-pin-duration-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@pinError</p>
+                            }
+                        </div>
+                        <div class="studio-span-8">
+                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                            <div class="mt-2 flex min-h-10 flex-wrap items-center gap-3 max-md:mt-0">
+                                <button type="button"
+                                        id="automatic-raid-pin-until-end"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(_pinUntilStreamEnd ? "true" : "false")"
+                                        aria-label="Keep pinned until stream end"
+                                        disabled="@(!_draft.Enabled)"
+                                        @onclick="TogglePinUntilStreamEnd"></button>
+                                <span class="text-sm font-semibold text-[var(--app-text-strong)]">Keep pinned until stream end</span>
                             </div>
+                        </div>
+                    }
+                    else if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Announcement)
+                    {
+                        <div class="studio-span-4">
+                            <label class="label" for="automatic-raid-announcement-color">Announcement color</label>
+                            <select id="automatic-raid-announcement-color"
+                                    class="input mt-2"
+                                    value="@_draft.AnnouncementColor"
+                                    disabled="@(!_draft.Enabled)"
+                                    aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
+                                    aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
+                                    @onchange="SetAnnouncementColor">
+                                @foreach (var color in _announcementColors)
+                                {
+                                    <option value="@color">@AnnouncementColorLabel(color)</option>
+                                }
+                            </select>
+                            <p class="mt-1 text-xs text-muted-foreground">If the announcement fails, no regular message is sent instead.</p>
+                            @if (ErrorFor(AutomaticRaidShoutoutValidationField.AnnouncementColor) is { } colorError)
+                            {
+                                <p id="automatic-raid-announcement-color-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@colorError</p>
+                            }
+                        </div>
+                    }
+
+                    <div class="studio-span-12">
+                        <label class="label" for="automatic-raid-message-template">Message</label>
+                        <textarea id="automatic-raid-message-template"
+                                  class="input mt-2 min-h-28 resize-y"
+                                  value="@_draft.MessageTemplate"
+                                  disabled="@(!_draft.Enabled)"
+                                  aria-describedby="automatic-raid-template-guidance automatic-raid-template-budget automatic-raid-message-template-error"
+                                  aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MessageTemplate)"
+                                  @oninput="SetMessageTemplate"></textarea>
+                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] mt-2">
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{twitch_handle}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{display_name}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{channel_url}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{last_game|fallback}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{stream_title|fallback}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{viewer_count}</span></span>
+                        </div>
+                        <p id="automatic-raid-template-guidance" class="form-help mt-2">
+                            Use the tokens above anywhere in the message. Last game and stream title require a non-empty inline fallback, written as <span class="font-mono">{last_game|fallback}</span>.
+                        </p>
+                        <p id="automatic-raid-template-budget" class="form-help">
+                            Write up to 150 characters of text and fallbacks. BlokeBot reserves 350 characters for live values, for a 500-character rendered limit. Messages are never silently shortened.
+                            @if (_authoredCharacters is { } used)
+                            {
+                                <b class="text-[var(--app-text-strong)]">@used/@AutomaticRaidShoutoutTemplate.MaximumAuthoredCharacters used.</b>
+                            }
+                        </p>
+                        @if (ErrorFor(AutomaticRaidShoutoutValidationField.MessageTemplate) is { } templateError)
+                        {
+                            <p id="automatic-raid-message-template-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@templateError</p>
                         }
                     </div>
-                </CollapsibleSection>
+                </div>
+
+                <div class="mt-4" aria-live="polite" data-automatic-raid-preview>
+                    @if (_previewError is not null)
+                    {
+                        <p class="text-sm font-semibold text-red-700" role="alert">@_previewError</p>
+                    }
+                    else
+                    {
+                        <StudioChatPreview Lines="PreviewLines()" />
+                        @if (_previewUsesFallback)
+                        {
+                            <p class="mt-1 text-xs text-muted-foreground">Preview uses the inline fallback because Twitch may not supply the last game.</p>
+                        }
+                    }
+                </div>
+            }
+
+            <div class="mt-4 rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-[1.05rem] py-[0.85rem] text-sm" aria-live="polite" data-automatic-raid-readiness>
+                <strong class="text-[var(--app-text-strong)]">Before a shoutout is sent</strong>
+                <p class="mt-1 text-muted-foreground">@_readinessText</p>
+            </div>
+
+            @if (_validationErrors.Count > 0)
+            {
+                <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                     role="alert"
+                     aria-labelledby="automatic-raid-validation-title"
+                     data-automatic-raid-validation>
+                    <strong id="automatic-raid-validation-title">Check these automatic shoutout settings</strong>
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach (var error in _validationErrors)
+                        {
+                            <li>@error.Message</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <button type="button"
+                        class="btn-primary"
+                        disabled="@_saving"
+                        @onclick="SaveAsync">
+                    @(_saving ? "Saving…" : "Save automatic shoutouts")
+                </button>
+                <span class="text-sm text-muted-foreground" role="status" aria-live="polite">@_saveStatus</span>
             </div>
         }
     </div>
-</CollapsibleSection>
+</StudioStage>
+
+<StudioStage Key="automatic-raid-outcomes"
+             Number="2"
+             Title="Automatic shoutout outcomes"
+             Summary="@_outcomesSummary"
+             Open="@_outcomesOpen"
+             OpenChanged="@(open => _outcomesOpen = open)">
+    @if (_outcomes.Count == 0)
+    {
+        <p class="text-sm text-muted-foreground" data-automatic-raid-outcomes>No automatic raid shoutouts recorded yet.</p>
+    }
+    else
+    {
+        <div class="grid gap-2" data-automatic-raid-outcomes>
+            @foreach (var outcome in _outcomes)
+            {
+                <NativeOperationRow @key="outcome.Id"
+                                    Title="@($"@{outcome.SourceLogin} · {outcome.ViewerCount} viewers")"
+                                    When="@outcome.MessageTimestamp.ToLocalTime().ToString("MMM d, HH:mm")">
+                    <span class="@OutcomePillClass(outcome)"><span class="status-pill__label">@OutcomeTitle(outcome)</span></span>
+                    <span class="mt-1 block">@OutcomeDescription(outcome)</span>
+                </NativeOperationRow>
+            }
+        </div>
+    }
+</StudioStage>

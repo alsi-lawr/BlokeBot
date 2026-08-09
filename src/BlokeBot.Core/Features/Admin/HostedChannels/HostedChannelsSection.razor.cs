@@ -1,9 +1,27 @@
+using BlokeBot.Core.Features.HostedChannels.Runtime;
 using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Admin.HostedChannels;
 
 public partial class HostedChannelsSection
 {
+    private bool _stageOpen = true;
+
+    private string _stageSummary
+    {
+        get
+        {
+            var runningCount = Hosts.Count(static host =>
+                host.Lifecycle
+                    is HostedChannelRuntimeLifecycle.Starting
+                        or HostedChannelRuntimeLifecycle.Started
+            );
+            var channels = Hosts.Count == 1 ? "1 channel" : $"{Hosts.Count} channels";
+            var bots = runningCount == 1 ? "1 bot running" : $"{runningCount} bots running";
+            return $"{channels} · {bots}";
+        }
+    }
+
     [Parameter, EditorRequired]
     public Func<Task> CreateHost { get; set; } = static () => Task.CompletedTask;
 

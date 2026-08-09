@@ -1,0 +1,14 @@
+<button type="button"
+        class="studio-choice-card flex cursor-pointer flex-col items-start gap-[0.2rem] rounded-[14px] border p-[0.9rem] text-left transition-[background-color,border-color,box-shadow,translate] duration-[140ms] ease-[ease] hover:-translate-y-0.5 focus-visible:outline-none motion-reduce:duration-[1ms] motion-reduce:hover:translate-y-0 @(Pressed
+            ? "border-[var(--app-focus-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-sm)]"
+            : "border-[var(--app-control-border)] bg-[var(--app-control-bg)] hover:border-[var(--app-control-hover-border)] hover:bg-[var(--app-control-hover)] hover:shadow-[var(--app-shadow-sm)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)]")"
+        aria-pressed="@(Pressed ? "true" : "false")"
+        @attributes="AdditionalAttributes"
+        @onclick="Select">
+    @if (Icon is { Length: > 0 } icon)
+    {
+        <span class="studio-choice-card__icon text-[1.2rem]" aria-hidden="true">@icon</span>
+    }
+    <span class="studio-choice-card__title max-w-full font-bold break-words text-[var(--app-text-strong)] @(Pressed ? "after:text-[var(--app-affirmative)] after:content-['_✓']" : null)">@Title</span>
+    <span class="studio-choice-card__description max-w-full text-[0.78rem] break-words text-[var(--app-text-muted)]">@Description</span>
+</button>

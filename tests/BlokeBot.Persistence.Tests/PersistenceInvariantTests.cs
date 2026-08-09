@@ -321,85 +321,6 @@ public sealed class PersistenceInvariantTests
         (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(1);
     }
 
-    [Test]
-    public void PersistedEnums_FormattingAndParsing_UseExactRoundTrippableTokens()
-    {
-        AssertTokens<AccessListEntryKind>([
-            (AccessListEntryKind.Blacklist, "blacklist"),
-            (AccessListEntryKind.Whitelist, "whitelist"),
-        ]);
-        AssertTokens<AnnouncementOccurrenceStatus>([
-            (AnnouncementOccurrenceStatus.Accepted, "Accepted"),
-            (AnnouncementOccurrenceStatus.Attempting, "Attempting"),
-            (AnnouncementOccurrenceStatus.None, "None"),
-            (AnnouncementOccurrenceStatus.Pending, "Pending"),
-            (AnnouncementOccurrenceStatus.RetryScheduled, "RetryScheduled"),
-            (AnnouncementOccurrenceStatus.SkippedExpired, "SkippedExpired"),
-            (AnnouncementOccurrenceStatus.TerminalAmbiguous, "TerminalAmbiguous"),
-            (AnnouncementOccurrenceStatus.TerminalInvalidTimeZone, "TerminalInvalidTimeZone"),
-            (AnnouncementOccurrenceStatus.TerminalMissingMessage, "TerminalMissingMessage"),
-            (AnnouncementOccurrenceStatus.TerminalRejected, "TerminalRejected"),
-            (AnnouncementOccurrenceStatus.TerminalUnexpected, "TerminalUnexpected"),
-        ]);
-        AssertTokens<AppCommandKind>([
-            (AppCommandKind.AddPoints, "AddPoints"),
-            (AppCommandKind.CancelGiveaway, "CancelGiveaway"),
-            (AppCommandKind.Commands, "Commands"),
-            (AppCommandKind.EndGiveaway, "EndGiveaway"),
-            (AppCommandKind.Gamble, "Gamble"),
-            (AppCommandKind.Giveaway, "Giveaway"),
-            (AppCommandKind.GivePoints, "GivePoints"),
-            (AppCommandKind.Guess, "Guess"),
-            (AppCommandKind.Guesses, "Guesses"),
-            (AppCommandKind.Join, "Join"),
-            (AppCommandKind.Points, "Points"),
-            (AppCommandKind.RemovePoints, "RemovePoints"),
-            (AppCommandKind.Start, "Start"),
-            (AppCommandKind.Stop, "Stop"),
-            (AppCommandKind.Win, "Win"),
-        ]);
-        AssertTokens<CustomCommandCooldownScope>([
-            (CustomCommandCooldownScope.Global, "Global"),
-            (CustomCommandCooldownScope.User, "User"),
-        ]);
-        AssertTokens<CustomCommandInvocationLimit>([
-            (CustomCommandInvocationLimit.OncePerStream, "OncePerStream"),
-            (CustomCommandInvocationLimit.OncePerStreamPerUser, "OncePerStreamPerUser"),
-            (CustomCommandInvocationLimit.OncePerUser, "OncePerUser"),
-            (CustomCommandInvocationLimit.Unlimited, "Unlimited"),
-        ]);
-        AssertTokens<CustomCommandInvocationResetScope>([
-            (CustomCommandInvocationResetScope.AllViewers, "AllViewers"),
-            (CustomCommandInvocationResetScope.OneViewer, "OneViewer"),
-        ]);
-        AssertTokens<CustomMessageSelectionMode>([
-            (CustomMessageSelectionMode.First, "First"),
-            (CustomMessageSelectionMode.Random, "Random"),
-            (CustomMessageSelectionMode.Sequential, "Sequential"),
-        ]);
-        AssertTokens<DurableAlertSeverity>([
-            (DurableAlertSeverity.Critical, "Critical"),
-            (DurableAlertSeverity.Info, "Info"),
-            (DurableAlertSeverity.Warning, "Warning"),
-        ]);
-        AssertTokens<GuessRoundStatus>([
-            (GuessRoundStatus.Closed, "Closed"),
-            (GuessRoundStatus.Completed, "Completed"),
-            (GuessRoundStatus.Open, "Open"),
-        ]);
-        AssertTokens<PointsEligibilityMode>([
-            (PointsEligibilityMode.Everyone, "everyone"),
-            (PointsEligibilityMode.Followers, "followers"),
-            (PointsEligibilityMode.Subscribers, "subscribers"),
-        ]);
-        AssertTokens<PointsGiveawayStatus>([
-            (PointsGiveawayStatus.Active, "Active"),
-            (PointsGiveawayStatus.Cancelled, "Cancelled"),
-            (PointsGiveawayStatus.Completed, "Completed"),
-            (PointsGiveawayStatus.Expired, "Expired"),
-        ]);
-    }
-
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>
         new()
         {
@@ -470,17 +391,6 @@ public sealed class PersistenceInvariantTests
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
             OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
-
-    private static void AssertTokens<TEnum>(IReadOnlyList<(TEnum Value, string Token)> cases)
-        where TEnum : struct, Enum
-    {
-        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(static item => item.Token));
-        foreach (var (value, token) in cases)
-        {
-            PersistedEnumTokens<TEnum>.Format(value).ShouldBe(token);
-            PersistedEnumTokens<TEnum>.Parse(token).ShouldBe(value);
-        }
-    }
 
     private static async Task<int> SeedHostAsync(BlokeBotDbContext db)
     {

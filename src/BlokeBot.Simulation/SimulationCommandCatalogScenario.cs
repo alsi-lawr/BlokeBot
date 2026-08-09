@@ -1,5 +1,6 @@
 using BlokeBot.Commands;
 using BlokeBot.Core;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Giveaways;
@@ -201,6 +202,39 @@ internal sealed class SimulationCommandCatalogScenario(
         };
         _ = await db.SaveChangesAsync(ct);
         _ = await events.PublishAsync(AppEventKind.CommandsChanged, ct);
+    }
+
+    public async Task SetAlertsAsync(string state, DurableAlertService alerts, CancellationToken ct)
+    {
+        if (!string.Equals(state, "active", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown alerts state.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var hostId = await HostIdAsync(db, ct);
+        _ = await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Critical,
+                "twitch-outbound-queue",
+                "simulation-outbound-backlog",
+                "Chat messages are backing up",
+                "The bot's outgoing chat queue is not draining. Viewers may not be seeing replies. Check the bot's connection for this channel.",
+                "/host#bot-status"
+            )
+            .RunAsync(ct);
+        _ = await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "follower-only-chat",
+                "simulation-follower-only",
+                "Follower-only chat may block the bot",
+                "This channel turned on follower-only chat and the bot account does not qualify yet. Replies may be rejected until it follows or is exempt.",
+                "/host#bot-status"
+            )
+            .RunAsync(ct);
     }
 
     public async Task<ViewerCommandCatalogSnapshot> SnapshotAsync(

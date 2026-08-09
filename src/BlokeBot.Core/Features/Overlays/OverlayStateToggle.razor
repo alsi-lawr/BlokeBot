@@ -1,9 +1,0 @@
-<button type="button"
-        class="@_cssClass"
-        role="switch"
-        aria-checked="@Value.ToString().ToLowerInvariant()"
-        data-state="@(Value ? "on" : "off")"
-        @onclick="ToggleAsync">
-    <span class="@_indicatorClass" aria-hidden="true"></span>
-    <span>@Label</span>
-</button>

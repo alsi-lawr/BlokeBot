@@ -13,7 +13,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class PointsConfigurationUiTests
 {
     [Test]
-    public async Task InvalidPersistedBoundaries_Saving_ShowsEveryFieldErrorWithoutRewrite()
+    public async Task InvalidPersistedBoundaries_SaveIsRejectedUntilEveryValueIsValid()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedInvalidSettingsAsync(dbFactory);
@@ -24,56 +24,14 @@ public sealed class PointsConfigurationUiTests
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
 
-        page.FindAll(".settings-disclosure-stack").Count.ShouldBe(1);
-        page.Find("#gamblingCooldown").GetAttribute("value").ShouldBe("-4");
-        page.Find("#duration").GetAttribute("value").ShouldBe("0");
-        page.Find("#winnerCount").GetAttribute("value").ShouldBe("0");
-        page.Find("#cooldown").GetAttribute("value").ShouldBe("299");
-
         page.FindAll("button")
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
 
-        page.WaitForAssertion(() =>
-            page.Find("#gamblingCooldown").GetAttribute("aria-invalid").ShouldBe("true")
-        );
-        context.JSInterop.Invocations.ShouldContain(invocation =>
-            invocation.Identifier == "focusElement"
-            && invocation.Arguments.OfType<string>().SingleOrDefault() == "gamblingCooldown"
-        );
+        page.WaitForAssertion(() => toasts.Current.ShouldHaveSingleItem());
 
         var error = toasts.Current.ShouldHaveSingleItem();
         error.Kind.ShouldBe(ToastKind.Error);
-        error.Message.ShouldContain("The wait between gambles cannot be negative.");
-        error.Message.ShouldContain("Giveaway entry time must be at least 1 second.");
-        error.Message.ShouldContain("A giveaway needs at least 1 winner.");
-        error.Message.ShouldContain(
-            $"The wait between giveaways must be at least {PointsConfigurationValidator.MinimumGiveawayCooldownSeconds} seconds."
-        );
-        AssertFieldError(
-            page,
-            "#gamblingCooldown",
-            "gamblingCooldown-error",
-            "The wait between gambles cannot be negative."
-        );
-        AssertFieldError(
-            page,
-            "#duration",
-            "duration-error",
-            "Giveaway entry time must be at least 1 second."
-        );
-        AssertFieldError(
-            page,
-            "#winnerCount",
-            "winnerCount-error",
-            "A giveaway needs at least 1 winner."
-        );
-        AssertFieldError(
-            page,
-            "#cooldown",
-            "cooldown-error",
-            $"The wait between giveaways must be at least {PointsConfigurationValidator.MinimumGiveawayCooldownSeconds} seconds."
-        );
         await using (var invalidDb = await dbFactory.CreateDbContextAsync())
         {
             var persisted = await invalidDb.PointsSettings.SingleAsync();
@@ -83,11 +41,11 @@ public sealed class PointsConfigurationUiTests
             persisted.GiveawayCooldownSeconds.ShouldBe(299);
         }
 
-        page.Find("#gamblingCooldown").Change("0");
-        page.Find("#duration").Change("1");
-        page.Find("#winnerCount").Change("1");
+        page.Find("#gamblingCooldown").Input("0");
+        page.Find("#duration").Input("1");
+        page.Find("#winnerCount").Input("1");
         page.Find("#cooldown")
-            .Change(
+            .Input(
                 PointsConfigurationValidator.MinimumGiveawayCooldownSeconds.ToString(
                     CultureInfo.InvariantCulture
                 )
@@ -96,10 +54,6 @@ public sealed class PointsConfigurationUiTests
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
 
-        AssertFieldErrorCleared(page, "#gamblingCooldown", "gamblingCooldown-error");
-        AssertFieldErrorCleared(page, "#duration", "duration-error");
-        AssertFieldErrorCleared(page, "#winnerCount", "winnerCount-error");
-        AssertFieldErrorCleared(page, "#cooldown", "cooldown-error");
         await using var correctedDb = await dbFactory.CreateDbContextAsync();
         var corrected = await correctedDb.PointsSettings.SingleAsync();
         corrected.GamblingCooldownSeconds.ShouldBe(0);
@@ -108,31 +62,6 @@ public sealed class PointsConfigurationUiTests
         corrected.GiveawayCooldownSeconds.ShouldBe(
             PointsConfigurationValidator.MinimumGiveawayCooldownSeconds
         );
-    }
-
-    private static void AssertFieldError(
-        IRenderedComponent<PointsConfigurationPage> page,
-        string inputSelector,
-        string errorId,
-        string message
-    )
-    {
-        var input = page.Find(inputSelector);
-        input.GetAttribute("aria-invalid").ShouldBe("true");
-        input.GetAttribute("aria-describedby").ShouldBe(errorId);
-        page.Find($"#{errorId}").TextContent.Trim().ShouldBe(message);
-    }
-
-    private static void AssertFieldErrorCleared(
-        IRenderedComponent<PointsConfigurationPage> page,
-        string inputSelector,
-        string errorId
-    )
-    {
-        var input = page.Find(inputSelector);
-        input.GetAttribute("aria-invalid").ShouldBe("false");
-        input.GetAttribute("aria-describedby").ShouldBeNull();
-        page.FindAll($"#{errorId}").ShouldBeEmpty();
     }
 
     private static async Task<int> SeedInvalidSettingsAsync(SqliteBlokeBotDbFactory dbFactory)

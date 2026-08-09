@@ -15,6 +15,19 @@ public partial class HostConfigPage
                 ?? "the custom bot account"
             : _botSettings.Identity.BotUsername;
 
+    private string _botAccountStageSummary =>
+        _state?.BotOverride is { Enabled: true } botOverride
+            ? botOverride.Status
+                is {
+                    State: BotAccountAuthorizationState.Ready,
+                    AuthorizedLogin: { Length: > 0 } authorizedLogin,
+                }
+                ? botOverride.WhisperResponsesEnabled
+                    ? $"On · @{authorizedLogin} · whispers on"
+                    : $"On · @{authorizedLogin}"
+                : "On · not connected"
+            : $"Off · using the shared {_botSettings.Identity.BotUsername} account";
+
     private string _activeBotReconnectUrl =>
         _state?.BotOverride.Enabled == true ? "/oauth/host-bot/start" : "/oauth/start";
 

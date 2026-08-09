@@ -311,11 +311,6 @@ public sealed class AutomationCatalogTests
     private static AutomationDefinitionCatalog Catalog() =>
         new([new CoreAutomationCatalogModule()]);
 
-    private static AutomationDefinitionDescriptor Descriptor(
-        AutomationDefinitionCatalog catalog,
-        AutomationDefinitionId id
-    ) => catalog.Descriptors.Single(definition => definition.Id == id);
-
     private static HostFeatureService FeatureService(SqliteBlokeBotDbFactory dbFactory) =>
         new(dbFactory, new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()), []);
 

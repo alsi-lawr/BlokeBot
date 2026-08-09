@@ -73,7 +73,7 @@ local succeeded, failure = pcall(function()
     ["request-boards"] = {
       laptop = {
         path = "/requests",
-        ready = "Edit board",
+        ready = "Game night requests",
       },
       phone = {
         path = "/requests/samplechannel/requests",
@@ -83,7 +83,7 @@ local succeeded, failure = pcall(function()
     ["play-with-viewers"] = {
       laptop = {
         path = "/queues",
-        ready = "Edit queue",
+        ready = "Set up queue",
       },
       phone = {
         path = "/queues/samplechannel/main",

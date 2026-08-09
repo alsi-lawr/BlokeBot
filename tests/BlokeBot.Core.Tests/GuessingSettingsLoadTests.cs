@@ -21,17 +21,25 @@ public sealed class GuessingSettingsLoadTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<GuessingSettings>();
-        page.FindAll(".settings-disclosure-stack").Count.ShouldBe(3);
+        page.FindAll(".settings-disclosure-stack").Count.ShouldBe(1);
+        page.FindAll("[data-stage]")
+            .Select(static stage => stage.GetAttribute("data-stage"))
+            .ShouldBe([
+                "round-type",
+                "accepted-answers",
+                "chat-commands",
+                "bot-replies",
+                "round-start-pin",
+            ]);
         await DeleteProfilesAsync(dbFactory, seed.SpecialProfileId);
 
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         page.WaitForAssertion(() =>
         {
-            page.Find("#profileSelect")
-                .GetAttribute("value")
-                .ShouldBe(seed.DefaultProfileId.ToString(CultureInfo.InvariantCulture));
+            page.Find(RoundTypeChip(seed.DefaultProfileId))
+                .GetAttribute("aria-pressed")
+                .ShouldBe("true");
             page.Find("input[placeholder='Round type name']")
                 .GetAttribute("value")
                 .ShouldBe("Default");
@@ -53,8 +61,7 @@ public sealed class GuessingSettingsLoadTests
         var page = context.Render<GuessingSettings>();
         await DeleteProfilesAsync(dbFactory, seed.DefaultProfileId, seed.SpecialProfileId);
 
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         page.WaitForAssertion(() => page.Markup.ShouldContain("Loading guessing settings..."));
         toasts.Current.Select(toast => toast.Kind).ShouldBe([ToastKind.Warning, ToastKind.Error]);
@@ -63,6 +70,9 @@ public sealed class GuessingSettingsLoadTests
             == "That round type is no longer available. Reloaded the current settings."
         );
     }
+
+    private static string RoundTypeChip(int profileId) =>
+        $"#guessing-round-type-{profileId.ToString(CultureInfo.InvariantCulture)}";
 
     private static BunitContext CreateContext(SqliteBlokeBotDbFactory dbFactory, int hostId)
     {

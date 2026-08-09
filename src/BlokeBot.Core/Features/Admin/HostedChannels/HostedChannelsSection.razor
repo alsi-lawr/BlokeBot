@@ -1,20 +1,23 @@
 @using BlokeBot.Core.Features.Admin.Monitoring
 
 <div id="hosts">
-    <CollapsibleSection Title="Channels using BlokeBot"
-                        Description="Add channels and start or stop their bots."
-                        InitiallyOpen="true">
-        <div class="border-b border-slate-200 p-5">
-            <ConnectedChannelsSummary />
-        </div>
-        <div class="surface-band border-b p-5">
-            <label class="label" for="newHostLogin">Add a channel</label>
-            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
-                <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
-                <button class="btn-primary sm:w-40" @onclick="CreateHost">Add channel</button>
+    <StudioStage Key="hosted-channels"
+                 Number="3"
+                 Title="Channels using BlokeBot"
+                 Summary="@_stageSummary"
+                 Open="@_stageOpen"
+                 OpenChanged="open => _stageOpen = open">
+        <ConnectedChannelsSummary />
+        <div class="studio-grid mt-3">
+            <div class="studio-span-8">
+                <label class="label" for="newHostLogin">Add a channel</label>
+                <input id="newHostLogin" class="input mt-2 w-full" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
+            </div>
+            <div class="studio-span-4 content-end">
+                <button class="btn-primary w-full" @onclick="CreateHost">Add channel</button>
             </div>
         </div>
-        <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
+        <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels mt-4 divide-y divide-slate-100">
             @if (Hosts.Count == 0)
             {
                 <div class="p-8 text-sm text-muted-foreground">No channels have been added yet.</div>
@@ -32,5 +35,6 @@
                 }
             }
         </div>
-    </CollapsibleSection>
+        <p class="mt-3 text-xs text-muted-foreground">Remove asks you to type the channel login to confirm, then permanently deletes settings, access, history, points, giveaways, and custom commands.</p>
+    </StudioStage>
 </div>

@@ -302,7 +302,7 @@ public sealed class GuessingRoundService(
             FormatRoundStarted(
                 settings.RoundStartedReply,
                 profile.Name,
-                FormatOptions(profile.OptionNames)
+                GuessAnswerNames.FormatOptionList(profile.OptionNames)
             ),
             PublicChatPin: pinPolicy is null
                 ? null
@@ -478,12 +478,6 @@ public sealed class GuessingRoundService(
                 ["options"] = options,
             }
         );
-
-    private static string FormatOptions(IEnumerable<string> options)
-    {
-        var values = options.Order(StringComparer.OrdinalIgnoreCase).ToArray();
-        return values.Length == 0 ? "none" : string.Join(", ", values);
-    }
 
     private static GuessingOperationOutcome NotConfigured() =>
         new GuessingOperationOutcome.Rejected("This channel is not set up.");

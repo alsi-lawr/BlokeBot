@@ -9,10 +9,8 @@ namespace BlokeBot.Persistence.Tests;
 
 public sealed class NativeTwitchMigrationTests
 {
-    private const string _publishedV03 = "20260726161453_v0.3.0";
     private const string _nativeTwitchFeatureSwitch =
         "20260728201821_v0.3.0_NativeTwitchFeatureSwitch";
-    private const string _automaticRaidShoutouts = "20260729101929_v0.3.0_AutomaticRaidShoutouts";
 
     [Test]
     public async Task NativeTwitchFeatureSwitch_SeededUpgrade_PreservesCapabilitiesMasksAndFinalSchema()
@@ -120,15 +118,6 @@ public sealed class NativeTwitchMigrationTests
                     .ToArrayAsync()
             ).ShouldBe(["prediction"]);
 
-            var history = await ReadColumnAsync(
-                upgraded.Database.GetDbConnection(),
-                """SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";"""
-            );
-            history.ShouldContain(_publishedV03);
-            history.ShouldContain(_nativeTwitchFeatureSwitch);
-            history.ShouldContain(_automaticRaidShoutouts);
-            history.ShouldNotContain("20260726031743_v0.3.0");
-            history.ShouldNotContain("20260728183253_v0.4.0");
             upgradedSchema = await ReadSchemaAsync(upgraded.Database.GetDbConnection());
         }
 

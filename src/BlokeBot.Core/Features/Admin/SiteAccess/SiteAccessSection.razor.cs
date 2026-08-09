@@ -37,11 +37,24 @@ public partial class SiteAccessSection
     public SiteAccessAdminState State { get; set; } = new(false, [], []);
 
     [Parameter, EditorRequired]
-    public Func<ChangeEventArgs, Task> ToggleWhitelist { get; set; } =
-        static _ => Task.CompletedTask;
+    public Func<bool, Task> ToggleWhitelist { get; set; } = static _ => Task.CompletedTask;
 
     [Parameter]
     public IReadOnlyList<AccessListEntryProfile> WhitelistEntries { get; set; } = [];
+
+    private bool _stageOpen;
+
+    private string _stageSummary =>
+        State.WhitelistEnabled
+            ? WhitelistEntries.Count == 1
+                ? "Approved list only · 1 approved"
+                : $"Approved list only · {WhitelistEntries.Count} approved"
+            : BlacklistEntries.Count switch
+            {
+                0 => "Anyone unless blocked",
+                1 => "Anyone unless blocked · 1 blocked",
+                var count => $"Anyone unless blocked · {count} blocked",
+            };
 
     private async Task OnBlacklistInput(string value)
     {

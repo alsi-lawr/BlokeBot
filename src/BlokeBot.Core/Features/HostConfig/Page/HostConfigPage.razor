@@ -79,19 +79,21 @@
     }
     else if (_state.HostId is { } hostId)
     {
-        <ApplicationCardCollection Owner="channel-setup-disclosure-cards">
+        <div class="settings-disclosure-stack">
         <div id="bot-status"
              class="host-config-fragment-target scroll-mt-24"
              role="region"
              aria-label="Bot status"
              tabindex="-1">
-        <CollapsibleSection Title="@($"#{_state.DisplayName}")"
-                            Description="Connect the bot and start or stop it for your channel."
-                            InitiallyOpen="true"
-                            OpenRequest="@_botStatusFragmentRequest"
-                            FocusElementId="bot-status"
-                            FocusRequest="@_botStatusFragmentRequest">
-            <div class="grid gap-3 p-4 lg:grid-cols-5">
+        <StudioStage Key="bot-status"
+                     Number="1"
+                     Title="@($"#{_state.DisplayName}")"
+                     Summary="@_botStatusStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.BotStatus)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.BotStatus, open)"
+                     FocusElementId="bot-status"
+                     FocusRequest="@_botStatusFragmentRequest">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat access</p>
@@ -228,300 +230,323 @@
                                              BotAccountName="@_activeBotAccountName"
                                              ReconnectUrl="@_activeBotReconnectUrl"
                                              ReloadKey="@_botAccountStatusReloadKey" />
-                <div class="runtime-control-card surface-muted rounded-lg px-3 py-2.5">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
-                        <span class="@_runtimeBadgeClass">
-                            <span class="@_runtimeDotClass"></span>
-                            <span class="status-pill__label">@_runtimeText</span>
-                        </span>
-                    </div>
-                    <div class="runtime-control-actions mt-3">
-                        <span class="block min-w-0" title="@_startRuntimeTooltip">
-                            <button class="primary-control grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                                    type="button"
-                                    disabled="@(!_canStart)"
-                                    aria-label="Start bot"
-                                    @onclick="() => StartAsync(hostId)">
-                                <span class="inline-flex h-9 w-9 items-center justify-center">
-                                    <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M8 5.5v13l10-6.5Z" />
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-bold">Start bot</span>
-                                    <span class="mt-1 block text-xs font-medium opacity-75">Let the bot join chat</span>
-                                </span>
-                            </button>
-                        </span>
-                        <span class="block min-w-0" title="@_stopRuntimeTooltip">
-                            <button class="control-surface grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                                    type="button"
-                                    disabled="@(!_canStop)"
-                                    aria-label="Stop bot"
-                                    @onclick="() => StopAsync(hostId)">
-                                <span class="inline-flex h-9 w-9 items-center justify-center text-red-700">
-                                    <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="7" y="7" width="10" height="10" rx="1.5" />
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-bold text-red-700">Stop bot</span>
-                                    <span class="mt-1 block text-xs font-medium text-slate-500">Take the bot out of chat</span>
-                                </span>
-                            </button>
-                        </span>
-                    </div>
+            </div>
+            <div class="runtime-control-card surface-muted mt-3 rounded-lg px-3 py-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
+                    <span class="@_runtimeBadgeClass">
+                        <span class="@_runtimeDotClass"></span>
+                        <span class="status-pill__label">@_runtimeText</span>
+                    </span>
+                </div>
+                <div class="runtime-control-actions mt-3">
+                    <span class="block min-w-0" title="@_startRuntimeTooltip">
+                        <button class="primary-control grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                disabled="@(!_canStart)"
+                                aria-label="Start bot"
+                                @onclick="() => StartAsync(hostId)">
+                            <span class="inline-flex h-9 w-9 items-center justify-center">
+                                <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M8 5.5v13l10-6.5Z" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold">Start bot</span>
+                                <span class="mt-1 block text-xs font-medium opacity-75">Let the bot join chat</span>
+                            </span>
+                        </button>
+                    </span>
+                    <span class="block min-w-0" title="@_stopRuntimeTooltip">
+                        <button class="control-surface grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                disabled="@(!_canStop)"
+                                aria-label="Stop bot"
+                                @onclick="() => StopAsync(hostId)">
+                            <span class="inline-flex h-9 w-9 items-center justify-center text-red-700">
+                                <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                                </svg>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold text-red-700">Stop bot</span>
+                                <span class="mt-1 block text-xs font-medium text-slate-500">Take the bot out of chat</span>
+                            </span>
+                        </button>
+                    </span>
                 </div>
             </div>
-        </CollapsibleSection>
+        </StudioStage>
         </div>
 
-        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="true">
-            <div class="space-y-4 p-5">
-                <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
-                    <input class="h-4 w-4"
-                           type="checkbox"
-                           checked="@_startupMessageEnabled"
-                           @onchange="SetStartupMessageEnabled" />
-                    Send a message when the bot joins or reconnects
-                </label>
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-foreground" for="startup-chat-message">Message</label>
+        <StudioStage Key="startup-message"
+                     Number="2"
+                     Title="Startup chat message"
+                     Summary="@_startupMessageStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.StartupMessage)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.StartupMessage, open)">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="startup-message-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(_startupMessageEnabled ? "true" : "false")"
+                            aria-label="Send a startup message"
+                            @onclick="ToggleStartupMessageEnabled"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Send a message when the bot joins or reconnects</span>
+                </div>
+                <div class="studio-span-12">
+                    <label class="label" for="startup-chat-message">Message</label>
                     <textarea id="startup-chat-message"
-                              class="input min-h-24 w-full"
+                              class="input mt-2 min-h-24 w-full"
                               maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
                               disabled="@(!_startupMessageEnabled)"
                               value="@_startupMessageText"
                               @oninput="SetStartupMessageText"></textarea>
-                    <p class="text-xs font-medium text-slate-500">
+                    <p class="mt-1 text-xs font-medium text-slate-500">
                         This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
                     </p>
                 </div>
-                <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                        type="button"
-                        disabled="@_startupMessageSaving"
-                        @onclick="() => SaveStartupMessageAsync(hostId)">
-                    @(_startupMessageSaving ? "Saving..." : "Save startup message")
-                </button>
+                <div class="studio-span-12">
+                    <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                            type="button"
+                            disabled="@_startupMessageSaving"
+                            @onclick="() => SaveStartupMessageAsync(hostId)">
+                        @(_startupMessageSaving ? "Saving..." : "Save startup message")
+                    </button>
+                </div>
             </div>
-        </CollapsibleSection>
+        </StudioStage>
 
-        <CollapsibleSection Title="Commands"
-                            Description="Choose the chat words viewers use to list available commands."
-                            InitiallyOpen="true">
-            <div class="space-y-4 p-5" data-simulation-command-settings>
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-foreground" for="commands-aliases">Command words</label>
+        <StudioStage Key="commands"
+                     Number="3"
+                     Title="Commands"
+                     Summary="@_commandsStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.Commands)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.Commands, open)">
+            <div class="studio-grid" data-simulation-command-settings>
+                <div class="studio-span-8">
+                    <label class="label" for="commands-aliases">Command words</label>
                     <input id="commands-aliases"
-                           class="input w-full"
+                           class="input mt-2 w-full"
                            value="@_commandsAliases"
                            @oninput="args => { _commandsAliases = args.Value?.ToString() ?? string.Empty; MarkCommandsDirty(); }"
                            placeholder="commands"
                            autocomplete="off" />
-                    <p class="text-xs font-medium text-slate-500">
+                    <p class="mt-1 text-xs font-medium text-slate-500">
                         Separate extra command words with commas. Leave this blank to disable the catalog.
                     </p>
                 </div>
+                <div class="studio-span-4 content-end">
+                    <button class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                            type="button"
+                            disabled="@_commandsSaving"
+                            @onclick="() => SaveCommandsAsync(hostId)">
+                        @(_commandsSaving ? "Saving..." : "Save Commands")
+                    </button>
+                </div>
                 @if (!string.IsNullOrWhiteSpace(_state.Commands.ConflictAlias))
                 {
-                    <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-700"
+                    <div class="studio-span-12 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-700"
                          role="alert"
                          data-command-conflict>
                         !@_state.Commands.ConflictAlias is already in use, so the default Commands command is disabled. Choose another word and save.
                     </div>
                 }
-                <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                        type="button"
-                        disabled="@_commandsSaving"
-                        @onclick="() => SaveCommandsAsync(hostId)">
-                    @(_commandsSaving ? "Saving..." : "Save Commands")
-                </button>
-
-                <CollapsibleSection Title="Viewer command inventory"
-                                    Description="Canonical command names, access, and current availability."
-                                    InitiallyOpen="false"
-                                    Opened="RefreshCommandCatalogAsync"
-                                    ContentId="available-viewer-commands">
-                    <div class="space-y-3 p-4" aria-live="polite" data-command-catalog>
-                        @if (_commandCatalogLoading)
-                        {
-                            <p class="text-sm text-muted-foreground">Loading command inventory...</p>
-                        }
-                        else if (_commandCatalog is null)
-                        {
-                            <p class="text-sm text-muted-foreground">Open this list to check configured commands and current availability.</p>
-                        }
-                        else
-                        {
-                            @if (_commandCatalog.Conflicts.Count > 0)
+                <div class="studio-span-12">
+                    <StudioFold Key="command-inventory"
+                                Label="Viewer command inventory"
+                                Open="@_commandInventoryOpen"
+                                OpenChanged="SetCommandInventoryOpenAsync">
+                        <div class="space-y-3" aria-live="polite" data-command-catalog>
+                            @if (_commandCatalogLoading)
                             {
-                                <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700"
-                                     role="alert"
-                                     data-command-catalog-conflicts>
-                                    @foreach (var conflict in _commandCatalog.Conflicts)
-                                    {
-                                        <p>@conflict</p>
-                                    }
-                                </div>
+                                <p class="text-sm text-muted-foreground">Loading command inventory...</p>
                             }
-                            @if (_commandCatalog.UnavailableFeatures.Count > 0)
+                            else if (_commandCatalog is null)
                             {
-                                <div class="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700"
-                                     data-command-catalog-unavailable>
-                                    @foreach (var unavailable in _commandCatalog.UnavailableFeatures)
-                                    {
-                                        <p>@unavailable</p>
-                                    }
-                                </div>
-                            }
-                            @if (_commandCatalog.Entries.Count == 0)
-                            {
-                                <p class="text-sm text-muted-foreground" data-command-catalog-empty>
-                                    No viewer commands are configured or currently available.
-                                </p>
+                                <p class="text-sm text-muted-foreground">Open this list to check configured commands and current availability.</p>
                             }
                             else
                             {
-                                <ul class="flex flex-wrap gap-2" aria-label="Viewer command inventory">
-                                    @foreach (var entry in _commandCatalog.Entries)
-                                    {
-                                        <li class="control-surface rounded-lg px-3 py-2 text-sm font-semibold"
-                                            data-command-source="@entry.Source.ToString().ToLowerInvariant()">
-                                            <span class="block">@entry.Name</span>
-                                            @if (entry.AccessSummary is not null)
-                                            {
-                                                <span class="block text-xs font-medium text-muted-foreground"
-                                                      data-command-access-summary>@entry.AccessSummary</span>
-                                            }
-                                            @if (CommandAvailabilitySummary(entry.Availability) is { } availability)
-                                            {
-                                                <span class="block text-xs font-bold text-amber-700"
-                                                      data-command-availability>@availability</span>
-                                            }
-                                        </li>
-                                    }
-                                </ul>
+                                @if (_commandCatalog.Conflicts.Count > 0)
+                                {
+                                    <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700"
+                                         role="alert"
+                                         data-command-catalog-conflicts>
+                                        @foreach (var conflict in _commandCatalog.Conflicts)
+                                        {
+                                            <p>@conflict</p>
+                                        }
+                                    </div>
+                                }
+                                @if (_commandCatalog.UnavailableFeatures.Count > 0)
+                                {
+                                    <div class="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700"
+                                         data-command-catalog-unavailable>
+                                        @foreach (var unavailable in _commandCatalog.UnavailableFeatures)
+                                        {
+                                            <p>@unavailable</p>
+                                        }
+                                    </div>
+                                }
+                                @if (_commandCatalog.Entries.Count == 0)
+                                {
+                                    <p class="text-sm text-muted-foreground" data-command-catalog-empty>
+                                        No viewer commands are configured or currently available.
+                                    </p>
+                                }
+                                else
+                                {
+                                    <ul class="flex flex-wrap gap-2" aria-label="Viewer command inventory">
+                                        @foreach (var entry in _commandCatalog.Entries)
+                                        {
+                                            <li class="control-surface rounded-lg px-3 py-2 text-sm font-semibold"
+                                                data-command-source="@entry.Source.ToString().ToLowerInvariant()">
+                                                <span class="block">@entry.Name</span>
+                                                @if (entry.AccessSummary is not null)
+                                                {
+                                                    <span class="block text-xs font-medium text-muted-foreground"
+                                                          data-command-access-summary>@entry.AccessSummary</span>
+                                                }
+                                                @if (CommandAvailabilitySummary(entry.Availability) is { } availability)
+                                                {
+                                                    <span class="block text-xs font-bold text-amber-700"
+                                                          data-command-availability>@availability</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
                             }
-                        }
-                    </div>
-                </CollapsibleSection>
+                        </div>
+                    </StudioFold>
+                </div>
             </div>
-        </CollapsibleSection>
+        </StudioStage>
 
         <div id="custom-bot" class="scroll-mt-24">
-            <BotAccountAuthorizationSection Status="@_state.BotOverride.Status"
-                                            Title="Use your own bot account"
-                                            Description="Use a Twitch account you control as the bot for this channel."
-                                            AuthorizeButtonText="Connect custom bot"
-                                            AuthorizationStartUrl="/oauth/host-bot/start"
-                                            Disabled="@(!_state.BotOverride.Enabled)"
-                                            DisabledMessage="Turn this on before connecting your own bot account."
-                                            ConfiguredAccountFallbackText="custom bot account"
-                                            ShowEnableToggle="true"
-                                            EnableToggleValue="@_state.BotOverride.Enabled"
-                                            EnableToggleLabel="Use custom bot"
-                                            EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
-                                            Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
-                                            Refresh="LoadAsync"
-                                            InitiallyOpen="true" />
-        </div>
-
-        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="true">
-            <div class="p-4">
-                <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
-                        <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
-                            <input class="h-4 w-4"
-                                   type="checkbox"
-                                   checked="@_state.BotOverride.WhisperResponsesEnabled"
-                                   disabled="@(!_state.BotOverride.Enabled)"
-                                   @onchange="args => SetWhisperResponsesEnabledAsync(hostId, args.Value is true)" />
-                            Reply with whispers from the custom bot
-                        </label>
-                        <p class="mt-2 text-xs font-medium text-slate-500">
-                            @(_state.BotOverride.Enabled
-                                ? "Reconnect the custom bot if Twitch asks for more access."
-                                : "Turn on custom bot before enabling whisper responses.")
-                        </p>
-                    </div>
-                    <div class="mt-4 border-t border-slate-200 pt-4">
-                        <div class="flex items-center justify-between gap-3">
-                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
-                            <span class="@_whisperQuotaBadgeClass whitespace-nowrap">
-                                <span class="@_whisperQuotaDotClass"></span>
-                                @_whisperQuotaText
-                            </span>
+        <StudioStage Key="custom-bot"
+                     Number="4"
+                     Title="Your own bot account"
+                     Summary="@_botAccountStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.BotAccount)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.BotAccount, open)">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="custom-bot-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(_state.BotOverride.Enabled ? "true" : "false")"
+                            aria-label="Use custom bot"
+                            @onclick="() => SetBotOverrideEnabledAsync(hostId, !_state.BotOverride.Enabled)"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Use a Twitch account you control as the bot for this channel</span>
+                </div>
+                <div class="studio-span-12">
+                    <BotAccountAuthorizationSection Status="@_state.BotOverride.Status"
+                                                    AuthorizeButtonText="Connect custom bot"
+                                                    AuthorizationStartUrl="/oauth/host-bot/start"
+                                                    Disabled="@(!_state.BotOverride.Enabled)"
+                                                    DisabledMessage="Turn this on before connecting your own bot account."
+                                                    ConfiguredAccountFallbackText="custom bot account"
+                                                    Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
+                                                    Refresh="LoadAsync" />
+                </div>
+                <div class="studio-span-12">
+                    <div class="surface-muted rounded-lg px-3 py-2.5">
+                        <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button"
+                                        id="whisper-responses-enabled"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(_state.BotOverride.WhisperResponsesEnabled ? "true" : "false")"
+                                        aria-label="Reply with whispers from the custom bot"
+                                        disabled="@(!_state.BotOverride.Enabled)"
+                                        @onclick="() => SetWhisperResponsesEnabledAsync(hostId, !_state.BotOverride.WhisperResponsesEnabled)"></button>
+                                <span class="text-sm font-semibold text-[var(--app-text-strong)]">Reply with whispers from the custom bot</span>
+                            </div>
+                            <p class="mt-2 text-xs font-medium text-slate-500">
+                                @(_state.BotOverride.Enabled
+                                    ? "Reconnect the custom bot if Twitch asks for more access."
+                                    : "Turn on custom bot before enabling whisper responses.")
+                            </p>
                         </div>
-                        <p class="mt-2 text-xs font-medium text-slate-500">
-                            @(_state.BotOverride.WhisperQuota.Exhausted
-                                ? "Twitch has paused whispers to new people for today."
-                                : $"The bot can whisper {_state.BotOverride.WhisperQuota.Remaining} more new people today.")
-                        </p>
+                        <div class="mt-4 border-t border-slate-200 pt-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
+                                <span class="@_whisperQuotaBadgeClass whitespace-nowrap">
+                                    <span class="@_whisperQuotaDotClass"></span>
+                                    @_whisperQuotaText
+                                </span>
+                            </div>
+                            <p class="mt-2 text-xs font-medium text-slate-500">
+                                @(_state.BotOverride.WhisperQuota.Exhausted
+                                    ? "Twitch has paused whispers to new people for today."
+                                    : $"The bot can whisper {_state.BotOverride.WhisperQuota.Remaining} more new people today.")
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </CollapsibleSection>
+        </StudioStage>
+        </div>
 
         <div id="moderator-help"
              class="host-config-fragment-target scroll-mt-24"
              role="region"
              aria-label="Moderator help"
              tabindex="-1">
-        <CollapsibleSection Title="Moderator help"
-                            Description="Choose which mods can view and change this channel."
-                            InitiallyOpen="true"
-                            OpenRequest="@_moderatorHelpFragmentRequest"
-                            FocusElementId="moderator-help"
-                            FocusRequest="@_moderatorHelpFragmentRequest">
-            <div class="space-y-5 p-5">
-                <div class="space-y-2">
-                    <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
-                        <input class="h-4 w-4" type="checkbox" checked="@_state.ModAccess.ModsEnabled" @onchange="args => SetModsEnabledAsync(hostId, args)" />
-                        Let moderators help with this channel
-                    </label>
-                    <p class="text-sm text-muted-foreground">When this is off, your saved allow and block lists stay here, but mods cannot use them.</p>
+        <StudioStage Key="moderator-help"
+                     Number="5"
+                     Title="Moderator help"
+                     Summary="@_moderatorHelpStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.ModeratorHelp)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.ModeratorHelp, open)"
+                     FocusElementId="moderator-help"
+                     FocusRequest="@_moderatorHelpFragmentRequest">
+            <div class="studio-grid">
+                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                    <button type="button"
+                            id="moderator-help-enabled"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(_state.ModAccess.ModsEnabled ? "true" : "false")"
+                            aria-label="Let moderators help"
+                            @onclick="() => SetModsEnabledAsync(hostId, !_state.ModAccess.ModsEnabled)"></button>
+                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Let moderators help with this channel</span>
+                    <span class="text-xs text-muted-foreground">When this is off, your saved allow and block lists stay here, but mods cannot use them.</span>
                 </div>
-
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-sm font-semibold text-foreground">Who can help?</p>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            @(_state.ModAccess.AllowModsByDefault ? "All channel mods can help unless they are blocked." : "Only mods on the allowed list can help.")
-                        </p>
-                    </div>
-                    <div class="@_accessModeSegmentClass" role="group" aria-label="Who can help with this channel">
-                        <span class="segmented-motion__indicator" aria-hidden="true"></span>
-                        <button class="@AccessModeTabClass(_state.ModAccess.AllowModsByDefault)"
-                                type="button"
-                                aria-pressed="@_state.ModAccess.AllowModsByDefault"
-                                @onclick="() => SetAllowModsByDefaultAsync(hostId, true)">
-                            All mods
-                        </button>
-                        <button class="@AccessModeTabClass(!_state.ModAccess.AllowModsByDefault)"
-                                type="button"
-                                aria-pressed="@(!_state.ModAccess.AllowModsByDefault)"
-                                @onclick="() => SetAllowModsByDefaultAsync(hostId, false)">
-                            Allowed list only
-                        </button>
-                    </div>
+                <div class="studio-span-12">
+                    <StudioSegmentedPill TValue="bool"
+                                         AriaLabel="Who can help with this channel"
+                                         Options="@_accessModeOptions"
+                                         Value="@_state.ModAccess.AllowModsByDefault"
+                                         ValueChanged="value => SetAllowModsByDefaultAsync(hostId, value)" />
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        @(_state.ModAccess.AllowModsByDefault ? "All channel mods can help unless they are blocked." : "Only mods on the allowed list can help.")
+                    </p>
                 </div>
-
-                <div class="grid gap-5 lg:grid-cols-2">
+                <div class="studio-span-6">
                     <AccessList Title="Allowed mods"
                                 Entries="_whitelistEntries"
                                 Placeholder="mod username"
                                 EmptyText="No mods added."
+                                DisabledText="@(_state.ModAccess.ModsEnabled ? "Not used while “All mods” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
                                 NewLogin="@_newWhitelistLogin"
                                 NewLoginChanged="value => _newWhitelistLogin = value"
                                 Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
                                 Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)"
                                 Disabled="@(!_state.ModAccess.ModsEnabled || _state.ModAccess.AllowModsByDefault)" />
-
+                </div>
+                <div class="studio-span-6">
                     <AccessList Title="Blocked mods"
                                 Entries="_blacklistEntries"
                                 Placeholder="mod username"
                                 EmptyText="No mods added."
+                                DisabledText="@(_state.ModAccess.ModsEnabled ? "Not used while “Allowed list only” is selected. Kept for when you switch." : "Not used while moderator help is off. Kept for when you switch.")"
                                 NewLogin="@_newBlacklistLogin"
                                 NewLoginChanged="value => _newBlacklistLogin = value"
                                 Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"
@@ -529,7 +554,7 @@
                                 Disabled="@(!_state.ModAccess.ModsEnabled || !_state.ModAccess.AllowModsByDefault)" />
                 </div>
             </div>
-        </CollapsibleSection>
+        </StudioStage>
         </div>
 
         <div id="chat-tools"
@@ -537,37 +562,37 @@
              role="region"
              aria-label="Chat tools"
              tabindex="-1">
-        <CollapsibleSection Title="Chat tools"
-                            Description="Turn on the bot tools you want in this channel."
-                            InitiallyOpen="true"
-                            OpenRequest="@_chatToolsFragmentRequest"
-                            FocusElementId="chat-tools"
-                            FocusRequest="@_chatToolsFragmentRequest">
-            <div class="application-card-collection p-3 sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">
+        <StudioStage Key="chat-tools"
+                     Number="6"
+                     Title="Chat tools"
+                     Summary="@_chatToolsStageSummary"
+                     Open="@_openStages.IsOpen(HostConfigStage.ChatTools)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.ChatTools, open)"
+                     FocusElementId="chat-tools"
+                     FocusRequest="@_chatToolsFragmentRequest">
+            <div class="application-card-collection sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">
                 @foreach (var feature in _state.Features)
                 {
                     <button class="@FeatureCardClass(feature)"
                             type="button"
                             aria-pressed="@feature.Enabled"
                             @onclick="() => SetFeatureEnabledAsync(hostId, feature.Feature, !feature.Enabled)">
-                        <span class="@FeatureIconClass(feature)">
-                            @FeatureIcon(feature.Feature)
-                        </span>
-                        <span class="min-w-0">
-                            <span class="flex items-center gap-2">
-                                <span class="truncate text-sm font-bold text-slate-950">@feature.Name</span>
-                                <span class="@FeatureBadgeClass(feature)">
-                                    <span class="@FeatureDotClass(feature)"></span>
-                                    @(feature.Enabled ? "on" : "off")
-                                </span>
+                        <span class="flex items-center gap-2.5">
+                            <span class="@FeatureIconClass(feature)">
+                                @FeatureIcon(feature.Feature)
                             </span>
-                            <span class="mt-1 block text-xs leading-5 text-muted-foreground">@feature.Description</span>
+                            <span class="min-w-0 flex-1 truncate text-sm font-bold text-[var(--app-text-strong)]">@feature.Name</span>
+                            <span class="@FeatureBadgeClass(feature)">
+                                <span class="@FeatureDotClass(feature)"></span>
+                                @(feature.Enabled ? "on" : "off")
+                            </span>
                         </span>
+                        <span class="mt-1.5 block text-xs leading-5 text-muted-foreground">@feature.Description</span>
                     </button>
                 }
             </div>
-        </CollapsibleSection>
+        </StudioStage>
         </div>
-        </ApplicationCardCollection>
+        </div>
     }
 </div>

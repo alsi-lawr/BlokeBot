@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Toasts;
@@ -20,6 +21,14 @@ public partial class CustomCommandSettingsPage
         ScheduledMessage,
     }
 
+    private enum CustomCommandStage
+    {
+        Basics,
+        Access,
+        Action,
+        FineTuning,
+    }
+
     private sealed record CustomCommandEditorSelection(CustomCommandEditorKind Kind, int Id);
 
     private static readonly IReadOnlyList<SegmentedTabItem> _settingsTabs =
@@ -28,18 +37,78 @@ public partial class CustomCommandSettingsPage
         new("message-library", "Message Library"),
     ];
 
+    private sealed record ActionChoice(
+        CustomCommandActionKind Kind,
+        string Icon,
+        string Title,
+        string Description
+    );
+
+    private sealed record ReplyRoute(
+        int Arguments,
+        string Label,
+        CustomCommandValidationFieldKind Field,
+        Func<CustomCommandReplyRoutesEditor, int?> Get,
+        Action<CustomCommandReplyRoutesEditor, int?> Set
+    );
+
+    private static readonly string[] _fragmentKeys = ["commands", "message-library"];
+
+    // Automation is deliberately absent: BLOKEBOT-D-199 withdraws the action's visibility while
+    // stored automation commands keep working and keep their recovery notice.
+    private static readonly IReadOnlyList<ActionChoice> _actionChoices =
+    [
+        new(
+            CustomCommandActionKind.Message,
+            "💬",
+            "Send a message",
+            "Reply in chat, with different replies for extra words."
+        ),
+        new(
+            CustomCommandActionKind.OverlayCue,
+            "✨",
+            "Play an overlay cue",
+            "Trigger sound or visuals on your stream overlay."
+        ),
+        new(
+            CustomCommandActionKind.Counter,
+            "🔢",
+            "Update a counter",
+            "Count things (deaths, wins, hugs) and say the total."
+        ),
+    ];
+
+    private static readonly IReadOnlyList<ReplyRoute> _replyRoutes =
+    [
+        new(
+            0,
+            "No arguments",
+            CustomCommandValidationFieldKind.ZeroArgumentReply,
+            static routes => routes.ZeroArgumentMessageLibraryEntryId,
+            static (routes, id) => routes.ZeroArgumentMessageLibraryEntryId = id
+        ),
+        new(
+            1,
+            "One argument",
+            CustomCommandValidationFieldKind.OneArgumentReply,
+            static routes => routes.OneArgumentMessageLibraryEntryId,
+            static (routes, id) => routes.OneArgumentMessageLibraryEntryId = id
+        ),
+        new(
+            2,
+            "Two arguments",
+            CustomCommandValidationFieldKind.TwoArgumentReply,
+            static routes => routes.TwoArgumentMessageLibraryEntryId,
+            static (routes, id) => routes.TwoArgumentMessageLibraryEntryId = id
+        ),
+    ];
+
     private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
         Enum.GetValues<CustomCommandCooldownScope>();
     private static readonly IReadOnlyList<CustomCommandInvocationLimit> _invocationLimits =
         Enum.GetValues<CustomCommandInvocationLimit>();
-    private static readonly IReadOnlyList<CustomCommandActionKind> _actionKinds =
-    [
-        CustomCommandActionKind.Message,
-        CustomCommandActionKind.Counter,
-        CustomCommandActionKind.OverlayCue,
-    ];
     private static readonly IReadOnlyList<OverlayCueQueuePolicy> _cueQueuePolicies =
         Enum.GetValues<OverlayCueQueuePolicy>();
     private static readonly IReadOnlyList<OverlayCueReplyOrder> _cueReplyOrders =
@@ -69,23 +138,27 @@ public partial class CustomCommandSettingsPage
     private long _fieldFocusRequest;
     private string? _pendingControlFocusId;
     private string? _editorFocusControlId;
-    private long _replySectionOpenRequest;
-    private long _commandSectionOpenRequest;
-    private long _commandAdvancedOpenRequest;
-    private int? _commandAdvancedEntityId;
-    private long _commandAccessOpenRequest;
-    private int? _commandAccessEntityId;
-    private long _counterSectionOpenRequest;
-    private long _announcementSectionOpenRequest;
     private long _announcementAdvancedOpenRequest;
     private int? _announcementAdvancedEntityId;
     private long _timeZoneSectionOpenRequest;
     private readonly Dictionary<string, ElementReference> _controls = [];
     private int? _pendingResetAllCommandId;
     private CustomCommandEditorSelection? _selectedEditor;
+    private readonly StudioOpenSet<CustomCommandStage> _openStages = new(CustomCommandStage.Basics);
+    private DashboardFragmentOwner _fragment = null!;
 
     protected override async Task OnInitializedAsync()
     {
+        _fragment = TrackSubscription(
+            new DashboardFragmentOwner(
+                _navigation,
+                _fragmentState,
+                _fragmentKeys,
+                KeyForTab(_activeTab),
+                InvokeAsync,
+                HandleFragmentChangedAsync
+            )
+        );
         _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.CustomCommandsChanged],
@@ -145,14 +218,10 @@ public partial class CustomCommandSettingsPage
             : null;
         _nextTemporaryId = -1;
         _validationErrors = [];
-        _activeTab = TabForKey(SegmentedTabs.CanonicalKey(_navigation, _settingsTabs));
+        _activeTab = TabForKey(_fragment.Canonical);
         _focusTarget = null;
         _pendingResetAllCommandId = null;
         _cueTestOutcome = null;
-        _commandAdvancedEntityId = null;
-        _commandAdvancedOpenRequest = 0;
-        _commandAccessEntityId = null;
-        _commandAccessOpenRequest = 0;
         _announcementAdvancedEntityId = null;
         _announcementAdvancedOpenRequest = 0;
         EnsureEditorSelection();
@@ -214,10 +283,6 @@ public partial class CustomCommandSettingsPage
                             _nextTemporaryId = -1;
                             _validationErrors = [];
                             _focusTarget = null;
-                            _commandAdvancedEntityId = null;
-                            _commandAdvancedOpenRequest = 0;
-                            _commandAccessEntityId = null;
-                            _commandAccessOpenRequest = 0;
                             _announcementAdvancedEntityId = null;
                             _announcementAdvancedOpenRequest = 0;
                             EnsureEditorSelection();
@@ -271,6 +336,7 @@ public partial class CustomCommandSettingsPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        _fragment.Publish(KeyForTab(_activeTab));
         if (
             _pendingControlFocusId is { } controlId
             && _controls.TryGetValue(controlId, out var control)
@@ -289,10 +355,17 @@ public partial class CustomCommandSettingsPage
     private static string KeyForTab(CustomCommandSettingsTab tab) =>
         tab == CustomCommandSettingsTab.MessageLibrary ? "message-library" : "commands";
 
-    private void HandleTabKeyChanged(string key)
+    private static CustomCommandSettingsTab TabForKind(CustomCommandEditorKind kind) =>
+        kind == CustomCommandEditorKind.Reply
+            ? CustomCommandSettingsTab.MessageLibrary
+            : CustomCommandSettingsTab.Commands;
+
+    private Task HandleFragmentChangedAsync(string key)
     {
         _activeTab = TabForKey(key);
         EnsureEditorSelection();
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private void SwitchTab(CustomCommandSettingsTab tab)
@@ -303,9 +376,11 @@ public partial class CustomCommandSettingsPage
         }
 
         _activeTab = tab;
-        var uri = _navigation.ToAbsoluteUri(_navigation.Uri);
-        _navigation.NavigateTo(uri.GetLeftPart(UriPartial.Query) + "#" + KeyForTab(tab));
+        EnsureEditorSelection();
+        _fragment.Select(KeyForTab(tab));
     }
+
+    private void HandleTabKeyChanged(string key) => SwitchTab(TabForKey(key));
 
     private void SelectValidationEditor(CustomCommandConfigurationValidationTarget target)
     {
@@ -327,9 +402,10 @@ public partial class CustomCommandSettingsPage
             ),
             _ => null,
         };
-        if (selection is not null)
+        if (selection is not null && selection != _selectedEditor)
         {
             _selectedEditor = selection;
+            ResetStages();
         }
     }
 
@@ -340,9 +416,20 @@ public partial class CustomCommandSettingsPage
 
     private void SelectEditor(CustomCommandEditorKind kind, int id, string focusControlId)
     {
-        _selectedEditor = new(kind, id);
+        var selection = new CustomCommandEditorSelection(kind, id);
+        if (selection != _selectedEditor)
+        {
+            _selectedEditor = selection;
+            ResetStages();
+        }
         _editorFocusControlId = focusControlId;
         _fieldFocusRequest++;
+    }
+
+    private void SelectRailItem(CustomCommandEditorKind kind, int id, string focusControlId)
+    {
+        SelectEditor(kind, id, focusControlId);
+        SwitchTab(TabForKind(kind));
     }
 
     private void EnsureEditorSelection()
@@ -370,6 +457,7 @@ public partial class CustomCommandSettingsPage
                 : FirstCommandTabSelection(),
             _ => null,
         };
+        ResetStages();
     }
 
     private bool SelectionBelongsToActiveTab(CustomCommandEditorSelection selection) =>
@@ -397,6 +485,8 @@ public partial class CustomCommandSettingsPage
             _ => false,
         };
 
+    private void ResetStages() => _openStages.Reset(CustomCommandStage.Basics);
+
     private long EditorFocusRequestFor(string controlId) =>
         _editorFocusControlId == controlId ? _fieldFocusRequest : 0;
 
@@ -406,14 +496,309 @@ public partial class CustomCommandSettingsPage
     private static string EditorRegionId(CustomCommandEditorKind kind, int id) =>
         $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-editor";
 
-    private long CommandAdvancedOpenRequest(int commandId) =>
-        _commandAdvancedEntityId == commandId ? _commandAdvancedOpenRequest : 0;
-
-    private long CommandAccessOpenRequest(int commandId) =>
-        _commandAccessEntityId == commandId ? _commandAccessOpenRequest : 0;
-
     private long AnnouncementAdvancedOpenRequest(int announcementId) =>
         _announcementAdvancedEntityId == announcementId ? _announcementAdvancedOpenRequest : 0;
+
+    private CustomCommandEditor? _selectedCommand =>
+        _selectedEditor is { Kind: CustomCommandEditorKind.Command, Id: var id }
+            ? _config?.Commands.FirstOrDefault(x => x.Id == id)
+            : null;
+
+    private CustomCounterEditor? _selectedCounter =>
+        _selectedEditor is { Kind: CustomCommandEditorKind.Counter, Id: var id }
+            ? _config?.Counters.FirstOrDefault(x => x.Id == id)
+            : null;
+
+    private CustomAnnouncementEditor? _selectedAnnouncement =>
+        _selectedEditor is { Kind: CustomCommandEditorKind.ScheduledMessage, Id: var id }
+            ? _config?.Announcements.FirstOrDefault(x => x.Id == id)
+            : null;
+
+    private CustomMessageLibraryEntryEditor? _selectedReply =>
+        _selectedEditor is { Kind: CustomCommandEditorKind.Reply, Id: var id }
+            ? _config?.MessageEntries.FirstOrDefault(x => x.Id == id)
+            : null;
+
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        _config is null ? []
+        : _activeTab == CustomCommandSettingsTab.MessageLibrary
+            ?
+            [
+                new(
+                    "Replies",
+                    [
+                        .. _config.MessageEntries.Select(entry =>
+                            RailItem(
+                                CustomCommandEditorKind.Reply,
+                                entry.Id,
+                                entry.Name,
+                                MessageEntryNameFieldId(entry),
+                                on: true
+                            )
+                        ),
+                    ],
+                    "No replies yet."
+                ),
+            ]
+        :
+        [
+            new(
+                "Commands",
+                [
+                    .. _config.Commands.Select(command =>
+                        RailItem(
+                            CustomCommandEditorKind.Command,
+                            command.Id,
+                            CommandInvocation(command),
+                            CommandNameFieldId(command),
+                            command.Enabled
+                        ) with
+                        {
+                            Monospace = true,
+                            Search = $"{command.Name} {command.Aliases}",
+                        }
+                    ),
+                ],
+                "No custom commands yet."
+            ),
+            new(
+                "Counters",
+                [
+                    .. _config.Counters.Select(counter =>
+                        RailItem(
+                            CustomCommandEditorKind.Counter,
+                            counter.Id,
+                            counter.Name,
+                            CounterNameFieldId(counter),
+                            on: true
+                        ) with
+                        {
+                            Meta = counter.Value.ToString(CultureInfo.CurrentCulture),
+                        }
+                    ),
+                ],
+                "No counters yet.",
+                RailAdd("counter", AddCounter)
+            ),
+            new(
+                "Announcements",
+                [
+                    .. _config.Announcements.Select(announcement =>
+                        RailItem(
+                            CustomCommandEditorKind.ScheduledMessage,
+                            announcement.Id,
+                            announcement.Name,
+                            AnnouncementNameFieldId(announcement),
+                            announcement.Enabled
+                        )
+                    ),
+                ],
+                "No scheduled messages yet.",
+                RailAdd("scheduled message", AddAnnouncement, _config.MessageEntries.Count == 0)
+            ),
+        ];
+
+    private StudioRailAdd RailAdd(string noun, Action add, bool disabled = false) =>
+        new(
+            $"add-{noun.Replace(' ', '-')}",
+            $"Add {noun}",
+            EventCallback.Factory.Create(this, add),
+            disabled
+        );
+
+    private StudioRailItem RailItem(
+        CustomCommandEditorKind kind,
+        int id,
+        string label,
+        string focusControlId,
+        bool on
+    )
+    {
+        var selected = IsEditorOpen(kind, id);
+        return new()
+        {
+            Key = $"{kind}-{id}",
+            Label = label,
+            LabelId = InventoryLabelId(kind, id),
+            ControlsId = selected ? EditorRegionId(kind, id) : null,
+            Action = $"edit-{RailActionSuffix(kind)}",
+            On = on,
+            Selected = selected,
+            Select = EventCallback.Factory.Create(
+                this,
+                () => SelectRailItem(kind, id, focusControlId)
+            ),
+        };
+    }
+
+    private static string RailActionSuffix(CustomCommandEditorKind kind) =>
+        kind switch
+        {
+            CustomCommandEditorKind.Reply => "reply",
+            CustomCommandEditorKind.Command => "command",
+            CustomCommandEditorKind.Counter => "counter",
+            _ => "scheduled-message",
+        };
+
+    private static IReadOnlyList<StudioSegmentedOption<bool>> AccessOptions(
+        CustomCommandEditor command
+    ) =>
+        [
+            new(true, "Everyone", CommandEveryoneAccessId(command)),
+            new(false, "Restricted", CommandRestrictedAccessId(command)),
+        ];
+
+    private static int? ParseEntryId(object? value) =>
+        int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var id) ? id : null;
+
+    private string _headerName =>
+        _selectedEditor switch
+        {
+            null => _activeTab == CustomCommandSettingsTab.MessageLibrary ? "Replies" : "Commands",
+            _ when _selectedCommand is { } command => CommandInvocation(command),
+            _ when _selectedCounter is { } counter => counter.Name,
+            _ when _selectedAnnouncement is { } announcement => announcement.Name,
+            _ when _selectedReply is { } entry => entry.Name,
+            _ => string.Empty,
+        };
+
+    private string? _headerStats =>
+        _selectedEditor switch
+        {
+            _ when _selectedCounter is { } counter => $"Current value: {counter.Value}",
+            _ when _selectedAnnouncement is { } announcement =>
+                $"{AnnouncementScheduleLabel(announcement.ScheduleKind)} · last sent {FormatLastSent(announcement.LastSentAtUtc)}",
+            _ when _selectedReply is { } entry =>
+                $"{CountLabel(entry.Variants.Count, "message")} · {MessageSelectionLabel(entry.SelectionMode)}",
+            _ => null,
+        };
+
+    private string _emptyInspectorMessage =>
+        _activeTab == CustomCommandSettingsTab.MessageLibrary
+            ? "No replies yet."
+            : "No custom commands yet.";
+
+    private static string CommandInvocation(CustomCommandEditor command)
+    {
+        var alias = CommandAliasNormalizer.Split(command.Aliases).FirstOrDefault();
+        return alias is { Length: > 0 } ? $"!{alias}"
+            : command.Name.Length > 0 ? command.Name
+            : "New command";
+    }
+
+    private static string BasicsSummary(CustomCommandEditor command)
+    {
+        var aliasCount = CommandAliasNormalizer.Split(command.Aliases).Count;
+        return aliasCount > 1
+            ? $"{CommandInvocation(command)} · {CountLabel(aliasCount, "command word")}"
+            : CommandInvocation(command);
+    }
+
+    private string _previewInvokerName => HostLogin.Length > 0 ? HostLogin : "viewer";
+
+    private IReadOnlyList<StudioChatLine> CommandPreviewLines(CustomCommandEditor command)
+    {
+        if (_config is null || command.Action is AutomationCustomCommandActionEditor)
+        {
+            return [];
+        }
+
+        var alias = CommandAliasNormalizer.Split(command.Aliases).FirstOrDefault()
+            is { Length: > 0 } first
+            ? first
+            : "command";
+        var (entryId, args) = PreviewRoute(command.Action.ReplyRoutes);
+        var entry = entryId is { } id
+            ? _config.MessageEntries.FirstOrDefault(x => x.Id == id)
+            : null;
+        return
+        [
+            new()
+            {
+                Speaker = "pixel_penny",
+                SpeakerColour = "#e91e63",
+                Message = "that save was insane",
+            },
+            new()
+            {
+                Speaker = "grumblesworth",
+                SpeakerColour = "#1e90ff",
+                Message = "do it again lol",
+            },
+            new()
+            {
+                Speaker = _previewInvokerName,
+                Message = args.Length == 0 ? $"!{alias}" : $"!{alias} {string.Join(' ', args)}",
+                Monospace = true,
+            },
+            PreviewReplyLine(command, entry, alias, args),
+        ];
+    }
+
+    // The preview illustrates the first configured argument count, with sample arguments standing in
+    // for what a viewer would type.
+    private static (int? EntryId, string[] Args) PreviewRoute(
+        CustomCommandReplyRoutesEditor routes
+    ) =>
+        routes switch
+        {
+            { ZeroArgumentMessageLibraryEntryId: { } zero } => (zero, []),
+            { OneArgumentMessageLibraryEntryId: { } one } => (one, ["pixel_penny"]),
+            { TwoArgumentMessageLibraryEntryId: { } two } => (two, ["pixel_penny", "10"]),
+            _ => (null, []),
+        };
+
+    private StudioChatLine PreviewReplyLine(
+        CustomCommandEditor command,
+        CustomMessageLibraryEntryEditor? entry,
+        string alias,
+        string[] args
+    )
+    {
+        if (entry is null || entry.Variants.Count == 0)
+        {
+            return new()
+            {
+                Message =
+                    command.Action is OverlayCueCustomCommandActionEditor
+                        ? "The overlay cue plays without a chat reply."
+                        : "No reply is chosen yet.",
+            };
+        }
+
+        var variant =
+            entry.SelectionMode == CustomMessageSelectionMode.Sequential
+                ? Math.Clamp(entry.CurrentVariantIndex, 0, entry.Variants.Count - 1)
+                : 0;
+        return new()
+        {
+            Speaker = "BlokeBot",
+            SpeakerColour = "#00ad6f",
+            Badge = "BOT",
+            Bot = true,
+            Message = CustomCommandTemplateRenderer.RenderCommandPreview(
+                entry.Variants[variant].Text,
+                new ChatCommandContext
+                {
+                    Message = new(
+                        _previewInvokerName,
+                        HostLogin,
+                        $"!{alias}",
+                        string.Empty,
+                        new Dictionary<string, string>()
+                    ),
+                    CommandName = alias,
+                    Responder = static (_, _) => ValueTask.CompletedTask,
+                },
+                args,
+                command.Action is CounterCustomCommandActionEditor counterAction
+                && _config?.Counters.FirstOrDefault(x => x.Id == counterAction.CounterId)
+                    is { } counter
+                    ? counter.Value + 1
+                    : null
+            ),
+        };
+    }
 
     private bool _hasChanges =>
         _config is not null
@@ -536,58 +921,18 @@ public partial class CustomCommandSettingsPage
     {
         switch (target)
         {
-            case {
-                Tab: CustomCommandSettingsTab.MessageLibrary,
-                EntityKind: CustomCommandValidationEntityKind.Reply
-                    or CustomCommandValidationEntityKind.Variant,
-            }:
-                _replySectionOpenRequest++;
+            case { EntityKind: CustomCommandValidationEntityKind.Command }:
+                _openStages.Open(StageForCommandField(target.FieldKind));
                 break;
             case {
-                Tab: CustomCommandSettingsTab.Commands,
-                EntityKind: CustomCommandValidationEntityKind.Command,
-            }:
-                _commandSectionOpenRequest++;
-                if (
-                    target.FieldKind
-                    is CustomCommandValidationFieldKind.Cooldown
-                        or CustomCommandValidationFieldKind.CooldownScope
-                        or CustomCommandValidationFieldKind.InvocationLimit
-                        or CustomCommandValidationFieldKind.Counter
-                )
-                {
-                    _commandAdvancedEntityId = target.EntityId;
-                    _commandAdvancedOpenRequest++;
-                }
-                if (target.FieldKind == CustomCommandValidationFieldKind.AllowedUsers)
-                {
-                    _commandAccessEntityId = target.EntityId;
-                    _commandAccessOpenRequest++;
-                }
-                break;
-            case {
-                Tab: CustomCommandSettingsTab.Commands,
-                EntityKind: CustomCommandValidationEntityKind.Counter,
-            }:
-                _counterSectionOpenRequest++;
-                break;
-            case {
-                Tab: CustomCommandSettingsTab.Commands,
                 EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.RetryDelay
+                    or CustomCommandValidationFieldKind.OccurrenceLifetime,
             }:
-                _announcementSectionOpenRequest++;
-                if (
-                    target.FieldKind
-                    is CustomCommandValidationFieldKind.RetryDelay
-                        or CustomCommandValidationFieldKind.OccurrenceLifetime
-                )
-                {
-                    _announcementAdvancedEntityId = target.EntityId;
-                    _announcementAdvancedOpenRequest++;
-                }
+                _announcementAdvancedEntityId = target.EntityId;
+                _announcementAdvancedOpenRequest++;
                 break;
             case {
-                Tab: CustomCommandSettingsTab.Commands,
                 EntityKind: CustomCommandValidationEntityKind.Configuration,
                 FieldKind: CustomCommandValidationFieldKind.TimeZone,
             }:
@@ -595,6 +940,21 @@ public partial class CustomCommandSettingsPage
                 break;
         }
     }
+
+    private static CustomCommandStage StageForCommandField(
+        CustomCommandValidationFieldKind field
+    ) =>
+        field switch
+        {
+            CustomCommandValidationFieldKind.Name or CustomCommandValidationFieldKind.Aliases =>
+                CustomCommandStage.Basics,
+            CustomCommandValidationFieldKind.AllowedUsers => CustomCommandStage.Access,
+            CustomCommandValidationFieldKind.Cooldown
+            or CustomCommandValidationFieldKind.CooldownScope
+            or CustomCommandValidationFieldKind.InvocationLimit
+            or CustomCommandValidationFieldKind.Counter => CustomCommandStage.FineTuning,
+            _ => CustomCommandStage.Action,
+        };
 
     private CustomCommandConfigurationValidationTarget? AliasCollisionTarget(
         CustomCommandConfigurationSaveFailure failure
@@ -718,9 +1078,6 @@ public partial class CustomCommandSettingsPage
     private static string CommandEnabledToggleId(CustomCommandEditor command) =>
         $"command-{command.Id}-enabled";
 
-    private static string CommandAccessLabelId(CustomCommandEditor command) =>
-        $"command-{command.Id}-access-label";
-
     private static string CommandEveryoneAccessId(CustomCommandEditor command) =>
         $"command-{command.Id}-access-everyone";
 
@@ -729,9 +1086,6 @@ public partial class CustomCommandSettingsPage
 
     private static string CommandModeratorAccessId(CustomCommandEditor command) =>
         $"command-{command.Id}-access-moderators";
-
-    private static string CommandSelectedUsersContentId(CustomCommandEditor command) =>
-        $"command-{command.Id}-selected-users";
 
     private static string CommandAllowedUserFieldId(CustomCommandEditor command) =>
         $"command-{command.Id}-allowed-user";
@@ -967,8 +1321,8 @@ public partial class CustomCommandSettingsPage
             ],
         };
         _config.MessageEntries.Add(entry);
-        SwitchTab(CustomCommandSettingsTab.MessageLibrary);
         SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry));
+        SwitchTab(CustomCommandSettingsTab.MessageLibrary);
     }
 
     private void RemoveMessageEntry(CustomMessageLibraryEntryEditor entry)
@@ -1065,8 +1419,8 @@ public partial class CustomCommandSettingsPage
             },
         };
         _config.Commands.Add(command);
-        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command));
+        SwitchTab(CustomCommandSettingsTab.Commands);
     }
 
     private void RemoveCommand(CustomCommandEditor command)
@@ -1295,8 +1649,8 @@ public partial class CustomCommandSettingsPage
 
         var counter = new CustomCounterEditor { Id = NextTemporaryId(), Name = "New counter" };
         _config.Counters.Add(counter);
-        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter));
+        SwitchTab(CustomCommandSettingsTab.Commands);
     }
 
     private void RemoveCounter(CustomCounterEditor counter)
@@ -1340,12 +1694,12 @@ public partial class CustomCommandSettingsPage
             Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
         };
         _config.Announcements.Add(announcement);
-        SwitchTab(CustomCommandSettingsTab.Commands);
         SelectEditor(
             CustomCommandEditorKind.ScheduledMessage,
             announcement.Id,
             AnnouncementNameFieldId(announcement)
         );
+        SwitchTab(CustomCommandSettingsTab.Commands);
     }
 
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
@@ -1407,11 +1761,6 @@ public partial class CustomCommandSettingsPage
             command.AllowedUsers.Count
         );
 
-    private static string SelectedUsersSummary(CustomCommandEditor command) =>
-        command.AllowedUsers.Count == 0
-            ? "Add specific Twitch accounts."
-            : CountLabel(command.AllowedUsers.Count, "selected person");
-
     private static string CountLabel(int count, string singular) =>
         $"{count} {(count == 1 ? singular : singular + "s")}";
 
@@ -1448,14 +1797,9 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             CustomCommandActionKind.OverlayCue => "Play an overlay cue",
-            CustomCommandActionKind.Automation => "Saved action unavailable",
+            CustomCommandActionKind.Automation => "Run automation flow",
             _ => "Choose what happens",
         };
-
-    private IEnumerable<CustomCommandActionKind> ActionKinds(CustomCommandEditor command) =>
-        command.ActionKind == CustomCommandActionKind.Automation
-            ? [.. _actionKinds, CustomCommandActionKind.Automation]
-            : _actionKinds;
 
     private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy) =>
         policy switch

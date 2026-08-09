@@ -3,11 +3,14 @@
 @inject HostBotStatusService _hostBotStatus
 
 <div class="space-y-2">
-    <label class="label" for="eligibility">Who can enter</label>
-    <select id="eligibility" class="input" title="@_followerEligibilityTitle" value="@Value" @onchange="OnEligibilityChangedAsync">
-        <option value="@PointsEligibilityMode.Everyone">Everyone</option>
-        <option value="@PointsEligibilityMode.Subscribers">Subscribers</option>
-        <option value="@PointsEligibilityMode.Followers" disabled="@(!_followerEligibilityAvailable)" title="@_followerEligibilityTitle">Followers</option>
-    </select>
-    <p class="text-xs font-medium text-slate-500">@_followerEligibilityTitle</p>
+    <span class="label">Who can enter</span>
+    <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+        <StudioSegmentedPill TValue="PointsEligibilityMode"
+                             AriaLabel="Who can enter"
+                             Options="_options"
+                             Value="Value"
+                             DisabledDescriptionId="eligibility-follower-status"
+                             ValueChanged="OnEligibilityChangedAsync" />
+        <span id="eligibility-follower-status" class="text-xs font-medium text-muted-foreground">@_followerEligibilityTitle</span>
+    </div>
 </div>

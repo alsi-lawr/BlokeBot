@@ -1,13 +1,13 @@
 @page "/"
 @inject IOptions<BlokeBotSiteOptions> SiteOptions
 
-<PageTitle>BlokeBot — Twitch channel tools you control</PageTitle>
+<PageTitle>BlokeBot | Twitch channel tools you control</PageTitle>
 
 <section class="hero section-shell" aria-labelledby="home-title">
     <div class="hero-copy">
         <p class="eyebrow">Self-hosted Twitch channel tools</p>
         <h1 id="home-title">Your channel. Your bot. Your rules.</h1>
-        <p class="lede">BlokeBot puts commands, guessing games, points, giveaways and moderation-ready controls in one dashboard—without handing your community data to another service.</p>
+        <p class="lede">BlokeBot puts commands, guessing games, points, giveaways and moderation-ready controls in one dashboard, without handing your community data to another service.</p>
         <div class="action-row" aria-label="Get started">
             <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Set up a channel</a>
             <a class="button button-secondary" href="install"><SiteIcon Name="server" />Run your own copy</a>
@@ -29,19 +29,21 @@
         />
 </section>
 
-@if (SiteOptions.Value.LiveAppUri is { } liveAppUri)
-{
-    <section class="docs-callout section-shell" aria-labelledby="live-app-heading">
-        <div>
-            <p class="eyebrow">BlokeBot live</p>
-            <h2 id="live-app-heading">Ready to check it out?</h2>
-            <p>Open the live BlokeBot dashboard and see what is available for your channel.</p>
-        </div>
-        <div class="docs-callout__actions">
-            <a class="button button-primary" href="@liveAppUri"><SiteIcon Name="arrow" />Check it out</a>
-        </div>
-    </section>
-}
+<div style="display: contents">
+    @if (SiteOptions.Value.LiveAppUri is not null)
+    {
+        <section class="docs-callout section-shell" aria-labelledby="live-app-heading">
+            <div>
+                <p class="eyebrow">BlokeBot live</p>
+                <h2 id="live-app-heading">Ready to check it out?</h2>
+                <p>Open the live BlokeBot dashboard and see what is available for your channel.</p>
+            </div>
+            <div class="docs-callout__actions">
+                <a class="button button-primary" href="@SiteOptions.Value.LiveAppUri"><SiteIcon Name="arrow" />Check it out</a>
+            </div>
+        </section>
+    }
+</div>
 
 <section class="role-strip section-shell" aria-labelledby="choose-path-heading">
     <div class="section-intro">

@@ -225,84 +225,6 @@ public sealed class SegmentedTabsTests
         navigation.Uri.ShouldEndWith("/guessing");
     }
 
-    [Test]
-    public void MajorDashboards_UseTheSharedComponentWithoutDuplicateTabMarkup()
-    {
-        var root = RepositoryRoot();
-        var guessing = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "Guessing",
-                "Rounds",
-                "GuessingDashboard.razor"
-            )
-        );
-        var overlays = File.ReadAllText(
-            Path.Combine(root, "src", "BlokeBot.Core", "Features", "Overlays", "OverlaysPage.razor")
-        );
-        var customCommands = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "CustomCommands",
-                "CustomCommandSettingsPage.razor"
-            )
-        );
-
-        guessing.ShouldContain("<SegmentedTabs");
-        overlays.ShouldContain("<SegmentedTabs");
-        customCommands.ShouldContain("<SegmentedTabs");
-        guessing.ShouldContain("OwnsFragment");
-        overlays.ShouldContain("OwnsFragment");
-        customCommands.ShouldContain("OwnsFragment");
-        guessing.ShouldNotContain("segmented-motion__indicator");
-        overlays.ShouldNotContain("segmented-motion__indicator");
-        customCommands.ShouldNotContain("segmented-motion__indicator");
-        customCommands.ShouldNotContain("role=\"tablist\"");
-    }
-
-    [Test]
-    public void SharedPresentation_KeepsOneTabWidthOnDesktopAndDistributesAtPhoneWidth()
-    {
-        var styles = File.ReadAllText(
-            Path.Combine(
-                RepositoryRoot(),
-                "src",
-                "BlokeBot.Core",
-                "Styles",
-                "components",
-                "segmented-controls.css"
-            )
-        );
-
-        styles.ShouldContain(
-            "grid-template-columns: repeat(var(--segmented-count), minmax(5.5rem, 7.5rem));"
-        );
-        styles.ShouldContain("justify-self: start;");
-        styles.ShouldContain("width: max-content;");
-        styles.ShouldContain(
-            """
-            .segmented-motion--shared .segmented-motion__tab {
-                    align-items: center;
-                    display: flex;
-                    justify-content: center;
-                    text-align: center;
-                }
-            """
-        );
-        styles.ShouldContain(
-            "grid-template-columns: repeat(var(--segmented-count), minmax(0, 1fr));"
-        );
-        styles.ShouldContain("justify-self: stretch;");
-        styles.ShouldContain("width: calc((100% - 0.5rem) / var(--segmented-count));");
-        styles.ShouldContain("transform: translateX(calc(var(--segmented-active-index) * 100%));");
-    }
-
     private static IRenderedComponent<FragmentTabsHost> RenderFragmentTabs(
         BunitContext context,
         Action<string>? onActiveKeyChanged = null
@@ -312,9 +234,6 @@ public sealed class SegmentedTabsTests
                 .Add(value => value.Items, _overlayItems)
                 .Add(value => value.OnChanged, onActiveKeyChanged)
         );
-
-    private static string RepositoryRoot() =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
     /// <summary>
     /// Mirrors the production parent contract: the page owns the selected key and passes it back

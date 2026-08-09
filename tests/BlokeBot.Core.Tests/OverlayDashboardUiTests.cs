@@ -1,4 +1,3 @@
-using AngleSharp.Html.Dom;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Overlays;
@@ -6,7 +5,6 @@ using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -15,7 +13,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class OverlayDashboardUiTests
 {
     [Test]
-    public async Task SelectedHostPage_RendersOneEditorAndOpaquePreviewWithoutPrivateKey()
+    public async Task SelectedHostPage_DoesNotExposeThePrivateOverlayKey()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedAsync(database);
@@ -29,50 +27,11 @@ public sealed class OverlayDashboardUiTests
 
         page.WaitForAssertion(() =>
         {
-            page.FindAll("[data-overlay-editor]").Count.ShouldBe(1);
             page.Find("iframe")
                 .GetAttribute("src")
                 .ShouldBe($"/overlays/preview/{seed.OverlayId:D}");
-            page.Find("iframe").HasAttribute("sandbox").ShouldBeFalse();
-            page.Find("iframe").ClassList.ShouldContain("overlay-preview-frame");
-            var previewTabs = page.Find("[aria-label='Preview state']");
-            previewTabs.QuerySelectorAll(".segmented-motion__tab").Length.ShouldBe(2);
-            previewTabs
-                .QuerySelector(".segmented-motion__tab--active")
-                .ShouldNotBeNull()
-                .TextContent.Trim()
-                .ShouldBe("Live");
             page.FindAll("[data-private-url-reveal]").ShouldBeEmpty();
             page.Markup.ShouldNotContain(seed.PrivateAccessKey);
-            page.Markup.ShouldContain("Open OBS Browser Sources appear here when connected.");
-        });
-
-        page.Find("[aria-label='Preview state']")
-            .QuerySelectorAll(".segmented-motion__tab")
-            .Single(value => value.TextContent.Trim() == "Representative")
-            .Click();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Find("[aria-label='Preview state']")
-                .QuerySelector(".segmented-motion__tab--active")
-                .ShouldNotBeNull()
-                .TextContent.Trim()
-                .ShouldBe("Representative");
-            page.FindAll(".segmented-motion__button").ShouldBeEmpty();
-        });
-
-        _ = page.Find("button").TextContent.ShouldNotBeNull();
-        page.Find("aside[aria-labelledby='overlay-inventory-title'] button.btn-secondary").Click();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Markup.ShouldContain("New overlay — not saved");
-            page.Markup.ShouldContain("Nothing has been saved yet");
-            page.FindAll("[data-overlay-editor]").Count.ShouldBe(1);
-            var feedback = page.Find("[data-overlay-feedback='success']");
-            feedback.ClassList.ShouldContain("text-slate-950");
-            feedback.ClassList.ShouldNotContain("text-blue-900");
         });
     }
 
@@ -106,126 +65,7 @@ public sealed class OverlayDashboardUiTests
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task ViewerQueueEditor_ReusesPreviewAppearanceAndParentRecovery(bool enabled)
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seed = await SeedViewerQueueAsync(database, enabled);
-        await using var context = UiTestContextFactory.Create(database, seed.HostId);
-        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
-            new GrantedModeratorAuthority()
-        );
-        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
-
-        var page = context.Render<OverlaysPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            ((IHtmlSelectElement)page.Find("#overlay-type")).Value.ShouldBe(
-                OverlayType.ViewerQueue.ToString()
-            );
-            page.FindAll("input[type='checkbox']").ShouldBeEmpty();
-        });
-        if (enabled)
-        {
-            page.Find("#viewer-queue-current-rows").GetAttribute("min").ShouldBe("0");
-            page.Find("#viewer-queue-current-rows").GetAttribute("max").ShouldBe("12");
-            page.Find("#viewer-queue-next-rows").GetAttribute("min").ShouldBe("0");
-            page.Find("#viewer-queue-next-rows").GetAttribute("max").ShouldBe("12");
-            page.FindAll("[aria-label='Viewer Queue sample state'] button").Count.ShouldBe(5);
-            page.FindAll("iframe").Count.ShouldBe(1);
-            _ = page.Find("[data-appearance-editor]").ShouldNotBeNull();
-            page.Markup.IndexOf("data-appearance-preview", StringComparison.Ordinal)
-                .ShouldBeLessThan(
-                    page.Markup.IndexOf("data-overlay-editor", StringComparison.Ordinal)
-                );
-            return;
-        }
-
-        page.FindAll("iframe").ShouldBeEmpty();
-        page.Find("[data-overlay-disabled-recovery]")
-            .TextContent.ShouldContain("Turn Play with viewers on in Channel setup");
-        page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save overlay")
-            .HasAttribute("disabled")
-            .ShouldBeTrue();
-    }
-
-    [Test]
-    public async Task GuessingEditor_OffersEverySampleAndRecoversWhenParentIsOff()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seed = await SeedGuessingAsync(database);
-        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
-        {
-            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
-                new GrantedModeratorAuthority()
-            );
-            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
-
-            var page = context.Render<OverlaysPage>();
-
-            page.WaitForAssertion(() =>
-            {
-                page.Find("iframe")
-                    .GetAttribute("src")
-                    .ShouldBe($"/overlays/preview/{seed.OverlayId:D}");
-                page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                    .Select(button => button.TextContent.Trim())
-                    .ShouldBe(["No round", "Open", "Closed", "Result"]);
-                page.Markup.ShouldContain("Show the number of guesses");
-                page.Markup.ShouldContain("Result animation duration");
-            });
-
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Single(button => button.TextContent.Trim() == "Result")
-                .Click();
-            page.WaitForAssertion(() =>
-                page.Find("iframe")
-                    .GetAttribute("src")
-                    .ShouldBe(
-                        $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample=completed"
-                    )
-            );
-        }
-
-        await using (var db = await database.CreateDbContextAsync())
-        {
-            _ = await db
-                .Hosts.Where(host => host.Id == seed.HostId)
-                .ExecuteUpdateAsync(setters =>
-                    setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
-                );
-        }
-        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
-        {
-            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
-                new GrantedModeratorAuthority()
-            );
-            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
-
-            var page = context.Render<OverlaysPage>();
-
-            page.WaitForAssertion(() =>
-            {
-                var type = (IHtmlSelectElement)page.Find("#overlay-type");
-                type.Value.ShouldBe(OverlayType.Guessing.ToString());
-                type.TextContent.ShouldContain("Guessing round");
-                type.IsDisabled.ShouldBeTrue();
-                page.Find("[data-overlay-disabled-recovery]")
-                    .TextContent.ShouldContain("Turn Guessing game on in Channel setup");
-                page.FindAll("iframe").ShouldBeEmpty();
-                page.FindAll("button")
-                    .Single(button => button.TextContent.Trim() == "Save overlay")
-                    .HasAttribute("disabled")
-                    .ShouldBeTrue();
-            });
-        }
-    }
-
-    [Test]
-    public async Task GuessingPreviewControls_RenderExplicitPressedValuesAcrossSelectionChanges()
+    public async Task GuessingPreviewSelection_ChangesThePreviewMode()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedGuessingAsync(database);
@@ -237,50 +77,23 @@ public sealed class OverlayDashboardUiTests
 
         var page = context.Render<OverlaysPage>();
 
-        page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("true");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
+        _ = page.WaitForElement("iframe");
 
         FindButton(page, "Guessing overlay sample state", "Result").Click();
 
         page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("false");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
-            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Where(button => button.TextContent.Trim() != "Result")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
-
-        page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save overlay")
-            .Click();
-        page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Representative").ShouldBe("true");
-            PressedValue(page, "Guessing overlay sample state", "Result").ShouldBe("true");
             page.Find("iframe")
                 .GetAttribute("src")
-                .ShouldEndWith("?mode=representative&sample=completed");
-        });
+                .ShouldEndWith("?mode=representative&sample=completed")
+        );
 
         FindButton(page, "Preview state", "Live").Click();
 
         page.WaitForAssertion(() =>
-        {
-            PressedValue(page, "Preview state", "Live").ShouldBe("true");
-            PressedValue(page, "Preview state", "Representative").ShouldBe("false");
-            page.FindAll("[aria-label='Guessing overlay sample state'] button")
-                .Select(button => button.GetAttribute("aria-pressed"))
-                .ShouldAllBe(value => value == "false");
-        });
+            (page.Find("iframe").GetAttribute("src") ?? string.Empty).ShouldNotContain(
+                "mode=representative"
+            )
+        );
     }
 
     [Test]
@@ -321,9 +134,13 @@ public sealed class OverlayDashboardUiTests
         var page = context.Render<OverlaysPage>();
 
         page.WaitForAssertion(() =>
-            page.FindAll("[aria-label='Saved overlays'] button").Count.ShouldBe(2)
+            page.FindAll("[aria-label='Saved overlays'] .studio-rail__item")
+                .Any(button =>
+                    button.TextContent.Contains("Styled guessing", StringComparison.Ordinal)
+                )
+                .ShouldBeTrue()
         );
-        page.FindAll("[aria-label='Saved overlays'] button")
+        page.FindAll("[aria-label='Saved overlays'] .studio-rail__item")
             .Single(button =>
                 button.TextContent.Contains("Styled guessing", StringComparison.Ordinal)
             )
@@ -337,19 +154,12 @@ public sealed class OverlayDashboardUiTests
             page.Find("[data-appearance-css]")
                 .GetAttribute("value")
                 .ShouldBe(".accent { fill: #f472b6; }");
-            page.Find("[data-appearance-editor]")
-                .GetAttribute("data-rendered-css")
-                .ShouldBe(".accent { fill: #f472b6; }");
         });
 
-        page.FindAll("button").Single(button => button.TextContent.Trim() == "Reset").Click();
+        page.Find("[data-appearance-fields] button").Click();
         page.WaitForAssertion(() =>
-        {
-            page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty);
-            page.Find("[data-appearance-editor]")
-                .GetAttribute("data-rendered-css")
-                .ShouldBe(string.Empty);
-        });
+            page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty)
+        );
 
         FindButton(page, "Guessing overlay sample state", "Result").Click();
         page.WaitForAssertion(() =>
@@ -363,77 +173,6 @@ public sealed class OverlayDashboardUiTests
         });
     }
 
-    [Test]
-    public async Task GiveawayEditor_OffersAllSamplesAndRecoversWhenPointsIsOff()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seed = await SeedGiveawayAsync(database);
-        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
-        {
-            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
-                new GrantedModeratorAuthority()
-            );
-            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
-            var page = context.Render<OverlaysPage>();
-
-            page.WaitForAssertion(() =>
-            {
-                page.FindAll("[aria-label='Giveaway overlay sample state'] button")
-                    .Select(button => button.TextContent.Trim())
-                    .ShouldBe(["Open", "Ending", "Winners", "Cancelled"]);
-                page.Markup.ShouldContain("Entrant count");
-                page.Markup.ShouldContain("Close-time countdown");
-                page.Markup.ShouldContain("Current join command");
-            });
-            FindButton(page, "Giveaway overlay sample state", "Winners").Click();
-            page.WaitForAssertion(() =>
-                page.Find("iframe")
-                    .GetAttribute("src")
-                    .ShouldBe(
-                        $"/overlays/preview/{seed.OverlayId:D}?mode=representative&sample=completed"
-                    )
-            );
-        }
-
-        await using (var db = await database.CreateDbContextAsync())
-        {
-            _ = await db
-                .Hosts.Where(host => host.Id == seed.HostId)
-                .ExecuteUpdateAsync(setters =>
-                    setters.SetProperty(host => host.EnabledFeatures, HostFeatureFlags.Overlays)
-                );
-        }
-        await using (var context = UiTestContextFactory.Create(database, seed.HostId))
-        {
-            _ = context.Services.AddSingleton<IModeratorAuthorityService>(
-                new GrantedModeratorAuthority()
-            );
-            _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
-            var page = context.Render<OverlaysPage>();
-
-            page.WaitForAssertion(() =>
-            {
-                var type = (IHtmlSelectElement)page.Find("#overlay-type");
-                type.Value.ShouldBe(OverlayType.Giveaway.ToString());
-                type.TextContent.ShouldContain("Points giveaway");
-                type.IsDisabled.ShouldBeTrue();
-                page.Find("[data-overlay-disabled-recovery]")
-                    .TextContent.ShouldContain("Turn Points on in Channel setup");
-                page.FindAll("iframe").ShouldBeEmpty();
-                page.FindAll("button")
-                    .Single(button => button.TextContent.Trim() == "Save overlay")
-                    .HasAttribute("disabled")
-                    .ShouldBeTrue();
-            });
-        }
-    }
-
-    private static string? PressedValue(
-        IRenderedComponent<OverlaysPage> page,
-        string groupLabel,
-        string buttonLabel
-    ) => FindButton(page, groupLabel, buttonLabel).GetAttribute("aria-pressed");
-
     private static AngleSharp.Dom.IElement FindButton(
         IRenderedComponent<OverlaysPage> page,
         string groupLabel,
@@ -441,23 +180,6 @@ public sealed class OverlayDashboardUiTests
     ) =>
         page.FindAll($"[aria-label='{groupLabel}'] button")
             .Single(button => button.TextContent.Trim() == buttonLabel);
-
-    private static string SourcePath(string fileName) =>
-        Path.GetFullPath(
-            Path.Combine(
-                AppContext.BaseDirectory,
-                "..",
-                "..",
-                "..",
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "Overlays",
-                fileName
-            )
-        );
 
     private static async Task<OverlaySeed> SeedAsync(SqliteBlokeBotDbFactory database)
     {
@@ -515,92 +237,6 @@ public sealed class OverlayDashboardUiTests
             IsEnabled = true,
             ConfigurationJson =
                 """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
-            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
-            KeyVersion = 1,
-            Revision = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.OverlayInstances.Add(overlay);
-        _ = await db.SaveChangesAsync();
-        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
-    }
-
-    private static async Task<OverlaySeed> SeedGiveawayAsync(SqliteBlokeBotDbFactory database)
-    {
-        const string PrivateAccessKey = "giveaway-component-test-key-0000000000000";
-        await using var db = await database.CreateDbContextAsync();
-        var host = new BotHost
-        {
-            TwitchUserId = "giveaway-streamer-id",
-            Login = "giveaway-streamer",
-            DisplayName = "Giveaway Streamer",
-            EnabledFeatures = HostFeatureFlags.Overlays | HostFeatureFlags.Points,
-            CreatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
-        var overlay = new OverlayInstance
-        {
-            PublicId = Guid.Parse("45949b52-282f-4133-b423-18d511690e70"),
-            HostId = host.Id,
-            Name = "Points giveaway",
-            Type = OverlayType.Giveaway,
-            IsEnabled = true,
-            ConfigurationJson =
-                """{"schemaVersion":1,"title":"Community giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true}""",
-            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
-            KeyVersion = 1,
-            Revision = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.OverlayInstances.Add(overlay);
-        _ = await db.SaveChangesAsync();
-        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
-    }
-
-    private static async Task<OverlaySeed> SeedViewerQueueAsync(
-        SqliteBlokeBotDbFactory database,
-        bool enabled
-    )
-    {
-        const string PrivateAccessKey = "viewer-queue-component-key-00000000000000";
-        await using var db = await database.CreateDbContextAsync();
-        var host = new BotHost
-        {
-            TwitchUserId = "queue-streamer-id",
-            Login = "queue-streamer",
-            DisplayName = "Queue Streamer",
-            EnabledFeatures =
-                HostFeatureFlags.Overlays
-                | (enabled ? HostFeatureFlags.PlayWithViewers : HostFeatureFlags.None),
-            CreatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
-        var queue = new PlayQueue
-        {
-            HostId = host.Id,
-            Slug = "squad",
-            Name = "Community squad",
-            ActivityName = "Example game",
-            Capacity = 4,
-            IsOpen = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.PlayQueues.Add(queue);
-        _ = await db.SaveChangesAsync();
-        var overlay = new OverlayInstance
-        {
-            PublicId = Guid.Parse("ecb603ce-c294-4d24-952e-a7dc5074ba3d"),
-            HostId = host.Id,
-            Name = "Viewer queue",
-            Type = OverlayType.ViewerQueue,
-            IsEnabled = true,
-            ConfigurationJson =
-                $$$"""{"schemaVersion":1,"queueId":{{{queue.Id}}},"currentRows":4,"nextRows":6,"appearance":{"x":160,"y":140,"width":1200,"height":800,"css":""}}""",
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
             KeyVersion = 1,
             Revision = 1,

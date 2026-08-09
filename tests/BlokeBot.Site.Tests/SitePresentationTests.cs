@@ -1,8 +1,3 @@
-using System.Net.Http.Headers;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shouldly;
@@ -30,16 +25,5 @@ public sealed class SitePresentationTests
             exception.Message.ShouldContain(BlokeBotSiteOptionsValidation.LiveAppUrlFailure);
             await Log.CloseAndFlushAsync();
         }
-    }
-
-    private static async Task<string> GetHomeAsync(WebApplication app)
-    {
-        var address = app
-            .Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>()!
-            .Addresses.Single();
-        using var client = new HttpClient { BaseAddress = new Uri(address) };
-        client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-        return await client.GetStringAsync("/");
     }
 }

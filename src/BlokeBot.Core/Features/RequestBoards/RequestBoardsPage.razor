@@ -17,10 +17,6 @@
         {
             <a class="btn-secondary" href="@_publicBoardUrl">Open public board</a>
         }
-        @if (_featureEnabled)
-        {
-            <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
-        }
     </Actions>
 
     <ChildContent>
@@ -40,238 +36,412 @@
     }
     else
     {
-        <div class="application-card-collection xl:grid-cols-[minmax(16rem,0.7fr)_minmax(0,1.8fr)]" data-card-owner="request-board-workspace-columns">
-            <aside class="card p-4">
-                <div class="flex items-center justify-between gap-3">
-                    <h2 class="text-lg font-semibold text-slate-950">Boards</h2>
-                    <button class="btn-secondary"
+        <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" aria-label="Request board studio">
+            <StudioRail AriaLabel="Saved boards" SearchPlaceholder="Search boards" Groups="_railGroups">
+                <Footer>
+                    <button class="btn-primary w-full"
                             type="button"
+                            data-action="new-board"
                             disabled="@_isCreating"
                             aria-describedby="@(_isCreating ? "request-board-create-guidance" : null)"
-                            @onclick="NewBoard">New board</button>
-                </div>
-                @if (_boardList.Count == 0)
-                {
-                    <p class="mt-3 text-sm text-muted-foreground">No saved boards yet.</p>
-                }
-                <div class="mt-3 grid gap-2">
-                    @foreach (var board in _boardList)
-                    {
-                        <button @key="board.Id"
-                                type="button"
-                                class="control-surface min-h-11 rounded-lg px-3 text-left text-sm font-semibold"
-                                aria-current="@(!_isCreating && board.Slug == _draft.Slug ? "true" : null)"
-                                @onclick="() => SelectBoardAsync(board.Slug)">
-                            @board.Title
-                            <span class="block text-xs font-normal text-muted-foreground">/@board.Slug · @(board.IsOpen ? "Open" : "Closed")</span>
-                        </button>
-                    }
-                </div>
-            </aside>
+                            @onclick="NewBoard">+ New board</button>
+                </Footer>
+            </StudioRail>
 
-            <div class="application-card-collection" data-card-owner="request-board-editor-cards">
-                <section class="card p-5" aria-labelledby="request-board-configuration">
-                    <h2 id="request-board-configuration" class="text-lg font-semibold text-slate-950">@(_isCreating ? "New board — not saved" : "Edit board")</h2>
+            <div class="studio__inspector flex min-w-0 flex-col">
+                <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                    <span id="request-board-configuration" class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@_headerTitle</span>
+                    @if (_headerStats is { } stats)
+                    {
+                        <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@stats</span>
+                    }
+                    <span class="studio__spacer flex-1"></span>
+                    @if (_moderatorPage is not null)
+                    {
+                        <StudioSegmentedPill TValue="RequestBoardPane"
+                                             AriaLabel="Board workspace"
+                                             Options="_paneOptions"
+                                             Value="_pane"
+                                             ValueChanged="@(pane => _pane = pane)" />
+                    }
+                    <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Accepting requests</span>
+                    <button type="button"
+                            id="request-board-open"
+                            class="studio-toggle"
+                            role="switch"
+                            aria-checked="@(_draft.IsOpen ? "true" : "false")"
+                            aria-label="Accepting requests"
+                            @onclick="() => _draft.IsOpen = !_draft.IsOpen"></button>
+                    <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
+                </header>
+
+                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
                     @if (_isCreating)
                     {
-                        <p id="request-board-create-guidance" class="mt-2 text-sm text-muted-foreground">
+                        <p id="request-board-create-guidance" class="text-sm text-muted-foreground">
                             Complete the board details, then select Save board to create it. The public board link is available after Save.
                         </p>
                     }
-                    <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <Field Id="request-board-slug"
-                               Label="Command and URL name"
-                               FocusRequest="@_primaryFocusRequest"
-                               @bind-Value="_draft.Slug" />
-                        <Field Id="request-board-name" Label="Title" @bind-Value="_draft.Title" />
-                        <div class="md:col-span-2">
-                            <TextAreaField Id="request-board-description" Label="Description" @bind-Value="_draft.Description" />
-                        </div>
-                        <Field Id="request-board-cost" Label="Point cost" @bind-Value="_draft.PointCost" />
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-slate-950" for="request-board-refunds">Refund policy</label>
-                            <select id="request-board-refunds" class="input" @bind="_draft.RefundPolicy">
-                                @foreach (var policy in Enum.GetValues<RequestBoardRefundPolicy>())
-                                {
-                                    <option value="@policy">@RefundPolicyLabel(policy)</option>
-                                }
-                            </select>
-                        </div>
-                        <Field Id="request-board-submission-limit" Label="Active submissions per viewer" @bind-Value="_draft.SubmissionLimit" />
-                        <Field Id="request-board-cooldown" Label="Submission cooldown (seconds)" @bind-Value="_draft.CooldownSeconds" />
-                        <Field Id="request-board-vote-limit" Label="Votes per viewer" @bind-Value="_draft.VoteLimit" />
-                        <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
-                            <input type="checkbox" @bind="_draft.IsOpen" /> Accept submissions
-                        </label>
-                        <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
-                            <input type="checkbox" @bind="_draft.VotingEnabled" /> Enable voting
-                        </label>
-                    </div>
-                    <div class="mt-6 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 class="text-base font-semibold text-slate-950">Submission fields</h3>
-                            <p id="request-field-limit" class="mt-1 text-sm text-muted-foreground">
-                                @_draft.Fields.Count of @RequestBoardLimits.MaximumFields fields.
-                                @if (_draft.Fields.Count >= RequestBoardLimits.MaximumFields)
-                                {
-                                    <span>Maximum of @RequestBoardLimits.MaximumFields fields reached.</span>
-                                }
-                            </p>
-                        </div>
-                        <button class="btn-secondary"
-                                type="button"
-                                disabled="@(_draft.Fields.Count >= RequestBoardLimits.MaximumFields)"
-                                aria-describedby="request-field-limit"
-                                @onclick="AddField">Add field</button>
-                    </div>
-                    <div class="management-field-workspace-container mt-3">
-                        <div class="management-field-workspace">
-                            <div class="management-field-inventory" aria-label="Submission fields">
-                            @foreach (var field in _draft.Fields)
-                            {
-                                var selected = IsFieldSelected(field);
-                                <div @key="field.Identity"
-                                     class="management-field-inventory-row surface-row"
-                                     data-current="@(selected ? "true" : "false")"
-                                     aria-current="@(selected ? "true" : null)">
-                                    <div class="min-w-0">
-                                        <p id="@FieldInventoryLabelId(field)" class="text-sm font-semibold text-slate-900">@FieldDisplayName(field)</p>
-                                        <p class="mt-1 break-words text-xs text-muted-foreground">@BoardFieldSummary(field)</p>
-                                    </div>
-                                    <button class="btn-secondary"
-                                            type="button"
-                                            aria-pressed="@(selected ? "true" : "false")"
-                                            aria-controls="@(selected ? FieldEditorRegionId(field) : null)"
-                                            @onclick="() => SelectField(field)">
-                                        @(selected ? "Editing" : "Edit field")
-                                    </button>
-                                </div>
-                            }
-                            </div>
-                            @foreach (var field in _draft.Fields.Where(IsFieldSelected))
-                            {
-                                var index = _draft.Fields.IndexOf(field);
-                                <section @key="field.Identity"
-                                         id="@FieldEditorRegionId(field)"
-                                         class="management-field-editor surface-muted"
-                                         role="region"
-                                         aria-labelledby="@FieldInventoryLabelId(field)"
-                                         data-selected-field-editor>
-                                    <div class="grid gap-3 md:grid-cols-2">
-                                        <Field Id="@($"request-field-key-{index}")"
-                                               Label="Key"
-                                               FocusRequest="@FieldFocusRequest(field)"
-                                               @bind-Value="field.Key" />
-                                        <Field Id="@($"request-field-label-{index}")" Label="Label" @bind-Value="field.Label" />
-                                        <div>
-                                            <label class="mb-1 block text-sm font-semibold text-slate-950" for="@($"request-field-kind-{index}")">Type</label>
-                                            <select id="@($"request-field-kind-{index}")" class="input" @bind="field.Kind">
-                                                @foreach (var kind in Enum.GetValues<RequestBoardFieldKind>())
-                                                {
-                                                    <option value="@kind">@FieldKindLabel(kind)</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <Field Id="@($"request-field-limit-{index}")" Label="Maximum length" @bind-Value="field.MaximumLength" />
-                                        @if (field.Kind == RequestBoardFieldKind.Choice)
-                                        {
-                                            <Field Id="@($"request-field-choices-{index}")" Label="Choices (comma-separated)" @bind-Value="field.Choices" />
-                                        }
-                                        @if (field.Kind == RequestBoardFieldKind.Number)
-                                        {
-                                            <Field Id="@($"request-field-min-{index}")" Label="Minimum (optional)" @bind-Value="field.MinimumNumber" />
-                                            <Field Id="@($"request-field-max-{index}")" Label="Maximum (optional)" @bind-Value="field.MaximumNumber" />
-                                        }
-                                        <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
-                                            <input type="checkbox" @bind="field.IsRequired" /> Required
-                                        </label>
-                                    </div>
-                                    <div class="mt-4 flex flex-wrap items-center gap-3">
-                                        <button class="btn-secondary"
-                                                type="button"
-                                                disabled="@(_draft.Fields.Count == 1)"
-                                                aria-describedby="@(_draft.Fields.Count == 1 ? "request-field-minimum" : null)"
-                                                @onclick="() => RemoveField(field)">Remove field</button>
-                                        @if (_draft.Fields.Count == 1)
-                                        {
-                                            <p id="request-field-minimum" class="text-sm text-muted-foreground">A request board needs at least one field.</p>
-                                        }
-                                    </div>
-                                </section>
-                            }
-                        </div>
-                    </div>
                     @if (!string.IsNullOrWhiteSpace(_feedback))
                     {
-                        <p class="mt-4 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+                        <p class="text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
                     }
-                </section>
 
-                @if (_moderatorPage is not null)
-                {
-                    <section class="application-card-collection" data-card-owner="request-board-moderation-cards" aria-labelledby="request-moderation-list">
-                        <div>
-                            <h2 id="request-moderation-list" class="text-xl font-semibold text-slate-950">Moderation</h2>
-                            <p class="mt-1 text-sm text-muted-foreground">@_moderatorPage.Board.OrderingDescription</p>
-                        </div>
-                        @if (_moderatorPage.Submissions.Count == 0)
+                    @if (_pane == RequestBoardPane.Review && _moderatorPage is { } moderation)
+                    {
+                        <p class="text-sm text-muted-foreground">Sorted the same way viewers see the board: accepted first, then queued, approved and awaiting review; ties broken by priority, votes, then age.</p>
+                        <section class="application-card-collection" data-card-owner="request-board-review-cards" aria-label="Requests to review">
+                        @if (moderation.Submissions.Count == 0)
                         {
                             <div class="card p-8 text-sm text-muted-foreground">No requests yet.</div>
                         }
-                        @foreach (var submission in _moderatorPage.Submissions)
+                        @foreach (var submission in moderation.Submissions)
                         {
                             var draft = _moderationDrafts[submission.Public.Id];
-                            <article @key="submission.Public.Id" class="card p-5">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">#@submission.Public.Id · @SubmissionStatusLabel(submission.Public.Status) · @ReservationStateLabel(submission.PointReservationState)</p>
-                                        <h3 class="mt-1 text-lg font-semibold text-slate-950">@submission.Public.Title</h3>
-                                        <p class="mt-1 text-sm text-muted-foreground">By @submission.Public.SubmitterLogin · @submission.Public.VoteCount votes</p>
-                                    </div>
+                            <article @key="submission.Public.Id" class="card p-5" data-request-card>
+                                <div class="flex flex-wrap items-center gap-x-[0.7rem] gap-y-2">
+                                    <span class="font-mono text-[0.8rem] font-bold text-[var(--app-text-muted)]">#@submission.Public.Id</span>
+                                    <span class="text-[1.02rem] font-extrabold text-[var(--app-text-strong)]">@submission.Public.Title</span>
+                                    <span class="@StatusPillClass(submission.Public.Status)">
+                                        <span class="status-pill__label">@SubmissionStatusLabel(submission.Public.Status)</span>
+                                    </span>
+                                    <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]">
+                                        <span class="status-pill__label">@ReservationStateLabel(submission.PointReservationState)</span>
+                                    </span>
                                     @if (submission.PossibleDuplicateIds.Count > 0)
                                     {
-                                        <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                                            Possible duplicates: @string.Join(", ", submission.PossibleDuplicateIds.Select(id => $"#{id}"))
-                                        </p>
+                                        <span class="status-pill bg-[var(--app-warning-bg)] text-[var(--app-warning-text)]" data-duplicate-warning>
+                                            <span class="status-pill__label">Looks like @string.Join(", ", submission.PossibleDuplicateIds.Select(id => $"#{id}"))</span>
+                                        </span>
                                     }
                                 </div>
-                                <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                                    @foreach (var value in submission.Public.Values)
-                                    {
-                                        <div>
-                                            <dt class="font-semibold text-slate-950">@value.Label</dt>
-                                            <dd class="break-words text-muted-foreground">@value.Value</dd>
-                                        </div>
-                                    }
-                                </dl>
-                                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                                    <Field Id="@($"request-category-{submission.Public.Id}")" Label="Category" @bind-Value="draft.Category" />
-                                    <Field Id="@($"request-tags-{submission.Public.Id}")" Label="Tags (comma-separated)" @bind-Value="draft.Tags" />
-                                    <Field Id="@($"request-priority-{submission.Public.Id}")" Label="Priority (-1000 to 1000)" @bind-Value="draft.Priority" />
-                                    <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request number" @bind-Value="draft.MergeTarget" />
-                                    <div class="md:col-span-2">
-                                        <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note" @bind-Value="draft.PublicNote" />
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <TextAreaField Id="@($"request-private-note-{submission.Public.Id}")" Label="Private moderator note" @bind-Value="draft.PrivateNote" />
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <TextAreaField Id="@($"request-rejection-{submission.Public.Id}")" Label="Private rejection reason" @bind-Value="draft.PrivateRejectionReason" />
-                                    </div>
-                                </div>
-                                <div class="mt-4 flex flex-wrap gap-2">
+                                <p class="mt-1 text-sm text-muted-foreground">By @submission.Public.SubmitterLogin · @submission.Public.VoteCount votes · @SubmittedStamp(submission.Public.CreatedAtUtc)</p>
+                                @if (submission.Public.Values.Count > 0)
+                                {
+                                    <dl class="mt-3 grid grid-cols-[repeat(auto-fit,minmax(11.25rem,1fr))] gap-x-[0.9rem] gap-y-2 text-sm">
+                                        @foreach (var value in submission.Public.Values)
+                                        {
+                                            <div @key="value.Key">
+                                                <dt class="font-semibold text-slate-950">@value.Label</dt>
+                                                <dd class="break-words text-muted-foreground">@value.Value</dd>
+                                            </div>
+                                        }
+                                    </dl>
+                                }
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
                                     @foreach (var target in AvailableTransitions(submission.Public.Status))
                                     {
                                         <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(submission.Public.Id, target)">@ModerationActionLabel(target)</button>
                                     }
-                                    <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
+                                </div>
+                                <div class="mt-2">
+                                    <StudioFold Key="@($"request-{submission.Public.Id}-details")"
+                                                Bare
+                                                Label="Notes, sorting & merge"
+                                                Open="@_openModerationFolds.IsOpen(submission.Public.Id)"
+                                                OpenChanged="@(open => _openModerationFolds.Set(submission.Public.Id, open))">
+                                        <div class="studio-grid">
+                                            <div class="studio-span-4">
+                                                <Field Id="@($"request-category-{submission.Public.Id}")" Label="Category" @bind-Value="draft.Category" />
+                                            </div>
+                                            <div class="studio-span-4 space-y-2">
+                                                <label class="label" for="@($"request-tags-{submission.Public.Id}")">
+                                                    Tags <span class="font-normal text-muted-foreground">(@DraftTags(draft).Count of @RequestBoardLimits.MaximumTags)</span>
+                                                </label>
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                    @foreach (var tag in DraftTags(draft))
+                                                    {
+                                                        <StudioChip @key="tag"
+                                                                    Label="@tag"
+                                                                    RemoveLabel="@($"Remove tag {tag}")"
+                                                                    RemoveAction="remove-tag"
+                                                                    Remove="@(() => RemoveTag(draft, tag))" />
+                                                    }
+                                                    <input id="@($"request-tags-{submission.Public.Id}")"
+                                                           class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
+                                                           placeholder="+ tag"
+                                                           aria-label="Add a tag"
+                                                           disabled="@(DraftTags(draft).Count >= RequestBoardLimits.MaximumTags)"
+                                                           value="@draft.TagDraft"
+                                                           @oninput="args => draft.TagDraft = args.Value?.ToString() ?? string.Empty"
+                                                           @onkeydown="args => AddTagOnEnter(draft, args)"
+                                                           @onblur="() => AddTag(draft)" />
+                                                </div>
+                                            </div>
+                                            <div class="studio-span-4">
+                                                <Field Id="@($"request-priority-{submission.Public.Id}")" Label="Priority (-1000 to 1000)" @bind-Value="draft.Priority" />
+                                            </div>
+                                            <div class="studio-span-12">
+                                                <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note (shown on the board)" @bind-Value="draft.PublicNote" />
+                                            </div>
+                                            <div class="studio-span-6">
+                                                <TextAreaField Id="@($"request-private-note-{submission.Public.Id}")" Label="Private moderator note" @bind-Value="draft.PrivateNote" />
+                                            </div>
+                                            <div class="studio-span-6">
+                                                <TextAreaField Id="@($"request-rejection-{submission.Public.Id}")" Label="Private rejection reason" @bind-Value="draft.PrivateRejectionReason" />
+                                            </div>
+                                            <div class="studio-span-4">
+                                                <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request number" @bind-Value="draft.MergeTarget" />
+                                            </div>
+                                            <div class="studio-span-8 content-end">
+                                                <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
+                                                <span class="ml-2 text-xs text-muted-foreground">Votes and history move to the other request.</span>
+                                            </div>
+                                        </div>
+                                    </StudioFold>
                                 </div>
                             </article>
                         }
-                    </section>
-                }
+                        </section>
+                    }
+                    else
+                    {
+                        <StudioStage Key="board-basics"
+                                     Number="1"
+                                     Title="Basics"
+                                     Summary="@_basicsSummary"
+                                     Open="@_openStages.IsOpen(RequestBoardStage.Basics)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.Basics, open))">
+                            <div class="studio-grid">
+                                <div class="studio-span-4">
+                                    <Field Id="request-board-slug"
+                                           Label="Command and URL name"
+                                           FocusRequest="@_primaryFocusRequest"
+                                           @bind-Value="_draft.Slug" />
+                                    <p class="mt-1 text-xs text-muted-foreground">Lowercase letters, numbers and dashes. Viewers type <span class="font-mono">!request @_slugOrExample</span> in chat.</p>
+                                </div>
+                                <div class="studio-span-8">
+                                    <Field Id="request-board-name" Label="Title" @bind-Value="_draft.Title" />
+                                    <p class="mt-1 text-xs text-muted-foreground">Shown at the top of the public board page.</p>
+                                </div>
+                                <div class="studio-span-12">
+                                    <TextAreaField Id="request-board-description" Label="Description" @bind-Value="_draft.Description" />
+                                </div>
+                                <div class="studio-span-12">
+                                    <StudioChatPreview Lines="ChatPreviewLines()" />
+                                    <p class="mt-1 text-xs text-muted-foreground">The full board also lives at <span class="font-mono">@_publicBoardUrl</span>, where signed-in viewers can submit with a proper form, vote, and withdraw.</p>
+                                </div>
+                            </div>
+                        </StudioStage>
+
+                        <StudioStage Key="board-questions"
+                                     Number="2"
+                                     Title="What viewers fill in"
+                                     Summary="@_questionsSummary"
+                                     Open="@_openStages.IsOpen(RequestBoardStage.Questions)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.Questions, open))">
+                            <p id="request-field-limit" class="mb-3 text-xs text-muted-foreground">
+                                Viewers always give a title; these questions ask for anything extra.
+                                <b>@_draft.Fields.Count of @RequestBoardLimits.MaximumFields</b> questions used.
+                                @if (_draft.Fields.Count >= RequestBoardLimits.MaximumFields)
+                                {
+                                    <span>Maximum of @RequestBoardLimits.MaximumFields questions reached.</span>
+                                }
+                            </p>
+                            <div class="grid gap-4 xl:grid-cols-[minmax(13.75rem,16.875rem)_minmax(0,1fr)]">
+                                <div class="grid content-start gap-[0.45rem]" aria-label="Submission questions">
+                                    @foreach (var field in _draft.Fields)
+                                    {
+                                        var selected = IsFieldSelected(field);
+                                        <button @key="field.Identity"
+                                                type="button"
+                                                class="rounded-[10px] border px-[0.7rem] py-2 text-left transition-colors duration-150 @(selected ? "border-[var(--app-control-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-sm)]" : "border-transparent bg-transparent hover:border-[var(--app-border)] hover:bg-[var(--app-control-hover)]")"
+                                                data-question-row
+                                                data-current="@(selected ? "true" : "false")"
+                                                aria-current="@(selected ? "true" : null)"
+                                                aria-controls="@(selected ? FieldEditorRegionId(field) : null)"
+                                                @onclick="() => SelectField(field)">
+                                            <span id="@FieldInventoryLabelId(field)" class="block text-sm font-bold text-[var(--app-text-strong)]">@FieldDisplayName(field)</span>
+                                            <span class="mt-[0.1rem] block break-words text-xs text-muted-foreground">@BoardFieldSummary(field)</span>
+                                        </button>
+                                    }
+                                    <button class="btn-secondary justify-self-start"
+                                            type="button"
+                                            disabled="@(_draft.Fields.Count >= RequestBoardLimits.MaximumFields)"
+                                            aria-describedby="request-field-limit"
+                                            @onclick="AddField">+ Add question</button>
+                                </div>
+                                @foreach (var field in _draft.Fields.Where(IsFieldSelected))
+                                {
+                                    var index = _draft.Fields.IndexOf(field);
+                                    <section @key="field.Identity"
+                                             id="@FieldEditorRegionId(field)"
+                                             class="min-w-0 rounded-[14px] border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] p-[0.95rem]"
+                                             role="region"
+                                             aria-labelledby="@FieldInventoryLabelId(field)"
+                                             data-selected-field-editor>
+                                        <div class="studio-grid">
+                                            <div class="studio-span-8">
+                                                <Field Id="@($"request-field-label-{index}")" Label="Question" @bind-Value="field.Label" />
+                                                <p class="mt-1 text-xs text-muted-foreground">What viewers see next to the answer box.</p>
+                                            </div>
+                                            <div class="studio-span-4">
+                                                <Field Id="@($"request-field-key-{index}")"
+                                                       Label="Short name"
+                                                       FocusRequest="@FieldFocusRequest(field)"
+                                                       @bind-Value="field.Key" />
+                                                <p class="mt-1 text-xs text-muted-foreground">Used in chat: <span class="font-mono">@(KeyOrExample(field))=…</span></p>
+                                            </div>
+                                            <div class="studio-span-12 space-y-2">
+                                                <span class="label">Kind of answer</span>
+                                                <StudioSegmentedPill TValue="RequestBoardFieldKind"
+                                                                     AriaLabel="Kind of answer"
+                                                                     Options="_fieldKindOptions"
+                                                                     Value="field.Kind"
+                                                                     ValueChanged="@(kind => field.Kind = kind)"
+                                                                     Wrap />
+                                            </div>
+                                            @if (field.Kind == RequestBoardFieldKind.Choice)
+                                            {
+                                                <div class="studio-span-8 space-y-2">
+                                                    <label class="label" for="@($"request-field-choices-{index}")">
+                                                        Choices <span class="font-normal text-muted-foreground">(@FieldChoices(field).Count of @RequestBoardLimits.MaximumChoices)</span>
+                                                    </label>
+                                                    <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                        @foreach (var choice in FieldChoices(field))
+                                                        {
+                                                            <StudioChip @key="choice"
+                                                                        Label="@choice"
+                                                                        RemoveLabel="@($"Remove choice {choice}")"
+                                                                        RemoveAction="remove-choice"
+                                                                        Remove="@(() => RemoveChoice(field, choice))" />
+                                                        }
+                                                        <input id="@($"request-field-choices-{index}")"
+                                                               class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
+                                                               placeholder="+ choice"
+                                                               aria-label="Add a choice"
+                                                               disabled="@(FieldChoices(field).Count >= RequestBoardLimits.MaximumChoices)"
+                                                               value="@field.ChoiceDraft"
+                                                               @oninput="args => field.ChoiceDraft = args.Value?.ToString() ?? string.Empty"
+                                                               @onkeydown="args => AddChoiceOnEnter(field, args)"
+                                                               @onblur="() => AddChoice(field)" />
+                                                    </div>
+                                                </div>
+                                            }
+                                            @if (field.Kind is RequestBoardFieldKind.Text or RequestBoardFieldKind.Url)
+                                            {
+                                                <div class="studio-span-4">
+                                                    <Field Id="@($"request-field-limit-{index}")" Label="Maximum length" @bind-Value="field.MaximumLength" />
+                                                </div>
+                                            }
+                                            @if (field.Kind == RequestBoardFieldKind.Number)
+                                            {
+                                                <div class="studio-span-4">
+                                                    <Field Id="@($"request-field-min-{index}")" Label="Minimum (optional)" @bind-Value="field.MinimumNumber" />
+                                                </div>
+                                                <div class="studio-span-4">
+                                                    <Field Id="@($"request-field-max-{index}")" Label="Maximum (optional)" @bind-Value="field.MaximumNumber" />
+                                                </div>
+                                            }
+                                            <div class="studio-span-4 space-y-2">
+                                                <span class="label">Answering is</span>
+                                                <StudioSegmentedPill TValue="bool"
+                                                                     AriaLabel="Answering is"
+                                                                     Options="_requirementOptions"
+                                                                     Value="field.IsRequired"
+                                                                     ValueChanged="@(required => field.IsRequired = required)" />
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                                            <button class="btn-secondary"
+                                                    type="button"
+                                                    disabled="@(_draft.Fields.Count == 1)"
+                                                    aria-describedby="@(_draft.Fields.Count == 1 ? "request-field-minimum" : null)"
+                                                    @onclick="() => RemoveField(field)">Remove question</button>
+                                            @if (_draft.Fields.Count == 1)
+                                            {
+                                                <p id="request-field-minimum" class="text-sm text-muted-foreground">Boards need at least one question.</p>
+                                            }
+                                        </div>
+                                    </section>
+                                }
+                            </div>
+                            <div class="mt-4 rounded-[14px] border border-dashed border-[var(--app-control-border)] bg-[var(--app-surface-muted)] px-[1.05rem] py-[0.85rem]">
+                                <p class="mb-2 text-[0.72rem] font-bold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">The public submission form</p>
+                                <div class="grid max-w-[40rem] grid-cols-[repeat(auto-fit,minmax(11.875rem,1fr))] gap-x-[0.8rem] gap-y-[0.55rem] rounded-[10px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-[0.8rem]">
+                                    <div class="text-[0.78rem]">
+                                        <b class="mb-[0.2rem] block text-[var(--app-text-strong)]">Title <span class="text-[var(--app-affirmative)]">*</span></b>
+                                        <div class="@_formPreviewBox">What you're requesting</div>
+                                    </div>
+                                    @foreach (var field in _draft.Fields)
+                                    {
+                                        <div @key="field.Identity" class="text-[0.78rem]">
+                                            <b class="mb-[0.2rem] block text-[var(--app-text-strong)]">@FieldDisplayName(field) @if (field.IsRequired) { <span class="text-[var(--app-affirmative)]">*</span> }</b>
+                                            <div class="@_formPreviewBox">@FieldPreviewPlaceholder(field)</div>
+                                        </div>
+                                    }
+                                    <div class="text-[0.78rem]">
+                                        <b class="mb-[0.2rem] block text-[var(--app-text-strong)]">Category / tags</b>
+                                        <div class="@_formPreviewBox">optional, comma-separated</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </StudioStage>
+
+                        <StudioStage Key="board-cost"
+                                     Number="3"
+                                     Title="Point cost &amp; refunds"
+                                     Summary="@_costSummary"
+                                     Open="@_openStages.IsOpen(RequestBoardStage.CostAndRefunds)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.CostAndRefunds, open))">
+                            <div class="studio-grid">
+                                <div class="studio-span-4">
+                                    <Field Id="request-board-cost" Label="Point cost" @bind-Value="_draft.PointCost" />
+                                    <p class="mt-1 text-xs text-muted-foreground">Set 0 to make requests free. Points are held when a request arrives and only charged when it sticks.</p>
+                                </div>
+                                <div class="studio-span-8 space-y-2">
+                                    <span class="label">When do viewers get points back?</span>
+                                    <StudioChoiceCards id="request-board-refunds"
+                                                       AriaLabel="When do viewers get points back?"
+                                                       Columns="StudioChoiceCardsColumns.TwoThenThree">
+                                        @foreach (var choice in _refundChoices)
+                                        {
+                                            <StudioChoiceCard @key="choice.Policy"
+                                                              data-refund-policy="@choice.Policy"
+                                                              Title="@choice.Title"
+                                                              Description="@choice.Description"
+                                                              Pressed="@(_draft.RefundPolicy == choice.Policy)"
+                                                              Select="@(() => _draft.RefundPolicy = choice.Policy)" />
+                                        }
+                                    </StudioChoiceCards>
+                                </div>
+                            </div>
+                        </StudioStage>
+
+                        <StudioStage Key="board-limits"
+                                     Number="4"
+                                     Title="Limits &amp; voting"
+                                     Summary="@_limitsSummary"
+                                     Open="@_openStages.IsOpen(RequestBoardStage.LimitsAndVoting)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.LimitsAndVoting, open))">
+                            <div class="studio-grid">
+                                <div class="studio-span-4">
+                                    <Field Id="request-board-submission-limit" Label="Active requests per viewer" @bind-Value="_draft.SubmissionLimit" />
+                                </div>
+                                <div class="studio-span-4">
+                                    <Field Id="request-board-cooldown" Label="Wait between requests (seconds)" @bind-Value="_draft.CooldownSeconds" />
+                                    <p class="mt-1 text-xs text-muted-foreground">0 means no wait.</p>
+                                </div>
+                                <div class="studio-span-4">
+                                    <Field Id="request-board-vote-limit" Label="Votes per viewer" @bind-Value="_draft.VoteLimit" />
+                                </div>
+                                <div class="studio-span-12 flex flex-wrap items-center gap-3">
+                                    <button type="button"
+                                            id="request-board-voting"
+                                            class="studio-toggle"
+                                            role="switch"
+                                            aria-checked="@(_draft.VotingEnabled ? "true" : "false")"
+                                            aria-label="Viewers can vote on requests"
+                                            @onclick="() => _draft.VotingEnabled = !_draft.VotingEnabled"></button>
+                                    <span class="text-sm font-semibold text-[var(--app-text-strong)]">Viewers can vote on requests</span>
+                                    <span class="text-xs text-muted-foreground">Votes lift a request up the queue.</span>
+                                </div>
+                            </div>
+                        </StudioStage>
+                    }
+                </div>
             </div>
-        </div>
+        </section>
     }
     </ChildContent>
 </DashboardPage>

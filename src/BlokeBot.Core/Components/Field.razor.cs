@@ -21,6 +21,12 @@ public partial class Field
     [Parameter]
     public string Placeholder { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Stops typing at the length the surface's own validator would reject.
+    /// </summary>
+    [Parameter]
+    public int? MaxLength { get; set; }
+
     [Parameter]
     public string Value { get; set; } = string.Empty;
 

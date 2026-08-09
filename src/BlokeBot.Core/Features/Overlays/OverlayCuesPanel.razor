@@ -23,94 +23,164 @@
                 {
                     <section class="@(HasFailed ? "card bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card bg-blue-50 p-4 text-sm font-semibold text-slate-950")" role="@(HasFailed ? "alert" : "status")">@Feedback</section>
                 }
-                <div class="cue-workspace" data-card-owner="cue-workspace-columns">
-                <section class="card cue-workspace__inventory p-5">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div><h2 class="text-lg font-semibold text-slate-950">Saved cues</h2><p class="mt-1 text-sm text-muted-foreground">Choose a cue to edit, or start a new one.</p></div>
-                        <div class="flex gap-2"><a class="btn-secondary" href="overlays#media">Manage media</a><button class="btn-secondary" type="button" @onclick="NewCue">New cue</button></div>
-                    </div>
-                    <div class="mt-4 grid gap-2" aria-label="Saved cues">
-                        @foreach (var cue in _items)
-                        {
-                            <button class="control-surface rounded-lg px-3 py-2 text-left" type="button" aria-current="@(_selected?.Id == cue.Id ? "true" : null)" @onclick="() => SelectCue(cue)">
-                                <span class="block font-semibold">@cue.Name</span><span class="text-xs text-muted-foreground">@(cue.IsEnabled ? "On" : "Off") · @PolicyLabel(cue.QueuePolicy)</span>
-                            </button>
-                        }
-                    </div>
-                </section>
-                <section class="card cue-workspace__editor p-5" data-cue-editor>
-                    <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-slate-950">@(_selected is null ? "New cue" : "Edit cue")</h2><button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button></div>
-                    <div class="mt-4 grid gap-4 md:grid-cols-3">
-                        <Field Id="cue-name" Label="Cue name" @bind-Value="_name" />
-                        <div><label class="label" for="cue-duration">Total duration (milliseconds)</label><input id="cue-duration" class="input mt-2" type="number" min="100" max="300000" @bind="_duration" /></div>
-                        <div><label class="label" for="cue-policy">When another cue is playing</label><select id="cue-policy" class="input mt-2" @bind="_policy">@foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>()) { <option value="@policy">@PolicyLabel(policy)</option> }</select></div>
-                    </div>
-                    <div class="mt-4"><OverlayStateToggle Label="Cue enabled" @bind-Value="_cueEnabled" /></div>
 
-                    <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-                        <div><h3 class="text-base font-semibold text-slate-950">Cue content</h3><p class="mt-1 text-sm text-muted-foreground">Content lower in the list appears in front when stacking values match.</p></div>
-                        <div class="flex flex-wrap gap-2">
-                            <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount || _assets.Count == 0)" @onclick="() => AddLayer(CueLayerKind.UploadedMedia)">Add uploaded media</button>
-                            <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount)" @onclick="() => AddLayer(CueLayerKind.OnlineMedia)">Add online media</button>
-                            <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount)" @onclick="() => AddLayer(CueLayerKind.WebPage)">Add web page</button>
-                        </div>
-                    </div>
+                <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" aria-label="Cue studio">
+                    <StudioRail AriaLabel="Saved cues" SearchPlaceholder="Search" Groups="_railGroups">
+                        <Footer>
+                            <div class="grid gap-2">
+                                <button class="btn-primary w-full" type="button" data-action="new-cue" @onclick="NewCue">+ New cue</button>
+                                <a class="btn-secondary w-full text-center" href="overlays#media">Manage media →</a>
+                            </div>
+                        </Footer>
+                    </StudioRail>
 
-                    <div class="application-card-collection mt-4" data-cue-layers>
-                        @for (var index = 0; index < _layers.Count; index++)
-                        {
-                            var layerIndex = index;
-                            var layer = _layers[index];
-                            <article class="control-surface rounded-lg p-4" @key="layer">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
-                                    <h4 class="font-semibold text-slate-950">Content @(index + 1)</h4>
-                                    <div class="flex gap-2">
-                                        <button class="btn-secondary" type="button" aria-label="Move content up" disabled="@(index == 0)" @onclick="() => MoveLayer(layerIndex, -1)">Up</button>
-                                        <button class="btn-secondary" type="button" aria-label="Move content down" disabled="@(index == _layers.Count - 1)" @onclick="() => MoveLayer(layerIndex, 1)">Down</button>
-                                        <button class="btn-secondary" type="button" disabled="@(_layers.Count == 1)" @onclick="() => RemoveLayer(layerIndex)">Remove</button>
+                    <div class="studio__inspector flex min-w-0 flex-col" data-cue-editor>
+                        <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                            <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_selected is null ? "New cue" : _name)</span>
+                            <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@HeaderStats()</span>
+                            <span class="studio__spacer flex-1"></span>
+                            <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Enabled</span>
+                            <button type="button"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_cueEnabled ? "true" : "false")"
+                                    aria-label="Cue enabled"
+                                    @onclick="() => _cueEnabled = !_cueEnabled"></button>
+                            <button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button>
+                        </header>
+
+                        <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
+                            <StudioStage Key="cue-basics"
+                                         Number="1"
+                                         Title="Basics"
+                                         Summary="@BasicsSummary()"
+                                         Open="@_openStages.IsOpen(CueStage.Basics)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Basics, open))">
+                                <div class="studio-grid">
+                                    <div class="studio-span-4"><Field Id="cue-name" Label="Cue name" @bind-Value="_name" /></div>
+                                    <div class="studio-span-4 space-y-2">
+                                        <label class="label" for="cue-duration">Total duration (milliseconds)</label>
+                                        <input id="cue-duration" class="input" type="number" min="100" max="300000" @bind="_duration" />
+                                        <p class="text-xs text-muted-foreground">100 ms – 300 000 ms.</p>
+                                    </div>
+                                    <div class="studio-span-4 space-y-2">
+                                        <label class="label" for="cue-policy">When another cue is playing</label>
+                                        <select id="cue-policy" class="input" @bind="_policy">@foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>()) { <option value="@policy">@PolicyLabel(policy)</option> }</select>
                                     </div>
                                 </div>
-                                <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <div><label class="label">Content type</label><select class="input mt-2" @bind="layer.Kind"><option value="@CueLayerKind.UploadedMedia">Uploaded media</option><option value="@CueLayerKind.OnlineMedia">Online media</option><option value="@CueLayerKind.WebPage">Web page</option></select></div>
-                                    @if (layer.Kind is CueLayerKind.UploadedMedia)
+                            </StudioStage>
+
+                            <StudioStage Key="cue-content"
+                                         Number="2"
+                                         Title="Content"
+                                         Summary="@ContentSummary()"
+                                         Open="@_openStages.IsOpen(CueStage.Content)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Content, open))">
+                                <p class="mb-3 text-xs leading-5 text-muted-foreground">
+                                    Content lower in the list appears in front when stacking values match. Up to @OverlayCueConfiguration.MaximumLayerCount layers.
+                                </p>
+
+                                <div class="grid gap-2" data-cue-layers>
+                                    @for (var index = 0; index < _layers.Count; index++)
                                     {
-                                        <div><label class="label">Media</label><select class="input mt-2" @bind="layer.AssetId"><option value="">Choose media</option>@foreach (var asset in _assets) { <option value="@asset.Id">@asset.Name (@OverlayMediaTypes.Label(asset.ContentType).ToLowerInvariant())</option> }</select></div>
-                                    }
-                                    else
-                                    {
-                                        <div class="md:col-span-1 xl:col-span-2"><label class="label">Secure address</label><input class="input mt-2" type="url" placeholder="https://example.com/media" @bind="layer.Address" /></div>
-                                    }
-                                    @if (layer.Kind is CueLayerKind.OnlineMedia)
-                                    {
-                                        <div><label class="label">Media type</label><select class="input mt-2" @bind="layer.MediaKind"><option value="@OverlayCueMediaKind.Video">Video</option><option value="@OverlayCueMediaKind.Audio">Audio</option></select></div>
+                                        var layerIndex = index;
+                                        var layer = _layers[index];
+                                        var open = _openLayers.IsOpen(layer);
+                                        <article @key="layer" class="@LayerRowClass(open)" data-cue-layer>
+                                            <div class="flex cursor-pointer flex-wrap items-center gap-3 px-3.5 py-2.5" @onclick="() => _openLayers.Toggle(layer)">
+                                                <span class="grid size-8 flex-none place-items-center rounded-lg border border-[var(--app-control-border)] bg-[var(--app-surface-muted)]" aria-hidden="true">@LayerGlyph(layer)</span>
+                                                <span class="min-w-0 flex-1">
+                                                    <span class="block truncate text-sm font-bold text-slate-950">@LayerTitle(layer)</span>
+                                                    <span class="block text-xs text-muted-foreground">@LayerSummary(layer)</span>
+                                                </span>
+                                                <span class="flex flex-none gap-1.5">
+                                                    <button class="btn-secondary h-8 px-2.5 text-xs" type="button" aria-label="Move content up" disabled="@(layerIndex == 0)" @onclick="() => MoveLayer(layerIndex, -1)" @onclick:stopPropagation>↑</button>
+                                                    <button class="btn-secondary h-8 px-2.5 text-xs" type="button" aria-label="Move content down" disabled="@(layerIndex == _layers.Count - 1)" @onclick="() => MoveLayer(layerIndex, 1)" @onclick:stopPropagation>↓</button>
+                                                    <button class="btn-secondary h-8 px-2.5 text-xs" type="button" aria-label="Remove content" disabled="@(_layers.Count == 1)" @onclick="() => RemoveLayer(layerIndex)" @onclick:stopPropagation>✕</button>
+                                                </span>
+                                                <button type="button"
+                                                        class="flex-none text-muted-foreground transition-transform duration-200 motion-reduce:transition-none @(open ? "rotate-90" : null)"
+                                                        aria-expanded="@(open ? "true" : "false")"
+                                                        aria-controls="@LayerBodyId(layerIndex)"
+                                                        aria-label="@($"Edit content {layerIndex + 1}")"
+                                                        @onclick="() => _openLayers.Toggle(layer)"
+                                                        @onclick:stopPropagation>›</button>
+                                            </div>
+                                            @if (open)
+                                            {
+                                                <div id="@LayerBodyId(layerIndex)" class="border-t border-[var(--app-border)] p-4">
+                                                    <div class="studio-grid">
+                                                        <div class="studio-span-4 space-y-2"><label class="label">Content type</label><select class="input" @bind="layer.Kind"><option value="@CueLayerKind.UploadedMedia">Uploaded media</option><option value="@CueLayerKind.OnlineMedia">Online media</option><option value="@CueLayerKind.WebPage">Web page</option></select></div>
+                                                        @if (layer.Kind is CueLayerKind.UploadedMedia)
+                                                        {
+                                                            <div class="studio-span-8 space-y-2"><label class="label">Media</label><select class="input" @bind="layer.AssetId"><option value="">Choose media</option>@foreach (var asset in _assets) { <option value="@asset.Id">@asset.Name (@OverlayMediaTypes.Label(asset.ContentType).ToLowerInvariant())</option> }</select></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="studio-span-8 space-y-2"><label class="label">Secure address</label><input class="input" type="url" placeholder="https://example.com/media" @bind="layer.Address" /></div>
+                                                        }
+                                                        @if (layer.Kind is CueLayerKind.OnlineMedia)
+                                                        {
+                                                            <div class="studio-span-4 space-y-2"><label class="label">Media type</label><select class="input" @bind="layer.MediaKind"><option value="@OverlayCueMediaKind.Video">Video</option><option value="@OverlayCueMediaKind.Audio">Audio</option></select></div>
+                                                        }
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Starts after (ms)</label><input class="input" type="number" min="0" max="300000" @bind="layer.StartMilliseconds" /></div>
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Plays for (ms)</label><input class="input" type="number" min="100" max="300000" @bind="layer.DurationMilliseconds" /></div>
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Stacking order</label><input class="input" type="number" min="-100" max="100" @bind="layer.StackOrder" /></div>
+                                                        @if (layer.Kind is not CueLayerKind.WebPage)
+                                                        {
+                                                            <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Volume (%)</label><input class="input" type="number" min="0" max="100" step="1" @bind="layer.VolumePercent" /></div>
+                                                        }
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Left (%)</label><input class="input" type="number" min="0" max="100" step="0.1" @bind="layer.X" /></div>
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Top (%)</label><input class="input" type="number" min="0" max="100" step="0.1" @bind="layer.Y" /></div>
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Width (%)</label><input class="input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Width" /></div>
+                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Height (%)</label><input class="input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Height" /></div>
+                                                        @if (layer.Kind is not CueLayerKind.WebPage)
+                                                        {
+                                                            <div class="studio-span-4 space-y-2"><label class="label">Fit</label><select class="input" @bind="layer.Fit"><option value="@OverlayCueFitMode.Contain">Show all</option><option value="@OverlayCueFitMode.Cover">Fill and crop</option><option value="@OverlayCueFitMode.Fill">Stretch to fill</option></select></div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        </article>
                                     }
                                 </div>
-                                <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                                    <div><label class="label">Starts after (ms)</label><input class="input mt-2" type="number" min="0" max="300000" @bind="layer.StartMilliseconds" /></div>
-                                    <div><label class="label">Plays for (ms)</label><input class="input mt-2" type="number" min="100" max="300000" @bind="layer.DurationMilliseconds" /></div>
-                                    <div><label class="label">Stacking order</label><input class="input mt-2" type="number" min="-100" max="100" @bind="layer.StackOrder" /></div>
-                                    <div><label class="label">Left (%)</label><input class="input mt-2" type="number" min="0" max="100" step="0.1" @bind="layer.X" /></div>
-                                    <div><label class="label">Top (%)</label><input class="input mt-2" type="number" min="0" max="100" step="0.1" @bind="layer.Y" /></div>
-                                    <div><label class="label">Width (%)</label><input class="input mt-2" type="number" min="0.1" max="100" step="0.1" @bind="layer.Width" /></div>
-                                    <div><label class="label">Height (%)</label><input class="input mt-2" type="number" min="0.1" max="100" step="0.1" @bind="layer.Height" /></div>
-                                    @if (layer.Kind is not CueLayerKind.WebPage)
-                                    {
-                                        <div><label class="label">Volume (%)</label><input class="input mt-2" type="number" min="0" max="100" step="1" @bind="layer.VolumePercent" /></div>
-                                        <div><label class="label">Fit</label><select class="input mt-2" @bind="layer.Fit"><option value="@OverlayCueFitMode.Contain">Show all</option><option value="@OverlayCueFitMode.Cover">Fill and crop</option><option value="@OverlayCueFitMode.Fill">Stretch to fill</option></select></div>
-                                    }
+
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount || _assets.Count == 0)" @onclick="() => AddLayer(CueLayerKind.UploadedMedia)">+ Uploaded media</button>
+                                    <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount)" @onclick="() => AddLayer(CueLayerKind.OnlineMedia)">+ Online media</button>
+                                    <button class="btn-secondary" type="button" disabled="@(_layers.Count >= OverlayCueConfiguration.MaximumLayerCount)" @onclick="() => AddLayer(CueLayerKind.WebPage)">+ Web page</button>
                                 </div>
-                            </article>
-                        }
+                                @if (_assets.Count == 0) { <p class="mt-3 text-sm text-muted-foreground">Upload media on the <a class="font-semibold text-blue-700 underline" href="overlays#media">Media tab</a> before adding uploaded content.</p> }
+                            </StudioStage>
+
+                            <StudioStage Key="cue-test"
+                                         Number="3"
+                                         Title="Test playback"
+                                         Summary="@TestSummary()"
+                                         Open="@_openStages.IsOpen(CueStage.Test)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Test, open))">
+                                <div class="studio-grid">
+                                    <div class="studio-span-8 space-y-2">
+                                        <label class="label" for="cue-target">Cue player</label>
+                                        <select id="cue-target" class="input" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select>
+                                        <p class="text-xs text-muted-foreground">Only enabled Cue player Browser Sources appear here. <a class="font-semibold text-blue-700 underline" href="overlays#sources">Manage Browser Sources →</a></p>
+                                    </div>
+                                    <div class="studio-span-4 content-end">
+                                        <button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || IsBusy)" @onclick="PlayAsync">Play test cue</button>
+                                    </div>
+                                </div>
+                                @if (_target is { } targetId)
+                                {
+                                    <div class="mt-4 aspect-video overflow-hidden rounded-xl bg-slate-950"><iframe class="size-full" src="@($"/overlays/preview/{targetId:D}")" title="Cue player preview" referrerpolicy="no-referrer"></iframe></div>
+                                }
+                            </StudioStage>
+
+                            @if (_selected is not null)
+                            {
+                                <div><button class="btn-secondary" type="button" @onclick="DeleteAsync">Delete cue</button></div>
+                            }
+                        </div>
                     </div>
-                    @if (_assets.Count == 0) { <p class="mt-3 text-sm text-muted-foreground">Upload media on the <a class="font-semibold text-blue-700 underline" href="overlays#media">Media tab</a> before adding uploaded content.</p> }
-                    @if (_selected is not null) { <button class="btn-secondary mt-4" type="button" @onclick="DeleteAsync">Delete cue</button> }
-                </section>
-                </div>
-                <section class="card p-5">
-                    <h2 class="text-lg font-semibold text-slate-950">Test playback</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Choose an enabled Cue player Browser Source, then play the saved cue as it will appear in OBS.</p>
-                    <div class="mt-4 flex flex-wrap items-end gap-3"><div class="min-w-64 flex-1"><label class="label" for="cue-target">Cue player</label><select id="cue-target" class="input mt-2" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select></div><a class="btn-secondary" href="overlays#sources">Manage Browser Sources</a><button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || IsBusy)" @onclick="PlayAsync">Play test cue</button></div>
-                    @if (_target is { } targetId) { <div class="mt-4 aspect-video overflow-hidden rounded-xl bg-slate-950"><iframe class="size-full" src="@($"/overlays/preview/{targetId:D}")" title="Cue player preview" referrerpolicy="no-referrer"></iframe></div> }
                 </section>
             }
         </ApplicationCardCollection>

@@ -89,7 +89,10 @@ local readiness = {
   },
   ["custom-commands"] = {
     path = "/custom-commands/settings",
-    expression = [[document.body.innerText.includes("Scheduled messages")]],
+    expression = [[Boolean(
+      document.querySelector(".studio-rail__item[aria-current='true']") &&
+      document.querySelector("[data-chat-preview] [data-chat-line='bot']")
+    )]],
   },
   ["automation-events"] = {
     path = "/automations/events",
@@ -149,48 +152,22 @@ local succeeded, failure = pcall(function()
       getComputedStyle(document.querySelector("main")).opacity === "1"
   ]=]):format(expected.path, expected.expression)
   viset.page.wait_for(viset.javascript(ready_expression), "20s")
-  if view == "custom-commands" then
-    viset.page.wait_for(
-      viset.javascript([[Boolean(document.querySelector("[id$='-action-kind']"))]]),
-      "20s"
-    )
-    viset.page.evaluate(viset.javascript([=[
-      (() => {
-        const action = document.querySelector("[id$='-action-kind']");
-        if (!action) {
-          throw new Error("Selected command action control was not found.");
-        }
-        action.value = "Automation";
-        action.dispatchEvent(new Event("change", { bubbles: true }));
-        return true;
-      })()
-    ]=]))
-    viset.page.wait_for(
-      viset.javascript([[Boolean(document.querySelector("[data-automation-command]"))]]),
-      "20s"
-    )
-    viset.page.evaluate(viset.javascript([=[
-      (() => {
-        const action = document.querySelector("[id$='-action-kind']");
-        action.focus({ preventScroll: true });
-        action.scrollIntoView({ block: "center" });
-        return true;
-      })()
-    ]=]))
-  elseif view == "native-shoutouts" then
+  if view == "native-shoutouts" then
     viset.sleep("350ms")
     viset.page.evaluate(viset.javascript([=[
       (() => {
-        const trigger = [...document.querySelectorAll(".disclosure-trigger")].find(
+        const trigger = [...document.querySelectorAll(".studio-stage__header")].find(
           candidate => candidate.textContent.includes("Automatic raid shoutouts")
         );
-        if (!trigger) throw new Error("Automatic raid shoutout disclosure was not found.");
+        if (!trigger) throw new Error("Automatic raid shoutout stage was not found.");
         trigger.click();
         return true;
       })()
     ]=]))
     viset.page.wait_for(
-      viset.javascript([[Boolean(document.querySelector("[data-automatic-raid-shoutouts]"))]]),
+      viset.javascript(
+        [[document.querySelector("[data-stage='automatic-raid']").classList.contains("studio-stage--open")]]
+      ),
       "20s"
     )
   end

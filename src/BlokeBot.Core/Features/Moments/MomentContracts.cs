@@ -72,11 +72,17 @@ public sealed record MomentView(
     IReadOnlyList<MomentContributorView> Contributors
 );
 
+/// <summary>
+/// One viewer's suggested wording. The two parts stay apart so a moderator can adopt either on its
+/// own; at least one of them is non-empty.
+/// </summary>
+public sealed record MomentSuggestionView(string Title, string Category);
+
 public sealed record ModeratorMomentView(
     MomentView Public,
     string ProviderFailureReason,
     string PrivateRejectionReason,
-    IReadOnlyList<string> Suggestions,
+    IReadOnlyList<MomentSuggestionView> Suggestions,
     IReadOnlyList<string> PrivateAudit
 );
 

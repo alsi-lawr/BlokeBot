@@ -1,0 +1,21 @@
+<div class="studio-chat rounded-[14px] border border-dashed border-[var(--app-control-border)] bg-[var(--app-surface-muted)] px-[1.05rem] py-[0.85rem]" data-chat-preview>
+    <p class="studio-chat__heading mb-2 text-[0.72rem] font-bold tracking-[0.07em] text-[var(--app-text-muted)] uppercase">@Heading</p>
+    <div class="studio-chat__log max-w-[29rem] rounded-[10px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] px-[0.8rem] py-[0.6rem] text-[0.875rem] leading-normal">
+        @foreach (var line in Lines)
+        {
+            <p @key="line"
+               class="@LineClass(line)"
+               data-chat-line="@LineKind(line)">
+                @if (line.Badge is { Length: > 0 } badge)
+                {
+                    <span class="studio-chat__badge mr-[0.35rem] inline-block rounded-[4px] bg-[var(--app-affirmative)] px-[0.3rem] py-[0.05rem] align-[1px] text-[0.6rem] font-extrabold tracking-[0.04em] text-[var(--app-surface-solid)]">@badge</span>
+                }
+                @if (line.Speaker is { Length: > 0 } speaker)
+                {
+                    <span class="studio-chat__name font-bold" style="color: @line.SpeakerColour">@speaker</span>
+                }
+                <span class="@(line.Monospace ? "studio-chat__message--mono font-mono" : null)">@line.Message</span>
+            </p>
+        }
+    </div>
+</div>

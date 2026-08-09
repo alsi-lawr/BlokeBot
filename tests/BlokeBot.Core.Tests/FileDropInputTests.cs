@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Components.Forms;
-using Microsoft.JSInterop;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -202,29 +200,4 @@ public sealed class FileDropInputTests
                 )
             )
         );
-
-    private sealed class TestBrowserFile(string name, long size, string contentType) : IBrowserFile
-    {
-        public string Name { get; } = name;
-        public DateTimeOffset LastModified { get; } = DateTimeOffset.UnixEpoch;
-        public long Size { get; } = size;
-        public string ContentType { get; } = contentType;
-
-        public Stream OpenReadStream(
-            long maxAllowedSize = 512000,
-            CancellationToken cancellationToken = default
-        ) => throw new NotSupportedException();
-    }
-
-    private sealed class NullJsRuntime : IJSRuntime
-    {
-        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>
-            ValueTask.FromResult(default(TValue)!);
-
-        public ValueTask<TValue> InvokeAsync<TValue>(
-            string identifier,
-            CancellationToken cancellationToken,
-            object?[]? args
-        ) => ValueTask.FromResult(default(TValue)!);
-    }
 }

@@ -42,16 +42,14 @@ public partial class GuessingDashboard
     private string _winnerName = string.Empty;
 
     private string _roundStartedText =>
-        _state?.CurrentRound is null
-            ? "Start a round when you're ready"
-            : _state
-                .CurrentRound.Lifecycle.StartedAtUtc.ToLocalTime()
-                .ToString("MMM d, HH:mm", CultureInfo.InvariantCulture);
+        _state?.CurrentRound is { } round
+            ? $"{round.ProfileName} · started {round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm", CultureInfo.InvariantCulture)}"
+            : "Start a round when you're ready";
 
     private string _roundStatusText =>
-        _state?.CurrentRound is null
-            ? "No round running"
-            : $"{_state.CurrentRound.ProfileName}: {RoundStatusLabel(_state.CurrentRound.Lifecycle)}";
+        _state?.CurrentRound is { } current
+            ? RoundStatusLabel(current.Lifecycle)
+            : "No round running";
 
     private static string RoundStatusLabel(GuessRoundLifecycle lifecycle) =>
         lifecycle.Match(

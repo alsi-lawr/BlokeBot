@@ -133,7 +133,11 @@ public static class PointsConfigurationValidator
             },
         };
 
-    private static string NormalizePointLabel(string pointLabel) =>
+    /// <summary>
+    /// The blank-falls-back-to-"points" rule, shared with the settings page so its chat previews
+    /// show the label the bot would actually send.
+    /// </summary>
+    internal static string NormalizePointLabel(string pointLabel) =>
         string.IsNullOrWhiteSpace(pointLabel) ? "points" : pointLabel.Trim();
 
     private static PointsCommandAliases SnapshotAliases(PointsCommandAliasEditor aliases) =>

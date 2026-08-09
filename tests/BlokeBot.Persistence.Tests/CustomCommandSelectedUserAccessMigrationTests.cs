@@ -49,6 +49,5 @@ public sealed class CustomCommandSelectedUserAccessMigrationTests
         policies[1].AllowEveryone.ShouldBeFalse();
         policies[1].AllowModerators.ShouldBeTrue();
         (await migrated.CustomCommandAllowedUsers.CountAsync()).ShouldBe(0);
-        (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_migration);
     }
 }

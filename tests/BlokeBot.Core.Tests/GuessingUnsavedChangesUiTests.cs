@@ -21,8 +21,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
 
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         page.FindAll("[data-unsaved-profile-dialog] button")
             .Select(static button => button.TextContent.Trim())
@@ -43,8 +42,7 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         ChooseDialogAction(page, "Discard and switch");
 
@@ -65,8 +63,7 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
         page.Find("input[placeholder='answer']").Change("green");
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         ChooseDialogAction(page, "Save and switch");
 
@@ -99,8 +96,7 @@ public sealed class GuessingUnsavedChangesUiTests
                     )
                 );
         }
-        page.Find("#profileSelect")
-            .Change(seed.SpecialProfileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(seed.SpecialProfileId)).Click();
 
         ChooseDialogAction(page, "Save and switch");
 
@@ -133,11 +129,12 @@ public sealed class GuessingUnsavedChangesUiTests
         string answer
     )
     {
-        page.Find("#profileSelect")
-            .GetAttribute("value")
-            .ShouldBe(profileId.ToString(CultureInfo.InvariantCulture));
+        page.Find(RoundTypeChip(profileId)).GetAttribute("aria-pressed").ShouldBe("true");
         page.Find("input[placeholder='answer']").GetAttribute("value").ShouldBe(answer);
     }
+
+    private static string RoundTypeChip(int profileId) =>
+        $"#guessing-round-type-{profileId.ToString(CultureInfo.InvariantCulture)}";
 
     private static BunitContext CreateContext(SqliteBlokeBotDbFactory dbFactory, int hostId)
     {

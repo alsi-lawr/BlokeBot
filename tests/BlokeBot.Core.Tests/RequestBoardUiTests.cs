@@ -10,64 +10,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class RequestBoardUiTests
 {
     [Test]
-    public async Task ModeratorEditor_RendersTaskLabelsForEveryPersistedRequestValue()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        var service = new RequestBoardService(
-            database,
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-
-        var page = context.Render<RequestBoardsPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Find("#request-board-refunds")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe([
-                    "Never refund",
-                    "Refund if rejected or withdrawn",
-                    "Refund if not fulfilled",
-                ]);
-            page.Find("#request-field-kind-0")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe(["Text", "Link", "Choose from a list", "Number", "Twitch clip link"]);
-        });
-
-        Enum.GetValues<RequestSubmissionStatus>()
-            .Select(RequestBoardsPage.SubmissionStatusLabel)
-            .ShouldBe([
-                "Awaiting review",
-                "Approved",
-                "In queue",
-                "Accepted",
-                "Completed",
-                "Rejected",
-                "Withdrawn",
-                "Merged into another request",
-            ]);
-        new[]
-        {
-            RequestSubmissionStatus.Approved,
-            RequestSubmissionStatus.Queued,
-            RequestSubmissionStatus.Accepted,
-            RequestSubmissionStatus.Completed,
-            RequestSubmissionStatus.Rejected,
-        }
-            .Select(RequestBoardsPage.ModerationActionLabel)
-            .ShouldBe(["Approve", "Add to queue", "Mark accepted", "Mark complete", "Reject"]);
-        Enum.GetValues<RequestPointReservationState>()
-            .Select(RequestBoardsPage.ReservationStateLabel)
-            .ShouldBe(["No points charged", "Points held", "Points refunded", "Points charged"]);
-    }
-
-    [Test]
     public async Task PublicBoard_RendersVisibleRulesEscapedLinksAndNoPrivateFields()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();

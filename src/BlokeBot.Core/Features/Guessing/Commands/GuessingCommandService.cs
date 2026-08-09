@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Guessing.Rounds;
@@ -47,7 +48,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["round"] = profile?.Name ?? string.Empty,
-                    ["options"] = FormatOptions(profile?.OptionNames ?? []),
+                    ["options"] = GuessAnswerNames.FormatOptionList(profile?.OptionNames ?? []),
                 }
             )
         );
@@ -145,12 +146,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 
     private static CommandResponse NotConfiguredResponse() =>
         CommandResponse.Chat("This channel is not set up.");
-
-    private static string FormatOptions(IEnumerable<string> options)
-    {
-        var values = options.Order(StringComparer.OrdinalIgnoreCase).ToArray();
-        return values.Length == 0 ? "none" : string.Join(", ", values);
-    }
 
     private static ValueTask<Option<int>> ResolveHostIdAsync(
         BlokeBotDbContext db,

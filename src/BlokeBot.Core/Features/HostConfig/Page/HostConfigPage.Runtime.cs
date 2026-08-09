@@ -87,6 +87,18 @@ public partial class HostConfigPage
             static _ => "stopping"
         ) ?? "offline";
 
+    private string _botStatusStageSummary =>
+        (
+            _state?.IsChannelBotAuthorized == true
+            && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
+        ) switch
+        {
+            true => $"Connected · bot {_runtimeText}",
+            false when _state?.IsChannelBotAuthorized == true =>
+                $"Needs reconnect · bot {_runtimeText}",
+            _ => $"Not connected · bot {_runtimeText}",
+        };
+
     private string _runtimeStatusMessage =>
         _runtimeLifecycle?.Match(
             static _ => "The bot is offline.",

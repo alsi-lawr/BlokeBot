@@ -1,0 +1,17 @@
+@typeparam TValue
+
+<div class="studio-segmented inline-flex rounded-full border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-[3px]@(Wrap ? " flex-wrap" : null)" role="group" aria-label="@AriaLabel">
+    @foreach (var option in Options)
+    {
+        <button @key="option.Value"
+                id="@option.Id"
+                type="button"
+                class="studio-segmented__option cursor-pointer rounded-full px-[0.95rem] py-[0.35rem] text-[0.85rem] font-semibold transition-[background-color,color] duration-200 ease-[ease] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:duration-[1ms] @(IsSelected(option)
+                    ? "bg-[var(--app-surface-solid)] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]"
+                    : "text-[var(--app-text-muted)] focus-visible:shadow-[var(--app-focus-shadow)]")"
+                aria-pressed="@(IsSelected(option) ? "true" : "false")"
+                aria-describedby="@(IsDisabled(option) ? DisabledDescriptionId : null)"
+                disabled="@IsDisabled(option)"
+                @onclick="() => ValueChanged.InvokeAsync(option.Value)">@option.Label</button>
+    }
+</div>

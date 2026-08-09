@@ -37,8 +37,7 @@ public partial class SegmentedTabs : IDisposable
 
     private readonly Dictionary<string, ElementReference> _tabElements = [];
     private string? _pendingFocusKey;
-    private string? _ownedPath;
-    private string? _announcedFragmentKey;
+    private DashboardFragmentOwner? _fragment;
 
     public static string TabId(string id, string key) => $"{id}-{key}-tab";
 
@@ -47,17 +46,7 @@ public partial class SegmentedTabs : IDisposable
     public static string CanonicalKey(
         NavigationManager navigation,
         IReadOnlyList<SegmentedTabItem> items
-    )
-    {
-        var fragment = CurrentFragment(navigation);
-        return items
-                .FirstOrDefault(item => string.Equals(item.Key, fragment, StringComparison.Ordinal))
-                ?.Key
-            ?? items[0].Key;
-    }
-
-    private static string CurrentFragment(NavigationManager navigation) =>
-        navigation.ToAbsoluteUri(navigation.Uri).Fragment.TrimStart('#');
+    ) => DashboardFragmentOwner.CanonicalKey(navigation, [.. items.Select(item => item.Key)]);
 
     private string _style =>
         $"--segmented-count: {Math.Max(Items.Count, 1)}; --segmented-active-index: {_activeIndex};";
@@ -83,18 +72,18 @@ public partial class SegmentedTabs : IDisposable
         _navigation.LocationChanged += HandleLocationChanged;
         if (OwnsFragment)
         {
-            _ownedPath = _navigation.ToAbsoluteUri(_navigation.Uri).AbsolutePath;
-            NormalizeFragment();
+            _fragment = new(
+                _navigation,
+                _fragmentState,
+                [.. Items.Select(item => item.Key)],
+                _selectedFragmentKey,
+                InvokeAsync,
+                ActiveKeyChanged.InvokeAsync
+            );
         }
     }
 
-    protected override void OnParametersSet()
-    {
-        if (OwnsFragment && _ownedPath is { } path)
-        {
-            _fragmentState.Set(path, _selectedFragmentKey);
-        }
-    }
+    protected override void OnParametersSet() => _fragment?.Publish(_selectedFragmentKey);
 
     // The browser skips the server-side LocationChanged notification for same-page fragment
     // pushes, so the parent's ActiveKey is the source of truth after the initial navigation.
@@ -136,13 +125,10 @@ public partial class SegmentedTabs : IDisposable
             return;
         }
 
-        if (OwnsFragment)
+        if (_fragment is { } fragment)
         {
-            // Same-page fragment pushes never raise LocationChanged on the server, so the
-            // selection is announced directly and the equivalent bunit event is deduplicated.
-            _announcedFragmentKey = item.Key;
             await ActiveKeyChanged.InvokeAsync(item.Key);
-            _navigation.NavigateTo(FragmentUriFor(item.Key));
+            fragment.Select(item.Key);
             return;
         }
 
@@ -189,32 +175,6 @@ public partial class SegmentedTabs : IDisposable
         return 0;
     }
 
-    private string FragmentUriFor(string key)
-    {
-        var current = _navigation.ToAbsoluteUri(_navigation.Uri);
-        return current.GetLeftPart(UriPartial.Query) + "#" + key;
-    }
-
-    private void NormalizeFragment()
-    {
-        if (
-            !string.Equals(
-                _navigation.ToAbsoluteUri(_navigation.Uri).AbsolutePath,
-                _ownedPath,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            return;
-        }
-
-        var canonical = CanonicalKey(_navigation, Items);
-        if (!string.Equals(CurrentFragment(_navigation), canonical, StringComparison.Ordinal))
-        {
-            _navigation.NavigateTo(FragmentUriFor(canonical), replace: true);
-        }
-    }
-
     private string? TabIdFor(SegmentedTabItem item) => Id is null ? null : TabId(Id, item.Key);
 
     private string? PanelIdFor(SegmentedTabItem item) => Id is null ? null : PanelId(Id, item.Key);
@@ -225,32 +185,11 @@ public partial class SegmentedTabs : IDisposable
         active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
 
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs args) =>
-        _ = InvokeAsync(async () =>
-        {
-            if (
-                OwnsFragment
-                && string.Equals(
-                    _navigation.ToAbsoluteUri(_navigation.Uri).AbsolutePath,
-                    _ownedPath,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                NormalizeFragment();
-                var canonical = CanonicalKey(_navigation, Items);
-                var announced = _announcedFragmentKey;
-                _announcedFragmentKey = null;
-                if (
-                    !string.Equals(canonical, announced, StringComparison.Ordinal)
-                    && !string.Equals(canonical, _selectedFragmentKey, StringComparison.Ordinal)
-                )
-                {
-                    await ActiveKeyChanged.InvokeAsync(canonical);
-                }
-            }
+        _ = InvokeAsync(StateHasChanged);
 
-            StateHasChanged();
-        });
-
-    public void Dispose() => _navigation.LocationChanged -= HandleLocationChanged;
+    public void Dispose()
+    {
+        _navigation.LocationChanged -= HandleLocationChanged;
+        _fragment?.Dispose();
+    }
 }

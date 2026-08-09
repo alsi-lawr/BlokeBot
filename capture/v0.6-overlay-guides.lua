@@ -83,13 +83,13 @@ local views = {
   ["guessing"] = {
     fragment = "#sources",
     selected = "Guessing round",
-    scroll = "[aria-labelledby='overlay-preview-title']",
+    scroll = "[data-stage='position-look']",
     ready = "[data-draft-type='guessing']",
   },
   ["giveaway"] = {
     fragment = "#sources",
     selected = "Points giveaway",
-    scroll = "[aria-labelledby='overlay-preview-title']",
+    scroll = "[data-stage='position-look']",
     ready = "[data-draft-type='giveaway']",
   },
   ["event-feed"] = {
@@ -101,12 +101,12 @@ local views = {
   ["viewer-queue"] = {
     fragment = "#sources",
     selected = "Viewer queue",
-    scroll = "[aria-labelledby='overlay-preview-title']",
+    scroll = "[data-stage='position-look']",
     ready = "[data-draft-type='viewerqueue']",
   },
   ["cues"] = {
     fragment = "#cues",
-    scroll = "[data-card-owner='cue-workspace-columns']",
+    scroll = "[data-cue-editor]",
     ready = "[data-cue-editor]",
   },
   ["media"] = {
@@ -228,6 +228,20 @@ local succeeded, failure = pcall(function()
       ]=]),
       "30s"
     )
+    -- narrate the preview stage closed and open the kind cards with the real headers
+    viset.page.evaluate(
+      viset.javascript([=[
+        (() => {
+          const position = document.querySelector("[data-stage='position-look'] .studio-stage__header");
+          if (position && position.getAttribute("aria-expanded") === "true") position.click();
+          const header = document.querySelector("[data-stage='what-it-shows'] .studio-stage__header");
+          if (!header) throw new Error("What it shows stage header not found");
+          if (header.getAttribute("aria-expanded") !== "true") header.click();
+          return true;
+        })()
+      ]=])
+    )
+    viset.sleep("500ms")
   elseif view == "viewer-queue" then
     viset.page.wait_for(
       viset.javascript([=[

@@ -2,15 +2,17 @@
 @inject NavigationManager _navigation
 
 <div class="@ContainerClass">
-    <p class="text-sm font-bold text-slate-950">Public leaderboard</p>
-    <div class="mt-3 grid gap-3">
-        <select class="input" aria-label="Leaderboard feature" @bind="_feature">
-            <option value="guessing">Guessing</option>
-            <option value="points">Points</option>
-        </select>
-        <div class="space-y-2">
+    <div class="studio-grid">
+        <div class="studio-span-4">
+            <label class="label" for="public-leaderboard-feature">Leaderboard</label>
+            <select class="input mt-2" id="public-leaderboard-feature" aria-label="Leaderboard feature" @bind="_feature">
+                <option value="guessing">Guessing</option>
+                <option value="points">Points</option>
+            </select>
+        </div>
+        <div class="studio-span-4">
             <label class="label" for="public-leaderboard-channel">Twitch channel name</label>
-            <input class="input"
+            <input class="input mt-2"
                    id="public-leaderboard-channel"
                    placeholder="samplechannel"
                    value="@_channel"
@@ -18,16 +20,19 @@
                    aria-invalid="@(_channelError is null ? "false" : "true")"
                    @ref="_channelInput"
                    @oninput="UpdateChannel" />
-            <p id="public-leaderboard-channel-hint" class="text-xs font-medium text-slate-500">You can enter samplechannel, @@samplechannel, or #samplechannel.</p>
+            <p id="public-leaderboard-channel-hint" class="mt-1 text-xs font-medium text-slate-500">You can enter samplechannel, @@samplechannel, or #samplechannel.</p>
             <p id="public-leaderboard-channel-error"
-               class="text-sm font-semibold text-red-700"
+               class="mt-1 text-sm font-semibold text-red-700"
                role="alert"
                hidden="@(_channelError is null)">Enter a Twitch channel name.</p>
         </div>
-        <button class="btn-secondary h-10 w-full"
-                type="button"
-                @onclick="OpenLeaderboard">
-            View leaderboard
-        </button>
+        <div class="studio-span-4">
+            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+            <button class="btn-secondary mt-2 h-10 w-full max-md:mt-0"
+                    type="button"
+                    @onclick="OpenLeaderboard">
+                View leaderboard
+            </button>
+        </div>
     </div>
 </div>

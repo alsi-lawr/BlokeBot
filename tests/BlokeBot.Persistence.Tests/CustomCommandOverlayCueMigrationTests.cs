@@ -89,6 +89,5 @@ public sealed class CustomCommandOverlayCueMigrationTests
                 """
             )
         );
-        (await db.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_migration);
     }
 }

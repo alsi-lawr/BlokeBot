@@ -16,56 +16,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class PlayQueueCommandAndUiTests
 {
     [Test]
-    public async Task ModeratorEditor_RendersTaskLabelsAndPlainWholeNumberGuidance()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var host = await SeedHostAsync(database);
-        var service = new PlayQueueService(
-            database,
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await using var context = UiTestContextFactory.Create(database, host);
-        _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new NoopPrivateLobbyDelivery());
-
-        var page = context.Render<PlayQueuesPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Find("#queue-mode")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe(["First to join", "Viewers who played least recently"]);
-            page.Find("label[for='queue-roles']").TextContent.ShouldBe("Party role targets");
-            page.Markup.ShouldContain("support=1, tank=1");
-            page.Markup.ShouldContain("best effort");
-            page.Markup.ShouldContain("viewer page and Viewer Queue overlay");
-        });
-
-        page.Find("#queue-capacity").Input("not-a-number");
-        FindButton(page, "Save queue").Click();
-        page.WaitForAssertion(() =>
-            page.Find("[role='alert']")
-                .TextContent.ShouldContain(
-                    "Enter whole numbers for party size, ready-check time, history, no-show wait, and party role targets."
-                )
-        );
-
-        Enum.GetValues<PlayQueueEntryStatus>()
-            .Select(PlayQueuesPage.EntryStatusLabel)
-            .ShouldBe([
-                "Waiting",
-                "Awaiting response",
-                "Ready",
-                "Selected",
-                "Left queue",
-                "Skipped",
-                "Did not respond",
-            ]);
-    }
-
-    [Test]
     public async Task ModeratorLobbyFailure_StatesThatPrivateMessageWasNotPostedPublicly()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -102,6 +52,8 @@ public sealed class PlayQueueCommandAndUiTests
 
         var page = context.Render<PlayQueuesPage>();
 
+        page.WaitForAssertion(() => _ = FindButton(page, "Run the queue"));
+        FindButton(page, "Run the queue").Click();
         page.WaitForElement("#queue-lobby-code").Input("join-code");
         FindButton(page, "Whisper party").Click();
 
@@ -460,16 +412,6 @@ public sealed class PlayQueueCommandAndUiTests
         _ = db.Hosts.Add(host);
         _ = await db.SaveChangesAsync();
         return host.Id;
-    }
-
-    private sealed class NoopPrivateLobbyDelivery : IPrivateLobbyDelivery
-    {
-        public Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
-            string hostLogin,
-            string lobbyCode,
-            IReadOnlyList<PrivateLobbyRecipient> recipients,
-            CancellationToken ct
-        ) => Task.FromResult<IReadOnlyList<PrivateLobbyDeliveryOutcome>>([]);
     }
 
     private sealed class FailingPrivateLobbyDelivery : IPrivateLobbyDelivery

@@ -16,7 +16,6 @@ using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Simulation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -355,50 +354,6 @@ public sealed class OverlayBrowserSourceTests
         completion.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         stopped.GetProperty("eventType").GetString().ShouldBe("cueStop");
         stopped.GetProperty("runId").GetGuid().ShouldBe(runId);
-    }
-
-    [Test]
-    public async Task Simulator_SeedsAReproducibleAnonymousBrowserSourceRoute()
-    {
-        await using var simulation = await SimulationApplication.BuildAsync(
-            ["--urls=http://127.0.0.1:0"],
-            CancellationToken.None
-        );
-        await simulation.App.InitializeSimulationAsync(CancellationToken.None);
-        await simulation.App.StartAsync();
-        var address = simulation
-            .App.Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>()!
-            .Addresses.ShouldHaveSingleItem();
-        using var client = new HttpClient { BaseAddress = new Uri(address) };
-
-        using var document = await client.GetAsync(
-            $"/overlay/{SimulationFixtureSeeder.OverlayAccessKey}"
-        );
-        using var state = await client.GetAsync(
-            $"/overlay/{SimulationFixtureSeeder.OverlayAccessKey}/state"
-        );
-        using var viewerQueueState = await client.GetAsync(
-            $"/overlay/{SimulationFixtureSeeder.ViewerQueueOverlayAccessKey}/state"
-        );
-
-        document.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await document.Content.ReadAsStringAsync()).ShouldContain("id=\"overlay-canvas\"");
-        state.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var json = await state.Content.ReadAsStringAsync();
-        json.ShouldContain("\"overlayType\":\"guessing\"");
-        json.ShouldContain("\"phase\":\"open\"");
-        json.ShouldContain("\"roundName\":\"Default\"");
-        json.ShouldContain("\"guessCount\":4");
-        json.ShouldContain("\"sequence\":1");
-        viewerQueueState.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var queueJson = await viewerQueueState.Content.ReadAsStringAsync();
-        queueJson.ShouldContain("\"overlayType\":\"viewerQueue\"");
-        queueJson.ShouldContain("\"queueName\":\"Community night\"");
-        queueJson.ShouldContain("\"totalQueueSize\":3");
-        queueJson.ShouldContain("\"displayName\":\"NightOwl\"");
-        queueJson.ShouldContain("\"displayName\":\"PlayerThree\"");
-        queueJson.ShouldNotContain("simulation-player");
     }
 
     [Test]

@@ -25,9 +25,17 @@ public partial class HostConfigPage
         _startupMessageDirty = false;
     }
 
-    private void SetStartupMessageEnabled(ChangeEventArgs args)
+    private string _startupMessageStageSummary =>
+        _state?.StartupMessage is { Enabled: true } configuration
+            ? $"On · “{ShortenForSummary(configuration.Text)}”"
+            : "Off";
+
+    private static string ShortenForSummary(string text) =>
+        text.Length <= 42 ? text : $"{text[..42].TrimEnd()}…";
+
+    private void ToggleStartupMessageEnabled()
     {
-        _startupMessageEnabled = args.Value is true;
+        _startupMessageEnabled = !_startupMessageEnabled;
         _startupMessageDirty = true;
     }
 

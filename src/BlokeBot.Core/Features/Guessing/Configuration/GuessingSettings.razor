@@ -1,7 +1,7 @@
 @page "/guessing/settings"
 @using BlokeBot.Eventing
 @using BlokeBot.Core.Features.HostedChannels
-@using BlokeBot.Persistence.Models
+@using BlokeBot.Core.Features.Points.Balances
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
@@ -38,54 +38,273 @@
     }
     else
     {
-        <div class="settings-disclosure-stack" data-card-owner="guessing-settings-disclosure-cards guessing-settings-cards settings-disclosure-cards">
-        <div id="profiles">
-            <ProfileSettingsSection Configuration="_config"
-                                    CreateProfile="CreateProfileAsync"
-                                    DeleteProfile="DeleteProfileAsync"
-                                    SelectProfile="SelectProfileAsync"
-                                    @bind-NewProfileName="_newProfileName" />
-        </div>
-
-        <div class="settings-disclosure-stack xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div id="aliases">
-                <CommandAliasSettingsSection Aliases="_config.Aliases" />
-            </div>
-
-            <GuessOptionsSettingsSection Options="_config.Profile.Options"
-                                         WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
-                                         @bind-WhisperAnswerReplies="_config.Profile.WhisperAnswerReplies"
-                                         AddOption="AddOption"
-                                         RemoveOption="RemoveOption" />
-        </div>
-
-        <div id="replies" class="settings-disclosure-stack">
-            <ReplySettingsSection Replies="_config.Profile.Replies" />
-            <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
-                                          WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
-                                          Options="_whisperReplyOptions" />
-            <section class="card space-y-4 p-6" aria-labelledby="round-start-pin-title">
-                <div>
-                    <h2 id="round-start-pin-title" class="text-lg font-bold">Round start pin</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Pin the confirmed round-start reply in Twitch chat.</p>
+        <div class="settings-disclosure-stack">
+            <StudioStage Key="round-type"
+                         Number="1"
+                         Title="Round type"
+                         Summary="@RoundTypeSummary()"
+                         Open="@_openStages.IsOpen(GuessingStage.RoundType)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.RoundType, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-12">
+                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Round type to edit">
+                            @foreach (var profile in _config.Profiles)
+                            {
+                                <StudioChip @key="profile.Id"
+                                            Id="@RoundTypeChipId(profile.Id)"
+                                            Label="@RoundTypeLabel(profile)"
+                                            Pressed="@(profile.Id == _config.Profile.Id)"
+                                            PressedNote="Editing this round type"
+                                            ReleasedNote=""
+                                            PressedChanged="@(_ => SelectProfileAsync(profile.Id))" />
+                            }
+                        </div>
+                        <p class="mt-2 text-xs text-muted-foreground">Switching with unsaved edits still asks: save, discard, or keep editing.</p>
+                    </div>
+                    <div class="studio-span-6">
+                        <Field Id="@($"guess-profile-{_config.Profile.Id}-name")"
+                               Label="Round type name"
+                               @bind-Value="_config.Profile.Name"
+                               Placeholder="Round type name" />
+                        <p class="mt-1 text-xs text-muted-foreground">Up to 128 characters. Names must be unique.</p>
+                    </div>
+                    <div class="studio-span-6 space-y-2">
+                        <label class="label" for="@($"guess-profile-{_config.Profile.Id}-winning-reward")">Points for a winning guess</label>
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                            <StudioStepper Id="@($"guess-profile-{_config.Profile.Id}-winning-reward")"
+                                           AriaLabel="Points for a winning guess"
+                                           Unit="points"
+                                           Step="10"
+                                           Minimum="0"
+                                           Maximum="@PointAmount.MaximumValue"
+                                           @bind-Value="_config.Profile.WinningGuessPointReward" />
+                        </div>
+                        <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
+                    </div>
+                    <div class="studio-span-6 content-end">
+                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                            <span>Use by default</span>
+                            <button type="button"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_config.Profile.IsDefault ? "true" : "false")"
+                                    aria-label="Use by default"
+                                    @onclick="() => _config.Profile.IsDefault = !_config.Profile.IsDefault"></button>
+                        </div>
+                    </div>
+                    <div class="studio-span-6 content-end">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                            <input class="input min-w-0 flex-1"
+                                   placeholder="new round type name"
+                                   aria-label="New round type name"
+                                   value="@_newProfileName"
+                                   @oninput="args => _newProfileName = args.Value?.ToString() ?? string.Empty" />
+                            <button class="btn-secondary" data-action="create-round-type" @onclick="CreateProfileAsync">Create</button>
+                            <button class="btn-secondary" data-action="delete-round-type" @onclick="DeleteProfileAsync">Delete</button>
+                        </div>
+                    </div>
                 </div>
-                <label class="flex items-center gap-3 text-sm font-medium">
-                    <input type="checkbox" @bind="_config.Pin.Enabled" />
-                    Pin round-start replies
-                </label>
-                @if (_config.Pin.Enabled)
+            </StudioStage>
+
+            <StudioStage Key="accepted-answers"
+                         Number="2"
+                         Title="Accepted answers"
+                         Summary="@AnswersSummary()"
+                         Open="@_openStages.IsOpen(GuessingStage.Answers)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Answers, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-12 studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                        <span class="label">Answer replies go to</span>
+                        <StudioSegmentedPill TValue="bool"
+                                             AriaLabel="Answer replies go to"
+                                             Options="_deliveryOptions"
+                                             Value="_config.Profile.WhisperAnswerReplies"
+                                             Disabled="@(!_config.WhisperResponsesEnabled)"
+                                             DisabledDescriptionId="answer-replies-whisper-recovery"
+                                             ValueChanged="SetAnswerWhispers" />
+                        @if (!_config.WhisperResponsesEnabled)
+                        {
+                            <p id="answer-replies-whisper-recovery" class="text-sm font-medium text-muted-foreground">Private replies need a connected custom bot. <a class="font-semibold text-primary underline" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
+                        }
+                    </div>
+                    <div class="studio-span-12">
+                        <div class="motion-list scroll-panel scroll-panel--valid-guesses pr-2">
+                            @if (_config.Profile.Options.Count == 0)
+                            {
+                                <p class="text-sm text-muted-foreground">No answers added yet.</p>
+                            }
+                            @foreach (var option in _config.Profile.Options)
+                            {
+                                <div @key="option" class="@OptionRowClass(option)">
+                                    <div class="studio-span-4">
+                                        <input class="input" placeholder="answer" aria-label="Answer" @bind="option.Name" />
+                                    </div>
+                                    <div class="studio-span-6">
+                                        <input class="input" placeholder="bot reply (optional; you can use {name} and {login})" aria-label="Bot reply" @bind="option.ReplyText" />
+                                    </div>
+                                    <div class="studio-span-2 content-end">
+                                        <button class="btn-secondary" disabled="@_pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <button class="btn-secondary mt-3" data-action="add-answer" @onclick="AddOption">Add answer</button>
+                        <p class="mt-2 text-xs text-muted-foreground">The first name is canonical; comma-separated aliases follow it. At least one answer is required, and duplicates are flagged on save.</p>
+                    </div>
+                    @if (AnswerPreviewLines() is { Count: > 0 } answerPreview)
+                    {
+                        <div class="studio-span-12">
+                            <StudioChatPreview Lines="answerPreview" />
+                        </div>
+                    }
+                </div>
+            </StudioStage>
+
+            <StudioStage Key="chat-commands"
+                         Number="3"
+                         Title="Chat commands"
+                         Summary="@CommandsSummary()"
+                         Open="@_openStages.IsOpen(GuessingStage.Commands)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Commands, open))">
+                <div class="studio-grid">
+                    @foreach (var field in _aliasFields)
+                    {
+                        <div class="studio-span-6 space-y-2" @key="field.Kind">
+                            <label class="label" for="@field.FieldId">@field.Label</label>
+                            <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                @foreach (var word in AliasWords(field))
+                                {
+                                    <StudioChip @key="word"
+                                                Label="@($"!{word}")"
+                                                RemoveLabel="@($"Remove !{word} from {field.Label}")"
+                                                RemoveAction="remove-command-word"
+                                                Remove="@(() => RemoveAliasWord(field, word))" />
+                                }
+                                <input id="@field.FieldId"
+                                       class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
+                                       placeholder="+ word"
+                                       aria-label="@($"Add a {field.Label} command word")"
+                                       value="@AliasDraft(field.Kind)"
+                                       @oninput="args => SetAliasDraft(field.Kind, args.Value?.ToString() ?? string.Empty)"
+                                       @onkeydown="args => AddAliasWordOnEnter(field, args)"
+                                       @onblur="() => AddAliasWord(field)" />
+                            </div>
+                        </div>
+                    }
+                    <p class="studio-span-12 text-xs text-muted-foreground">Each command word can only be used once in this channel. Type a word and press Enter to add it.</p>
+                </div>
+            </StudioStage>
+
+            <StudioStage Key="bot-replies"
+                         Number="4"
+                         Title="Bot replies"
+                         Summary="@RepliesSummary()"
+                         Open="@_openStages.IsOpen(GuessingStage.Replies)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Replies, open))">
+                <p class="mb-3 text-xs text-muted-foreground">Every message the bot can send. Open a row to change its wording or, where private delivery is possible, send it as a whisper instead.</p>
+                @if (!_config.WhisperResponsesEnabled)
                 {
-                    <label class="block text-sm font-medium">
-                        Duration in seconds (leave blank for until stream end)
-                        <input class="input mt-2" type="number" min="30" max="1800" @bind="_config.Pin.DurationSeconds" />
-                    </label>
-                    <label class="flex items-center gap-3 text-sm font-medium">
-                        <input type="checkbox" @bind="_config.Pin.UnpinWhenRoundStops" />
-                        Remove this pin when the round stops
-                    </label>
+                    <p id="reply-delivery-whisper-recovery" class="mb-3 text-sm font-medium text-muted-foreground">Private replies need a connected custom bot. <a class="font-semibold text-primary underline" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
                 }
-            </section>
-        </div>
+                <StudioReplyList>
+                    @foreach (var field in _replyFields)
+                    {
+                        <StudioReplyRow @key="field.Key"
+                                        Key="@field.Key"
+                                        Label="@field.Label"
+                                        Excerpt="@field.Read(_config.Profile.Replies)"
+                                        Customised="@IsCustomised(field)"
+                                        Whispered="@IsWhispered(field)"
+                                        Open="@_openReplies.IsOpen(field.Key)"
+                                        OpenChanged="@(open => _openReplies.Set(field.Key, open))">
+                            <textarea class="input min-h-16 resize-y"
+                                      id="@($"guessing-{field.Key}-reply")"
+                                      aria-label="@field.Label"
+                                      value="@field.Read(_config.Profile.Replies)"
+                                      @oninput="args => field.Write(_config.Profile.Replies, args.Value?.ToString() ?? string.Empty)"></textarea>
+                            @if (field.ChatOnlyNote is { Length: > 0 } note)
+                            {
+                                <p class="text-xs text-muted-foreground">@note</p>
+                            }
+                            else
+                            {
+                                <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                                    <span class="text-xs text-muted-foreground">Delivery</span>
+                                    <StudioSegmentedPill TValue="bool"
+                                                         AriaLabel="@($"{field.Label} delivery")"
+                                                         Options="_deliveryOptions"
+                                                         Value="@IsWhispered(field)"
+                                                         Disabled="@(!_config.WhisperResponsesEnabled)"
+                                                         DisabledDescriptionId="reply-delivery-whisper-recovery"
+                                                         ValueChanged="@(whisper => SetReplyWhispered(field, whisper))" />
+                                </div>
+                            }
+                            @if (field.Key == "round-started")
+                            {
+                                <StudioChatPreview Lines="RoundStartedPreviewLines()" />
+                            }
+                            else if (field.Key == "winner-announced")
+                            {
+                                <StudioChatPreview Lines="WinnerPreviewLines()" />
+                            }
+                        </StudioReplyRow>
+                    }
+                </StudioReplyList>
+            </StudioStage>
+
+            <StudioStage Key="round-start-pin"
+                         Number="5"
+                         Title="Round start pin"
+                         Summary="@PinSummary()"
+                         Open="@_openStages.IsOpen(GuessingStage.Pin)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Pin, open))">
+                <div class="studio-grid">
+                    <div class="studio-span-12">
+                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                            <span>Pin the round-start reply in Twitch chat</span>
+                            <button type="button"
+                                    class="studio-toggle"
+                                    role="switch"
+                                    aria-checked="@(_config.Pin.Enabled ? "true" : "false")"
+                                    aria-label="Pin round-start replies"
+                                    @onclick="() => _config.Pin.Enabled = !_config.Pin.Enabled"></button>
+                        </div>
+                    </div>
+                    @if (_config.Pin.Enabled)
+                    {
+                        <div class="studio-span-12 studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                            <StudioSegmentedPill TValue="bool"
+                                                 AriaLabel="How long the pin lasts"
+                                                 Options="_pinDurationOptions"
+                                                 Value="_pinUsesDuration"
+                                                 ValueChanged="SetPinUsesDuration" />
+                            @if (_pinUsesDuration)
+                            {
+                                <StudioStepper Id="guessing-pin-duration"
+                                               AriaLabel="Pin duration in seconds"
+                                               Unit="seconds"
+                                               Step="30"
+                                               Minimum="30"
+                                               Maximum="1800"
+                                               Value="@_pinDurationDraft"
+                                               ValueChanged="SetPinDuration" />
+                                <span class="text-xs text-muted-foreground">@PinDurationHint()</span>
+                            }
+                        </div>
+                        <div class="studio-span-12">
+                            <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                                <span>Remove the pin when the round stops</span>
+                                <button type="button"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(_config.Pin.UnpinWhenRoundStops ? "true" : "false")"
+                                        aria-label="Remove the pin when the round stops"
+                                        @onclick="() => _config.Pin.UnpinWhenRoundStops = !_config.Pin.UnpinWhenRoundStops"></button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </StudioStage>
         </div>
     }
 </div>

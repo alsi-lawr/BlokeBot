@@ -1,0 +1,103 @@
+@layer components {
+    /* The studio field grid is a shared responsive policy: every span collapses to full width
+       below md. Utilities would restate the span, the min-width guard, and the collapse
+       breakpoint at every one of its ~300 consumer cells. */
+    .studio-grid {
+        display: grid;
+        gap: 0.9rem 1rem;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .studio-span-4 {
+        grid-column: span 4;
+        min-width: 0;
+    }
+
+    .studio-span-6 {
+        grid-column: span 6;
+        min-width: 0;
+    }
+
+    .studio-span-8 {
+        grid-column: span 8;
+        min-width: 0;
+    }
+
+    .studio-span-12 {
+        grid-column: span 12;
+        min-width: 0;
+    }
+
+    /* The knob is a ::after pseudo-element driven by an aria-checked state family, and the
+       toggle has no owning component: 38 markup sites consume the class directly. */
+    .studio-toggle {
+        background: var(--app-control-border);
+        border: 0;
+        border-radius: 999px;
+        cursor: pointer;
+        flex: none;
+        height: 24px;
+        position: relative;
+        transition: background-color 200ms ease;
+        width: 44px;
+    }
+
+    .studio-toggle[aria-checked="true"] {
+        background: var(--app-affirmative-dot);
+    }
+
+    .studio-toggle::after {
+        background: var(--app-surface-solid);
+        border-radius: 999px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+        content: "";
+        height: 18px;
+        left: 3px;
+        position: absolute;
+        top: 3px;
+        transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        width: 18px;
+    }
+
+    .studio-toggle[aria-checked="true"]::after {
+        transform: translateX(20px);
+    }
+
+    .studio-toggle:focus-visible {
+        box-shadow: var(--app-focus-shadow);
+        outline: none;
+    }
+
+    .studio-toggle[disabled] {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    /* Sibling-combinator cascade: an instance cannot know whether another list precedes it. */
+    .studio-replies + .studio-replies {
+        margin-top: 1rem;
+    }
+
+    /* Generated ::after content. */
+    .studio-chat__name::after {
+        color: var(--app-text-strong);
+        content: ":";
+        font-weight: 700;
+        margin-right: 0.35rem;
+    }
+
+    @media (max-width: 48rem) {
+        .studio-span-4,
+        .studio-span-6,
+        .studio-span-8 {
+            grid-column: span 12;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .studio-toggle,
+        .studio-toggle::after {
+            transition-duration: 1ms;
+        }
+    }
+}

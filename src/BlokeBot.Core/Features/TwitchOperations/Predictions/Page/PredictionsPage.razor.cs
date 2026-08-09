@@ -1,20 +1,75 @@
 using System.Diagnostics;
+using System.Globalization;
+using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
 
 public partial class PredictionsPage
 {
+    private static readonly StudioSegmentedOption<int>[] _windowOptions =
+    [
+        new(30, "30s"),
+        new(60, "60s"),
+        new(120, "2 min"),
+        new(300, "5 min"),
+        new(0, "Custom"),
+    ];
+
+    private readonly StudioOpenSet<PredictionStage> _openStages = new();
+    private readonly List<string> _outcomes = ["", ""];
     private string _title = string.Empty;
-    private string _outcomes = string.Empty;
     private string _window = "60";
+    private int _windowChoice = 60;
+
+    private enum PredictionStage
+    {
+        Template,
+        Results,
+    }
 
     protected override HostFeatureFlags Feature => HostFeatureFlags.Predictions;
 
     protected override async Task<PredictionDashboardState?> LoadStateAsync(
         int hostId,
         CancellationToken cancellationToken
-    ) => await _predictions.LoadAsync(hostId, cancellationToken);
+    )
+    {
+        var state = await _predictions.LoadAsync(hostId, cancellationToken);
+        if (state is not null)
+        {
+            _openStages.SeedOnce(PredictionStage.Template, state.Templates.Count == 0);
+        }
+
+        return state;
+    }
+
+    private string _editorSummary
+    {
+        get
+        {
+            var filled = _outcomes.Count(static outcome => !string.IsNullOrWhiteSpace(outcome));
+            return string.IsNullOrWhiteSpace(_title) && filled == 0
+                ? "Question · 2–10 outcomes · entry window"
+                : $"“{(string.IsNullOrWhiteSpace(_title) ? "Untitled" : _title.Trim())}” · {filled} outcomes"
+                    + $" · {DurationProse.Format(int.TryParse(_window, out var seconds) ? seconds : 0)}";
+        }
+    }
+
+    private string _resultsSummary =>
+        State is not { Results.Count: > 0 } state
+            ? "No Prediction results yet"
+            : $"{state.Results.Count} finished · latest: “{state.Results[0].Title}”";
+
+    private void SetWindowChoice(int choice)
+    {
+        _windowChoice = choice;
+        if (choice > 0)
+        {
+            _window = choice.ToString(CultureInfo.InvariantCulture);
+        }
+    }
 
     private async Task SaveTemplateAsync()
     {
@@ -27,7 +82,7 @@ public partial class PredictionsPage
             Publish(
                 await _predictions.SaveTemplateAsync(
                     hostId,
-                    new(_title, _outcomes.Split('\n'), window),
+                    new(_title, _outcomes.ToArray(), window),
                     CancellationToken.None
                 )
             )

@@ -1,5 +1,6 @@
 @page "/moments"
 @using BlokeBot.Core.Components
+@using BlokeBot.Core.Components.Studio
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
@@ -46,36 +47,74 @@
         }
         else
         {
-            <ApplicationCardCollection Owner="dashboard-page-cards">
-            <section class="card p-5" aria-labelledby="moment-settings-heading">
-                <h2 id="moment-settings-heading" class="text-lg font-semibold">Capture settings</h2>
-                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field Id="moment-window" Label="Merge window (seconds)" @bind-Value="_mergeWindow" />
-                    <div class="space-y-2">
-                        <label class="label" for="moment-reward-policy">Point reward</label>
-                        <select id="moment-reward-policy" class="input" @bind="_rewardPolicy">
-                            @foreach (var policy in Enum.GetValues<MomentRewardPolicy>())
-                            {
-                                <option value="@policy">@RewardPolicyLabel(policy)</option>
-                            }
-                        </select>
+            <div class="settings-disclosure-stack">
+                <StudioStage Key="moment-capture"
+                             Number="1"
+                             Title="Capture settings"
+                             Summary="@CaptureSummary()"
+                             Open="@_openStages.IsOpen(MomentStage.Capture)"
+                             OpenChanged="@(open => _openStages.Set(MomentStage.Capture, open))">
+                    <div class="studio-grid">
+                        <div class="studio-span-4 space-y-2">
+                            <label class="label" for="moment-window">Merge window</label>
+                            <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
+                                <StudioStepper Id="moment-window"
+                                               AriaLabel="Merge window in seconds"
+                                               Unit="seconds"
+                                               Step="15"
+                                               Minimum="@MomentLimits.MinimumMergeWindowSeconds"
+                                               Maximum="@MomentLimits.MaximumMergeWindowSeconds"
+                                               @bind-Value="_mergeWindow" />
+                            </div>
+                            <p class="text-xs text-muted-foreground">Captures inside this window join the same moment. @MomentLimits.MinimumMergeWindowSeconds–@MomentLimits.MaximumMergeWindowSeconds seconds.</p>
+                        </div>
+                        <div class="studio-span-8">
+                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                            <span class="studio-switch-row mt-2 flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)] max-md:mt-0">
+                                <span id="moment-marker-fallback-label">Use a stream marker when a clip is unavailable</span>
+                                <button id="moment-marker-fallback"
+                                        type="button"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(_markerFallback ? "true" : "false")"
+                                        aria-labelledby="moment-marker-fallback-label"
+                                        @onclick="ToggleMarkerFallback"></button>
+                            </span>
+                        </div>
+                        <div class="studio-span-12">
+                            <StudioChatPreview Lines="_capturePreview" />
+                            <p class="mt-2 text-xs text-muted-foreground">
+                                !moment and !clip both capture. A second capture inside the merge window joins the existing moment instead of creating a new one. Viewers can add <span class="font-mono">| category=…</span> to suggest a category.
+                            </p>
+                        </div>
                     </div>
-                    <Field Id="moment-reward-amount" Label="Reward amount" @bind-Value="_rewardAmount" />
-                    <div class="moment-setting-toggle grid-rows-[auto_1fr]">
-                        <span class="label">Marker fallback</span>
-                        <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
-                               for="moment-marker-fallback">
-                            <input id="moment-marker-fallback" type="checkbox" @bind="_markerFallback" />
-                            Use a stream marker when a clip is unavailable
-                        </label>
+                </StudioStage>
+
+                <StudioStage Key="moment-reward"
+                             Number="2"
+                             Title="Point reward"
+                             Summary="@RewardSummary()"
+                             Open="@_openStages.IsOpen(MomentStage.Reward)"
+                             OpenChanged="@(open => _openStages.Set(MomentStage.Reward, open))">
+                    <div class="studio-grid">
+                        <div class="studio-span-12">
+                            <StudioSegmentedPill TValue="MomentRewardPolicy"
+                                                 AriaLabel="Point reward"
+                                                 Options="_rewardPolicies"
+                                                 @bind-Value="_rewardPolicy" />
+                        </div>
+                        <div class="studio-span-4">
+                            <Field Id="moment-reward-amount" Label="Reward amount" @bind-Value="_rewardAmount" />
+                            <p class="mt-1 text-xs text-muted-foreground">Granted when a moment is approved.</p>
+                        </div>
                     </div>
-                </div>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
-                    <span class="text-sm text-muted-foreground">@_streamStatus</span>
-                </div>
-            </section>
-            </ApplicationCardCollection>
+                </StudioStage>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
+                <span class="text-sm text-muted-foreground">@_streamStatus</span>
+            </div>
 
             @if (!string.IsNullOrWhiteSpace(_feedback))
             {
@@ -83,53 +122,145 @@
             }
 
             <section class="application-card-collection" data-card-owner="moment-candidate-cards" aria-labelledby="moment-candidates-heading">
-                <h2 id="moment-candidates-heading" class="text-xl font-semibold">Candidates</h2>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h2 id="moment-candidates-heading" class="text-xl font-semibold">Candidates</h2>
+                    <span class="text-sm text-muted-foreground">@CandidateCount()</span>
+                    <span class="grow"></span>
+                    @if (_page is { Candidates.Count: > 0 })
+                    {
+                        <StudioSegmentedPill TValue="MomentStateFilter"
+                                             AriaLabel="Show candidates"
+                                             Options="_stateFilters"
+                                             @bind-Value="_stateFilter" />
+                    }
+                </div>
                 @if (_page is null || _page.Candidates.Count == 0)
                 {
                     <div class="card p-6 text-sm text-muted-foreground">No moments captured yet. Viewers can use !moment or !clip.</div>
                 }
                 else
                 {
-                    @foreach (var candidate in _page.Candidates)
+                    var visible = VisibleCandidates();
+                    var selected = SelectedCandidate();
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach (var candidate in visible)
+                        {
+                            <StudioThumbnailCard @key="candidate.Public.PublicId"
+                                                 Name="@CandidateTitle(candidate)"
+                                                 Subline="@CandidateSubline(candidate)"
+                                                 ThumbnailClass="@ThumbnailClass(candidate.Public.State)"
+                                                 Selected="@(selected is not null && selected.Public.PublicId == candidate.Public.PublicId)"
+                                                 Select="@(() => _selectedId = candidate.Public.PublicId)">
+                                <Thumbnail>
+                                    <span aria-hidden="true">@StateGlyph(candidate.Public.State)</span>
+                                    <span class="@StatePillClass(candidate.Public.State) absolute top-2 left-2">
+                                        <span class="status-pill__label">@CandidateStateLabel(candidate.Public.State)</span>
+                                    </span>
+                                </Thumbnail>
+                            </StudioThumbnailCard>
+                        }
+                    </div>
+                    @if (selected is null)
                     {
-                        var draft = Draft(candidate.Public.PublicId);
-                        <article class="card p-5" @key="candidate.Public.PublicId">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@CandidateStateLabel(candidate.Public.State) · @candidate.Public.StreamIdentity</p>
-                                    <h3 class="mt-1 break-words text-lg font-semibold">@(candidate.Public.PublicTitle.Length == 0 ? "Untitled moment" : candidate.Public.PublicTitle)</h3>
-                                    <p class="text-sm text-muted-foreground">@candidate.Public.Contributors.Count contributors · @candidate.Public.VoteCount votes · @candidate.Public.PublicId</p>
-                                </div>
-                                @if (candidate.Public.ProviderUrl is { } url)
+                        <div class="card p-6 text-sm text-muted-foreground">No @FilterNoun() moments right now. Choose All to see every candidate.</div>
+                    }
+                    else
+                    {
+                        var draft = Draft(selected.Public.PublicId);
+                        var id = selected.Public.PublicId;
+                        <div class="card p-5">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span class="@StatePillClass(selected.Public.State)">
+                                    <span class="status-pill__label">@CandidateStateLabel(selected.Public.State)</span>
+                                </span>
+                                <span class="text-lg font-bold text-slate-950">@CandidateTitle(selected)</span>
+                                <span class="text-xs text-muted-foreground">@ReviewMeta(selected)</span>
+                                <span class="grow"></span>
+                                @if (selected.Public.ProviderUrl is { } url)
                                 {
                                     <a class="btn-secondary" href="@url" target="_blank" rel="noreferrer">Open on Twitch</a>
                                 }
                             </div>
-                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                                <Field Id="@($"moment-title-{candidate.Public.PublicId:N}")" Label="Public title" @bind-Value="draft.Title" />
-                                <Field Id="@($"moment-category-{candidate.Public.PublicId:N}")" Label="Category" @bind-Value="draft.Category" />
-                                <div class="sm:col-span-2">
-                                    <TextAreaField Id="@($"moment-private-{candidate.Public.PublicId:N}")" Label="Private moderator note / rejection reason" @bind-Value="draft.PrivateText" />
+                            @if (!string.IsNullOrWhiteSpace(selected.ProviderFailureReason))
+                            {
+                                <p class="mt-3 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700 ring-1 ring-red-200">@selected.ProviderFailureReason</p>
+                            }
+                            <div class="studio-grid mt-4">
+                                <div class="studio-span-6">
+                                    <Field Id="moment-title"
+                                           Label="Public title"
+                                           MaxLength="MomentLimits.MaximumTitleLength"
+                                           @bind-Value="draft.Title" />
+                                    <p class="mt-1 text-xs text-muted-foreground">Shown on the weekly recap. Up to @MomentLimits.MaximumTitleLength characters.</p>
                                 </div>
-                                <div class="sm:col-span-2">
-                                    <Field Id="@($"moment-merge-{candidate.Public.PublicId:N}")" Label="Merge into moment number" @bind-Value="draft.MergeTarget" />
+                                <div class="studio-span-6">
+                                    <Field Id="moment-category"
+                                           Label="Category"
+                                           MaxLength="MomentLimits.MaximumCategoryLength"
+                                           @bind-Value="draft.Category" />
+                                    <p class="mt-1 text-xs text-muted-foreground">Up to @MomentLimits.MaximumCategoryLength characters.</p>
                                 </div>
+                                @if (selected.Suggestions.Count > 0)
+                                {
+                                    <div class="studio-span-12 space-y-2">
+                                        <span class="label">Viewer suggestions</span>
+                                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                            @foreach (var suggestion in SuggestionChips(selected))
+                                            {
+                                                <button @key="suggestion"
+                                                        type="button"
+                                                        class="studio-chip studio-chip--pressable inline-flex cursor-pointer items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] transition-[background-color,border-color] duration-[140ms] ease-[ease] hover:border-[var(--app-control-hover-border)] hover:bg-[var(--app-control-hover)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none motion-reduce:duration-[1ms]"
+                                                        data-suggestion="@suggestion.Field"
+                                                        @onclick="() => UseSuggestion(draft, suggestion)">
+                                                    <span>@suggestion.Text</span>
+                                                    <span class="font-extrabold text-emerald-700">use</span>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </div>
-                            @if (candidate.Suggestions.Count > 0)
-                            {
-                                <p class="mt-3 text-sm text-muted-foreground">Suggestions: @string.Join("; ", candidate.Suggestions)</p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(candidate.ProviderFailureReason))
-                            {
-                                <p class="mt-3 text-sm text-amber-700">@candidate.ProviderFailureReason</p>
-                            }
+                            <div class="mt-4 grid gap-2">
+                                <StudioFold Key="moment-private"
+                                            Label="Private moderator note / rejection reason"
+                                            Open="@_openFolds.IsOpen(MomentFold.PrivateNote)"
+                                            OpenChanged="@(open => _openFolds.Set(MomentFold.PrivateNote, open))">
+                                    <textarea id="moment-private"
+                                              class="input min-h-20 resize-y"
+                                              aria-label="Private moderator note or rejection reason"
+                                              placeholder="Only moderators see this. It becomes the rejection reason if you reject."
+                                              value="@draft.PrivateText"
+                                              @oninput="args => draft.PrivateText = args.Value?.ToString() ?? string.Empty"></textarea>
+                                </StudioFold>
+                                <StudioFold Key="moment-merge"
+                                            Label="Merge into another moment"
+                                            Open="@_openFolds.IsOpen(MomentFold.Merge)"
+                                            OpenChanged="@(open => _openFolds.Set(MomentFold.Merge, open))">
+                                    <div class="studio-grid">
+                                        <div class="studio-span-8 space-y-2">
+                                            <label class="label" for="moment-merge">Merge target</label>
+                                            <select id="moment-merge" class="input" @bind="draft.MergeTarget">
+                                                <option value="">Choose a moment…</option>
+                                                @foreach (var target in MergeTargets(selected))
+                                                {
+                                                    <option @key="target.Public.PublicId" value="@target.Public.PublicId">@MergeTargetLabel(target)</option>
+                                                }
+                                            </select>
+                                            <p class="text-xs text-muted-foreground">This moment’s contributors and votes move to the target.</p>
+                                        </div>
+                                        <div class="studio-span-4">
+                                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                                            <button class="btn-secondary mt-2 max-md:mt-0" type="button" @onclick="() => MergeAsync(id)">Merge</button>
+                                        </div>
+                                    </div>
+                                </StudioFold>
+                            </div>
                             <div class="mt-4 flex flex-wrap gap-2">
-                                <button class="btn-primary" type="button" @onclick="() => ApproveAsync(candidate.Public.PublicId)">Approve</button>
-                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(candidate.Public.PublicId)">Save details</button>
-                                <button class="btn-secondary" type="button" @onclick="() => RejectAsync(candidate.Public.PublicId)">Reject</button>
-                                <button class="btn-secondary" type="button" @onclick="() => MergeAsync(candidate.Public.PublicId)">Merge</button>
+                                <button class="btn-primary" type="button" @onclick="() => ApproveAsync(id)">Approve</button>
+                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(id)">Save details</button>
+                                <button class="btn-secondary" type="button" @onclick="() => RejectAsync(id)">Reject</button>
                             </div>
-                        </article>
+                        </div>
                     }
                 }
             </section>

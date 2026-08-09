@@ -7,6 +7,14 @@ namespace BlokeBot.Core.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
+    private const string _featureIconBase =
+        "inline-flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)]";
+
+    private string _chatToolsStageSummary =>
+        _state is null
+            ? string.Empty
+            : $"{_state.Features.Count(static feature => feature.Enabled)} of {_state.Features.Count} on";
+
     private static string FeatureBadgeClass(HostFeatureCardState feature) =>
         feature.Enabled
             ? "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 text-[0.68rem] font-bold text-emerald-700 ring-1 ring-emerald-200"
@@ -14,8 +22,8 @@ public partial class HostConfigPage
 
     private static string FeatureCardClass(HostFeatureCardState feature) =>
         feature.Enabled
-            ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left"
-            : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left";
+            ? "feature-toggle-card w-full rounded-[14px] border border-[var(--app-focus-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-[var(--app-shadow-sm)] transition hover:-translate-y-0.5 hover:border-[var(--app-control-hover-border)] hover:bg-[var(--app-control-hover)] hover:shadow-[var(--app-shadow-surface)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none"
+            : "feature-toggle-card w-full rounded-[14px] border border-[var(--app-control-border)] bg-[var(--app-control-bg)] p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--app-control-hover-border)] hover:bg-[var(--app-control-hover)] hover:shadow-[var(--app-shadow-surface)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none";
 
     private static string FeatureDotClass(HostFeatureCardState feature) =>
         feature.Enabled
@@ -26,20 +34,20 @@ public partial class HostConfigPage
         feature.Enabled
             ? feature.Feature switch
             {
-                HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
-                HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
+                HostFeatureFlags.Points => $"{_featureIconBase} text-emerald-600",
+                HostFeatureFlags.CustomCommands => $"{_featureIconBase} text-violet-600",
                 HostFeatureFlags.Shoutouts
                 or HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
                 or HostFeatureFlags.RewardsAndRedemptions
-                or HostFeatureFlags.Predictions => "feature-toggle-card__icon text-purple-700",
-                HostFeatureFlags.RequestBoards => "feature-toggle-card__icon text-sky-700",
-                HostFeatureFlags.PlayWithViewers => "feature-toggle-card__icon text-emerald-700",
-                HostFeatureFlags.Moments => "feature-toggle-card__icon text-violet-700",
-                HostFeatureFlags.Overlays => "feature-toggle-card__icon text-blue-600",
-                _ => "feature-toggle-card__icon text-blue-600",
+                or HostFeatureFlags.Predictions => $"{_featureIconBase} text-purple-700",
+                HostFeatureFlags.RequestBoards => $"{_featureIconBase} text-sky-700",
+                HostFeatureFlags.PlayWithViewers => $"{_featureIconBase} text-emerald-700",
+                HostFeatureFlags.Moments => $"{_featureIconBase} text-violet-700",
+                HostFeatureFlags.Overlays => $"{_featureIconBase} text-blue-600",
+                _ => $"{_featureIconBase} text-blue-600",
             }
-            : "feature-toggle-card__icon text-slate-500";
+            : $"{_featureIconBase} text-slate-500";
 
     private static MarkupString FeatureIcon(HostFeatureFlags feature) =>
         new(

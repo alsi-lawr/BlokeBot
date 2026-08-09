@@ -1299,14 +1299,10 @@ public sealed class MomentHubService(
                 .Suggestions.OrderBy(value => value.CreatedAtUtc)
                 .ThenBy(value => value.Id)
                 .Take(MomentLimits.MaximumSuggestionCount)
-                .Select(value =>
-                    string.Join(
-                        " · ",
-                        new[] { value.SuggestedTitle, value.SuggestedCategory }.Where(text =>
-                            !string.IsNullOrWhiteSpace(text)
-                        )
-                    )
-                )
+                .Select(value => new MomentSuggestionView(
+                    value.SuggestedTitle,
+                    value.SuggestedCategory
+                ))
                 .ToArray(),
             audits
         );

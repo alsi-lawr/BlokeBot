@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Moments;
-using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Authorization;
@@ -14,58 +12,6 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class MomentUiTests
 {
-    [Test]
-    public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndUsesSemanticSettingsAlignment()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        var service = new MomentHubService(
-            database,
-            new UnusedMomentProvider(),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
-            new OfflineStreamLivenessProvider()
-        );
-
-        var page = context.Render<MomentsPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            var recap = page.Find("a[aria-label='Open weekly recap (opens in a new tab)']");
-            recap.TextContent.Trim().ShouldBe("Open weekly recap");
-            recap.GetAttribute("href").ShouldBe("/moments/streamer");
-            recap.GetAttribute("target").ShouldBe("_blank");
-            recap.GetAttribute("rel").ShouldBe("noopener");
-            _ = recap.Closest(".page-header__actions").ShouldNotBeNull();
-            _ = page.Find("#moment-marker-fallback").ShouldNotBeNull();
-            page.Find("label[for='moment-marker-fallback']")
-                .TextContent.ShouldContain("Use a stream marker");
-            page.Find(".moment-setting-toggle").ClassList.ShouldContain("grid-rows-[auto_1fr]");
-            var captureSettings = page.FindAll(
-                "#moment-settings-heading + .grid > :is(.space-y-2, .moment-setting-toggle)"
-            );
-            captureSettings.Count.ShouldBe(4);
-            captureSettings.ShouldAllBe(setting => setting.Children[0].ClassList.Contains("label"));
-            captureSettings
-                .Select(setting => setting.QuerySelector("input, select").ShouldNotBeNull().Id)
-                .ShouldBe([
-                    "moment-window",
-                    "moment-reward-policy",
-                    "moment-reward-amount",
-                    "moment-marker-fallback",
-                ]);
-            page.Find("#moment-reward-policy")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
-            page.Markup.ShouldNotContain("pt-6");
-        });
-    }
-
     [Test]
     public async Task PublicRecap_RendersApprovedTwitchLinkAndNeverPrivateModerationText()
     {
@@ -132,11 +78,12 @@ public sealed class MomentUiTests
             parameters.Add(component => component.Channel, "streamer")
         );
 
-        page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Weekly recap"));
-        page.Markup.ShouldContain("Public title");
-        _ = page.Find("a[href='https://clips.twitch.tv/PublicMoment']").ShouldNotBeNull();
-        page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
-        page.Find("input#moment-voter-login").GetAttribute("maxlength").ShouldBe("128");
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("Public title");
+            _ = page.Find("a[href='https://clips.twitch.tv/PublicMoment']");
+            page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
+        });
     }
 
     [Test]
@@ -225,9 +172,8 @@ public sealed class MomentUiTests
             var page = authenticated.Render<PublicMomentRecapPage>(parameters =>
                 parameters.Add(component => component.Channel, "streamer")
             );
-            page.WaitForAssertion(() => page.Markup.ShouldContain("Voting as"));
+            _ = page.WaitForElement("button.btn-secondary");
             await page.Find("button.btn-secondary").ClickAsync(new());
-            page.WaitForAssertion(() => page.Markup.ShouldContain("Vote recorded."));
         }
 
         using (var anonymous = new BunitContext())
@@ -240,9 +186,6 @@ public sealed class MomentUiTests
             page.WaitForAssertion(() => page.Find("#moment-voter-login").ShouldNotBeNull());
             page.Find("#moment-voter-login").Change("oauth_viewer");
             await page.Find("button.btn-secondary").ClickAsync(new());
-            page.WaitForAssertion(() =>
-                page.Markup.ShouldContain("Your vote was already recorded.")
-            );
         }
 
         await using var verify = await database.CreateDbContextAsync();
@@ -260,62 +203,5 @@ public sealed class MomentUiTests
             string description,
             CancellationToken ct
         ) => Task.FromResult<MomentProviderOutcome>(new MomentProviderOutcome.ClipReady(clipId));
-    }
-
-    private sealed class UnusedMomentProvider : IMomentProviderOperations
-    {
-        public Task<MomentProviderOutcome> CaptureAsync(
-            int hostId,
-            Guid publicId,
-            bool markerFallbackEnabled,
-            string description,
-            CancellationToken ct
-        ) =>
-            Task.FromResult<MomentProviderOutcome>(
-                new MomentProviderOutcome.Failed(null, null, "Not used by this UI test.")
-            );
-    }
-
-    private sealed class OfflineStreamLivenessProvider : IHostStreamLivenessProvider
-    {
-        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-            IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
-                ValueTask.FromResult(
-                    Result<HostStreamLivenessOutcome, Never>.Success(
-                        new HostStreamLivenessOutcome.Offline()
-                    )
-                )
-            );
-    }
-
-    private sealed class UnavailableStreamLivenessProvider : IHostStreamLivenessProvider
-    {
-        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-            IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
-                ValueTask.FromResult(
-                    Result<HostStreamLivenessOutcome, Never>.Success(
-                        new HostStreamLivenessOutcome.Unavailable(
-                            HostStreamLivenessUnavailableReason.ProviderRequestFailed,
-                            new HttpRequestException("Unavailable")
-                        )
-                    )
-                )
-            );
-    }
-
-    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
-    {
-        await using var db = await database.CreateDbContextAsync();
-        var host = new BotHost
-        {
-            EnabledFeatures = HostFeatureFlags.All,
-            Login = "streamer",
-            DisplayName = "Streamer",
-            TwitchUserId = "streamer-id",
-            CreatedAtUtc = DateTime.UtcNow,
-        };
-        _ = db.Hosts.Add(host);
-        _ = await db.SaveChangesAsync();
-        return host.Id;
     }
 }

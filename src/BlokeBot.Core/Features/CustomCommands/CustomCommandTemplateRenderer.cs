@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
@@ -9,6 +10,11 @@ internal sealed class CustomCommandTemplateRenderer(
     IMessageLibraryChatterSource chatters
 )
 {
+    private static readonly Regex _contextTokenPattern = new(
+        @"\{([A-Za-z0-9_]+)\}",
+        RegexOptions.CultureInvariant
+    );
+
     public Task<string> RenderCommandAsync(
         string template,
         MessageLibraryRenderHost host,
@@ -16,9 +22,29 @@ internal sealed class CustomCommandTemplateRenderer(
         IReadOnlyList<string> args,
         long? count,
         CancellationToken cancellationToken
+    ) => RenderAsync(template, host, CommandValues(context, args, count), cancellationToken);
+
+    public static string RenderCommandPreview(
+        string template,
+        ChatCommandContext context,
+        IReadOnlyList<string> args,
+        long? count
     )
     {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var values = CommandValues(context, args, count);
+        return _contextTokenPattern.Replace(
+            template,
+            match => values.TryGetValue(match.Groups[1].Value, out var value) ? value : match.Value
+        );
+    }
+
+    private static IReadOnlyDictionary<string, string> CommandValues(
+        ChatCommandContext context,
+        IReadOnlyList<string> args,
+        long? count
+    )
+    {
+        Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase)
         {
             ["user"] = Login.Normalize(context.Message.Login),
             ["channel"] = Login.Normalize(context.Message.Channel),
@@ -36,7 +62,7 @@ internal sealed class CustomCommandTemplateRenderer(
             values["count"] = count.Value.ToString(CultureInfo.InvariantCulture);
         }
 
-        return RenderAsync(template, host, values, cancellationToken);
+        return values;
     }
 
     public Task<string> RenderScheduledAsync(

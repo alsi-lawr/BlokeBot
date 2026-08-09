@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using System.Globalization;
+using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
 
@@ -14,14 +18,291 @@ public partial class PlayQueuesPage
     private Guid? _fieldFocusIdentity;
     private string _feedback = string.Empty;
     private string _lobbyCode = string.Empty;
+    private string _roleDraft = string.Empty;
     private long _fieldFocusRequest;
     private long _primaryFocusRequest;
     private bool _isCreating = true;
     private bool _operationFailed;
     private bool _featureEnabled;
+    private PlayQueuePane _pane = PlayQueuePane.Setup;
+    private readonly StudioOpenSet<PlayQueueStage> _openStages = new(PlayQueueStage.Basics);
+    private readonly StudioOpenSet<long> _openEntryFolds = new();
+
+    private const string _formPreviewBox =
+        "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
+
+    private enum PlayQueuePane
+    {
+        Setup,
+        Run,
+    }
+
+    private enum PlayQueueStage
+    {
+        Basics,
+        PartyAndFairPicks,
+        Questions,
+        TimingAndVisibility,
+    }
+
+    private sealed record SelectionChoice(
+        PlayQueueSelectionMode Mode,
+        string Title,
+        string Description
+    );
+
+    private static readonly IReadOnlyList<SelectionChoice> _selectionChoices =
+    [
+        new(
+            PlayQueueSelectionMode.JoinOrder,
+            "First to join",
+            "Simple queue order: higher priority, then earliest join."
+        ),
+        new(
+            PlayQueueSelectionMode.LeastRecentParticipation,
+            "Least recently played",
+            "Viewers who have not played with you lately jump ahead, so regulars do not hog every game."
+        ),
+    ];
 
     private string _publicUrl =>
         $"/queues/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
+
+    private string _slugOrExample => string.IsNullOrWhiteSpace(_draft.Slug) ? "duos" : _draft.Slug;
+
+    private string _nameOrExample =>
+        string.IsNullOrWhiteSpace(_draft.Name) ? "Ranked Duos" : _draft.Name;
+
+    private string _viewerPagePath => $"/queues/{HostLogin}/{_slugOrExample}";
+
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        [
+            new(
+                "Queues",
+                [
+                    .. _queueList.Select(queue => new StudioRailItem
+                    {
+                        Key = queue.Slug,
+                        Label = queue.Slug,
+                        Search = $"{queue.Slug} {queue.Name}",
+                        Sub = string.IsNullOrWhiteSpace(queue.Name) ? null : queue.Name,
+                        Meta = queue.IsOpen ? null : "closed",
+                        Monospace = true,
+                        On = queue.IsOpen,
+                        Selected = !_isCreating && queue.Slug == _draft.Slug,
+                        Select = EventCallback.Factory.Create(
+                            this,
+                            () => SelectQueueAsync(queue.Slug)
+                        ),
+                    }),
+                ],
+                "No saved queues yet."
+            ),
+        ];
+
+    private IReadOnlyList<StudioSegmentedOption<PlayQueuePane>> _paneOptions =>
+        [
+            new(PlayQueuePane.Setup, "Set up queue"),
+            new(
+                PlayQueuePane.Run,
+                _moderatorPage is { Waiting.Count: > 0 } moderation
+                    ? $"Run the queue · {moderation.Waiting.Count}"
+                    : "Run the queue"
+            ),
+        ];
+
+    private string _headerTitle =>
+        _isCreating ? "New queue (not saved)"
+        : string.IsNullOrWhiteSpace(_draft.Name) ? _draft.Slug
+        : _draft.Name;
+
+    private string? _headerStats =>
+        _moderatorPage is { } moderation
+            ? $"/{_draft.Slug} · {moderation.Waiting.Count} waiting · party {moderation.CurrentParty.Count} of {moderation.Queue.Capacity}"
+            : null;
+
+    private string _basicsSummary =>
+        string.IsNullOrWhiteSpace(_draft.Activity)
+            ? $"/{_slugOrExample}"
+            : $"/{_slugOrExample} · {_draft.Activity}";
+
+    private string _partySummary =>
+        $"Party of {_draft.Capacity} · {(_draft.SelectionMode == PlayQueueSelectionMode.JoinOrder ? "first to join picked first" : "least-recent players first")} · {(_roleSections.Count == 0 ? "no role targets" : Count(_roleSections.Count, "role target"))}";
+
+    private string _questionsSummary =>
+        _draft.Fields.Count == 0
+            ? "no questions · viewers just join with their name"
+            : $"{Count(_draft.Fields.Count, "question")} · all optional, shown publicly";
+
+    private string _timingSummary =>
+        $"{ReadyProse()} to ready up · {_draft.SkipExclusion} min sit-out · {(_draft.ShowNames ? "names shown" : "names hidden")}";
+
+    private string ReadyProse() =>
+        !int.TryParse(
+            _draft.ReadinessTimeout,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var seconds
+        )
+            ? $"{_draft.ReadinessTimeout} s"
+            : DurationProse.Format(seconds);
+
+    private static string Count(int count, string noun) =>
+        count == 1 ? $"1 {noun}" : $"{count} {noun}s";
+
+    private IReadOnlyList<string> _roleSections =>
+        _draft.RoleRequirements.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+
+    private static string RoleChipLabel(string section) => section.Replace("=", " × ");
+
+    private void AddRole()
+    {
+        var value = _roleDraft.Trim();
+        if (value.Length == 0 || _roleSections.Count >= PlayQueueLimits.MaximumRoles)
+        {
+            return;
+        }
+
+        var pair = value.Split('=', 2, StringSplitOptions.TrimEntries);
+        var count = 1;
+        if (
+            pair[0].Length == 0
+            || (
+                pair.Length == 2
+                && !int.TryParse(
+                    pair[1],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out count
+                )
+            )
+        )
+        {
+            return;
+        }
+
+        _draft.RoleRequirements = AppendedList(_roleSections, $"{pair[0]}={count}");
+        _roleDraft = string.Empty;
+    }
+
+    private void AddRoleOnEnter(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddRole();
+        }
+    }
+
+    private void RemoveRole(int index) =>
+        _draft.RoleRequirements = string.Join(
+            ", ",
+            _roleSections.Where((_, position) => position != index)
+        );
+
+    private static string AppendedList(IReadOnlyList<string> current, string value) =>
+        current.Count == 0 ? value : $"{string.Join(", ", current)}, {value}";
+
+    private static IReadOnlyList<string> FieldChoices(FieldDraft field) =>
+        field.Choices.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+
+    private static void AddChoice(FieldDraft field)
+    {
+        var value = field.ChoiceDraft.Trim();
+        if (value.Length == 0)
+        {
+            return;
+        }
+
+        field.Choices = AppendedList(FieldChoices(field), value);
+        field.ChoiceDraft = string.Empty;
+    }
+
+    private static void AddChoiceOnEnter(FieldDraft field, KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddChoice(field);
+        }
+    }
+
+    private static void RemoveChoice(FieldDraft field, string choice) =>
+        field.Choices = string.Join(", ", FieldChoices(field).Where(value => value != choice));
+
+    private static string KeyOrExample(FieldDraft field) =>
+        string.IsNullOrWhiteSpace(field.Key) ? "platform" : field.Key;
+
+    private static string FieldPreviewPlaceholder(FieldDraft field) =>
+        FieldChoices(field).Count > 0 ? "Choose… ▾" : "Free text";
+
+    private static string EntryStatusPillClass(PlayQueueEntryStatus status) =>
+        status is PlayQueueEntryStatus.Ready or PlayQueueEntryStatus.Selected
+            ? "status-pill bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
+            : "status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]";
+
+    private static string FairOrderProse(PlayQueueSelectionMode mode) =>
+        mode == PlayQueueSelectionMode.JoinOrder
+            ? "Picked in order: higher priority first, then join time."
+            : "Picked fairly: higher priority first, then whoever played with you least recently, then join time.";
+
+    private static string ParticipationProse(ModeratorPlayQueueEntryView entry) =>
+        entry.LastParticipatedAtUtc is { } last
+            ? $"last played {last.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}"
+            : "never played with you";
+
+    private IReadOnlyList<StudioChatLine> ChatPreviewLines()
+    {
+        var arguments = string.Join(
+            " ",
+            _draft
+                .Fields.Where(field => !string.IsNullOrWhiteSpace(field.Key))
+                .Select(field => (field.Key, Choices: FieldChoices(field)))
+                .Where(field => field.Choices.Count > 0)
+                .Take(2)
+                .Select(field => $"{field.Key}={field.Choices[0]}")
+        );
+        return
+        [
+            new()
+            {
+                Speaker = "gazza_plays",
+                SpeakerColour = "#1e90ff",
+                Message =
+                    arguments.Length == 0
+                        ? $"!join {_slugOrExample}"
+                        : $"!join {_slugOrExample} {arguments}",
+                Monospace = true,
+            },
+            new()
+            {
+                Speaker = "BlokeBot",
+                SpeakerColour = "#00ad6f",
+                Badge = "BOT",
+                Bot = true,
+                Message = $"You joined {_nameOrExample} at position 5.",
+            },
+            new()
+            {
+                Speaker = "pixel_penny",
+                SpeakerColour = "#e91e63",
+                Message = "!position",
+                Monospace = true,
+            },
+            new()
+            {
+                Speaker = "BlokeBot",
+                SpeakerColour = "#00ad6f",
+                Badge = "BOT",
+                Bot = true,
+                Message = "You are in the current party.",
+            },
+        ];
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,6 +349,8 @@ public partial class PlayQueuesPage
         _isCreating = false;
         _operationFailed = false;
         _feedback = string.Empty;
+        _pane = PlayQueuePane.Setup;
+        _openEntryFolds.Reset();
         SelectFirstField();
         await RefreshPageAsync();
     }
@@ -99,6 +382,8 @@ public partial class PlayQueuesPage
         _moderatorPage = null;
         _entryDrafts.Clear();
         _operationFailed = false;
+        _pane = PlayQueuePane.Setup;
+        _openEntryFolds.Reset();
         SelectFirstField();
         SetCreateGuidance();
         _primaryFocusRequest++;
@@ -214,22 +499,12 @@ public partial class PlayQueuesPage
 
     private static string QueueFieldSummary(FieldDraft field)
     {
-        var key = string.IsNullOrWhiteSpace(field.Key) ? "No key" : field.Key;
-        var choices = field.Choices.Split(
-            ',',
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-        );
-        var detail = choices.Length == 0 ? "Free text" : $"{choices.Length} choices";
-        return $"{key} · Optional · Public · {detail}";
+        var key = string.IsNullOrWhiteSpace(field.Key) ? "no key" : field.Key;
+        var choices = FieldChoices(field);
+        return choices.Count == 0
+            ? $"{key} · free text"
+            : $"{key} · pick from {Count(choices.Count, "choice")}";
     }
-
-    internal static string SelectionModeLabel(PlayQueueSelectionMode mode) =>
-        mode switch
-        {
-            PlayQueueSelectionMode.JoinOrder => "First to join",
-            PlayQueueSelectionMode.LeastRecentParticipation => "Viewers who played least recently",
-            _ => throw new UnreachableException("Unknown play queue selection mode."),
-        };
 
     internal static string EntryStatusLabel(PlayQueueEntryStatus status) =>
         status switch
@@ -557,6 +832,7 @@ public partial class PlayQueuesPage
         public string Key { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
         public string Choices { get; set; } = string.Empty;
+        public string ChoiceDraft { get; set; } = string.Empty;
 
         public PlayQueueFieldCommand ToCommand() =>
             new(

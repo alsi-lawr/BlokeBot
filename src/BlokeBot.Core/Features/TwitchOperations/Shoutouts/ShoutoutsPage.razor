@@ -35,40 +35,45 @@
     else if (State is not null)
     {
         <TaskPanel Title="Send a shoutout" Description="Enter the Twitch name of another channel that is live with viewers.">
-            <div class="field-row native-primary-row">
-                <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
-                <button class="btn-primary" @onclick="SendAsync">Send shoutout</button>
+            <div class="studio-grid">
+                <div class="studio-span-8">
+                    <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
+                </div>
+                <div class="studio-span-4 content-end">
+                    <button class="btn-primary w-full" type="button" @onclick="SendAsync">Send shoutout</button>
+                </div>
+                <div class="studio-span-12"><p class="form-help">@_cooldownText</p></div>
             </div>
-            <p class="form-help mt-4">@_cooldownText</p>
         </TaskPanel>
 
-        <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
-        <AutomaticRaidShoutoutSection HostId="HostId"
-                                      RunHostMutationAsync="RunAutomaticRaidMutationAsync" />
+        <div class="settings-disclosure-stack">
+            <AutomaticRaidShoutoutSection HostId="HostId"
+                                          RunHostMutationAsync="RunAutomaticRaidMutationAsync" />
 
-        <CollapsibleSection Title="Recent shoutouts" Description="See who you recommended and who recommended you." InitiallyOpen="false">
-            <div class="p-4">
+            <StudioStage Key="recent-shoutouts"
+                         Number="3"
+                         Title="Recent shoutouts"
+                         Summary="@_historySummary"
+                         Open="@_historyOpen"
+                         OpenChanged="@(open => _historyOpen = open)">
                 @if (State.History.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No shoutouts recorded yet.</p>
                 }
                 else
                 {
-                    <div class="phone-card-list" data-native-history="shoutouts">
+                    <div class="grid gap-2" data-native-history="shoutouts">
                         @foreach (var item in State.History)
                         {
-                            <article class="surface-row rounded-lg p-4" @key="item">
-                                <div class="flex flex-wrap items-start justify-between gap-2">
-                                    <strong class="text-slate-950">@item.Direction · @item.TargetLogin</strong>
-                                    <span class="text-xs text-muted-foreground">@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</span>
-                                </div>
-                                <p class="mt-2 text-sm text-muted-foreground">@item.ViewerCount viewers</p>
-                            </article>
+                            <NativeOperationRow @key="item"
+                                                Title="@($"{item.Direction} · @{item.TargetLogin}")"
+                                                When="@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")">
+                                @item.ViewerCount viewers
+                            </NativeOperationRow>
                         }
                     </div>
                 }
-            </div>
-        </CollapsibleSection>
-        </ApplicationCardCollection>
+            </StudioStage>
+        </div>
     }
 </DashboardPage>

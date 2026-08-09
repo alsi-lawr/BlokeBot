@@ -39,12 +39,18 @@
     }
     else
     {
-        <ApplicationCardCollection Owner="admin-page-disclosure-cards admin-authorization-disclosure-card">
-        <BotAccountAuthorizationSection Status="@_botAccountStatus"
-                                        Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
-                                        Clear="@ClearBotAccountAuthorizationAsync"
-                                        Refresh="@RefreshBotAccountAuthorizationAsync"
-                                        InitiallyOpen="true" />
+        <div class="settings-disclosure-stack">
+        <StudioStage Key="bot-account"
+                     Number="1"
+                     Title="Bot account"
+                     Summary="@_botAccountStageSummary"
+                     Open="@_botAccountStageOpen"
+                     OpenChanged="open => _botAccountStageOpen = open">
+            <BotAccountAuthorizationSection Status="@_botAccountStatus"
+                                            Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
+                                            Clear="@ClearBotAccountAuthorizationAsync"
+                                            Refresh="@RefreshBotAccountAuthorizationAsync" />
+        </StudioStage>
 
         <SiteAccessSection State="@_state"
                            WhitelistEntries="@_siteWhitelistEntries"
@@ -64,6 +70,6 @@
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
-        </ApplicationCardCollection>
+        </div>
     }
 </div>

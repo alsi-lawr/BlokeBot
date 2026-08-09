@@ -1,11 +1,15 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.RegularExpressions;
+using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 
 public partial class ChannelPointsPage
 {
+    private readonly StudioOpenSet<ChannelPointsStage> _openStages = new();
     private string? _editingRewardId;
     private string _rewardTitle = string.Empty;
     private string _rewardPrompt = string.Empty;
@@ -22,12 +26,56 @@ public partial class ChannelPointsPage
     private bool _rewardEnabled = true;
     private bool _rewardPaused;
 
+    private enum ChannelPointsStage
+    {
+        Editor,
+        Rewards,
+        History,
+    }
+
     protected override HostFeatureFlags Feature => HostFeatureFlags.RewardsAndRedemptions;
 
     protected override async Task<ChannelPointsDashboardState?> LoadStateAsync(
         int hostId,
         CancellationToken cancellationToken
-    ) => await _channelPoints.LoadAsync(hostId, cancellationToken);
+    )
+    {
+        var state = await _channelPoints.LoadAsync(hostId, cancellationToken);
+        if (state is not null)
+        {
+            _openStages.SeedOnce(ChannelPointsStage.Rewards, state.Rewards.Count > 0);
+        }
+
+        return state;
+    }
+
+    private string _editorSummary =>
+        _editingRewardId is null
+            ? string.IsNullOrWhiteSpace(_rewardTitle)
+                ? "Cost, limits, cooldown and a static tile preview"
+                : $"New reward: “{_rewardTitle}” · {_rewardCost} Channel Points"
+            : $"Editing “{_rewardTitle}” · {_rewardCost} Channel Points";
+
+    private string _rewardsSummary =>
+        State is not { Rewards.Count: > 0 } state
+            ? "No rewards found"
+            : $"{state.Rewards.Count} rewards · {state.Rewards.Count(static reward => reward.IsEnabled)} enabled";
+
+    private string _historySummary =>
+        State is not { History.Count: > 0 } state
+            ? "No redemption history yet"
+            : $"Latest: {state.History[0].RewardTitle} · {state.History[0].Status}";
+
+    private string CooldownProse() =>
+        int.TryParse(_rewardCooldownSeconds, out var seconds) && seconds > 0
+            ? $"That is {DurationProse.Format(seconds)}."
+            : "1 to 604,800 seconds.";
+
+    private string PreviewTileColor() =>
+        HexColour().IsMatch(_rewardBackgroundColor) ? _rewardBackgroundColor : "#9147FF";
+
+    [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
+    private static partial Regex HexColour();
 
     private async Task SaveRewardAsync()
     {
@@ -63,6 +111,7 @@ public partial class ChannelPointsPage
 
     private void EditReward(ChannelPointsRewardView reward)
     {
+        _openStages.Open(ChannelPointsStage.Editor);
         _editingRewardId = reward.ProviderRewardId;
         _rewardTitle = reward.Title;
         _rewardPrompt = reward.Prompt ?? string.Empty;
