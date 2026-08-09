@@ -183,7 +183,7 @@
                                             <div class="studio-span-4">
                                                 <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request number" @bind-Value="draft.MergeTarget" />
                                             </div>
-                                            <div class="studio-span-8 studio-align-end content-end">
+                                            <div class="studio-span-8 content-end">
                                                 <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
                                                 <span class="ml-2 text-xs text-muted-foreground">Votes and history move to the other request.</span>
                                             </div>

@@ -248,8 +248,9 @@
                                             </select>
                                             <p class="text-xs text-muted-foreground">This moment’s contributors and votes move to the target.</p>
                                         </div>
-                                        <div class="studio-span-4 self-end">
-                                            <button class="btn-secondary" type="button" @onclick="() => MergeAsync(id)">Merge</button>
+                                        <div class="studio-span-4">
+                                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                                            <button class="btn-secondary mt-2 max-md:mt-0" type="button" @onclick="() => MergeAsync(id)">Merge</button>
                                         </div>
                                     </div>
                                 </StudioFold>

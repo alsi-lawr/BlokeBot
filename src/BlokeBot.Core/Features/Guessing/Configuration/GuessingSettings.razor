@@ -81,7 +81,7 @@
                         </div>
                         <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
                     </div>
-                    <div class="studio-span-6 studio-align-end content-end">
+                    <div class="studio-span-6 content-end">
                         <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                             <span>Use by default</span>
                             <button type="button"
@@ -92,7 +92,7 @@
                                     @onclick="() => _config.Profile.IsDefault = !_config.Profile.IsDefault"></button>
                         </div>
                     </div>
-                    <div class="studio-span-6 studio-align-end content-end">
+                    <div class="studio-span-6 content-end">
                         <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <input class="input min-w-0 flex-1"
                                    placeholder="new round type name"
@@ -142,7 +142,7 @@
                                     <div class="studio-span-6">
                                         <input class="input" placeholder="bot reply (optional; you can use {name} and {login})" aria-label="Bot reply" @bind="option.ReplyText" />
                                     </div>
-                                    <div class="studio-span-2 studio-align-end content-end">
+                                    <div class="studio-span-2 content-end">
                                         <button class="btn-secondary" disabled="@_pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                                     </div>
                                 </div>
