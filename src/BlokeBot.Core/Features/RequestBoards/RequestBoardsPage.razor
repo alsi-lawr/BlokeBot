@@ -36,7 +36,7 @@
     }
     else
     {
-        <section class="studio" aria-label="Request board studio">
+        <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" aria-label="Request board studio">
             <StudioRail AriaLabel="Saved boards" SearchPlaceholder="Search boards" Groups="_railGroups">
                 <Footer>
                     <button class="btn-primary w-full"
@@ -48,14 +48,14 @@
                 </Footer>
             </StudioRail>
 
-            <div class="studio__inspector">
-                <header class="studio__header">
-                    <span id="request-board-configuration" class="studio__title">@_headerTitle</span>
+            <div class="studio__inspector flex min-w-0 flex-col">
+                <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                    <span id="request-board-configuration" class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@_headerTitle</span>
                     @if (_headerStats is { } stats)
                     {
-                        <span class="studio__subtitle">@stats</span>
+                        <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@stats</span>
                     }
-                    <span class="studio__spacer"></span>
+                    <span class="studio__spacer flex-1"></span>
                     @if (_moderatorPage is not null)
                     {
                         <StudioSegmentedPill TValue="RequestBoardPane"
@@ -64,7 +64,7 @@
                                              Value="_pane"
                                              ValueChanged="@(pane => _pane = pane)" />
                     }
-                    <span class="studio-toggle-label">Accepting requests</span>
+                    <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Accepting requests</span>
                     <button type="button"
                             id="request-board-open"
                             class="studio-toggle"
@@ -75,7 +75,7 @@
                     <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
                 </header>
 
-                <div class="studio__body">
+                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
                     @if (_isCreating)
                     {
                         <p id="request-board-create-guidance" class="text-sm text-muted-foreground">
@@ -148,7 +148,7 @@
                                                 <label class="label" for="@($"request-tags-{submission.Public.Id}")">
                                                     Tags <span class="font-normal text-muted-foreground">(@DraftTags(draft).Count of @RequestBoardLimits.MaximumTags)</span>
                                                 </label>
-                                                <div class="studio-chips">
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     @foreach (var tag in DraftTags(draft))
                                                     {
                                                         <StudioChip @key="tag"
@@ -158,7 +158,7 @@
                                                                     Remove="@(() => RemoveTag(draft, tag))" />
                                                     }
                                                     <input id="@($"request-tags-{submission.Public.Id}")"
-                                                           class="studio-chip-input"
+                                                           class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
                                                            placeholder="+ tag"
                                                            aria-label="Add a tag"
                                                            disabled="@(DraftTags(draft).Count >= RequestBoardLimits.MaximumTags)"
@@ -183,7 +183,7 @@
                                             <div class="studio-span-4">
                                                 <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request number" @bind-Value="draft.MergeTarget" />
                                             </div>
-                                            <div class="studio-span-8 studio-align-end">
+                                            <div class="studio-span-8 studio-align-end content-end">
                                                 <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
                                                 <span class="ml-2 text-xs text-muted-foreground">Votes and history move to the other request.</span>
                                             </div>
@@ -297,7 +297,7 @@
                                                     <label class="label" for="@($"request-field-choices-{index}")">
                                                         Choices <span class="font-normal text-muted-foreground">(@FieldChoices(field).Count of @RequestBoardLimits.MaximumChoices)</span>
                                                     </label>
-                                                    <div class="studio-chips">
+                                                    <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                         @foreach (var choice in FieldChoices(field))
                                                         {
                                                             <StudioChip @key="choice"
@@ -307,7 +307,7 @@
                                                                         Remove="@(() => RemoveChoice(field, choice))" />
                                                         }
                                                         <input id="@($"request-field-choices-{index}")"
-                                                               class="studio-chip-input"
+                                                               class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
                                                                placeholder="+ choice"
                                                                aria-label="Add a choice"
                                                                disabled="@(FieldChoices(field).Count >= RequestBoardLimits.MaximumChoices)"

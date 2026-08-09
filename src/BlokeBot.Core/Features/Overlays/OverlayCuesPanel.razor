@@ -24,7 +24,7 @@
                     <section class="@(HasFailed ? "card bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card bg-blue-50 p-4 text-sm font-semibold text-slate-950")" role="@(HasFailed ? "alert" : "status")">@Feedback</section>
                 }
 
-                <section class="studio" aria-label="Cue studio">
+                <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" aria-label="Cue studio">
                     <StudioRail AriaLabel="Saved cues" SearchPlaceholder="Search" Groups="_railGroups">
                         <Footer>
                             <div class="grid gap-2">
@@ -34,12 +34,12 @@
                         </Footer>
                     </StudioRail>
 
-                    <div class="studio__inspector" data-cue-editor>
-                        <header class="studio__header">
-                            <span class="studio__title">@(_selected is null ? "New cue" : _name)</span>
-                            <span class="studio__subtitle">@HeaderStats()</span>
-                            <span class="studio__spacer"></span>
-                            <span class="studio-toggle-label">Enabled</span>
+                    <div class="studio__inspector flex min-w-0 flex-col" data-cue-editor>
+                        <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                            <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_selected is null ? "New cue" : _name)</span>
+                            <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@HeaderStats()</span>
+                            <span class="studio__spacer flex-1"></span>
+                            <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Enabled</span>
                             <button type="button"
                                     class="studio-toggle"
                                     role="switch"
@@ -49,7 +49,7 @@
                             <button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button>
                         </header>
 
-                        <div class="studio__body">
+                        <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
                             <StudioStage Key="cue-basics"
                                          Number="1"
                                          Title="Basics"
@@ -165,7 +165,7 @@
                                         <select id="cue-target" class="input" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select>
                                         <p class="text-xs text-muted-foreground">Only enabled Cue player Browser Sources appear here. <a class="font-semibold text-blue-700 underline" href="overlays#sources">Manage Browser Sources →</a></p>
                                     </div>
-                                    <div class="studio-span-4 studio-align-end">
+                                    <div class="studio-span-4 studio-align-end content-end">
                                         <button class="btn-primary" type="button" disabled="@(_selected is null || _target is null || IsBusy)" @onclick="PlayAsync">Play test cue</button>
                                     </div>
                                 </div>

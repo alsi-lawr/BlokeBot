@@ -23,7 +23,7 @@
             <label class="label" for="winner">Winner</label>
             @if (_answerNames.Count > 0)
             {
-                <div class="studio-chips" role="group" aria-label="Configured answers">
+                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Configured answers">
                     @foreach (var answer in _answerNames)
                     {
                         <StudioChip @key="answer"
@@ -35,7 +35,7 @@
                     }
                 </div>
             }
-            <div class="studio-stepline">
+            <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                 <input id="winner" class="input min-w-0 flex-1" placeholder="winning answer" value="@WinnerName" @oninput="OnWinnerNameChanged" />
                 <button class="btn-primary" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
             </div>

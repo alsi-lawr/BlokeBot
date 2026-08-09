@@ -46,7 +46,7 @@
                 </section>
             }
 
-            <section class="studio" aria-label="Browser Source studio">
+            <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" aria-label="Browser Source studio">
                 <StudioRail AriaLabel="Saved overlays" SearchPlaceholder="Search" Groups="_railGroups">
                     <Footer>
                         <button class="btn-primary w-full"
@@ -58,23 +58,23 @@
                     </Footer>
                 </StudioRail>
 
-                <div class="studio__inspector" data-overlay-editor>
-                    <header class="studio__header">
-                        <span class="studio__title">@(_isCreating ? "New overlay — not saved" : _selected?.Name ?? _draftName)</span>
+                <div class="studio__inspector flex min-w-0 flex-col" data-overlay-editor>
+                    <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                        <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_isCreating ? "New overlay — not saved" : _selected?.Name ?? _draftName)</span>
                         @if (_isCreating)
                         {
-                            <span id="overlay-new-guidance" class="studio__subtitle">
+                            <span id="overlay-new-guidance" class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">
                                 Name this overlay, then select Create overlay. Its private Browser Source URL appears once, after creation.
                             </span>
                         }
                         else if (_selected is { } headerOverlay)
                         {
-                            <span class="studio__subtitle">@TypeLabel(headerOverlay.Type) · @UpdatedLabel(headerOverlay)</span>
+                            <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@TypeLabel(headerOverlay.Type) · @UpdatedLabel(headerOverlay)</span>
                         }
-                        <span class="studio__spacer"></span>
+                        <span class="studio__spacer flex-1"></span>
                         @if (_selected is { } toggledOverlay)
                         {
-                            <span class="studio-toggle-label">Enabled</span>
+                            <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Enabled</span>
                             <button type="button"
                                     class="studio-toggle"
                                     role="switch"
@@ -89,7 +89,7 @@
                                 @onclick="SaveAsync">@(_isCreating ? "Create overlay" : "Save overlay")</button>
                     </header>
 
-                    <div class="studio__body">
+                    <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
                         <StudioStage Key="overlay-basics"
                                      Number="1"
                                      Title="Basics"
@@ -289,7 +289,7 @@
                                 {
                                     <div class="studio-grid">
                                         <div class="studio-span-6 self-end">
-                                            <span class="studio-switch-row">
+                                            <span class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                                                 <span id="overlay-guess-count-label">Show the number of guesses</span>
                                                 <button type="button"
                                                         class="studio-toggle"
@@ -338,21 +338,21 @@
                                                    Placeholder="Points giveaway" />
                                         </div>
                                         <div class="studio-span-6 grid content-end gap-2">
-                                            <span class="studio-switch-row">
+                                            <span class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                                                 <span id="overlay-entrant-count-label">Entrant count</span>
                                                 <button type="button" class="studio-toggle" role="switch"
                                                         aria-checked="@(_draftShowEntrantCount ? "true" : "false")"
                                                         aria-labelledby="overlay-entrant-count-label"
                                                         @onclick="() => _draftShowEntrantCount = !_draftShowEntrantCount"></button>
                                             </span>
-                                            <span class="studio-switch-row">
+                                            <span class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                                                 <span id="overlay-countdown-label">Close-time countdown</span>
                                                 <button type="button" class="studio-toggle" role="switch"
                                                         aria-checked="@(_draftShowCountdown ? "true" : "false")"
                                                         aria-labelledby="overlay-countdown-label"
                                                         @onclick="() => _draftShowCountdown = !_draftShowCountdown"></button>
                                             </span>
-                                            <span class="studio-switch-row">
+                                            <span class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                                                 <span id="overlay-join-command-label">Current join command</span>
                                                 <button type="button" class="studio-toggle" role="switch"
                                                         aria-checked="@(_draftShowJoinCommand ? "true" : "false")"
@@ -385,10 +385,10 @@
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
                                                 <div class="space-y-2"><label class="label" for="point-event-template">Template</label><input id="point-event-template" class="input" @bind="_pointEventTemplate" /></div>
-                                                <div class="studio-chips">
-                                                    <span class="studio-chip font-mono">{recipient}</span>
-                                                    <span class="studio-chip font-mono">{amount}</span>
-                                                    <span class="studio-chip font-mono">{pointLabel}</span>
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{recipient}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{amount}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                                                     <div class="space-y-2"><label class="label" for="point-event-duration">On screen for (seconds)</label><input id="point-event-duration" class="input" type="number" min="1" max="30" @bind="_pointEventDuration" /></div>
@@ -412,13 +412,13 @@
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
                                                 <div class="space-y-2"><label class="label" for="guess-event-template">Template</label><input id="guess-event-template" class="input" @bind="_guessEventTemplate" /></div>
-                                                <div class="studio-chips">
-                                                    <span class="studio-chip font-mono">{roundName}</span>
-                                                    <span class="studio-chip font-mono">{winningAnswer}</span>
-                                                    <span class="studio-chip font-mono">{winners}</span>
-                                                    <span class="studio-chip font-mono">{winnerCount}</span>
-                                                    <span class="studio-chip font-mono">{amount}</span>
-                                                    <span class="studio-chip font-mono">{pointLabel}</span>
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{roundName}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winningAnswer}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winners}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winnerCount}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{amount}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                                                     <div class="space-y-2"><label class="label" for="guess-event-duration">On screen for (seconds)</label><input id="guess-event-duration" class="input" type="number" min="1" max="30" @bind="_guessEventDuration" /></div>
@@ -442,11 +442,11 @@
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
                                                 <div class="space-y-2"><label class="label" for="giveaway-event-template">Template</label><input id="giveaway-event-template" class="input" @bind="_giveawayEventTemplate" /></div>
-                                                <div class="studio-chips">
-                                                    <span class="studio-chip font-mono">{winners}</span>
-                                                    <span class="studio-chip font-mono">{winnerCount}</span>
-                                                    <span class="studio-chip font-mono">{prizes}</span>
-                                                    <span class="studio-chip font-mono">{pointLabel}</span>
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winners}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winnerCount}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{prizes}</span>
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                                                     <div class="space-y-2"><label class="label" for="giveaway-event-duration">On screen for (seconds)</label><input id="giveaway-event-duration" class="input" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div>

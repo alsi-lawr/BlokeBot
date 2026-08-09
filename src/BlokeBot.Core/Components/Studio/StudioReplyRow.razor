@@ -1,17 +1,25 @@
-<div class="studio-reply @(Open ? "studio-reply--open" : null)" data-reply="@Key">
+<div class="studio-reply mb-2 min-w-0 rounded-lg border border-[var(--app-border)] bg-[var(--app-control-bg)] @(Open ? "studio-reply--open" : null)" data-reply="@Key">
+    @* Below 30rem a long reply name would push the state pill and chevron out of the clipped row,
+       so the header re-lays as a grid with the excerpt on its own full row. *@
     <button type="button"
-            class="studio-reply__header"
+            class="studio-reply__header flex w-full cursor-pointer items-center gap-[0.7rem] rounded-lg px-[0.8rem] py-[0.55rem] text-left transition-[background-color] duration-[140ms] ease-[ease] hover:bg-[var(--app-control-hover)] focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none motion-reduce:duration-[1ms] max-[30rem]:grid max-[30rem]:grid-cols-[minmax(0,1fr)_auto_auto] max-[30rem]:gap-x-[0.6rem] max-[30rem]:gap-y-[0.35rem]"
             aria-expanded="@(Open ? "true" : "false")"
             aria-controls="@_bodyId"
             @onclick="Toggle">
-        <span class="studio-reply__label">@Label</span>
-        <span class="studio-reply__excerpt">@Excerpt</span>
-        <span class="studio-reply__state" data-reply-state="@_state">@_state</span>
-        <span class="studio-reply__chevron" aria-hidden="true">›</span>
+        <span class="studio-reply__label min-w-0 flex-none text-[0.84rem] font-bold text-[var(--app-text-strong)] wrap-anywhere">@Label</span>
+        <span class="studio-reply__excerpt min-w-[4ch] flex-1 overflow-hidden text-[0.8rem] text-ellipsis whitespace-nowrap text-[var(--app-text-muted)] max-[30rem]:col-span-full">@Excerpt</span>
+        <span class="studio-reply__state flex-none rounded-full border px-[0.65rem] py-[0.18rem] text-[0.72rem] font-bold @(_state == "whisper"
+                  ? "border-transparent bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
+                  : "border-[var(--app-border)] bg-[var(--app-surface-muted)] text-[var(--app-text-muted)]")"
+              data-reply-state="@_state">@_state</span>
+        <span class="studio-reply__chevron flex-none text-[var(--app-text-muted)] transition-transform duration-[250ms] ease-[ease] motion-reduce:duration-[1ms] @(Open ? "rotate-90" : null)" aria-hidden="true">›</span>
     </button>
-    <div id="@_bodyId" class="studio-reply__body" inert="@(!Open)">
-        <div class="studio-reply__clip">
-            <div class="studio-reply__content">
+    @* The spring animates grid-template-rows, so the clip child must own the overflow. *@
+    <div id="@_bodyId"
+         class="studio-reply__body grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:duration-[1ms] @(Open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")"
+         inert="@(!Open)">
+        <div class="studio-reply__clip min-w-0 overflow-hidden">
+            <div class="studio-reply__content grid gap-[0.6rem] px-[0.8rem] pt-1 pb-[0.85rem]">
                 @ChildContent
             </div>
         </div>

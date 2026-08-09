@@ -1,6 +1,6 @@
-<aside class="studio-rail scroll-panel" aria-label="@AriaLabel">
+<aside class="studio-rail scroll-panel flex min-w-0 flex-col gap-[0.2rem] rounded-tl-[14px] rounded-bl-[14px] border-r border-[var(--app-border)] bg-[var(--app-surface-muted)] p-4 max-lg:max-h-[min(20rem,45vh)] max-lg:rounded-tr-[14px] max-lg:rounded-bl-none max-lg:border-r-0 max-lg:border-b" aria-label="@AriaLabel">
     <input type="search"
-           class="studio-rail__search"
+           class="studio-rail__search mb-[0.35rem] min-h-9 w-full rounded-full border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.95rem] py-[0.4rem] text-[0.85rem] text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-placeholder)] focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
            placeholder="@SearchPlaceholder"
            aria-label="@AriaLabel"
            @bind="_search"
@@ -9,8 +9,8 @@
     @foreach (var group in Groups)
     {
         var items = Matching(group).ToArray();
-        <div class="studio-rail__group">
-            <p class="studio-rail__group-label">@group.Label</p>
+        <div class="studio-rail__group mx-[0.35rem] mt-[0.85rem] mb-1 flex items-center justify-between gap-2">
+            <p class="studio-rail__group-label text-[0.7rem] font-bold tracking-[0.08em] text-[var(--app-text-muted)] uppercase">@group.Label</p>
             @if (group.Add is { } add)
             {
                 <button type="button"
@@ -23,34 +23,36 @@
         </div>
         @if (items.Length == 0)
         {
-            <p class="studio-rail__empty">@EmptyLabel(group)</p>
+            <p class="studio-rail__empty px-[0.7rem] py-1 text-[0.8rem] text-[var(--app-text-muted)]">@EmptyLabel(group)</p>
         }
         @foreach (var item in items)
         {
             <button @key="item.Key"
                     type="button"
-                    class="studio-rail__item"
+                    class="studio-rail__item flex w-full cursor-pointer items-center gap-[0.55rem] rounded-[10px] border px-[0.7rem] py-2 text-left text-[0.875rem] transition-[background-color,border-color] duration-[140ms] ease-[ease] focus-visible:outline-none motion-reduce:duration-[1ms] @(item.Selected
+                        ? "border-[var(--app-control-border)] bg-[var(--app-surface-solid)] font-bold text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]"
+                        : "border-transparent text-[var(--app-text-medium)] hover:border-[var(--app-border)] hover:bg-[var(--app-control-hover)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)]")"
                     data-action="@item.Action"
                     aria-current="@(item.Selected ? "true" : "false")"
                     aria-controls="@item.ControlsId"
                     @onclick="item.Select">
-                <span class="studio-rail__dot @(item.On ? "studio-rail__dot--on" : null)" aria-hidden="true"></span>
+                <span class="studio-rail__dot h-2 w-2 flex-none rounded-full @(item.On ? "studio-rail__dot--on bg-[var(--app-affirmative-dot)]" : "bg-[var(--app-control-border)]")" aria-hidden="true"></span>
                 @if (item.Sub is { Length: > 0 } sub)
                 {
                     <span class="min-w-0 flex-1">
                         <span id="@item.LabelId"
-                              class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
+                              class="studio-rail__name min-w-0 wrap-anywhere @(item.Monospace ? "studio-rail__name--mono font-mono" : null)">@item.Label</span>
                         <span class="block text-xs font-normal text-muted-foreground">@sub</span>
                     </span>
                 }
                 else
                 {
                     <span id="@item.LabelId"
-                          class="studio-rail__name @(item.Monospace ? "studio-rail__name--mono" : null)">@item.Label</span>
+                          class="studio-rail__name min-w-0 wrap-anywhere @(item.Monospace ? "studio-rail__name--mono font-mono" : null)">@item.Label</span>
                 }
                 @if (item.Meta is { Length: > 0 } meta)
                 {
-                    <span class="studio-rail__meta">@meta</span>
+                    <span class="studio-rail__meta ml-auto flex-none text-[0.72rem] font-medium text-[var(--app-text-muted)]">@meta</span>
                 }
             </button>
         }
@@ -58,6 +60,6 @@
 
     @if (Footer is not null)
     {
-        <div class="studio-rail__footer">@Footer</div>
+        <div class="studio-rail__footer mt-[0.9rem]">@Footer</div>
     }
 </aside>

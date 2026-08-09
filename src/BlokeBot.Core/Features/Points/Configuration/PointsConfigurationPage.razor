@@ -66,7 +66,7 @@
                 <div class="studio-grid">
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="winRate">Chance of winning</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="winRate"
                                            AriaLabel="Chance of winning"
                                            Unit="%"
@@ -80,7 +80,7 @@
                     </div>
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="gamblingCooldown">Wait between gambles</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="gamblingCooldown"
                                            AriaLabel="Wait between gambles in seconds"
                                            Unit="seconds"
@@ -114,7 +114,7 @@
                 <div class="studio-grid">
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="duration">Time to enter</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="duration"
                                            AriaLabel="Time to enter in seconds"
                                            Unit="seconds"
@@ -133,7 +133,7 @@
                     </div>
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="winnerCount">Number of winners</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="winnerCount"
                                            AriaLabel="Number of winners"
                                            Unit="@(_config.GiveawayWinnerCount == 1 ? "winner" : "winners")"
@@ -151,7 +151,7 @@
                     </div>
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="points-giveaway-minimum-payout">Prize range</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="points-giveaway-minimum-payout"
                                            AriaLabel="Smallest prize"
                                            DecrementLabel="Smaller minimum"
@@ -175,7 +175,7 @@
                     </div>
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="cooldown">Wait between giveaways</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="cooldown"
                                            AriaLabel="Wait between giveaways in seconds"
                                            Unit="seconds"
@@ -209,7 +209,7 @@
                     {
                         <div class="studio-span-4 space-y-2" @key="field.Kind">
                             <label class="label" for="@field.FieldId">@field.Label</label>
-                            <div class="studio-chips">
+                            <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                 @foreach (var word in AliasWords(field))
                                 {
                                     <StudioChip @key="word"
@@ -219,7 +219,7 @@
                                                 Remove="@(() => RemoveAliasWord(field, word))" />
                                 }
                                 <input id="@field.FieldId"
-                                       class="studio-chip-input"
+                                       class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
                                        placeholder="+ word"
                                        aria-label="@($"Add a {field.Label} command word")"
                                        value="@AliasDraft(field.Kind)"
@@ -268,7 +268,7 @@
                                 }
                                 else
                                 {
-                                    <div class="studio-stepline">
+                                    <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                                         <span class="text-xs text-muted-foreground">Delivery</span>
                                         <StudioSegmentedPill TValue="bool"
                                                              AriaLabel="@($"{field.Label} delivery")"

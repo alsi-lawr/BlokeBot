@@ -1,11 +1,11 @@
-<span class="studio-stepper">
+<span class="studio-stepper inline-flex items-center overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] focus-within:border-[var(--app-focus-border)] focus-within:shadow-[var(--app-focus-shadow)]">
     <button type="button"
-            class="studio-stepper__step"
+            class="studio-stepper__step h-10 w-9 cursor-pointer text-[1rem] font-bold text-[var(--app-text-medium)] transition-[background-color] duration-[140ms] ease-[ease] hover:bg-[var(--app-control-hover)] hover:text-[var(--app-text-strong)] focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none motion-reduce:duration-[1ms]"
             data-action="decrement"
             aria-label="@DecrementLabel"
             @onclick="() => StepAsync(-1)">−</button>
     <input id="@Id"
-           class="studio-stepper__value"
+           class="studio-stepper__value w-[4.5rem] p-0 text-center font-semibold text-[var(--app-text-strong)] outline-none"
            inputmode="numeric"
            aria-label="@AriaLabel"
            aria-invalid="@(Invalid ? "true" : "false")"
@@ -14,10 +14,10 @@
            @oninput="OnInput" />
     @if (Unit is { Length: > 0 } unit)
     {
-        <span class="studio-stepper__unit">@unit</span>
+        <span class="studio-stepper__unit pr-[0.7rem] pl-[0.15rem] text-[0.78rem] text-[var(--app-text-muted)]">@unit</span>
     }
     <button type="button"
-            class="studio-stepper__step"
+            class="studio-stepper__step h-10 w-9 cursor-pointer text-[1rem] font-bold text-[var(--app-text-medium)] transition-[background-color] duration-[140ms] ease-[ease] hover:bg-[var(--app-control-hover)] hover:text-[var(--app-text-strong)] focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none motion-reduce:duration-[1ms]"
             data-action="increment"
             aria-label="@IncrementLabel"
             @onclick="() => StepAsync(1)">+</button>

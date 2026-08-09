@@ -111,7 +111,7 @@
                                 <p id="automatic-raid-pin-duration-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@pinError</p>
                             }
                         </div>
-                        <div class="studio-span-8 studio-align-end">
+                        <div class="studio-span-8 studio-align-end content-end">
                             <div class="flex min-h-10 flex-wrap items-center gap-3">
                                 <button type="button"
                                         id="automatic-raid-pin-until-end"
@@ -158,13 +158,13 @@
                                   aria-describedby="automatic-raid-template-guidance automatic-raid-template-budget automatic-raid-message-template-error"
                                   aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MessageTemplate)"
                                   @oninput="SetMessageTemplate"></textarea>
-                        <div class="studio-chips mt-2">
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{twitch_handle}</span></span>
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{display_name}</span></span>
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{channel_url}</span></span>
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{last_game|fallback}</span></span>
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{stream_title|fallback}</span></span>
-                            <span class="studio-chip font-mono text-[0.78rem]"><span>{viewer_count}</span></span>
+                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] mt-2">
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{twitch_handle}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{display_name}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{channel_url}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{last_game|fallback}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{stream_title|fallback}</span></span>
+                            <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{viewer_count}</span></span>
                         </div>
                         <p id="automatic-raid-template-guidance" class="form-help mt-2">
                             Use the tokens above anywhere in the message. Last game and stream title require a non-empty inline fallback, written as <span class="font-mono">{last_game|fallback}</span>.

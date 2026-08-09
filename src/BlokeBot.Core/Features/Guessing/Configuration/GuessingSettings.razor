@@ -47,7 +47,7 @@
                          OpenChanged="@(open => SetStage(GuessingStage.RoundType, open))">
                 <div class="studio-grid">
                     <div class="studio-span-12">
-                        <div class="studio-chips" role="group" aria-label="Round type to edit">
+                        <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Round type to edit">
                             @foreach (var profile in _config.Profiles)
                             {
                                 <StudioChip @key="profile.Id"
@@ -70,7 +70,7 @@
                     </div>
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="@($"guess-profile-{_config.Profile.Id}-winning-reward")">Points for a winning guess</label>
-                        <div class="studio-stepline">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioStepper Id="@($"guess-profile-{_config.Profile.Id}-winning-reward")"
                                            AriaLabel="Points for a winning guess"
                                            Unit="points"
@@ -81,8 +81,8 @@
                         </div>
                         <p class="text-xs text-muted-foreground">0 means no reward. Type any whole amount up to 10^100.</p>
                     </div>
-                    <div class="studio-span-6 studio-align-end">
-                        <div class="studio-switch-row">
+                    <div class="studio-span-6 studio-align-end content-end">
+                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                             <span>Use by default</span>
                             <button type="button"
                                     class="studio-toggle"
@@ -92,8 +92,8 @@
                                     @onclick="() => _config.Profile.IsDefault = !_config.Profile.IsDefault"></button>
                         </div>
                     </div>
-                    <div class="studio-span-6 studio-align-end">
-                        <div class="studio-stepline">
+                    <div class="studio-span-6 studio-align-end content-end">
+                        <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <input class="input min-w-0 flex-1"
                                    placeholder="new round type name"
                                    aria-label="New round type name"
@@ -113,7 +113,7 @@
                          Open="@IsStageOpen(GuessingStage.Answers)"
                          OpenChanged="@(open => SetStage(GuessingStage.Answers, open))">
                 <div class="studio-grid">
-                    <div class="studio-span-12 studio-stepline">
+                    <div class="studio-span-12 studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                         <span class="label">Answer replies go to</span>
                         <StudioSegmentedPill TValue="bool"
                                              AriaLabel="Answer replies go to"
@@ -142,7 +142,7 @@
                                     <div class="studio-span-6">
                                         <input class="input" placeholder="bot reply (optional — you can use {name} and {login})" aria-label="Bot reply" @bind="option.ReplyText" />
                                     </div>
-                                    <div class="studio-span-2 studio-align-end">
+                                    <div class="studio-span-2 studio-align-end content-end">
                                         <button class="btn-secondary" disabled="@_pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                                     </div>
                                 </div>
@@ -171,7 +171,7 @@
                     {
                         <div class="studio-span-6 space-y-2" @key="field.Kind">
                             <label class="label" for="@field.FieldId">@field.Label</label>
-                            <div class="studio-chips">
+                            <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                 @foreach (var word in AliasWords(field))
                                 {
                                     <StudioChip @key="word"
@@ -181,7 +181,7 @@
                                                 Remove="@(() => RemoveAliasWord(field, word))" />
                                 }
                                 <input id="@field.FieldId"
-                                       class="studio-chip-input"
+                                       class="studio-chip-input w-28 min-w-28 rounded-full border border-dashed border-[var(--app-control-border)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-muted)] focus:border-solid focus:border-[var(--app-focus-border)] focus:shadow-[var(--app-focus-shadow)]"
                                        placeholder="+ word"
                                        aria-label="@($"Add a {field.Label} command word")"
                                        value="@AliasDraft(field.Kind)"
@@ -228,7 +228,7 @@
                             }
                             else
                             {
-                                <div class="studio-stepline">
+                                <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                                     <span class="text-xs text-muted-foreground">Delivery</span>
                                     <StudioSegmentedPill TValue="bool"
                                                          AriaLabel="@($"{field.Label} delivery")"
@@ -260,7 +260,7 @@
                          OpenChanged="@(open => SetStage(GuessingStage.Pin, open))">
                 <div class="studio-grid">
                     <div class="studio-span-12">
-                        <div class="studio-switch-row">
+                        <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                             <span>Pin the round-start reply in Twitch chat</span>
                             <button type="button"
                                     class="studio-toggle"
@@ -272,7 +272,7 @@
                     </div>
                     @if (_config.Pin.Enabled)
                     {
-                        <div class="studio-span-12 studio-stepline">
+                        <div class="studio-span-12 studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                             <StudioSegmentedPill TValue="bool"
                                                  AriaLabel="How long the pin lasts"
                                                  Options="_pinDurationOptions"
@@ -292,7 +292,7 @@
                             }
                         </div>
                         <div class="studio-span-12">
-                            <div class="studio-switch-row">
+                            <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
                                 <span>Remove the pin when the round stops</span>
                                 <button type="button"
                                         class="studio-toggle"

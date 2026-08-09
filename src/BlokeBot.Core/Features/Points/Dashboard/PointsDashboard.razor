@@ -89,7 +89,7 @@
                     <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
                 </div>
                 <div class="border-b border-slate-200 p-5">
-                    <div class="studio-stepline">
+                    <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                         <input id="points-dashboard-lookup-login"
                                class="input min-w-0 flex-1"
                                placeholder="username"
@@ -107,7 +107,7 @@
                     }
                 </div>
                 <div class="space-y-4 p-5">
-                    <div class="studio-stepline">
+                    <div class="studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                         <span class="label">Adjust points</span>
                         <StudioSegmentedPill TValue="PointsAdjustment"
                                              AriaLabel="Adjust points"
@@ -167,19 +167,19 @@
             <div class="studio-grid p-5">
                 <div class="studio-span-6">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">People who joined</h3>
-                    <div class="studio-chips scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
+                    <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
                         @foreach (var entrant in _state.ActiveGiveaway?.Entrants ?? [])
                         {
-                            <span @key="entrant" class="studio-chip">@entrant</span>
+                            <span @key="entrant" class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)]">@entrant</span>
                         }
                     </div>
                 </div>
                 <div class="studio-span-6">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-muted-foreground">Winners</h3>
-                    <div class="studio-chips scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
+                    <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] scroll-panel scroll-panel--tag-cloud mt-3 pr-2">
                         @foreach (var winner in _state.ActiveGiveaway?.Winners ?? [])
                         {
-                            <span @key="winner" class="studio-chip border-transparent bg-emerald-50 text-emerald-700">@winner.Login · @winner.Payout.ToDisplayString()</span>
+                            <span @key="winner" class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-transparent bg-emerald-50 px-3 py-[0.28rem] text-[0.82rem] font-semibold text-emerald-700">@winner.Login · @winner.Payout.ToDisplayString()</span>
                         }
                     </div>
                     <p class="mt-2 text-xs text-muted-foreground">Winners appear here when the giveaway ends.</p>

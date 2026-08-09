@@ -88,7 +88,7 @@
             </ApplicationCardCollection>
         }
 
-        <section class="studio" data-active-fragment="@KeyForTab(_activeTab)" aria-label="Custom command studio">
+        <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" data-active-fragment="@KeyForTab(_activeTab)" aria-label="Custom command studio">
             <StudioRail AriaLabel="Commands, counters, announcements, and replies"
                         SearchPlaceholder="Search"
                         Groups="@_railGroups">
@@ -108,17 +108,17 @@
                 </Footer>
             </StudioRail>
 
-            <div class="studio__inspector">
-                <header class="studio__header">
-                    <span class="studio__title @(_selectedCommand is not null ? "studio__title--mono" : null)">@_headerName</span>
+            <div class="studio__inspector flex min-w-0 flex-col">
+                <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                    <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere @(_selectedCommand is not null ? "studio__title--mono font-mono" : null)">@_headerName</span>
                     @if (_headerStats is { } stats)
                     {
-                        <span class="studio__subtitle">@stats</span>
+                        <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@stats</span>
                     }
-                    <span class="studio__spacer"></span>
+                    <span class="studio__spacer flex-1"></span>
                     @if (_selectedCommand is { } toggledCommand)
                     {
-                        <span class="studio-toggle-label">Turned on</span>
+                        <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
                         <button type="button"
                                 id="@CommandEnabledToggleId(toggledCommand)"
                                 class="studio-toggle"
@@ -129,7 +129,7 @@
                     }
                     else if (_selectedAnnouncement is { } toggledAnnouncement)
                     {
-                        <span class="studio-toggle-label">Turned on</span>
+                        <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Turned on</span>
                         <button type="button"
                                 id="@AnnouncementEnabledToggleId(toggledAnnouncement)"
                                 class="studio-toggle"
@@ -146,7 +146,7 @@
                             @onclick="SaveAsync">Save</button>
                 </header>
 
-                <div class="studio__body">
+                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
                     @if (_selectedCommand is { } command)
                     {
                         <section @key="command"
@@ -211,7 +211,7 @@
                                     }
                                     @if (!command.AllowEveryone)
                                     {
-                                        <div class="studio-span-12 studio-chips">
+                                        <div class="studio-span-12 studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                             <StudioChip Id="@CommandModeratorAccessId(command)"
                                                         Label="Moderators"
                                                         Pressed="command.AllowModerators"
@@ -241,7 +241,7 @@
                                                    @bind-Value="command.AllowedUserLoginDraft"
                                                    Placeholder="viewer_name" />
                                         </div>
-                                        <div class="studio-span-6 studio-align-end">
+                                        <div class="studio-span-6 studio-align-end content-end">
                                             <button class="btn-secondary"
                                                     type="button"
                                                     data-action="add-allowed-user"
@@ -490,7 +490,7 @@
                                                    @bind-Value="command.ResetViewerLogin"
                                                    Placeholder="viewer login" />
                                         </div>
-                                        <div class="studio-span-6 studio-align-end custom-command-reset-boundary flex flex-wrap gap-2">
+                                        <div class="studio-span-6 studio-align-end content-end custom-command-reset-boundary flex flex-wrap gap-2">
                                             <button class="btn-secondary"
                                                     data-action="reset-viewer-use"
                                                     @onclick="() => ResetViewerAsync(command)">Reset viewer</button>

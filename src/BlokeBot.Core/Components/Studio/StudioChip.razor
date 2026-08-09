@@ -2,14 +2,16 @@
 {
     <button id="@Id"
             type="button"
-            class="studio-chip studio-chip--pressable"
+            class="studio-chip studio-chip--pressable inline-flex cursor-pointer items-center gap-[0.4rem] rounded-full border bg-[var(--app-surface-solid)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)] transition-[background-color,border-color] duration-[140ms] ease-[ease] hover:bg-[var(--app-control-hover)] focus-visible:outline-none motion-reduce:duration-[1ms] @(pressed
+                ? "border-[var(--app-focus-border)] shadow-[var(--app-shadow-sm)]"
+                : "border-[var(--app-control-border)] hover:border-[var(--app-control-hover-border)] focus-visible:border-[var(--app-focus-border)] focus-visible:shadow-[var(--app-focus-shadow)]")"
             data-selected="@(pressed ? "true" : "false")"
             aria-pressed="@(pressed ? "true" : "false")"
             @onclick="Toggle">
         <span>@Label</span>
         @if (pressed)
         {
-            <span class="studio-chip__mark" aria-hidden="true">✓</span>
+            <span class="studio-chip__mark font-extrabold text-[var(--app-affirmative)]" aria-hidden="true">✓</span>
             @if (PressedNote is { Length: > 0 } pressedNote)
             {
                 <span class="sr-only">@pressedNote</span>
@@ -17,22 +19,22 @@
         }
         else if (ReleasedNote is { Length: > 0 } releasedNote)
         {
-            <span class="studio-chip__note">@releasedNote</span>
+            <span class="studio-chip__note text-[0.72rem] font-medium text-[var(--app-text-muted)]">@releasedNote</span>
         }
     </button>
 }
 else
 {
-    <span id="@Id" class="studio-chip" @attributes="AdditionalAttributes">
+    <span id="@Id" class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] text-[0.82rem] font-semibold text-[var(--app-text-strong)]" @attributes="AdditionalAttributes">
         <span>@Label</span>
         @if (Note is { Length: > 0 } note)
         {
-            <span class="studio-chip__note">@note</span>
+            <span class="studio-chip__note text-[0.72rem] font-medium text-[var(--app-text-muted)]">@note</span>
         }
         @if (Remove.HasDelegate)
         {
             <button type="button"
-                    class="studio-chip__remove"
+                    class="studio-chip__remove cursor-pointer p-0 font-bold text-[var(--app-text-muted)] hover:text-[#dc2626] focus-visible:rounded-full focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none"
                     data-action="@RemoveAction"
                     aria-label="@RemoveLabel"
                     @onclick="Remove">✕</button>
