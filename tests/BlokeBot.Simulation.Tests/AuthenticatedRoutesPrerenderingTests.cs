@@ -37,6 +37,7 @@ public sealed class AuthenticatedRoutesPrerenderingTests
 
         var authenticatedHtml = await login.Content.ReadAsStringAsync();
         var authenticatedBody = Body(authenticatedHtml);
+        authenticatedHtml.ShouldNotContain("\"prerenderId\"");
         authenticatedBody.ShouldContain("<!--Blazor:{\"type\":\"server\"");
         authenticatedBody.ShouldNotContain("\"prerenderId\"");
         authenticatedBody.ShouldNotContain("app-shell");
