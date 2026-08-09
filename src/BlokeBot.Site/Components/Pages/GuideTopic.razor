@@ -38,6 +38,15 @@
             <p class="eyebrow">@_page.Eyebrow</p>
             <h1>@_page.Title</h1>
             <p class="lede">@_page.Summary</p>
+            @if (_page.Sections.Count > 1)
+            {
+                <nav class="anchor-chips" aria-label="On this page">
+                    @foreach (var section in _page.Sections)
+                    {
+                        <a href="@($"{new Uri(Navigation.Uri).AbsolutePath}#{section.Anchor}")">@section.Heading</a>
+                    }
+                </nav>
+            }
         </header>
 
         @if (_page.Media is not null)
@@ -124,10 +133,10 @@
         {
             <nav class="next-panel" aria-label="Continue through the guide">
                 <h2>Continue</h2>
-                <ul class="link-list">
+                <ul class="next-links">
                     @foreach (var link in _page.Next)
                     {
-                        <li><a class="text-link" href="@link.Href">@link.Label</a></li>
+                        <li><a href="@link.Href">@link.Label</a></li>
                     }
                 </ul>
             </nav>

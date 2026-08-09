@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject SiteProductVersion ProductVersion
+@inject IOptions<BlokeBotSiteOptions> SiteOptions
 
 <a class="skip-link" href="@($"{new Uri(Navigation.Uri).AbsolutePath}#main-content")">Skip to main content</a>
 <header class="site-header">
@@ -16,6 +17,10 @@
                 <a href="install">Install</a>
                 <a href="server-owners">Run a server</a>
             </nav>
+            @if (SiteOptions.Value.LiveAppUri is not null)
+            {
+                <a class="button button-primary button-compact header-cta" href="@SiteOptions.Value.LiveAppUri">Open dashboard</a>
+            }
             <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
                 <SiteIcon Name="sun" Class="theme-toggle__sun" />
                 <SiteIcon Name="moon" Class="theme-toggle__moon" />
@@ -28,10 +33,13 @@
 </main>
 <footer class="site-footer">
     <div class="footer-inner">
-        <div>
-            <p class="footer-title"><strong>BlokeBot</strong> keeps your Twitch channel tools under your control.</p>
-            <p class="footer-meta">Free and open source · Local durable state · Built for channel owners and moderators</p>
-            <p class="footer-meta">Site @ProductVersion.Value</p>
+        <div class="footer-brand">
+            <img class="footer-mark" src="media/blokedroid.svg" alt="" />
+            <div>
+                <p class="footer-title"><strong>BlokeBot</strong> keeps your Twitch channel tools under your control.</p>
+                <p class="footer-meta">Free and open source · Local durable state · Built for channel owners and moderators</p>
+                <p class="footer-meta">Site @ProductVersion.Value</p>
+            </div>
         </div>
         <nav aria-label="Footer navigation">
             <a href="guide"><SiteIcon Name="book" />User guide</a>
@@ -42,3 +50,10 @@
         </nav>
     </div>
 </footer>
+<nav class="site-dock" aria-label="Quick navigation">
+    <img class="site-dock__mark" src="media/blokedroid.svg" alt="" />
+    <a aria-current="@DockCurrent("overview")" href="how-it-works">Overview</a>
+    <a aria-current="@DockCurrent("guide")" href="guide">Guide</a>
+    <a aria-current="@DockCurrent("install")" href="install">Install</a>
+    <a aria-current="@DockCurrent("server")" href="server-owners">Server</a>
+</nav>
