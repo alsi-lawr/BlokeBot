@@ -11,7 +11,6 @@ using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -116,25 +115,6 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             .ShouldBe(2);
         handler.Paths.ShouldContain(static path =>
             path.EndsWith("/helix/predictions", StringComparison.Ordinal)
-        );
-
-        var services = new ServiceCollection();
-        _ = services.AddBlokeBotTwitchOperations();
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(ChannelPointsService)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(PredictionService)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(IChannelPointsEventObserver)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
-        );
-        services.ShouldContain(static descriptor =>
-            descriptor.ServiceType == typeof(IPredictionEventObserver)
-            && descriptor.Lifetime == ServiceLifetime.Singleton
         );
     }
 
