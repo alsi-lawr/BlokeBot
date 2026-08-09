@@ -28,9 +28,9 @@ card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|52|included
 card|src/BlokeBot.Core/Features/HostConfig/Page/HostConfigPage.razor|58|included|channel-setup-cards
 card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|37|included|dashboard-page-cards
 card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|43|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|138|included|moment-candidate-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|164|included|moment-candidate-cards
-card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|170|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|139|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|165|included|moment-candidate-cards
+card|src/BlokeBot.Core/Features/Moments/MomentsPage.razor|171|included|moment-candidate-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|15|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|21|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|27|included|public-moment-page-cards

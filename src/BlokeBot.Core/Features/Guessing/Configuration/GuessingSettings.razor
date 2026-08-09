@@ -140,7 +140,7 @@
                                         <input class="input" placeholder="answer" aria-label="Answer" @bind="option.Name" />
                                     </div>
                                     <div class="studio-span-6">
-                                        <input class="input" placeholder="bot reply (optional — you can use {name} and {login})" aria-label="Bot reply" @bind="option.ReplyText" />
+                                        <input class="input" placeholder="bot reply (optional; you can use {name} and {login})" aria-label="Bot reply" @bind="option.ReplyText" />
                                     </div>
                                     <div class="studio-span-2 studio-align-end content-end">
                                         <button class="btn-secondary" disabled="@_pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>

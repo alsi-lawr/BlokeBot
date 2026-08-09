@@ -68,8 +68,9 @@
                         <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
                         <p class="mt-1 text-xs text-muted-foreground">A short private note only you and your editors see in the recording.</p>
                     </div>
-                    <div class="studio-span-4 studio-align-end content-end">
-                        <button class="btn-primary w-full" @onclick="CreateMarkerAsync">Create marker</button>
+                    <div class="studio-span-4">
+                        <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                        <button class="btn-primary mt-2 w-full max-md:mt-0" @onclick="CreateMarkerAsync">Create marker</button>
                     </div>
                 </div>
             </StudioStage>

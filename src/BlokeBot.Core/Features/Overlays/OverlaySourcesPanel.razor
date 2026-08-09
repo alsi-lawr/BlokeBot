@@ -60,7 +60,7 @@
 
                 <div class="studio__inspector flex min-w-0 flex-col" data-overlay-editor>
                     <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
-                        <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_isCreating ? "New overlay — not saved" : _selected?.Name ?? _draftName)</span>
+                        <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_isCreating ? "New overlay (not saved)" : _selected?.Name ?? _draftName)</span>
                         @if (_isCreating)
                         {
                             <span id="overlay-new-guidance" class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">
@@ -246,7 +246,7 @@
                                     </div>
                                     <div class="mt-4">
                                         <StudioFold Key="overlay-css"
-                                                    Label="Advanced styling — overlay-local CSS"
+                                                    Label="Advanced styling: overlay-local CSS"
                                                     Open="@_cssFoldOpen"
                                                     OpenChanged="@(open => _cssFoldOpen = open)">
                                             <textarea id="appearance-css"
@@ -256,7 +256,7 @@
                                                       spellcheck="false"
                                                       @bind="_appearanceCss" @bind:event="oninput" data-appearance-css></textarea>
                                             <p class="mt-2 text-xs leading-5 text-muted-foreground">
-                                                Available selectors: .overlay, .&#99;ard, .accent, .kicker, .title, .detail, and .result — up to @OverlayAppearance.MaximumCssBytes bytes.
+                                                Available selectors: .overlay, .&#99;ard, .accent, .kicker, .title, .detail, and .result. Up to @OverlayAppearance.MaximumCssBytes bytes.
                                                 Imports, external URLs, markup, scripts, at-rules, and selectors outside this Browser Source are rejected.
                                             </p>
                                         </StudioFold>

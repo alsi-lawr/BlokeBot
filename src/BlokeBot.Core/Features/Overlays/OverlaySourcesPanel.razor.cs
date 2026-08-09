@@ -232,12 +232,12 @@ public partial class OverlaySourcesPanel
     private string WhatItShowsSummary() =>
         _draftType switch
         {
-            OverlayType.Guessing when !_guessingFeatureEnabled => "Paused — Guessing game is off",
+            OverlayType.Guessing when !_guessingFeatureEnabled => "Paused: Guessing game is off",
             OverlayType.Guessing => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{(_draftShowGuessCount ? "Guess count shown" : "Guess count hidden")} · result {_draftResultDurationSeconds} s"
             ),
-            OverlayType.Giveaway when !_pointsFeatureEnabled => "Paused — Points is off",
+            OverlayType.Giveaway when !_pointsFeatureEnabled => "Paused: Points is off",
             OverlayType.Giveaway => _draftGiveawayTitle.Trim() is { Length: > 0 } title
                 ? title
                 : "Points giveaway",
@@ -246,7 +246,7 @@ public partial class OverlaySourcesPanel
                 $"{EventFeedKindSummary()} · up to {_eventFeedCapacity} cards"
             ),
             OverlayType.ViewerQueue when !_playWithViewersFeatureEnabled =>
-                "Paused — Play with viewers is off",
+                "Paused: Play with viewers is off",
             OverlayType.ViewerQueue when _queueOptions.Count == 0 => "Create a queue first",
             OverlayType.ViewerQueue => _queueOptions
                 .FirstOrDefault(queue => queue.Id == _viewerQueueId)

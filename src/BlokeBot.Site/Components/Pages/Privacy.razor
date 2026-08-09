@@ -13,7 +13,7 @@
             : SiteOptions.Value.PrivacyContact!;
 }
 
-<PageTitle>Privacy, Twitch data and browser storage — BlokeBot</PageTitle>
+<PageTitle>Privacy, Twitch data and browser storage | BlokeBot</PageTitle>
 
 <article class="article-shell privacy-page">
     <header class="article-header">
@@ -250,8 +250,8 @@
             </li>
             <li>
                 <strong>Broadcaster permission.</strong> The channel owner grants the channel-level
-                permission that allows the bot to operate in their channel, and — where the channel
-                uses those features — the permissions behind polls, predictions, clips, markers and
+                permission that allows the bot to operate in their channel, and, where the channel
+                uses those features, the permissions behind polls, predictions, clips, markers and
                 Channel Points.
             </li>
         </ul>
@@ -283,7 +283,7 @@
         <h2 id="storage"><span id="storage-heading">Cookies and browser storage</span></h2>
         <p>
             This section is the complete inventory of what BlokeBot's two origins place in your
-            browser. All of it is first-party — set by BlokeBot itself, never by an advertising or
+            browser. All of it is first-party: set by BlokeBot itself, never by an advertising or
             analytics provider. Browser storage is separate from the server-side records described
             above: clearing your browser does not delete server records, and vice versa.
         </p>
@@ -318,28 +318,28 @@
         <p>
             Signing in also sets the framework's antiforgery cookie
             (<code>.AspNetCore.Antiforgery.*</code>), which protects submitted forms against
-            cross-site request forgery — a session-lifetime, HttpOnly, strictly necessary security
-            cookie. The help site sets no cookies at all.
+            cross-site request forgery. It is a session-lifetime, HttpOnly, strictly necessary
+            security cookie. The help site sets no cookies at all.
         </p>
 
         <h3>Saved preferences (localStorage)</h3>
         <dl class="kv-list">
-            <dt>blokebot.theme — both origins</dt>
+            <dt>blokebot.theme (both origins)</dt>
             <dd>
                 "light" or "dark". Remembers your appearance choice; until you choose, both sites
                 follow your system setting. Kept until you clear it or turn preference saving off.
             </dd>
             <dt>blokebot.sidebar.guessing.open, blokebot.sidebar.points.open,
                 blokebot.sidebar.customcommands.open, blokebot.sidebar.automations.open,
-                blokebot.sidebar.nativetwitch.open — dashboard</dt>
+                blokebot.sidebar.nativetwitch.open (dashboard)</dt>
             <dd>
                 "true" or "false". Remember which navigation groups you left open.
             </dd>
-            <dt>blokebot.shell.rail.v1 — dashboard</dt>
+            <dt>blokebot.shell.rail.v1 (dashboard)</dt>
             <dd>
                 Whether you prefer the full navigation rail or the compact icon rail.
             </dd>
-            <dt>blokebot.preferences.disabled — both origins</dt>
+            <dt>blokebot.preferences.disabled (both origins)</dt>
             <dd>
                 Only exists after you turn preference saving off. It is the single flag that honours
                 that choice and is the minimum needed to remember it.
@@ -347,7 +347,7 @@
         </dl>
         <p>
             The preference keys adapt each site's appearance to your choice. UK privacy rules exempt
-            this kind of storage from consent provided you get clear information — this inventory —
+            this kind of storage from consent provided you get clear information (this inventory)
             and a simple, free way to object. That control is right here:
         </p>
 
@@ -382,7 +382,7 @@
 
         <p>
             Because everything above is either strictly necessary security storage or an exempt
-            appearance preference with this objection control, neither site shows a consent banner —
+            appearance preference with this objection control, neither site shows a consent banner:
             there is nothing to consent to. If BlokeBot ever wanted to add storage or third-party
             technology outside these exemptions, it would have to ask first; the codebase carries a
             repository check that fails when unreviewed browser storage appears.
@@ -399,7 +399,7 @@
         <ul class="check-list">
             <li>
                 <strong>Channel removal.</strong> Removing a hosted channel stops its bot, deletes
-                its database records — including its viewers' participation records — and removes its
+                its database records, including its viewers' participation records, and removes its
                 uploaded overlay media directory from disk.
             </li>
             <li>
@@ -438,20 +438,20 @@
             For data attributable to your Twitch identity you can ask to access it, receive an
             export of it, correct it, restrict how it is used, object to how it is used, or have it
             erased. Where anything relies on consent you can withdraw that consent. Send requests to
-            <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a> — this address
+            <a class="text-link" href="mailto:@_privacyContact">@_privacyContact</a>. This address
             is monitored and is the route for every privacy request. There is no charge.
         </p>
         <ul class="check-list">
             <li>
                 <strong>Verification.</strong> To protect the very data you are asking about,
-                requests must be verifiable — most simply by writing from a channel or route that
+                requests must be verifiable, most simply by writing from a channel or route that
                 proves control of the Twitch account concerned, or by responding to a verification
                 whisper or message. Only the minimum correspondence needed to fulfil and evidence
                 the request is kept.
             </li>
             <li>
-                <strong>What erasure does.</strong> Records that exist only about you — guesses,
-                balances, entries, submissions, votes, queue entries, redemptions and the like — are
+                <strong>What erasure does.</strong> Records that exist only about you (guesses,
+                balances, entries, submissions, votes, queue entries, redemptions and the like) are
                 deleted outright. Records that must survive for non-personal integrity, such as the
                 point ledger's arithmetic or moderation audit trails, keep their numbers but lose
                 your Twitch ID, login, display name, submitted text, links and notes, with no lookup
@@ -464,7 +464,7 @@
             </li>
             <li>
                 <strong>Complaints.</strong> If you are unhappy with how a request was handled you
-                can complain to your data protection authority — in the UK, the Information
+                can complain to your data protection authority; in the UK that is the Information
                 Commissioner's Office (ico.org.uk).
             </li>
         </ul>

@@ -26,8 +26,9 @@
                role="alert"
                hidden="@(_channelError is null)">Enter a Twitch channel name.</p>
         </div>
-        <div class="studio-span-4 studio-align-end content-end">
-            <button class="btn-secondary h-10 w-full"
+        <div class="studio-span-4">
+            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+            <button class="btn-secondary mt-2 h-10 w-full max-md:mt-0"
                     type="button"
                     @onclick="OpenLeaderboard">
                 View leaderboard

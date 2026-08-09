@@ -67,7 +67,7 @@ public sealed class OverlayDashboardUiTests
 
         page.WaitForAssertion(() =>
         {
-            page.Markup.ShouldContain("New overlay — not saved");
+            page.Markup.ShouldContain("New overlay (not saved)");
             page.Markup.ShouldContain("Nothing has been saved yet");
             page.FindAll("[data-overlay-editor]").Count.ShouldBe(1);
             var feedback = page.Find("[data-overlay-feedback='success']");

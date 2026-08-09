@@ -871,7 +871,7 @@ internal static class OverlayBrowserSourceAssets
               .filter((field) => field.value.length > 0)
               .map((field) => `${field.label}: ${field.value}`)
               .join(" · ");
-            return fields.length === 0 ? name : `${name} — ${fields}`;
+            return fields.length === 0 ? name : `${name} · ${fields}`;
           };
 
           const renderViewerQueue = (state, appearance) => {

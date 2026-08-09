@@ -172,7 +172,7 @@
                                                 <Field Id="@($"request-priority-{submission.Public.Id}")" Label="Priority (-1000 to 1000)" @bind-Value="draft.Priority" />
                                             </div>
                                             <div class="studio-span-12">
-                                                <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note — shown on the board" @bind-Value="draft.PublicNote" />
+                                                <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note (shown on the board)" @bind-Value="draft.PublicNote" />
                                             </div>
                                             <div class="studio-span-6">
                                                 <TextAreaField Id="@($"request-private-note-{submission.Public.Id}")" Label="Private moderator note" @bind-Value="draft.PrivateNote" />

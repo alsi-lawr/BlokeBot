@@ -316,7 +316,7 @@ public partial class MomentsPage
             ];
 
     private static string MergeTargetLabel(ModeratorMomentView target) =>
-        $"{CandidateTitle(target)} — {target.Public.PublicId} ({CandidateStateLabel(target.Public.State)})";
+        $"{CandidateTitle(target)} · {target.Public.PublicId} ({CandidateStateLabel(target.Public.State)})";
 
     /// <summary>
     /// One adoptable part per viewer suggestion. The same wording suggested twice is one chip.

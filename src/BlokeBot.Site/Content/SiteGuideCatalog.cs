@@ -1699,7 +1699,7 @@ internal static class SiteGuideCatalog
                     [
                         "Stream went live, Stream went offline, New follower and Incoming raid need no approval beyond the channel's bot connection.",
                         "New subscription and Gifted subscriptions need the channel's subscription-reading permission; Cheer needs Bits reading; the three Hype Train events need Hype Train reading. The page names each required approval exactly.",
-                        "Gifted subscriptions, Cheer and Incoming raid each take a minimum — gift count, Bits amount or viewer count — and smaller events start nothing.",
+                        "Gifted subscriptions, Cheer and Incoming raid each take a minimum (gift count, Bits amount or viewer count), and smaller events start nothing.",
                         "Chat notification starts flows from typed Twitch notices such as announcements, resubs, gift upgrades and charity donations. You choose the notification type; ordinary chat messages never start automations.",
                     ],
                 },
@@ -1710,7 +1710,7 @@ internal static class SiteGuideCatalog
                     [
                         "The Channel Points redemption source starts a flow when a viewer redeems a Custom Reward. It needs the channel's redemption permissions and a Twitch Affiliate or Partner channel.",
                         "A reward filter limits the source to one Custom Reward; without it, every redemption starts the flow.",
-                        "The completion policy decides the redemption's status when the flow finishes: keep it manual, fulfil it when the flow succeeds, or cancel it — refunding the viewer — when the flow fails.",
+                        "The completion policy decides the redemption's status when the flow finishes: keep it manual, fulfil it when the flow succeeds, or cancel it, refunding the viewer, when the flow fails.",
                         "Automatic completion applies only to rewards BlokeBot can manage. Redemptions of rewards created elsewhere still start flows, but their status stays untouched.",
                     ],
                     Links =
@@ -1818,7 +1818,7 @@ internal static class SiteGuideCatalog
                     [
                         "A failed action follows its step's failure choice: stop the flow or continue past the failure.",
                         "BlokeBot does not retry an action whose Twitch outcome is uncertain, so a shoutout, poll, clip or chat message is never duplicated to force an answer.",
-                        "The matching feature page shows the Twitch-side result — recent shoutout outcomes, the active poll or Prediction, finished clips and waiting redemptions.",
+                        "The matching feature page shows the Twitch-side result: recent shoutout outcomes, the active poll or Prediction, finished clips and waiting redemptions.",
                         "If an action keeps failing, fix the connection, permission or feature switch it names before running the flow again; Alerts collects problems that need attention.",
                     ],
                     Links = [new SiteLink("Troubleshoot the bot", "troubleshooting")],
@@ -1882,7 +1882,7 @@ internal static class SiteGuideCatalog
                     [
                         "This help site's preference-saving control is on the privacy notice itself.",
                         "The dashboard's control is in its account menu: Stop saving view preferences. Each origin's control governs only that origin's storage.",
-                        "Private data requests — access, export, correction or erasure — go to the privacy contact named on the notice, not to chat or a public board.",
+                        "Private data requests (access, export, correction or erasure) go to the privacy contact named on the notice, not to chat or a public board.",
                     ],
                     Links = [new SiteLink("Read the privacy notice", "privacy")],
                 },

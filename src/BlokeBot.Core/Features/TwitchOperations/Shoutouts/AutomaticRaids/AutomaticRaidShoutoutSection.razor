@@ -64,14 +64,14 @@
                                           disabled="@(!_draft.Enabled)"
                                           Icon="📣"
                                           Title="Native Twitch shoutout"
-                                          Description="Twitch's own shoutout panel. Skipped silently if Twitch's cooldown is still active — never downgraded to chat."
+                                          Description="Twitch's own shoutout panel. Skipped silently if Twitch's cooldown is still active, never downgraded to chat."
                                           Pressed="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Native)"
                                           Select="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Native))" />
                         <StudioChoiceCard data-mechanism="chat"
                                           disabled="@(!_draft.Enabled)"
                                           Icon="💬"
                                           Title="Chat message"
-                                          Description="BlokeBot writes a message you compose — regular, pinned, or as an announcement."
+                                          Description="BlokeBot writes a message you compose: regular, pinned, or as an announcement."
                                           Pressed="@(_draft.Mechanism == AutomaticRaidShoutoutMechanism.Chat)"
                                           Select="@(() => SetMechanism(AutomaticRaidShoutoutMechanism.Chat))" />
                     </StudioChoiceCards>
@@ -111,8 +111,9 @@
                                 <p id="automatic-raid-pin-duration-error" class="mt-1 text-sm font-semibold text-red-700" role="alert">@pinError</p>
                             }
                         </div>
-                        <div class="studio-span-8 studio-align-end content-end">
-                            <div class="flex min-h-10 flex-wrap items-center gap-3">
+                        <div class="studio-span-8">
+                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                            <div class="mt-2 flex min-h-10 flex-wrap items-center gap-3 max-md:mt-0">
                                 <button type="button"
                                         id="automatic-raid-pin-until-end"
                                         class="studio-toggle"
@@ -170,7 +171,7 @@
                             Use the tokens above anywhere in the message. Last game and stream title require a non-empty inline fallback, written as <span class="font-mono">{last_game|fallback}</span>.
                         </p>
                         <p id="automatic-raid-template-budget" class="form-help">
-                            Write up to 150 characters of text and fallbacks — BlokeBot reserves 350 characters for live values, for a 500-character rendered limit. Messages are never silently shortened.
+                            Write up to 150 characters of text and fallbacks. BlokeBot reserves 350 characters for live values, for a 500-character rendered limit. Messages are never silently shortened.
                             @if (_authoredCharacters is { } used)
                             {
                                 <b class="text-[var(--app-text-strong)]">@used/@AutomaticRaidShoutoutTemplate.MaximumAuthoredCharacters used.</b>

@@ -68,8 +68,9 @@
                             </div>
                             <p class="text-xs text-muted-foreground">Captures inside this window join the same moment. @MomentLimits.MinimumMergeWindowSeconds–@MomentLimits.MaximumMergeWindowSeconds seconds.</p>
                         </div>
-                        <div class="studio-span-8 self-end">
-                            <span class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">
+                        <div class="studio-span-8">
+                            <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                            <span class="studio-switch-row mt-2 flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)] max-md:mt-0">
                                 <span id="moment-marker-fallback-label">Use a stream marker when a clip is unavailable</span>
                                 <button id="moment-marker-fallback"
                                         type="button"

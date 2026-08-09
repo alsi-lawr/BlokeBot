@@ -18,8 +18,8 @@ public partial class StudioChoiceCards
     public StudioChoiceCardsColumns Columns { get; set; } = StudioChoiceCardsColumns.Three;
 
     /// <summary>
-    /// Receives the container's element reference during ref capture — before any
-    /// <c>OnAfterRender</c> runs — so a page keeping a control dictionary for validation focus can
+    /// Receives the container's element reference during ref capture, before any
+    /// <c>OnAfterRender</c> runs, so a page keeping a control dictionary for validation focus can
     /// register the group without owning its markup.
     /// </summary>
     [Parameter]
@@ -66,7 +66,7 @@ public enum StudioChoiceCardsColumns
     Two,
 
     /// <summary>
-    /// Two across from <c>md</c>, opening to three from <c>xl</c> — for a three-card group whose
+    /// Two across from <c>md</c>, opening to three from <c>xl</c>, for a three-card group whose
     /// container is too narrow below <c>xl</c> to set three columns of bold prose.
     /// </summary>
     TwoThenThree,

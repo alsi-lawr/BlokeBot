@@ -13,7 +13,7 @@ namespace BlokeBot.Core.Components.Layout;
 /// through <see cref="Select"/> is remembered and the equivalent notification bunit raises is
 /// discarded. The change callback therefore reports only browser-driven fragment movement such as
 /// back and forward. Location notifications reach this type on the caller's thread, so the
-/// dispatcher supplied at construction — a component's <c>InvokeAsync</c> — marshals the reaction.
+/// dispatcher supplied at construction (a component's <c>InvokeAsync</c>) marshals the reaction.
 /// </remarks>
 public sealed class DashboardFragmentOwner : IDisposable
 {

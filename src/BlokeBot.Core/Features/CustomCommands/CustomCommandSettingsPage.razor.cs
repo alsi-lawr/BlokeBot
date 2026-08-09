@@ -68,7 +68,7 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Counter,
             "🔢",
             "Update a counter",
-            "Count things — deaths, wins, hugs — and say the total."
+            "Count things (deaths, wins, hugs) and say the total."
         ),
     ];
 

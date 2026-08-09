@@ -4,7 +4,7 @@ namespace BlokeBot.Core.Components.Studio;
 
 /// <summary>
 /// One selectable entry in a <see cref="StudioRail"/>. <c>Search</c> defaults to the label, so
-/// entries whose searchable text is wider than their label — command aliases, for example — supply
+/// entries whose searchable text is wider than their label (command aliases, for example) supply
 /// it explicitly.
 /// </summary>
 public sealed record StudioRailItem

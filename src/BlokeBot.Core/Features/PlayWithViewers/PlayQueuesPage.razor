@@ -134,7 +134,7 @@
                                                 @onclick="DeliverLobbyAsync">Whisper party</button>
                                     </div>
                                     <div class="studio-span-12">
-                                        <p class="text-xs text-muted-foreground">Sent as private Twitch whispers to the selected party only — never posted in chat. You are told exactly who could not be reached.</p>
+                                        <p class="text-xs text-muted-foreground">Sent as private Twitch whispers to the selected party only, never posted in chat. You are told exactly who could not be reached.</p>
                                     </div>
                                 </div>
                             </article>
@@ -224,7 +224,7 @@
                                 </div>
                                 <div class="studio-span-12">
                                     <StudioChatPreview Lines="ChatPreviewLines()" />
-                                    <p class="mt-1 text-xs text-muted-foreground">There is also a sign-in viewer page at <span class="font-mono">@_viewerPagePath</span> with a join form, live waiting list and current party — plus <span class="font-mono">!queue</span>, <span class="font-mono">!leave</span> and <span class="font-mono">!ready</span> in chat.</p>
+                                    <p class="mt-1 text-xs text-muted-foreground">There is also a sign-in viewer page at <span class="font-mono">@_viewerPagePath</span> with a join form, live waiting list and current party, plus <span class="font-mono">!queue</span>, <span class="font-mono">!leave</span> and <span class="font-mono">!ready</span> in chat.</p>
                                 </div>
                             </div>
                         </StudioStage>
@@ -293,7 +293,7 @@
                                      OpenChanged="@(open => SetStage(PlayQueueStage.Questions, open))">
                             <p id="queue-field-limit" class="mb-3 text-xs text-muted-foreground">
                                 Every answer is optional and appears on the viewer page and Viewer Queue overlay.
-                                <b>@_draft.Fields.Count of @PlayQueueLimits.MaximumFields</b> questions used — remove them all and viewers just join with their name.
+                                <b>@_draft.Fields.Count of @PlayQueueLimits.MaximumFields</b> questions used. Remove them all and viewers just join with their name.
                                 @if (_draft.Fields.Count >= PlayQueueLimits.MaximumFields)
                                 {
                                     <span>Maximum of @PlayQueueLimits.MaximumFields questions reached.</span>
@@ -374,7 +374,7 @@
                                 <p class="mb-2 text-[0.72rem] font-bold tracking-[0.07em] uppercase text-[var(--app-text-muted)]">The viewer join form</p>
                                 @if (_draft.Fields.Count == 0)
                                 {
-                                    <p class="text-sm text-muted-foreground">No questions — viewers just join with their name.</p>
+                                    <p class="text-sm text-muted-foreground">No questions. Viewers just join with their name.</p>
                                 }
                                 else
                                 {

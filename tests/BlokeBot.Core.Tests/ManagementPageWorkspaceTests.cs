@@ -29,7 +29,7 @@ public sealed class ManagementPageWorkspaceTests
 
         page.WaitForAssertion(() =>
         {
-            page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
+            page.Find("#request-board-configuration").TextContent.ShouldBe("New board (not saved)");
             page.Find("[role='status']").TextContent.ShouldContain("Save board to create it");
             FindButton(page, "+ New board").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/requests/streamer/']").ShouldBeEmpty();
@@ -86,7 +86,7 @@ public sealed class ManagementPageWorkspaceTests
         FindButton(page, "+ New board").Click();
         page.WaitForAssertion(() =>
         {
-            page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
+            page.Find("#request-board-configuration").TextContent.ShouldBe("New board (not saved)");
             FindButton(page, "+ New board").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/requests/streamer/']").ShouldBeEmpty();
         });
@@ -97,7 +97,7 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("[role='alert']").TextContent.ShouldContain("must contain valid numbers");
             page.Find("#request-board-name").GetAttribute("value").ShouldBe("Unsaved board");
-            page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
+            page.Find("#request-board-configuration").TextContent.ShouldBe("New board (not saved)");
         });
 
         page.Find("#request-board-submission-limit").Input("3");
@@ -106,7 +106,7 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("[role='alert']").TextContent.ShouldNotBeNullOrWhiteSpace();
             page.Find("#request-board-name").GetAttribute("value").ShouldBe("Unsaved board");
-            page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
+            page.Find("#request-board-configuration").TextContent.ShouldBe("New board (not saved)");
         });
         (await CountAsync(database, board: true)).ShouldBe(1);
         page.FindAll("aside button")
@@ -138,7 +138,7 @@ public sealed class ManagementPageWorkspaceTests
 
         page.WaitForAssertion(() =>
         {
-            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
+            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue (not saved)");
             page.Find("[role='status']").TextContent.ShouldContain("Save queue to create it");
             FindButton(page, "+ New queue").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/queues/streamer/']").ShouldBeEmpty();
@@ -165,7 +165,7 @@ public sealed class ManagementPageWorkspaceTests
             FindButton(page, "Remove question").Click();
         }
         page.FindAll("[data-selected-field-editor]").ShouldBeEmpty();
-        page.Markup.ShouldContain("No questions — viewers just join with their name");
+        page.Markup.ShouldContain("No questions. Viewers just join with their name");
 
         page.Find("#queue-slug").Input("community");
         page.Find("#queue-name").Input("Community games");
@@ -189,7 +189,7 @@ public sealed class ManagementPageWorkspaceTests
         FindButton(page, "+ New queue").Click();
         page.WaitForAssertion(() =>
         {
-            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
+            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue (not saved)");
             FindButton(page, "+ New queue").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/queues/streamer/']").ShouldBeEmpty();
         });
@@ -203,7 +203,7 @@ public sealed class ManagementPageWorkspaceTests
                     "Enter whole numbers for party size, ready-check time, history, no-show wait, and party role targets."
                 );
             page.Find("#queue-name").GetAttribute("value").ShouldBe("Unsaved queue");
-            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
+            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue (not saved)");
         });
 
         page.Find("#queue-capacity").Input("4");
@@ -212,7 +212,7 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("[role='alert']").TextContent.ShouldNotBeNullOrWhiteSpace();
             page.Find("#queue-name").GetAttribute("value").ShouldBe("Unsaved queue");
-            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
+            page.Find("#queue-config-heading").TextContent.ShouldBe("New queue (not saved)");
         });
         (await CountAsync(database, board: false)).ShouldBe(1);
         page.FindAll("aside button")

@@ -128,7 +128,7 @@ public partial class RequestBoardsPage
         ) ?? 0;
 
     private string _headerTitle =>
-        _isCreating ? "New board — not saved"
+        _isCreating ? "New board (not saved)"
         : string.IsNullOrWhiteSpace(_draft.Title) ? _draft.Slug
         : _draft.Title;
 

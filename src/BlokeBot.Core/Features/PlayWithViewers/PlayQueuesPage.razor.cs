@@ -112,7 +112,7 @@ public partial class PlayQueuesPage
         ];
 
     private string _headerTitle =>
-        _isCreating ? "New queue — not saved"
+        _isCreating ? "New queue (not saved)"
         : string.IsNullOrWhiteSpace(_draft.Name) ? _draft.Slug
         : _draft.Name;
 
