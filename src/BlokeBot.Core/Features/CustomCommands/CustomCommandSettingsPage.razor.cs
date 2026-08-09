@@ -31,6 +31,12 @@ public partial class CustomCommandSettingsPage
 
     private sealed record CustomCommandEditorSelection(CustomCommandEditorKind Kind, int Id);
 
+    private static readonly IReadOnlyList<SegmentedTabItem> _settingsTabs =
+    [
+        new("commands", "Commands"),
+        new("message-library", "Message Library"),
+    ];
+
     private sealed record ActionChoice(
         CustomCommandActionKind Kind,
         string Icon,
@@ -370,8 +376,11 @@ public partial class CustomCommandSettingsPage
         }
 
         _activeTab = tab;
+        EnsureEditorSelection();
         _fragment.Select(KeyForTab(tab));
     }
+
+    private void HandleTabKeyChanged(string key) => SwitchTab(TabForKey(key));
 
     private void SelectValidationEditor(CustomCommandConfigurationValidationTarget target)
     {
@@ -511,64 +520,10 @@ public partial class CustomCommandSettingsPage
             : null;
 
     private IReadOnlyList<StudioRailGroup> _railGroups =>
-        _config is null
-            ? []
-            :
+        _config is null ? []
+        : _activeTab == CustomCommandSettingsTab.MessageLibrary
+            ?
             [
-                new(
-                    "Commands",
-                    [
-                        .. _config.Commands.Select(command =>
-                            RailItem(
-                                CustomCommandEditorKind.Command,
-                                command.Id,
-                                CommandInvocation(command),
-                                CommandNameFieldId(command),
-                                command.Enabled
-                            ) with
-                            {
-                                Monospace = true,
-                                Search = $"{command.Name} {command.Aliases}",
-                            }
-                        ),
-                    ],
-                    "No custom commands yet."
-                ),
-                new(
-                    "Counters",
-                    [
-                        .. _config.Counters.Select(counter =>
-                            RailItem(
-                                CustomCommandEditorKind.Counter,
-                                counter.Id,
-                                counter.Name,
-                                CounterNameFieldId(counter),
-                                on: true
-                            ) with
-                            {
-                                Meta = counter.Value.ToString(CultureInfo.CurrentCulture),
-                            }
-                        ),
-                    ],
-                    "No counters yet.",
-                    RailAdd("counter", AddCounter)
-                ),
-                new(
-                    "Announcements",
-                    [
-                        .. _config.Announcements.Select(announcement =>
-                            RailItem(
-                                CustomCommandEditorKind.ScheduledMessage,
-                                announcement.Id,
-                                announcement.Name,
-                                AnnouncementNameFieldId(announcement),
-                                announcement.Enabled
-                            )
-                        ),
-                    ],
-                    "No scheduled messages yet.",
-                    RailAdd("scheduled message", AddAnnouncement, _config.MessageEntries.Count == 0)
-                ),
                 new(
                     "Replies",
                     [
@@ -582,10 +537,66 @@ public partial class CustomCommandSettingsPage
                             )
                         ),
                     ],
-                    "No replies yet.",
-                    RailAdd("reply", AddMessageEntry)
+                    "No replies yet."
                 ),
-            ];
+            ]
+        :
+        [
+            new(
+                "Commands",
+                [
+                    .. _config.Commands.Select(command =>
+                        RailItem(
+                            CustomCommandEditorKind.Command,
+                            command.Id,
+                            CommandInvocation(command),
+                            CommandNameFieldId(command),
+                            command.Enabled
+                        ) with
+                        {
+                            Monospace = true,
+                            Search = $"{command.Name} {command.Aliases}",
+                        }
+                    ),
+                ],
+                "No custom commands yet."
+            ),
+            new(
+                "Counters",
+                [
+                    .. _config.Counters.Select(counter =>
+                        RailItem(
+                            CustomCommandEditorKind.Counter,
+                            counter.Id,
+                            counter.Name,
+                            CounterNameFieldId(counter),
+                            on: true
+                        ) with
+                        {
+                            Meta = counter.Value.ToString(CultureInfo.CurrentCulture),
+                        }
+                    ),
+                ],
+                "No counters yet.",
+                RailAdd("counter", AddCounter)
+            ),
+            new(
+                "Announcements",
+                [
+                    .. _config.Announcements.Select(announcement =>
+                        RailItem(
+                            CustomCommandEditorKind.ScheduledMessage,
+                            announcement.Id,
+                            announcement.Name,
+                            AnnouncementNameFieldId(announcement),
+                            announcement.Enabled
+                        )
+                    ),
+                ],
+                "No scheduled messages yet.",
+                RailAdd("scheduled message", AddAnnouncement, _config.MessageEntries.Count == 0)
+            ),
+        ];
 
     private StudioRailAdd RailAdd(string noun, Action add, bool disabled = false) =>
         new(

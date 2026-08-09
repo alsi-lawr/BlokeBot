@@ -6,6 +6,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -14,6 +15,23 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class CustomCommandSettingsUiTests
 {
+    [Test]
+    public async Task MessageLibraryTab_Selecting_OpensSavedRepliesAndUpdatesTheFragment()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find("#custom-command-message-library-tab").Click();
+
+        cut.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
+        _ = cut.Find("[data-selected-editor='reply']").ShouldNotBeNull();
+        context
+            .Services.GetRequiredService<NavigationManager>()
+            .Uri.ShouldEndWith("#message-library");
+    }
+
     [Test]
     public async Task InitialLoadFailure_ShowsDurableRetryAndRecovers()
     {
@@ -89,7 +107,9 @@ public sealed class CustomCommandSettingsUiTests
 
         cut.Find("[data-allowed-user-id='selected-id']").TextContent.ShouldContain("@viewer");
         login.GetAttribute("value").ShouldBe(string.Empty);
+        SelectTab(cut, "message-library");
         cut.Find("button[data-action='edit-reply']").Click();
+        SelectTab(cut, "commands");
         cut.Find("button[data-action='edit-command']").Click();
         cut.Find("[data-allowed-user-id='selected-id']").TextContent.ShouldContain("Viewer");
 
@@ -285,8 +305,10 @@ public sealed class CustomCommandSettingsUiTests
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<CustomCommandSettingsPage>();
+        SelectTab(cut, "message-library");
         cut.Find("button[data-action='edit-reply']").Click();
         cut.Find("textarea").Input(string.Empty);
+        SelectTab(cut, "commands");
         cut.Find("button[data-action='edit-scheduled-message']").Click();
         foreach (
             var contentId in new[]
@@ -317,6 +339,7 @@ public sealed class CustomCommandSettingsUiTests
         var invalidMessage = cut.Find("textarea");
         invalidMessage.GetAttribute("aria-invalid").ShouldBe("true");
         _ = invalidMessage.GetAttribute("aria-describedby").ShouldNotBeNull();
+        SelectTab(cut, "commands");
         cut.Find("button[data-action='edit-scheduled-message']").Click();
         cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
         var invalidRetry = cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay");
@@ -332,6 +355,7 @@ public sealed class CustomCommandSettingsUiTests
             );
         }
 
+        SelectTab(cut, "message-library");
         cut.Find("button[data-action='edit-reply']").Click();
         cut.Find("textarea").Input("Corrected reply");
         cut.Find("button[aria-label='Save custom commands']").Click();
@@ -494,6 +518,7 @@ public sealed class CustomCommandSettingsUiTests
         cut.FindAll(".studio-rail__item[aria-current='true']").Count.ShouldBe(1);
         cut.Find(".studio-rail").NextElementSibling?.ClassList.ShouldContain("studio__inspector");
 
+        SelectTab(cut, "message-library");
         cut.Find("button[data-action='edit-reply']").Click();
 
         cut.FindAll("[data-selected-editor]").Count.ShouldBe(1);
@@ -697,13 +722,18 @@ public sealed class CustomCommandSettingsUiTests
         SeededConfiguration seeded
     )
     {
+        SelectTab(page, "message-library");
         page.Find("button[data-action='edit-reply']").Click();
         var controlId = $"message-entry-{seeded.MessageEntryId}-name";
         page.Find($"#{controlId}").Input(string.Empty);
+        SelectTab(page, "commands");
         page.Find("button[data-action='edit-counter']").Click();
         page.FindAll($"#{controlId}").ShouldBeEmpty();
         return new("[data-selected-editor='reply']", controlId);
     }
+
+    private static void SelectTab(IRenderedComponent<CustomCommandSettingsPage> page, string key) =>
+        page.Find($"#custom-command-{key}-tab").Click();
 
     private static ValidationSectionExpectation InvalidateCommand(
         IRenderedComponent<CustomCommandSettingsPage> page,

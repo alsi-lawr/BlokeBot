@@ -88,12 +88,30 @@
             </ApplicationCardCollection>
         }
 
-        <section class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]" data-active-fragment="@KeyForTab(_activeTab)" aria-label="Custom command studio">
-            <StudioRail AriaLabel="Commands, counters, announcements, and replies"
+        <SegmentedTabs Id="custom-command"
+                       AriaLabel="Custom command settings"
+                       Items="_settingsTabs"
+                       ActiveKey="@KeyForTab(_activeTab)"
+                       ActiveKeyChanged="HandleTabKeyChanged" />
+
+        <section id="@SegmentedTabs.PanelId("custom-command", KeyForTab(_activeTab))"
+                 class="studio grid grid-cols-[minmax(15rem,17rem)_minmax(0,1fr)] rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-[var(--app-shadow-surface)] max-lg:grid-cols-[minmax(0,1fr)]"
+                 data-active-fragment="@KeyForTab(_activeTab)"
+                 aria-label="Custom command studio"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId("custom-command", KeyForTab(_activeTab))"
+                 tabindex="0">
+            <StudioRail AriaLabel="@(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "Saved replies" : "Commands, counters, and announcements")"
                         SearchPlaceholder="Search"
                         Groups="@_railGroups">
                 <Footer>
-                    @if (_config.MessageEntries.Count == 0)
+                    @if (_activeTab == CustomCommandSettingsTab.MessageLibrary)
+                    {
+                        <button class="btn-primary w-full"
+                                data-action="add-reply"
+                                @onclick="AddMessageEntry">+ New reply</button>
+                    }
+                    else if (_config.MessageEntries.Count == 0)
                     {
                         <button class="btn-primary w-full"
                                 data-action="create-reply"

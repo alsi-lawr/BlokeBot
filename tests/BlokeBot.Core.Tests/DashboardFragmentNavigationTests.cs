@@ -213,7 +213,7 @@ public sealed class DashboardFragmentNavigationTests
         page.WaitForAssertion(() =>
         {
             page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
-            page.Find("[data-empty-inspector]").TextContent.Trim().ShouldBe("No replies yet.");
+            page.FindAll("[data-selected-editor]").ShouldBeEmpty();
         });
     }
 
@@ -235,14 +235,14 @@ public sealed class DashboardFragmentNavigationTests
             page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("commands");
         });
 
-        page.Find("button[data-action='add-reply']").Click();
+        page.Find("#custom-command-message-library-tab").Click();
 
         page.WaitForAssertion(() =>
         {
             navigation.Uri.ShouldEndWith("/custom-commands/settings#message-library");
             navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
             page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("message-library");
-            _ = page.Find("[data-selected-editor='reply']").ShouldNotBeNull();
+            page.FindAll("[data-selected-editor]").ShouldBeEmpty();
         });
 
         navigation.NavigateTo("/custom-commands/settings#commands");
