@@ -225,11 +225,11 @@
     <link rel="stylesheet" href="@Assets[$"{Environment.ApplicationName}.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/svg+xml" href="blokebot-mark.svg" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="_renderMode" />
 </head>
 
 <body>
-    <Routes @rendermode="_routesRenderMode" />
+    <Routes @rendermode="_renderMode" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>
@@ -254,7 +254,7 @@
 </html>
 
 @code {
-    private IComponentRenderMode _routesRenderMode =>
+    private IComponentRenderMode _renderMode =>
         HttpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true
             ? new InteractiveServerRenderMode(prerender: false)
             : InteractiveServer;
