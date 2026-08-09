@@ -1,6 +1,6 @@
 @typeparam TValue
 
-<div class="studio-segmented flex-wrap" role="group" aria-label="@AriaLabel">
+<div class="studio-segmented@(Wrap ? " flex-wrap" : null)" role="group" aria-label="@AriaLabel">
     @foreach (var option in Options)
     {
         <button @key="option.Value"

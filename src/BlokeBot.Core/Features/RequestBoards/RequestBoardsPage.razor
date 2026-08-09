@@ -288,7 +288,8 @@
                                                                      AriaLabel="Kind of answer"
                                                                      Options="_fieldKindOptions"
                                                                      Value="field.Kind"
-                                                                     ValueChanged="@(kind => field.Kind = kind)" />
+                                                                     ValueChanged="@(kind => field.Kind = kind)"
+                                                                     Wrap />
                                             </div>
                                             @if (field.Kind == RequestBoardFieldKind.Choice)
                                             {

@@ -41,6 +41,14 @@ public partial class StudioSegmentedPill<TValue>
     [Parameter]
     public string? DisabledDescriptionId { get; set; }
 
+    /// <summary>
+    /// Lets options break onto further rows instead of overflowing the pill. Off by default:
+    /// single-row consumers rely on text wrapping inside each option, which wrapping the row
+    /// would reshape.
+    /// </summary>
+    [Parameter]
+    public bool Wrap { get; set; }
+
     private bool IsSelected(StudioSegmentedOption<TValue> option) =>
         EqualityComparer<TValue?>.Default.Equals(option.Value, Value);
 

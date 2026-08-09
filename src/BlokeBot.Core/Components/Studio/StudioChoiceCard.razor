@@ -9,6 +9,6 @@
     {
         <span class="studio-choice-card__icon text-[1.2rem]" aria-hidden="true">@icon</span>
     }
-    <span class="studio-choice-card__title font-bold text-[var(--app-text-strong)] @(Pressed ? "after:text-[var(--app-affirmative)] after:content-['_✓']" : null)">@Title</span>
-    <span class="studio-choice-card__description text-[0.78rem] text-[var(--app-text-muted)]">@Description</span>
+    <span class="studio-choice-card__title max-w-full font-bold break-words text-[var(--app-text-strong)] @(Pressed ? "after:text-[var(--app-affirmative)] after:content-['_✓']" : null)">@Title</span>
+    <span class="studio-choice-card__description max-w-full text-[0.78rem] break-words text-[var(--app-text-muted)]">@Description</span>
 </button>
