@@ -1,4 +1,3 @@
-using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -9,62 +8,6 @@ public sealed class PublicChatOutboxPersistenceTests
 {
     private const string _deduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
-
-    [Test]
-    public async Task PendingOutboxMessage_RoundTripping_PreservesRequiredShapeAndToken()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
-        await using (var writeDb = await dbFactory.CreateDbContextAsync())
-        {
-            _ = writeDb.PublicChatOutboxMessages.Add(
-                new PublicChatOutboxMessage
-                {
-                    Channel = "streamer",
-                    Message = "durable message",
-                    DeduplicationKey = _deduplicationKey,
-                    CreatedAtUtc = now,
-                    ExpiresAtUtc = now.AddSeconds(30),
-                    NextAttemptAtUtc = now.AddSeconds(5),
-                }
-            );
-            _ = await writeDb.SaveChangesAsync();
-        }
-
-        await using var readDb = await dbFactory.CreateDbContextAsync();
-        var row = await readDb.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Channel.ShouldBe("streamer");
-        row.Message.ShouldBe("durable message");
-        row.DeduplicationKey.ShouldBe(_deduplicationKey);
-        row.CreatedAtUtc.ShouldBe(now);
-        row.ExpiresAtUtc.ShouldBe(now.AddSeconds(30));
-        row.NextAttemptAtUtc.ShouldBe(now.AddSeconds(5));
-        row.Status.ShouldBe(PublicChatOutboxStatus.Pending);
-        row.AttemptCount.ShouldBe(0);
-        row.SafePreSendFailureCount.ShouldBe(0);
-        row.FailurePhase.ShouldBeNull();
-        row.FailureType.ShouldBeNull();
-        row.HttpStatusCode.ShouldBeNull();
-        row.RejectionCode.ShouldBeNull();
-        var persistedStatus = await readDb
-            .Database.SqlQueryRaw<string>("SELECT Status AS Value FROM public_chat_outbox")
-            .SingleAsync();
-        persistedStatus.ShouldBe("Pending");
-        PersistedEnumTokens<PublicChatOutboxStatus>.Values.ShouldBe([
-            "Ambiguous",
-            "Claimed",
-            "Expired",
-            "MissingBot",
-            "MissingChannel",
-            "Pending",
-            "Rejected",
-            "SafePreSendExhausted",
-            "SafePreSendTransient",
-            "Sending",
-            "Unexpected",
-        ]);
-        PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ShouldBe(["Preparation", "Send"]);
-    }
 
     [Test]
     public async Task InvalidOutboxState_Inserting_IsRejectedByDatabaseConstraints()

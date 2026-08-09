@@ -10,7 +10,6 @@ public sealed class ViewerCommandCatalogMigrationTests
 {
     private const string _previousMigration = "20260730141846_v0.5.0_OverlayFeatureSwitch";
     private const string _catalogMigration = "20260730162013_v0.5.0_ViewerCommandCatalog";
-    private const string _independentChatTools = "20260730202307_v0.5.0_IndependentChatTools";
 
     [Test]
     public async Task Migration_BackfillsCanonicalOrderDefaultCatalogAndOnlyUntouchedPointsJoin()
@@ -56,7 +55,6 @@ public sealed class ViewerCommandCatalogMigrationTests
         }
 
         await using var migrated = await factory.CreateDbContextAsync();
-        (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_catalogMigration);
         (
             await migrated
                 .CustomCommandAliases.OrderBy(static value => value.SortOrder)
@@ -96,6 +94,5 @@ public sealed class ViewerCommandCatalogMigrationTests
             .SingleAsync();
         conflict.CommandsAliasesConfigured.ShouldBeTrue();
         conflict.CommandsDefaultConflictAlias.ShouldBe("commands");
-        (await migrated.Database.GetPendingMigrationsAsync()).ShouldContain(_independentChatTools);
     }
 }

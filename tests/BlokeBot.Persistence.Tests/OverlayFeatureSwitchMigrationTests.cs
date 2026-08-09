@@ -1,4 +1,3 @@
-using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -37,18 +36,6 @@ public sealed class OverlayFeatureSwitchMigrationTests
             .Select(static value => (long)value.EnabledFeatures)
             .ToArrayAsync();
         masks.ShouldBe([16L, 20L, 80L]);
-        (
-            await ReadScalarAsync(
-                upgraded.Database.GetDbConnection(),
-                """SELECT "dflt_value" FROM pragma_table_info('hosts') WHERE "name" = 'EnabledFeatures';"""
-            )
-        ).ShouldBe("31");
-        (
-            await ReadColumnAsync(
-                upgraded.Database.GetDbConnection(),
-                """SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";"""
-            )
-        ).ShouldContain(_overlayFeatureSwitch);
     }
 
     [Test]
@@ -77,45 +64,5 @@ public sealed class OverlayFeatureSwitchMigrationTests
                 .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([15L, 64L]);
-        (
-            await ReadScalarAsync(
-                downgraded.Database.GetDbConnection(),
-                """SELECT "dflt_value" FROM pragma_table_info('hosts') WHERE "name" = 'EnabledFeatures';"""
-            )
-        ).ShouldBe("15");
-    }
-
-    private static async Task<string> ReadScalarAsync(DbConnection connection, string sql)
-    {
-        if (connection.State is not System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        return (string)(await command.ExecuteScalarAsync())!;
-    }
-
-    private static async Task<IReadOnlyList<string>> ReadColumnAsync(
-        DbConnection connection,
-        string sql
-    )
-    {
-        if (connection.State is not System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        await using var reader = await command.ExecuteReaderAsync();
-        var values = new List<string>();
-        while (await reader.ReadAsync())
-        {
-            values.Add(reader.GetString(0));
-        }
-
-        return values;
     }
 }

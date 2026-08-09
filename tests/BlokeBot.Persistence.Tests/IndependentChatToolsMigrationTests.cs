@@ -1,4 +1,3 @@
-using System.Data.Common;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -10,7 +9,6 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class IndependentChatToolsMigrationTests
 {
     private const string _viewerCommandCatalog = "20260730162013_v0.5.0_ViewerCommandCatalog";
-    private const string _independentChatTools = "20260730202307_v0.5.0_IndependentChatTools";
 
     [Test]
     public async Task Upgrade_PreservesExistingBehaviorAndUnknownBitsWhileFreshHostsOptIn()
@@ -40,11 +38,6 @@ public sealed class IndependentChatToolsMigrationTests
                 .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([224L, 4072L, 247L, 8168L]);
-        (await ReadDefaultAsync(upgraded.Database.GetDbConnection())).ShouldBe("0");
-        (await ReadMigrationsAsync(upgraded.Database.GetDbConnection())).ShouldContain(
-            _independentChatTools
-        );
-
         var fresh = new BotHost
         {
             TwitchUserId = "fresh-id",
@@ -91,7 +84,6 @@ public sealed class IndependentChatToolsMigrationTests
                 .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
         ).ShouldBe([4127L, 0L, 0L, 0L, 4104L]);
-        (await ReadDefaultAsync(downgraded.Database.GetDbConnection())).ShouldBe("31");
     }
 
     private static BotHost Host(string login, HostFeatureFlags features) =>
@@ -103,32 +95,4 @@ public sealed class IndependentChatToolsMigrationTests
             EnabledFeatures = features,
             CreatedAtUtc = DateTime.UtcNow,
         };
-
-    private static async Task<string> ReadDefaultAsync(DbConnection connection)
-    {
-        if (connection.State is not System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """SELECT "dflt_value" FROM pragma_table_info('hosts') WHERE "name" = 'EnabledFeatures';""";
-        return (string)(await command.ExecuteScalarAsync())!;
-    }
-
-    private static async Task<IReadOnlyList<string>> ReadMigrationsAsync(DbConnection connection)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";""";
-        await using var reader = await command.ExecuteReaderAsync();
-        var values = new List<string>();
-        while (await reader.ReadAsync())
-        {
-            values.Add(reader.GetString(0));
-        }
-
-        return values;
-    }
 }

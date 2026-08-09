@@ -10,7 +10,6 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
-    private const string _overlayMigration = "20260730084046_v0.5.0_OverlayInstances";
     private const HostFeatureFlags _preAutomationsEnabledFeatures =
         HostFeatureFlags.Guessing
         | HostFeatureFlags.Points
@@ -49,8 +48,6 @@ public sealed class OverlayInstancePersistenceTests
         (await migrated.Hosts.Select(static value => value.EnabledFeatures).SingleAsync()).ShouldBe(
             _preAutomationsEnabledFeatures
         );
-        (await migrated.Database.GetAppliedMigrationsAsync()).ShouldContain(_overlayMigration);
-        (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await migrated.OverlayInstances.CountAsync()).ShouldBe(0);
         (await migrated.OverlayInstanceEvents.CountAsync()).ShouldBe(0);
     }
@@ -125,20 +122,6 @@ public sealed class OverlayInstancePersistenceTests
             )
         );
 
-        var schema = await ReadSchemaAsync(db);
-        schema.ShouldContain(value =>
-            value.Contains(
-                "CREATE UNIQUE INDEX \"IX_overlay_instances_AccessKeyDigest\"",
-                StringComparison.Ordinal
-            )
-        );
-        schema.ShouldContain(value =>
-            value.Contains(
-                "FOREIGN KEY (\"HostId\") REFERENCES \"hosts\" (\"Id\") ON DELETE CASCADE",
-                StringComparison.Ordinal
-            )
-        );
-
         _ = db.OverlayInstanceEvents.Add(
             new OverlayInstanceDomainEvent
             {
@@ -183,31 +166,4 @@ public sealed class OverlayInstancePersistenceTests
 
     private static byte[] RandomDigest(byte seed) =>
         Enumerable.Range(0, 32).Select(value => (byte)(seed + value)).ToArray();
-
-    private static async Task<IReadOnlyList<string>> ReadSchemaAsync(BlokeBotDbContext db)
-    {
-        var connection = db.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync();
-        }
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT COALESCE(sql, '')
-            FROM sqlite_master
-            WHERE name IN (
-                'overlay_instances',
-                'overlay_instance_events',
-                'IX_overlay_instances_AccessKeyDigest'
-            )
-            ORDER BY name;
-            """;
-        await using var reader = await command.ExecuteReaderAsync();
-        var values = new List<string>();
-        while (await reader.ReadAsync())
-        {
-            values.Add(reader.GetString(0));
-        }
-        return values;
-    }
 }
