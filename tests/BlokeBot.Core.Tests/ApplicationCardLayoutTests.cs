@@ -9,7 +9,7 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class ApplicationCardLayoutTests
 {
-    private const int _baselineCardAuthoringSiteCount = 89;
+    private const int _baselineCardAuthoringSiteCount = 87;
     private const int _baselineDisclosureAuthoringSiteCount = 26;
 
     private static readonly Regex _cardClassToken = new(

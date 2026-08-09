@@ -140,32 +140,32 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
             page.Find("[role='status']").TextContent.ShouldContain("Save queue to create it");
-            FindButton(page, "New queue").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ New queue").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/queues/streamer/']").ShouldBeEmpty();
-            page.FindAll(".management-field-inventory-row").Count.ShouldBe(4);
+            page.FindAll("[data-question-row]").Count.ShouldBe(4);
             page.FindAll("[data-selected-field-editor]").Count.ShouldBe(1);
         });
-        AssertEditorAssociation(page);
+        AssertQuestionEditorAssociation(page);
         (await CountAsync(database, board: false)).ShouldBe(0);
 
-        FindButton(page, "Add field").Click();
+        FindButton(page, "+ Add question").Click();
         page.WaitForAssertion(() =>
         {
-            page.FindAll(".management-field-inventory-row").Count.ShouldBe(5);
+            page.FindAll("[data-question-row]").Count.ShouldBe(5);
             page.FindAll("[data-selected-field-editor]").Count.ShouldBe(1);
         });
-        AssertEditorAssociation(page);
+        AssertQuestionEditorAssociation(page);
         page.Find("[data-selected-field-editor] input[id^='queue-field-key-']").Input("language");
         context.JSInterop.Invocations.ShouldContain(invocation =>
             invocation.Identifier == "Blazor._internal.domWrapper.focus"
         );
 
-        while (page.FindAll(".management-field-inventory-row").Count > 0)
+        while (page.FindAll("[data-question-row]").Count > 0)
         {
-            FindButton(page, "Remove field").Click();
+            FindButton(page, "Remove question").Click();
         }
         page.FindAll("[data-selected-field-editor]").ShouldBeEmpty();
-        page.Markup.ShouldContain("join without additional details");
+        page.Markup.ShouldContain("No questions — viewers just join with their name");
 
         page.Find("#queue-slug").Input("community");
         page.Find("#queue-name").Input("Community games");
@@ -174,7 +174,7 @@ public sealed class ManagementPageWorkspaceTests
         page.WaitForAssertion(() =>
         {
             page.Find("[role='status']").TextContent.ShouldContain("Queue created.");
-            page.Find("#queue-config-heading").TextContent.ShouldBe("Edit queue");
+            page.Find("#queue-config-heading").TextContent.ShouldBe("Community games");
             _ = page.Find("a[href='/queues/streamer/community']").ShouldNotBeNull();
             page.FindAll("[data-selected-field-editor]").ShouldBeEmpty();
         });
@@ -186,11 +186,11 @@ public sealed class ManagementPageWorkspaceTests
             page.Find("[role='status']").TextContent.ShouldContain("Queue saved.")
         );
 
-        FindButton(page, "New queue").Click();
+        FindButton(page, "+ New queue").Click();
         page.WaitForAssertion(() =>
         {
             page.Find("#queue-config-heading").TextContent.ShouldBe("New queue — not saved");
-            FindButton(page, "New queue").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ New queue").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/queues/streamer/']").ShouldBeEmpty();
         });
         page.Find("#queue-name").Input("Unsaved queue");
@@ -220,8 +220,8 @@ public sealed class ManagementPageWorkspaceTests
             .Click();
         page.WaitForAssertion(() =>
         {
-            page.Find("#queue-config-heading").TextContent.ShouldBe("Edit queue");
-            FindButton(page, "New queue").HasAttribute("disabled").ShouldBeFalse();
+            page.Find("#queue-config-heading").TextContent.ShouldBe("Updated community games");
+            FindButton(page, "+ New queue").HasAttribute("disabled").ShouldBeFalse();
             page.Find("#queue-name").GetAttribute("value").ShouldBe("Updated community games");
         });
     }
@@ -266,17 +266,15 @@ public sealed class ManagementPageWorkspaceTests
                 new NoopPrivateLobbyDelivery()
             );
             var page = queueContext.Render<PlayQueuesPage>();
-            page.WaitForAssertion(() =>
-                page.FindAll(".management-field-inventory-row").Count.ShouldBe(4)
-            );
+            page.WaitForAssertion(() => page.FindAll("[data-question-row]").Count.ShouldBe(4));
             for (var index = 4; index < PlayQueueLimits.MaximumFields; index++)
             {
-                FindButton(page, "Add field").Click();
+                FindButton(page, "+ Add question").Click();
             }
 
-            FindButton(page, "Add field").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ Add question").HasAttribute("disabled").ShouldBeTrue();
             page.Find("#queue-field-limit")
-                .TextContent.ShouldContain("Maximum of 12 fields reached");
+                .TextContent.ShouldContain("Maximum of 12 questions reached");
         }
     }
 
@@ -300,21 +298,6 @@ public sealed class ManagementPageWorkspaceTests
         editor.Id.ShouldNotBeNullOrWhiteSpace();
         row.GetAttribute("aria-current").ShouldBe("true");
         row.GetAttribute("aria-controls").ShouldBe(editor.Id);
-    }
-
-    private static void AssertEditorAssociation<TComponent>(IRenderedComponent<TComponent> page)
-        where TComponent : IComponent
-    {
-        var row = page.Find(".management-field-inventory-row[data-current='true']");
-        var editor = page.Find("[data-selected-field-editor]");
-        var label = row.QuerySelector("p[id]");
-        _ = label.ShouldNotBeNull();
-        editor.GetAttribute("aria-labelledby").ShouldBe(label!.Id);
-        editor.Id.ShouldNotBeNullOrWhiteSpace();
-        var editButton = row.QuerySelector("button");
-        _ = editButton.ShouldNotBeNull();
-        editButton!.GetAttribute("aria-pressed").ShouldBe("true");
-        editButton.GetAttribute("aria-controls").ShouldBe(editor.Id);
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

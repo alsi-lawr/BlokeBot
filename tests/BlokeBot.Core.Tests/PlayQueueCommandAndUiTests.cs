@@ -34,12 +34,14 @@ public sealed class PlayQueueCommandAndUiTests
         page.WaitForAssertion(() =>
         {
             page.Find("#queue-mode")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe(["First to join", "Viewers who played least recently"]);
-            page.Find("label[for='queue-roles']").TextContent.ShouldBe("Party role targets");
-            page.Markup.ShouldContain("support=1, tank=1");
-            page.Markup.ShouldContain("best effort");
+                .QuerySelectorAll(".studio-choice-card__title")
+                .Select(title => title.TextContent)
+                .ShouldBe(["First to join", "Least recently played"]);
+            page.Find("label[for='queue-roles']")
+                .TextContent.Trim()
+                .ShouldStartWith("Party role targets");
+            page.Find("#queue-roles").GetAttribute("placeholder").ShouldBe("+ role");
+            page.Markup.ShouldContain("Best effort");
             page.Markup.ShouldContain("viewer page and Viewer Queue overlay");
         });
 
@@ -102,6 +104,8 @@ public sealed class PlayQueueCommandAndUiTests
 
         var page = context.Render<PlayQueuesPage>();
 
+        page.WaitForAssertion(() => _ = FindButton(page, "Run the queue"));
+        FindButton(page, "Run the queue").Click();
         page.WaitForElement("#queue-lobby-code").Input("join-code");
         FindButton(page, "Whisper party").Click();
 

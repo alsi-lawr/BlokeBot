@@ -36,12 +36,10 @@ card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|21|included|
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|27|included|public-moment-page-cards
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|63|included|public-moment-card-grid
 card|src/BlokeBot.Core/Features/Moments/PublicMomentRecapPage.razor|84|included|public-moment-page-cards
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|30|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|36|included|dashboard-page-cards
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|44|included|play-queue-workspace-columns
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|72|included|play-queue-editor-cards
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|180|included|play-queue-editor-cards
-card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|207|included|play-queue-editor-cards
+card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|27|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|33|included|dashboard-page-cards
+card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|94|included|play-queue-run-cards
+card|src/BlokeBot.Core/Features/PlayWithViewers/PlayQueuesPage.razor|142|included|play-queue-run-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|14|included|public-queue-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|20|included|public-queue-page-cards
 card|src/BlokeBot.Core/Features/PlayWithViewers/PublicPlayQueuePage.razor|26|included|public-queue-page-cards
