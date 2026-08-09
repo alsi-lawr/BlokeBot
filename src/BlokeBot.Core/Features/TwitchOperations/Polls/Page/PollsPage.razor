@@ -98,8 +98,8 @@
                          Number="1"
                          Title="New poll template"
                          Summary="@_editorSummary"
-                         Open="@IsStageOpen(PollStage.Template)"
-                         OpenChanged="@(open => SetStage(PollStage.Template, open))">
+                         Open="@_openStages.IsOpen(PollStage.Template)"
+                         OpenChanged="@(open => _openStages.Set(PollStage.Template, open))">
                 <div class="studio-grid">
                     <div class="studio-span-8">
                         <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Which boss next?" MaxLength="60" />
@@ -196,8 +196,8 @@
                          Number="2"
                          Title="Recent results"
                          Summary="@_resultsSummary"
-                         Open="@IsStageOpen(PollStage.Results)"
-                         OpenChanged="@(open => SetStage(PollStage.Results, open))">
+                         Open="@_openStages.IsOpen(PollStage.Results)"
+                         OpenChanged="@(open => _openStages.Set(PollStage.Results, open))">
                 @if (State.Results.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No poll results yet.</p>

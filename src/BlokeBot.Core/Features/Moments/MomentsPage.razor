@@ -52,8 +52,8 @@
                              Number="1"
                              Title="Capture settings"
                              Summary="@CaptureSummary()"
-                             Open="@IsStageOpen(MomentStage.Capture)"
-                             OpenChanged="@(open => SetStage(MomentStage.Capture, open))">
+                             Open="@_openStages.IsOpen(MomentStage.Capture)"
+                             OpenChanged="@(open => _openStages.Set(MomentStage.Capture, open))">
                     <div class="studio-grid">
                         <div class="studio-span-4 space-y-2">
                             <label class="label" for="moment-window">Merge window</label>
@@ -94,8 +94,8 @@
                              Number="2"
                              Title="Point reward"
                              Summary="@RewardSummary()"
-                             Open="@IsStageOpen(MomentStage.Reward)"
-                             OpenChanged="@(open => SetStage(MomentStage.Reward, open))">
+                             Open="@_openStages.IsOpen(MomentStage.Reward)"
+                             OpenChanged="@(open => _openStages.Set(MomentStage.Reward, open))">
                     <div class="studio-grid">
                         <div class="studio-span-12">
                             <StudioSegmentedPill TValue="MomentRewardPolicy"
@@ -223,8 +223,8 @@
                             <div class="mt-4 grid gap-2">
                                 <StudioFold Key="moment-private"
                                             Label="Private moderator note / rejection reason"
-                                            Open="@IsFoldOpen(MomentFold.PrivateNote)"
-                                            OpenChanged="@(open => SetFold(MomentFold.PrivateNote, open))">
+                                            Open="@_openFolds.IsOpen(MomentFold.PrivateNote)"
+                                            OpenChanged="@(open => _openFolds.Set(MomentFold.PrivateNote, open))">
                                     <textarea id="moment-private"
                                               class="input min-h-20 resize-y"
                                               aria-label="Private moderator note or rejection reason"
@@ -234,8 +234,8 @@
                                 </StudioFold>
                                 <StudioFold Key="moment-merge"
                                             Label="Merge into another moment"
-                                            Open="@IsFoldOpen(MomentFold.Merge)"
-                                            OpenChanged="@(open => SetFold(MomentFold.Merge, open))">
+                                            Open="@_openFolds.IsOpen(MomentFold.Merge)"
+                                            OpenChanged="@(open => _openFolds.Set(MomentFold.Merge, open))">
                                     <div class="studio-grid">
                                         <div class="studio-span-8 space-y-2">
                                             <label class="label" for="moment-merge">Merge target</label>

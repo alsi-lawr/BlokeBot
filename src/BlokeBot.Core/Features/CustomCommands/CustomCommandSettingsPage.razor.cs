@@ -142,7 +142,7 @@ public partial class CustomCommandSettingsPage
     private readonly Dictionary<string, ElementReference> _controls = [];
     private int? _pendingResetAllCommandId;
     private CustomCommandEditorSelection? _selectedEditor;
-    private readonly HashSet<CustomCommandStage> _openStages = [CustomCommandStage.Basics];
+    private readonly StudioOpenSet<CustomCommandStage> _openStages = new(CustomCommandStage.Basics);
     private DashboardFragmentOwner _fragment = null!;
 
     protected override async Task OnInitializedAsync()
@@ -480,16 +480,7 @@ public partial class CustomCommandSettingsPage
             _ => false,
         };
 
-    private void ResetStages()
-    {
-        _openStages.Clear();
-        _ = _openStages.Add(CustomCommandStage.Basics);
-    }
-
-    private bool IsStageOpen(CustomCommandStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(CustomCommandStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
+    private void ResetStages() => _openStages.Reset(CustomCommandStage.Basics);
 
     private long EditorFocusRequestFor(string controlId) =>
         _editorFocusControlId == controlId ? _fieldFocusRequest : 0;
@@ -924,7 +915,7 @@ public partial class CustomCommandSettingsPage
         switch (target)
         {
             case { EntityKind: CustomCommandValidationEntityKind.Command }:
-                _ = _openStages.Add(StageForCommandField(target.FieldKind));
+                _openStages.Open(StageForCommandField(target.FieldKind));
                 break;
             case {
                 EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,

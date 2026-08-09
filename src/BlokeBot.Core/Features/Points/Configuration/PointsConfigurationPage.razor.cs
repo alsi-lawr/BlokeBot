@@ -298,8 +298,8 @@ public partial class PointsConfigurationPage
     ];
 
     private readonly Dictionary<PointsCommandKind, string> _aliasDrafts = [];
-    private readonly HashSet<PointsStage> _openStages = [PointsStage.Label];
-    private readonly HashSet<string> _openReplies = [];
+    private readonly StudioOpenSet<PointsStage> _openStages = new(PointsStage.Label);
+    private readonly StudioOpenSet<string> _openReplies = new();
 
     private PointsConfiguration? _config;
     private bool _featureEnabled;
@@ -368,16 +368,6 @@ public partial class PointsConfigurationPage
         _validationErrors = [];
         _aliasDrafts.Clear();
     }
-
-    private bool IsStageOpen(PointsStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(PointsStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private bool IsReplyOpen(string key) => _openReplies.Contains(key);
-
-    private void SetReplyOpen(string key, bool open) =>
-        _ = open ? _openReplies.Add(key) : _openReplies.Remove(key);
 
     private static string Whole(int value) => value.ToString(CultureInfo.InvariantCulture);
 
@@ -735,7 +725,7 @@ public partial class PointsConfigurationPage
     private void Reveal(PointsStage stage, string focusId)
     {
         _validationFocusId = focusId;
-        _ = _openStages.Add(stage);
+        _openStages.Open(stage);
         if (stage is PointsStage.Gambling)
         {
             _gamblingFocusRequest++;

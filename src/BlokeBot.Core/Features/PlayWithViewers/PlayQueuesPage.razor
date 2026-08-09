@@ -175,8 +175,8 @@
                                                     <StudioFold Key="@($"queue-entry-{entry.EntryId}")"
                                                                 Bare
                                                                 Label="Priority & private note"
-                                                                Open="@_openEntryFolds.Contains(entry.EntryId)"
-                                                                OpenChanged="@(open => SetEntryFold(entry.EntryId, open))">
+                                                                Open="@_openEntryFolds.IsOpen(entry.EntryId)"
+                                                                OpenChanged="@(open => _openEntryFolds.Set(entry.EntryId, open))">
                                                         <div class="studio-grid">
                                                             <div class="studio-span-4">
                                                                 <Field Id="@($"queue-priority-{entry.EntryId}")" Label="Priority (-1000 to 1000)" @bind-Value="entryDraft.Priority" />
@@ -206,8 +206,8 @@
                                      Number="1"
                                      Title="Basics"
                                      Summary="@_basicsSummary"
-                                     Open="@IsStageOpen(PlayQueueStage.Basics)"
-                                     OpenChanged="@(open => SetStage(PlayQueueStage.Basics, open))">
+                                     Open="@_openStages.IsOpen(PlayQueueStage.Basics)"
+                                     OpenChanged="@(open => _openStages.Set(PlayQueueStage.Basics, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="queue-slug"
@@ -233,8 +233,8 @@
                                      Number="2"
                                      Title="Party & fair picks"
                                      Summary="@_partySummary"
-                                     Open="@IsStageOpen(PlayQueueStage.PartyAndFairPicks)"
-                                     OpenChanged="@(open => SetStage(PlayQueueStage.PartyAndFairPicks, open))">
+                                     Open="@_openStages.IsOpen(PlayQueueStage.PartyAndFairPicks)"
+                                     OpenChanged="@(open => _openStages.Set(PlayQueueStage.PartyAndFairPicks, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="queue-capacity" Label="Party size" @bind-Value="_draft.Capacity" />
@@ -289,8 +289,8 @@
                                      Number="3"
                                      Title="What viewers share when joining"
                                      Summary="@_questionsSummary"
-                                     Open="@IsStageOpen(PlayQueueStage.Questions)"
-                                     OpenChanged="@(open => SetStage(PlayQueueStage.Questions, open))">
+                                     Open="@_openStages.IsOpen(PlayQueueStage.Questions)"
+                                     OpenChanged="@(open => _openStages.Set(PlayQueueStage.Questions, open))">
                             <p id="queue-field-limit" class="mb-3 text-xs text-muted-foreground">
                                 Every answer is optional and appears on the viewer page and Viewer Queue overlay.
                                 <b>@_draft.Fields.Count of @PlayQueueLimits.MaximumFields</b> questions used. Remove them all and viewers just join with their name.
@@ -395,8 +395,8 @@
                                      Number="4"
                                      Title="Timing & visibility"
                                      Summary="@_timingSummary"
-                                     Open="@IsStageOpen(PlayQueueStage.TimingAndVisibility)"
-                                     OpenChanged="@(open => SetStage(PlayQueueStage.TimingAndVisibility, open))">
+                                     Open="@_openStages.IsOpen(PlayQueueStage.TimingAndVisibility)"
+                                     OpenChanged="@(open => _openStages.Set(PlayQueueStage.TimingAndVisibility, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="queue-ready-expiry" Label="Time to answer a ready check (seconds)" @bind-Value="_draft.ReadinessTimeout" />

@@ -7,8 +7,8 @@ namespace BlokeBot.Core.Features.Overlays;
 
 public partial class OverlayCuesPanel
 {
-    private readonly HashSet<CueStage> _openStages = [CueStage.Content];
-    private readonly HashSet<CueLayerDraft> _openLayers = [];
+    private readonly StudioOpenSet<CueStage> _openStages = new(CueStage.Content);
+    private readonly StudioOpenSet<CueLayerDraft> _openLayers = new();
     private IReadOnlyList<OverlayCueView> _items = [];
     private IReadOnlyList<OverlayMediaAssetView> _assets = [];
     private OverlayCueAdmissionCatalog _catalog = new([], []);
@@ -73,8 +73,7 @@ public partial class OverlayCuesPanel
         _policy = OverlayCueQueuePolicy.Enqueue;
         _layers = [CueLayerDraft.New(CueLayerKind.WebPage)];
         Feedback = string.Empty;
-        _openLayers.Clear();
-        _ = _openLayers.Add(_layers[0]);
+        _openLayers.Reset(_layers[0]);
     }
 
     private void SelectCue(OverlayCueView cue)
@@ -85,7 +84,7 @@ public partial class OverlayCuesPanel
         _cueEnabled = cue.IsEnabled;
         _policy = cue.QueuePolicy;
         _layers = cue.Configuration.Layers.Select(CueLayerDraft.FromLayer).ToList();
-        _openLayers.Clear();
+        _openLayers.Reset();
     }
 
     private void AddLayer(CueLayerKind kind)
@@ -94,7 +93,7 @@ public partial class OverlayCuesPanel
         {
             var layer = CueLayerDraft.New(kind);
             _layers.Add(layer);
-            _ = _openLayers.Add(layer);
+            _openLayers.Open(layer);
         }
     }
 
@@ -247,14 +246,6 @@ public partial class OverlayCuesPanel
                 EmptyMessage: "No saved cues yet."
             ),
         ];
-
-    private bool IsStageOpen(CueStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(CueStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private void ToggleLayer(CueLayerDraft layer) =>
-        _ = _openLayers.Add(layer) || _openLayers.Remove(layer);
 
     private static string LayerBodyId(int index) => $"cue-layer-body-{index}";
 

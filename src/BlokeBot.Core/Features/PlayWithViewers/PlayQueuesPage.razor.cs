@@ -25,8 +25,8 @@ public partial class PlayQueuesPage
     private bool _operationFailed;
     private bool _featureEnabled;
     private PlayQueuePane _pane = PlayQueuePane.Setup;
-    private readonly HashSet<PlayQueueStage> _openStages = [PlayQueueStage.Basics];
-    private readonly HashSet<long> _openEntryFolds = [];
+    private readonly StudioOpenSet<PlayQueueStage> _openStages = new(PlayQueueStage.Basics);
+    private readonly StudioOpenSet<long> _openEntryFolds = new();
 
     private const string _formPreviewBox =
         "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
@@ -234,14 +234,6 @@ public partial class PlayQueuesPage
     private static void RemoveChoice(FieldDraft field, string choice) =>
         field.Choices = string.Join(", ", FieldChoices(field).Where(value => value != choice));
 
-    private bool IsStageOpen(PlayQueueStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(PlayQueueStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private void SetEntryFold(long entryId, bool open) =>
-        _ = open ? _openEntryFolds.Add(entryId) : _openEntryFolds.Remove(entryId);
-
     private static string KeyOrExample(FieldDraft field) =>
         string.IsNullOrWhiteSpace(field.Key) ? "platform" : field.Key;
 
@@ -358,7 +350,7 @@ public partial class PlayQueuesPage
         _operationFailed = false;
         _feedback = string.Empty;
         _pane = PlayQueuePane.Setup;
-        _openEntryFolds.Clear();
+        _openEntryFolds.Reset();
         SelectFirstField();
         await RefreshPageAsync();
     }
@@ -391,7 +383,7 @@ public partial class PlayQueuesPage
         _entryDrafts.Clear();
         _operationFailed = false;
         _pane = PlayQueuePane.Setup;
-        _openEntryFolds.Clear();
+        _openEntryFolds.Reset();
         SelectFirstField();
         SetCreateGuidance();
         _primaryFocusRequest++;

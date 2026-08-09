@@ -61,8 +61,8 @@
                          Number="1"
                          Title="Place a stream marker"
                          Summary="@_markerSummary"
-                         Open="@IsStageOpen(ClipMarkerStage.Marker)"
-                         OpenChanged="@(open => SetStage(ClipMarkerStage.Marker, open))">
+                         Open="@_openStages.IsOpen(ClipMarkerStage.Marker)"
+                         OpenChanged="@(open => _openStages.Set(ClipMarkerStage.Marker, open))">
                 <div class="studio-grid">
                     <div class="studio-span-8">
                         <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
@@ -79,8 +79,8 @@
                          Number="2"
                          Title="Clips and markers"
                          Summary="@_attemptsSummary"
-                         Open="@IsStageOpen(ClipMarkerStage.Attempts)"
-                         OpenChanged="@(open => SetStage(ClipMarkerStage.Attempts, open))">
+                         Open="@_openStages.IsOpen(ClipMarkerStage.Attempts)"
+                         OpenChanged="@(open => _openStages.Set(ClipMarkerStage.Attempts, open))">
                 @if (State.PendingClips.Count == 0 && State.Results.Count == 0 && State.Markers.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No clip or marker attempts yet.</p>

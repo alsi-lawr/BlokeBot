@@ -2,14 +2,14 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 
 public partial class ChannelPointsPage
 {
-    private readonly HashSet<ChannelPointsStage> _openStages = [];
-    private bool _stagesSeeded;
+    private readonly StudioOpenSet<ChannelPointsStage> _openStages = new();
     private string? _editingRewardId;
     private string _rewardTitle = string.Empty;
     private string _rewardPrompt = string.Empty;
@@ -41,22 +41,13 @@ public partial class ChannelPointsPage
     )
     {
         var state = await _channelPoints.LoadAsync(hostId, cancellationToken);
-        if (!_stagesSeeded && state is not null)
+        if (state is not null)
         {
-            _stagesSeeded = true;
-            if (state.Rewards.Count > 0)
-            {
-                _ = _openStages.Add(ChannelPointsStage.Rewards);
-            }
+            _openStages.SeedOnce(ChannelPointsStage.Rewards, state.Rewards.Count > 0);
         }
 
         return state;
     }
-
-    private bool IsStageOpen(ChannelPointsStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(ChannelPointsStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
 
     private string _editorSummary =>
         _editingRewardId is null
@@ -120,7 +111,7 @@ public partial class ChannelPointsPage
 
     private void EditReward(ChannelPointsRewardView reward)
     {
-        _ = _openStages.Add(ChannelPointsStage.Editor);
+        _openStages.Open(ChannelPointsStage.Editor);
         _editingRewardId = reward.ProviderRewardId;
         _rewardTitle = reward.Title;
         _rewardPrompt = reward.Prompt ?? string.Empty;

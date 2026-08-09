@@ -89,8 +89,8 @@
                      Number="1"
                      Title="@($"#{_state.DisplayName}")"
                      Summary="@_botStatusStageSummary"
-                     Open="@_botStatusStageOpen"
-                     OpenChanged="open => _botStatusStageOpen = open"
+                     Open="@_openStages.IsOpen(HostConfigStage.BotStatus)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.BotStatus, open)"
                      FocusElementId="bot-status"
                      FocusRequest="@_botStatusFragmentRequest">
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -283,8 +283,8 @@
                      Number="2"
                      Title="Startup chat message"
                      Summary="@_startupMessageStageSummary"
-                     Open="@_startupMessageStageOpen"
-                     OpenChanged="open => _startupMessageStageOpen = open">
+                     Open="@_openStages.IsOpen(HostConfigStage.StartupMessage)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.StartupMessage, open)">
             <div class="studio-grid">
                 <div class="studio-span-12 flex flex-wrap items-center gap-3">
                     <button type="button"
@@ -323,8 +323,8 @@
                      Number="3"
                      Title="Commands"
                      Summary="@_commandsStageSummary"
-                     Open="@_commandsStageOpen"
-                     OpenChanged="open => _commandsStageOpen = open">
+                     Open="@_openStages.IsOpen(HostConfigStage.Commands)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.Commands, open)">
             <div class="studio-grid" data-simulation-command-settings>
                 <div class="studio-span-8">
                     <label class="label" for="commands-aliases">Command words</label>
@@ -431,8 +431,8 @@
                      Number="4"
                      Title="Your own bot account"
                      Summary="@_botAccountStageSummary"
-                     Open="@_botAccountStageOpen"
-                     OpenChanged="open => _botAccountStageOpen = open">
+                     Open="@_openStages.IsOpen(HostConfigStage.BotAccount)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.BotAccount, open)">
             <div class="studio-grid">
                 <div class="studio-span-12 flex flex-wrap items-center gap-3">
                     <button type="button"
@@ -503,8 +503,8 @@
                      Number="5"
                      Title="Moderator help"
                      Summary="@_moderatorHelpStageSummary"
-                     Open="@_moderatorHelpStageOpen"
-                     OpenChanged="open => _moderatorHelpStageOpen = open"
+                     Open="@_openStages.IsOpen(HostConfigStage.ModeratorHelp)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.ModeratorHelp, open)"
                      FocusElementId="moderator-help"
                      FocusRequest="@_moderatorHelpFragmentRequest">
             <div class="studio-grid">
@@ -566,8 +566,8 @@
                      Number="6"
                      Title="Chat tools"
                      Summary="@_chatToolsStageSummary"
-                     Open="@_chatToolsStageOpen"
-                     OpenChanged="open => _chatToolsStageOpen = open"
+                     Open="@_openStages.IsOpen(HostConfigStage.ChatTools)"
+                     OpenChanged="open => _openStages.Set(HostConfigStage.ChatTools, open)"
                      FocusElementId="chat-tools"
                      FocusRequest="@_chatToolsFragmentRequest">
             <div class="application-card-collection sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">

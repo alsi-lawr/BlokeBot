@@ -160,8 +160,8 @@
                                          Number="1"
                                          Title="Basics"
                                          Summary="@BasicsSummary(command)"
-                                         Open="@IsStageOpen(CustomCommandStage.Basics)"
-                                         OpenChanged="@(open => SetStage(CustomCommandStage.Basics, open))">
+                                         Open="@_openStages.IsOpen(CustomCommandStage.Basics)"
+                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Basics, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-4">
                                         <Field Id="@CommandNameFieldId(command)"
@@ -193,8 +193,8 @@
                                          Number="2"
                                          Title="Who can use it"
                                          Summary="@CommandAccessSummary(command)"
-                                         Open="@IsStageOpen(CustomCommandStage.Access)"
-                                         OpenChanged="@(open => SetStage(CustomCommandStage.Access, open))">
+                                         Open="@_openStages.IsOpen(CustomCommandStage.Access)"
+                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Access, open))">
                                 <div class="studio-grid" data-command-access>
                                     <div class="studio-span-12">
                                         <StudioSegmentedPill TValue="bool"
@@ -258,8 +258,8 @@
                                          Number="3"
                                          Title="What happens"
                                          Summary="@ActionKindLabel(command.ActionKind)"
-                                         Open="@IsStageOpen(CustomCommandStage.Action)"
-                                         OpenChanged="@(open => SetStage(CustomCommandStage.Action, open))">
+                                         Open="@_openStages.IsOpen(CustomCommandStage.Action)"
+                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.Action, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-12">
                                         <StudioChoiceCards id="@CommandActionFieldId(command)"
@@ -418,8 +418,8 @@
                                          Number="4"
                                          Title="Fine-tuning"
                                          Summary="@CommandAdvancedSummary(command)"
-                                         Open="@IsStageOpen(CustomCommandStage.FineTuning)"
-                                         OpenChanged="@(open => SetStage(CustomCommandStage.FineTuning, open))">
+                                         Open="@_openStages.IsOpen(CustomCommandStage.FineTuning)"
+                                         OpenChanged="@(open => _openStages.Set(CustomCommandStage.FineTuning, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>

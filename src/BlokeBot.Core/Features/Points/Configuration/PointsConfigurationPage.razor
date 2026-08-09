@@ -42,8 +42,8 @@
                          Number="1"
                          Title="What points are called"
                          Summary="@LabelSummary()"
-                         Open="@IsStageOpen(PointsStage.Label)"
-                         OpenChanged="@(open => SetStage(PointsStage.Label, open))">
+                         Open="@_openStages.IsOpen(PointsStage.Label)"
+                         OpenChanged="@(open => _openStages.Set(PointsStage.Label, open))">
                 <div class="studio-grid">
                     <div class="studio-span-6">
                         <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
@@ -59,10 +59,10 @@
                          Number="2"
                          Title="Gambling"
                          Summary="@GamblingSummary()"
-                         Open="@IsStageOpen(PointsStage.Gambling)"
+                         Open="@_openStages.IsOpen(PointsStage.Gambling)"
                          FocusElementId="@_validationFocusId"
                          FocusRequest="@_gamblingFocusRequest"
-                         OpenChanged="@(open => SetStage(PointsStage.Gambling, open))">
+                         OpenChanged="@(open => _openStages.Set(PointsStage.Gambling, open))">
                 <div class="studio-grid">
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="winRate">Chance of winning</label>
@@ -107,10 +107,10 @@
                          Number="3"
                          Title="Giveaways"
                          Summary="@GiveawaysSummary()"
-                         Open="@IsStageOpen(PointsStage.Giveaways)"
+                         Open="@_openStages.IsOpen(PointsStage.Giveaways)"
                          FocusElementId="@_validationFocusId"
                          FocusRequest="@_giveawaysFocusRequest"
-                         OpenChanged="@(open => SetStage(PointsStage.Giveaways, open))">
+                         OpenChanged="@(open => _openStages.Set(PointsStage.Giveaways, open))">
                 <div class="studio-grid">
                     <div class="studio-span-6 space-y-2">
                         <label class="label" for="duration">Time to enter</label>
@@ -202,8 +202,8 @@
                          Number="4"
                          Title="Chat commands"
                          Summary="@CommandsSummary()"
-                         Open="@IsStageOpen(PointsStage.Commands)"
-                         OpenChanged="@(open => SetStage(PointsStage.Commands, open))">
+                         Open="@_openStages.IsOpen(PointsStage.Commands)"
+                         OpenChanged="@(open => _openStages.Set(PointsStage.Commands, open))">
                 <div class="studio-grid">
                     @foreach (var field in _aliasFields)
                     {
@@ -237,8 +237,8 @@
                          Number="5"
                          Title="Bot replies"
                          Summary="@RepliesSummary()"
-                         Open="@IsStageOpen(PointsStage.Replies)"
-                         OpenChanged="@(open => SetStage(PointsStage.Replies, open))">
+                         Open="@_openStages.IsOpen(PointsStage.Replies)"
+                         OpenChanged="@(open => _openStages.Set(PointsStage.Replies, open))">
                 <p class="mb-3 text-xs text-muted-foreground">Every message the bot can send, grouped by what it is about. Open a row to change its wording or, where private delivery is possible, send it as a whisper instead.</p>
                 @if (!_config.WhisperResponsesEnabled)
                 {
@@ -255,8 +255,8 @@
                                             Excerpt="@field.Read(_config.Replies)"
                                             Customised="@IsCustomised(field)"
                                             Whispered="@IsWhispered(field)"
-                                            Open="@IsReplyOpen(field.Key)"
-                                            OpenChanged="@(open => SetReplyOpen(field.Key, open))">
+                                            Open="@_openReplies.IsOpen(field.Key)"
+                                            OpenChanged="@(open => _openReplies.Set(field.Key, open))">
                                 <textarea class="input min-h-16 resize-y"
                                           id="@($"points-{field.Key}-reply")"
                                           aria-label="@field.Label"

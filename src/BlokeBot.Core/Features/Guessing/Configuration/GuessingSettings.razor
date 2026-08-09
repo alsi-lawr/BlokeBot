@@ -43,8 +43,8 @@
                          Number="1"
                          Title="Round type"
                          Summary="@RoundTypeSummary()"
-                         Open="@IsStageOpen(GuessingStage.RoundType)"
-                         OpenChanged="@(open => SetStage(GuessingStage.RoundType, open))">
+                         Open="@_openStages.IsOpen(GuessingStage.RoundType)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.RoundType, open))">
                 <div class="studio-grid">
                     <div class="studio-span-12">
                         <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]" role="group" aria-label="Round type to edit">
@@ -110,8 +110,8 @@
                          Number="2"
                          Title="Accepted answers"
                          Summary="@AnswersSummary()"
-                         Open="@IsStageOpen(GuessingStage.Answers)"
-                         OpenChanged="@(open => SetStage(GuessingStage.Answers, open))">
+                         Open="@_openStages.IsOpen(GuessingStage.Answers)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Answers, open))">
                 <div class="studio-grid">
                     <div class="studio-span-12 studio-stepline flex flex-wrap items-center gap-[0.6rem]">
                         <span class="label">Answer replies go to</span>
@@ -164,8 +164,8 @@
                          Number="3"
                          Title="Chat commands"
                          Summary="@CommandsSummary()"
-                         Open="@IsStageOpen(GuessingStage.Commands)"
-                         OpenChanged="@(open => SetStage(GuessingStage.Commands, open))">
+                         Open="@_openStages.IsOpen(GuessingStage.Commands)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Commands, open))">
                 <div class="studio-grid">
                     @foreach (var field in _aliasFields)
                     {
@@ -199,8 +199,8 @@
                          Number="4"
                          Title="Bot replies"
                          Summary="@RepliesSummary()"
-                         Open="@IsStageOpen(GuessingStage.Replies)"
-                         OpenChanged="@(open => SetStage(GuessingStage.Replies, open))">
+                         Open="@_openStages.IsOpen(GuessingStage.Replies)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Replies, open))">
                 <p class="mb-3 text-xs text-muted-foreground">Every message the bot can send. Open a row to change its wording or, where private delivery is possible, send it as a whisper instead.</p>
                 @if (!_config.WhisperResponsesEnabled)
                 {
@@ -215,8 +215,8 @@
                                         Excerpt="@field.Read(_config.Profile.Replies)"
                                         Customised="@IsCustomised(field)"
                                         Whispered="@IsWhispered(field)"
-                                        Open="@IsReplyOpen(field.Key)"
-                                        OpenChanged="@(open => SetReplyOpen(field.Key, open))">
+                                        Open="@_openReplies.IsOpen(field.Key)"
+                                        OpenChanged="@(open => _openReplies.Set(field.Key, open))">
                             <textarea class="input min-h-16 resize-y"
                                       id="@($"guessing-{field.Key}-reply")"
                                       aria-label="@field.Label"
@@ -256,8 +256,8 @@
                          Number="5"
                          Title="Round start pin"
                          Summary="@PinSummary()"
-                         Open="@IsStageOpen(GuessingStage.Pin)"
-                         OpenChanged="@(open => SetStage(GuessingStage.Pin, open))">
+                         Open="@_openStages.IsOpen(GuessingStage.Pin)"
+                         OpenChanged="@(open => _openStages.Set(GuessingStage.Pin, open))">
                 <div class="studio-grid">
                     <div class="studio-span-12">
                         <div class="studio-switch-row flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)]">

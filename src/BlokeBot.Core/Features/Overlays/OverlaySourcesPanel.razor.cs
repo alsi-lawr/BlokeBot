@@ -10,7 +10,9 @@ namespace BlokeBot.Core.Features.Overlays;
 public partial class OverlaySourcesPanel
 {
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly HashSet<OverlaySourceStage> _openStages = [OverlaySourceStage.PositionLook];
+    private readonly StudioOpenSet<OverlaySourceStage> _openStages = new(
+        OverlaySourceStage.PositionLook
+    );
     private bool _cssFoldOpen;
     private bool _obsFoldOpen;
     private IReadOnlyList<OverlayInstanceView> _instances = [];
@@ -207,11 +209,6 @@ public partial class OverlaySourcesPanel
         $"{TypeLabel(overlay.Type)} · {(overlay.IsEnabled ? "" : "disabled · ")}{(
             OtherConnectionCount(overlay) > 0 ? "connected" : "not connected"
         )}";
-
-    private bool IsStageOpen(OverlaySourceStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(OverlaySourceStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
 
     private string BasicsSummary()
     {
@@ -452,8 +449,7 @@ public partial class OverlaySourcesPanel
         _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
         LoadAppearance(DefaultAppearance(_draftType));
         _revealedBrowserSourceUrl = null;
-        _openStages.Clear();
-        _ = _openStages.Add(OverlaySourceStage.Basics);
+        _openStages.Reset(OverlaySourceStage.Basics);
         if (setFeedback)
         {
             SetSuccess(
@@ -525,8 +521,7 @@ public partial class OverlaySourcesPanel
         {
             _feedback = string.Empty;
             _operationFailed = false;
-            _openStages.Clear();
-            _ = _openStages.Add(OverlaySourceStage.PositionLook);
+            _openStages.Reset(OverlaySourceStage.PositionLook);
         }
     }
 
@@ -557,7 +552,7 @@ public partial class OverlaySourcesPanel
                         var revealedUrl = AbsoluteUrl(succeeded.Value.PrivateAccess.RelativeUrl);
                         await LoadAsync(succeeded.Value.Instance.Id);
                         _revealedBrowserSourceUrl = revealedUrl;
-                        _ = _openStages.Add(OverlaySourceStage.Delivery);
+                        _openStages.Open(OverlaySourceStage.Delivery);
                         SetSuccess("Overlay created. Copy the private Browser Source URL now.");
                     },
                     rejected =>
@@ -717,7 +712,7 @@ public partial class OverlaySourcesPanel
                     var revealedUrl = AbsoluteUrl(succeeded.Value.PrivateAccess.RelativeUrl);
                     await LoadAsync(succeeded.Value.Instance.Id);
                     _revealedBrowserSourceUrl = revealedUrl;
-                    _ = _openStages.Add(OverlaySourceStage.Delivery);
+                    _openStages.Open(OverlaySourceStage.Delivery);
                     SetSuccess(
                         "Private URL rotated. Copy the replacement now and update every OBS source."
                     );

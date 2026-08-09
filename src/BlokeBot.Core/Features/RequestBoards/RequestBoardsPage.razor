@@ -138,8 +138,8 @@
                                     <StudioFold Key="@($"request-{submission.Public.Id}-details")"
                                                 Bare
                                                 Label="Notes, sorting & merge"
-                                                Open="@_openModerationFolds.Contains(submission.Public.Id)"
-                                                OpenChanged="@(open => SetModerationFold(submission.Public.Id, open))">
+                                                Open="@_openModerationFolds.IsOpen(submission.Public.Id)"
+                                                OpenChanged="@(open => _openModerationFolds.Set(submission.Public.Id, open))">
                                         <div class="studio-grid">
                                             <div class="studio-span-4">
                                                 <Field Id="@($"request-category-{submission.Public.Id}")" Label="Category" @bind-Value="draft.Category" />
@@ -200,8 +200,8 @@
                                      Number="1"
                                      Title="Basics"
                                      Summary="@_basicsSummary"
-                                     Open="@IsStageOpen(RequestBoardStage.Basics)"
-                                     OpenChanged="@(open => SetStage(RequestBoardStage.Basics, open))">
+                                     Open="@_openStages.IsOpen(RequestBoardStage.Basics)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.Basics, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="request-board-slug"
@@ -228,8 +228,8 @@
                                      Number="2"
                                      Title="What viewers fill in"
                                      Summary="@_questionsSummary"
-                                     Open="@IsStageOpen(RequestBoardStage.Questions)"
-                                     OpenChanged="@(open => SetStage(RequestBoardStage.Questions, open))">
+                                     Open="@_openStages.IsOpen(RequestBoardStage.Questions)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.Questions, open))">
                             <p id="request-field-limit" class="mb-3 text-xs text-muted-foreground">
                                 Viewers always give a title; these questions ask for anything extra.
                                 <b>@_draft.Fields.Count of @RequestBoardLimits.MaximumFields</b> questions used.
@@ -382,8 +382,8 @@
                                      Number="3"
                                      Title="Point cost &amp; refunds"
                                      Summary="@_costSummary"
-                                     Open="@IsStageOpen(RequestBoardStage.CostAndRefunds)"
-                                     OpenChanged="@(open => SetStage(RequestBoardStage.CostAndRefunds, open))">
+                                     Open="@_openStages.IsOpen(RequestBoardStage.CostAndRefunds)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.CostAndRefunds, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="request-board-cost" Label="Point cost" @bind-Value="_draft.PointCost" />
@@ -412,8 +412,8 @@
                                      Number="4"
                                      Title="Limits &amp; voting"
                                      Summary="@_limitsSummary"
-                                     Open="@IsStageOpen(RequestBoardStage.LimitsAndVoting)"
-                                     OpenChanged="@(open => SetStage(RequestBoardStage.LimitsAndVoting, open))">
+                                     Open="@_openStages.IsOpen(RequestBoardStage.LimitsAndVoting)"
+                                     OpenChanged="@(open => _openStages.Set(RequestBoardStage.LimitsAndVoting, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-4">
                                     <Field Id="request-board-submission-limit" Label="Active requests per viewer" @bind-Value="_draft.SubmissionLimit" />

@@ -17,13 +17,12 @@ public partial class PollsPage
         new(0, "Custom"),
     ];
 
-    private readonly HashSet<PollStage> _openStages = [];
+    private readonly StudioOpenSet<PollStage> _openStages = new();
     private readonly List<string> _choices = ["", ""];
     private string _title = string.Empty;
     private string _duration = "60";
     private int _durationChoice = 60;
     private bool _channelPointsVotingEnabled;
-    private bool _stagesSeeded;
     private string _channelPointsPerVote = string.Empty;
 
     private enum PollStage
@@ -40,22 +39,13 @@ public partial class PollsPage
     )
     {
         var state = await _polls.LoadAsync(hostId, cancellationToken);
-        if (!_stagesSeeded && state is not null)
+        if (state is not null)
         {
-            _stagesSeeded = true;
-            if (state.Templates.Count == 0)
-            {
-                _ = _openStages.Add(PollStage.Template);
-            }
+            _openStages.SeedOnce(PollStage.Template, state.Templates.Count == 0);
         }
 
         return state;
     }
-
-    private bool IsStageOpen(PollStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(PollStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
 
     private string _editorSummary
     {

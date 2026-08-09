@@ -179,8 +179,8 @@ public partial class GuessingSettings
     ];
 
     private readonly Dictionary<GuessCommandKind, string> _aliasDrafts = [];
-    private readonly HashSet<GuessingStage> _openStages = [GuessingStage.RoundType];
-    private readonly HashSet<string> _openReplies = [];
+    private readonly StudioOpenSet<GuessingStage> _openStages = new(GuessingStage.RoundType);
+    private readonly StudioOpenSet<string> _openReplies = new();
     private readonly HashSet<GuessOptionEditor> _pendingRemovals = [];
 
     private GuessingConfiguration? _config;
@@ -236,16 +236,6 @@ public partial class GuessingSettings
         _pendingProfileId = null;
         await LoadConfigurationAsync(new GuessingProfileSelection.Default());
     }
-
-    private bool IsStageOpen(GuessingStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(GuessingStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private bool IsReplyOpen(string key) => _openReplies.Contains(key);
-
-    private void SetReplyOpen(string key, bool open) =>
-        _ = open ? _openReplies.Add(key) : _openReplies.Remove(key);
 
     private static string RoundTypeChipId(int profileId) =>
         $"guessing-round-type-{profileId.ToString(CultureInfo.InvariantCulture)}";

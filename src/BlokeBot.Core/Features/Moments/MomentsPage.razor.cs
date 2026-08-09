@@ -44,8 +44,8 @@ public partial class MomentsPage
     ];
 
     private readonly Dictionary<Guid, MomentDraft> _drafts = [];
-    private readonly HashSet<MomentStage> _openStages = [];
-    private readonly HashSet<MomentFold> _openFolds = [];
+    private readonly StudioOpenSet<MomentStage> _openStages = new();
+    private readonly StudioOpenSet<MomentFold> _openFolds = new();
 
     private MomentModeratorPage? _page;
     private string _mergeWindow = MomentLimits.DefaultMergeWindowSeconds.ToString(
@@ -152,16 +152,6 @@ public partial class MomentsPage
     }
 
     private MomentDraft Draft(Guid id) => _drafts[id];
-
-    private bool IsStageOpen(MomentStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(MomentStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private bool IsFoldOpen(MomentFold fold) => _openFolds.Contains(fold);
-
-    private void SetFold(MomentFold fold, bool open) =>
-        _ = open ? _openFolds.Add(fold) : _openFolds.Remove(fold);
 
     private void ToggleMarkerFallback() => _markerFallback = !_markerFallback;
 

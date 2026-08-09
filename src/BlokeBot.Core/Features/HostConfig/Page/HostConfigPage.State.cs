@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Components.Routing;
@@ -12,13 +13,21 @@ public partial class HostConfigPage
     private long _botStatusFragmentRequest;
     private long _chatToolsFragmentRequest;
     private long _moderatorHelpFragmentRequest;
-    private bool _botStatusStageOpen = true;
-    private bool _startupMessageStageOpen;
-    private bool _commandsStageOpen;
-    private bool _botAccountStageOpen;
-    private bool _moderatorHelpStageOpen;
-    private bool _chatToolsStageOpen = true;
+    private readonly StudioOpenSet<HostConfigStage> _openStages = new(
+        HostConfigStage.BotStatus,
+        HostConfigStage.ChatTools
+    );
     private HostConfigState? _state;
+
+    private enum HostConfigStage
+    {
+        BotStatus,
+        StartupMessage,
+        Commands,
+        BotAccount,
+        ModeratorHelp,
+        ChatTools,
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,15 +162,15 @@ public partial class HostConfigPage
         switch (Uri.UnescapeDataString(fragment))
         {
             case "bot-status":
-                _botStatusStageOpen = true;
+                _openStages.Open(HostConfigStage.BotStatus);
                 _botStatusFragmentRequest++;
                 break;
             case "chat-tools":
-                _chatToolsStageOpen = true;
+                _openStages.Open(HostConfigStage.ChatTools);
                 _chatToolsFragmentRequest++;
                 break;
             case "moderator-help":
-                _moderatorHelpStageOpen = true;
+                _openStages.Open(HostConfigStage.ModeratorHelp);
                 _moderatorHelpFragmentRequest++;
                 break;
         }

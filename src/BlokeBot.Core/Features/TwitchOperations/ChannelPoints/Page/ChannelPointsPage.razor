@@ -88,8 +88,8 @@
                              Number="1"
                              Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")"
                              Summary="@_editorSummary"
-                             Open="@IsStageOpen(ChannelPointsStage.Editor)"
-                             OpenChanged="@(open => SetStage(ChannelPointsStage.Editor, open))">
+                             Open="@_openStages.IsOpen(ChannelPointsStage.Editor)"
+                             OpenChanged="@(open => _openStages.Set(ChannelPointsStage.Editor, open))">
                     <div class="studio-grid">
                         <div class="studio-span-8">
                             <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" MaxLength="45" />
@@ -196,8 +196,8 @@
                              Number="2"
                              Title="Rewards"
                              Summary="@_rewardsSummary"
-                             Open="@IsStageOpen(ChannelPointsStage.Rewards)"
-                             OpenChanged="@(open => SetStage(ChannelPointsStage.Rewards, open))">
+                             Open="@_openStages.IsOpen(ChannelPointsStage.Rewards)"
+                             OpenChanged="@(open => _openStages.Set(ChannelPointsStage.Rewards, open))">
                     @if (State.Rewards.Count == 0)
                     {
                         <p class="text-sm text-muted-foreground">No rewards found.</p>
@@ -238,8 +238,8 @@
                              Number="3"
                              Title="Redemption history"
                              Summary="@_historySummary"
-                             Open="@IsStageOpen(ChannelPointsStage.History)"
-                             OpenChanged="@(open => SetStage(ChannelPointsStage.History, open))">
+                             Open="@_openStages.IsOpen(ChannelPointsStage.History)"
+                             OpenChanged="@(open => _openStages.Set(ChannelPointsStage.History, open))">
                     @if (State.History.Count == 0)
                     {
                         <p class="text-sm text-muted-foreground">No redemption history yet.</p>

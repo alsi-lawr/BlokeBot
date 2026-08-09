@@ -17,12 +17,11 @@ public partial class PredictionsPage
         new(0, "Custom"),
     ];
 
-    private readonly HashSet<PredictionStage> _openStages = [];
+    private readonly StudioOpenSet<PredictionStage> _openStages = new();
     private readonly List<string> _outcomes = ["", ""];
     private string _title = string.Empty;
     private string _window = "60";
     private int _windowChoice = 60;
-    private bool _stagesSeeded;
 
     private enum PredictionStage
     {
@@ -38,22 +37,13 @@ public partial class PredictionsPage
     )
     {
         var state = await _predictions.LoadAsync(hostId, cancellationToken);
-        if (!_stagesSeeded && state is not null)
+        if (state is not null)
         {
-            _stagesSeeded = true;
-            if (state.Templates.Count == 0)
-            {
-                _ = _openStages.Add(PredictionStage.Template);
-            }
+            _openStages.SeedOnce(PredictionStage.Template, state.Templates.Count == 0);
         }
 
         return state;
     }
-
-    private bool IsStageOpen(PredictionStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(PredictionStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
 
     private string _editorSummary
     {

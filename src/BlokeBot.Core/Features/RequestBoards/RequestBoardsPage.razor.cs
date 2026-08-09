@@ -23,8 +23,8 @@ public partial class RequestBoardsPage
     private bool _operationFailed;
     private bool _featureEnabled;
     private RequestBoardPane _pane = RequestBoardPane.Setup;
-    private readonly HashSet<RequestBoardStage> _openStages = [RequestBoardStage.Basics];
-    private readonly HashSet<long> _openModerationFolds = [];
+    private readonly StudioOpenSet<RequestBoardStage> _openStages = new(RequestBoardStage.Basics);
+    private readonly StudioOpenSet<long> _openModerationFolds = new();
 
     private const string _formPreviewBox =
         "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
@@ -207,16 +207,6 @@ public partial class RequestBoardsPage
             },
         ];
 
-    private bool IsStageOpen(RequestBoardStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(RequestBoardStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
-    private void SetModerationFold(long submissionId, bool open) =>
-        _ = open
-            ? _openModerationFolds.Add(submissionId)
-            : _openModerationFolds.Remove(submissionId);
-
     private static string StatusPillClass(RequestSubmissionStatus status) =>
         status is RequestSubmissionStatus.Queued or RequestSubmissionStatus.Accepted
             ? "status-pill bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
@@ -347,7 +337,7 @@ public partial class RequestBoardsPage
         _operationFailed = false;
         _feedback = string.Empty;
         _pane = RequestBoardPane.Setup;
-        _openModerationFolds.Clear();
+        _openModerationFolds.Reset();
         SelectFirstField();
         await LoadModeratorPageAsync();
     }
@@ -388,7 +378,7 @@ public partial class RequestBoardsPage
         _moderationDrafts.Clear();
         _operationFailed = false;
         _pane = RequestBoardPane.Setup;
-        _openModerationFolds.Clear();
+        _openModerationFolds.Reset();
         SelectFirstField();
         SetCreateGuidance();
         _primaryFocusRequest++;

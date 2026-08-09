@@ -110,8 +110,8 @@
                              Number="1"
                              Title="New Prediction template"
                              Summary="@_editorSummary"
-                             Open="@IsStageOpen(PredictionStage.Template)"
-                             OpenChanged="@(open => SetStage(PredictionStage.Template, open))">
+                             Open="@_openStages.IsOpen(PredictionStage.Template)"
+                             OpenChanged="@(open => _openStages.Set(PredictionStage.Template, open))">
                     <div class="studio-grid">
                         <div class="studio-span-8">
                             <Field Id="prediction-title" Label="Question" @bind-Value="_title" Placeholder="Will we win?" MaxLength="45" />
@@ -177,8 +177,8 @@
                              Number="2"
                              Title="Recent results"
                              Summary="@_resultsSummary"
-                             Open="@IsStageOpen(PredictionStage.Results)"
-                             OpenChanged="@(open => SetStage(PredictionStage.Results, open))">
+                             Open="@_openStages.IsOpen(PredictionStage.Results)"
+                             OpenChanged="@(open => _openStages.Set(PredictionStage.Results, open))">
                     @if (State.Results.Count == 0)
                     {
                         <p class="text-sm text-muted-foreground">No Prediction results yet.</p>

@@ -1,13 +1,13 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
 
 public partial class ClipsMarkersPage
 {
-    private readonly HashSet<ClipMarkerStage> _openStages = [];
+    private readonly StudioOpenSet<ClipMarkerStage> _openStages = new();
     private bool _clipHasDelay;
-    private bool _stagesSeeded;
     private string _markerDescription = string.Empty;
 
     private enum ClipMarkerStage
@@ -48,11 +48,6 @@ public partial class ClipsMarkersPage
         }
     }
 
-    private bool IsStageOpen(ClipMarkerStage stage) => _openStages.Contains(stage);
-
-    private void SetStage(ClipMarkerStage stage, bool open) =>
-        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
-
     protected override HostFeatureFlags Feature => HostFeatureFlags.ClipsAndMarkers;
 
     protected override async Task<ClipMarkerDashboardState?> LoadStateAsync(
@@ -61,17 +56,14 @@ public partial class ClipsMarkersPage
     )
     {
         var state = await _clipsMarkers.LoadAsync(hostId, cancellationToken);
-        if (!_stagesSeeded && state is not null)
+        if (state is not null)
         {
-            _stagesSeeded = true;
-            var needsAttention =
+            _openStages.SeedOnce(
+                ClipMarkerStage.Attempts,
                 state.PendingClips.Count > 0
-                || state.Results.Any(static clip => clip.Status == "Ambiguous")
-                || state.Markers.Any(static marker => marker.Status == "Ambiguous");
-            if (needsAttention)
-            {
-                _ = _openStages.Add(ClipMarkerStage.Attempts);
-            }
+                    || state.Results.Any(static clip => clip.Status == "Ambiguous")
+                    || state.Markers.Any(static marker => marker.Status == "Ambiguous")
+            );
         }
 
         return state;

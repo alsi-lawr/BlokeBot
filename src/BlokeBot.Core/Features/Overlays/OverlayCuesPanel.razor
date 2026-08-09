@@ -54,8 +54,8 @@
                                          Number="1"
                                          Title="Basics"
                                          Summary="@BasicsSummary()"
-                                         Open="@IsStageOpen(CueStage.Basics)"
-                                         OpenChanged="@(open => SetStage(CueStage.Basics, open))">
+                                         Open="@_openStages.IsOpen(CueStage.Basics)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Basics, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-4"><Field Id="cue-name" Label="Cue name" @bind-Value="_name" /></div>
                                     <div class="studio-span-4 space-y-2">
@@ -74,8 +74,8 @@
                                          Number="2"
                                          Title="Content"
                                          Summary="@ContentSummary()"
-                                         Open="@IsStageOpen(CueStage.Content)"
-                                         OpenChanged="@(open => SetStage(CueStage.Content, open))">
+                                         Open="@_openStages.IsOpen(CueStage.Content)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Content, open))">
                                 <p class="mb-3 text-xs leading-5 text-muted-foreground">
                                     Content lower in the list appears in front when stacking values match. Up to @OverlayCueConfiguration.MaximumLayerCount layers.
                                 </p>
@@ -85,9 +85,9 @@
                                     {
                                         var layerIndex = index;
                                         var layer = _layers[index];
-                                        var open = _openLayers.Contains(layer);
+                                        var open = _openLayers.IsOpen(layer);
                                         <article @key="layer" class="@LayerRowClass(open)" data-cue-layer>
-                                            <div class="flex cursor-pointer flex-wrap items-center gap-3 px-3.5 py-2.5" @onclick="() => ToggleLayer(layer)">
+                                            <div class="flex cursor-pointer flex-wrap items-center gap-3 px-3.5 py-2.5" @onclick="() => _openLayers.Toggle(layer)">
                                                 <span class="grid size-8 flex-none place-items-center rounded-lg border border-[var(--app-control-border)] bg-[var(--app-surface-muted)]" aria-hidden="true">@LayerGlyph(layer)</span>
                                                 <span class="min-w-0 flex-1">
                                                     <span class="block truncate text-sm font-bold text-slate-950">@LayerTitle(layer)</span>
@@ -103,7 +103,7 @@
                                                         aria-expanded="@(open ? "true" : "false")"
                                                         aria-controls="@LayerBodyId(layerIndex)"
                                                         aria-label="@($"Edit content {layerIndex + 1}")"
-                                                        @onclick="() => ToggleLayer(layer)"
+                                                        @onclick="() => _openLayers.Toggle(layer)"
                                                         @onclick:stopPropagation>›</button>
                                             </div>
                                             @if (open)
@@ -157,8 +157,8 @@
                                          Number="3"
                                          Title="Test playback"
                                          Summary="@TestSummary()"
-                                         Open="@IsStageOpen(CueStage.Test)"
-                                         OpenChanged="@(open => SetStage(CueStage.Test, open))">
+                                         Open="@_openStages.IsOpen(CueStage.Test)"
+                                         OpenChanged="@(open => _openStages.Set(CueStage.Test, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-8 space-y-2">
                                         <label class="label" for="cue-target">Cue player</label>

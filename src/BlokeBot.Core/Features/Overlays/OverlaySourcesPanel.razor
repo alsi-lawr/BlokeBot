@@ -94,8 +94,8 @@
                                      Number="1"
                                      Title="Basics"
                                      Summary="@BasicsSummary()"
-                                     Open="@IsStageOpen(OverlaySourceStage.Basics)"
-                                     OpenChanged="@(open => SetStage(OverlaySourceStage.Basics, open))">
+                                     Open="@_openStages.IsOpen(OverlaySourceStage.Basics)"
+                                     OpenChanged="@(open => _openStages.Set(OverlaySourceStage.Basics, open))">
                             <div class="studio-grid">
                                 <div class="studio-span-6">
                                     <Field Id="overlay-name"
@@ -138,8 +138,8 @@
                                          Number="2"
                                          Title="Position & look"
                                          Summary="@PositionSummary()"
-                                         Open="@IsStageOpen(OverlaySourceStage.PositionLook)"
-                                         OpenChanged="@(open => SetStage(OverlaySourceStage.PositionLook, open))">
+                                         Open="@_openStages.IsOpen(OverlaySourceStage.PositionLook)"
+                                         OpenChanged="@(open => _openStages.Set(OverlaySourceStage.PositionLook, open))">
                                 <div class="flex flex-wrap items-center gap-3">
                                     <StudioSegmentedPill TValue="OverlayPreviewMode"
                                                          AriaLabel="Preview state"
@@ -269,8 +269,8 @@
                                      Number="@whatItShowsNumber"
                                      Title="What it shows"
                                      Summary="@WhatItShowsSummary()"
-                                     Open="@IsStageOpen(OverlaySourceStage.WhatItShows)"
-                                     OpenChanged="@(open => SetStage(OverlaySourceStage.WhatItShows, open))">
+                                     Open="@_openStages.IsOpen(OverlaySourceStage.WhatItShows)"
+                                     OpenChanged="@(open => _openStages.Set(OverlaySourceStage.WhatItShows, open))">
                             @if (_draftType is OverlayType.Guessing)
                             {
                                 @if (!_guessingFeatureEnabled)
@@ -523,8 +523,8 @@
                                          Number="@(whatItShowsNumber + 1)"
                                          Title="Delivery & access"
                                          Summary="@DeliverySummary()"
-                                         Open="@IsStageOpen(OverlaySourceStage.Delivery)"
-                                         OpenChanged="@(open => SetStage(OverlaySourceStage.Delivery, open))">
+                                         Open="@_openStages.IsOpen(OverlaySourceStage.Delivery)"
+                                         OpenChanged="@(open => _openStages.Set(OverlaySourceStage.Delivery, open))">
                                 @if (_selectedFeatureEnabled)
                                 {
                                     <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-4 py-3">
