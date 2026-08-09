@@ -639,68 +639,6 @@
         outline: none;
     }
 
-    .studio-choice-cards {
-        display: grid;
-        gap: 0.8rem;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .studio-choice-card {
-        align-items: flex-start;
-        background: var(--app-control-bg);
-        border: 1px solid var(--app-control-border);
-        border-radius: 14px;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        padding: 0.9rem;
-        text-align: left;
-        transition:
-            background-color 140ms ease,
-            border-color 140ms ease,
-            box-shadow 140ms ease,
-            transform 140ms ease;
-    }
-
-    .studio-choice-card:hover {
-        background: var(--app-control-hover);
-        border-color: var(--app-control-hover-border);
-        box-shadow: var(--app-shadow-sm);
-        transform: translateY(-2px);
-    }
-
-    .studio-choice-card:focus-visible {
-        border-color: var(--app-focus-border);
-        box-shadow: var(--app-focus-shadow);
-        outline: none;
-    }
-
-    .studio-choice-card[aria-pressed="true"] {
-        background: var(--app-surface-solid);
-        border-color: var(--app-focus-border);
-        box-shadow: var(--app-shadow-sm);
-    }
-
-    .studio-choice-card__icon {
-        font-size: 1.2rem;
-    }
-
-    .studio-choice-card__title {
-        color: var(--app-text-strong);
-        font-weight: 700;
-    }
-
-    .studio-choice-card[aria-pressed="true"] .studio-choice-card__title::after {
-        color: var(--app-affirmative);
-        content: " ✓";
-    }
-
-    .studio-choice-card__description {
-        color: var(--app-text-muted);
-        font-size: 0.78rem;
-    }
-
     .studio-chat {
         background: var(--app-surface-muted);
         border: 1px dashed var(--app-control-border);
@@ -859,10 +797,6 @@
             grid-column: span 12;
         }
 
-        .studio-choice-cards {
-            grid-template-columns: minmax(0, 1fr);
-        }
-
         .studio-stage__content {
             padding-left: 1.15rem;
         }
@@ -885,14 +819,9 @@
         .studio-toggle,
         .studio-toggle::after,
         .studio-segmented__option,
-        .studio-choice-card,
         .studio-rail__item,
         .studio-chip--pressable {
             transition-duration: 1ms;
-        }
-
-        .studio-choice-card:hover {
-            transform: none;
         }
     }
 }

@@ -20,6 +20,13 @@ public partial class StudioFold
     [Parameter]
     public bool Open { get; set; }
 
+    /// <summary>
+    /// Drops the boxed chrome for a quiet inline toggle, for a fold that sits inside a row that
+    /// already carries its own border. The mechanism is identical; only the clothes change.
+    /// </summary>
+    [Parameter]
+    public bool Bare { get; set; }
+
     [Parameter]
     public EventCallback<bool> OpenChanged { get; set; }
 

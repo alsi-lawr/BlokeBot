@@ -31,20 +31,20 @@ public sealed class ManagementPageWorkspaceTests
         {
             page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
             page.Find("[role='status']").TextContent.ShouldContain("Save board to create it");
-            FindButton(page, "New board").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ New board").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/requests/streamer/']").ShouldBeEmpty();
             page.FindAll("[data-selected-field-editor]").Count.ShouldBe(1);
         });
-        AssertEditorAssociation(page);
+        AssertQuestionEditorAssociation(page);
         (await CountAsync(database, board: true)).ShouldBe(0);
 
-        FindButton(page, "Add field").Click();
+        FindButton(page, "+ Add question").Click();
         page.WaitForAssertion(() =>
         {
-            page.FindAll(".management-field-inventory-row").Count.ShouldBe(2);
+            page.FindAll("[data-question-row]").Count.ShouldBe(2);
             page.FindAll("[data-selected-field-editor]").Count.ShouldBe(1);
         });
-        AssertEditorAssociation(page);
+        AssertQuestionEditorAssociation(page);
         var addedEditor = page.Find("[data-selected-field-editor]");
         addedEditor
             .QuerySelector("input[id^='request-field-key-']")
@@ -54,17 +54,17 @@ public sealed class ManagementPageWorkspaceTests
             invocation.Identifier == "Blazor._internal.domWrapper.focus"
         );
 
-        page.FindAll(".management-field-inventory-row")[0].QuerySelector("button")!.Click();
-        page.FindAll(".management-field-inventory-row")[1].QuerySelector("button")!.Click();
+        page.FindAll("[data-question-row]")[0].Click();
+        page.FindAll("[data-question-row]")[1].Click();
         page.Find("[data-selected-field-editor] input[id^='request-field-key-']")
             .GetAttribute("value")
             .ShouldBe("notes");
-        FindButton(page, "Remove field").Click();
-        page.FindAll(".management-field-inventory-row").Count.ShouldBe(1);
+        FindButton(page, "Remove question").Click();
+        page.FindAll("[data-question-row]").Count.ShouldBe(1);
         page.FindAll("[data-selected-field-editor]").Count.ShouldBe(1);
-        page.Find(".management-field-inventory-row").GetAttribute("data-current").ShouldBe("true");
-        FindButton(page, "Remove field").HasAttribute("disabled").ShouldBeTrue();
-        page.Markup.ShouldContain("needs at least one field");
+        page.Find("[data-question-row]").GetAttribute("data-current").ShouldBe("true");
+        FindButton(page, "Remove question").HasAttribute("disabled").ShouldBeTrue();
+        page.Markup.ShouldContain("at least one question");
 
         page.Find("#request-board-slug").Input("clips");
         page.Find("#request-board-name").Input("Clip reviews");
@@ -72,7 +72,7 @@ public sealed class ManagementPageWorkspaceTests
         page.WaitForAssertion(() =>
         {
             page.Find("[role='status']").TextContent.ShouldContain("Board created.");
-            page.Find("#request-board-configuration").TextContent.ShouldBe("Edit board");
+            page.Find("#request-board-configuration").TextContent.ShouldBe("Clip reviews");
             _ = page.Find("a[href='/requests/streamer/clips']").ShouldNotBeNull();
         });
         (await CountAsync(database, board: true)).ShouldBe(1);
@@ -83,11 +83,11 @@ public sealed class ManagementPageWorkspaceTests
             page.Find("[role='status']").TextContent.ShouldContain("Board saved.")
         );
 
-        FindButton(page, "New board").Click();
+        FindButton(page, "+ New board").Click();
         page.WaitForAssertion(() =>
         {
             page.Find("#request-board-configuration").TextContent.ShouldBe("New board — not saved");
-            FindButton(page, "New board").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ New board").HasAttribute("disabled").ShouldBeTrue();
             page.FindAll("a[href^='/requests/streamer/']").ShouldBeEmpty();
         });
         page.Find("#request-board-name").Input("Unsaved board");
@@ -114,8 +114,8 @@ public sealed class ManagementPageWorkspaceTests
             .Click();
         page.WaitForAssertion(() =>
         {
-            page.Find("#request-board-configuration").TextContent.ShouldBe("Edit board");
-            FindButton(page, "New board").HasAttribute("disabled").ShouldBeFalse();
+            page.Find("#request-board-configuration").TextContent.ShouldBe("Updated clip reviews");
+            FindButton(page, "+ New board").HasAttribute("disabled").ShouldBeFalse();
             page.Find("#request-board-name").GetAttribute("value").ShouldBe("Updated clip reviews");
         });
     }
@@ -242,17 +242,15 @@ public sealed class ManagementPageWorkspaceTests
                 )
             );
             var page = boardContext.Render<RequestBoardsPage>();
-            page.WaitForAssertion(() =>
-                page.FindAll(".management-field-inventory-row").Count.ShouldBe(1)
-            );
+            page.WaitForAssertion(() => page.FindAll("[data-question-row]").Count.ShouldBe(1));
             for (var index = 1; index < RequestBoardLimits.MaximumFields; index++)
             {
-                FindButton(page, "Add field").Click();
+                FindButton(page, "+ Add question").Click();
             }
 
-            FindButton(page, "Add field").HasAttribute("disabled").ShouldBeTrue();
+            FindButton(page, "+ Add question").HasAttribute("disabled").ShouldBeTrue();
             page.Find("#request-field-limit")
-                .TextContent.ShouldContain("Maximum of 12 fields reached");
+                .TextContent.ShouldContain("Maximum of 12 questions reached");
         }
 
         await using (var queueContext = UiTestContextFactory.Create(database, hostId))
@@ -288,6 +286,21 @@ public sealed class ManagementPageWorkspaceTests
     )
         where TComponent : IComponent =>
         page.FindAll("button").Single(button => button.TextContent.Trim() == label);
+
+    private static void AssertQuestionEditorAssociation<TComponent>(
+        IRenderedComponent<TComponent> page
+    )
+        where TComponent : IComponent
+    {
+        var row = page.Find("[data-question-row][data-current='true']");
+        var editor = page.Find("[data-selected-field-editor]");
+        var label = row.QuerySelector("span[id]");
+        _ = label.ShouldNotBeNull();
+        editor.GetAttribute("aria-labelledby").ShouldBe(label!.Id);
+        editor.Id.ShouldNotBeNullOrWhiteSpace();
+        row.GetAttribute("aria-current").ShouldBe("true");
+        row.GetAttribute("aria-controls").ShouldBe(editor.Id);
+    }
 
     private static void AssertEditorAssociation<TComponent>(IRenderedComponent<TComponent> page)
         where TComponent : IComponent

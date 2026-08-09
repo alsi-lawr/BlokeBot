@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using System.Globalization;
+using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.RequestBoards;
 
@@ -18,9 +22,283 @@ public partial class RequestBoardsPage
     private bool _isCreating = true;
     private bool _operationFailed;
     private bool _featureEnabled;
+    private RequestBoardPane _pane = RequestBoardPane.Setup;
+    private readonly HashSet<RequestBoardStage> _openStages = [RequestBoardStage.Basics];
+    private readonly HashSet<long> _openModerationFolds = [];
+
+    private const string _formPreviewBox =
+        "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
+
+    private enum RequestBoardPane
+    {
+        Setup,
+        Review,
+    }
+
+    private enum RequestBoardStage
+    {
+        Basics,
+        Questions,
+        CostAndRefunds,
+        LimitsAndVoting,
+    }
+
+    private sealed record RefundChoice(
+        RequestBoardRefundPolicy Policy,
+        string Title,
+        string Description
+    );
+
+    private static readonly IReadOnlyList<RefundChoice> _refundChoices =
+    [
+        new(
+            RequestBoardRefundPolicy.Never,
+            "Never",
+            "Points are kept whatever happens to the request."
+        ),
+        new(
+            RequestBoardRefundPolicy.RejectedOrWithdrawn,
+            "Rejected or withdrawn",
+            "Refund when you reject it or the viewer pulls it back."
+        ),
+        new(
+            RequestBoardRefundPolicy.AnyUnfulfilledClosure,
+            "Not fulfilled",
+            "Refund any request that never gets completed."
+        ),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<RequestBoardFieldKind>
+    > _fieldKindOptions =
+    [
+        new(RequestBoardFieldKind.Text, FieldKindLabel(RequestBoardFieldKind.Text)),
+        new(RequestBoardFieldKind.Url, FieldKindLabel(RequestBoardFieldKind.Url)),
+        new(RequestBoardFieldKind.Number, FieldKindLabel(RequestBoardFieldKind.Number)),
+        new(RequestBoardFieldKind.Choice, FieldKindLabel(RequestBoardFieldKind.Choice)),
+        new(RequestBoardFieldKind.TwitchClip, FieldKindLabel(RequestBoardFieldKind.TwitchClip)),
+    ];
+
+    private static readonly IReadOnlyList<StudioSegmentedOption<bool>> _requirementOptions =
+    [
+        new(true, "Required"),
+        new(false, "Optional"),
+    ];
 
     private string _publicBoardUrl =>
         $"/requests/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
+
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        [
+            new(
+                "Boards",
+                [
+                    .. _boardList.Select(board => new StudioRailItem
+                    {
+                        Key = board.Slug,
+                        Label = board.Slug,
+                        Search = $"{board.Slug} {board.Title}",
+                        Sub = string.IsNullOrWhiteSpace(board.Title) ? null : board.Title,
+                        Meta = board.IsOpen ? null : "closed",
+                        Monospace = true,
+                        On = board.IsOpen,
+                        Selected = !_isCreating && board.Slug == _draft.Slug,
+                        Select = EventCallback.Factory.Create(
+                            this,
+                            () => SelectBoardAsync(board.Slug)
+                        ),
+                    }),
+                ],
+                "No saved boards yet."
+            ),
+        ];
+
+    private IReadOnlyList<StudioSegmentedOption<RequestBoardPane>> _paneOptions =>
+        [
+            new(RequestBoardPane.Setup, "Set up board"),
+            new(
+                RequestBoardPane.Review,
+                _pendingCount > 0 ? $"Review requests · {_pendingCount}" : "Review requests"
+            ),
+        ];
+
+    private int _pendingCount =>
+        _moderatorPage?.Submissions.Count(submission =>
+            submission.Public.Status == RequestSubmissionStatus.Pending
+        ) ?? 0;
+
+    private string _headerTitle =>
+        _isCreating ? "New board — not saved"
+        : string.IsNullOrWhiteSpace(_draft.Title) ? _draft.Slug
+        : _draft.Title;
+
+    private string? _headerStats =>
+        _moderatorPage is { } moderation
+            ? $"/{_draft.Slug} · {moderation.Submissions.Count} requests · {_pendingCount} awaiting review"
+            : null;
+
+    private string _slugOrExample => string.IsNullOrWhiteSpace(_draft.Slug) ? "games" : _draft.Slug;
+
+    private string _basicsSummary => $"/{_slugOrExample} · viewers type !request {_slugOrExample}";
+
+    private string _questionsSummary =>
+        $"{Count(_draft.Fields.Count, "question")} · {_draft.Fields.Count(question => question.IsRequired)} required";
+
+    private string _costSummary =>
+        $"{(_draft.PointCost.Trim() == "0" ? "free" : $"{_draft.PointCost} points")} · {RefundPolicyProse(_draft.RefundPolicy)}";
+
+    private string _limitsSummary =>
+        $"{_draft.SubmissionLimit} active each · {CooldownProse()} · {(_draft.VotingEnabled ? $"voting on, {_draft.VoteLimit} votes each" : "voting off")}";
+
+    private string CooldownProse() =>
+        !int.TryParse(
+            _draft.CooldownSeconds,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var seconds
+        )
+            ? $"{_draft.CooldownSeconds} s cooldown"
+        : seconds == 0 ? "no cooldown"
+        : $"{DurationProse.Format(seconds)} between requests";
+
+    private static string Count(int count, string noun) =>
+        count == 1 ? $"1 {noun}" : $"{count} {noun}s";
+
+    private static string RefundPolicyProse(RequestBoardRefundPolicy policy) =>
+        policy switch
+        {
+            RequestBoardRefundPolicy.Never => "no refunds",
+            RequestBoardRefundPolicy.RejectedOrWithdrawn => "refunded if rejected or withdrawn",
+            RequestBoardRefundPolicy.AnyUnfulfilledClosure => "refunded if not fulfilled",
+            _ => throw new UnreachableException("Unknown request board refund policy."),
+        };
+
+    private IReadOnlyList<StudioChatLine> ChatPreviewLines() =>
+        [
+            new()
+            {
+                Speaker = "pixel_penny",
+                SpeakerColour = "#e91e63",
+                Message = $"!request {_slugOrExample} Outer Wilds | tags=chill,space",
+                Monospace = true,
+            },
+            new()
+            {
+                Speaker = "BlokeBot",
+                SpeakerColour = "#00ad6f",
+                Badge = "BOT",
+                Bot = true,
+                Message = "Request #41 submitted for moderator review.",
+            },
+            new()
+            {
+                Speaker = "grumblesworth",
+                SpeakerColour = "#1e90ff",
+                Message = "!requestvote 41",
+                Monospace = true,
+            },
+            new()
+            {
+                Speaker = "BlokeBot",
+                SpeakerColour = "#00ad6f",
+                Badge = "BOT",
+                Bot = true,
+                Message = "Vote recorded for request #41.",
+            },
+        ];
+
+    private bool IsStageOpen(RequestBoardStage stage) => _openStages.Contains(stage);
+
+    private void SetStage(RequestBoardStage stage, bool open) =>
+        _ = open ? _openStages.Add(stage) : _openStages.Remove(stage);
+
+    private void SetModerationFold(long submissionId, bool open) =>
+        _ = open
+            ? _openModerationFolds.Add(submissionId)
+            : _openModerationFolds.Remove(submissionId);
+
+    private static string StatusPillClass(RequestSubmissionStatus status) =>
+        status is RequestSubmissionStatus.Queued or RequestSubmissionStatus.Accepted
+            ? "status-pill bg-[var(--app-affirmative-surface)] text-[var(--app-affirmative)]"
+            : "status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]";
+
+    private static string SubmittedStamp(DateTime value) =>
+        value.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+
+    private static string KeyOrExample(BoardFieldDraft field) =>
+        string.IsNullOrWhiteSpace(field.Key) ? "genre" : field.Key;
+
+    private static string FieldPreviewPlaceholder(BoardFieldDraft field) =>
+        field.Kind switch
+        {
+            RequestBoardFieldKind.Choice => "Choose an option ▾",
+            RequestBoardFieldKind.Url => "https://…",
+            RequestBoardFieldKind.TwitchClip => "https://clips.twitch.tv/…",
+            RequestBoardFieldKind.Number
+                when !string.IsNullOrWhiteSpace(field.MinimumNumber)
+                    && !string.IsNullOrWhiteSpace(field.MaximumNumber) =>
+                $"{field.MinimumNumber} to {field.MaximumNumber}",
+            RequestBoardFieldKind.Number => "A number",
+            _ => $"Up to {field.MaximumLength} characters",
+        };
+
+    private static IReadOnlyList<string> FieldChoices(BoardFieldDraft field) =>
+        field.Choices.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+
+    private static IReadOnlyList<string> DraftTags(ModerationDraft draft) =>
+        RequestBoardInput.ParseTags(draft.Tags);
+
+    private static string AppendedList(IReadOnlyList<string> current, string value) =>
+        current.Count == 0 ? value : $"{string.Join(", ", current)}, {value}";
+
+    private static void AddChoice(BoardFieldDraft field)
+    {
+        var value = field.ChoiceDraft.Trim();
+        if (value.Length == 0 || FieldChoices(field).Count >= RequestBoardLimits.MaximumChoices)
+        {
+            return;
+        }
+
+        field.Choices = AppendedList(FieldChoices(field), value);
+        field.ChoiceDraft = string.Empty;
+    }
+
+    private static void AddChoiceOnEnter(BoardFieldDraft field, KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddChoice(field);
+        }
+    }
+
+    private static void RemoveChoice(BoardFieldDraft field, string choice) =>
+        field.Choices = string.Join(", ", FieldChoices(field).Where(value => value != choice));
+
+    private static void AddTag(ModerationDraft draft)
+    {
+        var value = draft.TagDraft.Trim();
+        if (value.Length == 0 || DraftTags(draft).Count >= RequestBoardLimits.MaximumTags)
+        {
+            return;
+        }
+
+        draft.Tags = AppendedList(DraftTags(draft), value);
+        draft.TagDraft = string.Empty;
+    }
+
+    private static void AddTagOnEnter(ModerationDraft draft, KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddTag(draft);
+        }
+    }
+
+    private static void RemoveTag(ModerationDraft draft, string tag) =>
+        draft.Tags = string.Join(", ", DraftTags(draft).Where(value => value != tag));
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,6 +346,8 @@ public partial class RequestBoardsPage
         _isCreating = false;
         _operationFailed = false;
         _feedback = string.Empty;
+        _pane = RequestBoardPane.Setup;
+        _openModerationFolds.Clear();
         SelectFirstField();
         await LoadModeratorPageAsync();
     }
@@ -107,6 +387,8 @@ public partial class RequestBoardsPage
         _moderatorPage = null;
         _moderationDrafts.Clear();
         _operationFailed = false;
+        _pane = RequestBoardPane.Setup;
+        _openModerationFolds.Clear();
         SelectFirstField();
         SetCreateGuidance();
         _primaryFocusRequest++;
@@ -234,15 +516,6 @@ public partial class RequestBoardsPage
 
     private static string OptionalBoundary(string value) =>
         string.IsNullOrWhiteSpace(value) ? "any" : value;
-
-    internal static string RefundPolicyLabel(RequestBoardRefundPolicy policy) =>
-        policy switch
-        {
-            RequestBoardRefundPolicy.Never => "Never refund",
-            RequestBoardRefundPolicy.RejectedOrWithdrawn => "Refund if rejected or withdrawn",
-            RequestBoardRefundPolicy.AnyUnfulfilledClosure => "Refund if not fulfilled",
-            _ => throw new UnreachableException("Unknown request board refund policy."),
-        };
 
     internal static string FieldKindLabel(RequestBoardFieldKind kind) =>
         kind switch
@@ -494,6 +767,7 @@ public partial class RequestBoardsPage
         public string MinimumNumber { get; set; } = string.Empty;
         public string MaximumNumber { get; set; } = string.Empty;
         public string Choices { get; set; } = string.Empty;
+        public string ChoiceDraft { get; set; } = string.Empty;
 
         public RequestBoardFieldCommand? ToCommand() =>
             !int.TryParse(
@@ -564,6 +838,7 @@ public partial class RequestBoardsPage
         public string PrivateNote { get; set; } = string.Empty;
         public string PrivateRejectionReason { get; set; } = string.Empty;
         public string MergeTarget { get; set; } = string.Empty;
+        public string TagDraft { get; set; } = string.Empty;
 
         public ModerateRequestCommand? ToCommand(
             long submissionId,

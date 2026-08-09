@@ -262,27 +262,21 @@
                                          OpenChanged="@(open => SetStage(CustomCommandStage.Action, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-12">
-                                        <div id="@CommandActionFieldId(command)"
-                                             class="studio-choice-cards"
-                                             role="group"
-                                             aria-label="What happens"
-                                             tabindex="-1"
-                                             @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))"
-                                             @ref="_controls[CommandActionFieldId(command)]">
+                                        <StudioChoiceCards id="@CommandActionFieldId(command)"
+                                                           AriaLabel="What happens"
+                                                           CaptureElement="@(element => _controls[CommandActionFieldId(command)] = element)"
+                                                           @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))">
                                             @foreach (var choice in _actionChoices)
                                             {
-                                                <button @key="choice.Kind"
-                                                        type="button"
-                                                        class="studio-choice-card"
-                                                        data-action-kind="@choice.Kind"
-                                                        aria-pressed="@(command.ActionKind == choice.Kind ? "true" : "false")"
-                                                        @onclick="() => command.ActionKind = choice.Kind">
-                                                    <span class="studio-choice-card__icon" aria-hidden="true">@choice.Icon</span>
-                                                    <span class="studio-choice-card__title">@choice.Title</span>
-                                                    <span class="studio-choice-card__description">@choice.Description</span>
-                                                </button>
+                                                <StudioChoiceCard @key="choice.Kind"
+                                                                  data-action-kind="@choice.Kind"
+                                                                  Icon="@choice.Icon"
+                                                                  Title="@choice.Title"
+                                                                  Description="@choice.Description"
+                                                                  Pressed="@(command.ActionKind == choice.Kind)"
+                                                                  Select="@(() => command.ActionKind = choice.Kind)" />
                                             }
-                                        </div>
+                                        </StudioChoiceCards>
                                         @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
                                     @if (command.Action is AutomationCustomCommandActionEditor)

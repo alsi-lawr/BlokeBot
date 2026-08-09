@@ -1,10 +1,12 @@
-<div class="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)]" data-fold="@Key">
+<div class="@(Bare ? null : "rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)]")" data-fold="@Key">
     <button type="button"
-            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-950 focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none"
+            class="@(Bare
+                ? "inline-flex cursor-pointer items-center gap-[0.35rem] py-[0.2rem] text-[0.82rem] font-bold text-[var(--app-text-muted)] hover:text-[var(--app-text-strong)] focus-visible:rounded-md focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none"
+                : "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-950 focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none")"
             aria-expanded="@(Open ? "true" : "false")"
             aria-controls="@_bodyId"
             @onclick="Toggle">
-        <span class="text-muted-foreground transition-transform duration-200 motion-reduce:transition-none @(Open ? "rotate-90" : null)"
+        <span class="@(Bare ? "transition-transform duration-200 motion-reduce:transition-none" : "text-muted-foreground transition-transform duration-200 motion-reduce:transition-none") @(Open ? "rotate-90" : null)"
               aria-hidden="true">›</span>
         <span>@Label</span>
     </button>
@@ -12,7 +14,7 @@
          class="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none @(Open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")"
          inert="@(!Open)">
         <div class="min-w-0 overflow-hidden">
-            <div class="px-3 pt-1 pb-3">
+            <div class="@(Bare ? "pt-[0.7rem]" : "px-3 pt-1 pb-3")">
                 @ChildContent
             </div>
         </div>

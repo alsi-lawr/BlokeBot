@@ -73,7 +73,7 @@ local succeeded, failure = pcall(function()
     ["request-boards"] = {
       laptop = {
         path = "/requests",
-        ready = "Edit board",
+        ready = "Game night requests",
       },
       phone = {
         path = "/requests/samplechannel/requests",

@@ -27,17 +27,13 @@ public sealed class RequestBoardUiTests
         page.WaitForAssertion(() =>
         {
             page.Find("#request-board-refunds")
-                .QuerySelectorAll("option")
+                .QuerySelectorAll(".studio-choice-card .studio-choice-card__title")
+                .Select(title => title.TextContent)
+                .ShouldBe(["Never", "Rejected or withdrawn", "Not fulfilled"]);
+            page.Find("[aria-label='Kind of answer']")
+                .QuerySelectorAll("button")
                 .Select(option => option.TextContent)
-                .ShouldBe([
-                    "Never refund",
-                    "Refund if rejected or withdrawn",
-                    "Refund if not fulfilled",
-                ]);
-            page.Find("#request-field-kind-0")
-                .QuerySelectorAll("option")
-                .Select(option => option.TextContent)
-                .ShouldBe(["Text", "Link", "Choose from a list", "Number", "Twitch clip link"]);
+                .ShouldBe(["Text", "Link", "Number", "Choose from a list", "Twitch clip link"]);
         });
 
         Enum.GetValues<RequestSubmissionStatus>()
