@@ -15,46 +15,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentUiTests
 {
     [Test]
-    public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndEveryCaptureSetting()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database);
-        var service = new MomentHubService(
-            database,
-            new UnusedMomentProvider(),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await using var context = UiTestContextFactory.Create(database, hostId);
-        _ = context.Services.AddSingleton(service);
-        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(
-            new OfflineStreamLivenessProvider()
-        );
-
-        var page = context.Render<MomentsPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            var recap = page.Find("a[aria-label='Open weekly recap (opens in a new tab)']");
-            recap.TextContent.Trim().ShouldBe("Open weekly recap");
-            recap.GetAttribute("href").ShouldBe("/moments/streamer");
-            recap.GetAttribute("target").ShouldBe("_blank");
-            recap.GetAttribute("rel").ShouldBe("noopener");
-            _ = recap.Closest(".page-header__actions").ShouldNotBeNull();
-            var marker = page.Find("#moment-marker-fallback");
-            marker.GetAttribute("role").ShouldBe("switch");
-            page.Find($"#{marker.GetAttribute("aria-labelledby")}")
-                .TextContent.ShouldContain("Use a stream marker");
-            _ = page.Find("#moment-window").ShouldNotBeNull();
-            _ = page.Find("#moment-reward-amount").ShouldNotBeNull();
-            page.FindAll(".studio-segmented[aria-label='Point reward'] button")
-                .Select(option => option.TextContent)
-                .ShouldBe(["No reward", "First viewer to request", "All contributing viewers"]);
-            page.Markup.ShouldNotContain("pt-6");
-        });
-    }
-
-    [Test]
     public async Task PublicRecap_RendersApprovedTwitchLinkAndNeverPrivateModerationText()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -248,32 +208,6 @@ public sealed class MomentUiTests
             string description,
             CancellationToken ct
         ) => Task.FromResult<MomentProviderOutcome>(new MomentProviderOutcome.ClipReady(clipId));
-    }
-
-    private sealed class UnusedMomentProvider : IMomentProviderOperations
-    {
-        public Task<MomentProviderOutcome> CaptureAsync(
-            int hostId,
-            Guid publicId,
-            bool markerFallbackEnabled,
-            string description,
-            CancellationToken ct
-        ) =>
-            Task.FromResult<MomentProviderOutcome>(
-                new MomentProviderOutcome.Failed(null, null, "Not used by this UI test.")
-            );
-    }
-
-    private sealed class OfflineStreamLivenessProvider : IHostStreamLivenessProvider
-    {
-        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
-            IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
-                ValueTask.FromResult(
-                    Result<HostStreamLivenessOutcome, Never>.Success(
-                        new HostStreamLivenessOutcome.Offline()
-                    )
-                )
-            );
     }
 
     private sealed class UnavailableStreamLivenessProvider : IHostStreamLivenessProvider

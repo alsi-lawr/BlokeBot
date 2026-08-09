@@ -97,10 +97,6 @@ public partial class CustomCommandSettingsPage
         ),
     ];
 
-    // The preview renders through the production renderer so its placeholder substitution cannot
-    // drift from what viewers actually see.
-    private static readonly CustomCommandTemplateRenderer _previewRenderer = new();
-
     private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
@@ -769,7 +765,7 @@ public partial class CustomCommandSettingsPage
             SpeakerColour = "#00ad6f",
             Badge = "BOT",
             Bot = true,
-            Message = _previewRenderer.Render(
+            Message = CustomCommandTemplateRenderer.RenderCommandPreview(
                 entry.Variants[variant].Text,
                 new ChatCommandContext
                 {
