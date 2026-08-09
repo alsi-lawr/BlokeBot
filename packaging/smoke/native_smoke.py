@@ -117,10 +117,11 @@ def _remove_data_directory(
             now = monotonic()
             if deadline is None:
                 deadline = now + CLEANUP_RETRY_TIMEOUT_SECONDS
-            elif now >= deadline:
+            remaining = deadline - now
+            if remaining <= 0:
                 raise
             last_sharing_violation = error
-            sleep(CLEANUP_RETRY_INTERVAL_SECONDS)
+            sleep(min(CLEANUP_RETRY_INTERVAL_SECONDS, remaining))
 
 
 def smoke(executable: Path, version: str) -> None:

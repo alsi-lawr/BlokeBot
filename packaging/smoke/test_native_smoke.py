@@ -42,6 +42,25 @@ class RemoveDataDirectoryTests(unittest.TestCase):
         self.assertEqual(remove.call_count, 2)
         sleep.assert_called_once_with(0.1)
 
+    def test_sharing_violation_near_deadline_sleeps_only_for_remaining_time(self) -> None:
+        sharing_violation = PermissionError("file is in use")
+        sharing_violation.winerror = 32
+        remove = Mock(side_effect=sharing_violation)
+        monotonic = Mock(side_effect=[0.0, 4.95, 4.95, 5.0])
+        sleep = Mock()
+
+        with self.assertRaises(PermissionError):
+            native_smoke._remove_data_directory(
+                Path("data"),
+                remove=remove,
+                monotonic=monotonic,
+                sleep=sleep,
+            )
+
+        self.assertEqual(sleep.call_count, 2)
+        self.assertEqual(sleep.call_args_list[0].args[0], 0.1)
+        self.assertAlmostEqual(sleep.call_args_list[1].args[0], 0.05)
+
     def test_other_permission_error_is_not_retried(self) -> None:
         permission_error = PermissionError("access denied")
         permission_error.winerror = 5
