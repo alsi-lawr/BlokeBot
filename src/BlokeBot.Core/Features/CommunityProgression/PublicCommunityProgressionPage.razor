@@ -1,0 +1,57 @@
+@page "/community/{Channel}"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject CommunityProgressionService _progression
+
+<PageTitle>BlokeBot | Community progression</PageTitle>
+
+<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+    <div class="mx-auto max-w-6xl space-y-6">
+        <PageHeader Kicker="Community" Title="Season progression" Description="Public standings, quests, achievements, and persistent rewards." />
+        @if (!_loaded)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Loading public progression…</div>
+        }
+        else if (_view is null)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Public Community progression is unavailable for this channel.</div>
+        }
+        else if (_view.Seasons.Count == 0)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">No public seasons have opened yet.</div>
+        }
+        else
+        {
+            @foreach (var season in _view.Seasons)
+            {
+                <article class="card p-5" data-public-season="@season.Id.Value">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div><h2 class="text-xl font-semibold">@season.Name</h2><p class="mt-1 text-sm text-muted-foreground">@season.Description</p></div>
+                        <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"><span class="status-pill__label">@season.Status</span></span>
+                    </div>
+                    <div class="mt-5 grid gap-5 lg:grid-cols-2">
+                        <section><h3 class="font-semibold">Standings</h3>
+                            @if (season.Standings.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No participants yet.</p> }
+                            else { <ol class="mt-2 space-y-2">@foreach (var standing in season.Standings) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">#@standing.Rank @standing.DisplayName</span> <span class="text-muted-foreground">(@($"@{standing.Login}")) · @standing.CompletedCount completed · @standing.ProgressAmount progress</span></li> }</ol> }
+                        </section>
+                        <section><h3 class="font-semibold">Current viewer progress</h3>
+                            @if (season.Progress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No viewer progress yet.</p> }
+                            else { <ul class="mt-2 space-y-2">@foreach (var item in season.Progress.Take(20)) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">@item.DisplayName</span> · @item.DefinitionName: @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
+                        </section>
+                    </div>
+                    <div class="mt-5 grid gap-5 lg:grid-cols-2">
+                        <section><h3 class="font-semibold">Completed achievements &amp; history</h3>
+                            @if (season.Completions.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No completions yet.</p> }
+                            else { <ul class="mt-2 space-y-2">@foreach (var item in season.Completions.Take(20)) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">@(item.DisplayName ?? "Community")</span> completed @item.DefinitionName · @item.CompletedAtUtc.ToString("u")</li> }</ul> }
+                        </section>
+                        <section><h3 class="font-semibold">Reward unlocks</h3>
+                            @if (season.Unlocks.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No rewards unlocked yet.</p> }
+                            else { <ul class="mt-2 space-y-2">@foreach (var item in season.Unlocks.Take(20)) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">@($"@{item.Login}")</span> unlocked @item.Name (@item.Kind) @if (item.Equipped) { <span class="font-semibold text-emerald-700">· equipped</span> }</li> }</ul> }
+                        </section>
+                    </div>
+                </article>
+            }
+        }
+    </div>
+</main>

@@ -284,6 +284,7 @@ public sealed class FakeTwitchAuthority
                 or "channel.prediction.progress"
                 or "channel.prediction.lock"
                 or "channel.prediction.end"
+                or "channel.cheer"
                 or "channel.channel_points_custom_reward_redemption.add"
                 or "channel.channel_points_custom_reward_redemption.update";
         if (

@@ -24,6 +24,10 @@ public sealed class BotHost
 
     public DateTime? BountiesPausedAtUtc { get; set; }
 
+    public DateTime? CommunityProgressionPausedAtUtc { get; set; }
+
+    public DateTime? CommunityProgressionAcceptEventsAfterUtc { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

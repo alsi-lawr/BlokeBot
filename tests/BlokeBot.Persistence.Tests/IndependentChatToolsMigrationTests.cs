@@ -58,7 +58,7 @@ public sealed class IndependentChatToolsMigrationTests
         {
             await latest.Database.MigrateAsync();
             latest.Hosts.AddRange(
-                Host("all", HostFeatureFlags.All),
+                Host("all", (HostFeatureFlags)0x3FFF),
                 Host("none", HostFeatureFlags.None),
                 Host("one", HostFeatureFlags.Shoutouts),
                 Host(

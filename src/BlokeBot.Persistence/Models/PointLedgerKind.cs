@@ -20,6 +20,7 @@ public enum PointLedgerKind
     BountyPledgeRefund,
     BountyPledgeConsumption,
     BountyCompletionReward,
+    CommunityProgressionReward,
 }
 
 internal static class PointLedgerKindPersistence
@@ -40,6 +41,7 @@ internal static class PointLedgerKindPersistence
     private const string _bountyPledgeRefundToken = "BountyPledgeRefund";
     private const string _bountyPledgeConsumptionToken = "BountyPledgeConsumption";
     private const string _bountyCompletionRewardToken = "BountyCompletionReward";
+    private const string _communityProgressionRewardToken = "CommunityProgressionReward";
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
@@ -59,6 +61,7 @@ internal static class PointLedgerKindPersistence
         _bountyPledgeRefundToken,
         _bountyPledgeConsumptionToken,
         _bountyCompletionRewardToken,
+        _communityProgressionRewardToken,
     ];
 
     public static string ToToken(PointLedgerKind kind) =>
@@ -80,6 +83,7 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.BountyPledgeRefund => _bountyPledgeRefundToken,
             PointLedgerKind.BountyPledgeConsumption => _bountyPledgeConsumptionToken,
             PointLedgerKind.BountyCompletionReward => _bountyCompletionRewardToken,
+            PointLedgerKind.CommunityProgressionReward => _communityProgressionRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
 
@@ -102,6 +106,7 @@ internal static class PointLedgerKindPersistence
             _bountyPledgeRefundToken => PointLedgerKind.BountyPledgeRefund,
             _bountyPledgeConsumptionToken => PointLedgerKind.BountyPledgeConsumption,
             _bountyCompletionRewardToken => PointLedgerKind.BountyCompletionReward,
+            _communityProgressionRewardToken => PointLedgerKind.CommunityProgressionReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
 }

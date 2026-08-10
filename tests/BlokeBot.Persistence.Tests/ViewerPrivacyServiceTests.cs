@@ -316,6 +316,22 @@ public sealed class ViewerPrivacyServiceTests
             "OverlayInstanceDomainEvent.ActorLogin",
             "PublicChatPinOperation.PinnerTwitchUserId",
             "ActivePublicChatPin.PinnerTwitchUserId",
+            "CommunityAudit.ActorLogin",
+            "CommunityAudit.ActorTwitchUserId",
+            "CommunityCompletion.ViewerDisplayName",
+            "CommunityCompletion.ViewerLogin",
+            "CommunityCompletion.ViewerTwitchUserId",
+            "CommunityEquippedReward.ViewerLogin",
+            "CommunityEquippedReward.ViewerTwitchUserId",
+            "CommunityProgress.ViewerDisplayName",
+            "CommunityProgress.ViewerLogin",
+            "CommunityProgress.ViewerTwitchUserId",
+            "CommunityRewardUnlock.ViewerDisplayName",
+            "CommunityRewardUnlock.ViewerLogin",
+            "CommunityRewardUnlock.ViewerTwitchUserId",
+            "CommunitySeasonStanding.ViewerDisplayName",
+            "CommunitySeasonStanding.ViewerLogin",
+            "CommunitySeasonStanding.ViewerTwitchUserId",
         };
         var excluded = new Dictionary<string, string>(StringComparer.Ordinal)
         {

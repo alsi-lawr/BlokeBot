@@ -83,6 +83,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => x.RequestSubmissionId);
             _ = b.HasIndex(static x => new { x.HostId, x.BountyPledgeId });
             _ = b.HasIndex(static x => new { x.HostId, x.BountyRewardId });
+            _ = b.HasIndex(static x => new { x.HostId, x.CommunityCompletionId });
             _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(static x => x.HostId)
@@ -95,6 +96,11 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasOne<BountyContributorReward>()
                 .WithMany()
                 .HasForeignKey(static x => new { x.HostId, x.BountyRewardId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            _ = b.HasOne<CommunityCompletion>()
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.CommunityCompletionId })
                 .HasPrincipalKey(static x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });

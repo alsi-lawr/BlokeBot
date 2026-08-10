@@ -45,6 +45,11 @@
                         selection,
                         HostFeatureFlags.Bounties | HostFeatureFlags.Points
                     );
+                    var showCommunityProgression = FeatureIsVisible(
+                        session,
+                        selection,
+                        HostFeatureFlags.CommunityProgression
+                    );
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
                     var showRequestBoards = FeatureIsVisible(session, selection, HostFeatureFlags.RequestBoards);
@@ -59,7 +64,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showBounties || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -278,6 +283,24 @@
                             <span class="nav-menu__label min-w-0">Bounties</span>
                         </NavLink>
                         @RouteHelp("bounties", "Bounties")
+                    </div>
+                }
+
+                @if (showCommunityProgression)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="community">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="community"
+                                 aria-label="Community progression"
+                                 aria-describedby="@RouteHelpReference("community")"
+                                 aria-current="@CurrentRoute("community")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fuchsia-700" aria-hidden="true">★</span>
+                            <span class="nav-menu__label min-w-0">Community</span>
+                        </NavLink>
+                        @RouteHelp("community", "Community progression")
                     </div>
                 }
 

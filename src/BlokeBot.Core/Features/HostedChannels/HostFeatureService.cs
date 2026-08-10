@@ -121,6 +121,22 @@ public sealed class HostFeatureService(
         {
             host.BountiesPausedAtUtc ??= timeProvider.GetUtcNow().UtcDateTime;
         }
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            && !updated.Contains(HostFeatureFlags.CommunityProgression)
+        )
+        {
+            host.CommunityProgressionPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            && updated.Contains(HostFeatureFlags.CommunityProgression)
+        )
+        {
+            host.CommunityProgressionAcceptEventsAfterUtc = now;
+            host.CommunityProgressionPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         _ = await changes.NotifyChangedAsync(ct);

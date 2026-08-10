@@ -19,6 +19,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Guessing,
         HostFeatureFlags.Points,
         HostFeatureFlags.Bounties,
+        HostFeatureFlags.CommunityProgression,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -95,6 +96,12 @@ public static class HostFeatureCatalog
                 "Bounties",
                 "Let viewers fund channel challenges with points. Requires Points to be on.",
                 enabledFeatures.Contains(HostFeatureFlags.Bounties)
+            ),
+            new(
+                HostFeatureFlags.CommunityProgression,
+                "Community progression",
+                "Run seasons with quests, achievements, standings, and persistent rewards.",
+                enabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

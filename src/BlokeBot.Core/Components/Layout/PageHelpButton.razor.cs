@@ -70,6 +70,7 @@ public partial class PageHelpButton
             "/host" => _hostConfigHelp,
             "/requests" => _requestBoardsHelp,
             "/bounties" => _bountiesHelp,
+            "/community" => _communityProgressionHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -214,6 +215,39 @@ public partial class PageHelpButton
                     "A later Twitch rename does not move a balance or combine historical logins.",
                     "Public bounties show recorded contributor logins and pledge amounts. Private bounties show no public data. Moderator reasons remain private.",
                     "Turning Bounties off retains all configuration and history. Direct links recover through Channel setup, and turning it back on does not replay suppressed commands, events, or expiries.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _communityProgressionHelp = new(
+        "Community progression",
+        [
+            _featureSwitchHelp,
+            new(
+                "Seasons, progress, and privacy",
+                "Create a draft season, add typed quests, achievements, and persistent rewards, then open it for supported BlokeBot and Twitch events.",
+                [
+                    "Public mode shows participant Twitch identities, live individual progress, standings, completed achievements, reward unlocks, equipped rewards, and archived history. Hidden mode publishes nothing.",
+                    "Private moderator notes and internal audit records never appear on the public page.",
+                    "Closing freezes a standings snapshot and immutable completion history. Archiving keeps viewer unlocks and equipped selections.",
+                ]
+            ),
+            new(
+                "Resets and schedule edits",
+                "Daily and weekly repeatable quests use the channel time zone and the local boundary shown beside each definition.",
+                [
+                    "A daylight-saving gap moves forward to the first valid instant. An overlap uses the first occurrence and never resets again at the second.",
+                    "After downtime BlokeBot performs at most one rollover into the current period; it never replays every missed period.",
+                    "Saving an active schedule edit immediately closes the current period and resets active repeatable progress. You must confirm that consequence before saving; retries and multiple instances apply it once.",
+                ]
+            ),
+            new(
+                "Persistent rewards and recovery",
+                "Titles, supported badge icons, cosmetic accents, and points are granted atomically when progress completes.",
+                [
+                    "Viewers equip one unlocked title, badge, and accent for this host with !equiptitle, !equipbadge, and !equipaccent.",
+                    "Turning Community progression off blocks commands, events, timers, automation, rewards, and public output while preserving saved data. Re-enable resumes from the current period without replaying suppressed work.",
                 ]
             ),
         ]

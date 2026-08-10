@@ -48,6 +48,10 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute BountyCancel { get; } = new("bountycancel");
     public static FixedChatCommandRoute BountyReject { get; } = new("bountyreject");
     public static FixedChatCommandRoute BountyExtend { get; } = new("bountyextend");
+    public static FixedChatCommandRoute Progress { get; } = new("progress");
+    public static FixedChatCommandRoute EquipTitle { get; } = new("equiptitle");
+    public static FixedChatCommandRoute EquipBadge { get; } = new("equipbadge");
+    public static FixedChatCommandRoute EquipAccent { get; } = new("equipaccent");
 
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
@@ -81,6 +85,10 @@ public static class FixedChatCommandRoutes
                 BountyCancel.Value,
                 BountyReject.Value,
                 BountyExtend.Value,
+                Progress.Value,
+                EquipTitle.Value,
+                EquipBadge.Value,
+                EquipAccent.Value,
             ],
             StringComparer.OrdinalIgnoreCase
         );

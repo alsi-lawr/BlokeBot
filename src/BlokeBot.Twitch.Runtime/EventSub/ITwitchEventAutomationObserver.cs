@@ -57,7 +57,7 @@ public interface ITwitchEventAutomationObserver
 /// automation feature owner implements this so subscription lifecycle follows host connections and
 /// enabled flows.
 /// </summary>
-public interface IAutomationEventSubRequirementSource
+public interface IEventSubRequirementSource
 {
     ValueTask<bool> RequiresAsync(
         string channel,
@@ -65,6 +65,8 @@ public interface IAutomationEventSubRequirementSource
         CancellationToken cancellation
     );
 }
+
+public interface IAutomationEventSubRequirementSource : IEventSubRequirementSource;
 
 public enum AutomationEventSubRequirement
 {

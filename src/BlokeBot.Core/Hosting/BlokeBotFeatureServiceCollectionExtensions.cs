@@ -11,6 +11,7 @@ using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.Guessing.Configuration;
@@ -50,6 +51,43 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotCommunityProgression(
+        this IServiceCollection services
+    )
+    {
+        _ = services.AddSingleton<CommunityProgressionService>();
+        _ = services.AddSingleton<ICommunityAchievementGrantService>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionService>()
+        );
+        _ = services.AddSingleton<CommunityProgressionRuntime>();
+        _ = services.AddSingleton<ITwitchEventAutomationObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        _ = services.AddSingleton<IChatMessageObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        _ = services.AddSingleton<IEventSubRequirementSource>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IHostFeatureChangeObserver,
+                CommunityProgressionFeatureObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IBountyCompletionObserver,
+                BountyCommunityProgressionObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, CommunityProgressionScheduleWorker>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotBounties(this IServiceCollection services)
     {
         _ = services.AddSingleton<BountyService>();

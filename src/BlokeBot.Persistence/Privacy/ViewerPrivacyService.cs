@@ -146,6 +146,17 @@ public static class ViewerPrivacyService
                             && (reward.TwitchUserId == userId || reward.Login == login)
                         )
                     )
+                    || (
+                        x.CommunityCompletionId != null
+                        && db.CommunityCompletions.Any(completion =>
+                            completion.HostId == x.HostId
+                            && completion.Id == x.CommunityCompletionId
+                            && (
+                                completion.ViewerTwitchUserId == userId
+                                || completion.ViewerLogin == login
+                            )
+                        )
+                    )
                 ) && (hostId == null || x.HostId == hostId)
             )
         );
@@ -354,6 +365,48 @@ public static class ViewerPrivacyService
         await AddAsync(
             "bounties.moderation-audits",
             db.BountyModerationAudits.Where(x =>
+                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.progress",
+            db.CommunityProgress.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.completions",
+            db.CommunityCompletions.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.reward-unlocks",
+            db.CommunityRewardUnlocks.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.equipped-rewards",
+            db.CommunityEquippedRewards.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.standings",
+            db.CommunitySeasonStandings.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "community.moderation-audits",
+            db.CommunityAudits.Where(x =>
                 (x.ActorTwitchUserId == userId || x.ActorLogin == login)
                 && (hostId == null || x.HostId == hostId)
             )
@@ -568,6 +621,13 @@ public static class ViewerPrivacyService
         var bountyRewardIds = await db
             .BountyContributorRewards.Where(x =>
                 (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+        var communityCompletionIds = await db
+            .CommunityCompletions.Where(x =>
+                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
                 && (hostId == null || x.HostId == hostId)
             )
             .Select(x => x.Id)
@@ -919,6 +979,112 @@ public static class ViewerPrivacyService
         }
 
         Record("bounties.events", bountyEvents);
+        if (communityCompletionIds.Count > 0)
+        {
+            Record(
+                "community.points-ledger",
+                await db
+                    .PointLedgerEntries.Where(x =>
+                        communityCompletionIds.Contains(x.CommunityCompletionId ?? 0)
+                        && (hostId == null || x.HostId == hostId)
+                    )
+                    .ExecuteUpdateAsync(
+                        setters =>
+                            setters
+                                .SetProperty(x => x.Login, ErasedToken)
+                                .SetProperty(x => x.ActorLogin, (string?)null)
+                                .SetProperty(x => x.Note, string.Empty),
+                        ct
+                    )
+            );
+        }
+        Record(
+            "community.equipped-rewards",
+            await db
+                .CommunityEquippedRewards.Where(x =>
+                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct)
+        );
+        Record(
+            "community.reward-unlocks",
+            await db
+                .CommunityRewardUnlocks.Where(x =>
+                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct)
+        );
+        Record(
+            "community.progress",
+            await db
+                .CommunityProgress.Where(x =>
+                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct)
+        );
+        Record(
+            "community.completions",
+            await db
+                .CommunityCompletions.Where(x =>
+                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.SubjectKey, x => "erased:" + x.Id)
+                            .SetProperty(x => x.ViewerTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ViewerLogin, ErasedToken)
+                            .SetProperty(x => x.ViewerDisplayName, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "community.standings",
+            await db
+                .CommunitySeasonStandings.Where(x =>
+                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ViewerTwitchUserId, x => "erased:" + x.Id)
+                            .SetProperty(x => x.ViewerLogin, ErasedToken)
+                            .SetProperty(x => x.ViewerDisplayName, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "community.moderation-audits",
+            await db
+                .CommunityAudits.Where(x =>
+                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken)
+                            .SetProperty(x => x.PrivateNote, string.Empty),
+                    ct
+                )
+        );
+        var communityEvents = 0;
+        foreach (var needle in quotedNeedles)
+        {
+            communityEvents += await db
+                .CommunityEvents.Where(x =>
+                    EF.Functions.Like(x.PublicPayload, needle)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct);
+        }
+        Record("community.events", communityEvents);
         Record(
             "play-queues.entries",
             await db

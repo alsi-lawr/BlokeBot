@@ -46,6 +46,26 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         Set<BountyContributorReward>();
     public DbSet<BountyModerationAudit> BountyModerationAudits => Set<BountyModerationAudit>();
     public DbSet<BountyDomainEvent> BountyEvents => Set<BountyDomainEvent>();
+    public DbSet<CommunitySeason> CommunitySeasons => Set<CommunitySeason>();
+    public DbSet<CommunityDefinition> CommunityDefinitions => Set<CommunityDefinition>();
+    public DbSet<CommunityRewardDefinition> CommunityRewardDefinitions =>
+        Set<CommunityRewardDefinition>();
+    public DbSet<CommunityDefinitionReward> CommunityDefinitionRewards =>
+        Set<CommunityDefinitionReward>();
+    public DbSet<CommunityProgress> CommunityProgress => Set<CommunityProgress>();
+    public DbSet<CommunityCompletion> CommunityCompletions => Set<CommunityCompletion>();
+    public DbSet<CommunityRewardUnlock> CommunityRewardUnlocks => Set<CommunityRewardUnlock>();
+    public DbSet<CommunityEquippedReward> CommunityEquippedRewards =>
+        Set<CommunityEquippedReward>();
+    public DbSet<CommunitySourceEventReceipt> CommunitySourceEventReceipts =>
+        Set<CommunitySourceEventReceipt>();
+    public DbSet<CommunityExternalGrantReceipt> CommunityExternalGrantReceipts =>
+        Set<CommunityExternalGrantReceipt>();
+    public DbSet<CommunityResetPeriod> CommunityResetPeriods => Set<CommunityResetPeriod>();
+    public DbSet<CommunitySeasonStanding> CommunitySeasonStandings =>
+        Set<CommunitySeasonStanding>();
+    public DbSet<CommunityAudit> CommunityAudits => Set<CommunityAudit>();
+    public DbSet<CommunityDomainEvent> CommunityEvents => Set<CommunityDomainEvent>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
     public DbSet<PointsGiveawayEntrant> PointsGiveawayEntrants => Set<PointsGiveawayEntrant>();
     public DbSet<PointsGiveawayWinner> PointsGiveawayWinners => Set<PointsGiveawayWinner>();
@@ -132,6 +152,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
         ConfigureBounties(modelBuilder);
+        ConfigureCommunityProgression(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);

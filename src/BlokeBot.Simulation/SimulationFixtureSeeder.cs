@@ -47,6 +47,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedGuessingAsync(db, hostId, now, cancellationToken);
         await SeedPointsAsync(db, hostId, now, cancellationToken);
         await SeedBountyAsync(db, hostId, now, cancellationToken);
+        await SeedCommunityProgressionAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -157,6 +158,205 @@ internal sealed class SimulationFixtureSeeder(
                         OccurredAtUtc = now.AddMinutes(-30),
                     },
                 ],
+            }
+        );
+    }
+
+    private static async Task SeedCommunityProgressionAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("107163c8-39d5-4ba5-896f-142f72245568");
+        if (
+            await db.CommunitySeasons.AnyAsync(
+                value => value.PublicId == publicId,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        var season = new CommunitySeason
+        {
+            PublicId = publicId,
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("446c12d3-8aef-4317-9140-ac043286aa8c"),
+            Name = "Summer community climb",
+            Description = "Complete stream quests together and unlock permanent channel flair.",
+            ModeratorNotes = "Simulation-only private note",
+            Status = CommunitySeasonStatus.Open,
+            Visibility = CommunityVisibility.Public,
+            StartsAtUtc = now.AddDays(-5),
+            EndsAtUtc = now.AddDays(25),
+            OpenedAtUtc = now.AddDays(-5),
+            Revision = 2,
+            CreatedAtUtc = now.AddDays(-6),
+            UpdatedAtUtc = now.AddMinutes(-4),
+        };
+        var title = new CommunityRewardDefinition
+        {
+            PublicId = Guid.Parse("6cfdc3df-2f55-440c-b273-54e1b80ad5dc"),
+            HostId = hostId,
+            Key = "trailblazer",
+            Kind = CommunityRewardKind.Title,
+            Name = "Trailblazer",
+            PresentationToken = "trailblazer",
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var badge = new CommunityRewardDefinition
+        {
+            PublicId = Guid.Parse("add90a84-85fe-4798-aa74-e92810d8dc94"),
+            HostId = hostId,
+            Key = "summer-star",
+            Kind = CommunityRewardKind.Badge,
+            Name = "Summer star",
+            PresentationToken = "star",
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var achievement = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("6db0bd9a-9e69-49c5-a4bd-b6fa2604d30c"),
+            HostId = hostId,
+            Key = "first-cheer",
+            Name = "Bring the energy",
+            Description = "Cheer during the summer climb.",
+            Kind = CommunityDefinitionKind.Achievement,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.OneTime,
+            EventRule = CommunityEventRuleKind.Cheer,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 1,
+            PointsReward = "100",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var daily = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("470d3ef9-8c31-48f5-9c03-79f5c497360d"),
+            HostId = hostId,
+            Key = "daily-chat",
+            Name = "Daily regular",
+            Description = "Join five chat moments each day.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.ChatMessage,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 5,
+            PointsReward = "25",
+            ResetCadence = CommunityResetCadence.Daily,
+            ResetLocalTime = "06:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        db.CommunityRewardDefinitions.AddRange(title, badge);
+        db.CommunityDefinitions.AddRange(achievement, daily);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        db.CommunityDefinitionRewards.AddRange(
+            new CommunityDefinitionReward
+            {
+                DefinitionId = achievement.Id,
+                RewardDefinitionId = title.Id,
+            },
+            new CommunityDefinitionReward
+            {
+                DefinitionId = achievement.Id,
+                RewardDefinitionId = badge.Id,
+            }
+        );
+        var completion = new CommunityCompletion
+        {
+            PublicId = Guid.Parse("69655fd8-eb0e-4e73-8dd2-47d4b506bf92"),
+            HostId = hostId,
+            SeasonId = season.Id,
+            DefinitionId = achievement.Id,
+            SubjectKey = "viewer:3000",
+            ViewerTwitchUserId = "3000",
+            ViewerLogin = "nightowl",
+            ViewerDisplayName = "NightOwl",
+            DefinitionKey = achievement.Key,
+            DefinitionName = achievement.Name,
+            Sequence = 1,
+            PointsGranted = "100",
+            RewardSnapshot =
+                "[{\"key\":\"trailblazer\",\"kind\":\"Title\",\"name\":\"Trailblazer\"}]",
+            SourceOperationKey = "simulation-cheer",
+            CompletedAtUtc = now.AddHours(-2),
+        };
+        _ = db.CommunityCompletions.Add(completion);
+        db.CommunityProgress.AddRange(
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:3000",
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                Amount = 1,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddHours(-2),
+            },
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = daily.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                Amount = 3,
+                CompletionCount = 2,
+                PeriodKey = "v1:Daily:simulation",
+                UpdatedAtUtc = now.AddMinutes(-4),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+        db.CommunityRewardUnlocks.AddRange(
+            new CommunityRewardUnlock
+            {
+                HostId = hostId,
+                RewardDefinitionId = title.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                CompletionId = completion.Id,
+                GrantedAtUtc = completion.CompletedAtUtc,
+            },
+            new CommunityRewardUnlock
+            {
+                HostId = hostId,
+                RewardDefinitionId = badge.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                CompletionId = completion.Id,
+                GrantedAtUtc = completion.CompletedAtUtc,
+            }
+        );
+        _ = db.CommunityEquippedRewards.Add(
+            new CommunityEquippedReward
+            {
+                HostId = hostId,
+                Kind = CommunityRewardKind.Title,
+                RewardDefinitionId = title.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                LastOperationId = Guid.Parse("f02c9d94-b393-4bf6-816b-84a031da8f9c"),
+                EquippedAtUtc = now.AddHours(-1),
             }
         );
     }

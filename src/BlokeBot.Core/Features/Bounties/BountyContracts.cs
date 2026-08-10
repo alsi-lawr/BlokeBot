@@ -3,6 +3,16 @@ using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Bounties;
 
+public interface IBountyCompletionObserver
+{
+    Task BountyCompletedAsync(
+        int hostId,
+        Guid bountyPublicId,
+        DateTimeOffset completedAtUtc,
+        CancellationToken cancellationToken
+    );
+}
+
 public static class BountyLimits
 {
     public const int MaximumTitleLength = 160;

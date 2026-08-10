@@ -262,6 +262,14 @@ public sealed class ViewerCommandCatalogService(
             }
         }
 
+        if (enabledFeatures.Contains(HostFeatureFlags.CommunityProgression))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Progress));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipTitle));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipBadge));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipAccent));
+        }
+
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Queue));

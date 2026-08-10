@@ -13,9 +13,11 @@ internal sealed class EventSubChannelOperations(
     IBotChannelLifecycleNotifier lifecycle,
     INativeTwitchFeatureStateProvider nativeTwitch,
     IBroadcasterAccountProvider? broadcasters = null,
-    IAutomationEventSubRequirementSource? automationRequirements = null
+    IAutomationEventSubRequirementSource? automationRequirements = null,
+    IEnumerable<IEventSubRequirementSource>? eventRequirements = null
 ) : IEventSubChannelOperations
 {
+    private readonly IEventSubRequirementSource[] _eventRequirements = [.. eventRequirements ?? []];
     private static readonly IReadOnlyDictionary<
         EventSubBroadcasterOperationKind,
         IReadOnlyList<(string Type, string Version)>
@@ -216,7 +218,12 @@ internal sealed class EventSubChannelOperations(
                     channel,
                     NativeTwitchFeature.RewardsAndRedemptions,
                     cancellationToken
-                ),
+                )
+                    || await AutomationRequiresAsync(
+                        channel,
+                        AutomationEventSubRequirement.Redemptions,
+                        cancellationToken
+                    ),
             EventSubOperationSubscriptionKind.Predictions => await nativeTwitch.IsEnabledAsync(
                 channel,
                 NativeTwitchFeature.Predictions,
@@ -257,14 +264,29 @@ internal sealed class EventSubChannelOperations(
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
 
-    private ValueTask<bool> AutomationRequiresAsync(
+    private async ValueTask<bool> AutomationRequiresAsync(
         string channel,
         AutomationEventSubRequirement requirement,
         CancellationToken cancellationToken
-    ) =>
-        automationRequirements is null
-            ? ValueTask.FromResult(false)
-            : automationRequirements.RequiresAsync(channel, requirement, cancellationToken);
+    )
+    {
+        if (
+            automationRequirements is not null
+            && await automationRequirements.RequiresAsync(channel, requirement, cancellationToken)
+        )
+        {
+            return true;
+        }
+
+        foreach (var source in _eventRequirements)
+        {
+            if (await source.RequiresAsync(channel, requirement, cancellationToken))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(
         string channel,

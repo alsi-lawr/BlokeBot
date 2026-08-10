@@ -17,6 +17,9 @@ internal static class SimulationViewCatalog
         ["bounties"] = "/bounties",
         ["public-bounties"] =
             $"/bounties/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["community"] = "/community",
+        ["public-community"] =
+            $"/community/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",
         ["automation-events"] = "/automations/events",
         ["overlays"] = "/overlays#sources",

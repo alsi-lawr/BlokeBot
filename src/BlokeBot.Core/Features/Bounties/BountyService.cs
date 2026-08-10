@@ -17,12 +17,17 @@ namespace BlokeBot.Core.Features.Bounties;
 internal sealed class BountyService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    IEnumerable<IBountyCompletionObserver>? completionObservers = null
 )
 {
     private const int _eventSchemaVersion = 1;
     private const int _maximumEventPayloadLength = 1024;
     private const int _persistenceRetryCount = 20;
+    private readonly IBountyCompletionObserver[] _completionObservers =
+    [
+        .. completionObservers ?? [],
+    ];
 
     public async Task<BountyResult<BountyView>> CreateAsync(
         int hostId,
@@ -116,6 +121,23 @@ internal sealed class BountyService(
                     or BountyTransitionAction.Reject
                     or BountyTransitionAction.Expire;
             await PublishChangesAsync(pointsChanged, ct);
+        }
+
+        if (
+            command.Action == BountyTransitionAction.Complete
+            && result is BountyResult<BountyView>.Succeeded completed
+            && completed.Value.ResolvedAtUtc is { } completedAtUtc
+        )
+        {
+            foreach (var observer in _completionObservers)
+            {
+                await observer.BountyCompletedAsync(
+                    hostId,
+                    completed.Value.PublicId,
+                    new DateTimeOffset(DateTime.SpecifyKind(completedAtUtc, DateTimeKind.Utc)),
+                    ct
+                );
+            }
         }
 
         return result;

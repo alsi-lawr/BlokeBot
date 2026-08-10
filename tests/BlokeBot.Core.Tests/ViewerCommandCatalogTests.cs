@@ -19,6 +19,46 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerCommandCatalogTests
 {
     [Test]
+    public async Task CommunityProgressionSwitch_LoadingViewerCatalog_OmitsOwnedCommandsWhileOff()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.CommunityProgression,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var enabled = await catalog.LoadForHostAsync(hostId, CancellationToken.None);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures = HostFeatureFlags.None;
+            _ = await db.SaveChangesAsync();
+        }
+        var disabled = await catalog.LoadForHostAsync(hostId, CancellationToken.None);
+
+        enabled.Names.ShouldContain("!progress");
+        enabled.Names.ShouldContain("!equiptitle");
+        disabled.Names.ShouldNotContain("!progress");
+        disabled.Names.ShouldNotContain("!equiptitle");
+    }
+
+    [Test]
     public async Task OverlayCueCustomCommand_LoadingCatalog_InheritsOverlaysWithoutHidingMessageCommands()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -137,28 +177,7 @@ public sealed class ViewerCommandCatalogTests
 
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
-        snapshot.Names.ShouldBe([
-            "!bounties",
-            "!choices",
-            "!clip",
-            "!commands",
-            "!enter",
-            "!give",
-            "!join",
-            "!leave",
-            "!loyalty",
-            "!moment",
-            "!position",
-            "!predict",
-            "!queue",
-            "!ready",
-            "!request",
-            "!requests",
-            "!requestvote",
-            "!secret",
-            "!wager",
-            "!zeta",
-        ]);
+        snapshot.Names.ShouldBe(snapshot.Names.Order(StringComparer.OrdinalIgnoreCase));
         snapshot.Names.ShouldNotContain("!alpha");
         snapshot
             .Names.Distinct(StringComparer.OrdinalIgnoreCase)

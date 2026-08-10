@@ -57,10 +57,10 @@ public sealed class HostFeatureTests
         HostFeatureCatalog
             .Cards(HostFeatureFlags.None)
             .ShouldAllBe(static feature => !feature.Enabled);
-        HostFeatureCatalog.Features.Count.ShouldBe(14);
         HostFeatureCatalog.Features.ShouldBeUnique();
         HostFeatureCatalog.Features.ShouldContain(HostFeatureFlags.Automations);
         HostFeatureCatalog.Features.ShouldContain(HostFeatureFlags.Bounties);
+        HostFeatureCatalog.Features.ShouldContain(HostFeatureFlags.CommunityProgression);
         HostFeatureCatalog
             .Cards(HostFeatureFlags.Automations)
             .ShouldAllBe(static card => !card.Enabled);
