@@ -1,4 +1,5 @@
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -9,6 +10,9 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class BingoMigrationTests
 {
     private const string _previousMigration = "20260810091437_v0.9.0_CommunityProgression";
+    private const string _concurrencyMigration = "20260810150628_v0.9.0_BingoConcurrency";
+    private const string _opaqueAssignmentMigration =
+        "20260810154030_v0.9.0_BingoOpaqueAssignments";
 
     [Test]
     public async Task Upgrade_PreservesExistingHostsAsOptInAndPersistsRevisionedIssuedState()
@@ -124,7 +128,7 @@ public sealed class BingoMigrationTests
     }
 
     [Test]
-    public async Task CurrentDatabaseUpgrade_RekeysLegacyUniqueCardsWithoutChangingIssuedLayout()
+    public async Task Downgrade_WithMaterializedUniqueLayout_IsRefusedWithoutChangingAuthoritativeState()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         var initializer = new BlokeBotDatabaseInitializer(factory);
@@ -226,18 +230,33 @@ public sealed class BingoMigrationTests
             _ = seed.BingoGames.Add(game);
             _ = seed.BingoCards.Add(card);
             _ = await seed.SaveChangesAsync();
-            var markedPosition = 4;
-            _ = seed.BingoMarks.Add(
-                new BingoMark
+            seed.BingoMarks.AddRange(
+                Enumerable
+                    .Range(0, 3)
+                    .Select(position => new BingoMark
+                    {
+                        HostId = host.Id,
+                        GameId = game.Id,
+                        Card = card,
+                        SquareKey = expectedLayout[position],
+                        Position = position,
+                        IsActive = true,
+                        FirstMarkedAtUtc = DateTime.UtcNow,
+                        ChangedAtUtc = DateTime.UtcNow,
+                    })
+            );
+            _ = seed.BingoWins.Add(
+                new BingoWin
                 {
                     HostId = host.Id,
-                    GameId = game.Id,
+                    Game = game,
                     Card = card,
-                    SquareKey = expectedLayout[markedPosition],
-                    Position = markedPosition,
-                    IsActive = true,
-                    FirstMarkedAtUtc = DateTime.UtcNow,
-                    ChangedAtUtc = DateTime.UtcNow,
+                    PublicId = Guid.NewGuid(),
+                    Kind = BingoWinKind.Row,
+                    RuleIndex = 0,
+                    RuleKey = "row:0",
+                    PointsReward = "0",
+                    CompletedAtUtc = DateTime.UtcNow,
                 }
             );
             _ = await seed.SaveChangesAsync();
@@ -246,15 +265,74 @@ public sealed class BingoMigrationTests
         await initializer.InitializeAsync(default);
         await initializer.InitializeAsync(default);
 
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await using (var downgrade = await factory.CreateDbContextAsync())
+            {
+                var refusal = await Should.ThrowAsync<SqliteException>(() =>
+                    downgrade.GetService<IMigrator>().MigrateAsync(_concurrencyMigration)
+                );
+                refusal.SqliteErrorCode.ShouldBe(SQLitePCL.raw.SQLITE_CONSTRAINT);
+                refusal.SqliteExtendedErrorCode.ShouldBe(SQLitePCL.raw.SQLITE_CONSTRAINT_TRIGGER);
+            }
+            await AssertMaterializedCardPreservedAsync(
+                factory,
+                cardPublicId,
+                squareKeys,
+                expectedLayout
+            );
+        }
+    }
+
+    [Test]
+    public async Task Downgrade_WithoutMaterializedUniqueLayouts_Succeeds()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        var initializer = new BlokeBotDatabaseInitializer(factory);
+        await initializer.InitializeAsync(default);
+
+        await using (var downgrade = await factory.CreateDbContextAsync())
+        {
+            await downgrade.GetService<IMigrator>().MigrateAsync(_concurrencyMigration);
+            (await downgrade.Database.GetAppliedMigrationsAsync()).ShouldNotContain(
+                _opaqueAssignmentMigration
+            );
+        }
+
+        await initializer.InitializeAsync(default);
+        await using var upgraded = await factory.CreateDbContextAsync();
+        (await upgraded.Database.GetAppliedMigrationsAsync()).ShouldContain(
+            _opaqueAssignmentMigration
+        );
+    }
+
+    private static async Task AssertMaterializedCardPreservedAsync(
+        SqliteBlokeBotDbFactory factory,
+        Guid cardPublicId,
+        IReadOnlyCollection<string> squareKeys,
+        IReadOnlyList<string> expectedLayout
+    )
+    {
         await using var verify = await factory.CreateDbContextAsync();
+        (await verify.Database.GetAppliedMigrationsAsync()).ShouldContain(
+            _opaqueAssignmentMigration
+        );
         var migrated = await verify
             .BingoCards.Include(value => value.Marks)
+            .Include(value => value.Wins)
             .SingleAsync(value => value.PublicId == cardPublicId);
         migrated.AssignmentKey.ShouldBe(BingoCardAssignmentKey.Opaque(cardPublicId));
         migrated.AssignmentKey.ShouldNotContain("alice", Case.Insensitive);
         var restoredLayout = BingoIssuedLayout.Restore(migrated.IssuedLayout!, 3, squareKeys);
         restoredLayout.ShouldBe(expectedLayout);
-        var retainedMark = migrated.Marks.Single();
-        restoredLayout[retainedMark.Position].ShouldBe(retainedMark.SquareKey);
+        restoredLayout
+            .Take(3)
+            .ShouldBe(
+                migrated.Marks.OrderBy(value => value.Position).Select(value => value.SquareKey)
+            );
+        var win = migrated.Wins.Single();
+        win.Kind.ShouldBe(BingoWinKind.Row);
+        win.RuleIndex.ShouldBe(0);
+        win.RuleKey.ShouldBe("row:0");
     }
 }
