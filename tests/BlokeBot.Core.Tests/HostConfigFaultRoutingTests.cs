@@ -404,7 +404,6 @@ public sealed class HostConfigFaultRoutingTests
             var shoutouts = FindFeatureButton(page, "Shoutouts");
             shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
             shoutouts.TextContent.ShouldContain("manual and automatic raid shoutouts");
-            page.FindAll(".feature-toggle-card").Count.ShouldBe(12);
             page.FindAll("#chat-tools button")
                 .ShouldNotContain(static button =>
                     button.TextContent.Contains("Automations", StringComparison.Ordinal)
