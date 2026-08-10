@@ -1223,14 +1223,17 @@ public static class ViewerPrivacyService
                 );
             bingoEvents += await db
                 .BingoEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, pattern, "\\")
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        EF.Functions.Like(x.OperationKey, pattern, "\\")
+                        || EF.Functions.Like(x.PublicPayload, pattern, "\\")
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct);
             bingoOverlayItems += await db
                 .OverlayEventFeedItems.Where(x =>
                     (
-                        EF.Functions.Like(x.Title, pattern, "\\")
+                        EF.Functions.Like(x.SourceKey, pattern, "\\")
+                        || EF.Functions.Like(x.Title, pattern, "\\")
                         || EF.Functions.Like(x.Body, pattern, "\\")
                     ) && (hostId == null || x.HostId == hostId)
                 )

@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.Bingo;
@@ -25,13 +24,15 @@ public static class BingoCardLayout
                     nameof(squareKeys)
                 );
 
-        return keys.Select(key => new RankedSquare(
-                key,
-                Rank(seed, templateRevision, dimension.Value, assignmentKey, key.Value)
-            ))
-            .OrderBy(value => value.Rank, ByteArrayComparer.Instance)
-            .ThenBy(value => value.Key.Value, StringComparer.Ordinal)
-            .Select(value => value.Key)
+        return BingoIssuedLayout
+            .Generate(
+                seed,
+                templateRevision,
+                dimension.Value,
+                assignmentKey,
+                keys.Select(value => value.Value)
+            )
+            .Select(value => new BingoSquareKey(value))
             .ToArray();
     }
 
@@ -95,35 +96,6 @@ public static class BingoCardLayout
             );
         }
         return lines;
-    }
-
-    private static byte[] Rank(
-        string seed,
-        int revision,
-        int dimension,
-        string assignmentKey,
-        string squareKey
-    ) =>
-        SHA256.HashData(
-            Encoding.UTF8.GetBytes(
-                $"bingo-v1\0{seed}\0{revision}\0{dimension}\0{assignmentKey}\0{squareKey}"
-            )
-        );
-
-    private sealed record RankedSquare(BingoSquareKey Key, byte[] Rank);
-
-    private sealed class ByteArrayComparer : IComparer<byte[]>
-    {
-        internal static ByteArrayComparer Instance { get; } = new();
-
-        public int Compare(byte[]? left, byte[]? right) =>
-            (left, right) switch
-            {
-                _ when ReferenceEquals(left, right) => 0,
-                (null, _) => -1,
-                (_, null) => 1,
-                _ => left.AsSpan().SequenceCompareTo(right),
-            };
     }
 }
 

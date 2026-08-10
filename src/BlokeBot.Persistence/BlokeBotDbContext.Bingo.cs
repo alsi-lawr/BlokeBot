@@ -164,6 +164,7 @@ public sealed partial class BlokeBotDbContext
             _ = entity.Property(value => value.PublicId).HasConversion<string>();
             _ = entity.Property(value => value.AssignmentKey).HasMaxLength(240);
             _ = entity.Property(value => value.AssignmentName).HasMaxLength(160);
+            _ = entity.Property(value => value.IssuedLayout).HasMaxLength(16000);
             _ = entity
                 .HasOne(value => value.Game)
                 .WithMany(value => value.Cards)

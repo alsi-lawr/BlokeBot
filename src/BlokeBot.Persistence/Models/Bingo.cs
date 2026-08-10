@@ -219,6 +219,7 @@ public sealed class BingoCard
     public Guid PublicId { get; set; }
     public string AssignmentKey { get; set; } = string.Empty;
     public string AssignmentName { get; set; } = string.Empty;
+    public string? IssuedLayout { get; set; }
     public DateTime IssuedAtUtc { get; set; }
     public List<BingoParticipant> Participants { get; set; } = [];
     public List<BingoMark> Marks { get; set; } = [];

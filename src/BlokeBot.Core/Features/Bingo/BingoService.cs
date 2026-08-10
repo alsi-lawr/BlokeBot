@@ -336,35 +336,8 @@ public sealed class BingoService(
                 }
 
                 var now = clock.GetUtcNow().UtcDateTime;
-                var cards = game.Mode switch
-                {
-                    BingoGameMode.Shared => [NewCard(hostId, game.Id, "shared", "Everyone", now)],
-                    BingoGameMode.UniquePerViewer => game
-                        .Participants.OrderBy(value => value.TwitchUserId, StringComparer.Ordinal)
-                        .Select(value =>
-                            NewCard(
-                                hostId,
-                                game.Id,
-                                $"viewer:{value.TwitchUserId}",
-                                value.DisplayName,
-                                now
-                            )
-                        )
-                        .ToArray(),
-                    BingoGameMode.Team => game
-                        .Teams.Where(team =>
-                            game.Participants.Any(value => value.TeamId == team.Id)
-                        )
-                        .OrderBy(value => value.SortOrder)
-                        .ThenBy(value => value.Id)
-                        .Select(value =>
-                            NewCard(hostId, game.Id, $"team:{value.PublicId:N}", value.Name, now)
-                        )
-                        .ToArray(),
-                    _ => throw new ArgumentOutOfRangeException(),
-                };
+                var cards = CreateCards(game, hostId, now);
                 db.BingoCards.AddRange(cards);
-                AssignCards(game, cards);
                 game.Status = BingoGameStatus.Issued;
                 game.IssuedAtUtc = now;
                 game.RosterRevision++;
@@ -1513,44 +1486,120 @@ public sealed class BingoService(
         string assignmentKey,
         string assignmentName,
         DateTime issuedAt
+    ) => NewCard(hostId, gameId, Guid.NewGuid(), assignmentKey, assignmentName, issuedAt);
+
+    private static BingoCard NewUniqueCard(
+        int hostId,
+        long gameId,
+        string assignmentName,
+        DateTime issuedAt
+    )
+    {
+        var publicId = Guid.NewGuid();
+        return NewCard(
+            hostId,
+            gameId,
+            publicId,
+            BingoCardAssignmentKey.Opaque(publicId),
+            assignmentName,
+            issuedAt
+        );
+    }
+
+    private static BingoCard NewCard(
+        int hostId,
+        long gameId,
+        Guid publicId,
+        string assignmentKey,
+        string assignmentName,
+        DateTime issuedAt
     ) =>
         new()
         {
             HostId = hostId,
             GameId = gameId,
-            PublicId = Guid.NewGuid(),
+            PublicId = publicId,
             AssignmentKey = assignmentKey,
             AssignmentName = assignmentName,
             IssuedAtUtc = issuedAt,
         };
 
-    private static void AssignCards(BingoGame game, IReadOnlyList<BingoCard> cards)
+    private static IReadOnlyList<BingoCard> CreateCards(
+        BingoGame game,
+        int hostId,
+        DateTime issuedAt
+    )
     {
-        foreach (var participant in game.Participants)
+        switch (game.Mode)
         {
-            participant.Card = game.Mode switch
+            case BingoGameMode.Shared:
             {
-                BingoGameMode.Shared => cards.Single(),
-                BingoGameMode.UniquePerViewer => cards.Single(value =>
-                    value.AssignmentKey == $"viewer:{participant.TwitchUserId}"
-                ),
-                BingoGameMode.Team => cards.Single(value =>
-                    value.AssignmentKey
-                    == $"team:{game.Teams.Single(team => team.Id == participant.TeamId).PublicId:N}"
-                ),
-                _ => throw new ArgumentOutOfRangeException(),
-            };
+                var card = NewCard(hostId, game.Id, "shared", "Everyone", issuedAt);
+                foreach (var participant in game.Participants)
+                {
+                    participant.Card = card;
+                }
+                return [card];
+            }
+            case BingoGameMode.UniquePerViewer:
+                return game
+                    .Participants.OrderBy(value => value.TwitchUserId, StringComparer.Ordinal)
+                    .Select(participant =>
+                    {
+                        var card = NewUniqueCard(
+                            hostId,
+                            game.Id,
+                            participant.DisplayName,
+                            issuedAt
+                        );
+                        participant.Card = card;
+                        return card;
+                    })
+                    .ToArray();
+            case BingoGameMode.Team:
+            {
+                var cards = game
+                    .Teams.Where(team => game.Participants.Any(value => value.TeamId == team.Id))
+                    .OrderBy(value => value.SortOrder)
+                    .ThenBy(value => value.Id)
+                    .ToDictionary(
+                        value => value.Id,
+                        value =>
+                            NewCard(
+                                hostId,
+                                game.Id,
+                                $"team:{value.PublicId:N}",
+                                value.Name,
+                                issuedAt
+                            )
+                    );
+                foreach (var participant in game.Participants)
+                {
+                    participant.Card = cards[participant.TeamId!.Value];
+                }
+                return cards.Values.ToArray();
+            }
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
 
-    private static IReadOnlyList<BingoSquareKey> Layout(BingoGame game, BingoCard card) =>
-        BingoCardLayout.Generate(
-            game.Seed,
-            game.TemplateRevisionNumber,
-            new(game.Dimension),
-            card.AssignmentKey,
-            game.TemplateRevision!.Squares.Select(value => new BingoSquareKey(value.Key))
-        );
+    private static IReadOnlyList<BingoSquareKey> Layout(BingoGame game, BingoCard card)
+    {
+        var squareKeys = game.TemplateRevision!.Squares.Select(value => value.Key).ToArray();
+        return card.IssuedLayout is null
+            ? BingoCardLayout.Generate(
+                game.Seed,
+                game.TemplateRevisionNumber,
+                new(game.Dimension),
+                card.AssignmentKey,
+                squareKeys.Select(value => new BingoSquareKey(value))
+            )
+            : BingoIssuedLayout
+                .Restore(card.IssuedLayout, game.Dimension, squareKeys)
+                .Select(value => new BingoSquareKey(value))
+                .ToArray();
+    }
 
     private static int IndexOf(IReadOnlyList<BingoSquareKey> layout, string key)
     {

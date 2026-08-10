@@ -30,15 +30,9 @@ public sealed class BingoServiceTests
             .Select(value => new BingoSquareKey($"s-{value}"))
             .ToArray();
 
-        var first = BingoCardLayout.Generate("seed-42", 7, dimension, "viewer:one", keys);
-        var replay = BingoCardLayout.Generate(
-            "seed-42",
-            7,
-            dimension,
-            "viewer:one",
-            keys.Reverse()
-        );
-        var otherAssignment = BingoCardLayout.Generate("seed-42", 7, dimension, "viewer:two", keys);
+        var first = BingoCardLayout.Generate("seed-42", 7, dimension, "card:one", keys);
+        var replay = BingoCardLayout.Generate("seed-42", 7, dimension, "card:one", keys.Reverse());
+        var otherAssignment = BingoCardLayout.Generate("seed-42", 7, dimension, "card:two", keys);
 
         replay.ShouldBe(first);
         otherAssignment.ShouldNotBe(first);
@@ -504,6 +498,48 @@ public sealed class BingoServiceTests
             .Game;
         _ = Success(await service.ArchiveAsync(hostId, Action(teamGame), default));
 
+        _ = Success(
+            await service.CreateGameAsync(
+                hostId,
+                SharedGame(template.Id) with
+                {
+                    OperationId = Guid.NewGuid(),
+                    Seed = "shared-privacy",
+                },
+                default
+            )
+        );
+        var sharedGame = (await service.GetModeratorGamesAsync(hostId, default))
+            .Single(value => value.Game.Status == BingoGameStatus.Joining)
+            .Game;
+        _ = Success(await service.JoinAsync(hostId, Roster(sharedGame, alice, null), default));
+        _ = Success(await service.JoinAsync(hostId, Roster(sharedGame, bob, null), default));
+        _ = Success(await service.IssueAsync(hostId, Action(sharedGame), default));
+        sharedGame = (await service.GetModeratorGamesAsync(hostId, default))
+            .Single(value => value.Game.Status == BingoGameStatus.Issued)
+            .Game;
+        _ = Success(await service.ArchiveAsync(hostId, Action(sharedGame), default));
+
+        var beforeErasure = (await service.GetPublicAsync("alpha", default))!;
+        var uniqueCardBeforeErasure = beforeErasure
+            .Archive.Single(value => value.Mode == BingoGameMode.UniquePerViewer)
+            .Cards.Single(value =>
+                value.Participants.Any(participant => participant.Login == alice.Login)
+            );
+        var issuedLayout = uniqueCardBeforeErasure.Squares.Select(value => value.Key).ToArray();
+        string assignmentKeyBeforeErasure;
+        await using (var inspect = await database.CreateDbContextAsync())
+        {
+            assignmentKeyBeforeErasure = await inspect
+                .BingoCards.Where(value => value.PublicId == uniqueCardBeforeErasure.Id.Value)
+                .Select(value => value.AssignmentKey)
+                .SingleAsync();
+        }
+        foreach (var identity in new[] { alice.TwitchUserId, alice.Login, alice.DisplayName })
+        {
+            assignmentKeyBeforeErasure.ShouldNotContain(identity, Case.Insensitive);
+        }
+
         await using (var seed = await database.CreateDbContextAsync())
         {
             var overlay = new OverlayInstance
@@ -527,7 +563,7 @@ public sealed class BingoServiceTests
                     OverlayInstance = overlay,
                     HostId = hostId,
                     Kind = OverlayEventFeedKind.BingoEvent,
-                    SourceKey = "bingo-privacy",
+                    SourceKey = "bingo-alice-privacy",
                     Priority = OverlayEventFeedPriority.Normal,
                     Lifecycle = OverlayEventFeedLifecycle.Queued,
                     Title = "Bingo",
@@ -553,11 +589,11 @@ public sealed class BingoServiceTests
         var uniqueArchive = publicView!.Archive.Single(value =>
             value.Mode == BingoGameMode.UniquePerViewer
         );
-        uniqueArchive
-            .Cards.Single(value =>
-                value.Participants.Any(participant => participant.Login == "[erased]")
-            )
-            .AssignmentName.ShouldBe("[erased]");
+        var uniqueCardAfterErasure = uniqueArchive.Cards.Single(value =>
+            value.Id == uniqueCardBeforeErasure.Id
+        );
+        uniqueCardAfterErasure.AssignmentName.ShouldBe("[erased]");
+        uniqueCardAfterErasure.Squares.Select(value => value.Key).ShouldBe(issuedLayout);
         uniqueArchive
             .Cards.Single(value =>
                 value.Participants.Any(participant => participant.Login == bob.Login)
@@ -567,6 +603,10 @@ public sealed class BingoServiceTests
             .Archive.Single(value => value.Mode == BingoGameMode.Team)
             .Cards.Single()
             .AssignmentName.ShouldBe("Team Aurora");
+        publicView
+            .Archive.Single(value => value.Mode == BingoGameMode.Shared)
+            .Cards.Single()
+            .AssignmentName.ShouldBe("Everyone");
         var publicJson = JsonSerializer.Serialize(publicView);
         foreach (var identity in new[] { alice.TwitchUserId, alice.Login, alice.DisplayName })
         {
@@ -574,10 +614,38 @@ public sealed class BingoServiceTests
         }
 
         await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify
+                .BingoCards.Where(value => value.PublicId == uniqueCardBeforeErasure.Id.Value)
+                .Select(value => value.AssignmentKey)
+                .SingleAsync()
+        ).ShouldBe(assignmentKeyBeforeErasure);
         var retainedText = string.Join(
             '\n',
-            (await verify.BingoEvents.Select(value => value.PublicPayload).ToArrayAsync())
-                .Concat(await verify.BingoEvidence.Select(value => value.Summary).ToArrayAsync())
+            (
+                await verify
+                    .BingoCards.Select(value =>
+                        value.AssignmentKey
+                        + value.AssignmentName
+                        + (value.IssuedLayout ?? string.Empty)
+                    )
+                    .ToArrayAsync()
+            )
+                .Concat(
+                    await verify
+                        .BingoEvents.Select(value => value.OperationKey + value.PublicPayload)
+                        .ToArrayAsync()
+                )
+                .Concat(
+                    await verify
+                        .BingoEvidence.Select(value =>
+                            value.Summary
+                            + (value.ParticipantTwitchUserId ?? string.Empty)
+                            + (value.ParticipantLogin ?? string.Empty)
+                            + (value.ParticipantDisplayName ?? string.Empty)
+                        )
+                        .ToArrayAsync()
+                )
                 .Concat(
                     await verify
                         .BingoWinRecipients.Select(value =>
@@ -587,12 +655,16 @@ public sealed class BingoServiceTests
                 )
                 .Concat(
                     await verify
-                        .BingoModerationAudit.Select(value => value.PrivateNote)
+                        .BingoModerationAudit.Select(value =>
+                            value.ActorTwitchUserId + value.ActorLogin + value.PrivateNote
+                        )
                         .ToArrayAsync()
                 )
                 .Concat(
                     await verify
-                        .OverlayEventFeedItems.Select(value => value.Title + value.Body)
+                        .OverlayEventFeedItems.Select(value =>
+                            value.SourceKey + value.Title + value.Body
+                        )
                         .ToArrayAsync()
                 )
         );
