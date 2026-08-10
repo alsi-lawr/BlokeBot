@@ -314,6 +314,14 @@ public partial class CommunityProgressionPage
         return $"{definition.Schedule.Cadence}, resets {when} ({definition.TimeZoneId}){next}";
     }
 
+    private static IReadOnlyList<string> TokenOptions(CommunityRewardKind kind) =>
+        kind switch
+        {
+            CommunityRewardKind.Badge => [.. CommunityPresentationCatalog.BadgeIcons],
+            CommunityRewardKind.CosmeticAccent => [.. CommunityPresentationCatalog.CosmeticAccents],
+            _ => [],
+        };
+
     private CommunityActor Actor() => new(PageContext.Session.UserId, PageContext.Session.Login);
 
     private void Fail(string message)
@@ -365,7 +373,15 @@ public partial class CommunityProgressionPage
     private sealed class RewardDraft
     {
         public string Key { get; set; } = string.Empty;
-        public CommunityRewardKind Kind { get; set; } = CommunityRewardKind.Title;
+        public CommunityRewardKind Kind
+        {
+            get;
+            set
+            {
+                field = value;
+                PresentationToken = TokenOptions(value) is [var first, ..] ? first : string.Empty;
+            }
+        } = CommunityRewardKind.Title;
         public string Name { get; set; } = string.Empty;
         public string PresentationToken { get; set; } = string.Empty;
     }

@@ -165,7 +165,22 @@
                                                 <option value="@CommunityRewardKind.CosmeticAccent">Cosmetic accent</option>
                                             </select>
                                         </div>
-                                        <div class="studio-span-6"><Field Id="@($"reward-token-{season.Id.Value:N}")" Label="Presentation token" @bind-Value="_reward.PresentationToken" /></div>
+                                        <div class="studio-span-6">
+                                            @if (TokenOptions(_reward.Kind) is { Count: > 0 } tokens)
+                                            {
+                                                <label class="label" for="@($"reward-token-{season.Id.Value:N}")">Presentation token</label>
+                                                <select id="@($"reward-token-{season.Id.Value:N}")" class="input mt-1" @bind="_reward.PresentationToken">
+                                                    @foreach (var token in tokens)
+                                                    {
+                                                        <option value="@token">@token</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <Field Id="@($"reward-token-{season.Id.Value:N}")" Label="Presentation token" @bind-Value="_reward.PresentationToken" />
+                                            }
+                                        </div>
                                         <div class="studio-span-12"><button class="btn-secondary" type="button" @onclick="() => AddRewardAsync(season)">Add reward</button></div>
                                     </div>
                                     <div class="progression-preview">
@@ -187,7 +202,7 @@
                                                 }
                                             </div>
                                         }
-                                        <p class="text-xs text-muted-foreground">Badge tokens: star, crown, spark, shield. Accent tokens: sky, violet, amber, emerald. Titles use bounded text, never CSS.</p>
+                                        <p class="text-xs text-muted-foreground">Badges and accents pick a supported presentation token. Titles use bounded text, never CSS.</p>
                                     </div>
                                 </div>
                             </StudioStage>
