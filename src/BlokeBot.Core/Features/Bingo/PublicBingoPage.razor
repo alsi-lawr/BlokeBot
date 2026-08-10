@@ -6,64 +6,130 @@
 
 <PageTitle>BlokeBot | Bingo</PageTitle>
 
-<div class="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8" data-public-bingo>
-    <main class="mx-auto max-w-7xl">
-        <header class="rounded-2xl bg-slate-950 p-6 text-white shadow-xl">
-            <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Transparent public play</p>
-            <h1 class="mt-2 text-3xl font-black">@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")</h1>
-            <p class="mt-2 max-w-3xl text-sm text-slate-300">Cards show participant Twitch identities or team names, typed public evidence, completed wins, and archives. Provider payloads and private moderator notes are never published.</p>
-        </header>
+<div class="mx-auto max-w-6xl space-y-6" data-public-bingo>
+    <PageHeader Kicker="Community progression"
+                Title="@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")"
+                Description="Live cards, public evidence, wins, and archived games. Private moderator notes are never published." />
 
-        @if (!_loaded)
-        {
-            <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6">Loading Bingo…</p>
-        }
-        else if (_view is null)
-        {
-            <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6" data-public-bingo-unavailable>No public Bingo game is available.</p>
-        }
-        else
-        {
+    @if (!_loaded)
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading Bingo…</div>
+        </ApplicationCardCollection>
+    }
+    else if (_view is null)
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground" data-public-bingo-unavailable>No public Bingo game is available.</div>
+        </ApplicationCardCollection>
+    }
+    else
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
             @if (_view.LiveGame is { } live)
             {
-                <section class="mt-6" aria-labelledby="live-bingo-heading">
-                    <div class="flex flex-wrap items-end justify-between gap-3">
-                        <div><p class="text-xs font-bold uppercase tracking-wide text-cyan-700">Live cards</p><h2 id="live-bingo-heading" class="text-2xl font-black text-slate-950">@live.TemplateName</h2></div>
-                        <p class="text-sm text-slate-600">@live.Mode · @live.Dimension.Value×@live.Dimension.Value · revision @live.TemplateRevision · seed <span class="font-mono">@live.Seed</span></p>
-                    </div>
-                    @if (live.Teams.Count > 0)
-                    {
-                        <div class="mt-4 flex flex-wrap gap-2">@foreach (var team in live.Teams) { <span class="rounded-full bg-cyan-100 px-3 py-1 text-sm font-semibold text-cyan-900">@team.Name: @string.Join(", ", team.Members.Select(value => $"@{value.Login}"))</span> }</div>
-                    }
-                    <div class="mt-5 grid gap-5 xl:grid-cols-2">
-                        @foreach (var card in live.Cards)
+                <BingoDisclosure Key="@live.DisclosureKey()"
+                                 Open="@IsOpen(live.DisclosureKey())"
+                                 OpenChanged="value => SetOpen(live.DisclosureKey(), value)">
+                    <Header>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">@live.TemplateName</h2>
+                            <span class="@live.Status.PillClass()"><span class="status-pill__dot"></span><span class="status-pill__label">@live.Status.Label()</span></span>
+                        </div>
+                        <p class="text-sm text-muted-foreground">@ModeDescription(live)</p>
+                    </Header>
+                    <ChildContent>
+                        <div class="live-round-summary" aria-label="Bingo game summary">
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Mode</p>
+                                <p class="live-round-summary__value">@live.Mode.Label()</p>
+                                <p class="live-round-summary__detail">@CardCount(live)</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Grid</p>
+                                <p class="live-round-summary__value">@live.Dimension.GridLabel()</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Revision</p>
+                                <p class="live-round-summary__value">rev @live.TemplateRevision</p>
+                                <p class="live-round-summary__detail">frozen at issue</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Seed</p>
+                                <p class="live-round-summary__value font-mono">@live.Seed</p>
+                                <p class="live-round-summary__detail">recorded</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Wins</p>
+                                <p class="live-round-summary__value">@live.WinCount()</p>
+                                <p class="live-round-summary__detail">@live.WinDetail()</p>
+                            </div>
+                        </div>
+
+                        @if (live.Teams.Count > 0)
                         {
-                            <BingoPublicCard Game="live" Card="card" />
+                            <div class="bingo-roster">
+                                @foreach (var team in live.Teams)
+                                {
+                                    <span class="bingo-roster__chip pr-[0.7rem]" @key="team.Id.Value">
+                                        @team.Name
+                                        <span class="bingo-roster__login">@string.Join(", ", team.Members.Select(value => $"@{value.Login}"))</span>
+                                    </span>
+                                }
+                            </div>
                         }
-                    </div>
-                </section>
+
+                        <div class="bingo-card__pair" style="@live.Dimension.GridVariable()">
+                            @foreach (var card in live.Cards)
+                            {
+                                <BingoPublicCard Game="live" Card="card" @key="card.Id.Value" />
+                            }
+                        </div>
+                    </ChildContent>
+                </BingoDisclosure>
             }
             else
             {
-                <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6">No Bingo cards are live right now.</p>
+                <div class="card p-8 text-sm text-muted-foreground">No Bingo cards are live right now.</div>
             }
 
             @if (_view.Archive.Count > 0)
             {
-                <section class="mt-10" aria-labelledby="bingo-archive-heading">
-                    <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Completed history</p>
-                    <h2 id="bingo-archive-heading" class="text-2xl font-black text-slate-950">Archive</h2>
-                    <div class="mt-5 space-y-6">
+                <BingoDisclosure Key="@_archiveKey"
+                                 Open="@IsOpen(_archiveKey)"
+                                 OpenChanged="value => SetOpen(_archiveKey, value)">
+                    <Header>
+                        <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Archive</h2>
+                        <p class="text-sm text-muted-foreground">Completed games with their final cards, wins, and evidence.</p>
+                    </Header>
+                    <ChildContent>
                         @foreach (var game in _view.Archive)
                         {
-                            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <div class="flex flex-wrap items-end justify-between gap-2"><h3 class="text-xl font-bold">@game.TemplateName</h3><p class="text-xs text-slate-500">@game.Mode · @game.Dimension.Value×@game.Dimension.Value · revision @game.TemplateRevision · seed @game.Seed</p></div>
-                                <div class="mt-4 grid gap-5 xl:grid-cols-2">@foreach (var card in game.Cards) { <BingoPublicCard Game="game" Card="card" /> }</div>
-                            </article>
+                            <BingoDisclosure Key="@game.DisclosureKey()"
+                                             Class="bg-[var(--app-surface-solid)] shadow-none"
+                                             Open="@IsOpen(game.DisclosureKey())"
+                                             OpenChanged="value => SetOpen(game.DisclosureKey(), value)"
+                                             @key="game.Id.Value">
+                                <Header>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="status-pill status-pill--slate"><span class="status-pill__label">Archived</span></span>
+                                        <h3 class="font-semibold text-[var(--app-text-strong)]">@game.TemplateName</h3>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">@ArchiveSummary(game)</p>
+                                </Header>
+                                <ChildContent>
+                                    <div class="bingo-card__pair" style="@game.Dimension.GridVariable()">
+                                        @foreach (var card in game.Cards)
+                                        {
+                                            <BingoPublicCard Game="game" Card="card" @key="card.Id.Value" />
+                                        }
+                                    </div>
+                                </ChildContent>
+                            </BingoDisclosure>
                         }
-                    </div>
-                </section>
+                    </ChildContent>
+                </BingoDisclosure>
             }
-        }
-    </main>
+        </ApplicationCardCollection>
+    }
 </div>

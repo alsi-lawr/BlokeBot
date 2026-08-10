@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
@@ -10,6 +11,17 @@ namespace BlokeBot.Core.Features.Bingo;
 
 public partial class BingoPage
 {
+    private const string _templateStageKey = "bingo-template";
+    private const string _squaresStageKey = "bingo-squares";
+    private const string _openerKey = "bingo-opener";
+
+    private static readonly IReadOnlyList<StudioSegmentedOption<BingoGameMode>> _cardModes =
+    [
+        new(BingoGameMode.Shared, "Shared"),
+        new(BingoGameMode.UniquePerViewer, "Per viewer"),
+        new(BingoGameMode.Team, "Teams"),
+    ];
+
     private IReadOnlyList<BingoTemplateView> _templates = [];
     private IReadOnlyList<BingoModeratorGameView> _games = [];
     private IReadOnlyList<CounterChoice> _counters = [];
@@ -18,17 +30,30 @@ public partial class BingoPage
     private GameDraft _game = new();
     private readonly Dictionary<string, string> _privateNotes = [];
     private readonly Dictionary<string, string> _teamMoves = [];
+
+    /// <summary>Sections default to open, so only what a moderator has closed is tracked.</summary>
+    private readonly HashSet<string> _closed = [];
+    private int _selectedSquare;
     private bool _featureEnabled;
     private bool _operationFailed;
     private string _feedback = string.Empty;
 
     private string _publicUrl => $"/bingo/{Uri.EscapeDataString(HostLogin)}";
 
+    private IReadOnlyList<string> _letters => new BingoDimension(_template.Dimension).LetterRail();
+
     protected override async Task OnInitializedAsync()
     {
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
+
+    private bool IsOpen(string key) => !_closed.Contains(key);
+
+    private void SetOpen(string key, bool open) =>
+        _ = open ? _closed.Remove(key) : _closed.Add(key);
+
+    private static string AuditKey(BingoGameView game) => $"audit-{game.Id.Value:N}";
 
     private async Task LoadAsync()
     {
@@ -102,7 +127,7 @@ public partial class BingoPage
                     await CompleteAsync(result, "Template revision saved.");
                     if (result is BingoOperationOutcome.Succeeded)
                     {
-                        _template = TemplateDraft.New(_template.Dimension);
+                        StartNewTemplate();
                     }
                 }
             );
@@ -113,7 +138,14 @@ public partial class BingoPage
         }
     }
 
-    private void EditTemplate(BingoTemplateView template) =>
+    private void StartNewTemplate()
+    {
+        _template = TemplateDraft.New(_template.Dimension);
+        _selectedSquare = 0;
+    }
+
+    private void EditTemplate(BingoTemplateView template)
+    {
         _template = new TemplateDraft
         {
             Id = template.Id.Value,
@@ -126,6 +158,8 @@ public partial class BingoPage
             FullAchievement = template.FullCardReward.AchievementKey?.Value ?? string.Empty,
             Squares = template.Squares.Select(SquareDraft.From).ToList(),
         };
+        _selectedSquare = 0;
+    }
 
     private void ChangeDimension(ChangeEventArgs args)
     {
@@ -137,7 +171,123 @@ public partial class BingoPage
             return;
         }
         _template.Resize(dimension);
+        _selectedSquare = Math.Min(_selectedSquare, _template.Squares.Count - 1);
     }
+
+    private void ResetSelectedSquare() =>
+        _template.Squares[_selectedSquare] = SquareDraft.New(_selectedSquare);
+
+    private string GridVariable() =>
+        FormattableString.Invariant($"--bingo-dimension: {_template.Dimension}");
+
+    private string EditorCellClass(int position, SquareDraft square)
+    {
+        var empty = string.IsNullOrWhiteSpace(square.Title) ? " bingo-cell--empty" : string.Empty;
+        var selected = position == _selectedSquare ? " bingo-cell--selected" : string.Empty;
+        return $"bingo-cell bingo-cell--button{empty}{selected}";
+    }
+
+    private string SelectedPosition()
+    {
+        var row = (_selectedSquare / _template.Dimension) + 1;
+        var column = (_selectedSquare % _template.Dimension) + 1;
+        return $"row {row} · col {column}";
+    }
+
+    private string TemplateSummary()
+    {
+        var name = string.IsNullOrWhiteSpace(_template.Name) ? "Untitled template" : _template.Name;
+        var saved = _templates.FirstOrDefault(value => value.Id.Value == _template.Id);
+        var revision = saved is null ? "new template" : $"rev {saved.Revision}";
+        var fullCard = _template.FullCard ? "full card on" : "full card off";
+        var grid = $"{_template.Dimension}×{_template.Dimension}";
+        return $"{name} · {revision} · {grid} · {_template.LinePoints} pts per line · {fullCard}";
+    }
+
+    private string SquaresSummary()
+    {
+        var defined = _template.Squares.Count(value => !string.IsNullOrWhiteSpace(value.Title));
+        return $"{defined} of {_template.Squares.Count} squares defined";
+    }
+
+    private string RevisionNote()
+    {
+        var saved = _templates.FirstOrDefault(value => value.Id.Value == _template.Id);
+        var next = saved is null ? 1 : saved.Revision + 1;
+        return $"Saving creates revision {next}. Cards already issued stay on their recorded revision.";
+    }
+
+    private static string GameDescription(BingoGameView game) =>
+        game.Status switch
+        {
+            BingoGameStatus.Joining => "Open for joining. Rosters freeze when cards are issued.",
+            BingoGameStatus.Issued when game.IssuedAtUtc is { } issued =>
+                $"Issued {issued.DayStamp()} · rosters and card assignments are frozen.",
+            BingoGameStatus.Archived when game.ArchivedAtUtc is { } archived =>
+                $"Archived {archived.DayStamp()} · rewards already granted are retained permanently.",
+            _ => "Rosters and card assignments are frozen.",
+        };
+
+    private static string ModeDetail(BingoGameView game)
+    {
+        if (game.Mode == BingoGameMode.Team)
+        {
+            var cap = game.TeamCap is { } value ? $" · cap {value}" : string.Empty;
+            return $"{game.Teams.Count} teams{cap}";
+        }
+        return game.Status == BingoGameStatus.Joining ? "cards dealt at issue"
+            : game.Cards.Count == 1 ? "1 card"
+            : $"{game.Cards.Count} cards";
+    }
+
+    private static string PlayerCount(BingoGameView game) =>
+        game.ParticipantCap is { } cap
+            ? $"{game.Participants.Count} of {cap}"
+            : game.Participants.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string AuditLabel(BingoModeratorGameView item) =>
+        item.Audit.Count == 1
+            ? "Private moderation · 1 entry"
+            : $"Private moderation · {item.Audit.Count} entries";
+
+    private static IReadOnlyList<RosterGroup> Rosters(BingoGameView game)
+    {
+        if (game.Mode != BingoGameMode.Team)
+        {
+            return
+            [
+                new("all", $"Players · {PlayerText(game.Participants.Count)}", game.Participants),
+            ];
+        }
+
+        var groups = new List<RosterGroup>(game.Teams.Count + 1);
+        foreach (var team in game.Teams)
+        {
+            groups.Add(
+                new(
+                    team.Id.Value.ToString("N"),
+                    $"{team.Name} · {PlayerText(team.Members.Count)}",
+                    team.Members
+                )
+            );
+        }
+        var assigned = game
+            .Teams.SelectMany(team => team.Members)
+            .Select(value => value.TwitchUserId)
+            .ToHashSet();
+        var unassigned = game
+            .Participants.Where(value => !assigned.Contains(value.TwitchUserId))
+            .ToArray();
+        if (unassigned.Length > 0)
+        {
+            groups.Add(
+                new("unassigned", $"No team yet · {PlayerText(unassigned.Length)}", unassigned)
+            );
+        }
+        return groups;
+    }
+
+    private static string PlayerText(int count) => count == 1 ? "1 player" : $"{count} players";
 
     private async Task CreateGameAsync()
     {
@@ -353,6 +503,8 @@ public partial class BingoPage
         _feedback = message;
         _operationFailed = true;
     }
+
+    private sealed record RosterGroup(string Key, string Label, IReadOnlyList<BingoViewer> Members);
 
     private sealed class TemplateDraft
     {
