@@ -1,0 +1,17 @@
+@using BlokeBot.Persistence.Models
+
+<span class="@_chipClass" title="@_title">
+    @if (_badgePath is not null)
+    {
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="@_badgePath" /></svg>
+    }
+    else if (_isAccent)
+    {
+        <span class="progression-swatch" aria-hidden="true"></span>
+    }
+    <span>@_label</span>
+    @if (ShowKind)
+    {
+        <span class="progression-reward__kind">@_kindLabel</span>
+    }
+</span>

@@ -10,6 +10,7 @@ public partial class CommunityProgressionPage
 {
     private IReadOnlyList<CommunitySeasonView> _seasons = [];
     private readonly Dictionary<Guid, ScheduleEditDraft> _scheduleEdits = [];
+    private readonly HashSet<string> _closedStages = [];
     private SeasonDraft _season = SeasonDraft.New();
     private RewardDraft _reward = new();
     private DefinitionDraft _definition = new();
@@ -248,6 +249,69 @@ public partial class CommunityProgressionPage
         };
         _scheduleEdits[definition.Id.Value] = value;
         return value;
+    }
+
+    private static string StageKey(CommunitySeasonView season, string stage) =>
+        $"season-{season.Id.Value:N}-{stage}";
+
+    private bool StageOpen(CommunitySeasonView season, string stage) =>
+        !_closedStages.Contains(StageKey(season, stage));
+
+    private void SetStageOpen(CommunitySeasonView season, string stage, bool open)
+    {
+        var key = StageKey(season, stage);
+        _ = open ? _closedStages.Remove(key) : _closedStages.Add(key);
+    }
+
+    private static string SeasonSummary(CommunitySeasonView season)
+    {
+        var range = CommunityProgressionPresentation.SeasonRange(
+            season.StartsAtUtc,
+            season.EndsAtUtc
+        );
+        return season.Status switch
+        {
+            CommunitySeasonStatus.Draft => $"{range}. Being set up, not visible to viewers yet.",
+            CommunitySeasonStatus.Closed => $"{range}. Closed, standings snapshotted.",
+            CommunitySeasonStatus.Archived =>
+                $"{range}. Archived, final standings and completion history retained.",
+            _ => string.IsNullOrWhiteSpace(season.Description) ? range : season.Description,
+        };
+    }
+
+    private static string? SeasonTimeZone(CommunitySeasonView season) =>
+        season
+            .Definitions.Select(value => value.TimeZoneId)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+    private static string RewardSummary(CommunitySeasonView season) =>
+        season.Rewards.Count == 0 ? "None yet" : $"{season.Rewards.Count} defined";
+
+    private static string DefinitionSummary(CommunitySeasonView season) =>
+        season.Definitions.Count == 1 ? "1 definition" : $"{season.Definitions.Count} definitions";
+
+    private static string DefinitionShape(CommunityDefinitionView definition) =>
+        string.Join(
+            " · ",
+            CommunityProgressionPresentation.ScopeLabel(definition.Scope),
+            CommunityProgressionPresentation.CompletionLabel(definition.CompletionMode),
+            CommunityEventRuleCatalog.Describe(definition.EventRule).Label
+        );
+
+    private static string DefinitionCadence(CommunityDefinitionView definition)
+    {
+        var localTime = definition.Schedule.LocalTime.ToString(
+            "HH:mm",
+            CultureInfo.InvariantCulture
+        );
+        var when =
+            definition.Schedule.Cadence == CommunityResetCadence.Weekly
+                ? $"{definition.Schedule.Weekday ?? DayOfWeek.Monday} {localTime}"
+                : localTime;
+        var next = definition.NextResetUtc is { } value
+            ? $", next {CommunityProgressionPresentation.HumanMoment(value.UtcDateTime)}"
+            : string.Empty;
+        return $"{definition.Schedule.Cadence}, resets {when} ({definition.TimeZoneId}){next}";
     }
 
     private CommunityActor Actor() => new(PageContext.Session.UserId, PageContext.Session.Login);
