@@ -270,7 +270,12 @@ public sealed record CommunitySeasonView(
     DateTime EndsAtUtc,
     long Revision,
     IReadOnlyList<CommunityDefinitionView> Definitions,
-    IReadOnlyList<CommunityRewardView> Rewards
+    IReadOnlyList<CommunityRewardView> Rewards,
+    IReadOnlyList<CommunityStandingView> Standings,
+    IReadOnlyList<CommunityViewerProgressView> Progress,
+    IReadOnlyList<CommunityCommunalProgressView> CommunalProgress,
+    IReadOnlyList<CommunityCompletionView> Completions,
+    IReadOnlyList<CommunityUnlockView> Unlocks
 );
 
 public sealed record CommunityDefinitionView(
@@ -318,6 +323,15 @@ public sealed record CommunityViewerProgressView(
     string? PeriodKey
 );
 
+public sealed record CommunityCommunalProgressView(
+    string DefinitionName,
+    CommunityDefinitionKind DefinitionKind,
+    long Amount,
+    long Target,
+    int CompletionCount,
+    string? PeriodKey
+);
+
 public sealed record CommunityCompletionView(
     Guid Id,
     string? TwitchUserId,
@@ -348,6 +362,7 @@ public sealed record CommunityPublicSeasonView(
     DateTime EndsAtUtc,
     IReadOnlyList<CommunityStandingView> Standings,
     IReadOnlyList<CommunityViewerProgressView> Progress,
+    IReadOnlyList<CommunityCommunalProgressView> CommunalProgress,
     IReadOnlyList<CommunityCompletionView> Completions,
     IReadOnlyList<CommunityUnlockView> Unlocks
 );
@@ -385,11 +400,26 @@ public static class CommunityPresentationCatalog
 
 public sealed record CommunityEventRuleDescriptor(
     CommunityEventRuleKind Kind,
+    string Label,
     bool SupportsViewerProgress,
     bool SupportsCommunalProgress,
     bool SupportsEventValue,
     bool SupportsFilter
-);
+)
+{
+    public bool IsAvailableFor(
+        CommunityDefinitionKind definitionKind,
+        CommunityProgressScope scope
+    ) =>
+        (scope == CommunityProgressScope.Viewer ? SupportsViewerProgress : SupportsCommunalProgress)
+        && (
+            Kind != CommunityEventRuleKind.ExternalGrant
+            || (
+                definitionKind == CommunityDefinitionKind.Achievement
+                && scope == CommunityProgressScope.Viewer
+            )
+        );
+}
 
 public static class CommunityEventRuleCatalog
 {
@@ -398,18 +428,34 @@ public static class CommunityEventRuleCatalog
         CommunityEventRuleDescriptor
     > _rules = new CommunityEventRuleDescriptor[]
     {
-        new(CommunityEventRuleKind.ChatMessage, true, true, false, false),
-        new(CommunityEventRuleKind.Follow, true, true, false, false),
-        new(CommunityEventRuleKind.Subscription, true, true, false, true),
-        new(CommunityEventRuleKind.Cheer, true, true, true, false),
-        new(CommunityEventRuleKind.IncomingRaid, true, true, true, false),
-        new(CommunityEventRuleKind.RewardRedemption, true, true, false, true),
-        new(CommunityEventRuleKind.BountyCompleted, false, true, false, false),
-        new(CommunityEventRuleKind.ExternalGrant, true, false, false, false),
+        new(CommunityEventRuleKind.ChatMessage, "Chat message", true, true, false, false),
+        new(CommunityEventRuleKind.Follow, "Follow", true, true, false, false),
+        new(CommunityEventRuleKind.Subscription, "Subscription", true, true, false, true),
+        new(CommunityEventRuleKind.Cheer, "Cheer", true, true, true, false),
+        new(CommunityEventRuleKind.IncomingRaid, "Incoming raid", true, true, true, false),
+        new(CommunityEventRuleKind.RewardRedemption, "Reward redemption", true, true, false, true),
+        new(CommunityEventRuleKind.BountyCompleted, "Bounty completed", false, true, false, false),
+        new(
+            CommunityEventRuleKind.ExternalGrant,
+            "External achievement grant",
+            true,
+            false,
+            false,
+            false
+        ),
     }.ToDictionary(value => value.Kind);
 
     public static IEnumerable<CommunityEventRuleDescriptor> Rules => _rules.Values;
 
     public static CommunityEventRuleDescriptor Describe(CommunityEventRuleKind kind) =>
         _rules[kind];
+
+    public static IReadOnlyList<CommunityEventRuleDescriptor> AvailableFor(
+        CommunityDefinitionKind definitionKind,
+        CommunityProgressScope scope
+    ) =>
+        _rules
+            .Values.Where(value => value.IsAvailableFor(definitionKind, scope))
+            .OrderBy(value => value.Kind)
+            .ToArray();
 }

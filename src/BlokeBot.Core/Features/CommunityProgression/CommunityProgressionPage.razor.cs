@@ -17,6 +17,9 @@ public partial class CommunityProgressionPage
     private bool _failed;
     private string _feedback = string.Empty;
 
+    private IReadOnlyList<CommunityEventRuleDescriptor> _availableEventRules =>
+        CommunityEventRuleCatalog.AvailableFor(_definition.Kind, _definition.Scope);
+
     private string _publicUrl => $"/community/{Uri.EscapeDataString(HostLogin)}";
 
     protected override async Task OnInitializedAsync()
@@ -308,8 +311,28 @@ public partial class CommunityProgressionPage
         public string Key { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-        public CommunityDefinitionKind Kind { get; set; } = CommunityDefinitionKind.Quest;
-        public CommunityProgressScope Scope { get; set; } = CommunityProgressScope.Viewer;
+        public CommunityDefinitionKind Kind
+        {
+            get;
+            set
+            {
+                field = value;
+                if (value == CommunityDefinitionKind.Achievement)
+                {
+                    Completion = CommunityCompletionMode.OneTime;
+                }
+                EnsureAvailableRule();
+            }
+        } = CommunityDefinitionKind.Quest;
+        public CommunityProgressScope Scope
+        {
+            get;
+            set
+            {
+                field = value;
+                EnsureAvailableRule();
+            }
+        } = CommunityProgressScope.Viewer;
         public CommunityCompletionMode Completion { get; set; } = CommunityCompletionMode.OneTime;
         public CommunityEventRuleKind EventRule { get; set; } = CommunityEventRuleKind.ChatMessage;
         public CommunityProgressIncrement Increment { get; set; } =
@@ -321,6 +344,15 @@ public partial class CommunityProgressionPage
         public CommunityResetCadence ResetCadence { get; set; } = CommunityResetCadence.None;
         public string ResetLocalTime { get; set; } = "00:00";
         public DayOfWeek ResetWeekday { get; set; } = DayOfWeek.Monday;
+
+        private void EnsureAvailableRule()
+        {
+            var available = CommunityEventRuleCatalog.AvailableFor(Kind, Scope);
+            if (!available.Any(value => value.Kind == EventRule))
+            {
+                EventRule = available[0].Kind;
+            }
+        }
     }
 
     private sealed class ScheduleEditDraft

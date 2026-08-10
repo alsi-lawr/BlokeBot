@@ -39,6 +39,10 @@
                             @if (season.Progress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No viewer progress yet.</p> }
                             else { <ul class="mt-2 space-y-2">@foreach (var item in season.Progress.Take(20)) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">@item.DisplayName</span> · @item.DefinitionName: @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
                         </section>
+                        <section class="lg:col-span-2"><h3 class="font-semibold">Channel-wide goals</h3>
+                            @if (season.CommunalProgress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No communal goals are active.</p> }
+                            else { <ul class="mt-2 grid gap-2 sm:grid-cols-2">@foreach (var item in season.CommunalProgress) { <li class="rounded-lg border p-3 text-sm"><span class="font-semibold">@item.DefinitionName</span> · @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
+                        </section>
                     </div>
                     <div class="mt-5 grid gap-5 lg:grid-cols-2">
                         <section><h3 class="font-semibold">Completed achievements &amp; history</h3>

@@ -124,6 +124,11 @@ public sealed class CommunityProgressionServiceTests
             ).Key.ShouldBe("veteran");
         }
 
+        var management = (await service.GetModeratorSeasonsAsync(hostId, default)).Single();
+        management.Progress.Single().Amount.ShouldBe(2);
+        management.Completions.Single().DefinitionName.ShouldBe("Representative achievement");
+        management.Unlocks.Count.ShouldBe(2);
+
         var season = (await service.GetModeratorSeasonsAsync(hostId, default)).Single();
         _ = Success(
             await service.TransitionSeasonAsync(
@@ -158,6 +163,13 @@ public sealed class CommunityProgressionServiceTests
                 default
             )
         );
+        var archived = (await service.GetPublicAsync("alpha", default))
+            .ShouldNotBeNull()
+            .Seasons.Single();
+        archived.Status.ShouldBe(CommunitySeasonStatus.Archived);
+        archived.Standings.ShouldBe(closedPublic.Standings);
+        archived.Completions.Count.ShouldBe(1);
+        archived.Unlocks.Count.ShouldBe(2);
         (await service.GetViewerUnlocksAsync(hostId, viewer.TwitchUserId, default))
             .Single(value => value.Name == "Veteran")
             .Equipped.ShouldBeTrue();
@@ -170,6 +182,7 @@ public sealed class CommunityProgressionServiceTests
         var clock = new ManualTimeProvider(_now);
         var hostId = await SeedHostAsync(database, "alpha", "Europe/London");
         var service = CreateService(database, clock);
+        var secondInstance = CreateService(database, clock);
         var setup = await ConfigureAsync(
             database,
             service,
@@ -202,9 +215,11 @@ public sealed class CommunityProgressionServiceTests
             "confirmed"
         );
 
-        _ = Success(await service.EditScheduleAsync(hostId, edit, default));
-        Success(await service.EditScheduleAsync(hostId, edit, default))
-            .WasIdempotent.ShouldBeTrue();
+        var editOutcomes = await Task.WhenAll(
+            service.EditScheduleAsync(hostId, edit, default),
+            secondInstance.EditScheduleAsync(hostId, edit, default)
+        );
+        editOutcomes.Select(Success).Count(value => value.WasIdempotent).ShouldBe(1);
 
         await using (var verify = await database.CreateDbContextAsync())
         {
@@ -220,8 +235,10 @@ public sealed class CommunityProgressionServiceTests
         }
 
         clock.Advance(TimeSpan.FromDays(22));
-        await service.RollOverCurrentPeriodsAsync(CommunityRolloverKind.Restart, default);
-        await service.RollOverCurrentPeriodsAsync(CommunityRolloverKind.Restart, default);
+        await Task.WhenAll(
+            service.RollOverCurrentPeriodsAsync(CommunityRolloverKind.Restart, default),
+            secondInstance.RollOverCurrentPeriodsAsync(CommunityRolloverKind.Restart, default)
+        );
 
         await using var final = await database.CreateDbContextAsync();
         var periods = await final
@@ -320,6 +337,131 @@ public sealed class CommunityProgressionServiceTests
     }
 
     [Test]
+    public async Task ExternalAchievementGrant_UsesInclusiveSeasonWindowWithoutBreakingReplay()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database, new ManualTimeProvider(_now));
+        var setup = await ConfigureAsync(
+            database,
+            service,
+            hostId,
+            CommunityVisibility.Public,
+            CommunityEventRuleKind.ExternalGrant,
+            CommunityCompletionMode.OneTime,
+            CommunityResetSchedule.None,
+            definitionKey: "external-winner"
+        );
+        await OpenAsync(service, setup.Season, setup.Revision, hostId);
+        var startsAt = _now.AddDays(-1);
+        var endsAt = _now.AddDays(60);
+        CommunityExternalGrantRequest Request(
+            string operation,
+            string viewer,
+            DateTimeOffset occurredAt
+        ) =>
+            new(
+                hostId,
+                "integration",
+                operation,
+                new("external-winner"),
+                new(viewer, viewer, viewer),
+                occurredAt
+            );
+
+        _ = (
+            await service.GrantAsync(Request("before", "before", startsAt.AddTicks(-1)), default)
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.AchievementUnavailable>();
+        var atStart = Request("at-start", "start", startsAt);
+        _ = (
+            await service.GrantAsync(atStart, default)
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.Granted>();
+        (await service.GrantAsync(atStart with { OccurredAtUtc = endsAt.AddDays(1) }, default))
+            .ShouldBeOfType<CommunityExternalGrantOutcome.Granted>()
+            .WasIdempotent.ShouldBeTrue();
+        _ = (
+            await service.GrantAsync(
+                atStart with
+                {
+                    Viewer = new("conflict", "conflict", "Conflict"),
+                    OccurredAtUtc = endsAt.AddDays(1),
+                },
+                default
+            )
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.Conflict>();
+        _ = (
+            await service.GrantAsync(Request("at-end", "end", endsAt), default)
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.Granted>();
+        _ = (
+            await service.GrantAsync(Request("after", "after", endsAt.AddTicks(1)), default)
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.AchievementUnavailable>();
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.CommunityExternalGrantReceipts.CountAsync()).ShouldBe(2);
+        (await verify.CommunityCompletions.CountAsync()).ShouldBe(2);
+    }
+
+    [Test]
+    [Arguments(CommunityDefinitionKind.Quest, CommunityProgressScope.Viewer)]
+    [Arguments(CommunityDefinitionKind.Achievement, CommunityProgressScope.Communal)]
+    public async Task ExternalGrantDefinition_RejectsIncompatibleDefinitionShapes(
+        CommunityDefinitionKind kind,
+        CommunityProgressScope scope
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database, new ManualTimeProvider(_now));
+        _ = Success(
+            await service.CreateSeasonAsync(
+                hostId,
+                new(
+                    Guid.NewGuid(),
+                    "External grant season",
+                    "Public",
+                    "Private",
+                    CommunityVisibility.Public,
+                    _now.AddDays(-1).UtcDateTime,
+                    _now.AddDays(1).UtcDateTime,
+                    Actor()
+                ),
+                default
+            )
+        );
+        await using var db = await database.CreateDbContextAsync();
+        var seasonId = await db.CommunitySeasons.Select(value => value.PublicId).SingleAsync();
+
+        var result = await service.AddDefinitionAsync(
+            hostId,
+            new(
+                Guid.NewGuid(),
+                new(seasonId),
+                "invalid-external",
+                "Invalid external",
+                "Must not persist",
+                kind,
+                scope,
+                CommunityCompletionMode.OneTime,
+                CommunityEventRuleKind.ExternalGrant,
+                CommunityProgressIncrement.Occurrence,
+                null,
+                1,
+                PointAmount.Zero,
+                CommunityResetSchedule.None,
+                [],
+                Actor()
+            ),
+            default
+        );
+
+        _ = result.ShouldBeOfType<CommunityOperationOutcome.Invalid>();
+        CommunityEventRuleCatalog
+            .AvailableFor(kind, scope)
+            .ShouldAllBe(value => value.Kind != CommunityEventRuleKind.ExternalGrant);
+        (await db.CommunityDefinitions.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task CompletedBountyReconciliation_RepairsMissedObserverDeliveryExactlyOnce()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -372,6 +514,13 @@ public sealed class CommunityProgressionServiceTests
         );
         await service.ReconcileCompletedBountyEventsAsync(default);
 
+        var publicSeason = (await service.GetPublicAsync("alpha", default))
+            .ShouldNotBeNull()
+            .Seasons.Single();
+        var communal = publicSeason.CommunalProgress.Single();
+        communal.Amount.ShouldBe(1);
+        communal.Target.ShouldBe(1);
+        communal.CompletionCount.ShouldBe(1);
         await using var verify = await database.CreateDbContextAsync();
         (await verify.CommunitySourceEventReceipts.CountAsync()).ShouldBe(1);
         (await verify.CommunityCompletions.CountAsync()).ShouldBe(1);
@@ -405,6 +554,9 @@ public sealed class CommunityProgressionServiceTests
             )
         );
         (await service.GetPublicAsync("alpha", default)).ShouldBeNull();
+        var hiddenManagement = (await service.GetModeratorSeasonsAsync(hostId, default)).Single();
+        hiddenManagement.Progress.Single().Amount.ShouldBe(1);
+        hiddenManagement.Standings.Single().TwitchUserId.ShouldBe(viewer.TwitchUserId);
 
         var featureEvents = TestEventBus.Create<AppEventKind>();
         var features = new HostFeatureService(
@@ -518,6 +670,166 @@ public sealed class CommunityProgressionServiceTests
         (
             await runtime.RequiresAsync("alpha", AutomationEventSubRequirement.Follows, default)
         ).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task OwnedEntryPoints_WhenDisabled_PreserveStateAndDoNotReplayDelayedSources()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(_now);
+        var hostId = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database, clock);
+        var setup = await ConfigureAsync(
+            database,
+            service,
+            hostId,
+            CommunityVisibility.Public,
+            CommunityEventRuleKind.ChatMessage,
+            CommunityCompletionMode.OneTime,
+            CommunityResetSchedule.None,
+            target: 2
+        );
+        await OpenAsync(service, setup.Season, setup.Revision, hostId);
+        var runtime = new CommunityProgressionRuntime(
+            database,
+            service,
+            clock,
+            NullLogger<CommunityProgressionRuntime>.Instance
+        );
+        var bountyObserver = new BountyCommunityProgressionObserver(
+            service,
+            NullLogger<BountyCommunityProgressionObserver>.Instance
+        );
+        var commands = new RecordingCommandBuilder();
+        new CommunityProgressionCommandModule(database, service).AddCommands(commands);
+        var responses = new List<string>();
+        var command = CommandContext(
+            "viewer",
+            "alpha",
+            "progress",
+            new Dictionary<string, string>
+            {
+                ["id"] = Guid.NewGuid().ToString(),
+                ["user-id"] = "viewer-id",
+            },
+            response => responses.Add(response.Message)
+        );
+        var delayedTimestamp = _now.AddMinutes(1);
+        var delayedMessage = Message(
+            "viewer",
+            "alpha",
+            "hello",
+            new Dictionary<string, string>
+            {
+                ["id"] = "delayed-chat",
+                ["user-id"] = "viewer-id",
+                ["tmi-sent-ts"] = delayedTimestamp
+                    .ToUnixTimeMilliseconds()
+                    .ToString(CultureInfo.InvariantCulture),
+            }
+        );
+        var features = new HostFeatureService(
+            database,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            [],
+            [],
+            clock
+        );
+        await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+
+        await runtime.MessageReceivedAsync(delayedMessage, default);
+        await bountyObserver.BountyCompletedAsync(
+            hostId,
+            Guid.NewGuid(),
+            delayedTimestamp,
+            default
+        );
+        await commands[FixedChatCommandRoutes.Progress](command, [], default);
+
+        responses.ShouldBeEmpty();
+        clock.Advance(TimeSpan.FromMinutes(2));
+        await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+        await runtime.MessageReceivedAsync(delayedMessage, default);
+        await bountyObserver.BountyCompletedAsync(
+            hostId,
+            Guid.NewGuid(),
+            delayedTimestamp,
+            default
+        );
+        await runtime.MessageReceivedAsync(
+            Message(
+                "viewer",
+                "alpha",
+                "current",
+                new Dictionary<string, string>
+                {
+                    ["id"] = "current-chat",
+                    ["user-id"] = "viewer-id",
+                    ["tmi-sent-ts"] = clock
+                        .GetUtcNow()
+                        .ToUnixTimeMilliseconds()
+                        .ToString(CultureInfo.InvariantCulture),
+                }
+            ),
+            default
+        );
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.CommunityProgress.SingleAsync()).Amount.ShouldBe(1);
+        var receipts = await verify
+            .CommunitySourceEventReceipts.Select(value => value.SourceEventId)
+            .ToListAsync();
+        receipts.ShouldBe(["current-chat"]);
+    }
+
+    [Test]
+    public async Task TwitchObserver_UsesBroadcasterIdentityWithoutCrossHostLoginFallback()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var firstHost = await SeedHostAsync(database, "first");
+        var secondHost = await SeedHostAsync(database, "second");
+        var clock = new ManualTimeProvider(_now);
+        var service = CreateService(database, clock);
+        foreach (var hostId in new[] { firstHost, secondHost })
+        {
+            var setup = await ConfigureAsync(
+                database,
+                service,
+                hostId,
+                CommunityVisibility.Public,
+                CommunityEventRuleKind.Follow,
+                CommunityCompletionMode.OneTime,
+                CommunityResetSchedule.None,
+                target: 2
+            );
+            await OpenAsync(service, setup.Season, setup.Revision, hostId);
+        }
+        var runtime = new CommunityProgressionRuntime(
+            database,
+            service,
+            clock,
+            NullLogger<CommunityProgressionRuntime>.Instance
+        );
+
+        await runtime.FollowReceivedAsync(
+            new(
+                "follow-authority",
+                _now,
+                "viewer-id",
+                "viewer",
+                "Viewer",
+                "first-id",
+                "second",
+                "Second",
+                _now
+            ),
+            default
+        );
+
+        await using var verify = await database.CreateDbContextAsync();
+        var progress = await verify.CommunityProgress.SingleAsync();
+        progress.HostId.ShouldBe(firstHost);
+        progress.ViewerTwitchUserId.ShouldBe("viewer-id");
     }
 
     [Test]
@@ -729,6 +1041,56 @@ public sealed class CommunityProgressionServiceTests
         var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
         host.EnabledFeatures = features;
         _ = await db.SaveChangesAsync();
+    }
+
+    private static ChatMessage Message(
+        string login,
+        string channel,
+        string text,
+        IReadOnlyDictionary<string, string> tags
+    ) => new(login, channel, text, text, tags);
+
+    private static ChatCommandContext CommandContext(
+        string login,
+        string channel,
+        string commandName,
+        IReadOnlyDictionary<string, string> tags,
+        Action<CommandResponse> respond
+    ) =>
+        new()
+        {
+            Message = Message(login, channel, $"!{commandName}", tags),
+            CommandName = commandName,
+            Responder = (response, _) =>
+            {
+                respond(response);
+                return ValueTask.CompletedTask;
+            },
+        };
+
+    private sealed class RecordingCommandBuilder : IChatCommandBuilder
+    {
+        private readonly Dictionary<string, ChatCommandHandler> _handlers = new(
+            StringComparer.Ordinal
+        );
+
+        public ChatCommandHandler this[FixedChatCommandRoute route] => _handlers[route.Value];
+
+        public IChatCommandBuilder Map(string route, ChatCommandHandler handler)
+        {
+            _handlers.Add(route, handler);
+            return this;
+        }
+
+        public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler) =>
+            Map(route.Value, handler);
+
+        public IChatCommandBuilder MapDynamic(DynamicChatCommandHandler handler) => this;
+
+        public IChatCommandBuilder MapFallback(ChatCommandHandler handler) => this;
+
+        public IChatCommandBuilder UseFilter<TFilter>()
+            where TFilter : class, IChatCommandFilter => this;
     }
 
     private sealed record ConfiguredSeason(

@@ -1195,6 +1195,13 @@ public sealed class CommunityProgressionService(
         {
             return new CommunityExternalGrantOutcome.AchievementUnavailable();
         }
+        if (
+            request.OccurredAtUtc.UtcDateTime < season.StartsAtUtc
+            || request.OccurredAtUtc.UtcDateTime > season.EndsAtUtc
+        )
+        {
+            return new CommunityExternalGrantOutcome.AchievementUnavailable();
+        }
         var viewer = Normalize(request.Viewer);
         var subjectKey = $"viewer:{viewer.TwitchUserId}";
         var progress = await db.CommunityProgress.SingleOrDefaultAsync(
@@ -1277,9 +1284,19 @@ public sealed class CommunityProgressionService(
             .Where(value => value.HostId == hostId)
             .OrderByDescending(value => value.CreatedAtUtc)
             .ToListAsync(ct);
-        return seasons
-            .Select(value => ToSeasonView(value, host.TimeZoneId, clock.GetUtcNow()))
-            .ToArray();
+        var result = new List<CommunitySeasonView>();
+        foreach (var season in seasons)
+        {
+            result.Add(
+                ToSeasonView(
+                    season,
+                    host.TimeZoneId,
+                    clock.GetUtcNow(),
+                    await LoadSeasonActivityAsync(db, season, ct)
+                )
+            );
+        }
+        return result;
     }
 
     public async Task<CommunityPublicView?> GetPublicAsync(string hostLogin, CancellationToken ct)
@@ -1334,6 +1351,28 @@ public sealed class CommunityProgressionService(
         CancellationToken ct
     )
     {
+        var activity = await LoadSeasonActivityAsync(db, season, ct);
+        return new(
+            new(season.PublicId),
+            season.Name,
+            season.Description,
+            season.Status,
+            season.StartsAtUtc,
+            season.EndsAtUtc,
+            activity.Standings,
+            activity.Progress,
+            activity.CommunalProgress,
+            activity.Completions,
+            activity.Unlocks
+        );
+    }
+
+    private async Task<CommunitySeasonActivity> LoadSeasonActivityAsync(
+        BlokeBotDbContext db,
+        CommunitySeason season,
+        CancellationToken ct
+    )
+    {
         var definitions = await db
             .CommunityDefinitions.AsNoTracking()
             .Where(value => value.HostId == season.HostId && value.SeasonId == season.Id)
@@ -1357,11 +1396,7 @@ public sealed class CommunityProgressionService(
             : await LiveStandingsAsync(db, season, ct);
         var progress = await db
             .CommunityProgress.AsNoTracking()
-            .Where(value =>
-                value.HostId == season.HostId
-                && value.SeasonId == season.Id
-                && value.ViewerTwitchUserId != null
-            )
+            .Where(value => value.HostId == season.HostId && value.SeasonId == season.Id)
             .ToListAsync(ct);
         var completions = await db
             .CommunityCompletions.AsNoTracking()
@@ -1369,15 +1404,10 @@ public sealed class CommunityProgressionService(
             .OrderByDescending(value => value.CompletedAtUtc)
             .ToListAsync(ct);
         var unlocks = await LoadUnlocksAsync(db, season.HostId, null, season.Id, ct);
-        return new(
-            new(season.PublicId),
-            season.Name,
-            season.Description,
-            season.Status,
-            season.StartsAtUtc,
-            season.EndsAtUtc,
+        return new CommunitySeasonActivity(
             standings,
             progress
+                .Where(value => value.ViewerTwitchUserId is not null)
                 .Select(value =>
                 {
                     var definition = definitions[value.DefinitionId];
@@ -1385,6 +1415,21 @@ public sealed class CommunityProgressionService(
                         value.ViewerTwitchUserId!,
                         value.ViewerLogin!,
                         value.ViewerDisplayName!,
+                        definition.Name,
+                        definition.Kind,
+                        value.Amount,
+                        definition.Target,
+                        value.CompletionCount,
+                        value.PeriodKey
+                    );
+                })
+                .ToArray(),
+            progress
+                .Where(value => value.ViewerTwitchUserId is null)
+                .Select(value =>
+                {
+                    var definition = definitions[value.DefinitionId];
+                    return new CommunityCommunalProgressView(
                         definition.Name,
                         definition.Kind,
                         value.Amount,
@@ -1800,7 +1845,8 @@ public sealed class CommunityProgressionService(
     private static CommunitySeasonView ToSeasonView(
         CommunitySeason season,
         string timeZoneId,
-        DateTimeOffset now
+        DateTimeOffset now,
+        CommunitySeasonActivity activity
     ) =>
         new(
             new(season.PublicId),
@@ -1846,8 +1892,21 @@ public sealed class CommunityProgressionService(
                     value.Name,
                     value.PresentationToken
                 ))
-                .ToArray()
+                .ToArray(),
+            activity.Standings,
+            activity.Progress,
+            activity.CommunalProgress,
+            activity.Completions,
+            activity.Unlocks
         );
+
+    private sealed record CommunitySeasonActivity(
+        IReadOnlyList<CommunityStandingView> Standings,
+        IReadOnlyList<CommunityViewerProgressView> Progress,
+        IReadOnlyList<CommunityCommunalProgressView> CommunalProgress,
+        IReadOnlyList<CommunityCompletionView> Completions,
+        IReadOnlyList<CommunityUnlockView> Unlocks
+    );
 
     private static CommunityResetSchedule ToSchedule(CommunityDefinition definition) =>
         new(
@@ -1938,6 +1997,13 @@ public sealed class CommunityProgressionService(
             : string.IsNullOrWhiteSpace(draft.Name) || draft.Name.Trim().Length > 160
                 ? new("Definition name must be between 1 and 160 characters.")
             : draft.Target <= 0 ? new("Progress target must be positive.")
+            : draft.EventRule == CommunityEventRuleKind.ExternalGrant
+            && (
+                draft.Kind != CommunityDefinitionKind.Achievement
+                || draft.Scope != CommunityProgressScope.Viewer
+                || draft.CompletionMode != CommunityCompletionMode.OneTime
+            )
+                ? new("External grants are only supported for one-time viewer achievements.")
             : draft.Scope == CommunityProgressScope.Viewer && !rule.SupportsViewerProgress
                 ? new("That supported event rule cannot identify a viewer subject.")
             : draft.Scope == CommunityProgressScope.Communal && !rule.SupportsCommunalProgress

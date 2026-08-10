@@ -29,7 +29,7 @@ internal sealed class CommunityProgressionRuntime(
             new CommunitySourceEvent.ChatMessage(
                 messageId,
                 new(userId, message.Login, message.Login),
-                clock.GetUtcNow()
+                MessageOccurredAtUtc(message)
             ),
             cancellationToken
         );
@@ -247,6 +247,12 @@ internal sealed class CommunityProgressionRuntime(
 
     private static CommunityViewer Viewer(string userId, string login, string displayName) =>
         new(userId, login, string.IsNullOrWhiteSpace(displayName) ? login : displayName);
+
+    private DateTimeOffset MessageOccurredAtUtc(ChatMessage message) =>
+        message.Tags.TryGetValue("tmi-sent-ts", out var timestamp)
+        && long.TryParse(timestamp, out var unixMilliseconds)
+            ? DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds)
+            : clock.GetUtcNow();
 
     private static AutomationEventSubRequirement? Requirement(CommunityEventRuleKind rule) =>
         rule switch

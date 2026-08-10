@@ -127,7 +127,7 @@
                                         <select class="input mt-1" @bind="_definition.Completion"><option value="@CommunityCompletionMode.OneTime">One-time</option><option value="@CommunityCompletionMode.Repeatable">Repeatable</option></select>
                                     </label>
                                     <label class="label">Supported event
-                                        <select class="input mt-1" @bind="_definition.EventRule">@foreach (var kind in Enum.GetValues<CommunityEventRuleKind>()) { <option value="@kind">@kind</option> }</select>
+                                        <select class="input mt-1" @bind="_definition.EventRule">@foreach (var rule in _availableEventRules) { <option value="@rule.Kind">@rule.Label</option> }</select>
                                     </label>
                                     <label class="label">Increment
                                         <select class="input mt-1" @bind="_definition.Increment"><option value="@CommunityProgressIncrement.Occurrence">One per event</option><option value="@CommunityProgressIncrement.EventValue">Event value (bits/viewers)</option></select>
@@ -177,6 +177,39 @@
                                 </div>
                             }
                         </div>
+                    }
+                    @if (season.Status != CommunitySeasonStatus.Draft)
+                    {
+                        <section class="mt-5 rounded-xl border bg-[var(--app-surface-muted)] p-4" data-season-activity="@season.Id.Value">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <h3 class="font-semibold">Season activity</h3>
+                                <span class="text-xs font-semibold text-muted-foreground">@season.Visibility management view</span>
+                            </div>
+                            <div class="mt-4 grid gap-5 lg:grid-cols-2">
+                                <section><h4 class="font-semibold">@(season.Status is CommunitySeasonStatus.Closed or CommunitySeasonStatus.Archived ? "Final standings" : "Live standings")</h4>
+                                    @if (season.Standings.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No participants yet.</p> }
+                                    else { <ol class="mt-2 space-y-2">@foreach (var standing in season.Standings.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">#@standing.Rank @standing.DisplayName</span> <span class="text-muted-foreground">(@($"@{standing.Login}")) · @standing.CompletedCount completed · @standing.ProgressAmount progress</span></li> }</ol> }
+                                </section>
+                                <section><h4 class="font-semibold">Participant progress</h4>
+                                    @if (season.Progress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No viewer progress yet.</p> }
+                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Progress.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@item.DisplayName</span> · @item.DefinitionName: @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
+                                </section>
+                                <section class="lg:col-span-2"><h4 class="font-semibold">Channel-wide goals</h4>
+                                    @if (season.CommunalProgress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No communal goals are active.</p> }
+                                    else { <ul class="mt-2 grid gap-2 sm:grid-cols-2">@foreach (var item in season.CommunalProgress) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@item.DefinitionName</span> · @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
+                                </section>
+                            </div>
+                            <div class="mt-5 grid gap-5 lg:grid-cols-2">
+                                <section><h4 class="font-semibold">Completions &amp; history</h4>
+                                    @if (season.Completions.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No completions yet.</p> }
+                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Completions.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@(item.DisplayName ?? "Community")</span> completed @item.DefinitionName · @item.CompletedAtUtc.ToString("u")</li> }</ul> }
+                                </section>
+                                <section><h4 class="font-semibold">Persistent reward unlocks</h4>
+                                    @if (season.Unlocks.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No rewards unlocked yet.</p> }
+                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Unlocks.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@($"@{item.Login}")</span> unlocked @item.Name (@item.Kind) @if (item.Equipped) { <span class="font-semibold text-emerald-700">· equipped</span> }</li> }</ul> }
+                                </section>
+                            </div>
+                        </section>
                     }
                 </article>
             }

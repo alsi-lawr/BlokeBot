@@ -259,9 +259,29 @@ internal sealed class SimulationFixtureSeeder(
             CreatedAtUtc = now.AddDays(-6),
             Season = season,
         };
+        var communal = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("bcd1434c-16c9-4d29-83cb-a2ceeffb0e22"),
+            HostId = hostId,
+            Key = "community-bounty-drive",
+            Name = "Community bounty drive",
+            Description = "Complete four channel bounties together.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Communal,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.BountyCompleted,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 4,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
         _ = db.CommunitySeasons.Add(season);
         db.CommunityRewardDefinitions.AddRange(title, badge);
-        db.CommunityDefinitions.AddRange(achievement, daily);
+        db.CommunityDefinitions.AddRange(achievement, daily, communal);
         _ = await db.SaveChangesAsync(cancellationToken);
         db.CommunityDefinitionRewards.AddRange(
             new CommunityDefinitionReward
@@ -322,6 +342,16 @@ internal sealed class SimulationFixtureSeeder(
                 CompletionCount = 2,
                 PeriodKey = "v1:Daily:simulation",
                 UpdatedAtUtc = now.AddMinutes(-4),
+            },
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = communal.Id,
+                SubjectKey = "communal",
+                Amount = 3,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddMinutes(-6),
             }
         );
         _ = await db.SaveChangesAsync(cancellationToken);
@@ -359,6 +389,172 @@ internal sealed class SimulationFixtureSeeder(
                 EquippedAtUtc = now.AddHours(-1),
             }
         );
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await SeedArchivedCommunitySeasonAsync(db, hostId, now, cancellationToken);
+        await SeedHiddenCommunitySeasonAsync(db, hostId, now, cancellationToken);
+    }
+
+    private static async Task SeedArchivedCommunitySeasonAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var season = new CommunitySeason
+        {
+            PublicId = Guid.Parse("b24a1144-4bd0-43b2-b71e-5f4043c92bb8"),
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("6a26aa7b-0779-47cd-8024-49c135397785"),
+            Name = "Spring launch legacy",
+            Description = "Archived standings from the channel launch season.",
+            ModeratorNotes = "Archived simulation note",
+            Status = CommunitySeasonStatus.Archived,
+            Visibility = CommunityVisibility.Public,
+            StartsAtUtc = now.AddDays(-90),
+            EndsAtUtc = now.AddDays(-60),
+            OpenedAtUtc = now.AddDays(-90),
+            ClosedAtUtc = now.AddDays(-60),
+            ArchivedAtUtc = now.AddDays(-45),
+            Revision = 4,
+            CreatedAtUtc = now.AddDays(-91),
+            UpdatedAtUtc = now.AddDays(-45),
+        };
+        var achievement = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("217fc626-f6c2-470a-a0dd-1aebbc23053d"),
+            HostId = hostId,
+            Key = "launch-regular",
+            Name = "Launch regular",
+            Description = "Joined the launch season.",
+            Kind = CommunityDefinitionKind.Achievement,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.OneTime,
+            EventRule = CommunityEventRuleKind.ChatMessage,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 1,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-91),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        _ = db.CommunityDefinitions.Add(achievement);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = db.CommunityProgress.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                Amount = 1,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddDays(-70),
+            }
+        );
+        _ = db.CommunityCompletions.Add(
+            new()
+            {
+                PublicId = Guid.Parse("41557a98-cebd-4c0d-b738-9582b37e1bc8"),
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                DefinitionKey = achievement.Key,
+                DefinitionName = achievement.Name,
+                Sequence = 1,
+                PointsGranted = "0",
+                RewardSnapshot = "[]",
+                SourceOperationKey = "simulation-archived-chat",
+                CompletedAtUtc = now.AddDays(-70),
+            }
+        );
+        _ = db.CommunitySeasonStandings.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                CompletedCount = 1,
+                ProgressAmount = 1,
+                Rank = 1,
+                SnapshottedAtUtc = now.AddDays(-60),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedHiddenCommunitySeasonAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var season = new CommunitySeason
+        {
+            PublicId = Guid.Parse("1d528657-799a-4340-ad28-960a13e79fca"),
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("3841c2ea-e038-476f-be28-a2dd43bd40de"),
+            Name = "Moderator-only surprise season",
+            Description = "A hidden progression workspace for moderators.",
+            ModeratorNotes = "Never public simulation material",
+            Status = CommunitySeasonStatus.Open,
+            Visibility = CommunityVisibility.Hidden,
+            StartsAtUtc = now.AddDays(-4),
+            EndsAtUtc = now.AddDays(20),
+            OpenedAtUtc = now.AddDays(-4),
+            Revision = 2,
+            CreatedAtUtc = now.AddDays(-7),
+            UpdatedAtUtc = now.AddMinutes(-3),
+        };
+        var communal = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("f0fd3b15-aafb-4dc4-aa86-76d8f33f26f8"),
+            HostId = hostId,
+            Key = "secret-channel-goal",
+            Name = "Secret channel goal",
+            Description = "Hidden communal progress.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Communal,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.BountyCompleted,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 10,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-7),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        _ = db.CommunityDefinitions.Add(communal);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = db.CommunityProgress.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = communal.Id,
+                SubjectKey = "communal",
+                Amount = 7,
+                CompletionCount = 0,
+                UpdatedAtUtc = now.AddMinutes(-3),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedOverlayAsync(
