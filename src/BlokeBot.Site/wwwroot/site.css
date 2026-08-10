@@ -1613,8 +1613,14 @@ main {
 
 .footer-brand {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 1rem;
+}
+
+.footer-brand > div {
+  min-width: 0;
 }
 
 .footer-mark {
@@ -1629,6 +1635,7 @@ main {
 
 .footer-meta {
   margin-top: 0.35rem !important;
+  overflow-wrap: anywhere;
   color: #8595a0;
   font-size: 0.84rem;
 }
@@ -1881,6 +1888,10 @@ main {
 }
 
 @media (max-width: 38rem) {
+  .device-showcase__glow {
+    inset-inline: 0;
+  }
+
   .header-actions {
     align-items: flex-end;
   }

@@ -62,8 +62,8 @@
             <dt>Source and purpose</dt>
             <dd>
                 Twitch, during OAuth sign-in. It identifies you and decides which channel dashboards
-                you may open. Signing in is required to use the dashboard; the help site and public
-                leaderboards need no account.
+                you may open. Signing in is required to use the dashboard; the help site and
+                read-only public feature pages need no account.
             </dd>
             <dt>Where it lives</dt>
             <dd>
@@ -80,7 +80,8 @@
                 For each hosted channel: the channel's Twitch ID, login, display name, profile image
                 address, enabled features, time zone, and every feature's configuration (commands,
                 replies, announcement schedules, guessing profiles, points settings, boards, queues,
-                overlays, automations, access lists).
+                bounties, seasons, quests, achievements, Bingo templates, overlays, automations and
+                access lists).
             </dd>
             <dt>Source and purpose</dt>
             <dd>
@@ -120,8 +121,11 @@
                 participation itself: guesses, points balances and point history, giveaway entries
                 and wins, request-board submissions and votes including the text and links they
                 submit, play-queue entries and the answers given on joining, moment captures,
-                suggestions and votes, shoutout history, Channel Points redemptions including any
-                typed input, per-viewer command permissions and usage, and whisper recipients.
+                suggestions and votes, bounty pledges and settlement, season and quest progress,
+                achievement completions, persistent reward unlocks and equipped selections, Bingo
+                rosters, assigned cards, marks, evidence and wins, shoutout history, Channel Points
+                redemptions including any typed input, per-viewer command permissions and usage, and
+                whisper recipients.
             </dd>
             <dt>Source and purpose</dt>
             <dd>
@@ -144,8 +148,9 @@
             <dd>
                 Text and media the channel team writes or uploads: custom command responses, message
                 libraries, announcements, overlay names and appearance, uploaded overlay media
-                files, board and queue definitions, private moderator notes, and automation
-                configuration. These can contain personal information if the authors put it there.
+                files, board and queue definitions, bounty content, season and reward definitions,
+                Bingo templates, private moderator notes, and automation configuration. These can
+                contain personal information if the authors put it there.
             </dd>
             <dt>Lifecycle</dt>
             <dd>
@@ -158,9 +163,10 @@
         <dl class="kv-list">
             <dt>What</dt>
             <dd>
-                Feature event history (for example board, queue, moment and overlay events),
-                automation run records including the triggering event context, delivery receipts,
-                and operator-facing alerts. Application logs record operational events and errors.
+                Feature event history (for example board, queue, moment, bounty, progression, Bingo
+                and overlay events), automation run records including the triggering event context,
+                delivery receipts, and operator-facing alerts. Application logs record operational
+                events and errors.
             </dd>
             <dt>Purpose and lifecycle</dt>
             <dd>
@@ -393,8 +399,9 @@
         <h2 id="retention"><span id="retention-heading">Retention and deletion</span></h2>
         <p>
             BlokeBot keeps product history for a channel's lifecycle rather than deleting it on a
-            timer: guessing, points, request, queue, moment, command and automation history stays
-            useful for as long as the channel is hosted and the feature is in use. The bounds are:
+            timer: guessing, points, request, queue, moment, bounty, progression, Bingo, command and
+            automation history stays useful for as long as the channel is hosted and the feature is
+            in use. The bounds are:
         </p>
         <ul class="check-list">
             <li>
