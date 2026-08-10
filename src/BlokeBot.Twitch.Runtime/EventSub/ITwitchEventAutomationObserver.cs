@@ -14,6 +14,11 @@ public interface ITwitchEventAutomationObserver
         CancellationToken cancellation
     );
 
+    Task ChannelUpdatedAsync(
+        EventSubChannelUpdateEvent channelUpdate,
+        CancellationToken cancellation
+    );
+
     Task FollowReceivedAsync(EventSubFollowEvent follow, CancellationToken cancellation);
 
     Task SubscriptionReceivedAsync(
@@ -76,6 +81,7 @@ public enum AutomationEventSubRequirement
     Cheers,
     HypeTrain,
     ChatNotifications,
+    ChannelUpdates,
     IncomingRaids,
 
     /// <summary>
@@ -121,6 +127,17 @@ public sealed record EventSubStreamOfflineEvent(
     string BroadcasterUserId,
     string BroadcasterUserLogin,
     string BroadcasterUserName
+);
+
+public sealed record EventSubChannelUpdateEvent(
+    string MessageId,
+    DateTimeOffset MessageTimestamp,
+    string BroadcasterUserId,
+    string BroadcasterUserLogin,
+    string BroadcasterUserName,
+    string CategoryId,
+    string CategoryName,
+    string StreamTitle
 );
 
 public sealed record EventSubFollowEvent(

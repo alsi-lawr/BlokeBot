@@ -15,5 +15,6 @@ public enum AppEventKind
     MomentsChanged,
     BountiesChanged,
     CommunityProgressionChanged,
+    BingoChanged,
     OverlaysChanged,
 }

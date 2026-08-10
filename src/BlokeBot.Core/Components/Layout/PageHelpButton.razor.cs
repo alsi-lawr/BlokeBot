@@ -71,6 +71,7 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/bounties" => _bountiesHelp,
             "/community" => _communityProgressionHelp,
+            "/bingo" => _bingoHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -248,6 +249,31 @@ public partial class PageHelpButton
                 [
                     "Viewers equip one unlocked title, badge, and accent for this host with !equiptitle, !equipbadge, and !equipaccent.",
                     "Turning Community progression off blocks commands, events, timers, automation, rewards, and public output while preserving saved data. Re-enable resumes from the current period without replaying suppressed work.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _bingoHelp = new(
+        "Stream-event Bingo",
+        [
+            _featureSwitchHelp,
+            new(
+                "Templates, cards, and joining",
+                "Build reusable 3×3, 4×4, or 5×5 templates from typed automatic squares and moderator-confirmed moments.",
+                [
+                    "A saved revision, dimension, seed, and assignment identity reproduce each shared, viewer, or team card after later template edits.",
+                    "Viewers join before issue. Owners and moderators can move or remove them until issuing cards freezes the roster and assignments.",
+                    "Automatic choices are limited to connected Twitch and BlokeBot sources. Subjective moments stay manual; Bingo does not run scripts, image recognition, or speech recognition.",
+                ]
+            ),
+            new(
+                "Public evidence, corrections, and rewards",
+                "Public cards show participant Twitch identities or team names, typed evidence, wins, and archives.",
+                [
+                    "Raw provider payloads, credentials, internal identifiers, private moderator notes, and internal audit reasons are never public.",
+                    "Reversing a manual mark corrects the live card and evidence. Any completed win and its point, achievement, or title reward remain permanent and cannot grant again.",
+                    "Achievements and titles come from predeclared Community progression achievements. Turning Bingo off retains all data while stopping commands, EventSub reconciliation, marking, rewards, public output, overlay events, and queued work; re-enable never replays suppressed events.",
                 ]
             ),
         ]

@@ -1,0 +1,69 @@
+@page "/bingo/{Channel}"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject BingoService _bingo
+
+<PageTitle>BlokeBot | Bingo</PageTitle>
+
+<div class="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8" data-public-bingo>
+    <main class="mx-auto max-w-7xl">
+        <header class="rounded-2xl bg-slate-950 p-6 text-white shadow-xl">
+            <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Transparent public play</p>
+            <h1 class="mt-2 text-3xl font-black">@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")</h1>
+            <p class="mt-2 max-w-3xl text-sm text-slate-300">Cards show participant Twitch identities or team names, typed public evidence, completed wins, and archives. Provider payloads and private moderator notes are never published.</p>
+        </header>
+
+        @if (!_loaded)
+        {
+            <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6">Loading Bingo…</p>
+        }
+        else if (_view is null)
+        {
+            <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6" data-public-bingo-unavailable>No public Bingo game is available.</p>
+        }
+        else
+        {
+            @if (_view.LiveGame is { } live)
+            {
+                <section class="mt-6" aria-labelledby="live-bingo-heading">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
+                        <div><p class="text-xs font-bold uppercase tracking-wide text-cyan-700">Live cards</p><h2 id="live-bingo-heading" class="text-2xl font-black text-slate-950">@live.TemplateName</h2></div>
+                        <p class="text-sm text-slate-600">@live.Mode · @live.Dimension.Value×@live.Dimension.Value · revision @live.TemplateRevision · seed <span class="font-mono">@live.Seed</span></p>
+                    </div>
+                    @if (live.Teams.Count > 0)
+                    {
+                        <div class="mt-4 flex flex-wrap gap-2">@foreach (var team in live.Teams) { <span class="rounded-full bg-cyan-100 px-3 py-1 text-sm font-semibold text-cyan-900">@team.Name: @string.Join(", ", team.Members.Select(value => $"@{value.Login}"))</span> }</div>
+                    }
+                    <div class="mt-5 grid gap-5 xl:grid-cols-2">
+                        @foreach (var card in live.Cards)
+                        {
+                            <BingoPublicCard Game="live" Card="card" />
+                        }
+                    </div>
+                </section>
+            }
+            else
+            {
+                <p class="mt-6 rounded-xl border border-slate-200 bg-white p-6">No Bingo cards are live right now.</p>
+            }
+
+            @if (_view.Archive.Count > 0)
+            {
+                <section class="mt-10" aria-labelledby="bingo-archive-heading">
+                    <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Completed history</p>
+                    <h2 id="bingo-archive-heading" class="text-2xl font-black text-slate-950">Archive</h2>
+                    <div class="mt-5 space-y-6">
+                        @foreach (var game in _view.Archive)
+                        {
+                            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <div class="flex flex-wrap items-end justify-between gap-2"><h3 class="text-xl font-bold">@game.TemplateName</h3><p class="text-xs text-slate-500">@game.Mode · @game.Dimension.Value×@game.Dimension.Value · revision @game.TemplateRevision · seed @game.Seed</p></div>
+                                <div class="mt-4 grid gap-5 xl:grid-cols-2">@foreach (var card in game.Cards) { <BingoPublicCard Game="game" Card="card" /> }</div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            }
+        }
+    </main>
+</div>

@@ -20,6 +20,9 @@ internal static class SimulationViewCatalog
         ["community"] = "/community",
         ["public-community"] =
             $"/community/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["bingo"] = "/bingo",
+        ["public-bingo"] =
+            $"/bingo/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",
         ["automation-events"] = "/automations/events",
         ["overlays"] = "/overlays#sources",

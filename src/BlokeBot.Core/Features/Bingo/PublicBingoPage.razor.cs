@@ -1,0 +1,18 @@
+using Microsoft.AspNetCore.Components;
+
+namespace BlokeBot.Core.Features.Bingo;
+
+public partial class PublicBingoPage
+{
+    private BingoPublicView? _view;
+    private bool _loaded;
+
+    [Parameter]
+    public string Channel { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _view = await _bingo.GetPublicAsync(Channel, CancellationToken.None);
+        _loaded = true;
+    }
+}

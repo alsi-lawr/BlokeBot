@@ -19,6 +19,86 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerCommandCatalogTests
 {
     [Test]
+    public async Task BingoSwitch_LoadingViewerCatalog_OmitsOwnedCommandsWhileOff()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.Bingo,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+            var template = new BingoTemplate
+            {
+                HostId = hostId,
+                PublicId = Guid.NewGuid(),
+                CreationOperationId = Guid.NewGuid(),
+                Name = "Bingo",
+                CurrentRevision = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            };
+            var revision = new BingoTemplateRevision
+            {
+                HostId = hostId,
+                OperationId = Guid.NewGuid(),
+                Template = template,
+                Revision = 1,
+                Dimension = 3,
+                LinePointsReward = "0",
+                FullCardPointsReward = "0",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.BingoGames.Add(
+                new BingoGame
+                {
+                    HostId = hostId,
+                    PublicId = Guid.NewGuid(),
+                    CreationOperationId = Guid.NewGuid(),
+                    TemplateRevision = revision,
+                    TemplateName = "Bingo",
+                    TemplateRevisionNumber = 1,
+                    Dimension = 3,
+                    Seed = "seed",
+                    Mode = BingoGameMode.Shared,
+                    Status = BingoGameStatus.Joining,
+                    LinePointsReward = "0",
+                    FullCardPointsReward = "0",
+                    CreatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var enabled = await catalog.LoadForHostAsync(hostId, default);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures = HostFeatureFlags.None;
+            _ = await db.SaveChangesAsync();
+        }
+        var disabled = await catalog.LoadForHostAsync(hostId, default);
+
+        enabled.Names.ShouldContain("!bingo");
+        enabled.Names.ShouldContain("!bingojoin");
+        disabled.Names.ShouldNotContain("!bingo");
+        disabled.Names.ShouldNotContain("!bingojoin");
+    }
+
+    [Test]
     public async Task CommunityProgressionSwitch_LoadingViewerCatalog_OmitsOwnedCommandsWhileOff()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

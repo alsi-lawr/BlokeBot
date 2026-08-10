@@ -28,6 +28,10 @@ public sealed class BotHost
 
     public DateTime? CommunityProgressionAcceptEventsAfterUtc { get; set; }
 
+    public DateTime? BingoPausedAtUtc { get; set; }
+
+    public DateTime? BingoAcceptEventsAfterUtc { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

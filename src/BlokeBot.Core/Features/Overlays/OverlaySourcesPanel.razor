@@ -458,6 +458,31 @@
                                             </div>
                                         }
                                     </section>
+                                    <section class="@KindCardClass(_bingoEventEnabled)">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <span id="bingo-event-label" class="@KindTitleClass(_bingoEventEnabled)">Bingo events</span>
+                                            <button type="button" class="studio-toggle" role="switch"
+                                                    aria-checked="@(_bingoEventEnabled ? "true" : "false")"
+                                                    aria-labelledby="bingo-event-label"
+                                                    @onclick="() => _bingoEventEnabled = !_bingoEventEnabled"></button>
+                                        </div>
+                                        @if (_bingoEventEnabled)
+                                        {
+                                            <div class="mt-3 grid gap-3" data-event-feed-details>
+                                                <div class="space-y-2"><label class="label" for="bingo-event-template">Template</label><input id="bingo-event-template" class="input" @bind="_bingoEventTemplate" /></div>
+                                                <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
+                                                    <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{summary}</span>
+                                                </div>
+                                                <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+                                                    <div class="space-y-2"><label class="label" for="bingo-event-duration">On screen for (seconds)</label><input id="bingo-event-duration" class="input" type="number" min="1" max="30" @bind="_bingoEventDuration" /></div>
+                                                    <StudioSegmentedPill TValue="OverlayEventFeedPriority"
+                                                                         AriaLabel="Bingo event priority"
+                                                                         Options="_priorityOptions"
+                                                                         @bind-Value="_bingoEventPriority" />
+                                                </div>
+                                            </div>
+                                        }
+                                    </section>
                                 </div>
                             }
                             else if (_draftType is OverlayType.ViewerQueue)

@@ -65,6 +65,9 @@ internal sealed record ActiveEventSubSubscription
     internal EventSubOperationSubscriptionState AutomationStreamSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
 
+    internal EventSubOperationSubscriptionState AutomationChannelUpdateSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
     internal EventSubOperationSubscriptionState AutomationFollowSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
 
@@ -89,6 +92,7 @@ internal enum EventSubOperationSubscriptionKind
     RewardRedemptions,
     Predictions,
     AutomationStream,
+    AutomationChannelUpdates,
     AutomationFollows,
     AutomationSubscriptions,
     AutomationCheers,

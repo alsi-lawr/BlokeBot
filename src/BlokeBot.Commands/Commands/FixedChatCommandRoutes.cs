@@ -52,6 +52,9 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute EquipTitle { get; } = new("equiptitle");
     public static FixedChatCommandRoute EquipBadge { get; } = new("equipbadge");
     public static FixedChatCommandRoute EquipAccent { get; } = new("equipaccent");
+    public static FixedChatCommandRoute Bingo { get; } = new("bingo");
+    public static FixedChatCommandRoute BingoJoin { get; } = new("bingojoin");
+    public static FixedChatCommandRoute BingoLeave { get; } = new("bingoleave");
 
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
@@ -89,6 +92,9 @@ public static class FixedChatCommandRoutes
                 EquipTitle.Value,
                 EquipBadge.Value,
                 EquipAccent.Value,
+                Bingo.Value,
+                BingoJoin.Value,
+                BingoLeave.Value,
             ],
             StringComparer.OrdinalIgnoreCase
         );

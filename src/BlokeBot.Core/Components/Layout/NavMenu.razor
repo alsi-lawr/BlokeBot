@@ -50,6 +50,7 @@
                         selection,
                         HostFeatureFlags.CommunityProgression
                     );
+                    var showBingo = FeatureIsVisible(session, selection, HostFeatureFlags.Bingo);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
                     var showRequestBoards = FeatureIsVisible(session, selection, HostFeatureFlags.RequestBoards);
@@ -64,7 +65,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showBingo || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -301,6 +302,24 @@
                             <span class="nav-menu__label min-w-0">Community</span>
                         </NavLink>
                         @RouteHelp("community", "Community progression")
+                    </div>
+                }
+
+                @if (showBingo)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="bingo">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="bingo"
+                                 aria-label="Stream-event Bingo"
+                                 aria-describedby="@RouteHelpReference("bingo")"
+                                 aria-current="@CurrentRoute("bingo")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-cyan-700" aria-hidden="true">▦</span>
+                            <span class="nav-menu__label min-w-0">Bingo</span>
+                        </NavLink>
+                        @RouteHelp("bingo", "Stream-event Bingo")
                     </div>
                 }
 

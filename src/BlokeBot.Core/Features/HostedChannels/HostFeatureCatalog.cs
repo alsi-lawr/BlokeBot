@@ -20,6 +20,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Points,
         HostFeatureFlags.Bounties,
         HostFeatureFlags.CommunityProgression,
+        HostFeatureFlags.Bingo,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -102,6 +103,12 @@ public static class HostFeatureCatalog
                 "Community progression",
                 "Run seasons with quests, achievements, standings, and persistent rewards.",
                 enabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            ),
+            new(
+                HostFeatureFlags.Bingo,
+                "Bingo",
+                "Run shared, viewer, or team cards from typed stream events.",
+                enabledFeatures.Contains(HostFeatureFlags.Bingo)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

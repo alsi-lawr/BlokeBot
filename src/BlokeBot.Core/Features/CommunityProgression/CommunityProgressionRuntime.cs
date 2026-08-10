@@ -151,6 +151,11 @@ internal sealed class CommunityProgressionRuntime(
         CancellationToken cancellation
     ) => Task.CompletedTask;
 
+    public Task ChannelUpdatedAsync(
+        EventSubChannelUpdateEvent channelUpdate,
+        CancellationToken cancellation
+    ) => Task.CompletedTask;
+
     public Task SubscriptionGiftReceivedAsync(
         EventSubSubscriptionGiftEvent gift,
         CancellationToken cancellation

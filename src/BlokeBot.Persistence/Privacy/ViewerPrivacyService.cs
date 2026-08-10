@@ -370,6 +370,41 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "bingo.participants",
+            db.BingoParticipants.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bingo.evidence",
+            db.BingoEvidence.Where(x =>
+                (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bingo.win-recipients",
+            db.BingoWinRecipients.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bingo.moderation-audits",
+            db.BingoModerationAudit.Where(x =>
+                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bingo.template-revisions",
+            db.BingoTemplateRevisions.Where(x =>
+                (x.CreatedByTwitchUserId == userId || x.CreatedByLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
             "community.progress",
             db.CommunityProgress.Where(x =>
                 (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
@@ -979,6 +1014,97 @@ public static class ViewerPrivacyService
         }
 
         Record("bounties.events", bountyEvents);
+        Record(
+            "bingo.participants",
+            await db
+                .BingoParticipants.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, x => "erased:" + x.Id)
+                            .SetProperty(x => x.Login, ErasedToken)
+                            .SetProperty(x => x.DisplayName, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "bingo.evidence",
+            await db
+                .BingoEvidence.Where(x =>
+                    (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ParticipantTwitchUserId, (string?)null)
+                            .SetProperty(x => x.ParticipantLogin, (string?)null)
+                            .SetProperty(x => x.ParticipantDisplayName, (string?)null)
+                            .SetProperty(x => x.Summary, "Bingo event recorded"),
+                    ct
+                )
+        );
+        Record(
+            "bingo.win-recipients",
+            await db
+                .BingoWinRecipients.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, x => "erased:" + x.Id)
+                            .SetProperty(x => x.Login, ErasedToken)
+                            .SetProperty(x => x.DisplayName, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "bingo.moderation-audits",
+            await db
+                .BingoModerationAudit.Where(x =>
+                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken)
+                            .SetProperty(x => x.PrivateNote, string.Empty),
+                    ct
+                )
+        );
+        Record(
+            "bingo.template-revisions",
+            await db
+                .BingoTemplateRevisions.Where(x =>
+                    (x.CreatedByTwitchUserId == userId || x.CreatedByLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.CreatedByTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.CreatedByLogin, ErasedToken),
+                    ct
+                )
+        );
+        var bingoEvents = 0;
+        foreach (var needle in quotedNeedles)
+        {
+            bingoEvents += await db
+                .BingoEvents.Where(x =>
+                    EF.Functions.Like(x.PublicPayload, needle)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct);
+        }
+        Record("bingo.events", bingoEvents);
         if (communityCompletionIds.Count > 0)
         {
             Record(

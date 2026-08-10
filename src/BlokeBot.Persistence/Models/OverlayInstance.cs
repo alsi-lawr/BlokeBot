@@ -31,6 +31,9 @@ public enum OverlayEventFeedKind
 
     [PersistedToken("giveawayWinner")]
     GiveawayWinner,
+
+    [PersistedToken("bingoEvent")]
+    BingoEvent,
 }
 
 public enum OverlayEventFeedPriority

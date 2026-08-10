@@ -37,6 +37,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.Points => $"{_featureIconBase} text-emerald-600",
                 HostFeatureFlags.Bounties => $"{_featureIconBase} text-amber-700",
                 HostFeatureFlags.CommunityProgression => $"{_featureIconBase} text-fuchsia-700",
+                HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
                 HostFeatureFlags.CustomCommands => $"{_featureIconBase} text-violet-600",
                 HostFeatureFlags.Shoutouts
                 or HostFeatureFlags.Polls
@@ -81,6 +82,12 @@ public partial class HostConfigPage
                 HostFeatureFlags.CommunityProgression => """
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 3 15 9l6 1-4.5 4.5 1 6.5-5.5-3-5.5 3 1-6.5L3 10l6-1 3-6Z" />
+                </svg>
+                """,
+                HostFeatureFlags.Bingo => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <path d="M9.33 4v16M14.67 4v16M4 9.33h16M4 14.67h16" />
                 </svg>
                 """,
                 HostFeatureFlags.CustomCommands => """
@@ -207,6 +214,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.Bounties => "Bounties",
             HostFeatureFlags.CommunityProgression => "Community progression",
+            HostFeatureFlags.Bingo => "Bingo",
             HostFeatureFlags.CustomCommands => "Custom commands",
             HostFeatureFlags.Shoutouts => "Shoutouts",
             HostFeatureFlags.Polls => "Polls",

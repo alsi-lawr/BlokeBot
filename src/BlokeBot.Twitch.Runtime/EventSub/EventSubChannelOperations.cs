@@ -98,6 +98,14 @@ internal sealed class EventSubChannelOperations(
                     account,
                     cancellationToken
                 ),
+            EventSubOperationSubscriptionKind.AutomationChannelUpdates =>
+                CreateBroadcasterOperationSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    [("channel.update", "2")],
+                    cancellationToken
+                ),
             EventSubOperationSubscriptionKind.AutomationFollows =>
                 CreateAutomationBotConditionSubscriptionsAsync(
                     channel,
@@ -234,6 +242,12 @@ internal sealed class EventSubChannelOperations(
                 AutomationEventSubRequirement.Stream,
                 cancellationToken
             ),
+            EventSubOperationSubscriptionKind.AutomationChannelUpdates =>
+                await AutomationRequiresAsync(
+                    channel,
+                    AutomationEventSubRequirement.ChannelUpdates,
+                    cancellationToken
+                ),
             EventSubOperationSubscriptionKind.AutomationFollows => await AutomationRequiresAsync(
                 channel,
                 AutomationEventSubRequirement.Follows,

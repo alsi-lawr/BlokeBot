@@ -62,6 +62,43 @@ internal sealed record EventSubStreamOfflineWireEvent
             );
 }
 
+internal sealed record EventSubChannelUpdateWireEvent
+{
+    [JsonPropertyName("broadcaster_user_id")]
+    public string BroadcasterUserId { get; init; } = string.Empty;
+
+    [JsonPropertyName("broadcaster_user_login")]
+    public string BroadcasterUserLogin { get; init; } = string.Empty;
+
+    [JsonPropertyName("broadcaster_user_name")]
+    public string BroadcasterUserName { get; init; } = string.Empty;
+
+    [JsonPropertyName("category_id")]
+    public string CategoryId { get; init; } = string.Empty;
+
+    [JsonPropertyName("category_name")]
+    public string CategoryName { get; init; } = string.Empty;
+
+    [JsonPropertyName("title")]
+    public string StreamTitle { get; init; } = string.Empty;
+
+    internal EventSubChannelUpdateEvent? ToDomain(EventSubMetadata metadata) =>
+        !EventSubWireIdentity.IsUsable(metadata, BroadcasterUserId, BroadcasterUserLogin)
+        || string.IsNullOrWhiteSpace(CategoryId)
+        || string.IsNullOrWhiteSpace(CategoryName)
+            ? null
+            : new(
+                metadata.MessageId,
+                metadata.MessageTimestamp!.Value,
+                BroadcasterUserId,
+                BroadcasterUserLogin,
+                BroadcasterUserName,
+                CategoryId,
+                CategoryName,
+                StreamTitle
+            );
+}
+
 internal sealed record EventSubFollowWireEvent
 {
     [JsonPropertyName("user_id")]

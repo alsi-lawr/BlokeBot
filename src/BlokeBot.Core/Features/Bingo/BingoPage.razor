@@ -1,0 +1,258 @@
+@page "/bingo"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject BingoService _bingo
+@inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
+@inject IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> _dbFactory
+
+<PageTitle>BlokeBot | Bingo</PageTitle>
+
+<DashboardPage Kicker="Community progression"
+               Title="Stream-event Bingo"
+               Description="Build deterministic cards from typed Twitch and BlokeBot events, then run shared, viewer, or team games."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        @if (_featureEnabled && Host is not null)
+        {
+            <a class="btn-secondary" href="@_publicUrl" target="_blank" rel="noopener">Open public cards</a>
+        }
+    </Actions>
+    <ChildContent>
+        @if (Host is null)
+        {
+            <ApplicationCardCollection Owner="dashboard-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground">Choose a channel to manage Bingo.</div>
+            </ApplicationCardCollection>
+        }
+        else if (!_featureEnabled)
+        {
+            <ApplicationCardCollection Owner="dashboard-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground" data-bingo-disabled-recovery>
+                    Bingo is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Templates, rosters, issued cards, evidence, wins, rewards, and archives are retained without replaying events suppressed while off.
+                </div>
+            </ApplicationCardCollection>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <p class="rounded-lg border p-3 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+            }
+
+            <section class="card p-5" aria-labelledby="bingo-template-heading">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 id="bingo-template-heading" class="text-lg font-semibold text-slate-950">@(_template.Id is null ? "New template" : "New template revision")</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Issued cards keep their recorded revision, dimension, and seed after this template changes.</p>
+                    </div>
+                    @if (_template.Id is not null)
+                    {
+                        <button class="btn-secondary" type="button" @onclick="() => _template = TemplateDraft.New(_template.Dimension)">Start a new template</button>
+                    }
+                </div>
+                <div class="studio-grid mt-4">
+                    <div class="studio-span-6"><Field Id="bingo-template-name" Label="Template name" @bind-Value="_template.Name" /></div>
+                    <div class="studio-span-3">
+                        <label class="label" for="bingo-dimension">Grid</label>
+                        <select id="bingo-dimension" class="input" value="@_template.Dimension" @onchange="ChangeDimension">
+                            <option value="3">3 × 3</option>
+                            <option value="4">4 × 4</option>
+                            <option value="5">5 × 5</option>
+                        </select>
+                    </div>
+                    <div class="studio-span-3 flex items-end">
+                        <label class="flex min-h-11 items-center gap-2 font-semibold"><input type="checkbox" @bind="_template.FullCard" /> Award full-card wins</label>
+                    </div>
+                    <div class="studio-span-3"><Field Id="bingo-line-points" Label="Points per row/line" @bind-Value="_template.LinePoints" /></div>
+                    <div class="studio-span-3">
+                        <label class="label" for="bingo-line-achievement">Achievement/title per row/line</label>
+                        <select id="bingo-line-achievement" class="input" @bind="_template.LineAchievement">
+                            <option value="">No achievement</option>
+                            @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
+                        </select>
+                    </div>
+                    <div class="studio-span-3"><Field Id="bingo-full-points" Label="Points for full card" @bind-Value="_template.FullPoints" /></div>
+                    <div class="studio-span-3">
+                        <label class="label" for="bingo-full-achievement">Achievement/title for full card</label>
+                        <select id="bingo-full-achievement" class="input" @bind="_template.FullAchievement" disabled="@(!_template.FullCard)">
+                            <option value="">No achievement</option>
+                            @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-bingo-square-editors>
+                    @for (var index = 0; index < _template.Squares.Count; index++)
+                    {
+                        var square = _template.Squares[index];
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4" @key="square.Key">
+                            <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Square @(index + 1)</p>
+                            <div class="mt-3 grid gap-3">
+                                <Field Id="@($"bingo-square-title-{index}")" Label="Public title" @bind-Value="square.Title" />
+                                <Field Id="@($"bingo-square-key-{index}")" Label="Stable square key" @bind-Value="square.Key" />
+                                <div>
+                                    <label class="label" for="@($"bingo-square-kind-{index}")">Typed source</label>
+                                    <select id="@($"bingo-square-kind-{index}")" class="input" @bind="square.Kind">
+                                        <option value="@BingoSquareKind.Manual">Moderator confirmation</option>
+                                        <option value="@BingoSquareKind.IncomingRaid">Incoming raid</option>
+                                        <option value="@BingoSquareKind.BountyCompleted">Bounty completed</option>
+                                        <option value="@BingoSquareKind.GuessingResult">Guessing result</option>
+                                        <option value="@BingoSquareKind.GiveawayStarted">Giveaway started</option>
+                                        <option value="@BingoSquareKind.StreamCategoryChanged">Stream category changed</option>
+                                        <option value="@BingoSquareKind.CounterReached">Counter reached</option>
+                                    </select>
+                                </div>
+                                @if (square.Kind is BingoSquareKind.IncomingRaid or BingoSquareKind.CounterReached)
+                                {
+                                    <div><label class="label" for="@($"bingo-square-threshold-{index}")">Minimum / target</label><input id="@($"bingo-square-threshold-{index}")" class="input" type="number" min="1" @bind="square.Threshold" /></div>
+                                }
+                                @if (square.Kind == BingoSquareKind.CounterReached)
+                                {
+                                    <div>
+                                        <label class="label" for="@($"bingo-square-counter-{index}")">Saved counter</label>
+                                        <select id="@($"bingo-square-counter-{index}")" class="input" @bind="square.CounterId">
+                                            <option value="0">Choose counter</option>
+                                            @foreach (var counter in _counters) { <option value="@counter.Id">@counter.Name</option> }
+                                        </select>
+                                    </div>
+                                }
+                                @if (square.Kind == BingoSquareKind.GuessingResult)
+                                {
+                                    <Field Id="@($"bingo-square-answer-{index}")" Label="Winning answer (blank means any)" @bind-Value="square.Filter" />
+                                }
+                                @if (square.Kind == BingoSquareKind.StreamCategoryChanged)
+                                {
+                                    <Field Id="@($"bingo-square-category-{index}")" Label="Twitch category ID (blank means any)" @bind-Value="square.Filter" />
+                                }
+                                <TextAreaField Id="@($"bingo-square-note-{index}")" Label="Private moderator note" @bind-Value="square.PrivateNote" />
+                            </div>
+                        </article>
+                    }
+                </div>
+                <button class="btn-primary mt-4" type="button" @onclick="SaveTemplateAsync">Save revision</button>
+            </section>
+
+            @if (_templates.Count > 0)
+            {
+                <section class="card p-5" aria-labelledby="saved-bingo-templates-heading">
+                    <h2 id="saved-bingo-templates-heading" class="text-lg font-semibold text-slate-950">Reusable templates</h2>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach (var template in _templates)
+                        {
+                            <button class="btn-secondary" type="button" @onclick="() => EditTemplate(template)">@template.Name · rev @template.Revision · @template.Dimension.Value×@template.Dimension.Value</button>
+                        }
+                    </div>
+                </section>
+
+                <section class="card p-5" aria-labelledby="new-bingo-game-heading">
+                    <h2 id="new-bingo-game-heading" class="text-lg font-semibold text-slate-950">Open a game</h2>
+                    <div class="studio-grid mt-4">
+                        <div class="studio-span-4">
+                            <label class="label" for="bingo-game-template">Template revision</label>
+                            <select id="bingo-game-template" class="input" @bind="_game.TemplateId">
+                                @foreach (var template in _templates) { <option value="@template.Id.Value">@template.Name · rev @template.Revision</option> }
+                            </select>
+                        </div>
+                        <div class="studio-span-4">
+                            <label class="label" for="bingo-game-mode">Card mode</label>
+                            <select id="bingo-game-mode" class="input" @bind="_game.Mode">
+                                <option value="@BingoGameMode.Shared">Shared board</option>
+                                <option value="@BingoGameMode.UniquePerViewer">Unique per viewer</option>
+                                <option value="@BingoGameMode.Team">Teams</option>
+                            </select>
+                        </div>
+                        <div class="studio-span-4"><Field Id="bingo-game-seed" Label="Recorded seed" @bind-Value="_game.Seed" /></div>
+                        <div class="studio-span-3"><Field Id="bingo-participant-cap" Label="Participant cap (optional)" @bind-Value="_game.ParticipantCap" /></div>
+                        @if (_game.Mode == BingoGameMode.Team)
+                        {
+                            <div class="studio-span-3"><Field Id="bingo-team-cap" Label="Team cap (optional)" @bind-Value="_game.TeamCap" /></div>
+                            <div class="studio-span-6"><Field Id="bingo-teams" Label="Team names, comma separated" @bind-Value="_game.Teams" /></div>
+                        }
+                        <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateGameAsync">Open viewer joining</button></div>
+                    </div>
+                </section>
+            }
+
+            @foreach (var item in _games)
+            {
+                var game = item.Game;
+                <section class="card p-5" data-bingo-game="@game.Id.Value">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-950">@game.TemplateName</h2>
+                            <p class="mt-1 text-sm text-muted-foreground">@game.Mode · @game.Dimension.Value×@game.Dimension.Value · revision @game.TemplateRevision · seed <span class="font-mono">@game.Seed</span></p>
+                        </div>
+                        <span class="status-pill bg-slate-100 text-slate-700 ring-1 ring-slate-200"><span class="status-pill__label">@game.Status</span></span>
+                    </div>
+                    @if (game.Status == BingoGameStatus.Joining)
+                    {
+                        <p class="mt-4 text-sm">Viewers join with <code>!bingojoin</code>@(game.Mode == BingoGameMode.Team ? " followed by a team name" : string.Empty). Owner and moderator changes remain available until cards are issued.</p>
+                        @if (game.Participants.Count > 0)
+                        {
+                            <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                @foreach (var participant in game.Participants)
+                                {
+                                    <div class="rounded-lg border border-slate-200 p-3">
+                                        <p class="font-semibold">@participant.DisplayName <span class="text-sm text-muted-foreground">@@@participant.Login</span></p>
+                                        <TextAreaField Id="@($"bingo-participant-note-{participant.TwitchUserId}")" Label="Private roster note" Value="@Note(ParticipantNoteKey(participant))" ValueChanged="value => SetNote(ParticipantNoteKey(participant), value)" />
+                                        <div class="mt-2 flex flex-wrap items-end gap-2">
+                                            @if (game.Mode == BingoGameMode.Team)
+                                            {
+                                                <select class="input max-w-56" value="@_teamMoves.GetValueOrDefault(participant.TwitchUserId, string.Empty)" @onchange="args => _teamMoves[participant.TwitchUserId] = args.Value?.ToString() ?? string.Empty">
+                                                    <option value="">Move to team…</option>
+                                                    @foreach (var team in game.Teams) { <option value="@TeamValue(team)">@team.Name</option> }
+                                                </select>
+                                                <button class="btn-secondary" type="button" @onclick="() => MoveAsync(game, participant)">Move</button>
+                                            }
+                                            <button class="btn-secondary" type="button" @onclick="() => RemoveAsync(game, participant)">Remove</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <TextAreaField Id="@($"bingo-game-note-{game.Id.Value:N}")" Label="Private issue note" Value="@Note(GameNoteKey(game))" ValueChanged="value => SetNote(GameNoteKey(game), value)" />
+                        <button class="btn-primary mt-3" type="button" @onclick="() => IssueAsync(game)">Issue and freeze cards</button>
+                    }
+                    else if (game.Status == BingoGameStatus.Issued)
+                    {
+                        <div class="mt-5 grid gap-5 xl:grid-cols-2">
+                            @foreach (var card in game.Cards)
+                            {
+                                <article class="rounded-xl border border-slate-200 p-4">
+                                    <h3 class="font-semibold text-slate-950">@card.AssignmentName</h3>
+                                    @if (card.Participants.Count > 0) { <p class="mt-1 text-xs text-muted-foreground">@string.Join(", ", card.Participants.Select(value => $"@{value.Login}"))</p> }
+                                    <div class="mt-3 grid gap-2" style="@($"grid-template-columns: repeat({game.Dimension.Value}, minmax(0, 1fr));")">
+                                        @foreach (var square in card.Squares)
+                                        {
+                                            <div class="min-w-0 overflow-hidden rounded-lg border p-2 text-xs @(square.Marked ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white")">
+                                                <p class="break-words font-semibold">@square.Title</p>
+                                                <p class="mt-1 text-[0.68rem] text-muted-foreground">@square.Kind.DisplayName()</p>
+                                                @if (square.Kind == BingoSquareKind.Manual)
+                                                {
+                                                    <TextAreaField Id="@($"bingo-mark-note-{card.Id.Value:N}-{square.Position}")" Label="Private note" Value="@Note(MarkNoteKey(card, square))" ValueChanged="value => SetNote(MarkNoteKey(card, square), value)" />
+                                                    <button class="btn-secondary mt-2 min-h-8 px-2 py-1 text-xs" type="button" @onclick="() => ChangeMarkAsync(game, card, square)">@(square.Marked ? "Reverse" : "Confirm")</button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (card.Wins.Count > 0)
+                                    {
+                                        <ul class="mt-3 space-y-1 text-sm">@foreach (var win in card.Wins) { <li><b>@win.Kind</b> · @win.CompletedAtUtc.ToString("u") · reward retained permanently</li> }</ul>
+                                    }
+                                </article>
+                            }
+                        </div>
+                        <TextAreaField Id="@($"bingo-archive-note-{game.Id.Value:N}")" Label="Private archive note" Value="@Note(GameNoteKey(game))" ValueChanged="value => SetNote(GameNoteKey(game), value)" />
+                        <button class="btn-secondary mt-3" type="button" @onclick="() => ArchiveAsync(game)">Archive game</button>
+                    }
+                    @if (item.Audit.Count > 0)
+                    {
+                        <details class="mt-4 text-sm"><summary class="cursor-pointer font-semibold">Private moderation audit</summary><ul class="mt-2 space-y-1 text-muted-foreground">@foreach (var audit in item.Audit) { <li>@audit.OccurredAtUtc.ToString("u") · @audit.Action by @("@" + audit.ActorLogin) · @audit.PrivateNote</li> }</ul></details>
+                    }
+                </section>
+            }
+        }
+    </ChildContent>
+</DashboardPage>

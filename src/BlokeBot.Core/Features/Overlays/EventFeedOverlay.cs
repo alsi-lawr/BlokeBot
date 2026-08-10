@@ -43,6 +43,12 @@ public abstract record OverlayEventPresentation
         public ImmutableArray<string> Prizes { get; init; } = [];
         public required string PointLabel { get; init; }
     }
+
+    public sealed record BingoEvent : OverlayEventPresentation
+    {
+        public override OverlayEventFeedKind Kind => OverlayEventFeedKind.BingoEvent;
+        public required string Summary { get; init; }
+    }
 }
 
 public interface IOverlayEventPresenter
@@ -149,6 +155,12 @@ internal sealed partial class EventFeedTemplateRenderer
                 ["winnerCount"] = giveaway.Winners.Length.ToString(CultureInfo.InvariantCulture),
                 ["prizes"] = Join(giveaway.Prizes),
                 ["pointLabel"] = giveaway.PointLabel,
+            },
+            OverlayEventPresentation.BingoEvent bingo => new Dictionary<string, string>(
+                StringComparer.Ordinal
+            )
+            {
+                ["summary"] = bingo.Summary,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(presentation)),
         };
@@ -432,6 +444,7 @@ internal sealed class OverlayEventFeedService(
             {
                 HostFeatureFlags.Guessing => OverlayEventFeedKind.GuessingWinner,
                 HostFeatureFlags.Points => (OverlayEventFeedKind?)null,
+                HostFeatureFlags.Bingo => OverlayEventFeedKind.BingoEvent,
                 _ => null,
             };
             var query = db.OverlayEventFeedItems.Where(x =>
@@ -702,6 +715,14 @@ internal sealed class OverlayEventFeedService(
                 ct
             );
         }
+        if ((enabledFeatures & HostFeatureFlags.Bingo) != HostFeatureFlags.Bingo)
+        {
+            suppressed += await SuppressRecoveredAsync(
+                activeOrQueued.Where(x => x.Kind == OverlayEventFeedKind.BingoEvent),
+                now,
+                ct
+            );
+        }
         return suppressed;
     }
 
@@ -770,6 +791,7 @@ internal sealed class OverlayEventFeedService(
             OverlayEventFeedKind.PointAward or OverlayEventFeedKind.GiveawayWinner =>
                 HostFeatureFlags.Points,
             OverlayEventFeedKind.GuessingWinner => HostFeatureFlags.Guessing,
+            OverlayEventFeedKind.BingoEvent => HostFeatureFlags.Bingo,
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -779,6 +801,7 @@ internal sealed class OverlayEventFeedService(
             OverlayEventFeedKind.PointAward => "Points awarded",
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
+            OverlayEventFeedKind.BingoEvent => "Bingo",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

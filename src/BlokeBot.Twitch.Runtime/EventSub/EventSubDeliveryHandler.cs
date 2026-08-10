@@ -148,6 +148,12 @@ internal sealed class EventSubDeliveryHandler(
                     cancellationToken
                 );
                 break;
+            case EventSubNotification.ChannelUpdate { Event: var channelUpdate }:
+                await NotifyAutomationObserversAsync(
+                    (observer, token) => observer.ChannelUpdatedAsync(channelUpdate, token),
+                    cancellationToken
+                );
+                break;
             case EventSubNotification.Follow { Event: var follow }:
                 await NotifyAutomationObserversAsync(
                     (observer, token) => observer.FollowReceivedAsync(follow, token),

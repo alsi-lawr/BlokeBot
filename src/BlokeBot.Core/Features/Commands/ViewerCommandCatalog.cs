@@ -157,6 +157,19 @@ public sealed class ViewerCommandCatalogService(
                 .Select(value => value.Status)
                 .ToArrayAsync(ct)
             : [];
+        var bingoStatus = enabledFeatures.Contains(HostFeatureFlags.Bingo)
+            ? await db
+                .BingoGames.AsNoTracking()
+                .Where(value =>
+                    value.HostId == hostId
+                    && (
+                        value.Status == BingoGameStatus.Joining
+                        || value.Status == BingoGameStatus.Issued
+                    )
+                )
+                .Select(value => (BingoGameStatus?)value.Status)
+                .SingleOrDefaultAsync(ct)
+            : null;
         var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
             ? await db
                 .PlayQueues.AsNoTracking()
@@ -268,6 +281,16 @@ public sealed class ViewerCommandCatalogService(
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipTitle));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipBadge));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipAccent));
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.Bingo) && bingoStatus is not null)
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bingo));
+            if (bingoStatus == BingoGameStatus.Joining)
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoJoin));
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoLeave));
+            }
         }
 
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)
