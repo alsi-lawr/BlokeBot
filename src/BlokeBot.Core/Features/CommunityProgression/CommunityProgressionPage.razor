@@ -41,177 +41,444 @@
                 <p class="rounded-lg border p-3 text-sm font-semibold" role="@(_failed ? "alert" : "status")">@_feedback</p>
             }
 
-            <section class="card p-5" aria-labelledby="season-create-heading">
-                <h2 id="season-create-heading" class="text-lg font-semibold text-slate-950">New season</h2>
-                <div class="studio-grid mt-4">
-                    <div class="studio-span-6"><Field Id="season-name" Label="Name" @bind-Value="_season.Name" /></div>
-                    <div class="studio-span-6 grid gap-4 sm:grid-cols-2">
-                        <Field Id="season-start" Label="Starts (UTC)" @bind-Value="_season.StartsAtUtc" />
-                        <Field Id="season-end" Label="Ends (UTC)" @bind-Value="_season.EndsAtUtc" />
+            <details class="card progression-disclosure progression-card" open>
+                <summary>
+                    <div class="grid min-w-0 gap-1">
+                        <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">New season</h2>
+                        <p class="text-sm text-muted-foreground">Draft a season, then open it once its rewards and definitions are ready.</p>
                     </div>
-                    <div class="studio-span-12"><TextAreaField Id="season-description" Label="Public description" @bind-Value="_season.Description" /></div>
-                    <div class="studio-span-6">
-                        <label class="label" for="season-visibility">Visibility</label>
-                        <select id="season-visibility" class="input" @bind="_season.Visibility">
-                            <option value="@CommunityVisibility.Public">Public — participant Twitch identities and progress are visible</option>
-                            <option value="@CommunityVisibility.Hidden">Hidden — no public progression data</option>
-                        </select>
+                    <span class="progression-chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="progression-card__body">
+                    <div class="studio-grid">
+                        <div class="studio-span-6"><Field Id="season-name" Label="Name" @bind-Value="_season.Name" /></div>
+                        <div class="studio-span-6 grid gap-4 sm:grid-cols-2">
+                            <Field Id="season-start" Label="Starts (UTC)" @bind-Value="_season.StartsAtUtc" />
+                            <Field Id="season-end" Label="Ends (UTC)" @bind-Value="_season.EndsAtUtc" />
+                        </div>
+                        <div class="studio-span-12"><TextAreaField Id="season-description" Label="Public description" @bind-Value="_season.Description" /></div>
+                        <div class="studio-span-6">
+                            <label class="label" for="season-visibility">Visibility</label>
+                            <select id="season-visibility" class="input mt-1" @bind="_season.Visibility">
+                                <option value="@CommunityVisibility.Public">Public, participant Twitch identities and progress are visible</option>
+                                <option value="@CommunityVisibility.Hidden">Hidden, no public progression data</option>
+                            </select>
+                        </div>
+                        <div class="studio-span-6"><TextAreaField Id="season-notes" Label="Private moderator notes" @bind-Value="_season.ModeratorNotes" /></div>
+                        <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateSeasonAsync">Create draft season</button></div>
                     </div>
-                    <div class="studio-span-6"><TextAreaField Id="season-notes" Label="Private moderator notes" @bind-Value="_season.ModeratorNotes" /></div>
-                    <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateSeasonAsync">Create draft season</button></div>
                 </div>
-            </section>
+            </details>
 
             @foreach (var season in _seasons)
             {
-                <article class="card p-5" @key="season.Id" data-season-id="@season.Id.Value">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                <details class="card progression-disclosure progression-card"
+                         @key="season.Id"
+                         data-season-id="@season.Id.Value"
+                         open="@(season.Status != CommunitySeasonStatus.Archived)">
+                    <summary>
+                        <div class="grid min-w-0 gap-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-lg font-semibold text-slate-950">@season.Name</h2>
-                                <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"><span class="status-pill__label">@season.Status</span></span>
-                                <span class="text-xs font-semibold text-muted-foreground">@season.Visibility</span>
+                                <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">@season.Name</h2>
+                                <span class="@CommunityProgressionPresentation.StatusPillClass(season.Status)">
+                                    <span class="status-pill__dot"></span><span class="status-pill__label">@season.Status</span>
+                                </span>
+                                <span class="progression-tag">@season.Visibility</span>
                             </div>
-                            <p class="mt-1 text-sm text-muted-foreground">@season.Description</p>
-                            <p class="mt-2 text-xs text-muted-foreground">@season.StartsAtUtc.ToString("u") — @season.EndsAtUtc.ToString("u")</p>
+                            <p class="text-sm text-muted-foreground">@SeasonSummary(season)</p>
                         </div>
-                        <div class="flex flex-wrap gap-2">
-                            @if (season.Status == CommunitySeasonStatus.Draft)
-                            {
-                                <button class="btn-primary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Open)">Open season</button>
-                            }
-                            else if (season.Status == CommunitySeasonStatus.Open)
-                            {
-                                <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Close)">Close and snapshot standings</button>
-                            }
-                            else if (season.Status == CommunitySeasonStatus.Closed)
-                            {
-                                <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Archive)">Archive season</button>
-                            }
-                        </div>
-                    </div>
+                        <span class="progression-chevron" aria-hidden="true">›</span>
+                    </summary>
+                    <div class="progression-card__body">
+                        @if (season.Status != CommunitySeasonStatus.Draft)
+                        {
+                            <CommunitySeasonTimeline StartsAtUtc="season.StartsAtUtc"
+                                                     EndsAtUtc="season.EndsAtUtc"
+                                                     TimeZoneId="@SeasonTimeZone(season)" />
+                        }
 
-                    @if (season.Status == CommunitySeasonStatus.Draft)
-                    {
-                        <div class="mt-5 grid gap-4 lg:grid-cols-2">
-                            <section class="rounded-xl border p-4" aria-label="Add persistent reward">
-                                <h3 class="font-semibold">Add persistent reward</h3>
-                                <div class="mt-3 grid gap-3">
-                                    <Field Id="@($"reward-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_reward.Key" />
-                                    <Field Id="@($"reward-name-{season.Id.Value:N}")" Label="Display name" @bind-Value="_reward.Name" />
-                                    <label class="label">Type
-                                        <select class="input mt-1" @bind="_reward.Kind">
-                                            <option value="@CommunityRewardKind.Title">Title</option>
-                                            <option value="@CommunityRewardKind.Badge">Badge icon</option>
-                                            <option value="@CommunityRewardKind.CosmeticAccent">Cosmetic accent</option>
+                        @if (season.Status != CommunitySeasonStatus.Archived)
+                        {
+                            <div class="flex flex-wrap gap-2">
+                                @if (season.Status == CommunitySeasonStatus.Draft)
+                                {
+                                    <button class="btn-primary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Open)">Open season</button>
+                                }
+                                else if (season.Status == CommunitySeasonStatus.Open)
+                                {
+                                    <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Close)">Close and snapshot standings</button>
+                                }
+                                else
+                                {
+                                    <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(season, CommunitySeasonTransition.Archive)">Archive season</button>
+                                }
+                            </div>
+                        }
+
+                        @if (season.Status == CommunitySeasonStatus.Draft)
+                        {
+                            <StudioStage Key='@StageKey(season, "details")'
+                                         Number="1"
+                                         Title="Season details"
+                                         Summary="@SeasonSummary(season)"
+                                         Open='@StageOpen(season, "details")'
+                                         OpenChanged='value => SetStageOpen(season, "details", value)'>
+                                <div class="studio-grid">
+                                    <div class="studio-span-4">
+                                        <span class="label">Name</span>
+                                        <p class="text-sm">@season.Name</p>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <span class="label">Starts</span>
+                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.StartsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.StartsAtUtc)</p>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <span class="label">Ends</span>
+                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.EndsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.EndsAtUtc)</p>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <span class="label">Visibility</span>
+                                        <p class="text-sm">@season.Visibility</p>
+                                    </div>
+                                    <div class="studio-span-8">
+                                        <span class="label">Public description</span>
+                                        <p class="text-sm">@season.Description</p>
+                                    </div>
+                                </div>
+                            </StudioStage>
+
+                            <StudioStage Key='@StageKey(season, "rewards")'
+                                         Number="2"
+                                         Title="Persistent rewards"
+                                         Summary="@RewardSummary(season)"
+                                         Open='@StageOpen(season, "rewards")'
+                                         OpenChanged='value => SetStageOpen(season, "rewards", value)'>
+                                <div class="grid min-w-0 gap-5 lg:grid-cols-2">
+                                    <div class="studio-grid">
+                                        <div class="studio-span-6"><Field Id="@($"reward-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_reward.Key" /></div>
+                                        <div class="studio-span-6"><Field Id="@($"reward-name-{season.Id.Value:N}")" Label="Display name" @bind-Value="_reward.Name" /></div>
+                                        <div class="studio-span-6">
+                                            <label class="label" for="@($"reward-kind-{season.Id.Value:N}")">Type</label>
+                                            <select id="@($"reward-kind-{season.Id.Value:N}")" class="input mt-1" @bind="_reward.Kind">
+                                                <option value="@CommunityRewardKind.Title">Title</option>
+                                                <option value="@CommunityRewardKind.Badge">Badge icon</option>
+                                                <option value="@CommunityRewardKind.CosmeticAccent">Cosmetic accent</option>
+                                            </select>
+                                        </div>
+                                        <div class="studio-span-6">
+                                            @if (TokenOptions(_reward.Kind) is { Count: > 0 } tokens)
+                                            {
+                                                <label class="label" for="@($"reward-token-{season.Id.Value:N}")">Presentation token</label>
+                                                <select id="@($"reward-token-{season.Id.Value:N}")" class="input mt-1" @bind="_reward.PresentationToken">
+                                                    @foreach (var token in tokens)
+                                                    {
+                                                        <option value="@token">@token</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <Field Id="@($"reward-token-{season.Id.Value:N}")" Label="Presentation token" @bind-Value="_reward.PresentationToken" />
+                                            }
+                                        </div>
+                                        <div class="studio-span-12"><button class="btn-secondary" type="button" @onclick="() => AddRewardAsync(season)">Add reward</button></div>
+                                    </div>
+                                    <div class="progression-preview">
+                                        <span class="progression-preview__heading">Live preview</span>
+                                        <div class="progression-chips">
+                                            <CommunityRewardChip Kind="_reward.Kind" Name="@_reward.Name" PresentationToken="@_reward.PresentationToken" ShowKind="true" />
+                                        </div>
+                                        <span class="progression-preview__heading">Already defined</span>
+                                        @if (season.Rewards.Count == 0)
+                                        {
+                                            <p class="text-sm text-muted-foreground">No rewards yet.</p>
+                                        }
+                                        else
+                                        {
+                                            <div class="progression-chips">
+                                                @foreach (var reward in season.Rewards)
+                                                {
+                                                    <CommunityRewardChip Kind="reward.Kind" Name="@reward.Name" PresentationToken="@reward.PresentationToken" ShowKind="true" />
+                                                }
+                                            </div>
+                                        }
+                                        <p class="text-xs text-muted-foreground">Badges and accents pick a supported presentation token. Titles use bounded text, never CSS.</p>
+                                    </div>
+                                </div>
+                            </StudioStage>
+
+                            <StudioStage Key='@StageKey(season, "definitions")'
+                                         Number="3"
+                                         Title="Quests and achievements"
+                                         Summary="@DefinitionSummary(season)"
+                                         Open='@StageOpen(season, "definitions")'
+                                         OpenChanged='value => SetStageOpen(season, "definitions", value)'>
+                                <div class="studio-grid">
+                                    <div class="studio-span-6"><Field Id="@($"definition-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_definition.Key" /></div>
+                                    <div class="studio-span-6"><Field Id="@($"definition-name-{season.Id.Value:N}")" Label="Name" @bind-Value="_definition.Name" /></div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-kind-{season.Id.Value:N}")">Kind</label>
+                                        <select id="@($"definition-kind-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Kind">
+                                            <option value="@CommunityDefinitionKind.Quest">Quest</option>
+                                            <option value="@CommunityDefinitionKind.Achievement">Achievement</option>
                                         </select>
-                                    </label>
-                                    <Field Id="@($"reward-token-{season.Id.Value:N}")" Label="Presentation token" @bind-Value="_reward.PresentationToken" />
-                                    <p class="text-xs text-muted-foreground">Badge tokens: star, crown, spark, shield. Accent tokens: sky, violet, amber, emerald. Titles use bounded text, never CSS.</p>
-                                    <button class="btn-secondary" type="button" @onclick="() => AddRewardAsync(season)">Add reward</button>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-scope-{season.Id.Value:N}")">Progress owner</label>
+                                        <select id="@($"definition-scope-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Scope">
+                                            <option value="@CommunityProgressScope.Viewer">Per viewer</option>
+                                            <option value="@CommunityProgressScope.Communal">Channel-wide communal</option>
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-completion-{season.Id.Value:N}")">Completion</label>
+                                        <select id="@($"definition-completion-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Completion">
+                                            <option value="@CommunityCompletionMode.OneTime">One-time</option>
+                                            <option value="@CommunityCompletionMode.Repeatable">Repeatable</option>
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-rule-{season.Id.Value:N}")">Supported event</label>
+                                        <select id="@($"definition-rule-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.EventRule">
+                                            @foreach (var rule in _availableEventRules)
+                                            {
+                                                <option value="@rule.Kind">@rule.Label</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-increment-{season.Id.Value:N}")">Increment</label>
+                                        <select id="@($"definition-increment-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Increment">
+                                            <option value="@CommunityProgressIncrement.Occurrence">One per event</option>
+                                            <option value="@CommunityProgressIncrement.EventValue">Event value (bits/viewers)</option>
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4"><Field Id="@($"definition-filter-{season.Id.Value:N}")" Label="Optional typed filter token" @bind-Value="_definition.FilterToken" /></div>
+                                    <div class="studio-span-4"><Field Id="@($"definition-target-{season.Id.Value:N}")" Label="Target" @bind-Value="_definition.Target" /></div>
+                                    <div class="studio-span-4"><Field Id="@($"definition-points-{season.Id.Value:N}")" Label="Points reward" @bind-Value="_definition.PointsReward" /></div>
+                                    <div class="studio-span-4"><Field Id="@($"definition-rewards-{season.Id.Value:N}")" Label="Reward keys (comma separated)" @bind-Value="_definition.RewardKeys" /></div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-cadence-{season.Id.Value:N}")">Reset cadence</label>
+                                        <select id="@($"definition-cadence-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.ResetCadence">
+                                            <option value="@CommunityResetCadence.None">None</option>
+                                            <option value="@CommunityResetCadence.Daily">Daily</option>
+                                            <option value="@CommunityResetCadence.Weekly">Weekly</option>
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4"><Field Id="@($"definition-reset-time-{season.Id.Value:N}")" Label="Local reset time (HH:mm)" @bind-Value="_definition.ResetLocalTime" /></div>
+                                    <div class="studio-span-4">
+                                        <label class="label" for="@($"definition-weekday-{season.Id.Value:N}")">Weekly day</label>
+                                        <select id="@($"definition-weekday-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.ResetWeekday">
+                                            @foreach (var day in Enum.GetValues<DayOfWeek>())
+                                            {
+                                                <option value="@day">@day</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-12"><button class="btn-secondary" type="button" @onclick="() => AddDefinitionAsync(season)">Add definition</button></div>
                                 </div>
-                            </section>
+                            </StudioStage>
+                        }
+                        else
+                        {
+                            <details class="progression-disclosure progression-section" open>
+                                <summary>Persistent rewards<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                <div class="progression-section__body">
+                                    @if (season.Rewards.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No persistent rewards were defined.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="progression-chips">
+                                            @foreach (var reward in season.Rewards)
+                                            {
+                                                <CommunityRewardChip Kind="reward.Kind" Name="@reward.Name" PresentationToken="@reward.PresentationToken" ShowKind="true" />
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                        }
 
-                            <section class="rounded-xl border p-4" aria-label="Add quest or achievement">
-                                <h3 class="font-semibold">Add quest or achievement</h3>
-                                <div class="mt-3 grid gap-3">
-                                    <Field Id="@($"definition-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_definition.Key" />
-                                    <Field Id="@($"definition-name-{season.Id.Value:N}")" Label="Name" @bind-Value="_definition.Name" />
-                                    <label class="label">Kind
-                                        <select class="input mt-1" @bind="_definition.Kind"><option value="@CommunityDefinitionKind.Quest">Quest</option><option value="@CommunityDefinitionKind.Achievement">Achievement</option></select>
-                                    </label>
-                                    <label class="label">Progress owner
-                                        <select class="input mt-1" @bind="_definition.Scope"><option value="@CommunityProgressScope.Viewer">Per viewer</option><option value="@CommunityProgressScope.Communal">Channel-wide communal</option></select>
-                                    </label>
-                                    <label class="label">Completion
-                                        <select class="input mt-1" @bind="_definition.Completion"><option value="@CommunityCompletionMode.OneTime">One-time</option><option value="@CommunityCompletionMode.Repeatable">Repeatable</option></select>
-                                    </label>
-                                    <label class="label">Supported event
-                                        <select class="input mt-1" @bind="_definition.EventRule">@foreach (var rule in _availableEventRules) { <option value="@rule.Kind">@rule.Label</option> }</select>
-                                    </label>
-                                    <label class="label">Increment
-                                        <select class="input mt-1" @bind="_definition.Increment"><option value="@CommunityProgressIncrement.Occurrence">One per event</option><option value="@CommunityProgressIncrement.EventValue">Event value (bits/viewers)</option></select>
-                                    </label>
-                                    <Field Id="@($"definition-filter-{season.Id.Value:N}")" Label="Optional typed filter token" @bind-Value="_definition.FilterToken" />
-                                    <Field Id="@($"definition-target-{season.Id.Value:N}")" Label="Target" @bind-Value="_definition.Target" />
-                                    <Field Id="@($"definition-points-{season.Id.Value:N}")" Label="Points reward" @bind-Value="_definition.PointsReward" />
-                                    <Field Id="@($"definition-rewards-{season.Id.Value:N}")" Label="Reward keys (comma separated)" @bind-Value="_definition.RewardKeys" />
-                                    <label class="label">Reset cadence
-                                        <select class="input mt-1" @bind="_definition.ResetCadence"><option value="@CommunityResetCadence.None">None</option><option value="@CommunityResetCadence.Daily">Daily</option><option value="@CommunityResetCadence.Weekly">Weekly</option></select>
-                                    </label>
-                                    <Field Id="@($"definition-reset-time-{season.Id.Value:N}")" Label="Local reset time (HH:mm)" @bind-Value="_definition.ResetLocalTime" />
-                                    <label class="label">Weekly day
-                                        <select class="input mt-1" @bind="_definition.ResetWeekday">@foreach (var day in Enum.GetValues<DayOfWeek>()) { <option value="@day">@day</option> }</select>
-                                    </label>
-                                    <button class="btn-secondary" type="button" @onclick="() => AddDefinitionAsync(season)">Add definition</button>
-                                </div>
-                            </section>
-                        </div>
-                    }
+                        <details class="progression-disclosure progression-section" open>
+                            <summary>Definitions<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                            <div class="progression-section__body">
+                                @if (season.Definitions.Count == 0)
+                                {
+                                    <p class="text-sm text-muted-foreground">No quests or achievements yet.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var definition in season.Definitions)
+                                    {
+                                        <div class="progression-row" @key="definition.Id">
+                                            <div class="progression-row__head">
+                                                <span class="progression-row__name">@definition.Name</span>
+                                                <span class="@CommunityProgressionPresentation.DefinitionPillClass(definition.Kind)">
+                                                    <span class="status-pill__label">@definition.Kind</span>
+                                                </span>
+                                                <span class="progression-tag">@DefinitionShape(definition)</span>
+                                                <span class="progression-row__amount">target <b>@CommunityProgressionPresentation.Amount(definition.Target)</b> · @definition.PointsReward.ToDisplayString() pts</span>
+                                            </div>
+                                            @if (definition.Schedule.Cadence != CommunityResetCadence.None)
+                                            {
+                                                <p class="progression-row__meta">@DefinitionCadence(definition)</p>
+                                                <p class="progression-row__meta">DST gaps move to the first valid instant; overlaps use the first occurrence only. After downtime BlokeBot rolls into the current period and never replays missed periods.</p>
+                                            }
+                                            @if (season.Status == CommunitySeasonStatus.Open && definition.CompletionMode == CommunityCompletionMode.Repeatable)
+                                            {
+                                                var edit = ScheduleFor(definition);
+                                                <details class="progression-disclosure">
+                                                    <summary class="progression-row__meta">Edit reset schedule<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                                    <div class="studio-grid mt-3">
+                                                        <div class="studio-span-4">
+                                                            <label class="label" for="@($"schedule-cadence-{definition.Id.Value:N}")">Cadence</label>
+                                                            <select id="@($"schedule-cadence-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.Cadence">
+                                                                <option value="@CommunityResetCadence.None">None</option>
+                                                                <option value="@CommunityResetCadence.Daily">Daily</option>
+                                                                <option value="@CommunityResetCadence.Weekly">Weekly</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="studio-span-4">
+                                                            <label class="label" for="@($"schedule-time-{definition.Id.Value:N}")">New local reset time</label>
+                                                            <input id="@($"schedule-time-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.LocalTime" />
+                                                        </div>
+                                                        <div class="studio-span-4">
+                                                            <label class="label" for="@($"schedule-weekday-{definition.Id.Value:N}")">Weekly day</label>
+                                                            <select id="@($"schedule-weekday-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.Weekday">
+                                                                @foreach (var day in Enum.GetValues<DayOfWeek>())
+                                                                {
+                                                                    <option value="@day">@day</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="studio-span-12">
+                                                            <div class="progression-warning">
+                                                                <span>Saving closes the current period immediately and resets active repeatable progress. One audited rollover in @definition.TimeZoneId, and missed periods are never replayed.</span>
+                                                                <label><input type="checkbox" @bind="edit.Confirmed" /> I understand, reset active progress now</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="studio-span-12">
+                                                            <button class="btn-secondary progression-gate-action"
+                                                                    type="button"
+                                                                    disabled="@(!edit.Confirmed)"
+                                                                    @onclick="() => EditScheduleAsync(definition)">Save schedule and roll over</button>
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </details>
 
-                    @if (season.Rewards.Count > 0)
-                    {
-                        <p class="mt-4 text-sm"><span class="font-semibold">Persistent rewards:</span> @string.Join(", ", season.Rewards.Select(value => $"{value.Name} ({value.Kind}, {value.Key})"))</p>
-                    }
-                    @foreach (var definition in season.Definitions)
-                    {
-                        <div class="mt-4 rounded-xl border p-4 text-sm">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div><span class="font-semibold">@definition.Name</span> · @definition.Kind · @definition.Scope · @definition.EventRule · target @definition.Target</div>
-                                <span class="text-xs text-muted-foreground">@definition.Key</span>
-                            </div>
-                            @if (definition.Schedule.Cadence != CommunityResetCadence.None)
-                            {
-                                <p class="mt-2 text-muted-foreground">@definition.Schedule.Cadence at @definition.Schedule.LocalTime.ToString("HH:mm") @definition.Schedule.Weekday · @definition.TimeZoneId · next @definition.NextResetUtc?.ToString("u")</p>
-                                <p class="mt-1 text-xs text-muted-foreground">DST gaps move to the first valid instant; overlaps use the first occurrence only. After downtime BlokeBot rolls directly into the current period and never replays missed periods.</p>
-                            }
-                            @if (season.Status == CommunitySeasonStatus.Open && definition.CompletionMode == CommunityCompletionMode.Repeatable)
-                            {
-                                var edit = ScheduleFor(definition);
-                                <div class="mt-3 grid gap-2 md:grid-cols-4">
-                                    <select class="input" @bind="edit.Cadence"><option value="@CommunityResetCadence.None">None</option><option value="@CommunityResetCadence.Daily">Daily</option><option value="@CommunityResetCadence.Weekly">Weekly</option></select>
-                                    <input class="input" aria-label="New local reset time" @bind="edit.LocalTime" />
-                                    <select class="input" @bind="edit.Weekday">@foreach (var day in Enum.GetValues<DayOfWeek>()) { <option value="@day">@day</option> }</select>
-                                    <label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" @bind="edit.Confirmed" /> Reset active progress now</label>
-                                    <button class="btn-secondary md:col-span-4" type="button" @onclick="() => EditScheduleAsync(definition)">Save schedule and roll over immediately</button>
+                        @if (season.Status != CommunitySeasonStatus.Draft)
+                        {
+                            <div class="grid min-w-0 gap-4" data-season-activity="@season.Id.Value">
+                                <div class="grid min-w-0 gap-5 lg:grid-cols-2">
+                                    <details class="progression-disclosure progression-section" open>
+                                        <summary>@CommunityProgressionPresentation.StandingsHeading(season.Status)<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                        <div class="progression-section__body">
+                                            @if (season.Standings.Count == 0)
+                                            {
+                                                <p class="text-sm text-muted-foreground">No participants yet.</p>
+                                            }
+                                            else
+                                            {
+                                                <CommunityStandingsTable Standings="season.Standings" />
+                                            }
+                                        </div>
+                                    </details>
+                                    <div class="grid min-w-0 gap-4">
+                                        <details class="progression-disclosure progression-section" open>
+                                            <summary>Channel-wide goals<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                            <div class="progression-section__body">
+                                                @if (season.CommunalProgress.Count == 0)
+                                                {
+                                                    <p class="text-sm text-muted-foreground">No communal goals are active.</p>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var item in season.CommunalProgress)
+                                                    {
+                                                        <CommunityProgressMeterRow Name="@item.DefinitionName"
+                                                                                   Amount="item.Amount"
+                                                                                   Target="item.Target"
+                                                                                   CompletionCount="item.CompletionCount" />
+                                                    }
+                                                }
+                                            </div>
+                                        </details>
+                                        <details class="progression-disclosure progression-section" open>
+                                            <summary>Persistent reward unlocks<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                            <div class="progression-section__body">
+                                                @if (season.Unlocks.Count == 0)
+                                                {
+                                                    <p class="text-sm text-muted-foreground">No rewards unlocked yet.</p>
+                                                }
+                                                else
+                                                {
+                                                    <div class="progression-unlock-list">
+                                                        @foreach (var item in season.Unlocks.Take(20))
+                                                        {
+                                                            <CommunityUnlockRow Unlock="item" />
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </details>
+                                    </div>
                                 </div>
-                            }
-                        </div>
-                    }
-                    @if (season.Status != CommunitySeasonStatus.Draft)
-                    {
-                        <section class="mt-5 rounded-xl border bg-[var(--app-surface-muted)] p-4" data-season-activity="@season.Id.Value">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <h3 class="font-semibold">Season activity</h3>
-                                <span class="text-xs font-semibold text-muted-foreground">@season.Visibility management view</span>
+
+                                <details class="progression-disclosure progression-section" open>
+                                    <summary>Participant progress<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                    <div class="progression-section__body">
+                                        @if (season.Progress.Count == 0)
+                                        {
+                                            <p class="text-sm text-muted-foreground">No viewer progress yet.</p>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var item in season.Progress.Take(20))
+                                            {
+                                                <CommunityProgressMeterRow Name="@item.DisplayName"
+                                                                           Tag="@item.DefinitionName"
+                                                                           Amount="item.Amount"
+                                                                           Target="item.Target"
+                                                                           CompletionCount="item.CompletionCount" />
+                                            }
+                                        }
+                                    </div>
+                                </details>
+
+                                <details class="progression-disclosure progression-section" open>
+                                    <summary>Completions and history<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                    <div class="progression-section__body">
+                                        @if (season.Completions.Count == 0)
+                                        {
+                                            <p class="text-sm text-muted-foreground">No completions yet.</p>
+                                        }
+                                        else
+                                        {
+                                            <div class="progression-unlock-list">
+                                                @foreach (var item in season.Completions.Take(20))
+                                                {
+                                                    <div class="progression-unlock" @key="item.Id">
+                                                        <b>@(item.DisplayName ?? "Community")</b>
+                                                        <span>completed @item.DefinitionName</span>
+                                                        <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc)</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </details>
                             </div>
-                            <div class="mt-4 grid gap-5 lg:grid-cols-2">
-                                <section><h4 class="font-semibold">@(season.Status is CommunitySeasonStatus.Closed or CommunitySeasonStatus.Archived ? "Final standings" : "Live standings")</h4>
-                                    @if (season.Standings.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No participants yet.</p> }
-                                    else { <ol class="mt-2 space-y-2">@foreach (var standing in season.Standings.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">#@standing.Rank @standing.DisplayName</span> <span class="text-muted-foreground">(@($"@{standing.Login}")) · @standing.CompletedCount completed · @standing.ProgressAmount progress</span></li> }</ol> }
-                                </section>
-                                <section><h4 class="font-semibold">Participant progress</h4>
-                                    @if (season.Progress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No viewer progress yet.</p> }
-                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Progress.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@item.DisplayName</span> · @item.DefinitionName: @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
-                                </section>
-                                <section class="lg:col-span-2"><h4 class="font-semibold">Channel-wide goals</h4>
-                                    @if (season.CommunalProgress.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No communal goals are active.</p> }
-                                    else { <ul class="mt-2 grid gap-2 sm:grid-cols-2">@foreach (var item in season.CommunalProgress) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@item.DefinitionName</span> · @item.Amount / @item.Target · @item.CompletionCount completed</li> }</ul> }
-                                </section>
-                            </div>
-                            <div class="mt-5 grid gap-5 lg:grid-cols-2">
-                                <section><h4 class="font-semibold">Completions &amp; history</h4>
-                                    @if (season.Completions.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No completions yet.</p> }
-                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Completions.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@(item.DisplayName ?? "Community")</span> completed @item.DefinitionName · @item.CompletedAtUtc.ToString("u")</li> }</ul> }
-                                </section>
-                                <section><h4 class="font-semibold">Persistent reward unlocks</h4>
-                                    @if (season.Unlocks.Count == 0) { <p class="mt-2 text-sm text-muted-foreground">No rewards unlocked yet.</p> }
-                                    else { <ul class="mt-2 space-y-2">@foreach (var item in season.Unlocks.Take(20)) { <li class="rounded-lg border bg-[var(--app-surface)] p-3 text-sm"><span class="font-semibold">@($"@{item.Login}")</span> unlocked @item.Name (@item.Kind) @if (item.Equipped) { <span class="font-semibold text-emerald-700">· equipped</span> }</li> }</ul> }
-                                </section>
-                            </div>
-                        </section>
-                    }
-                </article>
+                        }
+                    </div>
+                </details>
             }
         }
     </ChildContent>

@@ -1,0 +1,15 @@
+<div class="progression-row">
+    <div class="progression-row__head">
+        <span class="progression-row__name">@Name</span>
+        @if (!string.IsNullOrWhiteSpace(Tag))
+        {
+            <span class="progression-tag">@Tag</span>
+        }
+        <span class="progression-row__amount"><b>@_amount</b> / @_target@_completions</span>
+    </div>
+    <div class="@_meterClass"><span style="@_fillStyle"></span></div>
+    @if (!string.IsNullOrWhiteSpace(Note))
+    {
+        <p class="progression-row__meta">@Note</p>
+    }
+</div>
