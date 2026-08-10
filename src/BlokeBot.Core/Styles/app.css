@@ -3,6 +3,7 @@
 @import "./base/document.css";
 @import "./components/surfaces.css";
 @import "./components/status-pills.css";
+@import "./components/meter.css";
 @import "./layout/topbar.css";
 @import "./components/page-context.css";
 @import "./components/segmented-controls.css";
@@ -11,6 +12,9 @@
 @import "./features/points-dashboard.css";
 @import "./features/responsive-data-cards.css";
 @import "./features/custom-command-workspace.css";
+@import "./features/bounties.css";
+@import "./features/bingo.css";
+@import "./features/community-progression.css";
 @import "./components/application-card-layout.css";
 @import "./utilities/motion-components.css";
 @import "./components/scroll-panels.css";

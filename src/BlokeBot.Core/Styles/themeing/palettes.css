@@ -52,6 +52,29 @@ html {
     --app-nav-selected-host-icon-bg: rgb(255 255 255 / 0.74);
     --app-shadow-sm: 0 1px 3px rgb(15 23 42 / 0.1);
     --app-shadow-surface: 0 18px 60px -34px rgb(15 23 42 / 0.5);
+    --tone-blue-bg: #eff6ff;
+    --tone-blue-fg: #1d4ed8;
+    --tone-blue-ring: #93c5fd;
+    --tone-blue-solid: #3b82f6;
+    --tone-green-bg: #d1fae5;
+    --tone-green-fg: #047857;
+    --tone-green-ring: rgb(16 185 129 / 0.4);
+    --tone-green-solid: #10b981;
+    --tone-amber-bg: #fef3c7;
+    --tone-amber-fg: #b45309;
+    --tone-amber-ring: #fcd34d;
+    --tone-amber-solid: #f59e0b;
+    --tone-red-bg: #fee2e2;
+    --tone-red-fg: #b91c1c;
+    --tone-red-ring: #fca5a5;
+    --tone-red-solid: #ef4444;
+    --tone-violet-bg: #ede9fe;
+    --tone-violet-fg: #6d28d9;
+    --tone-violet-ring: #c4b5fd;
+    --tone-violet-solid: #8b5cf6;
+    --tone-gold-bg: linear-gradient(135deg, #fef9c3, rgb(250 204 21 / 0.42));
+    --tone-gold-fg: #713f12;
+    --tone-gold-ring: rgb(202 138 4 / 0.55);
 }
 
 @media (min-width: 40rem) {
@@ -141,6 +164,29 @@ html[data-theme="dark"] {
     --app-nav-selected-host-icon-bg: rgb(37 43 43 / 0.92);
     --app-shadow-sm: 0 1px 3px rgb(0 0 0 / 0.38);
     --app-shadow-surface: 0 18px 62px -34px rgb(0 0 0 / 0.78);
+    --tone-blue-bg: rgb(59 130 246 / 0.16);
+    --tone-blue-fg: #93c5fd;
+    --tone-blue-ring: rgb(59 130 246 / 0.4);
+    --tone-blue-solid: #60a5fa;
+    --tone-green-bg: rgb(16 185 129 / 0.18);
+    --tone-green-fg: #34d399;
+    --tone-green-ring: rgb(16 185 129 / 0.4);
+    --tone-green-solid: #34d399;
+    --tone-amber-bg: rgb(245 158 11 / 0.16);
+    --tone-amber-fg: #fbbf24;
+    --tone-amber-ring: rgb(245 158 11 / 0.38);
+    --tone-amber-solid: #fbbf24;
+    --tone-red-bg: rgb(239 68 68 / 0.15);
+    --tone-red-fg: #f87171;
+    --tone-red-ring: rgb(239 68 68 / 0.4);
+    --tone-red-solid: #f87171;
+    --tone-violet-bg: rgb(139 92 246 / 0.18);
+    --tone-violet-fg: #c4b5fd;
+    --tone-violet-ring: rgb(139 92 246 / 0.4);
+    --tone-violet-solid: #a78bfa;
+    --tone-gold-bg: linear-gradient(135deg, rgb(250 204 21 / 0.2), rgb(202 138 4 / 0.14));
+    --tone-gold-fg: #fcd34d;
+    --tone-gold-ring: rgb(250 204 21 / 0.45);
 }
 
 html[data-theme="dark"] body {
