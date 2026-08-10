@@ -24,6 +24,10 @@ public sealed class PointLedgerEntry
 
     public long? RequestSubmissionId { get; set; }
 
+    public long? BountyPledgeId { get; set; }
+
+    public long? BountyRewardId { get; set; }
+
     public string Note { get; set; } = string.Empty;
 
     public string? OperationKey { get; set; }

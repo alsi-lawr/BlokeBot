@@ -7,6 +7,7 @@ using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
@@ -120,6 +121,7 @@ public static class BlokeBotApplication
                     ? PointsGiveawayNotificationMode.PublicChat
                     : PointsGiveawayNotificationMode.ReplyOnly
             )
+            .AddBlokeBotBounties()
             .AddBlokeBotRequestBoards()
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
@@ -146,6 +148,7 @@ public static class BlokeBotApplication
                 .AddCommandModule<ViewerCommandCatalogModule>()
                 .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
                 .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
+                .AddCommandModule<BountyCommandModule>()
                 .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<PlayQueueCommandModule>()
                 .AddCommandModule<MomentCommandModule>()

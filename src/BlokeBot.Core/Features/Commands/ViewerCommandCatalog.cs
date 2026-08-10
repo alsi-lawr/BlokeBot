@@ -146,6 +146,17 @@ public sealed class ViewerCommandCatalogService(
                 .Select(value => new { value.IsOpen, value.VotingEnabled })
                 .ToArrayAsync(ct)
             : [];
+        var publicBounties = enabledFeatures.Contains(
+            HostFeatureFlags.Bounties | HostFeatureFlags.Points
+        )
+            ? await db
+                .Bounties.AsNoTracking()
+                .Where(value =>
+                    value.HostId == hostId && value.Visibility == BountyVisibility.Public
+                )
+                .Select(value => value.Status)
+                .ToArrayAsync(ct)
+            : [];
         var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
             ? await db
                 .PlayQueues.AsNoTracking()
@@ -236,6 +247,19 @@ public sealed class ViewerCommandCatalogService(
         )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.RequestVote));
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.Bounties | HostFeatureFlags.Points))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bounties));
+            if (publicBounties.Length > 0)
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bounty));
+            }
+            if (publicBounties.Contains(BountyStatus.Funding))
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BountyPledge));
+            }
         }
 
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)

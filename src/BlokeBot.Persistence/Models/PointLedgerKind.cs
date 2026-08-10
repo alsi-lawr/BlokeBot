@@ -16,6 +16,10 @@ public enum PointLedgerKind
     RequestReservation,
     RequestRefund,
     MomentReward,
+    BountyPledgeReservation,
+    BountyPledgeRefund,
+    BountyPledgeConsumption,
+    BountyCompletionReward,
 }
 
 internal static class PointLedgerKindPersistence
@@ -32,6 +36,10 @@ internal static class PointLedgerKindPersistence
     private const string _requestReservationToken = "RequestReservation";
     private const string _requestRefundToken = "RequestRefund";
     private const string _momentRewardToken = "MomentReward";
+    private const string _bountyPledgeReservationToken = "BountyPledgeReservation";
+    private const string _bountyPledgeRefundToken = "BountyPledgeRefund";
+    private const string _bountyPledgeConsumptionToken = "BountyPledgeConsumption";
+    private const string _bountyCompletionRewardToken = "BountyCompletionReward";
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
@@ -47,6 +55,10 @@ internal static class PointLedgerKindPersistence
         _requestReservationToken,
         _requestRefundToken,
         _momentRewardToken,
+        _bountyPledgeReservationToken,
+        _bountyPledgeRefundToken,
+        _bountyPledgeConsumptionToken,
+        _bountyCompletionRewardToken,
     ];
 
     public static string ToToken(PointLedgerKind kind) =>
@@ -64,6 +76,10 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.RequestReservation => _requestReservationToken,
             PointLedgerKind.RequestRefund => _requestRefundToken,
             PointLedgerKind.MomentReward => _momentRewardToken,
+            PointLedgerKind.BountyPledgeReservation => _bountyPledgeReservationToken,
+            PointLedgerKind.BountyPledgeRefund => _bountyPledgeRefundToken,
+            PointLedgerKind.BountyPledgeConsumption => _bountyPledgeConsumptionToken,
+            PointLedgerKind.BountyCompletionReward => _bountyCompletionRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
 
@@ -82,6 +98,10 @@ internal static class PointLedgerKindPersistence
             _requestReservationToken => PointLedgerKind.RequestReservation,
             _requestRefundToken => PointLedgerKind.RequestRefund,
             _momentRewardToken => PointLedgerKind.MomentReward,
+            _bountyPledgeReservationToken => PointLedgerKind.BountyPledgeReservation,
+            _bountyPledgeRefundToken => PointLedgerKind.BountyPledgeRefund,
+            _bountyPledgeConsumptionToken => PointLedgerKind.BountyPledgeConsumption,
+            _bountyCompletionRewardToken => PointLedgerKind.BountyCompletionReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
 }

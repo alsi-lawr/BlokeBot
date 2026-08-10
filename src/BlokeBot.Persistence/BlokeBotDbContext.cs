@@ -40,6 +40,12 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<ActivePublicChatPin> ActivePublicChatPins => Set<ActivePublicChatPin>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
+    public DbSet<Bounty> Bounties => Set<Bounty>();
+    public DbSet<BountyPledge> BountyPledges => Set<BountyPledge>();
+    public DbSet<BountyContributorReward> BountyContributorRewards =>
+        Set<BountyContributorReward>();
+    public DbSet<BountyModerationAudit> BountyModerationAudits => Set<BountyModerationAudit>();
+    public DbSet<BountyDomainEvent> BountyEvents => Set<BountyDomainEvent>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
     public DbSet<PointsGiveawayEntrant> PointsGiveawayEntrants => Set<PointsGiveawayEntrant>();
     public DbSet<PointsGiveawayWinner> PointsGiveawayWinners => Set<PointsGiveawayWinner>();
@@ -125,6 +131,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureAnnouncements(modelBuilder);
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
+        ConfigureBounties(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);

@@ -46,6 +46,7 @@ internal sealed class SimulationFixtureSeeder(
 
         await SeedGuessingAsync(db, hostId, now, cancellationToken);
         await SeedPointsAsync(db, hostId, now, cancellationToken);
+        await SeedBountyAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -61,6 +62,102 @@ internal sealed class SimulationFixtureSeeder(
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login,
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             AuthRole.Streamer
+        );
+    }
+
+    private static async Task SeedBountyAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("3e25c2dc-6bc2-41fc-8808-055677f26195");
+        if (await db.Bounties.AnyAsync(value => value.PublicId == publicId, cancellationToken))
+        {
+            return;
+        }
+
+        _ = db.Bounties.Add(
+            new Bounty
+            {
+                HostId = hostId,
+                PublicId = publicId,
+                CreationOperationId = Guid.Parse("2fc49a64-88e8-4e64-a311-b93c91c1482f"),
+                CreationFingerprint = "simulation-bounty",
+                Title = "Community speedrun challenge",
+                Description = "Fund a no-reset attempt before the end of tonight's stream.",
+                Status = BountyStatus.Funding,
+                Visibility = BountyVisibility.Public,
+                FailurePledgePolicy = BountyFailurePledgePolicy.Refund,
+                RewardDistribution = BountyRewardDistribution.Proportional,
+                FundingTarget = "1500",
+                PledgedAmount = "900",
+                ContributorCount = 2,
+                CompletionReward = "300",
+                ExpiresAtUtc = now.AddHours(4),
+                Revision = 2,
+                CreatedAtUtc = now.AddMinutes(-35),
+                UpdatedAtUtc = now.AddMinutes(-12),
+                Pledges =
+                [
+                    new BountyPledge
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("73605d09-c245-429a-a4ba-ec4319dc14e7"),
+                        CommandFingerprint = "simulation-nightowl-pledge",
+                        ContributorTwitchUserId = "simulation-nightowl-id",
+                        ContributorLogin = "nightowl",
+                        Amount = "600",
+                        State = BountyPledgeState.Reserved,
+                        CreatedAtUtc = now.AddMinutes(-20),
+                        UpdatedAtUtc = now.AddMinutes(-20),
+                    },
+                    new BountyPledge
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("41259cd6-8247-4494-9aba-10e99990d50d"),
+                        CommandFingerprint = "simulation-chatregular-pledge",
+                        ContributorTwitchUserId = "simulation-chatregular-id",
+                        ContributorLogin = "chatregular",
+                        Amount = "300",
+                        State = BountyPledgeState.Reserved,
+                        CreatedAtUtc = now.AddMinutes(-12),
+                        UpdatedAtUtc = now.AddMinutes(-12),
+                    },
+                ],
+                Audits =
+                [
+                    new BountyModerationAudit
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("9b088d25-f405-4e5e-88d2-98a419618c5f"),
+                        CommandFingerprint = "simulation-created",
+                        Action = BountyAuditAction.Created,
+                        FromStatus = BountyStatus.Proposed,
+                        ToStatus = BountyStatus.Proposed,
+                        ActorTwitchUserId = SimulationMode.UserId,
+                        ActorLogin = SimulationMode.Login,
+                        Reason = "Prepared for the community challenge segment.",
+                        BountyRevision = 1,
+                        OccurredAtUtc = now.AddMinutes(-35),
+                    },
+                    new BountyModerationAudit
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("d0d33038-0f9d-401e-b56d-07ef8b02246d"),
+                        CommandFingerprint = "simulation-opened",
+                        Action = BountyAuditAction.FundingOpened,
+                        FromStatus = BountyStatus.Proposed,
+                        ToStatus = BountyStatus.Funding,
+                        ActorTwitchUserId = SimulationMode.UserId,
+                        ActorLogin = SimulationMode.Login,
+                        Reason = "Funding opened after the warm-up run.",
+                        BountyRevision = 2,
+                        OccurredAtUtc = now.AddMinutes(-30),
+                    },
+                ],
+            }
         );
     }
 

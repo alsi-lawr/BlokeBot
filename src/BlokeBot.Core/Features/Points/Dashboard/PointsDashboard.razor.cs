@@ -70,6 +70,11 @@ public partial class PointsDashboard
             PointLedgerKind.GuessWin => "Guessing prize",
             PointLedgerKind.RequestReservation => "Request reserved",
             PointLedgerKind.RequestRefund => "Request refunded",
+            PointLedgerKind.MomentReward => "Moment reward",
+            PointLedgerKind.BountyPledgeReservation => "Bounty pledge reserved",
+            PointLedgerKind.BountyPledgeRefund => "Bounty pledge refunded",
+            PointLedgerKind.BountyPledgeConsumption => "Bounty pledge spent",
+            PointLedgerKind.BountyCompletionReward => "Bounty completion reward",
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
 

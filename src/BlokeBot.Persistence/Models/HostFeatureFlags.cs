@@ -17,6 +17,7 @@ public enum HostFeatureFlags : ulong
     RewardsAndRedemptions = 1UL << 10,
     Predictions = 1UL << 11,
     Automations = 1UL << 12,
+    Bounties = 1UL << 13,
     NativeTwitchFeatures =
         Shoutouts | Polls | ClipsAndMarkers | RewardsAndRedemptions | Predictions,
     All =
@@ -32,5 +33,6 @@ public enum HostFeatureFlags : ulong
         | ClipsAndMarkers
         | RewardsAndRedemptions
         | Predictions
-        | Automations,
+        | Automations
+        | Bounties,
 }

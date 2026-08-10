@@ -120,6 +120,12 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.HostId, x.OperationId }).IsUnique();
             _ = b.HasIndex(static x => new
             {
+                x.HostId,
+                x.SubmitterLogin,
+                x.PointReservationState,
+            });
+            _ = b.HasIndex(static x => new
+            {
                 x.BoardId,
                 x.Status,
                 x.Priority,

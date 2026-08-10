@@ -14,6 +14,9 @@ internal static class SimulationViewCatalog
         ["guessing-settings"] = "/guessing/settings",
         ["points"] = "/points",
         ["points-settings"] = "/points/settings",
+        ["bounties"] = "/bounties",
+        ["public-bounties"] =
+            $"/bounties/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",
         ["automation-events"] = "/automations/events",
         ["overlays"] = "/overlays#sources",

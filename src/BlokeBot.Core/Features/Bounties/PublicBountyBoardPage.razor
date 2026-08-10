@@ -1,0 +1,108 @@
+@page "/bounties/{Channel}"
+@using BlokeBot.Core.Auth.Sessions
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [AllowAnonymous]
+@inject BountyService _bounties
+
+<PageTitle>BlokeBot | Bounty board</PageTitle>
+
+<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+    <div class="mx-auto max-w-5xl space-y-6">
+        <PageHeader Kicker="Community progression"
+                    Title="Bounty board"
+                    Description="Public viewer-funded challenges for this channel." />
+
+        @if (!_loaded)
+        {
+            <ApplicationCardCollection Owner="public-bounty-cards">
+                <div class="card p-8 text-sm text-muted-foreground">Loading bounties…</div>
+            </ApplicationCardCollection>
+        }
+        else if (_items.Count == 0)
+        {
+            <ApplicationCardCollection Owner="public-bounty-cards">
+                <div class="card p-8 text-sm text-muted-foreground">No public bounties are available.</div>
+            </ApplicationCardCollection>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <p class="rounded-lg border p-3 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+            }
+
+            <section class="application-card-collection" data-card-owner="public-bounty-cards" aria-label="Public bounties">
+                @foreach (var bounty in _items)
+                {
+                    <article @key="bounty.PublicId" class="card p-5" data-public-bounty-id="@bounty.PublicId">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="text-xl font-semibold text-slate-950">@bounty.Title</h2>
+                                    <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"><span class="status-pill__label">@bounty.Status</span></span>
+                                </div>
+                                <p class="mt-2 text-sm text-muted-foreground">@bounty.Description</p>
+                            </div>
+                            <span class="font-mono text-xs text-muted-foreground">@bounty.PublicId.ToString("N")[..8]</span>
+                        </div>
+                        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                            <div><dt class="font-semibold">Funding</dt><dd>@bounty.PledgedAmount.ToDisplayString() / @bounty.FundingTarget.ToDisplayString()</dd></div>
+                            <div><dt class="font-semibold">Contributors</dt><dd>@bounty.ContributorCount</dd></div>
+                            <div><dt class="font-semibold">Deadline</dt><dd>@bounty.ExpiresAtUtc.ToString("u")</dd></div>
+                            <div><dt class="font-semibold">Completion bonus</dt><dd>@bounty.CompletionReward.ToDisplayString() · @bounty.RewardDistribution</dd></div>
+                        </dl>
+
+                        @if (bounty.Contributors.Count > 0)
+                        {
+                            <section class="mt-4" aria-label="Recorded contributors">
+                                <h3 class="text-sm font-semibold">Recorded contributors</h3>
+                                <ul class="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                    @foreach (var contributor in bounty.Contributors)
+                                    {
+                                        <li class="rounded-full border px-3 py-1">@($"@{contributor.Login}") · @contributor.PledgedAmount.ToDisplayString()</li>
+                                    }
+                                </ul>
+                            </section>
+                        }
+
+                        @if (bounty.TerminalHistory.Count > 0)
+                        {
+                            <section class="mt-4" aria-label="Terminal history">
+                                <h3 class="text-sm font-semibold">Terminal history</h3>
+                                <ul class="mt-2 space-y-1 text-sm text-muted-foreground">
+                                    @foreach (var history in bounty.TerminalHistory)
+                                    {
+                                        <li>@history.OccurredAtUtc.ToString("u") · @history.Status</li>
+                                    }
+                                </ul>
+                            </section>
+                        }
+
+                        @if (bounty.Status == BountyStatus.Funding)
+                        {
+                            @if (_session.IsAuthenticated)
+                            {
+                                <div class="mt-4 flex flex-wrap items-end gap-2">
+                                    <div class="min-w-48 grow">
+                                        <Field Id="@($"public-bounty-pledge-{bounty.PublicId:N}")"
+                                               Label="Pledge points"
+                                               Value="@PledgeFor(bounty.PublicId)"
+                                               ValueChanged="value => SetPledge(bounty.PublicId, value)" />
+                                    </div>
+                                    <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
+                                </div>
+                                <p class="mt-2 text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
+                            }
+                            else
+                            {
+                                <p class="mt-4 text-sm text-muted-foreground">Sign in with Twitch to pledge points.</p>
+                            }
+                        }
+                    </article>
+                }
+            </section>
+        }
+    </div>
+</main>

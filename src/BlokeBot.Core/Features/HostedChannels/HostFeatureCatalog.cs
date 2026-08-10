@@ -18,6 +18,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Overlays,
         HostFeatureFlags.Guessing,
         HostFeatureFlags.Points,
+        HostFeatureFlags.Bounties,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -88,6 +89,12 @@ public static class HostFeatureCatalog
                 "Points",
                 "Track viewer points, run giveaways, and let moderators change balances.",
                 enabledFeatures.Contains(HostFeatureFlags.Points)
+            ),
+            new(
+                HostFeatureFlags.Bounties,
+                "Bounties",
+                "Let viewers fund channel challenges with points. Requires Points to be on.",
+                enabledFeatures.Contains(HostFeatureFlags.Bounties)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

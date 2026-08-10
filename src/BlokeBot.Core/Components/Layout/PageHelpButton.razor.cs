@@ -69,6 +69,7 @@ public partial class PageHelpButton
             "/custom-commands/settings" => _customCommandsHelp,
             "/host" => _hostConfigHelp,
             "/requests" => _requestBoardsHelp,
+            "/bounties" => _bountiesHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -187,6 +188,32 @@ public partial class PageHelpButton
                 "Open a saved board to approve, queue, accept, complete, reject, or merge viewer submissions.",
                 [
                     "Public notes are visible to viewers. Private moderator notes and rejection reasons stay private.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _bountiesHelp = new(
+        "Bounties",
+        [
+            _featureSwitchHelp,
+            new(
+                "Fund and settle challenges",
+                "Create a draft, open funding, then accept and resolve the challenge. Bounties require Points to be on.",
+                [
+                    "Pledges are held from each viewer's host-scoped login balance and requests above the target are capped to the remaining amount.",
+                    "Accepting below target is allowed. Funding and accepted bounties can be extended or expire.",
+                    "Cancellation and expiry refund pledges. Each bounty chooses whether failure refunds or spends them.",
+                    "Completion spends pledges and can distribute a fixed bonus equally or proportionally.",
+                ]
+            ),
+            new(
+                "Identity, visibility, and recovery",
+                "Point settlement and contributor grouping use the recorded normalized Twitch login, not Twitch user ID.",
+                [
+                    "A later Twitch rename does not move a balance or combine historical logins.",
+                    "Public bounties show recorded contributor logins and pledge amounts. Private bounties show no public data. Moderator reasons remain private.",
+                    "Turning Bounties off retains all configuration and history. Direct links recover through Channel setup, and turning it back on does not replay suppressed commands, events, or expiries.",
                 ]
             ),
         ]

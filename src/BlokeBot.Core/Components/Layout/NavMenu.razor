@@ -40,6 +40,11 @@
                     var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
+                    var showBounties = FeatureIsVisible(
+                        session,
+                        selection,
+                        HostFeatureFlags.Bounties | HostFeatureFlags.Points
+                    );
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
                     var showRequestBoards = FeatureIsVisible(session, selection, HostFeatureFlags.RequestBoards);
@@ -54,7 +59,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -255,6 +260,24 @@
                             <span class="nav-menu__label min-w-0">Request boards</span>
                         </NavLink>
                         @RouteHelp("requests", "Request boards")
+                    </div>
+                }
+
+                @if (showBounties)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="bounties">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="bounties"
+                                 aria-label="Bounties"
+                                 aria-describedby="@RouteHelpReference("bounties")"
+                                 aria-current="@CurrentRoute("bounties")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700" aria-hidden="true">◆</span>
+                            <span class="nav-menu__label min-w-0">Bounties</span>
+                        </NavLink>
+                        @RouteHelp("bounties", "Bounties")
                     </div>
                 }
 

@@ -30,6 +30,7 @@ public sealed class PageHelpButtonTests
             .ToArray();
 
         routes.ShouldBe([
+            "/bounties",
             "/custom-commands/settings",
             "/guessing",
             "/guessing/settings",

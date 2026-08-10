@@ -1,3 +1,4 @@
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Persistence.Privacy;
@@ -122,8 +123,30 @@ public static class ViewerPrivacyService
         await AddAsync(
             "points.ledger",
             db.PointLedgerEntries.Where(x =>
-                (x.Login == login || x.ActorLogin == login || x.CounterpartyLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.Login == login
+                    || x.ActorLogin == login
+                    || x.CounterpartyLogin == login
+                    || (
+                        x.BountyPledgeId != null
+                        && db.BountyPledges.Any(pledge =>
+                            pledge.HostId == x.HostId
+                            && pledge.Id == x.BountyPledgeId
+                            && (
+                                pledge.ContributorTwitchUserId == userId
+                                || pledge.ContributorLogin == login
+                            )
+                        )
+                    )
+                    || (
+                        x.BountyRewardId != null
+                        && db.BountyContributorRewards.Any(reward =>
+                            reward.HostId == x.HostId
+                            && reward.Id == x.BountyRewardId
+                            && (reward.TwitchUserId == userId || reward.Login == login)
+                        )
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
@@ -315,6 +338,27 @@ public static class ViewerPrivacyService
                 })
         );
         await AddAsync(
+            "bounties.pledges",
+            db.BountyPledges.Where(x =>
+                (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bounties.rewards",
+            db.BountyContributorRewards.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "bounties.moderation-audits",
+            db.BountyModerationAudits.Where(x =>
+                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
             "play-queues.entries",
             db.PlayQueueEntries.Where(x =>
                     (
@@ -504,6 +548,30 @@ public static class ViewerPrivacyService
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var bountyPledges = await db
+            .BountyPledges.Where(x =>
+                (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new { x.Id, x.ContributorLogin })
+            .ToListAsync(ct);
+        var bountyPledgeIds = bountyPledges.Select(x => x.Id).ToList();
+        foreach (
+            var recordedLogin in bountyPledges
+                .Select(x => x.ContributorLogin)
+                .Where(value => !string.IsNullOrWhiteSpace(value) && value != ErasedToken)
+                .Distinct(StringComparer.Ordinal)
+        )
+        {
+            quotedNeedles.Add($"%\"{recordedLogin}\"%");
+        }
+        var bountyRewardIds = await db
+            .BountyContributorRewards.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => x.Id)
+            .ToListAsync(ct);
 
         void Record(string section, int rows)
         {
@@ -565,6 +633,27 @@ public static class ViewerPrivacyService
                     ct
                 )
         );
+        if (bountyPledgeIds.Count > 0 || bountyRewardIds.Count > 0)
+        {
+            Record(
+                "bounties.ledger",
+                await db
+                    .PointLedgerEntries.Where(x =>
+                        (
+                            bountyPledgeIds.Contains(x.BountyPledgeId ?? 0)
+                            || bountyRewardIds.Contains(x.BountyRewardId ?? 0)
+                        ) && (hostId == null || x.HostId == hostId)
+                    )
+                    .ExecuteUpdateAsync(
+                        setters =>
+                            setters
+                                .SetProperty(x => x.Login, ErasedToken)
+                                .SetProperty(x => x.ActorLogin, (string?)null)
+                                .SetProperty(x => x.Note, string.Empty),
+                        ct
+                    )
+            );
+        }
         Record(
             "points.giveaway-entries",
             await db
@@ -765,6 +854,71 @@ public static class ViewerPrivacyService
         }
 
         Record("request-boards.events", requestBoardEvents);
+        Record(
+            "bounties.pledges",
+            await db
+                .BountyPledges.Where(x =>
+                    (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ContributorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ContributorLogin, ErasedToken)
+                            .SetProperty(
+                                x => x.State,
+                                x =>
+                                    x.State == BountyPledgeState.Reserved
+                                        ? BountyPledgeState.Consumed
+                                        : x.State
+                            ),
+                    ct
+                )
+        );
+        Record(
+            "bounties.rewards",
+            await db
+                .BountyContributorRewards.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, ErasedToken)
+                            .SetProperty(x => x.Login, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "bounties.moderation-audits",
+            await db
+                .BountyModerationAudits.Where(x =>
+                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken)
+                            .SetProperty(x => x.Reason, string.Empty),
+                    ct
+                )
+        );
+        var bountyEvents = 0;
+        foreach (var needle in quotedNeedles)
+        {
+            bountyEvents += await db
+                .BountyEvents.Where(x =>
+                    EF.Functions.Like(x.PublicPayload, needle)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct);
+        }
+
+        Record("bounties.events", bountyEvents);
         Record(
             "play-queues.entries",
             await db

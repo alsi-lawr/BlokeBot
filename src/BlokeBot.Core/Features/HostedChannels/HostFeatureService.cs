@@ -21,7 +21,8 @@ public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
     IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
-    IEnumerable<IHostFeatureChangeObserver> featureObservers
+    IEnumerable<IHostFeatureChangeObserver> featureObservers,
+    TimeProvider timeProvider
 )
 {
     public HostFeatureService(
@@ -29,7 +30,15 @@ public sealed class HostFeatureService(
         HostedChannelChangeNotifier changes,
         IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
     )
-        : this(dbFactory, changes, nativeTwitchObservers, []) { }
+        : this(dbFactory, changes, nativeTwitchObservers, [], TimeProvider.System) { }
+
+    public HostFeatureService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        HostedChannelChangeNotifier changes,
+        IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
+        IEnumerable<IHostFeatureChangeObserver> featureObservers
+    )
+        : this(dbFactory, changes, nativeTwitchObservers, featureObservers, TimeProvider.System) { }
 
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
         CancellationToken ct
@@ -104,6 +113,14 @@ public sealed class HostFeatureService(
             return;
         }
 
+        var bountyRequirements = HostFeatureFlags.Bounties | HostFeatureFlags.Points;
+        if (
+            host.EnabledFeatures.Contains(bountyRequirements)
+            && !updated.Contains(bountyRequirements)
+        )
+        {
+            host.BountiesPausedAtUtc ??= timeProvider.GetUtcNow().UtcDateTime;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         _ = await changes.NotifyChangedAsync(ct);

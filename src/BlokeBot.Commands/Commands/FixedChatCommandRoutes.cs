@@ -37,6 +37,17 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute QueueClose { get; } = new("queueclose");
     public static FixedChatCommandRoute Moment { get; } = new("moment");
     public static FixedChatCommandRoute Clip { get; } = new("clip");
+    public static FixedChatCommandRoute Bounties { get; } = new("bounties");
+    public static FixedChatCommandRoute Bounty { get; } = new("bounty");
+    public static FixedChatCommandRoute BountyPledge { get; } = new("bountypledge");
+    public static FixedChatCommandRoute BountyCreate { get; } = new("bountycreate");
+    public static FixedChatCommandRoute BountyOpen { get; } = new("bountyopen");
+    public static FixedChatCommandRoute BountyAccept { get; } = new("bountyaccept");
+    public static FixedChatCommandRoute BountyComplete { get; } = new("bountycomplete");
+    public static FixedChatCommandRoute BountyFail { get; } = new("bountyfail");
+    public static FixedChatCommandRoute BountyCancel { get; } = new("bountycancel");
+    public static FixedChatCommandRoute BountyReject { get; } = new("bountyreject");
+    public static FixedChatCommandRoute BountyExtend { get; } = new("bountyextend");
 
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
@@ -59,6 +70,17 @@ public static class FixedChatCommandRoutes
                 QueueClose.Value,
                 Moment.Value,
                 Clip.Value,
+                Bounties.Value,
+                Bounty.Value,
+                BountyPledge.Value,
+                BountyCreate.Value,
+                BountyOpen.Value,
+                BountyAccept.Value,
+                BountyComplete.Value,
+                BountyFail.Value,
+                BountyCancel.Value,
+                BountyReject.Value,
+                BountyExtend.Value,
             ],
             StringComparer.OrdinalIgnoreCase
         );

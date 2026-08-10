@@ -9,6 +9,7 @@ using BlokeBot.Core.Features.Admin.Authorization;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
@@ -49,6 +50,26 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotBounties(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<BountyService>();
+        _ = services.AddSingleton<BountyPauseObserver>();
+        _ = services.AddSingleton<IHostFeatureChangeObserver>(static services =>
+            services.GetRequiredService<BountyPauseObserver>()
+        );
+        _ = services.AddSingleton(
+            new BountyExpirySchedulerPolicy
+            {
+                PollInterval = TimeSpan.FromSeconds(30),
+                BatchSize = 100,
+            }
+        );
+        _ = services.AddSingleton<BountyExpiryScheduler>();
+        _ = services.AddHostedService(static sp => sp.GetRequiredService<BountyExpiryScheduler>());
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotAppCommands(this IServiceCollection services)
     {
         _ = services.AddSingleton<CommandAliasRegistry>();

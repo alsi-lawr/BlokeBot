@@ -22,6 +22,8 @@ public sealed class BotHost
 
     public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.None;
 
+    public DateTime? BountiesPausedAtUtc { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

@@ -133,7 +133,16 @@ public sealed class PointBalanceService(
         var now = DateTime.UtcNow;
         var target = await LoadBalanceForUpdateAsync(db, hostId, targetLogin, now, ct);
         var current = PointAmount.ParseAbsolute(target.Amount);
-        if (current.Value + amount.Value > PointAmount.MaximumValue)
+        if (
+            !await PointCreditCapacity.CanCreditAsync(
+                db,
+                hostId,
+                target.Login,
+                current,
+                amount.Value,
+                ct
+            )
+        )
         {
             return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }
@@ -332,7 +341,16 @@ public sealed class PointBalanceService(
             );
         }
 
-        if (targetCurrent.Value + amount.Value > PointAmount.MaximumValue)
+        if (
+            !await PointCreditCapacity.CanCreditAsync(
+                db,
+                hostId,
+                target.Login,
+                targetCurrent,
+                amount.Value,
+                ct
+            )
+        )
         {
             return Failure(new PointBalanceMutationFailure.CapExceeded(targetCurrent, amount));
         }
@@ -404,19 +422,26 @@ public sealed class PointBalanceService(
             return Failure(new PointBalanceMutationFailure.InsufficientBalance(current, stake));
         }
 
+        if (
+            outcome is PointGambleOutcome.Won
+            && !await PointCreditCapacity.CanCreditAsync(
+                db,
+                hostId,
+                row.Login,
+                current,
+                stake.Value,
+                ct
+            )
+        )
+        {
+            return Failure(new PointBalanceMutationFailure.CapExceeded(current, stake));
+        }
+
         var prepared = outcome.Match(
             _ =>
-                current.Value + stake.Value > PointAmount.MaximumValue
-                    ? Result<GambleMutation, PointBalanceMutationFailure>.Error(
-                        new PointBalanceMutationFailure.CapExceeded(current, stake)
-                    )
-                    : Result<GambleMutation, PointBalanceMutationFailure>.Success(
-                        new GambleMutation(
-                            current.Add(stake),
-                            stake.Value,
-                            PointLedgerKind.GambleWin
-                        )
-                    ),
+                Result<GambleMutation, PointBalanceMutationFailure>.Success(
+                    new GambleMutation(current.Add(stake), stake.Value, PointLedgerKind.GambleWin)
+                ),
             _ =>
                 Result<GambleMutation, PointBalanceMutationFailure>.Success(
                     new GambleMutation(
@@ -476,7 +501,16 @@ public sealed class PointBalanceService(
     {
         var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
         var current = PointAmount.ParseAbsolute(row.Amount);
-        if (current.Value + amount.Value > PointAmount.MaximumValue)
+        if (
+            !await PointCreditCapacity.CanCreditAsync(
+                db,
+                hostId,
+                row.Login,
+                current,
+                amount.Value,
+                ct
+            )
+        )
         {
             return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }
@@ -529,7 +563,16 @@ public sealed class PointBalanceService(
 
         var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
         var current = PointAmount.ParseAbsolute(row.Amount);
-        if (current.Value + amount.Value > PointAmount.MaximumValue)
+        if (
+            !await PointCreditCapacity.CanCreditAsync(
+                db,
+                hostId,
+                row.Login,
+                current,
+                amount.Value,
+                ct
+            )
+        )
         {
             return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }

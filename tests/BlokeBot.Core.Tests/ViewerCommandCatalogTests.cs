@@ -138,6 +138,7 @@ public sealed class ViewerCommandCatalogTests
         var snapshot = await catalog.LoadForHostAsync(fixture.HostId, CancellationToken.None);
 
         snapshot.Names.ShouldBe([
+            "!bounties",
             "!choices",
             "!clip",
             "!commands",
@@ -164,6 +165,65 @@ public sealed class ViewerCommandCatalogTests
             .Count()
             .ShouldBe(snapshot.Names.Count);
         snapshot.Conflicts.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task BountyRoutes_LoadingViewerCatalog_RequireBothSwitchesAndPublicState()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedCatalogFixtureAsync(dbFactory);
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var enabledEmpty = await catalog.LoadForHostAsync(fixture.HostId, default);
+        enabledEmpty.Names.ShouldContain("!bounties");
+        enabledEmpty.Names.ShouldNotContain("!bounty");
+        enabledEmpty.Names.ShouldNotContain("!bountypledge");
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var now = DateTime.UtcNow;
+            _ = db.Bounties.Add(
+                new Bounty
+                {
+                    HostId = fixture.HostId,
+                    PublicId = Guid.NewGuid(),
+                    CreationOperationId = Guid.NewGuid(),
+                    Title = "Public",
+                    Status = BountyStatus.Funding,
+                    Visibility = BountyVisibility.Public,
+                    FailurePledgePolicy = BountyFailurePledgePolicy.Refund,
+                    RewardDistribution = BountyRewardDistribution.Equal,
+                    FundingTarget = "100",
+                    PledgedAmount = "0",
+                    CompletionReward = "0",
+                    ExpiresAtUtc = now.AddDays(1),
+                    Revision = 1,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+
+        var active = await catalog.LoadForHostAsync(fixture.HostId, default);
+        active.Names.ShouldContain("!bounties");
+        active.Names.ShouldContain("!bounty");
+        active.Names.ShouldContain("!bountypledge");
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync();
+            host.EnabledFeatures &= ~HostFeatureFlags.Points;
+            _ = await db.SaveChangesAsync();
+        }
+
+        var disabled = await catalog.LoadForHostAsync(fixture.HostId, default);
+        disabled.Names.ShouldNotContain("!bounties");
+        disabled.Names.ShouldNotContain("!bounty");
+        disabled.Names.ShouldNotContain("!bountypledge");
     }
 
     [Test]

@@ -83,7 +83,7 @@ public sealed class IndependentChatToolsMigrationTests
                 .Hosts.OrderBy(static value => value.Id)
                 .Select(static value => (long)value.EnabledFeatures)
                 .ToArrayAsync()
-        ).ShouldBe([4127L, 0L, 0L, 0L, 4104L]);
+        ).ShouldBe([4127L | (long)HostFeatureFlags.Bounties, 0L, 0L, 0L, 4104L]);
     }
 
     private static BotHost Host(string login, HostFeatureFlags features) =>
