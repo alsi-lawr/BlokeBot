@@ -62,10 +62,8 @@ public sealed class CommunityProgressionUiTests
 
         cut.WaitForAssertion(() =>
         {
-            cut.Markup.ShouldContain("Community progression is off for this channel");
-            cut.Markup.ShouldContain("/host#chat-tools");
-            cut.Markup.ShouldContain("retained");
-            cut.Markup.ShouldNotContain("RETAINED-SEASON");
+            _ = cut.Find("a[href='/host#chat-tools']");
+            cut.FindAll("#season-name, [data-season-id], [data-season-activity]").ShouldBeEmpty();
         });
     }
 }

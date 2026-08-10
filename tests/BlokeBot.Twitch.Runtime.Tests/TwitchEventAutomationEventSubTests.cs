@@ -595,6 +595,43 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         operations.CreateCount("channel").ShouldBe(3);
     }
 
+    [Test]
+    public async Task ChannelOperations_ConsumesEventRequirementsAcrossFeatureGateChanges()
+    {
+        var requirements = new MutableEventSubRequirementSource(
+            AutomationEventSubRequirement.Follows
+        );
+        var operations = new EventSubChannelOperations(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            new DisabledNativeTwitchFeatures(),
+            eventRequirements: [requirements]
+        );
+
+        requirements.Enabled = true;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationFollows,
+                default
+            )
+        ).ShouldBeTrue();
+
+        requirements.Enabled = false;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationFollows,
+                default
+            )
+        ).ShouldBeFalse();
+    }
+
     private static EventSubDeliveryHandler CreateHandler(RecordingAutomationObserver observer) =>
         new(
             null!,
@@ -667,6 +704,22 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
             NativeTwitchFeature feature,
             CancellationToken cancellationToken
         ) => ValueTask.FromResult(false);
+    }
+
+    private sealed class MutableEventSubRequirementSource(AutomationEventSubRequirement requirement)
+        : IEventSubRequirementSource
+    {
+        internal bool Enabled { get; set; }
+
+        public ValueTask<bool> RequiresAsync(
+            string channel,
+            AutomationEventSubRequirement requested,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Enabled && requested == requirement);
+        }
     }
 
     private sealed class RecordingShoutoutObserver : IShoutoutEventObserver

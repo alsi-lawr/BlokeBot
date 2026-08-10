@@ -673,6 +673,35 @@ public sealed class CommunityProgressionServiceTests
     }
 
     [Test]
+    public async Task FeatureGateChanges_ReconcileEventSubSubscriptions()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(_now);
+        var hostId = await SeedHostAsync(database, "alpha");
+        var trigger = new RecordingEventSubReconciliationTrigger();
+        var observer = new CommunityProgressionFeatureObserver(
+            CreateService(database, clock),
+            trigger
+        );
+        var features = new HostFeatureService(
+            database,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            [],
+            [observer],
+            clock
+        );
+
+        await features.DisableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+
+        trigger.Reconciled.ShouldBeTrue();
+        trigger.Reset();
+
+        await features.EnableAsync(hostId, HostFeatureFlags.CommunityProgression, default);
+
+        trigger.Reconciled.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task OwnedEntryPoints_WhenDisabled_PreserveStateAndDoNotReplayDelayedSources()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -1091,6 +1120,26 @@ public sealed class CommunityProgressionServiceTests
 
         public IChatCommandBuilder UseFilter<TFilter>()
             where TFilter : class, IChatCommandFilter => this;
+    }
+
+    private sealed class RecordingEventSubReconciliationTrigger
+        : IEventSubChannelReconciliationTrigger
+    {
+        internal bool Reconciled { get; private set; }
+
+        public Task ReconcileAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Reconciled = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ReconcileRevocationAsync(
+            string subscriptionId,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Revocation reconciliation was not expected.");
+
+        internal void Reset() => Reconciled = false;
     }
 
     private sealed record ConfiguredSeason(
