@@ -166,6 +166,7 @@ public sealed class BingoGame
     public BingoGameStatus Status { get; set; }
     public int? ParticipantCap { get; set; }
     public int? TeamCap { get; set; }
+    public long RosterRevision { get; set; }
     public bool FullCardWinEnabled { get; set; }
     public string LinePointsReward { get; set; } = "0";
     public string? LineAchievementKey { get; set; }

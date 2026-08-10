@@ -165,6 +165,53 @@ internal sealed class SimulationFixtureSeeder(
                 }
             );
         }
+        var archiveTemplate = new BingoTemplate
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("95d4f8bb-2e3b-43dc-aabd-418f0498761b"),
+            CreationOperationId = Guid.Parse("664461c4-cc46-4427-a905-86d5be1c8ca3"),
+            Name = "Five-by-five stream archive",
+            CurrentRevision = 1,
+            CreatedAtUtc = now.AddDays(-4),
+            UpdatedAtUtc = now.AddDays(-3),
+        };
+        var archiveRevision = new BingoTemplateRevision
+        {
+            HostId = hostId,
+            OperationId = Guid.Parse("338c88dd-39b4-4fb9-9c97-52e4d43cc6b4"),
+            Template = archiveTemplate,
+            Revision = 1,
+            Dimension = 5,
+            FullCardWinEnabled = true,
+            LinePointsReward = "250",
+            LineAchievementKey = "bingo-winner",
+            FullCardPointsReward = "1000",
+            FullCardAchievementKey = "bingo-winner",
+            CreatedByTwitchUserId = "1000",
+            CreatedByLogin = "streamer",
+            CreatedAtUtc = now.AddDays(-3),
+        };
+        for (var index = 0; index < 25; index++)
+        {
+            var kind = squareKinds[index % squareKinds.Length];
+            archiveRevision.Squares.Add(
+                new BingoSquare
+                {
+                    HostId = hostId,
+                    Key = $"archive-moment-{index + 1}",
+                    SortOrder = index,
+                    Title = $"Archived stream moment {index + 1}",
+                    Kind = kind,
+                    Threshold = kind == BingoSquareKind.IncomingRaid ? 10 : null,
+                    FilterToken = kind switch
+                    {
+                        BingoSquareKind.GuessingResult => "blue",
+                        BingoSquareKind.StreamCategoryChanged => "509658",
+                        _ => null,
+                    },
+                }
+            );
+        }
         var game = new BingoGame
         {
             HostId = hostId,
@@ -232,10 +279,10 @@ internal sealed class SimulationFixtureSeeder(
             HostId = hostId,
             PublicId = Guid.Parse("69e9e686-06cc-4879-ae59-fd0279f1d820"),
             CreationOperationId = Guid.Parse("fe7fc0cb-2e5b-4199-a967-22a05d7dc271"),
-            TemplateRevision = revision,
-            TemplateName = template.Name,
-            TemplateRevisionNumber = 3,
-            Dimension = 4,
+            TemplateRevision = archiveRevision,
+            TemplateName = archiveTemplate.Name,
+            TemplateRevisionNumber = 1,
+            Dimension = 5,
             Seed = "archive-night-17",
             Mode = BingoGameMode.Shared,
             Status = BingoGameStatus.Archived,
@@ -268,7 +315,7 @@ internal sealed class SimulationFixtureSeeder(
             DisplayName = "Archivist",
             JoinedAtUtc = now.AddDays(-3).AddMinutes(5),
         };
-        _ = db.BingoTemplates.Add(template);
+        db.BingoTemplates.AddRange(template, archiveTemplate);
         db.BingoGames.AddRange(game, archivedGame);
         db.BingoTeams.AddRange(aurora, nebula);
         db.BingoCards.AddRange(auroraCard, nebulaCard, archivedCard);

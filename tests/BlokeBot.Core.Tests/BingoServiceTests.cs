@@ -4,8 +4,11 @@ using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Privacy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -132,6 +135,138 @@ public sealed class BingoServiceTests
             .Cards.Single(value => value.AssignmentName == "Aurora")
             .Squares.Select(value => value.Key)
             .ShouldBe(originalLayout);
+    }
+
+    [Test]
+    public async Task IssueFailure_LeavesTheJoiningRosterUnissuedAndTheSameCommandCanRetry()
+    {
+        var failure = new FailFirstIssuedGameSaveInterceptor();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(failure);
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Bingo);
+        var service = CreateService(database);
+        var template = await ConfigureTemplateAsync(database, service, hostId, 3, ManualSquares(3));
+        _ = Success(
+            await service.CreateGameAsync(
+                hostId,
+                SharedGame(template.Id) with
+                {
+                    Mode = BingoGameMode.UniquePerViewer,
+                },
+                default
+            )
+        );
+        var game = (await service.GetModeratorGamesAsync(hostId, default)).Single().Game;
+        _ = Success(await service.JoinAsync(hostId, Roster(game, Viewer("one"), null), default));
+        _ = Success(await service.JoinAsync(hostId, Roster(game, Viewer("two"), null), default));
+        var issue = Action(game);
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.IssueAsync(hostId, issue, default)
+        );
+
+        await using (var failed = await database.CreateDbContextAsync())
+        {
+            var retained = await failed
+                .BingoGames.Include(value => value.Cards)
+                .Include(value => value.Participants)
+                .SingleAsync();
+            retained.Status.ShouldBe(BingoGameStatus.Joining);
+            retained.Cards.ShouldBeEmpty();
+            retained.Participants.ShouldAllBe(value => value.CardId == null);
+            (
+                await failed.BingoModerationAudit.AnyAsync(value => value.Action == "issue")
+            ).ShouldBeFalse();
+            (
+                await failed.BingoEvents.AnyAsync(value =>
+                    value.Kind == BingoDomainEventKind.GameIssued
+                )
+            ).ShouldBeFalse();
+        }
+
+        _ = Success(await service.IssueAsync(hostId, issue, default));
+
+        await using var retried = await database.CreateDbContextAsync();
+        var issued = await retried
+            .BingoGames.Include(value => value.Cards)
+            .Include(value => value.Participants)
+            .SingleAsync();
+        issued.Status.ShouldBe(BingoGameStatus.Issued);
+        issued.Cards.Count.ShouldBe(issued.Participants.Count);
+        issued.Participants.ShouldAllBe(value => value.CardId != null);
+        (await retried.BingoModerationAudit.CountAsync(value => value.Action == "issue")).ShouldBe(
+            1
+        );
+        (
+            await retried.BingoEvents.CountAsync(value =>
+                value.Kind == BingoDomainEventKind.GameIssued
+            )
+        ).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ConcurrentServiceInstances_AllowOnlyOneActiveGameForAHost()
+    {
+        var synchronization = new SynchronizeFirstGameCreatesInterceptor();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(synchronization);
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Bingo);
+        var first = CreateService(database);
+        var second = CreateService(database);
+        var template = await ConfigureTemplateAsync(database, first, hostId, 3, ManualSquares(3));
+
+        var outcomes = await Task.WhenAll(
+            first.CreateGameAsync(hostId, SharedGame(template.Id), default),
+            second.CreateGameAsync(
+                hostId,
+                SharedGame(template.Id) with
+                {
+                    OperationId = Guid.NewGuid(),
+                    Seed = "other-seed",
+                },
+                default
+            )
+        );
+
+        outcomes.OfType<BingoOperationOutcome.Succeeded>().Count().ShouldBe(1);
+        outcomes.OfType<BingoOperationOutcome.Conflict>().Count().ShouldBe(1);
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify.BingoGames.CountAsync(value =>
+                value.Status == BingoGameStatus.Joining || value.Status == BingoGameStatus.Issued
+            )
+        ).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ConcurrentServiceInstances_EnforceTheOptionalParticipantCap()
+    {
+        var synchronization = new SynchronizeFirstParticipantJoinsInterceptor();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(synchronization);
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Bingo);
+        var first = CreateService(database);
+        var second = CreateService(database);
+        var template = await ConfigureTemplateAsync(database, first, hostId, 3, ManualSquares(3));
+        _ = Success(
+            await first.CreateGameAsync(
+                hostId,
+                SharedGame(template.Id) with
+                {
+                    Mode = BingoGameMode.UniquePerViewer,
+                    ParticipantCap = 1,
+                },
+                default
+            )
+        );
+        var game = (await first.GetModeratorGamesAsync(hostId, default)).Single().Game;
+
+        var outcomes = await Task.WhenAll(
+            first.JoinAsync(hostId, Roster(game, Viewer("one"), null), default),
+            second.JoinAsync(hostId, Roster(game, Viewer("two"), null), default)
+        );
+
+        outcomes.OfType<BingoOperationOutcome.Succeeded>().Count().ShouldBe(1);
+        outcomes.OfType<BingoOperationOutcome.Invalid>().Count().ShouldBe(1);
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.BingoParticipants.CountAsync()).ShouldBe(1);
     }
 
     [Test]
@@ -290,6 +425,181 @@ public sealed class BingoServiceTests
                 BingoEvidenceAction.Reversed,
                 BingoEvidenceAction.Marked,
             ]);
+    }
+
+    [Test]
+    public async Task ViewerErasure_RemovesUniqueCardAndDerivedPublicEventIdentity()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Bingo);
+        var service = CreateService(database);
+        var squares = Enumerable
+            .Range(1, 9)
+            .Select(value =>
+                (BingoSquareDefinition)
+                    new BingoSquareDefinition.IncomingRaid(new($"raid-{value}"), $"Raid {value}", 1)
+            )
+            .ToArray();
+        var template = await ConfigureTemplateAsync(database, service, hostId, 3, squares);
+        _ = Success(
+            await service.CreateGameAsync(
+                hostId,
+                SharedGame(template.Id) with
+                {
+                    Mode = BingoGameMode.UniquePerViewer,
+                },
+                default
+            )
+        );
+        var game = (await service.GetModeratorGamesAsync(hostId, default)).Single().Game;
+        var alice = new BingoViewer("alice-id", "alice", "Alice Display");
+        var bob = new BingoViewer("bob-id", "bob", "Bob Display");
+        _ = Success(
+            await service.JoinAsync(
+                hostId,
+                Roster(game, alice, null) with
+                {
+                    PrivateNote = "Alice Display verified before issue.",
+                },
+                default
+            )
+        );
+        _ = Success(await service.JoinAsync(hostId, Roster(game, bob, null), default));
+        _ = Success(await service.IssueAsync(hostId, Action(game), default));
+        _ = Success(
+            await service.ProcessEventAsync(
+                hostId,
+                new BingoAutomaticEvent.IncomingRaid("raid-alice", alice, 12, _now),
+                default
+            )
+        );
+        game = (await service.GetModeratorGamesAsync(hostId, default)).Single().Game;
+        _ = Success(await service.ArchiveAsync(hostId, Action(game), default));
+
+        _ = Success(
+            await service.CreateGameAsync(
+                hostId,
+                new(
+                    Guid.NewGuid(),
+                    template.Id,
+                    BingoGameMode.Team,
+                    "team-privacy",
+                    null,
+                    1,
+                    ["Team Aurora"],
+                    Actor()
+                ),
+                default
+            )
+        );
+        var teamGame = (await service.GetModeratorGamesAsync(hostId, default))
+            .Single(value => value.Game.Status == BingoGameStatus.Joining)
+            .Game;
+        var team = teamGame.Teams.Single();
+        _ = Success(await service.JoinAsync(hostId, Roster(teamGame, alice, team.Id), default));
+        _ = Success(await service.JoinAsync(hostId, Roster(teamGame, bob, team.Id), default));
+        _ = Success(await service.IssueAsync(hostId, Action(teamGame), default));
+        teamGame = (await service.GetModeratorGamesAsync(hostId, default))
+            .Single(value => value.Game.Status == BingoGameStatus.Issued)
+            .Game;
+        _ = Success(await service.ArchiveAsync(hostId, Action(teamGame), default));
+
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            var overlay = new OverlayInstance
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                Name = "Bingo feed",
+                Type = OverlayType.EventFeed,
+                IsEnabled = true,
+                ConfigurationJson = "{}",
+                AccessKeyDigest = new byte[32],
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = _now.UtcDateTime,
+                UpdatedAtUtc = _now.UtcDateTime,
+            };
+            _ = seed.OverlayInstances.Add(overlay);
+            _ = seed.OverlayEventFeedItems.Add(
+                new OverlayEventFeedItem
+                {
+                    OverlayInstance = overlay,
+                    HostId = hostId,
+                    Kind = OverlayEventFeedKind.BingoEvent,
+                    SourceKey = "bingo-privacy",
+                    Priority = OverlayEventFeedPriority.Normal,
+                    Lifecycle = OverlayEventFeedLifecycle.Queued,
+                    Title = "Bingo",
+                    Body = "Alice Display (@alice) completed a row",
+                    DurationSeconds = 5,
+                    EnqueuedAtUtc = _now.UtcDateTime,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+
+        await using (var erase = await database.CreateDbContextAsync())
+        {
+            _ = await ViewerPrivacyService.EraseAsync(
+                erase,
+                PrivacySubject.Create(alice.TwitchUserId, alice.Login),
+                hostId,
+                default
+            );
+        }
+
+        var publicView = await service.GetPublicAsync("alpha", default);
+        var uniqueArchive = publicView!.Archive.Single(value =>
+            value.Mode == BingoGameMode.UniquePerViewer
+        );
+        uniqueArchive
+            .Cards.Single(value =>
+                value.Participants.Any(participant => participant.Login == "[erased]")
+            )
+            .AssignmentName.ShouldBe("[erased]");
+        uniqueArchive
+            .Cards.Single(value =>
+                value.Participants.Any(participant => participant.Login == bob.Login)
+            )
+            .AssignmentName.ShouldBe(bob.DisplayName);
+        publicView
+            .Archive.Single(value => value.Mode == BingoGameMode.Team)
+            .Cards.Single()
+            .AssignmentName.ShouldBe("Team Aurora");
+        var publicJson = JsonSerializer.Serialize(publicView);
+        foreach (var identity in new[] { alice.TwitchUserId, alice.Login, alice.DisplayName })
+        {
+            publicJson.ShouldNotContain(identity, Case.Insensitive);
+        }
+
+        await using var verify = await database.CreateDbContextAsync();
+        var retainedText = string.Join(
+            '\n',
+            (await verify.BingoEvents.Select(value => value.PublicPayload).ToArrayAsync())
+                .Concat(await verify.BingoEvidence.Select(value => value.Summary).ToArrayAsync())
+                .Concat(
+                    await verify
+                        .BingoWinRecipients.Select(value =>
+                            value.TwitchUserId + value.Login + value.DisplayName
+                        )
+                        .ToArrayAsync()
+                )
+                .Concat(
+                    await verify
+                        .BingoModerationAudit.Select(value => value.PrivateNote)
+                        .ToArrayAsync()
+                )
+                .Concat(
+                    await verify
+                        .OverlayEventFeedItems.Select(value => value.Title + value.Body)
+                        .ToArrayAsync()
+                )
+        );
+        foreach (var identity in new[] { alice.TwitchUserId, alice.Login, alice.DisplayName })
+        {
+            retainedText.ShouldNotContain(identity, Case.Insensitive);
+        }
     }
 
     [Test]
@@ -682,6 +992,73 @@ public sealed class BingoServiceTests
             Events.Add(value);
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FailFirstIssuedGameSaveInterceptor : SaveChangesInterceptor
+    {
+        private int _remainingFailures = 1;
+
+        public override ValueTask<int> SavedChangesAsync(
+            SaveChangesCompletedEventData eventData,
+            int result,
+            CancellationToken cancellationToken = default
+        ) =>
+            eventData
+                .Context?.Set<BingoGame>()
+                .Local.Any(value => value.Status == BingoGameStatus.Issued) == true
+            && Interlocked.CompareExchange(ref _remainingFailures, 0, 1) == 1
+                ? throw new InvalidOperationException("Simulated issue commit interruption.")
+                : base.SavedChangesAsync(eventData, result, cancellationToken);
+    }
+
+    private abstract class SynchronizeFirstTwoSavesInterceptor : SaveChangesInterceptor
+    {
+        private readonly TaskCompletionSource _arrived = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _remainingArrivals = 2;
+
+        protected abstract bool IsTarget(BlokeBotDbContext context);
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (eventData.Context is not BlokeBotDbContext db || !IsTarget(db))
+            {
+                return result;
+            }
+            var remaining = Interlocked.Decrement(ref _remainingArrivals);
+            if (remaining == 0)
+            {
+                _arrived.SetResult();
+            }
+            if (remaining >= 0)
+            {
+                await _arrived.Task.WaitAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    private sealed class SynchronizeFirstGameCreatesInterceptor
+        : SynchronizeFirstTwoSavesInterceptor
+    {
+        protected override bool IsTarget(BlokeBotDbContext context) =>
+            context
+                .ChangeTracker.Entries<BingoGame>()
+                .Any(value => value.State == EntityState.Added);
+    }
+
+    private sealed class SynchronizeFirstParticipantJoinsInterceptor
+        : SynchronizeFirstTwoSavesInterceptor
+    {
+        protected override bool IsTarget(BlokeBotDbContext context) =>
+            context
+                .ChangeTracker.Entries<BingoParticipant>()
+                .Any(value => value.State == EntityState.Added);
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider

@@ -101,5 +101,25 @@ public sealed class BingoMigrationTests
         stored
             .TemplateRevision!.Squares.Select(value => value.Kind)
             .ShouldAllBe(value => value == BingoSquareKind.Manual);
+
+        _ = upgraded.BingoGames.Add(
+            new BingoGame
+            {
+                HostId = host.Id,
+                PublicId = Guid.NewGuid(),
+                CreationOperationId = Guid.NewGuid(),
+                TemplateRevisionId = stored.TemplateRevisionId,
+                TemplateName = stored.TemplateName,
+                TemplateRevisionNumber = stored.TemplateRevisionNumber,
+                Dimension = stored.Dimension,
+                Seed = "second-active-game",
+                Mode = BingoGameMode.Shared,
+                Status = BingoGameStatus.Joining,
+                LinePointsReward = "0",
+                FullCardPointsReward = "0",
+                CreatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        _ = await Should.ThrowAsync<DbUpdateException>(() => upgraded.SaveChangesAsync());
     }
 }

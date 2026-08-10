@@ -10,6 +10,7 @@ using BlokeBot.Core.Identity;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Bingo;
@@ -22,7 +23,8 @@ public sealed class BingoService(
     IEnumerable<IBingoOverlayEventObserver>? overlayObservers = null
 )
 {
-    private static readonly ConcurrentDictionary<int, SemaphoreSlim> _hostGates = new();
+    private const int _persistenceRetryCount = 20;
+    private readonly ConcurrentDictionary<int, SemaphoreSlim> _hostGates = new();
     private readonly IBingoOverlayEventObserver[] _overlayObservers = [.. overlayObservers ?? []];
 
     public async Task<BingoOperationOutcome> SaveTemplateAsync(
@@ -134,7 +136,7 @@ public sealed class BingoService(
         BingoGameDraft draft,
         CancellationToken ct
     ) =>
-        await LockedAsync<BingoOperationOutcome>(
+        await LockedLifecycleAsync<BingoOperationOutcome>(
             hostId,
             async () =>
             {
@@ -288,11 +290,12 @@ public sealed class BingoService(
         BingoGameActionCommand command,
         CancellationToken ct
     ) =>
-        await LockedAsync<BingoOperationOutcome>(
+        await LockedLifecycleAsync<BingoOperationOutcome>(
             hostId,
             async () =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
                 if (!await FeatureEnabledAsync(db, hostId, ct))
                 {
                     return new BingoOperationOutcome.FeatureDisabled();
@@ -361,10 +364,10 @@ public sealed class BingoService(
                     _ => throw new ArgumentOutOfRangeException(),
                 };
                 db.BingoCards.AddRange(cards);
-                _ = await db.SaveChangesAsync(ct);
                 AssignCards(game, cards);
                 game.Status = BingoGameStatus.Issued;
                 game.IssuedAtUtc = now;
+                game.RosterRevision++;
                 AddAudit(
                     db,
                     hostId,
@@ -387,6 +390,7 @@ public sealed class BingoService(
                     now
                 );
                 _ = await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
                 await PublishAndOverlayAsync(
                     new(
                         hostId,
@@ -735,7 +739,7 @@ public sealed class BingoService(
         RosterChange change,
         CancellationToken ct
     ) =>
-        await LockedAsync<BingoOperationOutcome>(
+        await LockedLifecycleAsync<BingoOperationOutcome>(
             hostId,
             async () =>
             {
@@ -843,6 +847,7 @@ public sealed class BingoService(
                     default:
                         throw new ArgumentOutOfRangeException(nameof(change));
                 }
+                game.RosterRevision++;
                 AddAudit(
                     db,
                     hostId,
@@ -1523,18 +1528,16 @@ public sealed class BingoService(
     {
         foreach (var participant in game.Participants)
         {
-            participant.CardId = game.Mode switch
+            participant.Card = game.Mode switch
             {
-                BingoGameMode.Shared => cards.Single().Id,
-                BingoGameMode.UniquePerViewer => cards
-                    .Single(value => value.AssignmentKey == $"viewer:{participant.TwitchUserId}")
-                    .Id,
-                BingoGameMode.Team => cards
-                    .Single(value =>
-                        value.AssignmentKey
-                        == $"team:{game.Teams.Single(team => team.Id == participant.TeamId).PublicId:N}"
-                    )
-                    .Id,
+                BingoGameMode.Shared => cards.Single(),
+                BingoGameMode.UniquePerViewer => cards.Single(value =>
+                    value.AssignmentKey == $"viewer:{participant.TwitchUserId}"
+                ),
+                BingoGameMode.Team => cards.Single(value =>
+                    value.AssignmentKey
+                    == $"team:{game.Teams.Single(team => team.Id == participant.TeamId).PublicId:N}"
+                ),
                 _ => throw new ArgumentOutOfRangeException(),
             };
         }
@@ -1856,6 +1859,51 @@ public sealed class BingoService(
             _ = gate.Release();
         }
     }
+
+    private Task<T> LockedLifecycleAsync<T>(
+        int hostId,
+        Func<Task<T>> operation,
+        CancellationToken ct
+    ) => LockedAsync(hostId, () => RetryLifecyclePersistenceAsync(operation, ct), ct);
+
+    private static async Task<T> RetryLifecyclePersistenceAsync<T>(
+        Func<Task<T>> operation,
+        CancellationToken ct
+    )
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await operation();
+            }
+            catch (Exception exception)
+                when (attempt < _persistenceRetryCount && IsLifecyclePersistenceCollision(exception)
+                )
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
+            }
+        }
+    }
+
+    private static bool IsLifecyclePersistenceCollision(Exception exception) =>
+        exception switch
+        {
+            DbUpdateConcurrencyException => true,
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
+            } => true,
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
+                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
+            } => true,
+            DbUpdateException { InnerException: { } inner } => IsLifecyclePersistenceCollision(
+                inner
+            ),
+            _ => false,
+        };
 
     private static string WinLabel(BingoWinLine line) =>
         line.Kind switch

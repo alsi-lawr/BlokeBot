@@ -11,26 +11,29 @@
         </div>
         @if (Card.Wins.Count > 0) { <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">@Card.Wins.Count win@(Card.Wins.Count == 1 ? "" : "s")</span> }
     </div>
-    <div class="mt-4 grid gap-2" style="@($"grid-template-columns: repeat({Game.Dimension.Value}, minmax(0, 1fr));")">
-        @foreach (var square in Card.Squares)
-        {
-            <div class="min-h-24 min-w-0 overflow-hidden rounded-xl border p-2 text-xs @(square.Marked ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50")" data-bingo-marked="@square.Marked.ToString().ToLowerInvariant()">
-                <p class="break-words font-bold text-slate-950">@square.Title</p>
-                <p class="mt-1 break-all text-[0.68rem] font-semibold text-slate-500">@square.Kind.DisplayName()</p>
-                @if (square.Evidence.Count > 0)
-                {
-                    <ul class="mt-2 space-y-1 break-words text-[0.7rem] leading-4 text-slate-700">
-                        @foreach (var evidence in square.Evidence)
-                        {
-                            <li>
-                                <span class="font-semibold">@evidence.Action:</span> @evidence.Summary · @evidence.OccurredAtUtc.ToString("u")
-                                @if (evidence.Participant is { } participant) { <span> · @participant.DisplayName (@("@" + participant.Login))</span> }
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        }
+    <p class="mt-4 text-xs text-slate-500 sm:hidden">Scroll sideways to see every card column.</p>
+    <div class="mt-2 overflow-x-auto pb-2" tabindex="0" aria-label="Scrollable @Game.Dimension.Value by @Game.Dimension.Value Bingo card">
+        <div class="grid gap-2" style="@Game.Dimension.GridStyle()">
+            @foreach (var square in Card.Squares)
+            {
+                <div class="min-h-24 min-w-0 overflow-hidden rounded-xl border p-2 text-xs @(square.Marked ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50")" data-bingo-marked="@square.Marked.ToString().ToLowerInvariant()">
+                    <p class="break-words font-bold text-slate-950">@square.Title</p>
+                    <p class="mt-1 text-[0.68rem] font-semibold text-slate-500">@square.Kind.DisplayName()</p>
+                    @if (square.Evidence.Count > 0)
+                    {
+                        <ul class="mt-2 space-y-1 break-words text-[0.7rem] leading-4 text-slate-700">
+                            @foreach (var evidence in square.Evidence)
+                            {
+                                <li>
+                                    <span class="font-semibold">@evidence.Action:</span> @evidence.Summary · @evidence.OccurredAtUtc.ToString("u")
+                                    @if (evidence.Participant is { } participant) { <span> · @participant.DisplayName (@("@" + participant.Login))</span> }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </div>
     </div>
     @if (Card.Wins.Count > 0)
     {

@@ -377,6 +377,24 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "bingo.unique-cards",
+            db.BingoCards.Where(x =>
+                    x.Game!.Mode == BingoGameMode.UniquePerViewer
+                    && x.Participants.Any(participant =>
+                        participant.TwitchUserId == userId || participant.Login == login
+                    )
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.Id,
+                    x.HostId,
+                    x.GameId,
+                    x.AssignmentName,
+                    x.IssuedAtUtc,
+                })
+        );
+        await AddAsync(
             "bingo.evidence",
             db.BingoEvidence.Where(x =>
                 (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
@@ -667,6 +685,82 @@ public static class ViewerPrivacyService
             )
             .Select(x => x.Id)
             .ToListAsync(ct);
+        var bingoParticipants = await db
+            .BingoParticipants.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new
+            {
+                x.CardId,
+                x.TwitchUserId,
+                x.Login,
+                x.DisplayName,
+            })
+            .ToListAsync(ct);
+        var bingoEvidenceIdentities = await db
+            .BingoEvidence.Where(x =>
+                (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new
+            {
+                x.ParticipantTwitchUserId,
+                x.ParticipantLogin,
+                x.ParticipantDisplayName,
+            })
+            .ToListAsync(ct);
+        var bingoRecipientIdentities = await db
+            .BingoWinRecipients.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new
+            {
+                x.TwitchUserId,
+                x.Login,
+                x.DisplayName,
+            })
+            .ToListAsync(ct);
+        var uniqueBingoCardIds = bingoParticipants
+            .Where(value => value.CardId is not null)
+            .Select(value => value.CardId!.Value)
+            .ToArray();
+        var uniqueBingoCards = await db
+            .BingoCards.Where(x =>
+                uniqueBingoCardIds.Contains(x.Id)
+                && x.Game!.Mode == BingoGameMode.UniquePerViewer
+                && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new { x.Id, x.AssignmentName })
+            .ToListAsync(ct);
+        var uniqueBingoCardIdsToErase = uniqueBingoCards.Select(value => value.Id).ToArray();
+        var bingoIdentityPatterns = new[] { subject.TwitchUserId, subject.Login }
+            .Concat(
+                bingoParticipants.SelectMany(value =>
+                    new[] { value.TwitchUserId, value.Login, value.DisplayName }
+                )
+            )
+            .Concat(
+                bingoEvidenceIdentities.SelectMany(value =>
+                    new[]
+                    {
+                        value.ParticipantTwitchUserId,
+                        value.ParticipantLogin,
+                        value.ParticipantDisplayName,
+                    }
+                )
+            )
+            .Concat(
+                bingoRecipientIdentities.SelectMany(value =>
+                    new[] { value.TwitchUserId, value.Login, value.DisplayName }
+                )
+            )
+            .Concat(uniqueBingoCards.Select(value => value.AssignmentName))
+            .Where(value => !string.IsNullOrWhiteSpace(value) && value != ErasedToken)
+            .Select(value => LikeContainsPattern(value!))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
         void Record(string section, int rows)
         {
@@ -1015,6 +1109,15 @@ public static class ViewerPrivacyService
 
         Record("bounties.events", bountyEvents);
         Record(
+            "bingo.unique-cards",
+            await db
+                .BingoCards.Where(x => uniqueBingoCardIdsToErase.Contains(x.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(x => x.AssignmentName, ErasedToken),
+                    ct
+                )
+        );
+        Record(
             "bingo.participants",
             await db
                 .BingoParticipants.Where(x =>
@@ -1094,17 +1197,49 @@ public static class ViewerPrivacyService
                     ct
                 )
         );
+        var bingoEvidenceText = 0;
+        var bingoAuditText = 0;
         var bingoEvents = 0;
-        foreach (var needle in quotedNeedles)
+        var bingoOverlayItems = 0;
+        foreach (var pattern in bingoIdentityPatterns)
         {
+            bingoEvidenceText += await db
+                .BingoEvidence.Where(x =>
+                    EF.Functions.Like(x.Summary, pattern, "\\")
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(x => x.Summary, "Bingo event recorded"),
+                    ct
+                );
+            bingoAuditText += await db
+                .BingoModerationAudit.Where(x =>
+                    EF.Functions.Like(x.PrivateNote, pattern, "\\")
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(x => x.PrivateNote, string.Empty),
+                    ct
+                );
             bingoEvents += await db
                 .BingoEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
+                    EF.Functions.Like(x.PublicPayload, pattern, "\\")
                     && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct);
+            bingoOverlayItems += await db
+                .OverlayEventFeedItems.Where(x =>
+                    (
+                        EF.Functions.Like(x.Title, pattern, "\\")
+                        || EF.Functions.Like(x.Body, pattern, "\\")
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct);
         }
+        Record("bingo.evidence-text", bingoEvidenceText);
+        Record("bingo.moderation-audit-text", bingoAuditText);
         Record("bingo.events", bingoEvents);
+        Record("bingo.overlay-items", bingoOverlayItems);
         if (communityCompletionIds.Count > 0)
         {
             Record(
@@ -1406,4 +1541,7 @@ public static class ViewerPrivacyService
         await transaction.CommitAsync(ct);
         return new ViewerErasureReport(changed);
     }
+
+    private static string LikeContainsPattern(string value) =>
+        $"%{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";
 }

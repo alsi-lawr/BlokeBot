@@ -88,12 +88,17 @@ public sealed partial class BlokeBotDbContext
             _ = entity
                 .HasIndex(value => new { value.HostId, value.CreationOperationId })
                 .IsUnique();
+            _ = entity
+                .HasIndex(value => value.HostId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Joining', 'Issued')");
             _ = entity.HasIndex(value => new { value.HostId, value.Status });
             _ = entity.Property(value => value.PublicId).HasConversion<string>();
             _ = entity.Property(value => value.TemplateName).HasMaxLength(160);
             _ = entity.Property(value => value.Seed).HasMaxLength(160);
             _ = entity.Property(value => value.Mode).HasPersistedTokenConversion();
             _ = entity.Property(value => value.Status).HasPersistedTokenConversion();
+            _ = entity.Property(value => value.RosterRevision).IsConcurrencyToken();
             _ = entity.Property(value => value.LinePointsReward).HasMaxLength(128);
             _ = entity.Property(value => value.LineAchievementKey).HasMaxLength(80);
             _ = entity.Property(value => value.FullCardPointsReward).HasMaxLength(128);
