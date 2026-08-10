@@ -270,10 +270,15 @@ public partial class BountiesPage
         {
             BountyStatus.Proposed =>
             [
-                BountyTransitionAction.Cancel,
+                BountyTransitionAction.Reject,
                 BountyTransitionAction.OpenFunding,
             ],
-            BountyStatus.Funding => [BountyTransitionAction.Cancel, BountyTransitionAction.Accept],
+            BountyStatus.Funding =>
+            [
+                BountyTransitionAction.Reject,
+                BountyTransitionAction.Cancel,
+                BountyTransitionAction.Accept,
+            ],
             BountyStatus.Accepted =>
             [
                 BountyTransitionAction.Cancel,
