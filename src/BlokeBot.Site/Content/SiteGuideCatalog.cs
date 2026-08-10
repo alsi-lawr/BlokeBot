@@ -18,9 +18,14 @@ internal static class SiteGuideCatalog
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
+            ]
+        ),
+        new(
+            "Stream presentation",
+            [
                 GuideLink("Browser Sources", "overlays"),
-                GuideLink("Cues", "overlays#cues"),
-                GuideLink("Media library", "overlays#media"),
+                GuideLink("Cues", "overlays/cues"),
+                GuideLink("Media library", "overlays/media"),
             ]
         ),
         new(
@@ -511,24 +516,32 @@ internal static class SiteGuideCatalog
                         "Rename keeps the private URL. Disable stops display while retaining setup. Rotate revokes the old URL. Delete permanently removes the source.",
                     ],
                 },
-                new SiteGuideSection
-                {
-                    Heading = "Build and trigger reusable Cues",
-                    Anchor = "cues",
-                    Paragraphs =
-                    [
-                        "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
-                    ],
-                    Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-cues.png",
-                        LightPhoneSource: "media/phone-light-overlay-cues.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
-                        LightLaptopSource: "media/laptop-light-overlay-cues.png",
-                        PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
-                        LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
-                        "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
-                    ),
-                },
+            ],
+            Next =
+            [
+                new SiteLink("Build and trigger reusable Cues", "overlays/cues"),
+                new SiteLink("Manage media for Cues", "overlays/media"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/cues",
+            Eyebrow = "Stream presentation · Cues",
+            Title = "Build and trigger reusable Cues",
+            Summary =
+                "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-cues.png",
+                LightPhoneSource: "media/phone-light-overlay-cues.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
+                LightLaptopSource: "media/laptop-light-overlay-cues.png",
+                PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
+                LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
+                "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
+            ),
+            Sections =
+            [
                 new SiteGuideSection
                 {
                     Heading = "Prepare a Cue player",
@@ -590,24 +603,32 @@ internal static class SiteGuideCatalog
                         "If the layer layout is wrong, correct its timing, order or percentage geometry, save, and run one new test.",
                     ],
                 },
-                new SiteGuideSection
-                {
-                    Heading = "Manage media for Cues",
-                    Anchor = "media",
-                    Paragraphs =
-                    [
-                        "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
-                    ],
-                    Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-media.png",
-                        LightPhoneSource: "media/phone-light-overlay-media.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-media.png",
-                        LightLaptopSource: "media/laptop-light-overlay-media.png",
-                        PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
-                        LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
-                        "Media stays in the selected channel's private storage and is available to its Cues."
-                    ),
-                },
+            ],
+            Next =
+            [
+                new SiteLink("Manage media for Cues", "overlays/media"),
+                new SiteLink("Create Custom Commands", "commands"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/media",
+            Eyebrow = "Stream presentation · Media library",
+            Title = "Manage media for Cues",
+            Summary =
+                "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-media.png",
+                LightPhoneSource: "media/phone-light-overlay-media.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-media.png",
+                LightLaptopSource: "media/laptop-light-overlay-media.png",
+                PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
+                LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
+                "Media stays in the selected channel's private storage and is available to its Cues."
+            ),
+            Sections =
+            [
                 new SiteGuideSection
                 {
                     Heading = "Upload accepted browser media",
@@ -1779,7 +1800,7 @@ internal static class SiteGuideCatalog
                         "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source. The cue, the Cue player and the Overlays feature must all be enabled for playback.",
                         "A replaced or deleted cue or Cue player makes the action fail rather than silently playing something else.",
                     ],
-                    Links = [new SiteLink("Build reusable Cues", "overlays#cues")],
+                    Links = [new SiteLink("Build reusable Cues", "overlays/cues")],
                 },
                 new SiteGuideSection
                 {
