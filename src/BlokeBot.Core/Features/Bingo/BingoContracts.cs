@@ -409,9 +409,4 @@ internal static class BingoSquareKindPresentation
             BingoSquareKind.CounterReached => "Counter",
             _ => throw new ArgumentOutOfRangeException(nameof(value)),
         };
-
-    internal static string GridStyle(this BingoDimension dimension) =>
-        FormattableString.Invariant(
-            $"grid-template-columns: repeat({dimension.Value}, minmax(8rem, 1fr)); min-width: {(dimension.Value * 8.5) - 0.5:0.#}rem;"
-        );
 }
