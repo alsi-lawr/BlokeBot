@@ -1,4 +1,5 @@
 @page "/bounties"
+@using BlokeBot.Core.Components.Studio
 @using BlokeBot.Core.Features.Points.Balances
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
@@ -49,99 +50,214 @@
                 <p class="rounded-lg border p-3 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
             }
 
-            <section class="card p-5" aria-labelledby="new-bounty-heading">
-                <h2 id="new-bounty-heading" class="text-lg font-semibold text-slate-950">New bounty</h2>
-                <div class="studio-grid mt-4">
-                    <div class="studio-span-6"><Field Id="bounty-title" Label="Title" @bind-Value="_draft.Title" /></div>
-                    <div class="studio-span-6"><Field Id="bounty-expiry" Label="Expiry (UTC)" @bind-Value="_draft.ExpiresAtUtc" /></div>
-                    <div class="studio-span-12"><TextAreaField Id="bounty-description" Label="Description" @bind-Value="_draft.Description" /></div>
-                    <div class="studio-span-4"><Field Id="bounty-target" Label="Funding target" @bind-Value="_draft.FundingTarget" /></div>
-                    <div class="studio-span-4"><Field Id="bounty-reward" Label="Completion bonus pool" @bind-Value="_draft.CompletionReward" /></div>
-                    <div class="studio-span-4">
-                        <label class="label" for="bounty-visibility">Visibility</label>
-                        <select id="bounty-visibility" class="input" @bind="_draft.Visibility">
-                            <option value="@BountyVisibility.Public">Public</option>
-                            <option value="@BountyVisibility.Private">Private</option>
-                        </select>
+            <div class="settings-disclosure-stack">
+                <StudioStage Key="bounty-new"
+                             Number="1"
+                             Title="New bounty"
+                             Summary="Title, description, funding target, expiry, failure policy, bonus distribution"
+                             Open="_draftOpen"
+                             OpenChanged="open => _draftOpen = open">
+                    <div class="studio-grid">
+                        <div class="studio-span-6"><Field Id="bounty-title" Label="Title" @bind-Value="_draft.Title" /></div>
+                        <div class="studio-span-6"><Field Id="bounty-expiry" Label="Expiry (UTC)" @bind-Value="_draft.ExpiresAtUtc" /></div>
+                        <div class="studio-span-12"><TextAreaField Id="bounty-description" Label="Description" @bind-Value="_draft.Description" /></div>
+                        <div class="studio-span-4"><Field Id="bounty-target" Label="Funding target" @bind-Value="_draft.FundingTarget" /></div>
+                        <div class="studio-span-4"><Field Id="bounty-reward" Label="Completion bonus pool" @bind-Value="_draft.CompletionReward" /></div>
+                        <div class="studio-span-4">
+                            <label class="label" for="bounty-visibility">Visibility</label>
+                            <select id="bounty-visibility" class="input" @bind="_draft.Visibility">
+                                <option value="@BountyVisibility.Public">Public</option>
+                                <option value="@BountyVisibility.Private">Private</option>
+                            </select>
+                        </div>
+                        <div class="studio-span-6">
+                            <label class="label" for="bounty-failure">If the bounty fails</label>
+                            <select id="bounty-failure" class="input" @bind="_draft.FailurePolicy">
+                                <option value="@BountyFailurePledgePolicy.Refund">Refund pledges</option>
+                                <option value="@BountyFailurePledgePolicy.Spend">Spend pledges</option>
+                            </select>
+                        </div>
+                        <div class="studio-span-6">
+                            <label class="label" for="bounty-reward-distribution">Completion bonus distribution</label>
+                            <select id="bounty-reward-distribution" class="input" @bind="_draft.RewardDistribution">
+                                <option value="@BountyRewardDistribution.Equal">Equal</option>
+                                <option value="@BountyRewardDistribution.Proportional">Proportional</option>
+                            </select>
+                        </div>
+                        <div class="studio-span-6"><TextAreaField Id="bounty-create-reason" Label="Private moderator note" @bind-Value="_draft.Reason" /></div>
+                        <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateAsync">Create proposed bounty</button></div>
                     </div>
-                    <div class="studio-span-6">
-                        <label class="label" for="bounty-failure">If the bounty fails</label>
-                        <select id="bounty-failure" class="input" @bind="_draft.FailurePolicy">
-                            <option value="@BountyFailurePledgePolicy.Refund">Refund pledges</option>
-                            <option value="@BountyFailurePledgePolicy.Spend">Spend pledges</option>
-                        </select>
-                    </div>
-                    <div class="studio-span-6">
-                        <label class="label" for="bounty-reward-distribution">Completion bonus distribution</label>
-                        <select id="bounty-reward-distribution" class="input" @bind="_draft.RewardDistribution">
-                            <option value="@BountyRewardDistribution.Equal">Equal</option>
-                            <option value="@BountyRewardDistribution.Proportional">Proportional</option>
-                        </select>
-                    </div>
-                    <div class="studio-span-6"><TextAreaField Id="bounty-create-reason" Label="Private moderator note" @bind-Value="_draft.Reason" /></div>
-                    <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateAsync">Create proposed bounty</button></div>
-                </div>
-            </section>
+                </StudioStage>
+            </div>
+
+            <StudioSegmentedPill TValue="BountyBoardFilter"
+                                 AriaLabel="Show bounties"
+                                 Options="_boardFilters"
+                                 @bind-Value="_boardFilter" />
 
             <section class="application-card-collection" data-card-owner="bounty-cards" aria-label="Bounties">
-                @if (_items.Count == 0)
+                @if (_visibleItems.Count == 0)
                 {
-                    <div class="card p-8 text-sm text-muted-foreground">No bounties yet.</div>
+                    <div class="card p-8 text-sm text-muted-foreground">@EmptyBoardMessage()</div>
                 }
-                @foreach (var item in _items)
+                @foreach (var item in _visibleItems)
                 {
                     var bounty = item.Bounty;
-                    <article @key="bounty.PublicId" class="card p-5" data-bounty-id="@bounty.PublicId">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h2 class="text-lg font-semibold text-slate-950">@bounty.Title</h2>
-                                    <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"><span class="status-pill__label">@bounty.Status</span></span>
-                                    <span class="text-xs font-semibold text-muted-foreground">@bounty.Visibility</span>
+                    if (BountyPresentation.IsTerminal(bounty.Status))
+                    {
+                        var timeline = BountyPresentation.Timeline(bounty);
+                        <details @key="bounty.PublicId" class="bounty-disclosure rounded-[0.65rem] border border-[var(--app-border)] bg-[var(--app-surface-solid)]" data-bounty-id="@bounty.PublicId">
+                            <summary class="flex flex-wrap items-center gap-[0.65rem] px-4 py-3">
+                                <span class="@BountyPresentation.StatusPillClass(bounty.Status)">
+                                    <span class="status-pill__dot bg-current"></span>
+                                    <span class="status-pill__label">@bounty.Status</span>
+                                </span>
+                                <span class="text-sm font-bold text-[var(--app-text-strong)]">@bounty.Title</span>
+                                <span class="font-mono text-xs text-muted-foreground">@BountyPresentation.ShortId(bounty.PublicId)</span>
+                                <span class="ml-auto text-right text-[0.78rem] text-[var(--app-text-muted)]">@BountyPresentation.OutcomeMeta(bounty)</span>
+                                <span class="bounty-disclosure__chevron text-[1.05rem] leading-none" aria-hidden="true">›</span>
+                            </summary>
+                            <div class="grid gap-[0.9rem] px-4 pb-4">
+                                <p class="@BountyPresentation.OutcomeBandClass(bounty.Status)">@BountyPresentation.OutcomeSentence(bounty)</p>
+                                <div class="flex flex-wrap items-center gap-x-[0.55rem] gap-y-[0.35rem] text-[0.8rem] text-[var(--app-text-muted)]">
+                                    @for (var index = 0; index < timeline.Count; index++)
+                                    {
+                                        if (index > 0)
+                                        {
+                                            <span class="text-[var(--app-control-border)]" aria-hidden="true">→</span>
+                                        }
+                                        <span><b class="font-semibold text-[var(--app-text-strong)]">@timeline[index].Label</b> @timeline[index].When</span>
+                                    }
                                 </div>
-                                <p class="mt-1 text-sm text-muted-foreground">@bounty.Description</p>
-                            </div>
-                            <span class="font-mono text-xs text-muted-foreground">@ShortId(bounty.PublicId)</span>
-                        </div>
-                        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                            <div><dt class="font-semibold">Funding</dt><dd>@bounty.PledgedAmount.ToDisplayString() / @bounty.FundingTarget.ToDisplayString()</dd></div>
-                            <div><dt class="font-semibold">Contributors</dt><dd>@bounty.ContributorCount</dd></div>
-                            <div><dt class="font-semibold">Expires</dt><dd>@bounty.ExpiresAtUtc.ToString("u")</dd></div>
-                            <div><dt class="font-semibold">Completion bonus</dt><dd>@bounty.CompletionReward.ToDisplayString() · @bounty.RewardDistribution</dd></div>
-                        </dl>
-                        @if (bounty.Contributors.Count > 0)
-                        {
-                            <p class="mt-3 text-sm"><span class="font-semibold">Recorded pledges:</span> @string.Join(", ", bounty.Contributors.Select(value => $"@{value.Login} {value.PledgedAmount.ToDisplayString()}"))</p>
-                        }
-                        <div class="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                            <TextAreaField Id="@($"bounty-reason-{bounty.PublicId:N}")" Label="Private audit reason" Value="@ReasonFor(bounty.PublicId)" ValueChanged="value => SetReason(bounty.PublicId, value)" />
-                            <div class="flex flex-wrap content-end items-end gap-2">
-                                @foreach (var action in AvailableActions(bounty.Status))
+                                @if (bounty.Contributors.Count > 0)
                                 {
-                                    <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(bounty, action)">@ActionLabel(action)</button>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                        {
+                                            <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
+                                        }
+                                        @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
+                                        {
+                                            <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
+                                        }
+                                    </div>
+                                }
+                                @if (item.Audits.Count > 0)
+                                {
+                                    <details class="text-sm">
+                                        <summary class="cursor-pointer text-[0.82rem] font-semibold text-[var(--app-text-medium)]">@AuditSummary(item)</summary>
+                                        <ul class="mt-2 grid gap-[0.3rem] pl-4 text-[0.8rem] text-muted-foreground">
+                                            @foreach (var audit in item.Audits)
+                                            {
+                                                <li>@AuditLine(audit)</li>
+                                            }
+                                        </ul>
+                                    </details>
                                 }
                             </div>
-                        </div>
-                        @if (CanExtend(bounty.Status))
-                        {
-                            <div class="mt-3 flex flex-wrap items-end gap-2">
-                                <div class="min-w-56 grow"><Field Id="@($"bounty-extend-{bounty.PublicId:N}")" Label="Extend expiry (UTC)" Value="@ExtensionFor(bounty.PublicId)" ValueChanged="value => SetExtension(bounty.PublicId, value)" /></div>
-                                <button class="btn-secondary" type="button" @onclick="() => ExtendAsync(bounty)">Extend</button>
+                        </details>
+                    }
+                    else
+                    {
+                        <details @key="bounty.PublicId" class="card bounty-disclosure" data-bounty-id="@bounty.PublicId" open>
+                            <summary class="flex flex-wrap items-start justify-between gap-3 p-5">
+                                <div class="grid min-w-0 gap-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-lg font-semibold text-slate-950">@bounty.Title</h2>
+                                        <span class="@BountyPresentation.StatusPillClass(bounty.Status)">
+                                            <span class="status-pill__dot bg-current"></span>
+                                            <span class="status-pill__label">@bounty.Status</span>
+                                        </span>
+                                        <span class="text-xs font-semibold text-muted-foreground">@bounty.Visibility</span>
+                                        <span class="font-mono text-xs text-muted-foreground">@BountyPresentation.ShortId(bounty.PublicId)</span>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">@bounty.Description</p>
+                                </div>
+                                <div class="grid flex-none justify-items-end gap-[0.1rem] text-right">
+                                    <span class="text-[1.05rem] leading-[1.2] font-bold @BountyPresentation.CountdownClass(bounty)">@BountyPresentation.Countdown(bounty)</span>
+                                    <span class="text-xs text-[var(--app-text-muted)]">@BountyPresentation.AbsoluteUtc(bounty.ExpiresAtUtc)</span>
+                                </div>
+                                <span class="bounty-disclosure__chevron self-center text-[1.05rem] leading-none" aria-hidden="true">›</span>
+                            </summary>
+                            <div class="grid gap-4 border-t border-[var(--app-border)] p-5">
+                                <div class="grid gap-[0.45rem]">
+                                    <div class="flex flex-wrap items-baseline justify-between gap-2 text-[0.85rem] text-[var(--app-text-muted)]">
+                                        <span><b class="text-[0.95rem] font-bold text-[var(--app-text-strong)]">@bounty.PledgedAmount.ToDisplayString()</b> @BountyPresentation.PledgedSummary(bounty)</span>
+                                        <span>@BountyPresentation.FundingProgressSummary(bounty)</span>
+                                    </div>
+                                    <div class="@BountyPresentation.MeterClass(bounty)"
+                                         role="progressbar"
+                                         aria-label="Funding progress"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100"
+                                         aria-valuenow="@BountyPresentation.FundingPercent(bounty)">
+                                        <span style="width: @BountyPresentation.FundingPercent(bounty)%"></span>
+                                    </div>
+                                    <div class="flex flex-wrap items-baseline justify-between gap-2 text-[0.85rem] text-[var(--app-text-muted)]">
+                                        <span>@BountyPresentation.ContributorSummary(bounty)</span>
+                                        <span>@BountyPresentation.BonusSummary(bounty)</span>
+                                    </div>
+                                </div>
+                                @if (bounty.Contributors.Count > 0)
+                                {
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                        {
+                                            <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
+                                        }
+                                        @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
+                                        {
+                                            <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
+                                        }
+                                    </div>
+                                }
+                                <div class="grid gap-3 border-t border-dashed border-[var(--app-border)] pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                                    <TextAreaField Id="@($"bounty-reason-{bounty.PublicId:N}")"
+                                                   Label="Private audit reason"
+                                                   Value="@ReasonFor(bounty.PublicId)"
+                                                   ValueChanged="value => SetReason(bounty.PublicId, value)" />
+                                    <div class="flex flex-wrap content-end items-end gap-2">
+                                        @if (BountyLifecycle.CanExtend(bounty.Status))
+                                        {
+                                            <button class="btn-secondary"
+                                                    type="button"
+                                                    aria-expanded="@(IsExtendOpen(bounty.PublicId) ? "true" : "false")"
+                                                    aria-controls="@ExtendRegionId(bounty.PublicId)"
+                                                    @onclick="() => ToggleExtend(bounty.PublicId)">Extend</button>
+                                        }
+                                        @foreach (var action in AvailableActions(bounty.Status))
+                                        {
+                                            <button class="@ActionButtonClass(action)" type="button" @onclick="() => TransitionAsync(bounty, action)">@ActionLabel(action)</button>
+                                        }
+                                    </div>
+                                </div>
+                                @if (BountyLifecycle.CanExtend(bounty.Status) && IsExtendOpen(bounty.PublicId))
+                                {
+                                    <div id="@ExtendRegionId(bounty.PublicId)" class="flex flex-wrap items-end gap-2">
+                                        <div class="min-w-56 grow">
+                                            <Field Id="@($"bounty-extend-{bounty.PublicId:N}")"
+                                                   Label="New expiry (UTC)"
+                                                   Value="@ExtensionFor(bounty.PublicId)"
+                                                   ValueChanged="value => SetExtension(bounty.PublicId, value)" />
+                                        </div>
+                                        <button class="btn-secondary" type="button" @onclick="() => ExtendAsync(bounty)">Save new expiry</button>
+                                    </div>
+                                }
+                                @if (item.Audits.Count > 0)
+                                {
+                                    <details class="text-sm">
+                                        <summary class="cursor-pointer text-[0.82rem] font-semibold text-[var(--app-text-medium)]">@AuditSummary(item)</summary>
+                                        <ul class="mt-2 grid gap-[0.3rem] pl-4 text-[0.8rem] text-muted-foreground">
+                                            @foreach (var audit in item.Audits)
+                                            {
+                                                <li>@AuditLine(audit)</li>
+                                            }
+                                        </ul>
+                                    </details>
+                                }
                             </div>
-                        }
-                        @if (item.Audits.Count > 0)
-                        {
-                            <details class="mt-4 text-sm">
-                                <summary class="cursor-pointer font-semibold">Private moderation audit</summary>
-                                <ul class="mt-2 space-y-2 text-muted-foreground">
-                                    @foreach (var audit in item.Audits)
-                                    {
-                                        <li>@audit.OccurredAtUtc.ToString("u") · @audit.Action by @($"@{audit.ActorLogin}") · @audit.Reason</li>
-                                    }
-                                </ul>
-                            </details>
-                        }
-                    </article>
+                        </details>
+                    }
                 }
             </section>
         }

@@ -12,7 +12,7 @@
     <div class="mx-auto max-w-5xl space-y-6">
         <PageHeader Kicker="Community progression"
                     Title="Bounty board"
-                    Description="Public viewer-funded challenges for this channel." />
+                    Description="Viewer-funded challenges for this channel. Pledge points to make them happen." />
 
         @if (!_loaded)
         {
@@ -34,73 +34,140 @@
             }
 
             <section class="application-card-collection" data-card-owner="public-bounty-cards" aria-label="Public bounties">
-                @foreach (var bounty in _items)
+                @foreach (var bounty in _activeItems)
                 {
-                    <article @key="bounty.PublicId" class="card p-5" data-public-bounty-id="@bounty.PublicId">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
+                    <details @key="bounty.PublicId" class="card bounty-disclosure" data-public-bounty-id="@bounty.PublicId" open>
+                        <summary class="flex flex-wrap items-start justify-between gap-3 p-5">
+                            <div class="grid min-w-0 gap-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <h2 class="text-xl font-semibold text-slate-950">@bounty.Title</h2>
-                                    <span class="status-pill bg-[var(--app-surface-muted)] text-[var(--app-text-muted)] ring-1 ring-[var(--app-border)]"><span class="status-pill__label">@bounty.Status</span></span>
+                                    <span class="@BountyPresentation.StatusPillClass(bounty.Status)">
+                                        <span class="status-pill__dot bg-current"></span>
+                                        <span class="status-pill__label">@bounty.Status</span>
+                                    </span>
                                 </div>
-                                <p class="mt-2 text-sm text-muted-foreground">@bounty.Description</p>
+                                <p class="text-sm text-muted-foreground">@bounty.Description</p>
                             </div>
-                            <span class="font-mono text-xs text-muted-foreground">@bounty.PublicId.ToString("N")[..8]</span>
-                        </div>
-                        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                            <div><dt class="font-semibold">Funding</dt><dd>@bounty.PledgedAmount.ToDisplayString() / @bounty.FundingTarget.ToDisplayString()</dd></div>
-                            <div><dt class="font-semibold">Contributors</dt><dd>@bounty.ContributorCount</dd></div>
-                            <div><dt class="font-semibold">Deadline</dt><dd>@bounty.ExpiresAtUtc.ToString("u")</dd></div>
-                            <div><dt class="font-semibold">Completion bonus</dt><dd>@bounty.CompletionReward.ToDisplayString() · @bounty.RewardDistribution</dd></div>
-                        </dl>
-
-                        @if (bounty.Contributors.Count > 0)
-                        {
-                            <section class="mt-4" aria-label="Recorded contributors">
-                                <h3 class="text-sm font-semibold">Recorded contributors</h3>
-                                <ul class="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                    @foreach (var contributor in bounty.Contributors)
-                                    {
-                                        <li class="rounded-full border px-3 py-1">@($"@{contributor.Login}") · @contributor.PledgedAmount.ToDisplayString()</li>
-                                    }
-                                </ul>
-                            </section>
-                        }
-
-                        @if (bounty.TerminalHistory.Count > 0)
-                        {
-                            <section class="mt-4" aria-label="Terminal history">
-                                <h3 class="text-sm font-semibold">Terminal history</h3>
-                                <ul class="mt-2 space-y-1 text-sm text-muted-foreground">
-                                    @foreach (var history in bounty.TerminalHistory)
-                                    {
-                                        <li>@history.OccurredAtUtc.ToString("u") · @history.Status</li>
-                                    }
-                                </ul>
-                            </section>
-                        }
-
-                        @if (bounty.Status == BountyStatus.Funding)
-                        {
-                            @if (_session.IsAuthenticated)
-                            {
-                                <div class="mt-4 flex flex-wrap items-end gap-2">
-                                    <div class="min-w-48 grow">
-                                        <Field Id="@($"public-bounty-pledge-{bounty.PublicId:N}")"
-                                               Label="Pledge points"
-                                               Value="@PledgeFor(bounty.PublicId)"
-                                               ValueChanged="value => SetPledge(bounty.PublicId, value)" />
-                                    </div>
-                                    <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
+                            <div class="grid flex-none justify-items-end gap-[0.1rem] text-right">
+                                <span class="text-[1.05rem] leading-[1.2] font-bold @BountyPresentation.CountdownClass(bounty)">@BountyPresentation.Countdown(bounty)</span>
+                                <span class="text-xs text-[var(--app-text-muted)]">@BountyPresentation.AbsoluteUtc(bounty.ExpiresAtUtc)</span>
+                            </div>
+                            <span class="bounty-disclosure__chevron self-center text-[1.05rem] leading-none" aria-hidden="true">›</span>
+                        </summary>
+                        <div class="grid gap-4 border-t border-[var(--app-border)] p-5">
+                            <div class="grid gap-[0.45rem]">
+                                <div class="flex flex-wrap items-baseline justify-between gap-2 text-[0.85rem] text-[var(--app-text-muted)]">
+                                    <span><b class="text-[0.95rem] font-bold text-[var(--app-text-strong)]">@bounty.PledgedAmount.ToDisplayString()</b> @BountyPresentation.PledgedSummary(bounty)</span>
+                                    <span>@BountyPresentation.FundingProgressSummary(bounty)</span>
                                 </div>
-                                <p class="mt-2 text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
-                            }
-                            else
+                                <div class="@BountyPresentation.MeterClass(bounty)"
+                                     role="progressbar"
+                                     aria-label="Funding progress"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"
+                                     aria-valuenow="@BountyPresentation.FundingPercent(bounty)">
+                                    <span style="width: @BountyPresentation.FundingPercent(bounty)%"></span>
+                                </div>
+                                <div class="flex flex-wrap items-baseline justify-between gap-2 text-[0.85rem] text-[var(--app-text-muted)]">
+                                    <span>@BountyPresentation.ContributorSummary(bounty)</span>
+                                    <span>@BountyPresentation.BonusSummary(bounty)</span>
+                                </div>
+                            </div>
+                            @if (bounty.Contributors.Count > 0)
                             {
-                                <p class="mt-4 text-sm text-muted-foreground">Sign in with Twitch to pledge points.</p>
+                                <div class="flex flex-wrap items-center gap-2" aria-label="Recorded contributors">
+                                    @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                    {
+                                        <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
+                                    }
+                                    @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
+                                    {
+                                        <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
+                                    }
+                                </div>
                             }
-                        }
-                    </article>
+                            @if (bounty.Status == BountyStatus.Funding)
+                            {
+                                <div class="flex flex-wrap items-end gap-3 border-t border-dashed border-[var(--app-border)] pt-4">
+                                    @if (_session.IsAuthenticated)
+                                    {
+                                        <div class="max-w-64 min-w-48 grow">
+                                            <Field Id="@($"public-bounty-pledge-{bounty.PublicId:N}")"
+                                                   Label="Pledge points"
+                                                   Value="@PledgeFor(bounty.PublicId)"
+                                                   ValueChanged="value => SetPledge(bounty.PublicId, value)" />
+                                        </div>
+                                        <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
+                                        <p class="text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-sm text-muted-foreground">Sign in with Twitch to pledge points.</p>
+                                    }
+                                </div>
+                            }
+                            else if (bounty.Status == BountyStatus.Accepted)
+                            {
+                                <p class="border-t border-dashed border-[var(--app-border)] pt-4 text-sm text-muted-foreground">Funding is closed. The bounty is on: it completes, fails, or expires from here.</p>
+                            }
+                        </div>
+                    </details>
+                }
+
+                @if (_settledItems.Count > 0)
+                {
+                    <details class="card bounty-disclosure" open>
+                        <summary class="flex flex-wrap items-start justify-between gap-3 p-5">
+                            <div class="grid min-w-0 gap-1">
+                                <h2 class="text-xl font-semibold text-slate-950">History</h2>
+                                <p class="text-sm text-muted-foreground">Settled bounties and what happened to the points.</p>
+                            </div>
+                            <span class="bounty-disclosure__chevron self-center text-[1.05rem] leading-none" aria-hidden="true">›</span>
+                        </summary>
+                        <div class="grid gap-3 border-t border-[var(--app-border)] p-5">
+                            @foreach (var bounty in _settledItems)
+                            {
+                                var timeline = BountyPresentation.Timeline(bounty);
+                                <details @key="bounty.PublicId" class="bounty-disclosure rounded-[0.65rem] border border-[var(--app-border)] bg-[var(--app-surface-solid)]" data-public-bounty-id="@bounty.PublicId">
+                                    <summary class="flex flex-wrap items-center gap-[0.65rem] px-4 py-3">
+                                        <span class="@BountyPresentation.StatusPillClass(bounty.Status)">
+                                            <span class="status-pill__dot bg-current"></span>
+                                            <span class="status-pill__label">@bounty.Status</span>
+                                        </span>
+                                        <span class="text-sm font-bold text-[var(--app-text-strong)]">@bounty.Title</span>
+                                        <span class="ml-auto text-right text-[0.78rem] text-[var(--app-text-muted)]">@BountyPresentation.OutcomeMeta(bounty)</span>
+                                        <span class="bounty-disclosure__chevron text-[1.05rem] leading-none" aria-hidden="true">›</span>
+                                    </summary>
+                                    <div class="grid gap-[0.9rem] px-4 pb-4">
+                                        <p class="@BountyPresentation.OutcomeBandClass(bounty.Status)">@BountyPresentation.OutcomeSentence(bounty)</p>
+                                        <div class="flex flex-wrap items-center gap-x-[0.55rem] gap-y-[0.35rem] text-[0.8rem] text-[var(--app-text-muted)]">
+                                            @for (var index = 0; index < timeline.Count; index++)
+                                            {
+                                                if (index > 0)
+                                                {
+                                                    <span class="text-[var(--app-control-border)]" aria-hidden="true">→</span>
+                                                }
+                                                <span><b class="font-semibold text-[var(--app-text-strong)]">@timeline[index].Label</b> @timeline[index].When</span>
+                                            }
+                                        </div>
+                                        @if (bounty.Contributors.Count > 0)
+                                        {
+                                            <div class="flex flex-wrap items-center gap-2" aria-label="Recorded contributors">
+                                                @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                                {
+                                                    <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
+                                                }
+                                                @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
+                                                {
+                                                    <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </details>
+                            }
+                        </div>
+                    </details>
                 }
             </section>
         }

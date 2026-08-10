@@ -21,6 +21,12 @@ public partial class PublicBountyBoardPage
     [Parameter]
     public string Channel { get; set; } = string.Empty;
 
+    private IReadOnlyList<BountyView> _activeItems =>
+        [.. _items.Where(value => !BountyPresentation.IsTerminal(value.Status))];
+
+    private IReadOnlyList<BountyView> _settledItems =>
+        [.. _items.Where(value => BountyPresentation.IsTerminal(value.Status))];
+
     protected override async Task OnParametersSetAsync()
     {
         _session = AuthenticatedSession.FromPrincipal((await _authenticationState).User);

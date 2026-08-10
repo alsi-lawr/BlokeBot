@@ -1,0 +1,85 @@
+@layer components {
+    /* The marker suppression and the chevron rotation both hang off the parent details' open
+       state, which a utility on the chevron cannot address. */
+    .bounty-disclosure > summary {
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .bounty-disclosure > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .bounty-disclosure__chevron {
+        color: var(--app-text-muted);
+        flex: none;
+        transition: transform 250ms ease;
+    }
+
+    .bounty-disclosure > summary:hover .bounty-disclosure__chevron {
+        color: var(--app-text-strong);
+    }
+
+    .bounty-disclosure[open] > summary .bounty-disclosure__chevron {
+        transform: rotate(90deg);
+    }
+
+    .bounty-outcome {
+        align-items: center;
+        border-radius: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.85rem;
+        font-weight: 600;
+        gap: 0.4rem 0.6rem;
+        padding: 0.6rem 0.9rem;
+    }
+
+    .bounty-outcome--green {
+        background: var(--tone-green-bg);
+        box-shadow: inset 0 0 0 1px var(--tone-green-ring);
+        color: var(--tone-green-fg);
+    }
+
+    .bounty-outcome--red {
+        background: var(--tone-red-bg);
+        box-shadow: inset 0 0 0 1px var(--tone-red-ring);
+        color: var(--tone-red-fg);
+    }
+
+    .bounty-outcome--amber {
+        background: var(--tone-amber-bg);
+        box-shadow: inset 0 0 0 1px var(--tone-amber-ring);
+        color: var(--tone-amber-fg);
+    }
+
+    .bounty-outcome--slate {
+        background: var(--app-surface-muted);
+        box-shadow: inset 0 0 0 1px var(--app-border);
+        color: var(--app-text-muted);
+    }
+
+    .bounty-chip {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        color: var(--app-text-medium);
+        display: inline-flex;
+        font-size: 0.8rem;
+        font-weight: 600;
+        gap: 0.4rem;
+        padding: 0.3rem 0.7rem;
+    }
+
+    .bounty-chip__amount {
+        color: var(--app-text-muted);
+        font-weight: 500;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .bounty-disclosure__chevron {
+            transition-duration: 1ms;
+        }
+    }
+}

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
@@ -11,7 +12,10 @@ public partial class BountiesPage
     private IReadOnlyList<BountyModeratorView> _items = [];
     private readonly Dictionary<Guid, string> _reasons = [];
     private readonly Dictionary<Guid, string> _extensions = [];
+    private readonly HashSet<Guid> _openExtensions = [];
     private BountyDraft _draft = BountyDraft.New();
+    private BountyBoardFilter _boardFilter = BountyBoardFilter.Active;
+    private bool _draftOpen;
     private bool _bountiesConfigured;
     private bool _pointsEnabled;
     private bool _featureEnabled;
@@ -19,6 +23,20 @@ public partial class BountiesPage
     private string _feedback = string.Empty;
 
     private string _publicBoardUrl => $"/bounties/{Uri.EscapeDataString(HostLogin)}";
+
+    private IReadOnlyList<BountyModeratorView> _visibleItems =>
+        [
+            .. _items.Where(value =>
+                BountyPresentation.IsTerminal(value.Bounty.Status)
+                == (_boardFilter == BountyBoardFilter.History)
+            ),
+        ];
+
+    private IReadOnlyList<StudioSegmentedOption<BountyBoardFilter>> _boardFilters =>
+        [
+            new(BountyBoardFilter.Active, $"Active · {ActiveCount()}"),
+            new(BountyBoardFilter.History, $"History · {_items.Count - ActiveCount()}"),
+        ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,6 +111,7 @@ public partial class BountiesPage
                 if (!_operationFailed)
                 {
                     _draft = BountyDraft.New();
+                    _boardFilter = BountyBoardFilter.Active;
                     await LoadAsync();
                 }
             }
@@ -150,14 +169,29 @@ public partial class BountiesPage
                     CancellationToken.None
                 );
                 _feedback = result.Match(
-                    static succeeded => $"Expiry extended to {succeeded.Value.ExpiresAtUtc:u}.",
+                    static succeeded =>
+                        $"Expiry extended to {BountyPresentation.AbsoluteUtc(succeeded.Value.ExpiresAtUtc)}.",
                     static rejected => rejected.Reason.Message
                 );
                 _operationFailed = result is BountyResult<BountyView>.Rejected;
+                if (!_operationFailed)
+                {
+                    _ = _openExtensions.Remove(bounty.PublicId);
+                }
+
                 await LoadAsync();
             }
         );
     }
+
+    private int ActiveCount() =>
+        _items.Count(value => !BountyPresentation.IsTerminal(value.Bounty.Status));
+
+    private string EmptyBoardMessage() =>
+        _items.Count == 0 ? "No bounties yet."
+        : _boardFilter == BountyBoardFilter.Active
+            ? "No active bounties. Settled work sits under History."
+        : "No settled bounties yet.";
 
     private BountyActor Actor() => new(PageContext.Session.UserId, PageContext.Session.Login);
 
@@ -172,6 +206,30 @@ public partial class BountiesPage
         );
 
     private void SetExtension(Guid id, string value) => _extensions[id] = value;
+
+    private bool IsExtendOpen(Guid id) => _openExtensions.Contains(id);
+
+    private void ToggleExtend(Guid id)
+    {
+        if (!_openExtensions.Remove(id))
+        {
+            _ = _openExtensions.Add(id);
+        }
+    }
+
+    private static string ExtendRegionId(Guid id) => $"bounty-extend-region-{id:N}";
+
+    private static string AuditSummary(BountyModeratorView item) =>
+        item.Audits.Count == 1
+            ? "Private moderation audit · 1 entry"
+            : $"Private moderation audit · {item.Audits.Count} entries";
+
+    private static string AuditLine(BountyModerationAuditView audit)
+    {
+        var line =
+            $"{BountyPresentation.AbsoluteUtc(audit.OccurredAtUtc)} · {BountyPresentation.AuditActionLabel(audit.Action)} by @{audit.ActorLogin}";
+        return string.IsNullOrWhiteSpace(audit.Reason) ? line : $"{line} · {audit.Reason}";
+    }
 
     private void Fail(string message)
     {
@@ -212,26 +270,26 @@ public partial class BountiesPage
         {
             BountyStatus.Proposed =>
             [
-                BountyTransitionAction.OpenFunding,
-                BountyTransitionAction.Reject,
-            ],
-            BountyStatus.Funding =>
-            [
-                BountyTransitionAction.Accept,
-                BountyTransitionAction.Reject,
                 BountyTransitionAction.Cancel,
+                BountyTransitionAction.OpenFunding,
             ],
+            BountyStatus.Funding => [BountyTransitionAction.Cancel, BountyTransitionAction.Accept],
             BountyStatus.Accepted =>
             [
-                BountyTransitionAction.Complete,
-                BountyTransitionAction.Fail,
                 BountyTransitionAction.Cancel,
+                BountyTransitionAction.Fail,
+                BountyTransitionAction.Complete,
             ],
             _ => [],
         };
 
-    private static bool CanExtend(BountyStatus status) =>
-        status is BountyStatus.Funding or BountyStatus.Accepted;
+    private static string ActionButtonClass(BountyTransitionAction action) =>
+        action
+            is BountyTransitionAction.OpenFunding
+                or BountyTransitionAction.Accept
+                or BountyTransitionAction.Complete
+            ? "btn-primary"
+            : "btn-secondary";
 
     private static string ActionLabel(BountyTransitionAction action) =>
         action switch
@@ -246,7 +304,11 @@ public partial class BountiesPage
             _ => throw new UnreachableException(),
         };
 
-    private static string ShortId(Guid id) => id.ToString("N")[..8];
+    private enum BountyBoardFilter
+    {
+        Active,
+        History,
+    }
 
     private sealed class BountyDraft
     {
