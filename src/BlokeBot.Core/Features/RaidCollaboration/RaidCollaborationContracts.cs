@@ -182,6 +182,12 @@ public interface IRaidWelcomeSender
 
 public interface IRaidCollaborationShoutoutProvider
 {
+    Task<ShoutoutDashboardState> LoadAsync(
+        int hostId,
+        string? targetLogin,
+        CancellationToken cancellationToken
+    );
+
     Task<ShoutoutOperationOutcome> SendAsync(
         int hostId,
         string targetLogin,

@@ -1,6 +1,7 @@
+using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.RaidCollaboration;
-using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -52,7 +53,7 @@ public sealed class RaidCollaborationServiceTests
     }
 
     [Test]
-    public async Task DisabledAndPreEnableEvents_CauseNoProviderEffectsMutationOrReplay()
+    public async Task DisabledPreEnableAndIdDisagreement_CauseNoEffectsMutationOrReplay()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.None);
@@ -75,6 +76,17 @@ public sealed class RaidCollaborationServiceTests
         }
         await fixture.Service.IncomingRaidReceivedAsync(
             Incoming("disabled", _now, "raider-id", "raider"),
+            default
+        );
+        await fixture.Service.IncomingRaidReceivedAsync(
+            Incoming(
+                "id-disagreement",
+                _now.AddMinutes(2),
+                "raider-id",
+                "raider",
+                targetId: "unrelated-id",
+                targetLogin: "alpha"
+            ),
             default
         );
 
@@ -132,6 +144,10 @@ public sealed class RaidCollaborationServiceTests
                 value.Contains("relationship gap", StringComparison.OrdinalIgnoreCase)
             );
         fixture.Provider.LoadedLogins.ShouldNotContain("private-other");
+        _ = (
+            await fixture.Service.SendShoutoutAsync(hostId, "eligible", default)
+        ).ShouldBeOfType<ShoutoutOperationOutcome.Sent>();
+        fixture.Shoutouts.Targets.ShouldBe(["eligible"]);
     }
 
     [Test]
@@ -158,6 +174,22 @@ public sealed class RaidCollaborationServiceTests
         ).ShouldBeOfType<ConfirmedRaidStartOutcome.FeatureDisabled>();
         fixture.Provider.LoadedLogins.ShouldBeEmpty();
         fixture.Provider.StartedLogins.ShouldBeEmpty();
+
+        var broadcasterTokens = new RecordingBroadcasterTokens();
+        var twitch = new RecordingHttpClientFactory();
+        var provider = new TwitchRaidCollaborationProvider(
+            database,
+            broadcasterTokens,
+            new HelixClient(twitch, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            Settings(),
+            new FixedTimeProvider(_now)
+        );
+
+        _ = (
+            await provider.StartConfirmedRaidAsync(hostId, "eligible-id", "eligible", default)
+        ).ShouldBeOfType<ConfirmedRaidStartOutcome.FeatureDisabled>();
+        broadcasterTokens.StatusRequests.ShouldBe(0);
+        twitch.Requests.ShouldBe(0);
     }
 
     private static FixtureState Fixture(SqliteBlokeBotDbFactory database)
@@ -171,7 +203,6 @@ public sealed class RaidCollaborationServiceTests
                 database,
                 provider,
                 welcome,
-                shoutouts,
                 shoutouts,
                 [domainEvents],
                 TestEventBus.Create<AppEventKind>(),
@@ -246,7 +277,9 @@ public sealed class RaidCollaborationServiceTests
         string messageId,
         DateTimeOffset timestamp,
         string raiderId,
-        string raiderLogin
+        string raiderLogin,
+        string targetId = "alpha-id",
+        string targetLogin = "alpha"
     ) =>
         new(
             messageId,
@@ -254,10 +287,15 @@ public sealed class RaidCollaborationServiceTests
             raiderId,
             raiderLogin,
             raiderLogin,
-            "alpha-id",
-            "alpha",
-            "Alpha",
+            targetId,
+            targetLogin,
+            targetLogin,
             42
+        );
+
+    private static BotSettings Settings() =>
+        BotSettings.FromOptions(
+            new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
         );
 
     private static RaidCollaborationHistoryEntry History(
@@ -361,9 +399,7 @@ public sealed class RaidCollaborationServiceTests
         }
     }
 
-    private sealed class RecordingShoutouts
-        : IRaidCollaborationShoutoutProvider,
-            IShoutoutDashboardOperations
+    private sealed class RecordingShoutouts : IRaidCollaborationShoutoutProvider
     {
         internal List<string> Targets { get; } = [];
 
@@ -406,5 +442,45 @@ public sealed class RaidCollaborationServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class RecordingBroadcasterTokens : IHostBroadcasterTokenStatusProvider
+    {
+        internal int StatusRequests { get; private set; }
+
+        public Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            StatusRequests++;
+            return Task.FromResult<TokenStatus>(
+                new TokenStatus.Unavailable(AccessTokenUnavailableReason.MissingRefreshToken, [])
+            );
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        ) => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingHttpClientFactory : IHttpClientFactory
+    {
+        internal int Requests { get; private set; }
+
+        public HttpClient CreateClient(string name) => new(new Handler(this));
+
+        private sealed class Handler(RecordingHttpClientFactory owner) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken
+            )
+            {
+                owner.Requests++;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+            }
+        }
     }
 }

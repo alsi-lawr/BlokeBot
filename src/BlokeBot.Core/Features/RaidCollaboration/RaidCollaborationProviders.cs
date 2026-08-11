@@ -1,5 +1,4 @@
 using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -84,6 +83,10 @@ internal sealed class TwitchRaidCollaborationProvider(
         CancellationToken cancellationToken
     )
     {
+        if (!await FeatureEnabledAsync(hostId, cancellationToken))
+        {
+            return new ConfirmedRaidStartOutcome.FeatureDisabled();
+        }
         var context = await ProviderContextAsync(
             hostId,
             HostBroadcasterAuthorizationService.RaidManagementScopes,
@@ -218,29 +221,30 @@ internal sealed class RaidWelcomeSender(
     }
 }
 
-internal sealed class RaidCollaborationShoutoutProvider(
-    IShoutoutDashboardOperations shoutouts,
-    IDbContextFactory<BlokeBotDbContext> dbFactory
-) : IRaidCollaborationShoutoutProvider
+internal sealed class RaidCollaborationShoutoutProvider(INativeShoutoutOperations shoutouts)
+    : IRaidCollaborationShoutoutProvider
 {
-    public async Task<ShoutoutOperationOutcome> SendAsync(
+    public Task<ShoutoutDashboardState> LoadAsync(
+        int hostId,
+        string? targetLogin,
+        CancellationToken cancellationToken
+    ) =>
+        shoutouts.LoadAsync(
+            hostId,
+            targetLogin,
+            NativeShoutoutOwner.RaidCollaboration,
+            cancellationToken
+        );
+
+    public Task<ShoutoutOperationOutcome> SendAsync(
         int hostId,
         string targetLogin,
         CancellationToken cancellationToken
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var enabled = await db
-            .Hosts.AsNoTracking()
-            .AnyAsync(
-                host =>
-                    host.Id == hostId
-                    && (host.EnabledFeatures & HostFeatureFlags.RaidCollaboration)
-                        == HostFeatureFlags.RaidCollaboration,
-                cancellationToken
-            );
-        return enabled
-            ? await shoutouts.SendAsync(hostId, targetLogin, cancellationToken)
-            : new ShoutoutOperationOutcome.NotReady("Raid & collaboration is turned off.");
-    }
+    ) =>
+        shoutouts.SendAsync(
+            hostId,
+            targetLogin,
+            NativeShoutoutOwner.RaidCollaboration,
+            cancellationToken
+        );
 }

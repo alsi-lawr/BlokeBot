@@ -26,6 +26,9 @@ public static class TwitchOperationsServiceCollectionExtensions
         _ = services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
+        _ = services.AddSingleton<INativeShoutoutOperations>(static provider =>
+            provider.GetRequiredService<ShoutoutService>()
+        );
         _ = services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );

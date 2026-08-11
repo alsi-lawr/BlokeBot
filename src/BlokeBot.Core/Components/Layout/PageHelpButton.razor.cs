@@ -352,7 +352,7 @@ public partial class PageHelpButton
                 "Choose a welcome message, optional native shoutout, and deduplication window. Duplicate EventSub deliveries appear once, and repeated raids inside the window do not repeat the welcome sequence.",
                 [
                     "Twitch supplies an aggregate viewer count for a raid. BlokeBot does not infer or store individual viewer attribution.",
-                    "Native shoutouts reuse Twitch live and cooldown checks and require the separate Shoutouts tool to be on.",
+                    "Native shoutouts reuse Twitch authority, live-state, cooldown, and provider checks. They are controlled by Raid & collaboration, not the separate Shoutouts switch.",
                 ]
             ),
             new(

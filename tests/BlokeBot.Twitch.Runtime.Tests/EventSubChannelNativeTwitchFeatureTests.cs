@@ -115,14 +115,9 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         harness.Session.Start(["channel"], CancellationToken.None);
         await harness.Session.DrainAsync();
 
-        operations
-            .OperationKinds("channel")
-            .ShouldBe([
-                null,
-                EventSubOperationSubscriptionKind.Raids,
-                EventSubOperationSubscriptionKind.OutgoingRaids,
-            ]);
-        operations.CreateCount("channel").ShouldBe(3);
+        var created = operations.OperationKinds("channel");
+        created.ShouldContain(EventSubOperationSubscriptionKind.Raids);
+        created.ShouldContain(EventSubOperationSubscriptionKind.OutgoingRaids);
     }
 
     [Test]

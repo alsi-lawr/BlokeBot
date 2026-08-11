@@ -2,6 +2,7 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -38,6 +39,11 @@ internal static class SimulationServiceCollectionExtensions
         _ = services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
         _ = services.Replace(
             ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(static provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
+        );
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<INativeShoutoutOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )
         );

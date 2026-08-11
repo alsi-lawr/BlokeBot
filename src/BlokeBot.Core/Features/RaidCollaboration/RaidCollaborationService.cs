@@ -1,5 +1,4 @@
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -13,7 +12,6 @@ public sealed class RaidCollaborationService(
     IRaidCollaborationProvider provider,
     IRaidWelcomeSender welcomeSender,
     IRaidCollaborationShoutoutProvider shoutouts,
-    IShoutoutDashboardOperations shoutoutDashboard,
     IEnumerable<IRaidCollaborationDomainEventObserver> domainEventObservers,
     EventBus<AppEventKind> events,
     TimeProvider clock
@@ -80,7 +78,7 @@ public sealed class RaidCollaborationService(
             return new RaidCollaborationLoadOutcome.FeatureDisabled();
         }
 
-        var shoutoutContext = await shoutoutDashboard.LoadAsync(hostId, null, cancellationToken);
+        var shoutoutContext = await shoutouts.LoadAsync(hostId, null, cancellationToken);
         var latestArrival = history
             .Where(value => value.Direction == RaidDirection.Incoming)
             .Select(value => new RaidArrivalSummary(
@@ -262,18 +260,10 @@ public sealed class RaidCollaborationService(
             direction == RaidDirection.Incoming
                 ? incomingRaid.ToBroadcasterUserId
                 : incomingRaid.FromBroadcasterUserId;
-        var ownerLogin =
-            direction == RaidDirection.Incoming
-                ? incomingRaid.ToBroadcasterUserLogin
-                : incomingRaid.FromBroadcasterUserLogin;
         await using var lookup = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await lookup
             .Hosts.AsNoTracking()
-            .SingleOrDefaultAsync(
-                value =>
-                    value.TwitchUserId == ownerId || value.Login == Login.Normalize(ownerLogin),
-                cancellationToken
-            );
+            .SingleOrDefaultAsync(value => value.TwitchUserId == ownerId, cancellationToken);
         if (
             host is null
             || !host.EnabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
