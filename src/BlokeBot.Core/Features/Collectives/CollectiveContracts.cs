@@ -101,7 +101,7 @@ public abstract record CollectiveMutationOutcome
 
     public sealed record LastCoordinatorRequired : CollectiveMutationOutcome;
 
-    public sealed record ProviderRejected : CollectiveMutationOutcome;
+    public sealed record ProviderRejected(bool WasIdempotent = false) : CollectiveMutationOutcome;
 }
 
 public abstract record CollectiveDashboardOutcome

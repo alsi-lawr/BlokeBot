@@ -252,6 +252,92 @@ public sealed class CollectiveServiceTests
     }
 
     [Test]
+    public Task RaidProviderCompletion_ReconfigurationDoesNotOverwriteNewerRelayState() =>
+        AssertProviderIntervalRaceAsync(ProviderIntervalMutation.ReconfigureRelay);
+
+    [Test]
+    public Task RaidProviderCompletion_DisabledTargetReturnsTypedNonSuccess() =>
+        AssertProviderIntervalRaceAsync(ProviderIntervalMutation.DisableTarget);
+
+    [Test]
+    public Task RaidProviderCompletion_ReenabledTargetWatermarkRejectsSuppressedClaim() =>
+        AssertProviderIntervalRaceAsync(ProviderIntervalMutation.DisableAndReenableTarget);
+
+    [Test]
+    public Task RaidProviderCompletion_RevokedTargetDoesNotOverwriteMembershipState() =>
+        AssertProviderIntervalRaceAsync(ProviderIntervalMutation.RevokeTarget);
+
+    [Test]
+    public async Task RaidProviderRejection_IsDurableAuditedRevisionedAndIdempotent()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(_now);
+        var alpha = await SeedHostAsync(database, "alpha");
+        var beta = await SeedHostAsync(database, "beta");
+        var provider = new ControlledRaidProvider();
+        var service = new CollectiveService(database, provider, clock);
+        var collectiveId = await CreateWithMemberAsync(service, alpha, beta);
+        _ = (
+            await service.ConfigureRaidRelayAsync(
+                new(
+                    Guid.NewGuid(),
+                    collectiveId,
+                    "Weekend relay",
+                    alpha,
+                    beta,
+                    Authority(alpha, "alpha")
+                ),
+                default
+            )
+        ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
+        var before = (await service.LoadAsync(Authority(alpha, "alpha"), collectiveId, default))
+            .ShouldBeOfType<CollectiveDashboardOutcome.Loaded>()
+            .Workspace.SelectedCollective!;
+        var operationId = Guid.NewGuid();
+        var command = new ConfirmRaidHandoffCommand(
+            operationId,
+            collectiveId,
+            before.RaidRelay!.Revision,
+            Authority(alpha, "alpha")
+        );
+        var confirmation = service.ConfirmRaidHandoffAsync(command, default);
+        await provider.WaitForStartAsync();
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        provider.Complete(new ConfirmedRaidStartOutcome.ProviderRejected());
+        var first = (
+            await confirmation
+        ).ShouldBeOfType<CollectiveMutationOutcome.ProviderRejected>();
+        first.WasIdempotent.ShouldBeFalse();
+        var second = (
+            await service.ConfirmRaidHandoffAsync(command, default)
+        ).ShouldBeOfType<CollectiveMutationOutcome.ProviderRejected>();
+        second.WasIdempotent.ShouldBeTrue();
+
+        await using var verify = await database.CreateDbContextAsync();
+        var relay = await verify
+            .CollectiveRaidRelays.Include(value => value.Collective)
+                .ThenInclude(value => value.Audits)
+            .Include(value => value.Handoffs)
+            .SingleAsync();
+        relay.Revision.ShouldBe(before.RaidRelay.Revision + 1);
+        relay.LastSourceEventAtUtc.ShouldBe(clock.GetUtcNow().UtcDateTime);
+        relay.UpdatedAtUtc.ShouldBe(clock.GetUtcNow().UtcDateTime);
+        relay.Collective.Revision.ShouldBe(before.Revision + 1);
+        relay.Collective.UpdatedAtUtc.ShouldBe(clock.GetUtcNow().UtcDateTime);
+        var handoff = relay.Handoffs.ShouldHaveSingleItem();
+        handoff.OperationId.ShouldBe(operationId.ToString("N"));
+        handoff.Status.ShouldBe(CollectiveRaidHandoffStatus.ProviderRejected);
+        var rejectionAudit = relay
+            .Collective.Audits.Where(value =>
+                value.Action == CollectiveAuditAction.RaidHandoffProviderRejected
+            )
+            .ShouldHaveSingleItem();
+        rejectionAudit.OperationId.ShouldBe($"{operationId:N}:provider-rejected");
+        provider.StartCount.ShouldBe(1);
+    }
+
+    [Test]
     public async Task PublicProjection_IsAllowlistedAndHidesAllDisabledHostState()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -340,6 +426,137 @@ public sealed class CollectiveServiceTests
         );
         return collectiveId;
     }
+
+    private static async Task AssertProviderIntervalRaceAsync(ProviderIntervalMutation mutation)
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(_now);
+        var alpha = await SeedHostAsync(database, "alpha");
+        var beta = await SeedHostAsync(database, "beta");
+        var provider = new ControlledRaidProvider();
+        var service = new CollectiveService(database, provider, clock);
+        var collectiveId = await CreateWithMemberAsync(service, alpha, beta);
+        _ = (
+            await service.ConfigureRaidRelayAsync(
+                new(
+                    Guid.NewGuid(),
+                    collectiveId,
+                    "Original relay",
+                    alpha,
+                    beta,
+                    Authority(alpha, "alpha")
+                ),
+                default
+            )
+        ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
+        var before = (await service.LoadAsync(Authority(alpha, "alpha"), collectiveId, default))
+            .ShouldBeOfType<CollectiveDashboardOutcome.Loaded>()
+            .Workspace.SelectedCollective!;
+        var confirmation = service.ConfirmRaidHandoffAsync(
+            new(
+                Guid.NewGuid(),
+                collectiveId,
+                before.RaidRelay!.Revision,
+                Authority(alpha, "alpha")
+            ),
+            default
+        );
+        await provider.WaitForStartAsync();
+
+        switch (mutation)
+        {
+            case ProviderIntervalMutation.ReconfigureRelay:
+                _ = (
+                    await service.ConfigureRaidRelayAsync(
+                        new(
+                            Guid.NewGuid(),
+                            collectiveId,
+                            "Reconfigured relay",
+                            alpha,
+                            beta,
+                            Authority(alpha, "alpha")
+                        ),
+                        default
+                    )
+                ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
+                break;
+            case ProviderIntervalMutation.DisableTarget:
+                clock.Advance(TimeSpan.FromMinutes(1));
+                await FeatureService(database, clock)
+                    .DisableAsync(beta, HostFeatureFlags.RaidCollaboration, default);
+                break;
+            case ProviderIntervalMutation.DisableAndReenableTarget:
+                clock.Advance(TimeSpan.FromMinutes(1));
+                var features = FeatureService(database, clock);
+                await features.DisableAsync(beta, HostFeatureFlags.Collectives, default);
+                clock.Advance(TimeSpan.FromMinutes(1));
+                await features.EnableAsync(beta, HostFeatureFlags.Collectives, default);
+                break;
+            case ProviderIntervalMutation.RevokeTarget:
+                _ = (
+                    await service.RevokeAsync(
+                        new(Guid.NewGuid(), collectiveId, beta, Authority(alpha, "alpha")),
+                        default
+                    )
+                ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null);
+        }
+
+        provider.Complete(new ConfirmedRaidStartOutcome.Started("beta"));
+        var outcome = await confirmation;
+        if (mutation == ProviderIntervalMutation.DisableTarget)
+        {
+            outcome
+                .ShouldBeOfType<CollectiveMutationOutcome.FeatureDisabled>()
+                .HostId.ShouldBe(beta);
+        }
+        else
+        {
+            _ = outcome.ShouldBeOfType<CollectiveMutationOutcome.Conflict>();
+        }
+
+        await using var verify = await database.CreateDbContextAsync();
+        var relay = await verify
+            .CollectiveRaidRelays.Include(value => value.Collective)
+                .ThenInclude(value => value.Audits)
+            .Include(value => value.Collective)
+                .ThenInclude(value => value.Memberships)
+            .Include(value => value.Handoffs)
+            .SingleAsync();
+        relay.CurrentHostId.ShouldBe(alpha);
+        relay.NextHostId.ShouldBe(beta);
+        relay.Handoffs.ShouldHaveSingleItem().Status.ShouldBe(CollectiveRaidHandoffStatus.Prepared);
+        relay.Collective.Audits.ShouldNotContain(value =>
+            value.Action == CollectiveAuditAction.RaidHandoffConfirmed
+            || value.Action == CollectiveAuditAction.RaidHandoffProviderRejected
+        );
+        if (mutation == ProviderIntervalMutation.ReconfigureRelay)
+        {
+            relay.Name.ShouldBe("Reconfigured relay");
+            relay.Revision.ShouldBe(before.RaidRelay.Revision + 1);
+        }
+        if (mutation == ProviderIntervalMutation.RevokeTarget)
+        {
+            relay
+                .Collective.Memberships.Single(value => value.HostId == beta)
+                .Status.ShouldBe(CollectiveMembershipStatus.Revoked);
+        }
+        provider.StartCount.ShouldBe(1);
+    }
+
+    private static HostFeatureService FeatureService(
+        SqliteBlokeBotDbFactory database,
+        TimeProvider clock
+    ) =>
+        new(
+            database,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            [],
+            [],
+            clock
+        );
 
     private static CollectiveAuthority Authority(int hostId, string login) =>
         new(hostId, $"{login}-id", login, true);
@@ -477,6 +694,58 @@ public sealed class CollectiveServiceTests
             int hostId,
             CancellationToken cancellationToken
         ) => Task.FromResult(true);
+    }
+
+    private sealed class ControlledRaidProvider : IRaidCollaborationProvider
+    {
+        private readonly TaskCompletionSource _started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource<ConfirmedRaidStartOutcome> _completion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal int StartCount { get; private set; }
+
+        internal Task WaitForStartAsync() => _started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        internal void Complete(ConfirmedRaidStartOutcome outcome) =>
+            _ = _completion.TrySetResult(outcome);
+
+        public Task<RaidChannelSnapshotOutcome> LoadLiveChannelAsync(
+            int hostId,
+            string login,
+            string? approvedClipId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<RaidChannelSnapshotOutcome>(
+                new RaidChannelSnapshotOutcome.Unavailable()
+            );
+
+        public async Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
+            int hostId,
+            string targetTwitchUserId,
+            string targetLogin,
+            CancellationToken cancellationToken
+        )
+        {
+            StartCount++;
+            _ = _started.TrySetResult();
+            return await _completion.Task.WaitAsync(cancellationToken);
+        }
+
+        public Task<bool> HasRaidManagementAuthorizationAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(true);
+    }
+
+    private enum ProviderIntervalMutation
+    {
+        ReconfigureRelay,
+        DisableTarget,
+        DisableAndReenableTarget,
+        RevokeTarget,
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider

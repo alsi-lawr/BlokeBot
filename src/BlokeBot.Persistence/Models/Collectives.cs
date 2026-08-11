@@ -98,6 +98,9 @@ public enum CollectiveAuditAction
     [PersistedToken("RaidHandoffConfirmed")]
     RaidHandoffConfirmed,
 
+    [PersistedToken("RaidHandoffProviderRejected")]
+    RaidHandoffProviderRejected,
+
     [PersistedToken("GoalChanged")]
     GoalChanged,
 

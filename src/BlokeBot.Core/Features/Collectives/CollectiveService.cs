@@ -521,36 +521,29 @@ public sealed class CollectiveService(
         {
             return claim.Outcome;
         }
+        var state = claim.State!;
         if (
-            !await FeatureAcceptsCurrentWorkAsync(
-                command.Authority.SelectedHostId,
-                claim.OccurredAtUtc,
-                ct
-            )
+            await RequireRaidWorkAsync(state.SourceHostId, state.OccurredAtUtc, ct) is
+            { } sourceGate
         )
         {
-            return new CollectiveMutationOutcome.FeatureDisabled(command.Authority.SelectedHostId);
+            return sourceGate;
         }
         if (
-            claim.TargetTwitchUserId is not { } targetTwitchUserId
-            || claim.TargetLogin is not { } targetLogin
+            await RequireRaidWorkAsync(state.TargetHostId, state.OccurredAtUtc, ct) is
+            { } targetGate
         )
         {
-            return new CollectiveMutationOutcome.Invalid(
-                "The relay handoff target is unavailable."
-            );
+            return targetGate;
         }
         var provider = await raidProvider.StartConfirmedRaidAsync(
-            command.Authority.SelectedHostId,
-            targetTwitchUserId,
-            targetLogin,
+            state.SourceHostId,
+            state.TargetTwitchUserId,
+            state.TargetLogin,
             ct
         );
         var providerAccepted = provider is ConfirmedRaidStartOutcome.Started;
-        await CompleteRaidHandoffAsync(command, providerAccepted, ct);
-        return providerAccepted
-            ? Success(command.CollectiveId)
-            : new CollectiveMutationOutcome.ProviderRejected();
+        return await CompleteRaidHandoffAsync(command, state, providerAccepted, ct);
     }
 
     public async Task<CollectiveMutationOutcome> ConfigureGoalAsync(
@@ -1495,12 +1488,12 @@ public sealed class CollectiveService(
         );
         if (gate is not null)
         {
-            return new(gate, null, null, default);
+            return new(gate, null);
         }
         var collective = await LoadCollectiveForMutationAsync(db, command.CollectiveId, ct);
-        if (collective?.RaidRelay is not { NextHostId: { } targetHostId } relay)
+        if (collective?.RaidRelay is not { } relay)
         {
-            return new(new CollectiveMutationOutcome.NotFound(), null, null, default);
+            return new(new CollectiveMutationOutcome.NotFound(), null);
         }
         var operation = Operation(command.OperationId);
         var existing = relay.Handoffs.SingleOrDefault(value => value.OperationId == operation);
@@ -1508,18 +1501,23 @@ public sealed class CollectiveService(
         {
             return new(
                 existing.Status == CollectiveRaidHandoffStatus.Confirmed
-                    ? new CollectiveMutationOutcome.Succeeded(command.CollectiveId, true)
+                        ? new CollectiveMutationOutcome.Succeeded(command.CollectiveId, true)
+                    : existing.Status == CollectiveRaidHandoffStatus.ProviderRejected
+                        ? new CollectiveMutationOutcome.ProviderRejected(true)
                     : new CollectiveMutationOutcome.Conflict(
                         "That handoff operation has already been prepared."
                     ),
-                null,
-                null,
-                existing.OccurredAtUtc
+                null
             );
+        }
+        if (relay.NextHostId is not { } targetHostId)
+        {
+            return new(new CollectiveMutationOutcome.NotFound(), null);
         }
         if (
             relay.CurrentHostId != command.Authority.SelectedHostId
             || relay.Revision != command.ExpectedRevision
+            || !ActiveMember(collective, command.Authority.SelectedHostId)
             || !ActiveMember(collective, targetHostId)
         )
         {
@@ -1527,9 +1525,7 @@ public sealed class CollectiveService(
                 new CollectiveMutationOutcome.Conflict(
                     "The relay changed or the selected host does not own the current handoff."
                 ),
-                null,
-                null,
-                default
+                null
             );
         }
         if (
@@ -1542,23 +1538,51 @@ public sealed class CollectiveService(
             { } disabled
         )
         {
-            return new(disabled, null, null, default);
+            return new(disabled, null);
         }
-        var target = await db
+        var hosts = await db
             .Hosts.AsNoTracking()
-            .SingleAsync(value => value.Id == targetHostId, ct);
+            .Where(value =>
+                value.Id == command.Authority.SelectedHostId || value.Id == targetHostId
+            )
+            .ToDictionaryAsync(value => value.Id, ct);
+        if (
+            !hosts.TryGetValue(command.Authority.SelectedHostId, out var source)
+            || !hosts.TryGetValue(targetHostId, out var target)
+        )
+        {
+            return new(new CollectiveMutationOutcome.NotFound(), null);
+        }
         if (string.IsNullOrWhiteSpace(target.TwitchUserId))
         {
             return new(
                 new CollectiveMutationOutcome.Invalid(
                     "The next host does not have a provider identity."
                 ),
-                null,
-                null,
-                default
+                null
             );
         }
         var now = UtcNow();
+        if (RaidWorkGate(source, now) is { } sourceGate)
+        {
+            return new(sourceGate, null);
+        }
+        if (RaidWorkGate(target, now) is { } targetGate)
+        {
+            return new(targetGate, null);
+        }
+        if (
+            !ActiveMemberAcceptsWork(collective, command.Authority.SelectedHostId, now)
+            || !ActiveMemberAcceptsWork(collective, targetHostId, now)
+        )
+        {
+            return new(
+                new CollectiveMutationOutcome.Conflict(
+                    "A relay host no longer accepts work for this handoff."
+                ),
+                null
+            );
+        }
         relay.Handoffs.Add(
             new()
             {
@@ -1581,11 +1605,23 @@ public sealed class CollectiveService(
         );
         _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new(null, target.TwitchUserId, target.Login, now);
+        return new(
+            null,
+            new(
+                relay.Id,
+                relay.Revision,
+                command.Authority.SelectedHostId,
+                targetHostId,
+                target.TwitchUserId,
+                target.Login,
+                now
+            )
+        );
     }
 
-    private async Task CompleteRaidHandoffAsync(
+    private async Task<CollectiveMutationOutcome> CompleteRaidHandoffAsync(
         ConfirmRaidHandoffCommand command,
+        RaidHandoffClaimState claim,
         bool providerAccepted,
         CancellationToken ct
     )
@@ -1595,40 +1631,110 @@ public sealed class CollectiveService(
         var relay = await db
             .CollectiveRaidRelays.Include(value => value.Collective)
                 .ThenInclude(value => value.Audits)
+            .Include(value => value.Collective)
+                .ThenInclude(value => value.Memberships)
             .Include(value => value.Handoffs)
-            .SingleAsync(value => value.Collective.PublicId == command.CollectiveId.Value, ct);
-        var handoff = relay.Handoffs.Single(value =>
+            .SingleOrDefaultAsync(
+                value => value.Collective.PublicId == command.CollectiveId.Value,
+                ct
+            );
+        if (relay is null)
+        {
+            return new CollectiveMutationOutcome.NotFound();
+        }
+        var handoff = relay.Handoffs.SingleOrDefault(value =>
             value.OperationId == Operation(command.OperationId)
         );
-        if (handoff.Status != CollectiveRaidHandoffStatus.Prepared)
+        if (handoff is null)
         {
-            return;
+            return new CollectiveMutationOutcome.NotFound();
+        }
+        if (handoff.Status == CollectiveRaidHandoffStatus.Confirmed)
+        {
+            return new CollectiveMutationOutcome.Succeeded(command.CollectiveId, true);
+        }
+        if (handoff.Status == CollectiveRaidHandoffStatus.ProviderRejected)
+        {
+            return new CollectiveMutationOutcome.ProviderRejected(true);
+        }
+        var sourceGate = await RequireAuthorityAsync(
+            db,
+            command.Authority,
+            HostFeatureFlags.RaidCollaboration,
+            ct
+        );
+        if (sourceGate is not null)
+        {
+            return sourceGate;
+        }
+        var hosts = await db
+            .Hosts.AsNoTracking()
+            .Where(value => value.Id == claim.SourceHostId || value.Id == claim.TargetHostId)
+            .ToDictionaryAsync(value => value.Id, ct);
+        if (
+            !hosts.TryGetValue(claim.SourceHostId, out var source)
+            || !hosts.TryGetValue(claim.TargetHostId, out var target)
+        )
+        {
+            return new CollectiveMutationOutcome.NotFound();
+        }
+        if (RaidWorkGate(target, claim.OccurredAtUtc) is { } targetGate)
+        {
+            return targetGate;
+        }
+        if (
+            RaidWorkGate(source, claim.OccurredAtUtc) is not null
+            || command.Authority.SelectedHostId != claim.SourceHostId
+            || command.ExpectedRevision != claim.ExpectedRelayRevision
+            || relay.Id != claim.RelayId
+            || relay.Revision != claim.ExpectedRelayRevision
+            || relay.CurrentHostId != claim.SourceHostId
+            || relay.NextHostId != claim.TargetHostId
+            || handoff.FromHostId != claim.SourceHostId
+            || handoff.ToHostId != claim.TargetHostId
+            || handoff.OccurredAtUtc != claim.OccurredAtUtc
+            || target.TwitchUserId != claim.TargetTwitchUserId
+            || target.Login != claim.TargetLogin
+            || !ActiveMemberAcceptsWork(relay.Collective, claim.SourceHostId, claim.OccurredAtUtc)
+            || !ActiveMemberAcceptsWork(relay.Collective, claim.TargetHostId, claim.OccurredAtUtc)
+        )
+        {
+            return new CollectiveMutationOutcome.Conflict(
+                "The prepared relay handoff became stale before provider completion."
+            );
         }
         var now = UtcNow();
         handoff.Status = providerAccepted
             ? CollectiveRaidHandoffStatus.Confirmed
             : CollectiveRaidHandoffStatus.ProviderRejected;
         handoff.UpdatedAtUtc = now;
+        relay.Revision++;
+        relay.LastSourceEventAtUtc = now;
+        relay.UpdatedAtUtc = now;
         if (providerAccepted)
         {
             relay.CurrentHostId = handoff.ToHostId;
             relay.NextHostId = null;
             relay.Status = CollectiveWorkflowStatus.Completed;
-            relay.Revision++;
-            relay.LastSourceEventAtUtc = now;
-            relay.UpdatedAtUtc = now;
-            Touch(relay.Collective, now);
-            AddAudit(
-                relay.Collective,
-                $"{handoff.OperationId}:confirmed",
-                CollectiveAuditAction.RaidHandoffConfirmed,
-                command.Authority,
-                handoff.ToHostId,
-                now
-            );
         }
+        Touch(relay.Collective, now);
+        AddAudit(
+            relay.Collective,
+            providerAccepted
+                ? $"{handoff.OperationId}:confirmed"
+                : $"{handoff.OperationId}:provider-rejected",
+            providerAccepted
+                ? CollectiveAuditAction.RaidHandoffConfirmed
+                : CollectiveAuditAction.RaidHandoffProviderRejected,
+            command.Authority,
+            handoff.ToHostId,
+            now
+        );
         _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        return providerAccepted
+            ? Success(command.CollectiveId)
+            : new CollectiveMutationOutcome.ProviderRejected();
     }
 
     private async Task<CollectiveMutationOutcome?> RequireAuthorityAsync(
@@ -1660,7 +1766,7 @@ public sealed class CollectiveService(
             : null;
     }
 
-    private async Task<bool> FeatureAcceptsCurrentWorkAsync(
+    private async Task<CollectiveMutationOutcome?> RequireRaidWorkAsync(
         int hostId,
         DateTime occurredAtUtc,
         CancellationToken ct
@@ -1670,8 +1776,30 @@ public sealed class CollectiveService(
         var host = await db
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == hostId, ct);
-        return AcceptsCurrentWork(host, occurredAtUtc);
+        return RaidWorkGate(host, occurredAtUtc);
     }
+
+    private static CollectiveMutationOutcome? RaidWorkGate(BotHost? host, DateTime occurredAtUtc) =>
+        host switch
+        {
+            null => new CollectiveMutationOutcome.NotFound(),
+            _ when (
+                    host.EnabledFeatures
+                    & (HostFeatureFlags.Collectives | HostFeatureFlags.RaidCollaboration)
+                ) != (HostFeatureFlags.Collectives | HostFeatureFlags.RaidCollaboration) =>
+                new CollectiveMutationOutcome.FeatureDisabled(host.Id),
+            _ when (
+                    host.CollectivesAcceptWorkAfterUtc is { } collectiveWatermark
+                    && occurredAtUtc < collectiveWatermark
+                )
+                    || (
+                        host.RaidCollaborationAcceptEventsAfterUtc is { } raidWatermark
+                        && occurredAtUtc < raidWatermark
+                    ) => new CollectiveMutationOutcome.Conflict(
+                "A relay host was disabled or re-enabled after this handoff was prepared."
+            ),
+            _ => null,
+        };
 
     private static bool AcceptsCurrentWork(BotHost? host, DateTime? occurredAtUtc) =>
         host is not null
@@ -1820,8 +1948,16 @@ public sealed class CollectiveService(
 
     private sealed record RaidHandoffClaim(
         CollectiveMutationOutcome? Outcome,
-        string? TargetTwitchUserId,
-        string? TargetLogin,
+        RaidHandoffClaimState? State
+    );
+
+    private sealed record RaidHandoffClaimState(
+        long RelayId,
+        long ExpectedRelayRevision,
+        int SourceHostId,
+        int TargetHostId,
+        string TargetTwitchUserId,
+        string TargetLogin,
         DateTime OccurredAtUtc
     );
 

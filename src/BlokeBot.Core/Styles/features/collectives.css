@@ -3,6 +3,15 @@
         gap: 0.8rem;
     }
 
+    .collective-desktop-page-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .collective-mobile-page-actions {
+        display: none;
+    }
+
     .collective-flow-card {
         align-items: end;
         display: grid;
@@ -691,6 +700,20 @@
     @media (max-width: 40rem) {
         [data-collectives-page="true"] {
             gap: 0.65rem;
+        }
+
+        [data-collectives-page="true"] .dashboard-page__actions,
+        .collective-desktop-page-actions {
+            display: none;
+        }
+
+        .collective-mobile-page-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .collective-mobile-page-actions > * {
+            flex: 1;
         }
 
         .collective-flow-card {

@@ -18,8 +18,10 @@
     <Actions>
         @if (_featureEnabled && Host is not null)
         {
-            <button class="btn-secondary" type="button" @onclick="ShowInvite">Invite host</button>
-            <button class="btn-primary" type="button" @onclick="ShowCreate">New collective</button>
+            <div class="collective-desktop-page-actions">
+                <button class="btn-secondary" type="button" @onclick="ShowInvite">Invite host</button>
+                <button class="btn-primary" type="button" @onclick="ShowCreate">New collective</button>
+            </div>
         }
     </Actions>
     <ChildContent>
@@ -52,24 +54,6 @@
             {
                 <p class="card p-3 text-sm font-semibold" role="@(_failed ? "alert" : "status")">@_feedback</p>
             }
-            @if (_showCreate)
-            {
-                <section class="card collective-flow-card" aria-label="Create collective">
-                    <label class="label" for="collective-name">Collective name</label>
-                    <input id="collective-name" class="input" maxlength="160" @bind="_newCollectiveName" />
-                    <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="CreateAsync">Create collective</button></div>
-                </section>
-            }
-            else if (_showInvite && _selected is not null)
-            {
-                <section class="card collective-flow-card" aria-label="Invite host">
-                    <label class="label" for="collective-invite-host">Known host</label>
-                    <select id="collective-invite-host" class="input" @bind="_inviteHostId"><option value="0">Choose a host</option>@foreach (var host in _knownHosts){<option value="@host.HostId">@host.DisplayName</option>}</select>
-                    <p class="text-xs text-muted-foreground">The selected host must accept for itself. Twitch raids, follows, moderators, and relationships never add trust.</p>
-                    <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="InviteAsync">Send invitation</button></div>
-                </section>
-            }
-
             @if (_selected is null)
             {
                 <section class="card p-8 text-sm text-muted-foreground">No collectives include this host yet. Create one or accept an invitation when it arrives.</section>
@@ -189,7 +173,33 @@
                         </div>
                     </aside>
 
-                    <details class="collective-mobile-management"><summary>Membership &amp; @Host.DisplayName settings</summary><div>@foreach(var member in selected.Members){<p><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span></p>}<button class="btn-secondary" type="button" @onclick="ShowInvite">Invite another host</button></div></details>
+                    <details class="collective-mobile-management"><summary>Membership &amp; @Host.DisplayName settings</summary><div>@foreach(var member in selected.Members){<p><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span></p>}</div></details>
+                </section>
+            }
+
+            <div class="collective-mobile-page-actions" aria-label="Collective management actions">
+                @if (_selected is not null)
+                {
+                    <button class="btn-secondary" type="button" @onclick="ShowInvite">Invite host</button>
+                }
+                <button class="btn-primary" type="button" @onclick="ShowCreate">New collective</button>
+            </div>
+
+            @if (_showCreate)
+            {
+                <section class="card collective-flow-card" aria-label="Create collective">
+                    <label class="label" for="collective-name">Collective name</label>
+                    <input id="collective-name" class="input" maxlength="160" @bind="_newCollectiveName" />
+                    <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="CreateAsync">Create collective</button></div>
+                </section>
+            }
+            else if (_showInvite && _selected is not null)
+            {
+                <section class="card collective-flow-card" aria-label="Invite host">
+                    <label class="label" for="collective-invite-host">Known host</label>
+                    <select id="collective-invite-host" class="input" @bind="_inviteHostId"><option value="0">Choose a host</option>@foreach (var host in _knownHosts){<option value="@host.HostId">@host.DisplayName</option>}</select>
+                    <p class="text-xs text-muted-foreground">The selected host must accept for itself. Twitch raids, follows, moderators, and relationships never add trust.</p>
+                    <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="InviteAsync">Send invitation</button></div>
                 </section>
             }
         }
