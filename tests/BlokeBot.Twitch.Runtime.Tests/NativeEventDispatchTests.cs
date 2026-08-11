@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using BlokeBot.Commands;
 using Shouldly;
 
@@ -125,7 +127,10 @@ public sealed class NativeEventDispatchTests
             CancellationToken.None
         );
 
-        disabledGate.Channels.ShouldBe(["target_login"]);
+        disabledGate.Requests.ShouldBe([
+            ("target_login", NativeTwitchFeature.Shoutouts),
+            ("target_login", NativeTwitchFeature.RaidCollaboration),
+        ]);
         disabledObserver.Events.ShouldBeEmpty();
 
         var wrongTargetGate = new MutableNativeTwitchFeatureStateProvider
@@ -141,8 +146,30 @@ public sealed class NativeEventDispatchTests
             CancellationToken.None
         );
 
-        wrongTargetGate.Channels.ShouldBe(["target_login"]);
+        wrongTargetGate.Requests.ShouldBe([
+            ("target_login", NativeTwitchFeature.Shoutouts),
+            ("target_login", NativeTwitchFeature.RaidCollaboration),
+        ]);
         wrongTargetObserver.Events.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task OutgoingRaid_GatesCollaborationObserverBySourceChannel()
+    {
+        var envelope = EventSubNotificationTests.IncomingRaidEnvelope();
+        var subscription = JsonNode.Parse(envelope.Subscription!.Value.GetRawText())!.AsObject();
+        subscription["condition"] = new JsonObject { ["from_broadcaster_user_id"] = "source-id" };
+        envelope = envelope with { Subscription = JsonSerializer.SerializeToElement(subscription) };
+        var gate = new MutableNativeTwitchFeatureStateProvider { EnabledChannel = "source_login" };
+        var observer = new RecordingIncomingRaidObserver();
+
+        await CreateSession(gate, observer)
+            .DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+
+        gate.Requests.ShouldContain(("source_login", NativeTwitchFeature.RaidCollaboration));
+        observer
+            .Events.ShouldHaveSingleItem()
+            .SubscriptionDirection.ShouldBe(EventSubRaidSubscriptionDirection.Outgoing);
     }
 
     private static EventSubDeliveryHandler CreateSession(

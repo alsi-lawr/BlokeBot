@@ -25,7 +25,10 @@ internal sealed record EventSubIncomingRaidWireEvent
     [JsonPropertyName("viewers")]
     public int? ViewerCount { get; init; }
 
-    internal EventSubIncomingRaidEvent? ToDomain(EventSubMetadata metadata) =>
+    internal EventSubIncomingRaidEvent? ToDomain(
+        EventSubMetadata metadata,
+        EventSubRaidSubscriptionDirection direction
+    ) =>
         string.IsNullOrWhiteSpace(metadata.MessageId)
         || metadata.MessageTimestamp is not { } messageTimestamp
         || messageTimestamp == default
@@ -47,6 +50,7 @@ internal sealed record EventSubIncomingRaidWireEvent
                 ToBroadcasterUserId,
                 ToBroadcasterUserLogin,
                 ToBroadcasterUserName,
-                viewerCount
+                viewerCount,
+                direction
             );
 }

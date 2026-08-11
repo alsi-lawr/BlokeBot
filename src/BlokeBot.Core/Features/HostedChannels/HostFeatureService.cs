@@ -167,6 +167,21 @@ public sealed class HostFeatureService(
             host.CompetitionsAcceptWorkAfterUtc = now;
             host.CompetitionsPausedAtUtc = null;
         }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
+            && !updated.Contains(HostFeatureFlags.RaidCollaboration)
+        )
+        {
+            host.RaidCollaborationPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
+            && updated.Contains(HostFeatureFlags.RaidCollaboration)
+        )
+        {
+            host.RaidCollaborationAcceptEventsAfterUtc = now;
+            host.RaidCollaborationPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         foreach (var observer in featureObservers)

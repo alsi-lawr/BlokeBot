@@ -17,5 +17,6 @@ public enum AppEventKind
     CommunityProgressionChanged,
     BingoChanged,
     CompetitionsChanged,
+    RaidCollaborationChanged,
     OverlaysChanged,
 }

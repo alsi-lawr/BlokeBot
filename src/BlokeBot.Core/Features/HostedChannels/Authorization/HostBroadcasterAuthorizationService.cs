@@ -43,6 +43,12 @@ public sealed class HostBroadcasterAuthorizationService(
         "channel:read:hype_train",
     ];
 
+    public static readonly string[] RaidManagementScopes =
+    [
+        .. MilestoneScopes,
+        Scopes.ChannelManageRaids,
+    ];
+
     public async Task<HostBroadcasterAuthorizationOutcome> AuthorizeAsync(
         int hostId,
         HostBotAccountAuthorizationGrant grant,

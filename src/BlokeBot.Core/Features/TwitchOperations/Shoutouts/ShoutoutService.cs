@@ -8,6 +8,29 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 
+internal enum NativeShoutoutOwner
+{
+    Shoutouts,
+    RaidCollaboration,
+}
+
+internal interface INativeShoutoutOperations
+{
+    Task<ShoutoutDashboardState> LoadAsync(
+        int hostId,
+        string? targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
+    );
+
+    Task<ShoutoutOperationOutcome> SendAsync(
+        int hostId,
+        string targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
+    );
+}
+
 public sealed class ShoutoutService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IHostBotAccountTokenStatusProvider accounts,
@@ -16,7 +39,11 @@ public sealed class ShoutoutService(
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
-) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation, IShoutoutDashboardOperations
+)
+    : IShoutoutEventObserver,
+        IAutomaticRaidNativeShoutoutOperation,
+        IShoutoutDashboardOperations,
+        INativeShoutoutOperations
 {
     internal const string UnauthorizedAuthorityMessage =
         "Twitch rejected the configured bot's shoutout authority.";
@@ -28,19 +55,28 @@ public sealed class ShoutoutService(
         Scopes.ModeratorManageShoutouts,
     ];
 
-    public async Task<ShoutoutDashboardState> LoadAsync(
+    public Task<ShoutoutDashboardState> LoadAsync(
         int hostId,
         string? targetLogin,
         CancellationToken cancellationToken
+    ) => LoadAsync(hostId, targetLogin, NativeShoutoutOwner.Shoutouts, cancellationToken);
+
+    async Task<ShoutoutDashboardState> INativeShoutoutOperations.LoadAsync(
+        int hostId,
+        string? targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
+    ) => await LoadAsync(hostId, targetLogin, owner, cancellationToken);
+
+    private async Task<ShoutoutDashboardState> LoadAsync(
+        int hostId,
+        string? targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.Shoutouts,
-                cancellationToken
-            )
-        )
+        var requiredFeature = FeatureFor(owner);
+        if (!await nativeTwitch.IsEnabledAsync(hostId, requiredFeature, cancellationToken))
         {
             return new(null, new ShoutoutTargetCooldownReadiness.Unknown(), []);
         }
@@ -88,19 +124,28 @@ public sealed class ShoutoutService(
         return new(cooldown, targetCooldown, history);
     }
 
-    public async Task<ShoutoutOperationOutcome> SendAsync(
+    public Task<ShoutoutOperationOutcome> SendAsync(
         int hostId,
         string targetLogin,
         CancellationToken cancellationToken
+    ) => SendAsync(hostId, targetLogin, NativeShoutoutOwner.Shoutouts, cancellationToken);
+
+    async Task<ShoutoutOperationOutcome> INativeShoutoutOperations.SendAsync(
+        int hostId,
+        string targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
+    ) => await SendAsync(hostId, targetLogin, owner, cancellationToken);
+
+    private async Task<ShoutoutOperationOutcome> SendAsync(
+        int hostId,
+        string targetLogin,
+        NativeShoutoutOwner owner,
+        CancellationToken cancellationToken
     )
     {
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                hostId,
-                HostFeatureFlags.Shoutouts,
-                cancellationToken
-            )
-        )
+        var requiredFeature = FeatureFor(owner);
+        if (!await nativeTwitch.IsEnabledAsync(hostId, requiredFeature, cancellationToken))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -120,7 +165,7 @@ public sealed class ShoutoutService(
                 "Select a connected Twitch channel first."
             );
         }
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts))
+        if (!host.EnabledFeatures.Contains(requiredFeature))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -158,6 +203,7 @@ public sealed class ShoutoutService(
                     missing.AccessToken,
                     missing.Validation.UserId,
                     missing.GrantedScopes,
+                    requiredFeature,
                     cancellationToken
                 ),
             ready =>
@@ -169,6 +215,7 @@ public sealed class ShoutoutService(
                     ready.AccessToken,
                     ready.Validation.UserId,
                     ready.GrantedScopes,
+                    requiredFeature,
                     cancellationToken
                 )
         );
@@ -255,6 +302,7 @@ public sealed class ShoutoutService(
         string accessToken,
         string botId,
         IReadOnlyList<string> grantedScopes,
+        HostFeatureFlags requiredFeature,
         CancellationToken cancellationToken
     )
     {
@@ -302,13 +350,7 @@ public sealed class ShoutoutService(
                 "The configured bot must be this channel's broadcaster or moderator."
             );
         }
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                host.Id,
-                HostFeatureFlags.Shoutouts,
-                cancellationToken
-            )
-        )
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, requiredFeature, cancellationToken))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -344,6 +386,14 @@ public sealed class ShoutoutService(
     ) =>
         await helix.GetModeratedChannelStatusAsync(context, botId, broadcasterId, cancellationToken)
         is ModeratedChannelStatus.IsModerator;
+
+    private static HostFeatureFlags FeatureFor(NativeShoutoutOwner owner) =>
+        owner switch
+        {
+            NativeShoutoutOwner.Shoutouts => HostFeatureFlags.Shoutouts,
+            NativeShoutoutOwner.RaidCollaboration => HostFeatureFlags.RaidCollaboration,
+            _ => throw new ArgumentOutOfRangeException(nameof(owner), owner, null),
+        };
 
     private static async Task StoreCooldownAsync(
         BlokeBotDbContext db,

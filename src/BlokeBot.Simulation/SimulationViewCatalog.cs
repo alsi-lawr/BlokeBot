@@ -27,6 +27,7 @@ internal static class SimulationViewCatalog
         ["public-bingo"] =
             $"/bingo/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["competitions"] = "/competitions",
+        ["raid-collaboration"] = "/raid-collaboration",
         ["public-competitions"] =
             $"/competitions/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",

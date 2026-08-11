@@ -76,6 +76,7 @@ public partial class PageHelpButton
                     && path.EndsWith("/me", StringComparison.Ordinal) => _viewerPassportsHelp,
             "/bingo" => _bingoHelp,
             "/competitions" => _competitionsHelp,
+            "/raid-collaboration" => _raidCollaborationHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -329,6 +330,38 @@ public partial class PageHelpButton
                     "Private member contact, lobby information, moderator notes, and audit reasons are never published or emitted in lifecycle payloads.",
                     "Match reminders use permitted private delivery. Turning Tournaments & leagues off blocks pages, commands, registration, starts, results, advancement, reminders, rewards, lifecycle effects, and connected-provider work.",
                     "Saved configuration and history remain. Re-enable resumes retained current state without replaying commands, events, timers, reminders, subscriptions, rewards, or provider actions suppressed while off.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _raidCollaborationHelp = new(
+        "Raid & collaboration",
+        [
+            _featureSwitchHelp,
+            new(
+                "Opt in and pause safely",
+                "Raid & collaboration has its own Channel setup switch and starts off for every channel.",
+                [
+                    "While off, the hub, raid subscriptions, history changes, welcome sequence, shortlist checks, native shoutout handoff, and outgoing raid provider calls are blocked.",
+                    "Saved settings, approved channels, and history remain private to this channel. Turning the feature back on restores them without replaying suppressed events, timers, welcome steps, shoutouts, queued work, or provider actions.",
+                ]
+            ),
+            new(
+                "Welcome an incoming community",
+                "Choose a welcome message, optional native shoutout, and deduplication window. Duplicate EventSub deliveries appear once, and repeated raids inside the window do not repeat the welcome sequence.",
+                [
+                    "Twitch supplies an aggregate viewer count for a raid. BlokeBot does not infer or store individual viewer attribution.",
+                    "Native shoutouts reuse Twitch authority, live-state, cooldown, and provider checks. They are controlled by Raid & collaboration, not the separate Shoutouts switch.",
+                ]
+            ),
+            new(
+                "Choose an outgoing raid",
+                "Only channels you approve can appear. Live state, language, selected categories, and recent outgoing history are checked each time and every exclusion is explained.",
+                [
+                    "Approval is your allowlist, not a safety or reputation score.",
+                    "Prepare raid opens an explicit confirmation. BlokeBot never starts a raid directly from a recommendation.",
+                    "An optional approved clip is fetched through Twitch only when it belongs to that channel and is recent.",
                 ]
             ),
         ]

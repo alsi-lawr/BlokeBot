@@ -91,6 +91,13 @@ internal sealed class EventSubChannelOperations(
                 account,
                 cancellationToken
             ),
+            EventSubOperationSubscriptionKind.OutgoingRaids =>
+                CreateConfiguredBotOutgoingRaidSubscriptionAsync(
+                    channel,
+                    authorization,
+                    account,
+                    cancellationToken
+                ),
             EventSubOperationSubscriptionKind.AutomationStream =>
                 CreateAutomationStreamSubscriptionsAsync(
                     channel,
@@ -193,6 +200,33 @@ internal sealed class EventSubChannelOperations(
         );
     }
 
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotOutgoingRaidSubscriptionAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        CancellationToken ct
+    )
+    {
+        var broadcasterId = await identities.ResolveBroadcasterIdAsync(
+            channel,
+            account.AccessToken,
+            ct
+        );
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return new EventSubSubscriptionSetupOutcome.MissingChannel();
+        }
+
+        var id = await CreateAsync(
+            "channel.raid",
+            new Dictionary<string, string> { ["from_broadcaster_user_id"] = broadcasterId },
+            ct
+        );
+        return new EventSubSubscriptionSetupOutcome.Created(
+            CreateActive(channel, authorization, account, [id])
+        );
+    }
+
     public async ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
         string channel,
         EventSubOperationSubscriptionKind kind,
@@ -205,17 +239,27 @@ internal sealed class EventSubChannelOperations(
                 NativeTwitchFeature.Shoutouts,
                 cancellationToken
             ),
-            // One channel.raid subscription serves both automatic shoutouts and automation flows.
+            // One incoming channel.raid subscription serves shoutouts, collaboration, and automations.
             EventSubOperationSubscriptionKind.Raids => await nativeTwitch.IsEnabledAsync(
                 channel,
                 NativeTwitchFeature.Shoutouts,
                 cancellationToken
             )
+                || await nativeTwitch.IsEnabledAsync(
+                    channel,
+                    NativeTwitchFeature.RaidCollaboration,
+                    cancellationToken
+                )
                 || await AutomationRequiresAsync(
                     channel,
                     AutomationEventSubRequirement.IncomingRaids,
                     cancellationToken
                 ),
+            EventSubOperationSubscriptionKind.OutgoingRaids => await nativeTwitch.IsEnabledAsync(
+                channel,
+                NativeTwitchFeature.RaidCollaboration,
+                cancellationToken
+            ),
             EventSubOperationSubscriptionKind.Polls => await nativeTwitch.IsEnabledAsync(
                 channel,
                 NativeTwitchFeature.Polls,

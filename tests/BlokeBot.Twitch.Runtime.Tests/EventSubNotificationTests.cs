@@ -67,6 +67,23 @@ public sealed class EventSubNotificationTests
         incomingRaid.ToBroadcasterUserLogin.ShouldBe("target_login");
         incomingRaid.ToBroadcasterUserName.ShouldBe("Target Display");
         incomingRaid.ViewerCount.ShouldBe(42);
+        incomingRaid.SubscriptionDirection.ShouldBe(EventSubRaidSubscriptionDirection.Incoming);
+    }
+
+    [Test]
+    public void OutgoingRaidEnvelope_MapsSubscriptionConditionDirection()
+    {
+        var outgoing = JsonNode.Parse(_incomingRaidJson)!.AsObject();
+        outgoing["subscription"]!["condition"] = new JsonObject
+        {
+            ["from_broadcaster_user_id"] = "source-id",
+        };
+
+        var raid = Parse(outgoing.ToJsonString(), "raid-message-1")
+            .ShouldBeOfType<EventSubNotification.IncomingRaid>()
+            .Event;
+
+        raid.SubscriptionDirection.ShouldBe(EventSubRaidSubscriptionDirection.Outgoing);
     }
 
     [Test]

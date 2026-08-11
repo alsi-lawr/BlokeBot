@@ -59,6 +59,7 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
             NativeTwitchFeature.Polls => HostFeatureFlags.Polls,
             NativeTwitchFeature.RewardsAndRedemptions => HostFeatureFlags.RewardsAndRedemptions,
             NativeTwitchFeature.Predictions => HostFeatureFlags.Predictions,
+            NativeTwitchFeature.RaidCollaboration => HostFeatureFlags.RaidCollaboration,
             _ => throw new ArgumentOutOfRangeException(nameof(feature), feature, null),
         };
 
@@ -73,6 +74,7 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
                 or HostFeatureFlags.RewardsAndRedemptions
                 or HostFeatureFlags.Predictions
                 or HostFeatureFlags.Moments
+                or HostFeatureFlags.RaidCollaboration
             )
         )
         {

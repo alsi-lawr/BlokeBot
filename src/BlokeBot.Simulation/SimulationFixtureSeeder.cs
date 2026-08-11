@@ -57,6 +57,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedViewerPassportsAsync(db, hostId, now, cancellationToken);
         await SeedBingoAsync(db, hostId, now, cancellationToken);
         await SeedCompetitionAsync(db, hostId, now, cancellationToken);
+        await SeedRaidCollaborationAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -2307,5 +2308,128 @@ internal sealed class SimulationFixtureSeeder(
             MessageTimestampUtc = timestamp,
             ClaimedAtUtc = timestamp,
             CompletedAtUtc = timestamp.AddSeconds(2),
+        };
+
+    private static async Task SeedRaidCollaborationAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            await db.RaidCollaborationSettings.AnyAsync(
+                value => value.HostId == hostId,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        _ = db.RaidCollaborationSettings.Add(
+            new RaidCollaborationSettings
+            {
+                HostId = hostId,
+                WelcomeEnabled = true,
+                WelcomeMessage = "Welcome {display_name} and community! 💜",
+                NativeShoutoutEnabled = true,
+                DeduplicationWindowMinutes = 60,
+                Language = "en",
+                EligibleCategories = "Celeste\nMakers & Crafting",
+                RelationshipCooldownHours = 336,
+                UpdatedAtUtc = now,
+            }
+        );
+        db.ApprovedRaidChannels.AddRange(
+            new ApprovedRaidChannel
+            {
+                HostId = hostId,
+                TwitchUserId = "maple-id",
+                Login = "maplepixel",
+                DisplayName = "MaplePixel",
+                ApprovedClipId = "maple-clip",
+                ApprovedAtUtc = now.AddDays(-70),
+                UpdatedAtUtc = now.AddDays(-4),
+            },
+            new ApprovedRaidChannel
+            {
+                HostId = hostId,
+                TwitchUserId = "cozy-id",
+                Login = "cozyworkshop",
+                DisplayName = "CozyWorkshop",
+                ApprovedAtUtc = now.AddDays(-30),
+                UpdatedAtUtc = now.AddDays(-30),
+            },
+            new ApprovedRaidChannel
+            {
+                HostId = hostId,
+                Login = "offlinereviewer",
+                DisplayName = "OfflineReviewer",
+                ApprovedAtUtc = now.AddDays(-20),
+                UpdatedAtUtc = now.AddDays(-20),
+            }
+        );
+        db.RaidCollaborationHistory.AddRange(
+            History(
+                hostId,
+                "simulation-raid-incoming",
+                RaidDirection.Incoming,
+                "maple-id",
+                "maplepixel",
+                "MaplePixel",
+                93,
+                "Celeste",
+                "maple-previous-stream",
+                now.AddMinutes(-8),
+                RaidWelcomeOutcome.Delivered,
+                RaidShoutoutOutcome.Sent
+            ),
+            History(
+                hostId,
+                "simulation-raid-outgoing",
+                RaidDirection.Outgoing,
+                "old-friend-id",
+                "oldfriend",
+                "OldFriend",
+                117,
+                "Hades II",
+                "old-friend-stream",
+                now.AddDays(-38),
+                RaidWelcomeOutcome.NotConfigured,
+                RaidShoutoutOutcome.NotConfigured
+            )
+        );
+    }
+
+    private static RaidCollaborationHistoryEntry History(
+        int hostId,
+        string providerMessageId,
+        RaidDirection direction,
+        string otherTwitchUserId,
+        string otherLogin,
+        string otherDisplayName,
+        int viewerCount,
+        string category,
+        string streamId,
+        DateTime occurredAtUtc,
+        RaidWelcomeOutcome welcomeOutcome,
+        RaidShoutoutOutcome shoutoutOutcome
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            ProviderMessageId = providerMessageId,
+            Direction = direction,
+            OtherTwitchUserId = otherTwitchUserId,
+            OtherLogin = otherLogin,
+            OtherDisplayName = otherDisplayName,
+            ViewerCount = viewerCount,
+            Category = category,
+            ProviderStreamId = streamId,
+            OccurredAtUtc = occurredAtUtc,
+            WelcomeOutcome = welcomeOutcome,
+            ShoutoutOutcome = shoutoutOutcome,
+            RecordedAtUtc = occurredAtUtc,
         };
 }

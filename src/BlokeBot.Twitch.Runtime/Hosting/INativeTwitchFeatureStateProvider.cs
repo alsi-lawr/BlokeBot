@@ -15,4 +15,5 @@ public enum NativeTwitchFeature
     Polls,
     RewardsAndRedemptions,
     Predictions,
+    RaidCollaboration,
 }
