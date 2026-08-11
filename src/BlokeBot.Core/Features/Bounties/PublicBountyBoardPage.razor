@@ -88,17 +88,24 @@
                             }
                             @if (bounty.Status == BountyStatus.Funding)
                             {
-                                <div class="flex flex-wrap items-end gap-3 border-t border-dashed border-[var(--app-border)] pt-4">
+                                <div class="border-t border-dashed border-[var(--app-border)] pt-4">
                                     @if (_session.IsAuthenticated)
                                     {
-                                        <div class="max-w-64 min-w-48 grow">
-                                            <Field Id="@($"public-bounty-pledge-{bounty.PublicId:N}")"
-                                                   Label="Pledge points"
-                                                   Value="@PledgeFor(bounty.PublicId)"
-                                                   ValueChanged="value => SetPledge(bounty.PublicId, value)" />
+                                        <div class="studio-grid">
+                                            <div class="studio-span-4">
+                                                <Field Id="@($"public-bounty-pledge-{bounty.PublicId:N}")"
+                                                       Label="Pledge points"
+                                                       Value="@PledgeFor(bounty.PublicId)"
+                                                       ValueChanged="value => SetPledge(bounty.PublicId, value)" />
+                                            </div>
+                                            <div class="studio-span-8">
+                                                <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                                                <div class="mt-2 flex flex-wrap items-center gap-3 max-md:mt-0">
+                                                    <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
+                                                    <p class="text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button class="btn-primary" type="button" @onclick="() => PledgeAsync(bounty)">Pledge</button>
-                                        <p class="text-xs text-muted-foreground">Pledging as @($"@{_session.Login}"). Requests above the remaining target are capped automatically.</p>
                                     }
                                     else
                                     {
