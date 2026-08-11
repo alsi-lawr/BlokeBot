@@ -43,6 +43,10 @@ public partial class ViewerPassportsPage
         _passport is null
             ? "Choose what this channel can show about your participation."
             : $"Choose what {_passport.HostDisplayName} can show about your participation.";
+    private ViewerPassportRewardView? _previewBadge =>
+        SelectedReward(_selectedBadge, _passport?.EarnedBadges);
+    private ViewerPassportRewardView? _previewTitle =>
+        SelectedReward(_selectedTitle, _passport?.EarnedTitles);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -148,15 +152,20 @@ public partial class ViewerPassportsPage
     private ViewerPassportIdentity Identity() =>
         new(PageContext.Session.UserId, PageContext.Session.Login, PageContext.Session.DisplayText);
 
-    private void ToggleAttendance(ChangeEventArgs args) => _hideAttendance = args.Value is not true;
+    private void ToggleAttendance() => _hideAttendance = !_hideAttendance;
 
     private string VisibilityClass(ViewerPassportVisibility visibility) =>
         visibility == _visibility
-            ? "flex cursor-pointer items-start gap-3 rounded-xl border border-blue-500 bg-blue-50 p-3"
-            : "flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--app-border)] p-3";
+            ? "passport-visibility-option passport-visibility-option--selected"
+            : "passport-visibility-option";
 
     private static long? ParseReward(string value) =>
         long.TryParse(value, out var parsed) ? parsed : null;
+
+    private static ViewerPassportRewardView? SelectedReward(
+        string value,
+        IReadOnlyList<ViewerPassportRewardView>? rewards
+    ) => rewards?.SingleOrDefault(reward => reward.Id == ParseReward(value));
 
     private string ExportUrl() =>
         _passport is null ? "#" : $"/passports/{Uri.EscapeDataString(_passport.HostLogin)}/export";
@@ -174,13 +183,13 @@ public partial class ViewerPassportsPage
         builder =>
         {
             builder.OpenElement(0, "div");
-            builder.AddAttribute(1, "class", "rounded-xl bg-[var(--app-surface-muted)] p-3");
+            builder.AddAttribute(1, "class", "passport-preview__stat");
             builder.OpenElement(2, "b");
-            builder.AddAttribute(3, "class", "block text-lg text-[var(--app-text-strong)]");
+            builder.AddAttribute(3, "class", "passport-preview__stat-value");
             builder.AddContent(4, value);
             builder.CloseElement();
             builder.OpenElement(5, "span");
-            builder.AddAttribute(6, "class", "text-xs text-muted-foreground");
+            builder.AddAttribute(6, "class", "passport-preview__stat-label");
             builder.AddContent(7, label);
             builder.CloseElement();
             builder.CloseElement();
