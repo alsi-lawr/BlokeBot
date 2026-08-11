@@ -157,6 +157,69 @@ public sealed class ViewerCommandCatalogTests
     }
 
     [Test]
+    public async Task CollectivesSwitch_LoadingViewerCatalog_OmitsRetainedCommandWhileOff()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.Collectives,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+            _ = db.Collectives.Add(
+                new Collective
+                {
+                    PublicId = Guid.NewGuid(),
+                    CreationOperationId = Guid.NewGuid(),
+                    Name = "Retained collective",
+                    Revision = 1,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                    Memberships =
+                    [
+                        new()
+                        {
+                            HostId = hostId,
+                            Role = CollectiveMembershipRole.Coordinator,
+                            Status = CollectiveMembershipStatus.Active,
+                            AcceptWorkAfterUtc = DateTime.UtcNow,
+                            InvitedAtUtc = DateTime.UtcNow,
+                            RespondedAtUtc = DateTime.UtcNow,
+                            UpdatedAtUtc = DateTime.UtcNow,
+                        },
+                    ],
+                }
+            );
+            _ = await db.SaveChangesAsync();
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var enabled = await catalog.LoadForHostAsync(hostId, default);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures = HostFeatureFlags.None;
+            _ = await db.SaveChangesAsync();
+        }
+        var disabled = await catalog.LoadForHostAsync(hostId, default);
+
+        enabled.Names.ShouldContain("!collective");
+        disabled.Names.ShouldNotContain("!collective");
+    }
+
+    [Test]
     public async Task BingoSwitch_LoadingViewerCatalog_OmitsOwnedCommandsWhileOff()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

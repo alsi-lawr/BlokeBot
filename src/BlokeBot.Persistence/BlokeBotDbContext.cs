@@ -186,6 +186,17 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<AutomationFlowRun> AutomationFlowRuns => Set<AutomationFlowRun>();
     public DbSet<AutomationNodeRun> AutomationNodeRuns => Set<AutomationNodeRun>();
     public DbSet<AutomationEventReceipt> AutomationEventReceipts => Set<AutomationEventReceipt>();
+    public DbSet<Collective> Collectives => Set<Collective>();
+    public DbSet<CollectiveMembership> CollectiveMemberships => Set<CollectiveMembership>();
+    public DbSet<CollectiveTournamentReference> CollectiveTournamentReferences =>
+        Set<CollectiveTournamentReference>();
+    public DbSet<CollectiveRaidRelay> CollectiveRaidRelays => Set<CollectiveRaidRelay>();
+    public DbSet<CollectiveRaidHandoff> CollectiveRaidHandoffs => Set<CollectiveRaidHandoff>();
+    public DbSet<CollectiveGoal> CollectiveGoals => Set<CollectiveGoal>();
+    public DbSet<CollectiveGoalHostTotal> CollectiveGoalHostTotals =>
+        Set<CollectiveGoalHostTotal>();
+    public DbSet<CollectiveLocalSetting> CollectiveLocalSettings => Set<CollectiveLocalSetting>();
+    public DbSet<CollectiveAudit> CollectiveAudits => Set<CollectiveAudit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -214,6 +225,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureMoments(modelBuilder);
         ConfigureOverlays(modelBuilder);
         ConfigureAutomations(modelBuilder);
+        ConfigureCollectives(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>

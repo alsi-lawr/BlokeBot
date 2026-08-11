@@ -181,6 +181,15 @@ public sealed class ViewerCommandCatalogService(
                         && value.EntryKind == CompetitionEntryKind.Individual,
                     ct
                 );
+        var collectiveParticipation =
+            enabledFeatures.Contains(HostFeatureFlags.Collectives)
+            && await db
+                .CollectiveMemberships.AsNoTracking()
+                .AnyAsync(
+                    value =>
+                        value.HostId == hostId && value.Status == CollectiveMembershipStatus.Active,
+                    ct
+                );
         var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
             ? await db
                 .PlayQueues.AsNoTracking()
@@ -321,6 +330,11 @@ public sealed class ViewerCommandCatalogService(
         if (enabledFeatures.Contains(HostFeatureFlags.CooperativeGame))
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Raid));
+        }
+
+        if (collectiveParticipation)
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Collective));
         }
 
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)

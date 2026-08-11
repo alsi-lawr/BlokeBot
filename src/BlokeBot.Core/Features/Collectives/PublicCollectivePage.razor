@@ -1,0 +1,55 @@
+@page "/collectives/{HostLogin}/{CollectivePublicId:guid}"
+@using BlokeBot.Core.Components.Layout
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject CollectiveService _service
+
+<PageTitle>BlokeBot | Collective</PageTitle>
+
+<DashboardPage Kicker="Community"
+               Title="@(_projection?.Name ?? "Collective")"
+               Description="Bounded shared tournament, relay, and goal state from explicitly participating hosts."
+               Width="DashboardPageWidth.Wide"
+               data-public-collective-page="true">
+    <ChildContent>
+        @if (_projection is null)
+        {
+            <section class="card p-8 text-sm text-muted-foreground" data-public-collective-unavailable>This collective is unavailable.</section>
+        }
+        else
+        {
+            <section class="collective-public-summary"><span>Explicit participating hosts</span><strong>@string.Join(" · ", _projection.ParticipatingHosts)</strong><small>Server-owned allowlist · no implied Twitch trust</small></section>
+            <div class="collective-public-grid">
+                @if (_projection.Tournament is { } tournament)
+                {
+                    <article class="card p-5"><span class="collective-sidecar__label">Tournament reference</span><h2>@tournament.Name</h2><p>@tournament.OwnerLogin · @tournament.Format · @tournament.Status</p><div class="collective-metrics"><div><span>Round</span><strong>@tournament.Round</strong></div><div><span>Entrants</span><strong>@tournament.EntrantCount</strong></div><div><span>Results</span><strong>@tournament.ConfirmedResultCount</strong></div></div></article>
+                }
+                @if (_projection.RaidRelay is { } relay)
+                {
+                    <article class="card p-5"><span class="collective-sidecar__label">Raid relay</span><h2>@relay.Name</h2><p>Current host: @relay.CurrentHostLogin</p><div class="collective-metrics"><div><span>Aggregate viewers</span><strong>@relay.AggregateViewerCount</strong></div><div><span>Status</span><strong>@relay.Status</strong></div></div></article>
+                }
+                @if (_projection.Goal is { } goal)
+                {
+                    <article class="card p-5"><span class="collective-sidecar__label">Cross-channel goal</span><h2>@goal.Name</h2><p>@goal.Current / @goal.Target @goal.UnitName</p><div class="collective-host-progress">@foreach(var total in goal.HostTotals){<div><strong>@total.HostDisplayName</strong><span>@total.Total</span></div>}</div></article>
+                }
+            </div>
+        }
+    </ChildContent>
+</DashboardPage>
+
+@code {
+    [Parameter]
+    public string HostLogin { get; set; } = string.Empty;
+
+    [Parameter]
+    public Guid CollectivePublicId { get; set; }
+
+    private CollectivePublicProjection? _projection;
+
+    protected override async Task OnParametersSetAsync() =>
+        _projection = await _service.LoadPublicAsync(
+            HostLogin,
+            new(CollectivePublicId),
+            CancellationToken.None
+        );
+}

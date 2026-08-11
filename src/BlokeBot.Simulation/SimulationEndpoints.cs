@@ -1,6 +1,10 @@
 using BlokeBot.Commands;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Simulation;
 
@@ -47,6 +51,34 @@ internal static class SimulationEndpoints
             )
             .AllowAnonymous();
 
+        _ = app.MapPost(
+                "/simulation/collectives/{state}",
+                static async (
+                    string state,
+                    IDbContextFactory<BlokeBotDbContext> dbFactory,
+                    HostFeatureService features,
+                    CancellationToken ct
+                ) =>
+                {
+                    await using var db = await dbFactory.CreateDbContextAsync(ct);
+                    var hostId = await db
+                        .Hosts.Where(value => value.Login == SimulationMode.Login)
+                        .Select(value => value.Id)
+                        .SingleAsync(ct);
+                    if (string.Equals(state, "enabled", StringComparison.Ordinal))
+                    {
+                        await features.EnableAsync(hostId, HostFeatureFlags.Collectives, ct);
+                        return Results.Ok();
+                    }
+                    if (string.Equals(state, "disabled", StringComparison.Ordinal))
+                    {
+                        await features.DisableAsync(hostId, HostFeatureFlags.Collectives, ct);
+                        return Results.Ok();
+                    }
+                    return Results.BadRequest();
+                }
+            )
+            .AllowAnonymous();
         _ = app.MapPost(
                 "/simulation/commands/liveness/{state}",
                 static async (

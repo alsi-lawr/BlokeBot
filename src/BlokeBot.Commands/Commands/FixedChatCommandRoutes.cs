@@ -59,6 +59,7 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute Competitions { get; } = new("competitions");
     public static FixedChatCommandRoute CompetitionJoin { get; } = new("competitionjoin");
     public static FixedChatCommandRoute Raid { get; } = new("raid");
+    public static FixedChatCommandRoute Collective { get; } = new("collective");
 
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
@@ -103,6 +104,7 @@ public static class FixedChatCommandRoutes
                 Competitions.Value,
                 CompetitionJoin.Value,
                 Raid.Value,
+                Collective.Value,
             ],
             StringComparer.OrdinalIgnoreCase
         );

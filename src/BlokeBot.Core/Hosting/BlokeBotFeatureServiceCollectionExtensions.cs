@@ -12,6 +12,7 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.BlokeRaid;
 using BlokeBot.Core.Features.Bounties;
+using BlokeBot.Core.Features.Collectives;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.Competitions;
@@ -44,6 +45,7 @@ using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.HostSetup;
 using BlokeBot.Core.Features.PublicLeaderboards;
+using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Features.ViewerPassports;
@@ -56,6 +58,22 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotCollectives(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<CollectiveService>();
+        _ = services.AddSingleton<ICompetitionLifecycleObserver>(static provider =>
+            provider.GetRequiredService<CollectiveService>()
+        );
+        _ = services.AddSingleton<IBountyChangeObserver>(static provider =>
+            provider.GetRequiredService<CollectiveService>()
+        );
+        _ = services.AddSingleton<IRaidCollaborationDomainEventObserver>(static provider =>
+            provider.GetRequiredService<CollectiveService>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotBlokeRaid(this IServiceCollection services)
     {
         _ = services.AddSingleton<IBlokeRaidRandom, BlokeRaidRandom>();
