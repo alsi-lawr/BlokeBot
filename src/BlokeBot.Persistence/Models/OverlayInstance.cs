@@ -40,6 +40,9 @@ public enum OverlayEventFeedKind
 
     [PersistedToken("bingoEvent")]
     BingoEvent,
+
+    [PersistedToken("achievementCompletion")]
+    AchievementCompletion,
 }
 
 public enum OverlayEventFeedPriority

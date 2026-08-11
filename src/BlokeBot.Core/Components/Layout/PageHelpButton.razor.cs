@@ -418,10 +418,12 @@ public partial class PageHelpButton
             ),
             new(
                 "Unified event feed",
-                "One Event Feed Browser Source presents point awards, Guessing winners, and Giveaway winners.",
+                "One Event Feed Browser Source presents point awards, Guessing winners, Giveaway winners, Bingo events, and achievement completions.",
                 [
                     "Choose which events appear, what each item says, its importance, and how long it stays visible.",
-                    "If Points or Guessing is off, its cards stay hidden. Saved settings remain when you turn a feature back on.",
+                    "Achievement events inherit both Community progression and Overlays without adding a Channel Setup switch. Turning either parent off blocks achievement projection, queueing, preview, publication, reconnect state, and rendering while retaining saved feed settings and history.",
+                    "Turning both parents back on accepts only new achievement completions. Suppressed events, animations, queued work, and timers never replay.",
+                    "Achievement cards expose only a public viewer name, achievement name, and presentation-safe reward names or points. Twitch user IDs, balances, moderator notes, internal keys, and reward tokens remain private.",
                 ]
             ),
             new(

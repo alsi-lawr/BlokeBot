@@ -702,7 +702,12 @@ internal sealed class OverlayStateProvider(
                 }
             || !await RequiredFeaturesEnabledAsync(
                 instance.HostId,
-                OverlayType.EventFeed,
+                OverlayRequiredFeatures.For(OverlayType.EventFeed)
+                    | (
+                        kind == OverlayEventFeedKind.AchievementCompletion
+                            ? HostFeatureFlags.CommunityProgression
+                            : HostFeatureFlags.None
+                    ),
                 cancellationToken
             )
         )
@@ -743,6 +748,15 @@ internal sealed class OverlayStateProvider(
                 SourceKey = "sample-bingo",
                 Summary = "Team Nebula completed row 2",
             },
+            OverlayEventFeedKind.AchievementCompletion =>
+                new OverlayEventPresentation.AchievementCompletion
+                {
+                    HostId = instance.HostId,
+                    SourceKey = "sample-achievement",
+                    Viewer = "NightOwl",
+                    Achievement = "Community trailblazer",
+                    Rewards = "250 points, Trailblazer",
+                },
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         var kindConfiguration = configuration.Kinds[kind];
@@ -767,7 +781,8 @@ internal sealed class OverlayStateProvider(
                             OverlayEventFeedKind.PointAward => "Points awarded",
                             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
                             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
-                            _ => "Bingo",
+                            OverlayEventFeedKind.BingoEvent => "Bingo",
+                            _ => "Achievement unlocked",
                         },
                         EventFeedProjectionText.DecodeOnce(
                             EventFeedTemplateRenderer.Render(kindConfiguration, sample)
@@ -1219,16 +1234,24 @@ internal sealed class OverlayStateProvider(
         int hostId,
         OverlayType type,
         CancellationToken cancellationToken
+    ) =>
+        await RequiredFeaturesEnabledAsync(
+            hostId,
+            OverlayRequiredFeatures.For(type),
+            cancellationToken
+        );
+
+    private async Task<bool> RequiredFeaturesEnabledAsync(
+        int hostId,
+        HostFeatureFlags requiredFeatures,
+        CancellationToken cancellationToken
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         return await db
             .Hosts.AsNoTracking()
             .Where(value => value.Id == hostId)
-            .Select(value =>
-                (value.EnabledFeatures & OverlayRequiredFeatures.For(type))
-                == OverlayRequiredFeatures.For(type)
-            )
+            .Select(value => (value.EnabledFeatures & requiredFeatures) == requiredFeatures)
             .SingleOrDefaultAsync(cancellationToken);
     }
 

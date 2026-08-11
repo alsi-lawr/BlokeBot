@@ -46,6 +46,10 @@ public partial class OverlaySourcesPanel
     private string _bingoEventTemplate = "{summary}";
     private OverlayEventFeedPriority _bingoEventPriority = OverlayEventFeedPriority.High;
     private int _bingoEventDuration = 8;
+    private bool _achievementEventEnabled = true;
+    private string _achievementEventTemplate = "{viewer} unlocked {achievement} · {rewards}";
+    private OverlayEventFeedPriority _achievementEventPriority = OverlayEventFeedPriority.High;
+    private int _achievementEventDuration = 8;
     private IReadOnlyList<PlayQueueSummary> _queueOptions = [];
     private int _viewerQueueId;
     private int _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
@@ -181,16 +185,18 @@ public partial class OverlaySourcesPanel
             )),
     ];
 
-    private static readonly IReadOnlyList<
-        StudioSegmentedOption<OverlayEventFeedKind?>
-    > _eventFeedSampleOptions =
-    [
-        .. Enum.GetValues<OverlayEventFeedKind>()
-            .Select(sample => new StudioSegmentedOption<OverlayEventFeedKind?>(
-                sample,
-                EventKindLabel(sample)
-            )),
-    ];
+    private IReadOnlyList<StudioSegmentedOption<OverlayEventFeedKind?>> _eventFeedSampleOptions =>
+        [
+            .. Enum.GetValues<OverlayEventFeedKind>()
+                .Where(sample =>
+                    sample != OverlayEventFeedKind.AchievementCompletion
+                    || _communityProgressionFeatureEnabled
+                )
+                .Select(sample => new StudioSegmentedOption<OverlayEventFeedKind?>(
+                    sample,
+                    EventKindLabel(sample)
+                )),
+        ];
 
     private static readonly IReadOnlyList<
         StudioSegmentedOption<ViewerQueueOverlaySampleState?>
@@ -310,14 +316,21 @@ public partial class OverlaySourcesPanel
                 (_guessEventEnabled, "guessing winners"),
                 (_giveawayEventEnabled, "giveaway winners"),
                 (_bingoEventEnabled, "Bingo events"),
+                (
+                    _achievementEventEnabled && _communityProgressionFeatureEnabled,
+                    "achievement completions"
+                ),
             }
                 .Where(kind => kind.Item1)
                 .Select(kind => kind.Item2),
         ];
+        var availableKindCount =
+            Enum.GetValues<OverlayEventFeedKind>().Length
+            - (_communityProgressionFeatureEnabled ? 0 : 1);
         return kinds.Length switch
         {
             0 => "No event kinds on",
-            3 => "All event kinds on",
+            var count when count == availableKindCount => "All available event kinds on",
             _ => string.Join(" + ", kinds),
         };
     }
@@ -610,6 +623,20 @@ public partial class OverlaySourcesPanel
                 ref _bingoEventPriority,
                 ref _bingoEventDuration
             );
+            LoadEventKind(
+                feed.Kinds[OverlayEventFeedKind.AchievementCompletion],
+                ref _achievementEventEnabled,
+                ref _achievementEventTemplate,
+                ref _achievementEventPriority,
+                ref _achievementEventDuration
+            );
+            if (
+                !_communityProgressionFeatureEnabled
+                && _eventFeedPreviewSample == OverlayEventFeedKind.AchievementCompletion
+            )
+            {
+                _eventFeedPreviewSample = OverlayEventFeedKind.PointAward;
+            }
         }
         if (overlay.Configuration is OverlayConfiguration.ViewerQueueV1 queue)
         {
@@ -1089,6 +1116,12 @@ public partial class OverlaySourcesPanel
                         _bingoEventPriority,
                         _bingoEventDuration
                     ),
+                    [OverlayEventFeedKind.AchievementCompletion] = new(
+                        _achievementEventEnabled,
+                        _achievementEventTemplate,
+                        _achievementEventPriority,
+                        _achievementEventDuration
+                    ),
                 },
                 DraftAppearance()
             ),
@@ -1225,6 +1258,7 @@ public partial class OverlaySourcesPanel
             OverlayEventFeedKind.GuessingWinner => "guessing-winner",
             OverlayEventFeedKind.GiveawayWinner => "giveaway-winner",
             OverlayEventFeedKind.BingoEvent => "bingo-event",
+            OverlayEventFeedKind.AchievementCompletion => "achievement-completion",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -1235,6 +1269,7 @@ public partial class OverlaySourcesPanel
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
             OverlayEventFeedKind.BingoEvent => "Bingo event",
+            OverlayEventFeedKind.AchievementCompletion => "Achievement completion",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

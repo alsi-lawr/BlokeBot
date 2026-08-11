@@ -14,6 +14,15 @@ public interface ICommunityProgressionChangeObserver
     ValueTask CommunityProgressionChangedAsync(int hostId, CancellationToken cancellationToken);
 }
 
+public interface ICommunityAchievementCompletionObserver
+{
+    ValueTask AchievementCompletedAsync(
+        int hostId,
+        Guid completionId,
+        CancellationToken cancellationToken
+    );
+}
+
 public readonly record struct CommunityDefinitionKey
 {
     public CommunityDefinitionKey(string value)

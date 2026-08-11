@@ -2,6 +2,7 @@ using System.Globalization;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,86 @@ namespace BlokeBot.Core.Tests;
 public sealed class CommunityProgressionServiceTests
 {
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public async Task CompletedAchievement_PresentsSafeHostScopedCardOnceAfterCommit()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(_now);
+        var hostId = await SeedHostAsync(database, "alpha");
+        var otherHostId = await SeedHostAsync(database, "beta");
+        await SetFeatureAsync(database, hostId, HostFeatureFlags.All);
+        await SetFeatureAsync(database, otherHostId, HostFeatureFlags.All);
+        var feed = new OverlayEventFeedService(
+            database,
+            clock,
+            new OverlayPublisherServices(),
+            NullLogger<OverlayEventFeedService>.Instance
+        );
+        var achievementPublisher = new CommunityAchievementOverlayEventPublisher(database, [feed]);
+        var service = CreateService(database, clock, achievementObserver: achievementPublisher);
+        _ = await SeedEventFeedAsync(database, hostId, "Alpha feed", clock.GetUtcNow());
+        var otherOverlayId = await SeedEventFeedAsync(
+            database,
+            otherHostId,
+            "Beta feed",
+            clock.GetUtcNow()
+        );
+        var setup = await ConfigureAsync(
+            database,
+            service,
+            hostId,
+            CommunityVisibility.Public,
+            CommunityEventRuleKind.ChatMessage,
+            CommunityCompletionMode.OneTime,
+            CommunityResetSchedule.None,
+            points: 25,
+            withTitle: true,
+            definitionKey: "private-definition-key",
+            rewardKey: "private-reward-key",
+            rewardPresentationToken: "private-reward-token"
+        );
+        await OpenAsync(service, setup.Season, setup.Revision, hostId);
+        var sourceEvent = new CommunitySourceEvent.ChatMessage(
+            "achievement-message",
+            new CommunityViewer("private-viewer-id", "viewerlogin", "Viewer Name"),
+            _now
+        );
+
+        _ = Success(await service.ProcessEventAsync(hostId, sourceEvent, default));
+        Success(await service.ProcessEventAsync(hostId, sourceEvent, default))
+            .WasIdempotent.ShouldBeTrue();
+
+        await using var db = await database.CreateDbContextAsync();
+        var persisted = (await db.OverlayEventFeedItems.ToListAsync()).ShouldHaveSingleItem();
+        persisted.HostId.ShouldBe(hostId);
+        persisted.OverlayInstanceId.ShouldNotBe(otherOverlayId);
+        persisted.Kind.ShouldBe(OverlayEventFeedKind.AchievementCompletion);
+        persisted.SourceKey.ShouldBe(
+            (await db.CommunityCompletions.SingleAsync()).PublicId.ToString("N")
+        );
+        var overlay = await db.OverlayInstances.SingleAsync(value => value.HostId == hostId);
+        var state = await feed.ReadAsync(
+            new ResolvedOverlayInstance(
+                hostId,
+                overlay.PublicId,
+                overlay.Type,
+                OverlayConfiguration.EventFeedV1.Default,
+                new OverlayRevision(overlay.Revision)
+            ),
+            default
+        );
+        var card = state!.Active!;
+        card.Body.ShouldContain("Viewer Name");
+        card.Body.ShouldContain("Representative achievement");
+        card.Body.ShouldContain("25 points");
+        card.Body.ShouldContain("Trailblazer");
+        card.Body.ShouldNotContain("private-viewer-id");
+        card.Body.ShouldNotContain("private moderator material");
+        card.Body.ShouldNotContain("private-definition-key");
+        card.Body.ShouldNotContain("private-reward-key");
+        card.Body.ShouldNotContain("private-reward-token");
+    }
 
     [Test]
     public async Task CommittedSourceEvent_NotifiesTheOwningHostOnceAndIdempotentRetryDoesNotReplay()
@@ -948,14 +1029,58 @@ public sealed class CommunityProgressionServiceTests
     private static CommunityProgressionService CreateService(
         SqliteBlokeBotDbFactory database,
         TimeProvider clock,
-        ICommunityProgressionChangeObserver? observer = null
+        ICommunityProgressionChangeObserver? observer = null,
+        ICommunityAchievementCompletionObserver? achievementObserver = null
     ) =>
         new(
             database,
             TestEventBus.Create<AppEventKind>(),
             clock,
-            observer is null ? null : [observer]
+            observer is null ? null : [observer],
+            achievementObserver is null ? null : [achievementObserver]
         );
+
+    private static async Task<long> SeedEventFeedAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        string name,
+        DateTimeOffset now
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var overlay = new OverlayInstance
+        {
+            PublicId = Guid.NewGuid(),
+            HostId = hostId,
+            Name = name,
+            Type = OverlayType.EventFeed,
+            IsEnabled = true,
+            ConfigurationJson = OverlayConfiguration.EventFeedV1.Default.ToPersistenceJson(),
+            AccessKeyDigest = Enumerable.Repeat(checked((byte)hostId), 32).ToArray(),
+            KeyVersion = 1,
+            Revision = 1,
+            CreatedAtUtc = now.UtcDateTime,
+            UpdatedAtUtc = now.UtcDateTime,
+        };
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
+        return overlay.Id;
+    }
+
+    private sealed class OverlayPublisherServices : IServiceProvider
+    {
+        private readonly IOverlayLivePublisher _publisher = new NoopOverlayPublisher();
+
+        public object? GetService(Type serviceType) =>
+            serviceType == typeof(IOverlayLivePublisher) ? _publisher : null;
+    }
+
+    private sealed class NoopOverlayPublisher : IOverlayLivePublisher
+    {
+        public void PublishState(ResolvedOverlayInstance instance) { }
+
+        public void PublishTest(ResolvedOverlayInstance instance) { }
+    }
 
     private sealed class CommunityProgressionChangeObserver : ICommunityProgressionChangeObserver
     {
@@ -984,7 +1109,9 @@ public sealed class CommunityProgressionServiceTests
         int points = 0,
         bool withTitle = false,
         string definitionKey = "representative",
-        CommunityProgressScope scope = CommunityProgressScope.Viewer
+        CommunityProgressScope scope = CommunityProgressScope.Viewer,
+        string rewardKey = "trailblazer",
+        string rewardPresentationToken = "trailblazer"
     )
     {
         _ = Success(
@@ -1014,10 +1141,10 @@ public sealed class CommunityProgressionServiceTests
                     new(
                         Guid.NewGuid(),
                         new(season.PublicId),
-                        "trailblazer",
+                        rewardKey,
                         CommunityRewardKind.Title,
                         "Trailblazer",
-                        "trailblazer",
+                        rewardPresentationToken,
                         Actor()
                     ),
                     default

@@ -190,7 +190,7 @@ public abstract record OverlayConfiguration
                 || dto.SchemaVersion != 1
                 || dto.OverflowPolicy is null
                 || dto.Kinds is null
-                || dto.Kinds.Count is not (3 or 4)
+                || dto.Kinds.Count is < 3 or > 5
                 || dto.Kinds.Any(static pair =>
                     pair.Value is null || pair.Value.Template is null || pair.Value.Priority is null
                 )
@@ -198,15 +198,11 @@ public abstract record OverlayConfiguration
             {
                 throw new ArgumentException();
             }
-            var expected = new[] { "pointAward", "guessingWinner", "giveawayWinner" };
-            if (dto.Kinds.Count == 4)
-            {
-                expected = [.. expected, "bingoEvent"];
-            }
+            string[] required = ["pointAward", "guessingWinner", "giveawayWinner"];
+            string[] allowed = [.. required, "bingoEvent", "achievementCompletion"];
             if (
-                !dto
-                    .Kinds.Keys.Order(StringComparer.Ordinal)
-                    .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+                required.Any(key => !dto.Kinds.ContainsKey(key))
+                || dto.Kinds.Keys.Any(key => !allowed.Contains(key, StringComparer.Ordinal))
             )
             {
                 throw new ArgumentException();
@@ -223,6 +219,12 @@ public abstract record OverlayConfiguration
             _ = kinds.TryAdd(
                 OverlayEventFeedKind.BingoEvent,
                 OverlayConfiguration.EventFeedV1.Default.Kinds[OverlayEventFeedKind.BingoEvent]
+            );
+            _ = kinds.TryAdd(
+                OverlayEventFeedKind.AchievementCompletion,
+                OverlayConfiguration.EventFeedV1.Default.Kinds[
+                    OverlayEventFeedKind.AchievementCompletion
+                ]
             );
             return new OverlayConfigurationParseResult.Valid(
                 new EventFeedV1(
@@ -619,6 +621,12 @@ public abstract record OverlayConfiguration
                         OverlayEventFeedPriority.High,
                         8
                     ),
+                    [OverlayEventFeedKind.AchievementCompletion] = new(
+                        true,
+                        "{viewer} unlocked {achievement} · {rewards}",
+                        OverlayEventFeedPriority.High,
+                        8
+                    ),
                 },
                 OverlayAppearance.EventFeedDefault
             );
@@ -645,6 +653,7 @@ public abstract record OverlayConfiguration
                     "pointLabel",
                 ],
                 OverlayEventFeedKind.BingoEvent => ["summary"],
+                OverlayEventFeedKind.AchievementCompletion => ["viewer", "achievement", "rewards"],
                 _ => throw new ArgumentOutOfRangeException(nameof(kind)),
             };
             var remaining = template;

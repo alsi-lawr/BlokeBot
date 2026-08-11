@@ -296,6 +296,51 @@ public sealed class EventFeedOverlayTests
     }
 
     [Test]
+    public async Task AchievementSample_RequiresBothParentsAndDoesNotMutateProgression()
+    {
+        await using var fixture = await Fixture.CreateAsync(
+            capacity: 10,
+            EventFeedOverflowPolicy.DropNewest
+        );
+        IOverlayStateProvider provider = new OverlayStateProvider(
+            fixture.Database,
+            new OverlayServerEpoch(),
+            fixture.Clock,
+            fixture.Service
+        );
+
+        var sample = (
+            await provider.ProjectEventFeedSampleAsync(
+                fixture.Instance,
+                OverlayEventFeedKind.AchievementCompletion,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlaySnapshotProjection.EventFeedV1>();
+
+        sample.Snapshot.State.Active!.Kind.ShouldBe("achievementCompletion");
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            (await db.CommunityCompletions.CountAsync()).ShouldBe(0);
+        }
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays);
+        _ = (
+            await provider.ProjectEventFeedSampleAsync(
+                fixture.Instance,
+                OverlayEventFeedKind.AchievementCompletion,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
+        await fixture.SetFeaturesAsync(HostFeatureFlags.CommunityProgression);
+        _ = (
+            await provider.ProjectEventFeedSampleAsync(
+                fixture.Instance,
+                OverlayEventFeedKind.AchievementCompletion,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<OverlaySnapshotProjection.Unavailable>();
+    }
+
+    [Test]
     public async Task DisabledParentOrSource_AdmitsNothingAndSuppressedCardsNeverReplay()
     {
         await using var fixture = await Fixture.CreateAsync(
@@ -337,6 +382,41 @@ public sealed class EventFeedOverlayTests
         await using var db = await fixture.Database.CreateDbContextAsync();
         var items = await db.OverlayEventFeedItems.ToListAsync();
         items.ShouldHaveSingleItem().Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Suppressed);
+    }
+
+    [Test]
+    public async Task AchievementParentGating_DropsSuppressedWorkAndNeverReplaysAfterEnable()
+    {
+        await using var fixture = await Fixture.CreateAsync(
+            capacity: 10,
+            EventFeedOverflowPolicy.DropNewest
+        );
+        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays);
+        await fixture.PresentAchievementAsync("suppressed", "First viewer");
+        await fixture.SetFeaturesAsync(HostFeatureFlags.All);
+
+        var restored = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
+        restored!.Active.ShouldBeNull();
+        await fixture.PresentAchievementAsync("accepted", "Second viewer");
+        await fixture.SetFeaturesAsync(
+            HostFeatureFlags.All & ~HostFeatureFlags.CommunityProgression
+        );
+        await fixture.Service.SuppressSourceAsync(
+            fixture.HostId,
+            HostFeatureFlags.CommunityProgression,
+            CancellationToken.None
+        );
+        await fixture.SetFeaturesAsync(HostFeatureFlags.All);
+
+        var enabledAgain = await fixture.Service.ReadAsync(
+            fixture.Instance,
+            CancellationToken.None
+        );
+        enabledAgain!.Active.ShouldBeNull();
+        enabledAgain.Pending.ShouldBeEmpty();
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        db.OverlayEventFeedItems.ShouldHaveSingleItem()
+            .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Suppressed);
     }
 
     [Test]
@@ -676,6 +756,19 @@ public sealed class EventFeedOverlayTests
                     Winners = ["winner"],
                     Amount = "10",
                     PointLabel = "points",
+                },
+                CancellationToken.None
+            );
+
+        internal Task PresentAchievementAsync(string sourceKey, string viewer) =>
+            Service.PresentAsync(
+                new OverlayEventPresentation.AchievementCompletion
+                {
+                    HostId = HostId,
+                    SourceKey = sourceKey,
+                    Viewer = viewer,
+                    Achievement = "Community trailblazer",
+                    Rewards = "250 points, Trailblazer",
                 },
                 CancellationToken.None
             );

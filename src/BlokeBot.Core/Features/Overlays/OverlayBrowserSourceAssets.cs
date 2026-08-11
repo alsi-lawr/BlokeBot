@@ -822,7 +822,9 @@ internal static class OverlayBrowserSourceAssets
               card.id >= 0 &&
               (card.kind === "pointAward" ||
                 card.kind === "guessingWinner" ||
-                card.kind === "giveawayWinner") &&
+                card.kind === "giveawayWinner" ||
+                card.kind === "bingoEvent" ||
+                card.kind === "achievementCompletion") &&
               (card.priority === "normal" || card.priority === "high") &&
               typeof card.title === "string" &&
               typeof card.body === "string" &&

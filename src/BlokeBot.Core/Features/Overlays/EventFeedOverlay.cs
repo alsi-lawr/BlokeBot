@@ -49,6 +49,14 @@ public abstract record OverlayEventPresentation
         public override OverlayEventFeedKind Kind => OverlayEventFeedKind.BingoEvent;
         public required string Summary { get; init; }
     }
+
+    public sealed record AchievementCompletion : OverlayEventPresentation
+    {
+        public override OverlayEventFeedKind Kind => OverlayEventFeedKind.AchievementCompletion;
+        public required string Viewer { get; init; }
+        public required string Achievement { get; init; }
+        public required string Rewards { get; init; }
+    }
 }
 
 public interface IOverlayEventPresenter
@@ -161,6 +169,15 @@ internal sealed partial class EventFeedTemplateRenderer
             )
             {
                 ["summary"] = bingo.Summary,
+            },
+            OverlayEventPresentation.AchievementCompletion achievement => new Dictionary<
+                string,
+                string
+            >(StringComparer.Ordinal)
+            {
+                ["viewer"] = achievement.Viewer,
+                ["achievement"] = achievement.Achievement,
+                ["rewards"] = achievement.Rewards,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(presentation)),
         };
@@ -328,7 +345,12 @@ internal sealed class OverlayEventFeedService(
         {
             return;
         }
-        if (feature is HostFeatureFlags.Points or HostFeatureFlags.Guessing)
+        if (
+            feature
+            is HostFeatureFlags.Points
+                or HostFeatureFlags.Guessing
+                or HostFeatureFlags.CommunityProgression
+        )
         {
             await SuppressSourceAsync(hostId, feature, cancellationToken);
             return;
@@ -445,6 +467,7 @@ internal sealed class OverlayEventFeedService(
                 HostFeatureFlags.Guessing => OverlayEventFeedKind.GuessingWinner,
                 HostFeatureFlags.Points => (OverlayEventFeedKind?)null,
                 HostFeatureFlags.Bingo => OverlayEventFeedKind.BingoEvent,
+                HostFeatureFlags.CommunityProgression => OverlayEventFeedKind.AchievementCompletion,
                 _ => null,
             };
             var query = db.OverlayEventFeedItems.Where(x =>
@@ -723,6 +746,17 @@ internal sealed class OverlayEventFeedService(
                 ct
             );
         }
+        if (
+            (enabledFeatures & HostFeatureFlags.CommunityProgression)
+            != HostFeatureFlags.CommunityProgression
+        )
+        {
+            suppressed += await SuppressRecoveredAsync(
+                activeOrQueued.Where(x => x.Kind == OverlayEventFeedKind.AchievementCompletion),
+                now,
+                ct
+            );
+        }
         return suppressed;
     }
 
@@ -792,6 +826,7 @@ internal sealed class OverlayEventFeedService(
                 HostFeatureFlags.Points,
             OverlayEventFeedKind.GuessingWinner => HostFeatureFlags.Guessing,
             OverlayEventFeedKind.BingoEvent => HostFeatureFlags.Bingo,
+            OverlayEventFeedKind.AchievementCompletion => HostFeatureFlags.CommunityProgression,
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -802,6 +837,7 @@ internal sealed class OverlayEventFeedService(
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
             OverlayEventFeedKind.BingoEvent => "Bingo",
+            OverlayEventFeedKind.AchievementCompletion => "Achievement unlocked",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

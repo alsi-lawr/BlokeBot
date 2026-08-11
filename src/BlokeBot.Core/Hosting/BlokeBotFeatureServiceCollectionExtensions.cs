@@ -244,6 +244,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddHostedService(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayEventFeedService>()
         );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                ICommunityAchievementCompletionObserver,
+                CommunityAchievementOverlayEventPublisher
+            >()
+        );
         _ = services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
         _ = services.AddSingleton<OverlayLiveCoordinator>();
         _ = services.AddSingleton<IOverlayLivePublisher>(static serviceProvider =>
