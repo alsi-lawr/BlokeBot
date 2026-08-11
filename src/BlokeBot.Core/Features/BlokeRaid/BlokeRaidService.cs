@@ -714,7 +714,7 @@ public sealed class BlokeRaidService(
         }
 
         var previousPhase = campaign.CurrentPhase;
-        campaign.CurrentPhase = Phase(configuration, campaign);
+        campaign.CurrentPhase = NextPhase(configuration, campaign);
         campaign.Revision++;
         var contribution = Contribution(campaign, command.Viewer, now);
         contribution.ActionCount++;
@@ -851,7 +851,7 @@ public sealed class BlokeRaidService(
         campaign.CurrentHealth = remaining;
         var totalDamage = beforeHealth - remaining;
         var previousPhase = campaign.CurrentPhase;
-        campaign.CurrentPhase = Phase(configuration, campaign);
+        campaign.CurrentPhase = NextPhase(configuration, campaign);
         campaign.Revision++;
         var response = Response(
             configuration,
@@ -1149,7 +1149,7 @@ public sealed class BlokeRaidService(
             },
             now
         );
-        if (campaign.CurrentPhase != previousPhase)
+        if (campaign.CurrentPhase > previousPhase)
         {
             AddEvent(
                 db,
@@ -1253,13 +1253,15 @@ public sealed class BlokeRaidService(
             ),
         };
 
-    private static int Phase(BlokeRaidConfiguration configuration, BlokeRaidCampaign campaign)
+    private static int NextPhase(BlokeRaidConfiguration configuration, BlokeRaidCampaign campaign)
     {
         var percent =
             campaign.MaximumHealth == 0 ? 0 : campaign.CurrentHealth * 100 / campaign.MaximumHealth;
-        return percent <= configuration.PhaseThreeHealthPercent ? 3
+        var configuredPhase =
+            percent <= configuration.PhaseThreeHealthPercent ? 3
             : percent <= configuration.PhaseTwoHealthPercent ? 2
             : 1;
+        return Math.Max(campaign.CurrentPhase, configuredPhase);
     }
 
     private static string Response(
@@ -1270,9 +1272,13 @@ public sealed class BlokeRaidService(
         int previousPhase
     ) =>
         campaign.CurrentHealth == 0 ? configuration.VictoryResponse
-        : campaign.CurrentPhase != previousPhase
-            ? campaign.CurrentPhase == 2 ? configuration.PhaseTwoResponse
-                : configuration.PhaseThreeResponse
+        : campaign.CurrentPhase > previousPhase
+            ? campaign.CurrentPhase switch
+            {
+                2 => configuration.PhaseTwoResponse,
+                3 => configuration.PhaseThreeResponse,
+                _ => configuration.PhaseOneResponse,
+            }
         : kind switch
         {
             BlokeRaidActionKind.Attack => $"Attack dealt {outcome} damage.",

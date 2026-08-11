@@ -1,4 +1,6 @@
 @page "/raid/{Channel}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
 @inject BlokeRaidService _raids
 @inject TimeProvider _clock
 

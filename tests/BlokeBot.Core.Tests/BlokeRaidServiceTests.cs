@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -340,6 +341,142 @@ public sealed class BlokeRaidServiceTests
             .Response.ShouldBe("The shell splits exactly once.");
     }
 
+    [Test]
+    public async Task ThresholdEdit_PreservesReachedPhaseAndDoesNotRepeatItsEvent()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(_now);
+        var service = new BlokeRaidService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            new SequenceRandom(40, 5, 10, 20),
+            clock
+        );
+        var configured = (
+            await service.SaveConfigurationAsync(
+                hostId,
+                Draft() with
+                {
+                    MaximumHealth = 100,
+                    AttackMinimum = 1,
+                    AttackMaximum = 99,
+                    AttackCooldownSeconds = 0,
+                    PhaseTwoHealthPercent = 65,
+                    PhaseThreeHealthPercent = 30,
+                    PhaseTwoResponse = "Phase two response.",
+                    PhaseThreeResponse = "Phase three response.",
+                },
+                default
+            )
+        ).ShouldBeOfType<BlokeRaidConfigurationOutcome.Saved>();
+        _ = Success(await service.StartAsync(hostId, Campaign("start"), default));
+
+        var reachedPhaseTwo = ActionSuccess(
+            await service.ActAsync(
+                hostId,
+                new("chat:phase-two", BlokeRaidActionKind.Attack, Viewer("viewer"), "stream"),
+                default
+            )
+        );
+        reachedPhaseTwo.Action.PhaseAfter.ShouldBe(2);
+        reachedPhaseTwo.Action.Response.ShouldBe("Phase two response.");
+        _ = (
+            await service.SaveConfigurationAsync(
+                hostId,
+                Draft() with
+                {
+                    Revision = configured.Configuration.Revision,
+                    MaximumHealth = 100,
+                    AttackMinimum = 1,
+                    AttackMaximum = 99,
+                    AttackCooldownSeconds = 0,
+                    PhaseTwoHealthPercent = 50,
+                    PhaseThreeHealthPercent = 30,
+                    PhaseTwoResponse = "Edited phase two response.",
+                    PhaseThreeResponse = "Edited phase three response.",
+                },
+                default
+            )
+        ).ShouldBeOfType<BlokeRaidConfigurationOutcome.Saved>();
+
+        var aboveEditedThreshold = ActionSuccess(
+            await service.ActAsync(
+                hostId,
+                new("chat:still-phase-two", BlokeRaidActionKind.Attack, Viewer("viewer"), "stream"),
+                default
+            )
+        );
+        var belowEditedThreshold = ActionSuccess(
+            await service.ActAsync(
+                hostId,
+                new("chat:past-phase-two", BlokeRaidActionKind.Attack, Viewer("viewer"), "stream"),
+                default
+            )
+        );
+        var reachedPhaseThree = ActionSuccess(
+            await service.ActAsync(
+                hostId,
+                new("chat:phase-three", BlokeRaidActionKind.Attack, Viewer("viewer"), "stream"),
+                default
+            )
+        );
+
+        aboveEditedThreshold.Action.PhaseAfter.ShouldBe(2);
+        aboveEditedThreshold.Action.Response.ShouldBe("Attack dealt 5 damage.");
+        belowEditedThreshold.Action.PhaseAfter.ShouldBe(2);
+        belowEditedThreshold.Action.Response.ShouldBe("Attack dealt 10 damage.");
+        reachedPhaseThree.Action.PhaseAfter.ShouldBe(3);
+        reachedPhaseThree.Action.Response.ShouldBe("Edited phase three response.");
+        await using var verify = await database.CreateDbContextAsync();
+        var phaseEventKeys = await verify
+            .BlokeRaidEvents.Where(value => value.Kind == BlokeRaidEventKind.PhaseChanged)
+            .OrderBy(value => value.Id)
+            .Select(value => value.OperationKey)
+            .ToArrayAsync();
+        phaseEventKeys.Length.ShouldBe(2);
+        phaseEventKeys.Distinct().Count().ShouldBe(phaseEventKeys.Length);
+        phaseEventKeys[0].ShouldEndWith(":2");
+        phaseEventKeys[1].ShouldEndWith(":3");
+    }
+
+    [Test]
+    public async Task GuessingRuntime_FeatureOffDoesNotApplyCompletedProviderRound()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(_now);
+        var service = Service(database, clock, 5);
+        await SaveConfigurationAsync(service, hostId, Draft() with { CorrectGuessDamage = 7 });
+        var started = Success(
+            await service.StartAsync(hostId, Campaign("start"), default)
+        ).Campaign;
+        await SeedCompletedGuessAsync(database, hostId);
+        var features = new HostFeatureService(
+            database,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            [],
+            [],
+            clock
+        );
+        await features.DisableAsync(hostId, HostFeatureFlags.CooperativeGame, default);
+        var countsBefore = await CountsAsync(database);
+        var runtime = new BlokeRaidRuntime(
+            database,
+            service,
+            NullLogger<BlokeRaidRuntime>.Instance
+        );
+
+        await runtime.GuessingChangedAsync(hostId, default);
+
+        (await CountsAsync(database)).ShouldBe(countsBefore);
+        await using var verify = await database.CreateDbContextAsync();
+        var campaign = await verify.BlokeRaidCampaigns.SingleAsync();
+        campaign.PublicId.ShouldBe(started.Id);
+        campaign.CurrentHealth.ShouldBe(campaign.MaximumHealth);
+        (await verify.BlokeRaidContributions.CountAsync()).ShouldBe(0);
+    }
+
     private static BlokeRaidService Service(
         SqliteBlokeBotDbFactory database,
         TimeProvider clock,
@@ -437,6 +574,40 @@ public sealed class BlokeRaidServiceTests
         _ = await db.SaveChangesAsync();
     }
 
+    private static async Task SeedCompletedGuessAsync(SqliteBlokeBotDbFactory database, int hostId)
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var profile = new GuessRoundProfile
+        {
+            HostId = hostId,
+            Name = "Raid provider round",
+            Slug = "raid-provider-round",
+            IsDefault = true,
+            ReplySettings = new BotReplySettings(),
+        };
+        _ = db.Rounds.Add(
+            new GuessRound
+            {
+                HostId = hostId,
+                GuessRoundProfile = profile,
+                Status = GuessRoundStatus.Completed,
+                StartedAtUtc = _now.AddMinutes(-5).UtcDateTime,
+                ClosedAtUtc = _now.UtcDateTime,
+                WinningName = "blue",
+                Votes =
+                [
+                    new GuessVote
+                    {
+                        Login = "viewer",
+                        GuessName = "blue",
+                        GuessedAtUtc = _now.AddMinutes(-2).UtcDateTime,
+                    },
+                ],
+            }
+        );
+        _ = await db.SaveChangesAsync();
+    }
+
     private static async Task<BoundaryCounts> CountsAsync(SqliteBlokeBotDbFactory database)
     {
         await using var db = await database.CreateDbContextAsync();
@@ -454,6 +625,19 @@ public sealed class BlokeRaidServiceTests
     {
         public int NextInclusive(int minimum, int maximum)
         {
+            outcome.ShouldBeInRange(minimum, maximum);
+            return outcome;
+        }
+    }
+
+    private sealed class SequenceRandom(params int[] outcomes) : IBlokeRaidRandom
+    {
+        private readonly Queue<int> _outcomes = new(outcomes);
+
+        public int NextInclusive(int minimum, int maximum)
+        {
+            _outcomes.ShouldNotBeEmpty();
+            var outcome = _outcomes.Dequeue();
             outcome.ShouldBeInRange(minimum, maximum);
             return outcome;
         }
