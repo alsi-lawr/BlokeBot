@@ -6,6 +6,7 @@
 @import "./components/meter.css";
 @import "./layout/topbar.css";
 @import "./components/page-context.css";
+@import "./components/sticky-save-region.css";
 @import "./components/segmented-controls.css";
 @import "./components/studio.css";
 @import "./features/home-and-feature-cards.css";

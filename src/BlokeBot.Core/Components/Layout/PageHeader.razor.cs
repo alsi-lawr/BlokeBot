@@ -13,9 +13,6 @@ public partial class PageHeader
     [Parameter]
     public string Kicker { get; set; } = string.Empty;
 
-    [Parameter]
-    public string SaveStatus { get; set; } = string.Empty;
-
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 }

@@ -245,7 +245,7 @@
                                 </div>
                                 @if (BountyLifecycle.CanExtend(bounty.Status) && IsExtendOpen(bounty.PublicId))
                                 {
-                                    <div id="@ExtendRegionId(bounty.PublicId)" class="studio-grid">
+                                    <div id="@ExtendRegionId(bounty.PublicId)" class="studio-grid" data-sticky-save-scope>
                                         <div class="studio-span-4">
                                             <Field Id="@($"bounty-extend-{bounty.PublicId:N}")"
                                                    Label="New expiry (UTC)"
@@ -254,7 +254,10 @@
                                         </div>
                                         <div class="studio-span-8">
                                             <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
-                                            <button class="btn-secondary mt-2 max-md:mt-0" type="button" @onclick="() => ExtendAsync(bounty)">Save new expiry</button>
+                                            <StickySaveRegion Scope="StickySaveScope.Editor"
+                                                              Active="@(_activeExtensionId == bounty.PublicId)">
+                                                <button class="btn-secondary mt-2 max-md:mt-0" type="button" @onclick="() => ExtendAsync(bounty)">Save new expiry</button>
+                                            </StickySaveRegion>
                                         </div>
                                     </div>
                                 }

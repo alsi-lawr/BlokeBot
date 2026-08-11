@@ -69,27 +69,6 @@
         gap: 0.75rem;
     }
 
-    .dashboard-page__save-feedback {
-        color: var(--app-text-muted);
-        font-size: 0.82rem;
-        font-weight: 650;
-        line-height: 1.4;
-    }
-
-    .dashboard-page__save-feedback[data-save-feedback="dirty"],
-    .dashboard-page__save-feedback[data-save-feedback="saving"] {
-        color: var(--app-text-medium);
-    }
-
-    .dashboard-page__save-feedback[data-save-feedback="success"] {
-        color: rgb(21 128 61);
-    }
-
-    .dashboard-page__save-feedback[data-save-feedback="validation"],
-    .dashboard-page__save-feedback[data-save-feedback="failure"] {
-        color: rgb(185 28 28);
-    }
-
     .task-panel {
         background: var(--app-surface);
         border: 1px solid var(--app-border);
@@ -377,12 +356,6 @@
 
     .page-header__description {
         line-height: 1.4;
-    }
-
-    .page-header__actions {
-        position: sticky;
-        bottom: 0.75rem;
-        z-index: 10;
     }
 
     .task-panel,

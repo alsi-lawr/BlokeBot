@@ -238,7 +238,12 @@ public partial class CommunityProgressionPage
     private void ToggleScheduleConfirmation(CommunityDefinitionView definition)
     {
         var edit = ScheduleFor(definition);
-        edit.Confirmed = !edit.Confirmed;
+        var confirmed = !edit.Confirmed;
+        foreach (var scheduleEdit in _scheduleEdits.Values)
+        {
+            scheduleEdit.Confirmed = false;
+        }
+        edit.Confirmed = confirmed;
     }
 
     private ScheduleEditDraft ScheduleFor(CommunityDefinitionView definition)

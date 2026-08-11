@@ -16,6 +16,7 @@ public partial class PlayQueuesPage
     private QueueDraft _draft = QueueDraft.New();
     private Guid? _selectedFieldIdentity;
     private Guid? _fieldFocusIdentity;
+    private long? _activeEntryEditorId;
     private string _feedback = string.Empty;
     private string _lobbyCode = string.Empty;
     private string _roleDraft = string.Empty;
@@ -351,6 +352,7 @@ public partial class PlayQueuesPage
         _feedback = string.Empty;
         _pane = PlayQueuePane.Setup;
         _openEntryFolds.Reset();
+        _activeEntryEditorId = null;
         SelectFirstField();
         await RefreshPageAsync();
     }
@@ -384,6 +386,7 @@ public partial class PlayQueuesPage
         _operationFailed = false;
         _pane = PlayQueuePane.Setup;
         _openEntryFolds.Reset();
+        _activeEntryEditorId = null;
         SelectFirstField();
         SetCreateGuidance();
         _primaryFocusRequest++;
@@ -619,6 +622,19 @@ public partial class PlayQueuesPage
             );
             _operationFailed = result is PlayQueueResult<ModeratorPlayQueueEntryView>.Rejected;
         });
+
+    private void SetEntryEditorOpen(long id, bool open)
+    {
+        _openEntryFolds.Set(id, open);
+        if (open)
+        {
+            _activeEntryEditorId = id;
+        }
+        else if (_activeEntryEditorId == id)
+        {
+            _activeEntryEditorId = null;
+        }
+    }
 
     private Task EntryMutationAsync(
         Func<Task<PlayQueueResult<ModeratorPlayQueueEntryView>>> mutate,

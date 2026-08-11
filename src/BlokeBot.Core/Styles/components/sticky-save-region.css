@@ -1,0 +1,143 @@
+@layer components {
+    html,
+    [data-sticky-save-scope] {
+        --app-save-safe-area-inset: env(safe-area-inset-bottom, 0px);
+        scroll-padding-bottom: calc(6rem + var(--app-save-safe-area-inset));
+    }
+
+    [data-sticky-save-scope][data-sticky-save-boundary-active="true"] {
+        padding-bottom: calc(5.5rem + var(--app-save-safe-area-inset));
+    }
+
+    [data-sticky-save-scope] :is(input, select, textarea, [tabindex]):focus-visible {
+        scroll-margin-bottom: calc(6rem + var(--app-save-safe-area-inset));
+    }
+
+    .sticky-save-region {
+        align-items: center;
+        display: flex;
+        justify-content: flex-end;
+        min-width: 0;
+    }
+
+    .sticky-save-region__sentinel {
+        display: block;
+        height: 0;
+        width: 0;
+    }
+
+    .sticky-save-region__surface {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        max-width: 100%;
+    }
+
+    .sticky-save-region__feedback {
+        color: var(--app-text-muted);
+        font-size: 0.82rem;
+        font-weight: 650;
+        line-height: 1.4;
+        min-width: 0;
+    }
+
+    .sticky-save-region__feedback[data-save-feedback="success"] {
+        color: var(--app-affirmative);
+    }
+
+    .sticky-save-region__feedback[data-save-feedback="validation"],
+    .sticky-save-region__feedback[data-save-feedback="failure"] {
+        color: var(--app-warning-text);
+    }
+
+    .sticky-save-region[data-save-active="true"] {
+        min-height: 4.25rem;
+    }
+
+    .sticky-save-region[data-save-active="true"][data-save-visible="true"]
+        .sticky-save-region__surface {
+        backdrop-filter: blur(12px);
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        bottom: max(0.75rem, var(--app-save-safe-area-inset));
+        box-shadow: var(--app-shadow-surface);
+        max-width: calc(100vw - 2rem);
+        padding: 0.5rem;
+        position: fixed;
+        right: 1rem;
+        z-index: 35;
+    }
+
+    .sticky-save-region[data-save-scope="modal"][data-save-visible="true"]
+        .sticky-save-region__surface {
+        backdrop-filter: none;
+        background: transparent;
+        border: 0;
+        bottom: auto;
+        box-shadow: none;
+        max-width: 100%;
+        padding: 0;
+        position: static;
+        right: auto;
+        z-index: 55;
+    }
+
+    body:has(
+            .sticky-save-region[data-save-scope="modal"][data-save-visible="true"]
+        )
+        .sticky-save-region:not([data-save-scope="modal"])
+        .sticky-save-region__surface {
+        visibility: hidden;
+    }
+
+    .sticky-save-region__action {
+        align-items: center;
+        display: flex;
+        min-width: 0;
+    }
+
+    .sticky-save-region__action > button,
+    .sticky-save-region__action > .btn-primary,
+    .sticky-save-region__action > .btn-secondary {
+        min-height: 44px !important;
+    }
+
+    body:has(.sticky-save-region[data-save-visible="true"]) .toast-region {
+        bottom: calc(6.25rem + var(--app-save-safe-area-inset)) !important;
+    }
+
+    @media (max-width: 30rem) {
+        .sticky-save-region[data-save-active="true"] {
+            min-height: 4.75rem;
+        }
+
+        .sticky-save-region[data-save-active="true"][data-save-visible="true"]
+            .sticky-save-region__surface {
+            bottom: max(0.5rem, var(--app-save-safe-area-inset));
+            left: 0.5rem;
+            max-width: calc(100vw - 1rem);
+            right: 0.5rem;
+        }
+
+        .sticky-save-region__feedback {
+            flex: 1 1 8rem;
+        }
+
+        .sticky-save-region__action {
+            flex: 0 1 auto;
+        }
+
+        .sticky-save-region__action > button,
+        .sticky-save-region__action > .btn-primary,
+        .sticky-save-region__action > .btn-secondary {
+            min-height: 48px !important;
+        }
+
+        body:has(.sticky-save-region[data-save-visible="true"]) .toast-region {
+            bottom: calc(6.75rem + var(--app-save-safe-area-inset)) !important;
+        }
+    }
+}

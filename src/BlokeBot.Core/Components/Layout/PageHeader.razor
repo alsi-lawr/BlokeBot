@@ -17,12 +17,8 @@
         </div>
         @if (ChildContent is not null)
         {
-            <div class="page-header__actions" data-sticky-save-actions>
+            <div class="page-header__actions">
                 @ChildContent
-                @if (!string.IsNullOrWhiteSpace(SaveStatus))
-                {
-                    <span class="page-header__save-status" role="status" data-sticky-save-status>@SaveStatus</span>
-                }
             </div>
         }
     </div>

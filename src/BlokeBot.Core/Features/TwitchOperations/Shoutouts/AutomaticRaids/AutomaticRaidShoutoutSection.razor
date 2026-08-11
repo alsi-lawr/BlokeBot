@@ -5,6 +5,7 @@
 @inject EventBus<AppEventKind> _events
 
 <StudioStage Key="automatic-raid"
+             data-sticky-save-scope
              Number="1"
              Title="Automatic raid shoutouts"
              Summary="@_settingsSummary"
@@ -222,12 +223,14 @@
             }
 
             <div class="mt-4 flex flex-wrap items-center gap-3">
-                <button type="button"
-                        class="btn-primary"
-                        disabled="@_saving"
-                        @onclick="SaveAsync">
-                    @(_saving ? "Saving…" : "Save automatic shoutouts")
-                </button>
+                <StickySaveRegion Scope="StickySaveScope.Editor">
+                    <button type="button"
+                            class="btn-primary"
+                            disabled="@_saving"
+                            @onclick="SaveAsync">
+                        @(_saving ? "Saving…" : "Save automatic shoutouts")
+                    </button>
+                </StickySaveRegion>
                 <span class="text-sm text-muted-foreground" role="status" aria-live="polite">@_saveStatus</span>
             </div>
         }

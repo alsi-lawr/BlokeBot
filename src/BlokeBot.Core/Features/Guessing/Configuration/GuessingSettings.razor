@@ -12,11 +12,12 @@
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6">
+<div class="mx-auto max-w-7xl space-y-6" data-sticky-save-scope>
     <PageHeader Title="Round settings"
-                Description="Choose game types, answers, chat commands, and what the bot says.">
+                Description="Choose game types, answers, chat commands, and what the bot says." />
+    <StickySaveRegion>
         <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
-    </PageHeader>
+    </StickySaveRegion>
 
     @if (Host is null)
     {
@@ -313,6 +314,7 @@
 {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" data-unsaved-profile-dialog>
         <section class="surface w-full max-w-lg rounded-xl p-6 shadow-xl"
+                 data-sticky-save-scope
                  role="dialog"
                  aria-modal="true"
                  aria-labelledby="unsaved-profile-title"
@@ -320,7 +322,9 @@
             <h2 id="unsaved-profile-title" class="text-lg font-bold text-slate-950">Unsaved round type changes</h2>
             <p id="unsaved-profile-description" class="mt-2 text-sm leading-6 text-slate-600">Choose what to do with your changes before switching round type.</p>
             <div class="mt-5 grid gap-2 sm:grid-cols-3">
-                <button class="btn-primary" @onclick="SaveAndSwitchAsync">Save and switch</button>
+                <StickySaveRegion Scope="StickySaveScope.Modal">
+                    <button class="btn-primary" @onclick="SaveAndSwitchAsync">Save and switch</button>
+                </StickySaveRegion>
                 <button class="btn-secondary" @onclick="DiscardAndSwitchAsync">Discard and switch</button>
                 <button class="btn-secondary" @onclick="KeepEditing">Keep editing</button>
             </div>

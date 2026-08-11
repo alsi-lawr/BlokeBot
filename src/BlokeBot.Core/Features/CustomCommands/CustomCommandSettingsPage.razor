@@ -126,8 +126,8 @@
                 </Footer>
             </StudioRail>
 
-            <div class="studio__inspector flex min-w-0 flex-col">
-                <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+            <div class="studio__inspector flex min-w-0 flex-col" data-sticky-save-scope>
+                <header class="studio__header flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
                     <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere @(_selectedCommand is not null ? "studio__title--mono font-mono" : null)">@_headerName</span>
                     @if (_headerStats is { } stats)
                     {
@@ -157,11 +157,13 @@
                                 disabled="@NativeDeliveryUnavailable(toggledAnnouncement)"
                                 @onclick="() => toggledAnnouncement.Enabled = !toggledAnnouncement.Enabled"></button>
                     }
-                    <button class="@(_hasChanges ? "btn-primary custom-command-save--dirty" : "btn-secondary")"
-                            aria-label="Save custom commands"
-                            data-save-state="@(_hasChanges ? "dirty" : "clean")"
-                            disabled="@(!_hasChanges)"
-                            @onclick="SaveAsync">Save</button>
+                    <StickySaveRegion Scope="StickySaveScope.Editor">
+                        <button class="@(_hasChanges ? "btn-primary custom-command-save--dirty" : "btn-secondary")"
+                                aria-label="Save custom commands"
+                                data-save-state="@(_hasChanges ? "dirty" : "clean")"
+                                disabled="@(!_hasChanges)"
+                                @onclick="SaveAsync">Save</button>
+                    </StickySaveRegion>
                 </header>
 
                 <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">

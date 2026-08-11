@@ -47,7 +47,7 @@
             }
 
             <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">
-                <div class="card overflow-hidden">
+                <div class="card overflow-hidden" data-sticky-save-scope>
                     <section class="grid gap-4 p-5">
                         <div>
                             <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Profile</h2>
@@ -110,7 +110,9 @@
                     </section>
 
                     <section class="flex flex-wrap gap-2 border-t border-[var(--app-border)] p-5">
-                        <button class="btn-primary" type="button" @onclick="SaveAsync">Save passport</button>
+                        <StickySaveRegion Scope="StickySaveScope.Editor">
+                            <button class="btn-primary" type="button" @onclick="SaveAsync">Save passport</button>
+                        </StickySaveRegion>
                         <a class="btn-secondary" href="@ExportUrl()">Export my channel data</a>
                         @if (!_confirmReset)
                         {

@@ -1,0 +1,24 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div @ref="_element"
+     class="@_class"
+     data-save-active="@Active.ToString().ToLowerInvariant()"
+     data-save-scope="@Scope.ToString().ToLowerInvariant()"
+     data-save-visible="false"
+     @attributes="AdditionalAttributes">
+    <span class="sticky-save-region__sentinel" aria-hidden="true"></span>
+    <div class="sticky-save-region__surface">
+        @if (Feedback is not null)
+        {
+            <p class="sticky-save-region__feedback"
+               data-save-feedback="@Feedback.Kind.ToString().ToLowerInvariant()"
+               role="@_feedbackRole">
+                @Feedback.Message
+            </p>
+        }
+        <div class="sticky-save-region__action">
+            @ChildContent
+        </div>
+    </div>
+</div>

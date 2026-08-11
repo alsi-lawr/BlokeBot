@@ -45,6 +45,7 @@
 
             <div class="settings-disclosure-stack">
                 <StudioStage Key="bingo-template"
+                             data-sticky-save-scope
                              Number="1"
                              Title="Template"
                              Summary="@TemplateSummary()"
@@ -210,10 +211,10 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3">
+                        <StickySaveRegion Scope="StickySaveScope.Editor">
                             <button class="btn-primary" type="button" @onclick="SaveTemplateAsync">Save revision</button>
                             <span class="text-sm text-muted-foreground">@RevisionNote()</span>
-                        </div>
+                        </StickySaveRegion>
                     </div>
                 </StudioStage>
             </div>

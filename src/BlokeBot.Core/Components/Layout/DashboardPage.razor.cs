@@ -26,6 +26,9 @@ public partial class DashboardPage
     [Parameter]
     public PageSaveFeedback? SaveFeedback { get; set; }
 
+    [Parameter]
+    public RenderFragment? SaveAction { get; set; }
+
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 
@@ -40,9 +43,4 @@ public partial class DashboardPage
             DashboardPageWidth.Wide => "dashboard-page dashboard-page--wide app-motion-stack",
             _ => throw new UnreachableException(),
         };
-
-    private string _saveFeedbackRole =>
-        SaveFeedback?.Kind is PageSaveFeedbackKind.Validation or PageSaveFeedbackKind.Failure
-            ? "alert"
-            : "status";
 }

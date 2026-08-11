@@ -34,8 +34,8 @@
                         </Footer>
                     </StudioRail>
 
-                    <div class="studio__inspector flex min-w-0 flex-col" data-cue-editor>
-                        <header class="studio__header sticky top-[var(--app-topbar-sticky-offset)] z-[5] flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] backdrop-blur-[8px] max-lg:rounded-tr-none">
+                    <div class="studio__inspector flex min-w-0 flex-col" data-cue-editor data-sticky-save-scope>
+                        <header class="studio__header flex flex-wrap items-center gap-x-[0.9rem] gap-y-2 rounded-tr-[14px] border-b border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-[0.85rem] max-lg:rounded-tr-none">
                             <span class="studio__title min-w-0 text-[1.1rem] font-extrabold text-[var(--app-text-strong)] wrap-anywhere">@(_selected is null ? "New cue" : _name)</span>
                             <span class="studio__subtitle text-[0.78rem] text-[var(--app-text-muted)]">@HeaderStats()</span>
                             <span class="studio__spacer flex-1"></span>
@@ -46,7 +46,9 @@
                                     aria-checked="@(_cueEnabled ? "true" : "false")"
                                     aria-label="Cue enabled"
                                     @onclick="() => _cueEnabled = !_cueEnabled"></button>
-                            <button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button>
+                            <StickySaveRegion Scope="StickySaveScope.Editor" Active="@(_selected is not null)">
+                                <button class="btn-primary" type="button" disabled="@IsBusy" @onclick="SaveAsync">@(_selected is null ? "Create cue" : "Save cue")</button>
+                            </StickySaveRegion>
                         </header>
 
                         <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">

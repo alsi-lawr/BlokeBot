@@ -107,6 +107,7 @@
 
             <div class="settings-disclosure-stack">
                 <StudioStage Key="prediction-template"
+                             data-sticky-save-scope
                              Number="1"
                              Title="New Prediction template"
                              Summary="@_editorSummary"
@@ -157,7 +158,9 @@
                             <p class="text-xs text-muted-foreground">2–10 outcomes, up to 25 characters each. Viewers back exactly one.</p>
                         </div>
                     </div>
-                    <div class="mt-4"><button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button></div>
+                    <StickySaveRegion Scope="StickySaveScope.Editor" class="mt-4">
+                        <button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button>
+                    </StickySaveRegion>
                     @if (State.Templates.Count > 0)
                     {
                         <div class="mt-4 grid gap-2 border-t border-[var(--app-border)] pt-4">

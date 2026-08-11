@@ -47,7 +47,7 @@
         }
         else
         {
-            <div class="settings-disclosure-stack">
+            <div class="settings-disclosure-stack" data-sticky-save-scope>
                 <StudioStage Key="moment-capture"
                              Number="1"
                              Title="Capture settings"
@@ -109,11 +109,10 @@
                         </div>
                     </div>
                 </StudioStage>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-                <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
-                <span class="text-sm text-muted-foreground">@_streamStatus</span>
+                <StickySaveRegion Scope="StickySaveScope.Editor">
+                    <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
+                    <span class="text-sm text-muted-foreground">@_streamStatus</span>
+                </StickySaveRegion>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(_feedback))
@@ -168,7 +167,7 @@
                     {
                         var draft = Draft(selected.Public.PublicId);
                         var id = selected.Public.PublicId;
-                        <div class="card p-5">
+                        <div class="card p-5" data-sticky-save-scope>
                             <div class="flex flex-wrap items-center gap-3">
                                 <span class="@StatePillClass(selected.Public.State)">
                                     <span class="status-pill__label">@CandidateStateLabel(selected.Public.State)</span>
@@ -257,7 +256,9 @@
                             </div>
                             <div class="mt-4 flex flex-wrap gap-2">
                                 <button class="btn-primary" type="button" @onclick="() => ApproveAsync(id)">Approve</button>
-                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(id)">Save details</button>
+                                <StickySaveRegion Scope="StickySaveScope.Editor">
+                                    <button class="btn-secondary" type="button" @onclick="() => EditAsync(id)">Save details</button>
+                                </StickySaveRegion>
                                 <button class="btn-secondary" type="button" @onclick="() => RejectAsync(id)">Reject</button>
                             </div>
                         </div>
