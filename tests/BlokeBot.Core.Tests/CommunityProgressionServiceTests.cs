@@ -15,6 +15,39 @@ public sealed class CommunityProgressionServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task CommittedSourceEvent_NotifiesTheOwningHostOnceAndIdempotentRetryDoesNotReplay()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var observer = new CommunityProgressionChangeObserver();
+        var service = CreateService(database, new ManualTimeProvider(_now), observer);
+        var setup = await ConfigureAsync(
+            database,
+            service,
+            hostId,
+            CommunityVisibility.Public,
+            CommunityEventRuleKind.ChatMessage,
+            CommunityCompletionMode.Repeatable,
+            CommunityResetSchedule.None,
+            target: 3,
+            scope: CommunityProgressScope.Communal
+        );
+        await OpenAsync(service, setup.Season, setup.Revision, hostId);
+        observer.HostIds.Clear();
+        var sourceEvent = new CommunitySourceEvent.ChatMessage(
+            "event-1",
+            new CommunityViewer("viewer-1", "viewer", "Viewer"),
+            _now
+        );
+
+        _ = Success(await service.ProcessEventAsync(hostId, sourceEvent, default));
+        Success(await service.ProcessEventAsync(hostId, sourceEvent, default))
+            .WasIdempotent.ShouldBeTrue();
+
+        observer.HostIds.ShouldBe([hostId]);
+    }
+
+    [Test]
     public async Task SupportedEvents_CompleteAtomicallyExactlyOnceAndFreezeClosedStandings()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -914,8 +947,30 @@ public sealed class CommunityProgressionServiceTests
 
     private static CommunityProgressionService CreateService(
         SqliteBlokeBotDbFactory database,
-        TimeProvider clock
-    ) => new(database, TestEventBus.Create<AppEventKind>(), clock);
+        TimeProvider clock,
+        ICommunityProgressionChangeObserver? observer = null
+    ) =>
+        new(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            clock,
+            observer is null ? null : [observer]
+        );
+
+    private sealed class CommunityProgressionChangeObserver : ICommunityProgressionChangeObserver
+    {
+        internal List<int> HostIds { get; } = [];
+
+        public ValueTask CommunityProgressionChangedAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            HostIds.Add(hostId);
+            return ValueTask.CompletedTask;
+        }
+    }
 
     private static async Task<ConfiguredSeason> ConfigureAsync(
         SqliteBlokeBotDbFactory database,

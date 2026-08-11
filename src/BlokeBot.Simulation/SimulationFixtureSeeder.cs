@@ -23,6 +23,10 @@ internal sealed class SimulationFixtureSeeder(
         "simulation-event-feed-overlay-key-000000000000";
     internal const string ViewerQueueOverlayAccessKey =
         "simulation-viewer-queue-overlay-key-0000000";
+    internal const string CommunityGoalOverlayAccessKey =
+        "simulation-community-goal-key-0000000000000";
+    internal const string ViewerFundedBountyOverlayAccessKey =
+        "simulation-bounty-progress-key-000000000000";
 
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
@@ -1186,6 +1190,60 @@ internal sealed class SimulationFixtureSeeder(
                     ConfigurationJson =
                         """{"schemaVersion":1,"title":"Community points giveaway","showEntrantCount":true,"showCountdown":true,"showJoinCommand":true,"appearance":{"x":160,"y":690,"width":1600,"height":270,"css":""}}""",
                     AccessKeyDigest = OverlayAccessKeyDigest.Compute(GiveawayOverlayAccessKey),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                }
+            );
+        }
+
+        if (
+            !await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("4c067d9e-5f8f-4b98-b9eb-597dc34f70fa"),
+                cancellationToken
+            )
+        )
+        {
+            _ = db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    PublicId = Guid.Parse("4c067d9e-5f8f-4b98-b9eb-597dc34f70fa"),
+                    HostId = hostId,
+                    Name = "Community milestone",
+                    Type = OverlayType.CommunityGoal,
+                    IsEnabled = true,
+                    ConfigurationJson =
+                        """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":0,"appearance":{"x":1160,"y":80,"width":680,"height":300,"css":""}}""",
+                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(CommunityGoalOverlayAccessKey),
+                    KeyVersion = 1,
+                    Revision = 1,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                }
+            );
+        }
+
+        if (
+            !await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("b1396f64-e28e-44df-8eaa-b1fb2ac0ff26"),
+                cancellationToken
+            )
+        )
+        {
+            _ = db.OverlayInstances.Add(
+                new OverlayInstance
+                {
+                    PublicId = Guid.Parse("b1396f64-e28e-44df-8eaa-b1fb2ac0ff26"),
+                    HostId = hostId,
+                    Name = "Viewer challenge",
+                    Type = OverlayType.ViewerFundedBounty,
+                    IsEnabled = true,
+                    ConfigurationJson =
+                        """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":3,"appearance":{"x":1160,"y":80,"width":680,"height":340,"css":""}}""",
+                    AccessKeyDigest = OverlayAccessKeyDigest.Compute(
+                        ViewerFundedBountyOverlayAccessKey
+                    ),
                     KeyVersion = 1,
                     Revision = 1,
                     CreatedAtUtc = now,

@@ -64,6 +64,8 @@ public abstract record OverlayConfiguration
                     OverlayType.Giveaway => ParseGiveaway(document.RootElement),
                     OverlayType.EventFeed => ParseEventFeed(document.RootElement),
                     OverlayType.ViewerQueue => ParseViewerQueue(document.RootElement),
+                    OverlayType.CommunityGoal => ParseCommunityGoal(document.RootElement),
+                    OverlayType.ViewerFundedBounty => ParseViewerFundedBounty(document.RootElement),
                     _ => new OverlayConfigurationParseResult.Invalid(
                         "The overlay type is not supported."
                     ),
@@ -265,6 +267,49 @@ public abstract record OverlayConfiguration
             return new OverlayConfigurationParseResult.Invalid(
                 "A Viewer Queue configuration must contain schemaVersion 1, a saved queue, current and next row counts from 0 to 12, and appearance."
             );
+        }
+    }
+
+    private static OverlayConfigurationParseResult ParseCommunityGoal(JsonElement root) =>
+        ParseProgressOverlay(
+            root,
+            static dto => new CommunityGoalV1(
+                dto.SelectedItemId,
+                dto.RotationSeconds,
+                dto.RecentContributorCount,
+                ParseAppearance(dto.Appearance!)
+            ),
+            "A community goal configuration must select one public goal or rotate current public communal goals, use a rotation from 5 to 120 seconds, show from 0 to 5 contributors, and include appearance."
+        );
+
+    private static OverlayConfigurationParseResult ParseViewerFundedBounty(JsonElement root) =>
+        ParseProgressOverlay(
+            root,
+            static dto => new ViewerFundedBountyV1(
+                dto.SelectedItemId,
+                dto.RotationSeconds,
+                dto.RecentContributorCount,
+                ParseAppearance(dto.Appearance!)
+            ),
+            "A viewer-funded bounty configuration must select one public bounty or rotate current public bounties, use a rotation from 5 to 120 seconds, show from 0 to 5 contributors, and include appearance."
+        );
+
+    private static OverlayConfigurationParseResult ParseProgressOverlay(
+        JsonElement root,
+        Func<ProgressOverlayConfigurationDto, OverlayConfiguration> create,
+        string invalidMessage
+    )
+    {
+        try
+        {
+            var dto = root.Deserialize<ProgressOverlayConfigurationDto>(_strictJsonOptions);
+            return dto is null || dto.SchemaVersion != 1 || dto.Appearance is null
+                ? new OverlayConfigurationParseResult.Invalid(invalidMessage)
+                : new OverlayConfigurationParseResult.Valid(create(dto));
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            return new OverlayConfigurationParseResult.Invalid(invalidMessage);
         }
     }
 
@@ -686,6 +731,109 @@ public abstract record OverlayConfiguration
                 _persistenceJsonOptions
             );
     }
+
+    public sealed record CommunityGoalV1 : ProgressOverlayV1
+    {
+        public CommunityGoalV1(
+            Guid? selectedItemId,
+            int rotationSeconds,
+            int recentContributorCount,
+            OverlayAppearance? appearance = null
+        )
+            : base(
+                selectedItemId,
+                rotationSeconds,
+                recentContributorCount,
+                appearance ?? OverlayAppearance.CommunityGoalDefault
+            ) { }
+
+        public override OverlayType Type => OverlayType.CommunityGoal;
+
+        public static CommunityGoalV1 Default =>
+            new(null, DefaultRotationSeconds, 0, OverlayAppearance.CommunityGoalDefault);
+    }
+
+    public sealed record ViewerFundedBountyV1 : ProgressOverlayV1
+    {
+        public ViewerFundedBountyV1(
+            Guid? selectedItemId,
+            int rotationSeconds,
+            int recentContributorCount,
+            OverlayAppearance? appearance = null
+        )
+            : base(
+                selectedItemId,
+                rotationSeconds,
+                recentContributorCount,
+                appearance ?? OverlayAppearance.ViewerFundedBountyDefault
+            ) { }
+
+        public override OverlayType Type => OverlayType.ViewerFundedBounty;
+
+        public static ViewerFundedBountyV1 Default =>
+            new(null, DefaultRotationSeconds, 3, OverlayAppearance.ViewerFundedBountyDefault);
+    }
+
+    public abstract record ProgressOverlayV1 : OverlayConfiguration
+    {
+        public const int MinimumRotationSeconds = 5;
+        public const int MaximumRotationSeconds = 120;
+        public const int DefaultRotationSeconds = 20;
+        public const int MaximumRecentContributorCount = 5;
+
+        private protected ProgressOverlayV1(
+            Guid? selectedItemId,
+            int rotationSeconds,
+            int recentContributorCount,
+            OverlayAppearance appearance
+        )
+        {
+            if (
+                selectedItemId == Guid.Empty
+                || rotationSeconds is < MinimumRotationSeconds or > MaximumRotationSeconds
+                || recentContributorCount is < 0 or > MaximumRecentContributorCount
+            )
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(rotationSeconds),
+                    "Choose one saved item or rotation from 5 to 120 seconds and show from 0 to 5 recent contributors."
+                );
+            }
+
+            SelectedItemId = selectedItemId;
+            RotationSeconds = rotationSeconds;
+            RecentContributorCount = recentContributorCount;
+            Appearance = appearance;
+        }
+
+        public override int SchemaVersion => 1;
+
+        public Guid? SelectedItemId { get; }
+
+        public int RotationSeconds { get; }
+
+        public int RecentContributorCount { get; }
+
+        public OverlayAppearance Appearance { get; }
+
+        internal override string ToPersistenceJson() =>
+            JsonSerializer.Serialize(
+                new ProgressOverlayConfigurationDto(
+                    SchemaVersion,
+                    SelectedItemId,
+                    RotationSeconds,
+                    RecentContributorCount,
+                    new OverlayAppearanceDto(
+                        Appearance.X,
+                        Appearance.Y,
+                        Appearance.Width,
+                        Appearance.Height,
+                        Appearance.Css
+                    )
+                ),
+                _persistenceJsonOptions
+            );
+    }
 }
 
 public enum EventFeedOverflowPolicy
@@ -749,6 +897,14 @@ internal sealed record ViewerQueueConfigurationDto(
     int QueueId,
     int CurrentRows,
     int NextRows,
+    OverlayAppearanceDto? Appearance
+);
+
+internal sealed record ProgressOverlayConfigurationDto(
+    int SchemaVersion,
+    Guid? SelectedItemId,
+    int RotationSeconds,
+    int RecentContributorCount,
     OverlayAppearanceDto? Appearance
 );
 

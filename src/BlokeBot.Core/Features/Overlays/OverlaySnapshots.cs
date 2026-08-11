@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Numerics;
 using System.Text.Json.Serialization;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Balances;
@@ -38,6 +40,12 @@ public interface IOverlayStateProvider
         ViewerQueueOverlaySampleState sample,
         CancellationToken cancellationToken
     ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
+
+    Task<OverlaySnapshotProjection> ProjectProgressSampleAsync(
+        ResolvedOverlayInstance instance,
+        ProgressOverlaySampleState sample,
+        CancellationToken cancellationToken
+    ) => Task.FromResult<OverlaySnapshotProjection>(new OverlaySnapshotProjection.Unavailable());
 }
 
 public enum GuessingOverlaySampleState
@@ -66,6 +74,16 @@ public enum ViewerQueueOverlaySampleState
     SelectedNext,
 }
 
+public enum ProgressOverlaySampleState
+{
+    Active,
+    ProgressUpdate,
+    Completed,
+    Failed,
+    Expired,
+    Empty,
+}
+
 public abstract record OverlaySnapshotProjection
 {
     private OverlaySnapshotProjection() { }
@@ -83,6 +101,12 @@ public abstract record OverlaySnapshotProjection
         : OverlaySnapshotProjection;
 
     public sealed record ViewerQueueV1(ViewerQueueV1OverlaySnapshot Snapshot)
+        : OverlaySnapshotProjection;
+
+    public sealed record CommunityGoalV1(CommunityGoalV1OverlaySnapshot Snapshot)
+        : OverlaySnapshotProjection;
+
+    public sealed record ViewerFundedBountyV1(ViewerFundedBountyV1OverlaySnapshot Snapshot)
         : OverlaySnapshotProjection;
 
     public sealed record Unavailable : OverlaySnapshotProjection;
@@ -190,6 +214,62 @@ public sealed record ViewerQueueV1OverlaySnapshot
 
     public required PlayQueueOverlayState State { get; init; }
 }
+
+public sealed record CommunityGoalV1OverlaySnapshot
+{
+    public string OverlayType => "communityGoal";
+    public int SchemaVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+    public required int RotationSeconds { get; init; }
+    public required string Animation { get; init; }
+    public OverlayAppearance Appearance { get; init; } = OverlayAppearance.CommunityGoalDefault;
+    public required ProgressOverlayPresentationState State { get; init; }
+}
+
+public sealed record ViewerFundedBountyV1OverlaySnapshot
+{
+    public string OverlayType => "viewerFundedBounty";
+    public int SchemaVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required DateTimeOffset GeneratedAtUtc { get; init; }
+    public required int RotationSeconds { get; init; }
+    public required string Animation { get; init; }
+    public OverlayAppearance Appearance { get; init; } =
+        OverlayAppearance.ViewerFundedBountyDefault;
+    public required ProgressOverlayPresentationState State { get; init; }
+}
+
+public sealed record ProgressOverlayPresentationState(
+    IReadOnlyList<ProgressOverlayItemPresentation> Items
+);
+
+public sealed record ProgressOverlayItemPresentation(
+    Guid Id,
+    string Context,
+    string Title,
+    string Current,
+    string Target,
+    int Percentage,
+    DateTimeOffset ExpiresAtUtc,
+    ProgressOverlayItemState State,
+    int CompletionCount,
+    IReadOnlyList<ProgressOverlayContributorPresentation> RecentContributors
+);
+
+[JsonConverter(typeof(JsonStringEnumConverter<ProgressOverlayItemState>))]
+public enum ProgressOverlayItemState
+{
+    Active,
+    Accepted,
+    Completed,
+    Failed,
+    Expired,
+}
+
+public sealed record ProgressOverlayContributorPresentation(string Login, string Amount);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "phase")]
 [JsonDerivedType(typeof(GiveawayV1OverlayPresentationState.Idle), "idle")]
@@ -440,6 +520,42 @@ internal sealed class OverlayStateProvider(
         )
         {
             return await GiveawayAsync(instance, giveawayConfiguration, cancellationToken);
+        }
+
+        if (
+            instance
+                is {
+                    Type: OverlayType.CommunityGoal,
+                    Configuration: OverlayConfiguration.CommunityGoalV1 communityGoalConfiguration,
+                }
+            && await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.CommunityGoal,
+                cancellationToken
+            )
+        )
+        {
+            return await CommunityGoalAsync(
+                instance,
+                communityGoalConfiguration,
+                cancellationToken
+            );
+        }
+
+        if (
+            instance
+                is {
+                    Type: OverlayType.ViewerFundedBounty,
+                    Configuration: OverlayConfiguration.ViewerFundedBountyV1 bountyConfiguration,
+                }
+            && await RequiredFeaturesEnabledAsync(
+                instance.HostId,
+                OverlayType.ViewerFundedBounty,
+                cancellationToken
+            )
+        )
+        {
+            return await ViewerFundedBountyAsync(instance, bountyConfiguration, cancellationToken);
         }
 
         if (
@@ -779,6 +895,70 @@ internal sealed class OverlayStateProvider(
         return ViewerQueue(instance, configuration, state, "none");
     }
 
+    public async Task<OverlaySnapshotProjection> ProjectProgressSampleAsync(
+        ResolvedOverlayInstance instance,
+        ProgressOverlaySampleState sample,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!await RequiredFeaturesEnabledAsync(instance.HostId, instance.Type, cancellationToken))
+        {
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var item =
+            sample is ProgressOverlaySampleState.Empty
+                ? Array.Empty<ProgressOverlayItemPresentation>()
+                :
+                [
+                    new ProgressOverlayItemPresentation(
+                        Guid.Parse("a43d6ff0-7f88-4c37-8118-a09f9ee795d8"),
+                        instance.Type is OverlayType.CommunityGoal
+                            ? "Season 3"
+                            : "Viewer challenge",
+                        instance.Type is OverlayType.CommunityGoal
+                            ? "Unlock the community showcase"
+                            : "Beat the midnight gauntlet",
+                        sample is ProgressOverlaySampleState.Completed ? "20000" : "13640",
+                        "20000",
+                        sample is ProgressOverlaySampleState.Completed ? 100 : 68,
+                        now.AddDays(sample is ProgressOverlaySampleState.Expired ? -1 : 12),
+                        SampleState(sample),
+                        sample is ProgressOverlaySampleState.Completed ? 1 : 0,
+                        instance.Type is OverlayType.ViewerFundedBounty
+                            ? new[]
+                            {
+                                new ProgressOverlayContributorPresentation("pixeljay", "500"),
+                                new ProgressOverlayContributorPresentation("mossybyte", "250"),
+                                new ProgressOverlayContributorPresentation("lumen", "100"),
+                            }
+                            : []
+                    ),
+                ];
+
+        return instance.Configuration switch
+        {
+            OverlayConfiguration.CommunityGoalV1 configuration => CommunityGoal(
+                instance,
+                configuration,
+                item,
+                sample is ProgressOverlaySampleState.ProgressUpdate
+                    ? "progress"
+                    : SampleAnimation(sample)
+            ),
+            OverlayConfiguration.ViewerFundedBountyV1 configuration => ViewerFundedBounty(
+                instance,
+                configuration,
+                item,
+                sample is ProgressOverlaySampleState.ProgressUpdate
+                    ? "progress"
+                    : SampleAnimation(sample)
+            ),
+            _ => new OverlaySnapshotProjection.Unavailable(),
+        };
+    }
+
     private OverlaySnapshotProjection Empty(ResolvedOverlayInstance instance) =>
         new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
@@ -805,6 +985,235 @@ internal sealed class OverlayStateProvider(
                 State = state,
             }
         );
+
+    private async Task<OverlaySnapshotProjection> CommunityGoalAsync(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.CommunityGoalV1 configuration,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var definitions = await db
+            .CommunityDefinitions.AsNoTracking()
+            .Where(value =>
+                value.HostId == instance.HostId
+                && value.Scope == CommunityProgressScope.Communal
+                && value.Season.Visibility == CommunityVisibility.Public
+                && (
+                    configuration.SelectedItemId == null
+                        ? value.Season.Status == CommunitySeasonStatus.Open
+                        : value.PublicId == configuration.SelectedItemId
+                            && value.Season.Status != CommunitySeasonStatus.Draft
+                )
+            )
+            .OrderBy(value => value.Season.EndsAtUtc)
+            .ThenBy(value => value.Id)
+            .Take(12)
+            .Select(value => new CommunityGoalProjectionRow(
+                value.Id,
+                value.PublicId,
+                value.Season.Name,
+                value.Name,
+                value.Target,
+                value.Season.Status,
+                value.Season.EndsAtUtc
+            ))
+            .ToArrayAsync(cancellationToken);
+        var definitionIds = definitions.Select(value => value.Id).ToArray();
+        var progress = await db
+            .CommunityProgress.AsNoTracking()
+            .Where(value =>
+                value.HostId == instance.HostId
+                && definitionIds.Contains(value.DefinitionId)
+                && value.ViewerTwitchUserId == null
+            )
+            .ToDictionaryAsync(
+                value => value.DefinitionId,
+                value => new { value.Amount, value.CompletionCount },
+                cancellationToken
+            );
+        var now = timeProvider.GetUtcNow();
+        var items = definitions
+            .Select(value =>
+            {
+                var progressValue = progress.GetValueOrDefault(value.Id);
+                var amount = progressValue?.Amount ?? 0;
+                var state =
+                    amount >= value.Target ? ProgressOverlayItemState.Completed
+                    : value.SeasonStatus == CommunitySeasonStatus.Open
+                    && value.ExpiresAtUtc > now.UtcDateTime
+                        ? ProgressOverlayItemState.Active
+                    : ProgressOverlayItemState.Expired;
+                return new ProgressOverlayItemPresentation(
+                    value.PublicId,
+                    value.SeasonName,
+                    value.Title,
+                    amount.ToString(CultureInfo.InvariantCulture),
+                    value.Target.ToString(CultureInfo.InvariantCulture),
+                    Percentage(amount, value.Target),
+                    Utc(value.ExpiresAtUtc),
+                    state,
+                    progressValue?.CompletionCount ?? 0,
+                    []
+                );
+            })
+            .ToArray();
+        return CommunityGoal(instance, configuration, items, "none");
+    }
+
+    private async Task<OverlaySnapshotProjection> ViewerFundedBountyAsync(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.ViewerFundedBountyV1 configuration,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var bounties = await db
+            .Bounties.AsNoTracking()
+            .Where(value =>
+                value.HostId == instance.HostId
+                && value.Visibility == BountyVisibility.Public
+                && (
+                    configuration.SelectedItemId == null
+                        ? value.Status != BountyStatus.Proposed
+                            && value.Status != BountyStatus.Cancelled
+                        : value.PublicId == configuration.SelectedItemId
+                            && value.Status != BountyStatus.Proposed
+                            && value.Status != BountyStatus.Cancelled
+                )
+            )
+            .OrderBy(value =>
+                value.Status == BountyStatus.Funding || value.Status == BountyStatus.Accepted
+                    ? 0
+                    : 1
+            )
+            .ThenBy(value => value.ExpiresAtUtc)
+            .ThenByDescending(value => value.UpdatedAtUtc)
+            .Take(12)
+            .Select(value => new BountyOverlayProjectionRow(
+                value.Id,
+                value.PublicId,
+                value.Title,
+                value.PledgedAmount,
+                value.FundingTarget,
+                value.Status,
+                value.ExpiresAtUtc
+            ))
+            .ToArrayAsync(cancellationToken);
+        var items = new List<ProgressOverlayItemPresentation>(bounties.Length);
+        foreach (var bounty in bounties)
+        {
+            var recent =
+                configuration.RecentContributorCount == 0
+                    ? []
+                    : await db
+                        .BountyPledges.AsNoTracking()
+                        .Where(value =>
+                            value.HostId == instance.HostId && value.BountyId == bounty.Id
+                        )
+                        .OrderByDescending(value => value.CreatedAtUtc)
+                        .ThenByDescending(value => value.Id)
+                        .Take(configuration.RecentContributorCount)
+                        .Select(value => new ProgressOverlayContributorPresentation(
+                            value.ContributorLogin,
+                            value.Amount
+                        ))
+                        .ToArrayAsync(cancellationToken);
+            var current = BigInteger.Parse(bounty.Current, CultureInfo.InvariantCulture);
+            var target = BigInteger.Parse(bounty.Target, CultureInfo.InvariantCulture);
+            items.Add(
+                new ProgressOverlayItemPresentation(
+                    bounty.PublicId,
+                    "Viewer-funded bounty",
+                    bounty.Title,
+                    bounty.Current,
+                    bounty.Target,
+                    Percentage(current, target),
+                    Utc(bounty.ExpiresAtUtc),
+                    BountyState(bounty.Status),
+                    0,
+                    recent
+                )
+            );
+        }
+        return ViewerFundedBounty(instance, configuration, items, "none");
+    }
+
+    private OverlaySnapshotProjection CommunityGoal(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.CommunityGoalV1 configuration,
+        IReadOnlyList<ProgressOverlayItemPresentation> items,
+        string animation
+    ) =>
+        new OverlaySnapshotProjection.CommunityGoalV1(
+            new CommunityGoalV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                RotationSeconds = configuration.RotationSeconds,
+                Animation = animation,
+                Appearance = configuration.Appearance,
+                State = new ProgressOverlayPresentationState(items),
+            }
+        );
+
+    private OverlaySnapshotProjection ViewerFundedBounty(
+        ResolvedOverlayInstance instance,
+        OverlayConfiguration.ViewerFundedBountyV1 configuration,
+        IReadOnlyList<ProgressOverlayItemPresentation> items,
+        string animation
+    ) =>
+        new OverlaySnapshotProjection.ViewerFundedBountyV1(
+            new ViewerFundedBountyV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                RotationSeconds = configuration.RotationSeconds,
+                Animation = animation,
+                Appearance = configuration.Appearance,
+                State = new ProgressOverlayPresentationState(items),
+            }
+        );
+
+    private static ProgressOverlayItemState SampleState(ProgressOverlaySampleState sample) =>
+        sample switch
+        {
+            ProgressOverlaySampleState.Completed => ProgressOverlayItemState.Completed,
+            ProgressOverlaySampleState.Failed => ProgressOverlayItemState.Failed,
+            ProgressOverlaySampleState.Expired => ProgressOverlayItemState.Expired,
+            _ => ProgressOverlayItemState.Active,
+        };
+
+    private static string SampleAnimation(ProgressOverlaySampleState sample) =>
+        sample switch
+        {
+            ProgressOverlaySampleState.Completed => "complete",
+            ProgressOverlaySampleState.Failed or ProgressOverlaySampleState.Expired =>
+                "statusChange",
+            _ => "none",
+        };
+
+    private static ProgressOverlayItemState BountyState(BountyStatus status) =>
+        status switch
+        {
+            BountyStatus.Accepted => ProgressOverlayItemState.Accepted,
+            BountyStatus.Completed => ProgressOverlayItemState.Completed,
+            BountyStatus.Failed => ProgressOverlayItemState.Failed,
+            BountyStatus.Expired => ProgressOverlayItemState.Expired,
+            _ => ProgressOverlayItemState.Active,
+        };
+
+    private static int Percentage(long current, long target) =>
+        Percentage(new BigInteger(current), new BigInteger(target));
+
+    private static int Percentage(BigInteger current, BigInteger target) =>
+        target <= 0
+            ? current > 0
+                ? 100
+                : 0
+            : (int)BigInteger.Min(100, BigInteger.Max(0, current * 100 / target));
 
     private async Task<bool> RequiredFeaturesEnabledAsync(
         int hostId,
@@ -1030,5 +1439,25 @@ internal sealed class OverlayStateProvider(
         DateTime? CompletedAtUtc,
         int EntrantCount,
         GiveawayWinnerPresentation[] Winners
+    );
+
+    private sealed record CommunityGoalProjectionRow(
+        long Id,
+        Guid PublicId,
+        string SeasonName,
+        string Title,
+        long Target,
+        CommunitySeasonStatus SeasonStatus,
+        DateTime ExpiresAtUtc
+    );
+
+    private sealed record BountyOverlayProjectionRow(
+        long Id,
+        Guid PublicId,
+        string Title,
+        string Current,
+        string Target,
+        BountyStatus Status,
+        DateTime ExpiresAtUtc
     );
 }

@@ -86,6 +86,11 @@ public sealed record OverlayAppearance
 
     public static OverlayAppearance ViewerQueueDefault => new(160, 140, 1200, 800, string.Empty);
 
+    public static OverlayAppearance CommunityGoalDefault => new(1160, 80, 680, 300, string.Empty);
+
+    public static OverlayAppearance ViewerFundedBountyDefault =>
+        new(1160, 80, 680, 340, string.Empty);
+
     public static string? ValidateCss(string css)
     {
         if (Encoding.UTF8.GetByteCount(css) > MaximumCssBytes)

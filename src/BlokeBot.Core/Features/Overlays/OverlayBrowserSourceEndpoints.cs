@@ -170,6 +170,9 @@ internal static class OverlayBrowserSourceEndpoints
                 SampleToken(value),
             OverlayType.ViewerQueue when TryParseViewerQueueSample(sample, out var value) =>
                 SampleToken(value),
+            OverlayType.CommunityGoal
+            or OverlayType.ViewerFundedBounty when TryParseProgressSample(sample, out var value) =>
+                SampleToken(value),
             _ => null,
         };
         return sampleToken is null
@@ -283,6 +286,14 @@ internal static class OverlayBrowserSourceEndpoints
                 context.RequestServices,
                 ct
             ),
+            (OverlayType.CommunityGoal or OverlayType.ViewerFundedBounty, var sample)
+                when TryParseProgressSample(sample, out var value) => ProjectSampleSafelyAsync(
+                stateProvider,
+                instance,
+                value,
+                context.RequestServices,
+                ct
+            ),
             _ => ProjectSafelyAsync(stateProvider, instance, context.RequestServices, ct),
         };
 
@@ -295,6 +306,8 @@ internal static class OverlayBrowserSourceEndpoints
             OverlaySnapshotProjection.GiveawayV1 giveaway => Results.Json(giveaway.Snapshot),
             OverlaySnapshotProjection.EventFeedV1 feed => Results.Json(feed.Snapshot),
             OverlaySnapshotProjection.ViewerQueueV1 queue => Results.Json(queue.Snapshot),
+            OverlaySnapshotProjection.CommunityGoalV1 goal => Results.Json(goal.Snapshot),
+            OverlaySnapshotProjection.ViewerFundedBountyV1 bounty => Results.Json(bounty.Snapshot),
             _ => Unavailable(),
         };
 
@@ -406,29 +419,14 @@ internal static class OverlayBrowserSourceEndpoints
             }
 
             var result = await overlays.GetAsync(session, overlayId, cancellationToken);
-            if (result is not OverlayInstanceResult<OverlayInstanceView>.Succeeded succeeded)
-            {
-                return new OverlayPreviewResolution.Unavailable();
-            }
-            var guessingDisabled =
-                succeeded.Value.Type is OverlayType.Guessing
-                && !await features.IsEnabledAsync(
+            return
+                result is OverlayInstanceResult<OverlayInstanceView>.Succeeded succeeded
+                && await features.IsEnabledAsync(
                     selectedHost.Id,
-                    HostFeatureFlags.Guessing,
+                    OverlayRequiredFeatures.For(succeeded.Value.Type),
                     cancellationToken
-                );
-            var giveawayDisabled =
-                succeeded.Value.Type is OverlayType.Giveaway
-                && !await features.IsEnabledAsync(
-                    selectedHost.Id,
-                    HostFeatureFlags.Points,
-                    cancellationToken
-                );
-            return guessingDisabled switch
-            {
-                true => new OverlayPreviewResolution.Unavailable(),
-                false when giveawayDisabled => new OverlayPreviewResolution.Unavailable(),
-                false => new OverlayPreviewResolution.Resolved(
+                )
+                ? new OverlayPreviewResolution.Resolved(
                     new ResolvedOverlayInstance(
                         selectedHost.Id,
                         succeeded.Value.Id,
@@ -436,8 +434,8 @@ internal static class OverlayBrowserSourceEndpoints
                         succeeded.Value.Configuration,
                         succeeded.Value.Revision
                     )
-                ),
-            };
+                )
+                : new OverlayPreviewResolution.Unavailable();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -484,6 +482,7 @@ internal static class OverlayBrowserSourceEndpoints
             OverlayConfiguration.GiveawayV1 giveaway => giveaway.Appearance,
             OverlayConfiguration.EventFeedV1 feed => feed.Appearance,
             OverlayConfiguration.ViewerQueueV1 queue => queue.Appearance,
+            OverlayConfiguration.ProgressOverlayV1 progress => progress.Appearance,
             _ => null,
         };
         return appearance?.ToScopedCss() ?? string.Empty;
@@ -591,6 +590,68 @@ internal static class OverlayBrowserSourceEndpoints
             return new OverlaySnapshotProjection.Unavailable();
         }
     }
+
+    private static async Task<OverlaySnapshotProjection> ProjectSampleSafelyAsync(
+        IOverlayStateProvider stateProvider,
+        ResolvedOverlayInstance instance,
+        ProgressOverlaySampleState sample,
+        IServiceProvider services,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            return await stateProvider.ProjectProgressSampleAsync(
+                instance,
+                sample,
+                cancellationToken
+            );
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            services
+                .GetRequiredService<ILogger<OverlayBrowserSourceLog>>()
+                .LogWarning(exception, "A progress overlay sample could not be projected.");
+            return new OverlaySnapshotProjection.Unavailable();
+        }
+    }
+
+    private static bool TryParseProgressSample(string? value, out ProgressOverlaySampleState sample)
+    {
+        sample = value switch
+        {
+            "active" => ProgressOverlaySampleState.Active,
+            "progress-update" => ProgressOverlaySampleState.ProgressUpdate,
+            "completed" => ProgressOverlaySampleState.Completed,
+            "failed" => ProgressOverlaySampleState.Failed,
+            "expired" => ProgressOverlaySampleState.Expired,
+            "empty" => ProgressOverlaySampleState.Empty,
+            _ => default,
+        };
+        return value
+            is "active"
+                or "progress-update"
+                or "completed"
+                or "failed"
+                or "expired"
+                or "empty";
+    }
+
+    private static string SampleToken(ProgressOverlaySampleState sample) =>
+        sample switch
+        {
+            ProgressOverlaySampleState.Active => "active",
+            ProgressOverlaySampleState.ProgressUpdate => "progress-update",
+            ProgressOverlaySampleState.Completed => "completed",
+            ProgressOverlaySampleState.Failed => "failed",
+            ProgressOverlaySampleState.Expired => "expired",
+            ProgressOverlaySampleState.Empty => "empty",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample)),
+        };
 
     private static bool TryParseViewerQueueSample(
         string? value,
@@ -890,6 +951,10 @@ internal static class OverlayBrowserSourceEndpoints
                                     or OverlayLiveTransportMessage.EventFeedEvent
                                     or OverlayLiveTransportMessage.ViewerQueueBaseline
                                     or OverlayLiveTransportMessage.ViewerQueueEvent
+                                    or OverlayLiveTransportMessage.CommunityGoalBaseline
+                                    or OverlayLiveTransportMessage.CommunityGoalEvent
+                                    or OverlayLiveTransportMessage.ViewerFundedBountyBaseline
+                                    or OverlayLiveTransportMessage.ViewerFundedBountyEvent
                                     or OverlayLiveTransportMessage.Cue
                                     or OverlayLiveTransportMessage.CueStop
                             && !live.MaySend(connection)
@@ -921,6 +986,14 @@ internal static class OverlayBrowserSourceEndpoints
                             OverlayLiveTransportMessage.ViewerQueueBaseline baseline =>
                                 JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.ViewerQueueEvent publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.CommunityGoalBaseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.CommunityGoalEvent publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.ViewerFundedBountyBaseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.ViewerFundedBountyEvent publication =>
                                 JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
                             OverlayLiveTransportMessage.Cue publication => JsonSerializer.Serialize(
                                 publication.Envelope,

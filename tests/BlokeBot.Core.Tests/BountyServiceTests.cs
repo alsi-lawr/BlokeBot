@@ -12,6 +12,36 @@ public sealed class BountyServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 10, 0, 0, TimeSpan.Zero);
 
     [Test]
+    public async Task CommittedPledge_NotifiesTheOwningHostOnceAndIdempotentRetryDoesNotReplay()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        await SeedBalanceAsync(database, hostId, "viewer", "100");
+        var observer = new BountyChangeObserver();
+        var service = new BountyService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            new ManualTimeProvider(_now),
+            changeObservers: [observer]
+        );
+        var bounty = Success(await service.CreateAsync(hostId, Create(), default)).Value;
+        bounty = Success(
+            await service.TransitionAsync(
+                hostId,
+                Transition(bounty, BountyTransitionAction.OpenFunding),
+                default
+            )
+        ).Value;
+        observer.HostIds.Clear();
+        var command = Pledge(bounty, "viewer-id", "viewer", 25);
+
+        _ = Success(await service.PledgeAsync(hostId, command, default));
+        Success(await service.PledgeAsync(hostId, command, default)).WasIdempotent.ShouldBeTrue();
+
+        observer.HostIds.ShouldBe([hostId]);
+    }
+
+    [Test]
     public async Task CompletedBounty_CapsFundingConsumesPledgesAndDistributesReward()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -546,6 +576,18 @@ public sealed class BountyServiceTests
     ) => new(Guid.NewGuid(), bounty.PublicId, bounty.Revision, action, Actor("host", "alpha"));
 
     private static BountyActor Actor(string userId, string login) => new(userId, login);
+
+    private sealed class BountyChangeObserver : IBountyChangeObserver
+    {
+        internal List<int> HostIds { get; } = [];
+
+        public ValueTask BountyChangedAsync(int hostId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            HostIds.Add(hostId);
+            return ValueTask.CompletedTask;
+        }
+    }
 
     private static BountyService CreateService(
         SqliteBlokeBotDbFactory database,

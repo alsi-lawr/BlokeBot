@@ -10,6 +10,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
+    private const string _v090Migration = "20260810154030_v0.9.0_BingoOpaqueAssignments";
     private const HostFeatureFlags _preAutomationsEnabledFeatures =
         HostFeatureFlags.Guessing
         | HostFeatureFlags.Points
@@ -141,6 +142,57 @@ public sealed class OverlayInstancePersistenceTests
         _ = await db.SaveChangesAsync();
         (await db.OverlayInstances.CountAsync()).ShouldBe(0);
         (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CommunityProgressOverlayMigration_PreservesSourcesAndAllowsOnlyNewTypedKinds()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using (var db = await factory.CreateDbContextAsync())
+        {
+            await db.GetService<IMigrator>().MigrateAsync(_v090Migration);
+            var host = new BotHost
+            {
+                TwitchUserId = "host-id",
+                Login = "host",
+                DisplayName = "Host",
+                EnabledFeatures = HostFeatureFlags.All,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            _ = db.OverlayInstances.Add(
+                Overlay(host.Id, Guid.NewGuid(), RandomDigest(30), """{"schemaVersion":1}""")
+            );
+            _ = await db.SaveChangesAsync();
+            await db.Database.MigrateAsync();
+
+            var goal = Overlay(
+                host.Id,
+                Guid.NewGuid(),
+                RandomDigest(60),
+                """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":0,"appearance":{"x":1160,"y":80,"width":680,"height":300,"css":""}}"""
+            );
+            goal.Type = OverlayType.CommunityGoal;
+            _ = db.OverlayInstances.Add(goal);
+            var bounty = Overlay(
+                host.Id,
+                Guid.NewGuid(),
+                RandomDigest(90),
+                """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":3,"appearance":{"x":1160,"y":80,"width":680,"height":340,"css":""}}"""
+            );
+            bounty.Type = OverlayType.ViewerFundedBounty;
+            _ = db.OverlayInstances.Add(bounty);
+            _ = await db.SaveChangesAsync();
+        }
+
+        await using var migrated = await factory.CreateDbContextAsync();
+        (
+            await migrated
+                .OverlayInstances.OrderBy(value => value.Id)
+                .Select(value => value.Type)
+                .ToArrayAsync()
+        ).ShouldBe([OverlayType.Empty, OverlayType.CommunityGoal, OverlayType.ViewerFundedBounty]);
     }
 
     private static OverlayInstance Overlay(

@@ -405,6 +405,16 @@ public partial class PageHelpButton
                     "Names follow the queue's public-name setting. Every optional entry field is public. Moderator notes, lobby details, Twitch account details, temporary skips, and queue history never appear.",
                 ]
             ),
+            new(
+                "Community goals and viewer-funded bounties",
+                "Choose one public item or rotate current public items. Community goal sources require Community progression and Overlays; viewer-funded bounty sources require Bounties and Overlays. These inherited requirements add no new Channel Setup switch.",
+                [
+                    "Turning either required parent off blocks projection, preview, Browser Source rendering, live publication, reconnect state, tests, and animations. The retained direct editor links to Channel setup.",
+                    "Saved source configuration and domain history remain intact. Turning both parents back on restores current authoritative progress without replaying suppressed updates, timers, queued work, or completion animations.",
+                    "Community sources expose only public communal goals. Bounty sources expose only public bounty state and the configured number of public pledge login/amount callouts. Hidden seasons, viewer progress, private bounties, Twitch user IDs, balances, moderator notes, reasons, and internal accounting remain private.",
+                    "Representative samples cover active progress, a progress change, completion, failure, expiry, and an empty public state without changing a goal or bounty.",
+                ]
+            ),
         ]
     );
 

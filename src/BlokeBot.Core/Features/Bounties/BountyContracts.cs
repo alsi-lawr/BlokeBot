@@ -13,6 +13,11 @@ public interface IBountyCompletionObserver
     );
 }
 
+public interface IBountyChangeObserver
+{
+    ValueTask BountyChangedAsync(int hostId, CancellationToken cancellationToken);
+}
+
 public static class BountyLimits
 {
     public const int MaximumTitleLength = 160;

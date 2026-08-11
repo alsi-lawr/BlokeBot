@@ -58,7 +58,8 @@ internal static class OverlayBrowserSourceAssets
         .guessing-card,
         .giveaway-card,
         .event-feed-card,
-        .viewer-queue-card {
+        .viewer-queue-card,
+        .progress-overlay-card {
           fill: rgba(15, 23, 42, 0.94);
           stroke: rgba(148, 163, 184, 0.72);
           stroke-width: 2;
@@ -67,7 +68,9 @@ internal static class OverlayBrowserSourceAssets
         .guessing-accent,
         .giveaway-accent,
         .event-feed-accent,
-        .viewer-queue-accent {
+        .viewer-queue-accent,
+        .progress-overlay-accent,
+        .progress-overlay-fill {
           fill: #60a5fa;
         }
 
@@ -133,6 +136,36 @@ internal static class OverlayBrowserSourceAssets
           from { opacity: 0.3; transform: translateY(24px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        .progress-overlay-kicker,
+        .progress-overlay-context,
+        .progress-overlay-title,
+        .progress-overlay-detail,
+        .progress-overlay-result,
+        .progress-overlay-contributors {
+          fill: #f8fafc;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        .progress-overlay-kicker { fill: #5eead4; font-size: 20px; font-weight: 850; letter-spacing: 3px; }
+        .progress-overlay-context { fill: #a5b4fc; font-size: 18px; font-weight: 750; text-anchor: end; }
+        .progress-overlay-title { font-size: 34px; font-weight: 850; }
+        .progress-overlay-detail { fill: #cbd5e1; font-size: 20px; font-weight: 650; }
+        .progress-overlay-result { fill: #f8fafc; font-size: 23px; font-weight: 800; }
+        .progress-overlay-contributors { fill: #cbd5e1; font-size: 16px; font-weight: 650; }
+        .progress-overlay-track { fill: rgba(255, 255, 255, 0.14); }
+        #overlay-root[data-progress-state="completed"] .progress-overlay-accent,
+        #overlay-root[data-progress-state="completed"] .progress-overlay-fill { fill: #34d399; }
+        #overlay-root[data-progress-state="failed"] .progress-overlay-accent,
+        #overlay-root[data-progress-state="failed"] .progress-overlay-fill { fill: #f87171; }
+        #overlay-root[data-progress-state="expired"] .progress-overlay-accent,
+        #overlay-root[data-progress-state="expired"] .progress-overlay-fill { fill: #fbbf24; }
+        #overlay-root[data-progress-state="accepted"] .progress-overlay-accent,
+        #overlay-root[data-progress-state="accepted"] .progress-overlay-fill { fill: #a78bfa; }
+        #overlay-root[data-animation="progress"] .progress-overlay-fill { animation: progress-overlay-fill 620ms ease-out; transform-origin: left; }
+        #overlay-root[data-animation="complete"] .progress-overlay-presentation { animation: progress-overlay-complete 760ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+        #overlay-root[data-animation="statusChange"] .progress-overlay-presentation { animation: guessing-overlay-status 360ms ease-out; }
+        @keyframes progress-overlay-fill { from { transform: scaleX(.72); } to { transform: scaleX(1); } }
+        @keyframes progress-overlay-complete { from { opacity: .35; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
 
         .giveaway-kicker {
           fill: #93c5fd;
@@ -282,6 +315,7 @@ internal static class OverlayBrowserSourceAssets
           let testPulseTimer = null;
           let presentationAnimationTimer = null;
           let giveawayCountdownTimer = null;
+          let progressRotationTimer = null;
           let loadedSnapshotSequence = null;
           const cueTimers = new Map();
           const svgNamespace = canvas.namespaceURI;
@@ -976,6 +1010,120 @@ internal static class OverlayBrowserSourceAssets
             });
           };
 
+          const validProgressState = (state) =>
+            typeof state === "object" &&
+            state !== null &&
+            Array.isArray(state.items) &&
+            state.items.length <= 12 &&
+            state.items.every((item) =>
+              typeof item?.id === "string" &&
+              typeof item.context === "string" &&
+              typeof item.title === "string" &&
+              typeof item.current === "string" &&
+              typeof item.target === "string" &&
+              Number.isSafeInteger(item.percentage) &&
+              item.percentage >= 0 &&
+              item.percentage <= 100 &&
+              Number.isSafeInteger(item.completionCount) &&
+              item.completionCount >= 0 &&
+              !Number.isNaN(Date.parse(item.expiresAtUtc)) &&
+              ["active", "accepted", "completed", "failed", "expired"].includes(
+                String(item.state).toLowerCase(),
+              ) &&
+              Array.isArray(item.recentContributors) &&
+              item.recentContributors.length <= 5 &&
+              item.recentContributors.every(
+                (contributor) =>
+                  typeof contributor?.login === "string" &&
+                  typeof contributor.amount === "string",
+              ),
+            );
+
+          const progressStatus = (state) => {
+            if (state === "completed") return "COMPLETED";
+            if (state === "failed") return "FAILED";
+            if (state === "expired") return "EXPIRED";
+            if (state === "accepted") return "ACCEPTED";
+            return "IN PROGRESS";
+          };
+
+          const progressExpiry = (item, generatedAtUtc) => {
+            const state = String(item.state).toLowerCase();
+            if (state === "completed" || state === "failed" || state === "expired") {
+              return progressStatus(state);
+            }
+            const remaining = Date.parse(item.expiresAtUtc) - Date.parse(generatedAtUtc);
+            if (remaining <= 0) return "Deadline reached";
+            const days = Math.ceil(remaining / 86400000);
+            return days === 1 ? "Ends in 1 day" : `Ends in ${days} days`;
+          };
+
+          const renderProgress = (state, appearance, rotationSeconds, overlayType, generatedAtUtc) => {
+            if (progressRotationTimer !== null) {
+              window.clearTimeout(progressRotationTimer);
+              progressRotationTimer = null;
+            }
+            canvas.replaceChildren();
+            if (state.items.length === 0) {
+              delete root.dataset.progressState;
+              return;
+            }
+
+            const renderItem = (index) => {
+              canvas.replaceChildren();
+              const item = state.items[index];
+              const itemState = String(item.state).toLowerCase();
+              root.dataset.progressState = itemState;
+              const definitions = svgElement("defs", {});
+              appendTextClip(definitions, "progress-overlay-title-clip", 30, 60, 620, 54);
+              const geometryGroup = svgElement("g", {
+                class: "overlay",
+                transform: `translate(${appearance.x} ${appearance.y}) scale(${appearance.width / 680} ${appearance.height / 340})`,
+              });
+              const presentationGroup = svgElement("g", { class: "progress-overlay-presentation" });
+              presentationGroup.append(
+                definitions,
+                svgElement("rect", { class: "progress-overlay-card card", x: "0", y: "0", width: "680", height: "340", rx: "22" }),
+                svgElement("rect", { class: "progress-overlay-accent accent", x: "0", y: "0", width: "9", height: "340", rx: "5" }),
+              );
+              appendText(
+                presentationGroup,
+                "progress-overlay-kicker kicker",
+                30,
+                38,
+                `${overlayType === "communityGoal" ? "COMMUNITY GOAL" : "VIEWER-FUNDED BOUNTY"}${state.items.length > 1 ? ` · ${index + 1} OF ${state.items.length}` : ""}`,
+              );
+              appendText(presentationGroup, "progress-overlay-context detail", 650, 38, item.context);
+              appendFittedText(presentationGroup, "progress-overlay-title title", 30, 99, item.title, 620, "progress-overlay-title-clip");
+              appendText(presentationGroup, "progress-overlay-result result", 30, 142, `${item.current} / ${item.target}`);
+              appendText(presentationGroup, "progress-overlay-context detail", 650, 142, `${item.percentage}%`);
+              presentationGroup.append(
+                svgElement("rect", { class: "progress-overlay-track", x: "30", y: "160", width: "620", height: "14", rx: "7" }),
+                svgElement("rect", { class: "progress-overlay-fill accent", x: "30", y: "160", width: String(620 * item.percentage / 100), height: "14", rx: "7" }),
+              );
+              appendText(presentationGroup, "progress-overlay-detail detail", 30, 210, progressStatus(itemState));
+              appendText(presentationGroup, "progress-overlay-context detail", 650, 210, progressExpiry(item, generatedAtUtc));
+              if (item.recentContributors.length > 0) {
+                appendText(
+                  presentationGroup,
+                  "progress-overlay-contributors detail",
+                  30,
+                  272,
+                  item.recentContributors.map((value) => `@${value.login} +${value.amount}`).join("   •   "),
+                );
+              }
+              geometryGroup.append(presentationGroup);
+              canvas.append(geometryGroup);
+              if (state.items.length > 1) {
+                progressRotationTimer = window.setTimeout(() => {
+                  applyAnimation("statusChange", 700);
+                  renderItem((index + 1) % state.items.length);
+                }, rotationSeconds * 1000);
+              }
+            };
+            renderItem(0);
+          };
+
           const clearPresentationAnimation = () => {
             if (presentationAnimationTimer !== null) {
               window.clearTimeout(presentationAnimationTimer);
@@ -996,6 +1144,8 @@ internal static class OverlayBrowserSourceAssets
               && animation !== "partyChange"
               && animation !== "readyOutcome"
               && animation !== "selectedNext"
+              && animation !== "progress"
+              && animation !== "complete"
             ) {
               return;
             }
@@ -1085,7 +1235,12 @@ internal static class OverlayBrowserSourceAssets
                 state.next = state.next.slice(0, dashboardDraft.choices.nextRows);
               }
             }
-            return { ...projection, state, appearance: dashboardDraft.appearance };
+            const rotationSeconds =
+              (projection.overlayType === "communityGoal" || projection.overlayType === "viewerFundedBounty") &&
+              Number.isSafeInteger(dashboardDraft.choices?.rotationSeconds)
+                ? dashboardDraft.choices.rotationSeconds
+                : projection.rotationSeconds;
+            return { ...projection, state, rotationSeconds, appearance: dashboardDraft.appearance };
           };
 
           const applyPresentation = (projection, sequence, epoch, occurredAtUtc, fromDraft = false) => {
@@ -1174,6 +1329,26 @@ internal static class OverlayBrowserSourceAssets
                   ? projection.animation
                   : "none",
                 700,
+                fromDraft,
+              );
+            } else if (projection.overlayType === "communityGoal" || projection.overlayType === "viewerFundedBounty") {
+              if (
+                !Number.isSafeInteger(projection.rotationSeconds) ||
+                projection.rotationSeconds < 5 ||
+                projection.rotationSeconds > 120 ||
+                !validProgressState(projection.state) ||
+                !validAppearance(projection.appearance)
+              ) return false;
+              renderProgress(
+                projection.state,
+                projection.appearance,
+                projection.rotationSeconds,
+                projection.overlayType,
+                occurredAtUtc,
+              );
+              applyPresentationAnimation(
+                typeof projection.animation === "string" ? projection.animation : "none",
+                900,
                 fromDraft,
               );
             } else {
@@ -1596,6 +1771,9 @@ internal static class OverlayBrowserSourceAssets
               }
               if (giveawayCountdownTimer !== null) {
                 window.clearTimeout(giveawayCountdownTimer);
+              }
+              if (progressRotationTimer !== null) {
+                window.clearTimeout(progressRotationTimer);
               }
               clearCues();
             },
