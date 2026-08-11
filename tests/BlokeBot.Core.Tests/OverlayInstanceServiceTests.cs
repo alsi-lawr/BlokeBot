@@ -563,6 +563,80 @@ public sealed class OverlayInstanceServiceTests
         (await db.OverlayInstanceEvents.CountAsync()).ShouldBe(1);
     }
 
+    [Test]
+    public async Task CommunityProgressOverlayParents_BlockEveryManagedBoundaryAndRetainSetup()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var session = Session(AuthRole.Streamer, fixture.HostId);
+        var cases = new (CreateOverlayInstanceCommand Command, HostFeatureFlags RequiredParent)[]
+        {
+            (
+                new(
+                    "Community goal",
+                    OverlayType.CommunityGoal,
+                    OverlayConfiguration.CommunityGoalV1.Default
+                ),
+                HostFeatureFlags.CommunityProgression
+            ),
+            (
+                new(
+                    "Viewer-funded bounty",
+                    OverlayType.ViewerFundedBounty,
+                    OverlayConfiguration.ViewerFundedBountyV1.Default
+                ),
+                HostFeatureFlags.Bounties
+            ),
+        };
+
+        foreach (var (command, requiredParent) in cases)
+        {
+            await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays | requiredParent);
+            var created = (
+                await fixture.Service.CreateAsync(session, command, CancellationToken.None)
+            ).SucceededValue();
+
+            foreach (var incomplete in new[] { HostFeatureFlags.Overlays, requiredParent })
+            {
+                await fixture.SetFeaturesAsync(incomplete);
+                _ = (
+                    await fixture.Resolver.ResolveAsync(
+                        created.PrivateAccess.AccessKey,
+                        CancellationToken.None
+                    )
+                ).ShouldBeOfType<OverlayResolutionResult.NotFound>();
+                _ = (
+                    await fixture.Service.ConfigureAsync(
+                        session,
+                        new(
+                            created.Instance.Id,
+                            created.Instance.Revision,
+                            created.Instance.Configuration
+                        ),
+                        CancellationToken.None
+                    )
+                )
+                    .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceView>.Rejected>()
+                    .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+                _ = (await fixture.Service.CreateAsync(session, command, CancellationToken.None))
+                    .ShouldBeOfType<OverlayInstanceResult<OverlayInstanceCreation>.Rejected>()
+                    .Reason.ShouldBeOfType<OverlayInstanceRejection.FeatureDisabled>();
+            }
+
+            await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays | requiredParent);
+            var restored = (
+                await fixture.Service.GetAsync(session, created.Instance.Id, CancellationToken.None)
+            ).SucceededValue();
+            restored.Revision.ShouldBe(created.Instance.Revision);
+            restored.Configuration.ShouldBe(created.Instance.Configuration);
+            _ = (
+                await fixture.Resolver.ResolveAsync(
+                    created.PrivateAccess.AccessKey,
+                    CancellationToken.None
+                )
+            ).ShouldBeOfType<OverlayResolutionResult.Resolved>();
+        }
+    }
+
     private static CreateOverlayInstanceCommand Create(string name) =>
         new(name, OverlayType.Empty, new OverlayConfiguration.EmptyV1());
 

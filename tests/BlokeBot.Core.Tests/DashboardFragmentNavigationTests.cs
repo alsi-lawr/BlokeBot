@@ -248,7 +248,11 @@ public sealed class DashboardFragmentNavigationTests
         _ = context.Services.AddSingleton<IModeratorAuthorityService>(
             new GrantedModeratorAuthority()
         );
-        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
         return context;
     }
 

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using BlokeBot.Core.Features.Bounties;
+using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.Guessing.Game;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points.Giveaways;
@@ -23,7 +25,9 @@ internal sealed class OverlayLiveCoordinator(
         IAsyncDisposable,
         IGuessingChangeObserver,
         IPointsGiveawayChangeObserver,
-        IPlayQueueChangeObserver
+        IPlayQueueChangeObserver,
+        IBountyChangeObserver,
+        ICommunityProgressionChangeObserver
 {
     private const int _connectionQueueCapacity = 16;
     private readonly CancellationTokenSource _stopping = new();
@@ -34,6 +38,7 @@ internal sealed class OverlayLiveCoordinator(
     private readonly Dictionary<Guid, long> _sequences = [];
     private readonly Dictionary<OverlayIdentity, GuessingOverlayPhase> _guessingPhases = [];
     private readonly Dictionary<OverlayIdentity, GiveawayOverlayPhase> _giveawayPhases = [];
+    private readonly Dictionary<OverlayIdentity, ProgressOverlayFingerprint> _progressStates = [];
     private IDisposable? _overlayChangesSubscription;
     private IDisposable? _playQueueChangesSubscription;
     private long _generation;
@@ -125,6 +130,14 @@ internal sealed class OverlayLiveCoordinator(
     public ValueTask GiveawayChangedAsync(int hostId, CancellationToken cancellationToken) =>
         OverlayTypeChangedAsync(hostId, OverlayType.Giveaway, cancellationToken);
 
+    public ValueTask BountyChangedAsync(int hostId, CancellationToken cancellationToken) =>
+        OverlayTypeChangedAsync(hostId, OverlayType.ViewerFundedBounty, cancellationToken);
+
+    public ValueTask CommunityProgressionChangedAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => OverlayTypeChangedAsync(hostId, OverlayType.CommunityGoal, cancellationToken);
+
     private ValueTask OverlayTypeChangedAsync(
         int hostId,
         OverlayType type,
@@ -200,6 +213,8 @@ internal sealed class OverlayLiveCoordinator(
                 or OverlaySnapshotProjection.GiveawayV1
                 or OverlaySnapshotProjection.EventFeedV1
                 or OverlaySnapshotProjection.ViewerQueueV1
+                or OverlaySnapshotProjection.CommunityGoalV1
+                or OverlaySnapshotProjection.ViewerFundedBountyV1
             )
         )
         {
@@ -301,6 +316,8 @@ internal sealed class OverlayLiveCoordinator(
                     or OverlaySnapshotProjection.GiveawayV1
                     or OverlaySnapshotProjection.EventFeedV1
                     or OverlaySnapshotProjection.ViewerQueueV1
+                    or OverlaySnapshotProjection.CommunityGoalV1
+                    or OverlaySnapshotProjection.ViewerFundedBountyV1
                 )
             )
             {
@@ -448,6 +465,18 @@ internal sealed class OverlayLiveCoordinator(
                         },
                     }
                 ),
+            OverlaySnapshotProjection.CommunityGoalV1 goal => ProgressBaseline(
+                instance,
+                goal.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
+            OverlaySnapshotProjection.ViewerFundedBountyV1 bounty => ProgressBaseline(
+                instance,
+                bounty.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required to open a live overlay."
             ),
@@ -570,6 +599,20 @@ internal sealed class OverlayLiveCoordinator(
                         },
                     }
                 ),
+            OverlaySnapshotProjection.CommunityGoalV1 goal => ProgressEvent(
+                publication.Kind,
+                identity,
+                goal.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
+            OverlaySnapshotProjection.ViewerFundedBountyV1 bounty => ProgressEvent(
+                publication.Kind,
+                identity,
+                bounty.Snapshot,
+                sequence,
+                occurredAtUtc
+            ),
             _ => throw new InvalidOperationException(
                 "A supported projection is required for live publication."
             ),
@@ -602,6 +645,141 @@ internal sealed class OverlayLiveCoordinator(
             }
         );
     }
+
+    private OverlayLiveTransportMessage ProgressBaseline(
+        ResolvedOverlayInstance instance,
+        CommunityGoalV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        _progressStates[new OverlayIdentity(instance.HostId, instance.OverlayId)] = Fingerprint(
+            snapshot.State
+        );
+        return new OverlayLiveTransportMessage.CommunityGoalBaseline(
+            new CommunityGoalV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                EventType = "baseline",
+                OccurredAtUtc = occurredAtUtc,
+                Payload = new CommunityGoalV1OverlayLivePayload
+                {
+                    RotationSeconds = snapshot.RotationSeconds,
+                    Animation = "none",
+                    State = snapshot.State,
+                },
+            }
+        );
+    }
+
+    private OverlayLiveTransportMessage ProgressBaseline(
+        ResolvedOverlayInstance instance,
+        ViewerFundedBountyV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        _progressStates[new OverlayIdentity(instance.HostId, instance.OverlayId)] = Fingerprint(
+            snapshot.State
+        );
+        return new OverlayLiveTransportMessage.ViewerFundedBountyBaseline(
+            new ViewerFundedBountyV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                EventType = "baseline",
+                OccurredAtUtc = occurredAtUtc,
+                Payload = new ViewerFundedBountyV1OverlayLivePayload
+                {
+                    RotationSeconds = snapshot.RotationSeconds,
+                    Animation = "none",
+                    State = snapshot.State,
+                },
+            }
+        );
+    }
+
+    private OverlayLiveTransportMessage ProgressEvent(
+        OverlayLivePublicationKind kind,
+        OverlayIdentity identity,
+        CommunityGoalV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        var animation = ProgressAnimation(kind, identity, snapshot.State);
+        return new OverlayLiveTransportMessage.CommunityGoalEvent(
+            new CommunityGoalV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                EventType = kind is OverlayLivePublicationKind.Test ? "test" : "state",
+                OccurredAtUtc = occurredAtUtc,
+                Payload = new CommunityGoalV1OverlayLivePayload
+                {
+                    RotationSeconds = snapshot.RotationSeconds,
+                    Animation = animation,
+                    State = snapshot.State,
+                },
+            }
+        );
+    }
+
+    private OverlayLiveTransportMessage ProgressEvent(
+        OverlayLivePublicationKind kind,
+        OverlayIdentity identity,
+        ViewerFundedBountyV1OverlaySnapshot snapshot,
+        long sequence,
+        DateTimeOffset occurredAtUtc
+    )
+    {
+        var animation = ProgressAnimation(kind, identity, snapshot.State);
+        return new OverlayLiveTransportMessage.ViewerFundedBountyEvent(
+            new ViewerFundedBountyV1OverlayLiveEnvelope
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = sequence,
+                EventType = kind is OverlayLivePublicationKind.Test ? "test" : "state",
+                OccurredAtUtc = occurredAtUtc,
+                Payload = new ViewerFundedBountyV1OverlayLivePayload
+                {
+                    RotationSeconds = snapshot.RotationSeconds,
+                    Animation = animation,
+                    State = snapshot.State,
+                },
+            }
+        );
+    }
+
+    private string ProgressAnimation(
+        OverlayLivePublicationKind kind,
+        OverlayIdentity identity,
+        ProgressOverlayPresentationState state
+    )
+    {
+        var current = Fingerprint(state);
+        var previous = _progressStates.GetValueOrDefault(identity);
+        _progressStates[identity] = current;
+        return kind is OverlayLivePublicationKind.Test || previous is null ? "none"
+            : previous.CompletionCount < current.CompletionCount ? "complete"
+            : previous.State is not ProgressOverlayItemState.Completed
+            && current.State is ProgressOverlayItemState.Completed
+                ? "complete"
+            : previous.ItemId != current.ItemId || previous.State != current.State ? "statusChange"
+            : previous.Current == current.Current ? "none"
+            : "progress";
+    }
+
+    private static ProgressOverlayFingerprint Fingerprint(ProgressOverlayPresentationState state) =>
+        state.Items.FirstOrDefault() is { } item
+            ? new ProgressOverlayFingerprint(
+                item.Id,
+                item.Current,
+                item.State,
+                item.CompletionCount
+            )
+            : ProgressOverlayFingerprint.Empty;
 
     private static GiveawayV1OverlayLivePayload GiveawayPayload(
         GiveawayV1OverlaySnapshot snapshot,
@@ -772,6 +950,7 @@ internal sealed class OverlayLiveCoordinator(
             }
             _guessingPhases.Clear();
             _giveawayPhases.Clear();
+            _progressStates.Clear();
         }
     }
 
@@ -837,6 +1016,17 @@ internal sealed class OverlayLiveCoordinator(
         OverlayLivePublicationKind Kind,
         PlayQueueOverlayTransition QueueTransition
     );
+
+    private sealed record ProgressOverlayFingerprint(
+        Guid ItemId,
+        string Current,
+        ProgressOverlayItemState State,
+        int CompletionCount
+    )
+    {
+        internal static ProgressOverlayFingerprint Empty { get; } =
+            new(Guid.Empty, string.Empty, ProgressOverlayItemState.Active, 0);
+    }
 
     private sealed class PresenceState
     {
@@ -1013,6 +1203,19 @@ internal abstract record OverlayLiveTransportMessage
         : OverlayLiveTransportMessage;
 
     internal sealed record ViewerQueueEvent(ViewerQueueV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record CommunityGoalBaseline(CommunityGoalV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record CommunityGoalEvent(CommunityGoalV1OverlayLiveEnvelope Envelope)
+        : OverlayLiveTransportMessage;
+
+    internal sealed record ViewerFundedBountyBaseline(
+        ViewerFundedBountyV1OverlayLiveEnvelope Envelope
+    ) : OverlayLiveTransportMessage;
+
+    internal sealed record ViewerFundedBountyEvent(ViewerFundedBountyV1OverlayLiveEnvelope Envelope)
         : OverlayLiveTransportMessage;
 
     internal sealed record Cue(CuePlaybackLiveEnvelope Envelope) : OverlayLiveTransportMessage;

@@ -50,6 +50,13 @@ public partial class OverlaySourcesPanel
     private int _viewerQueueId;
     private int _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
     private int _viewerQueueNextRows = OverlayConfiguration.ViewerQueueV1.DefaultNextRows;
+    private IReadOnlyList<ProgressOverlayOption> _communityGoalOptions = [];
+    private IReadOnlyList<ProgressOverlayOption> _bountyOptions = [];
+    private Guid? _progressSelectedItemId;
+    private int _progressRotationSeconds = OverlayConfiguration
+        .ProgressOverlayV1
+        .DefaultRotationSeconds;
+    private int _progressRecentContributorCount = 3;
     private int _appearanceX = OverlayAppearance.GuessingDefault.X;
     private int _appearanceY = OverlayAppearance.GuessingDefault.Y;
     private int _appearanceWidth = OverlayAppearance.GuessingDefault.Width;
@@ -62,6 +69,8 @@ public partial class OverlaySourcesPanel
     private bool _guessingFeatureEnabled;
     private bool _pointsFeatureEnabled;
     private bool _playWithViewersFeatureEnabled;
+    private bool _bountiesFeatureEnabled;
+    private bool _communityProgressionFeatureEnabled;
     private bool _isCreating = true;
     private bool _isLoading = true;
     private bool _isBusy;
@@ -110,16 +119,27 @@ public partial class OverlaySourcesPanel
             {
                 mode = $"?mode=representative&sample={SampleToken(_viewerQueuePreviewSample)}";
             }
+            if (
+                _previewMode is OverlayPreviewMode.Representative
+                && _selected.Type is OverlayType.CommunityGoal or OverlayType.ViewerFundedBounty
+            )
+            {
+                mode = $"?mode=representative&sample={SampleToken(_progressPreviewSample)}";
+            }
             return $"/overlays/preview/{_selected.Id:D}{mode}";
         }
     }
 
-    private bool _selectedFeatureEnabled =>
-        _selected?.Type switch
+    private bool _selectedFeatureEnabled => FeatureEnabled(_selected?.Type ?? _draftType);
+
+    private bool FeatureEnabled(OverlayType type) =>
+        type switch
         {
             OverlayType.Guessing => _guessingFeatureEnabled,
             OverlayType.Giveaway => _pointsFeatureEnabled,
             OverlayType.ViewerQueue => _playWithViewersFeatureEnabled,
+            OverlayType.CommunityGoal => _communityProgressionFeatureEnabled,
+            OverlayType.ViewerFundedBounty => _bountiesFeatureEnabled,
             _ => true,
         };
 
@@ -128,6 +148,7 @@ public partial class OverlaySourcesPanel
     private OverlayEventFeedKind _eventFeedPreviewSample = OverlayEventFeedKind.PointAward;
     private ViewerQueueOverlaySampleState _viewerQueuePreviewSample =
         ViewerQueueOverlaySampleState.Open;
+    private ProgressOverlaySampleState _progressPreviewSample = ProgressOverlaySampleState.Active;
 
     private static readonly IReadOnlyList<
         StudioSegmentedOption<OverlayPreviewMode>
@@ -177,6 +198,17 @@ public partial class OverlaySourcesPanel
     [
         .. Enum.GetValues<ViewerQueueOverlaySampleState>()
             .Select(sample => new StudioSegmentedOption<ViewerQueueOverlaySampleState?>(
+                sample,
+                SampleLabel(sample)
+            )),
+    ];
+
+    private static readonly IReadOnlyList<
+        StudioSegmentedOption<ProgressOverlaySampleState?>
+    > _progressSampleOptions =
+    [
+        .. Enum.GetValues<ProgressOverlaySampleState>()
+            .Select(sample => new StudioSegmentedOption<ProgressOverlaySampleState?>(
                 sample,
                 SampleLabel(sample)
             )),
@@ -253,9 +285,20 @@ public partial class OverlaySourcesPanel
                 .FirstOrDefault(queue => queue.Id == _viewerQueueId)
                 ?.Name
                 ?? "Viewer Queue",
+            OverlayType.CommunityGoal when !_communityProgressionFeatureEnabled =>
+                "Paused: Community progression is off",
+            OverlayType.ViewerFundedBounty when !_bountiesFeatureEnabled =>
+                "Paused: Bounties is off",
+            OverlayType.CommunityGoal => ProgressSelectionSummary(_communityGoalOptions),
+            OverlayType.ViewerFundedBounty => ProgressSelectionSummary(_bountyOptions),
             OverlayType.CuePlayer => "Receives reusable cue layers",
             _ => "No visual settings",
         };
+
+    private string ProgressSelectionSummary(IReadOnlyList<ProgressOverlayOption> options) =>
+        _progressSelectedItemId is { } selected
+            ? options.FirstOrDefault(value => value.Id == selected)?.Label ?? "Selected item"
+            : $"Rotate current items · {_progressRotationSeconds} s";
 
     private string EventFeedKindSummary()
     {
@@ -392,10 +435,48 @@ public partial class OverlaySourcesPanel
                 HostFeatureFlags.PlayWithViewers,
                 CancellationToken.None
             );
+            _bountiesFeatureEnabled = await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Bounties,
+                CancellationToken.None
+            );
+            _communityProgressionFeatureEnabled = await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.CommunityProgression,
+                CancellationToken.None
+            );
             _queueOptions = _playWithViewersFeatureEnabled
                 ? await _queues.GetQueuesForHostAsync(HostId, CancellationToken.None)
                 : [];
             _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
+            _communityGoalOptions = _communityProgressionFeatureEnabled
+                ? (await _progression.GetModeratorSeasonsAsync(HostId, CancellationToken.None))
+                    .Where(season =>
+                        season.Visibility == CommunityVisibility.Public
+                        && season.Status != CommunitySeasonStatus.Draft
+                    )
+                    .SelectMany(season =>
+                        season
+                            .Definitions.Where(definition =>
+                                definition.Scope == CommunityProgressScope.Communal
+                            )
+                            .Select(definition => new ProgressOverlayOption(
+                                definition.Id.Value,
+                                $"{season.Name} · {definition.Name}"
+                            ))
+                    )
+                    .ToArray()
+                : [];
+            _bountyOptions = _bountiesFeatureEnabled
+                ? (await _bounties.GetModeratorBoardAsync(HostId, CancellationToken.None))
+                    .Select(value => value.Bounty)
+                    .Where(value =>
+                        value.Visibility == BountyVisibility.Public
+                        && value.Status is not (BountyStatus.Proposed or BountyStatus.Cancelled)
+                    )
+                    .Select(value => new ProgressOverlayOption(value.PublicId, value.Title))
+                    .ToArray()
+                : [];
 
             var result = await _overlays.ListAsync(PageContext.Session, CancellationToken.None);
             _ = result.Match(
@@ -452,6 +533,9 @@ public partial class OverlaySourcesPanel
         _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
         _viewerQueueNextRows = OverlayConfiguration.ViewerQueueV1.DefaultNextRows;
         _viewerQueueId = _queueOptions.FirstOrDefault()?.Id ?? 0;
+        _progressSelectedItemId = null;
+        _progressRotationSeconds = OverlayConfiguration.ProgressOverlayV1.DefaultRotationSeconds;
+        _progressRecentContributorCount = 3;
         LoadAppearance(DefaultAppearance(_draftType));
         _revealedBrowserSourceUrl = null;
         _openStages.Reset(OverlaySourceStage.Basics);
@@ -461,6 +545,13 @@ public partial class OverlaySourcesPanel
                 "New overlay ready. Name it, then select Create overlay. Nothing has been saved yet."
             );
         }
+    }
+
+    private void DraftTypeChanged()
+    {
+        _progressSelectedItemId = null;
+        _progressRecentContributorCount = _draftType is OverlayType.ViewerFundedBounty ? 3 : 0;
+        LoadAppearance(DefaultAppearance(_draftType));
     }
 
     private void SelectOverlay(OverlayInstanceView overlay) =>
@@ -527,6 +618,13 @@ public partial class OverlaySourcesPanel
             _viewerQueueNextRows = queue.NextRows;
             LoadAppearance(queue.Appearance);
         }
+        if (overlay.Configuration is OverlayConfiguration.ProgressOverlayV1 progress)
+        {
+            _progressSelectedItemId = progress.SelectedItemId;
+            _progressRotationSeconds = progress.RotationSeconds;
+            _progressRecentContributorCount = progress.RecentContributorCount;
+            LoadAppearance(progress.Appearance);
+        }
         _isCreating = false;
         _revealedBrowserSourceUrl = null;
         if (clearFeedback)
@@ -591,6 +689,10 @@ public partial class OverlaySourcesPanel
                             "This giveaway overlay is paused. Turn Points on in Channel setup before changing it.",
                         OverlayType.ViewerQueue =>
                             "This Viewer Queue overlay is paused. Turn Play with viewers on in Channel setup before changing it.",
+                        OverlayType.CommunityGoal =>
+                            "This community goal overlay is paused. Turn Community progression on in Channel setup before changing it.",
+                        OverlayType.ViewerFundedBounty =>
+                            "This viewer-funded bounty overlay is paused. Turn Bounties on in Channel setup before changing it.",
                         _ =>
                             "This guessing overlay is paused. Turn Guessing game on in Channel setup before changing it.",
                     }
@@ -934,6 +1036,13 @@ public partial class OverlaySourcesPanel
         SetSuccess($"{SampleLabel(sample)} sample selected.");
     }
 
+    private void SetPreviewSample(ProgressOverlaySampleState sample)
+    {
+        _progressPreviewSample = sample;
+        _previewMode = OverlayPreviewMode.Representative;
+        SetSuccess($"{SampleLabel(sample)} sample selected.");
+    }
+
     private OverlayConfiguration DraftConfiguration() =>
         _draftType switch
         {
@@ -989,6 +1098,18 @@ public partial class OverlaySourcesPanel
                 _viewerQueueNextRows,
                 DraftAppearance()
             ),
+            OverlayType.CommunityGoal => new OverlayConfiguration.CommunityGoalV1(
+                _progressSelectedItemId,
+                _progressRotationSeconds,
+                0,
+                DraftAppearance()
+            ),
+            OverlayType.ViewerFundedBounty => new OverlayConfiguration.ViewerFundedBountyV1(
+                _progressSelectedItemId,
+                _progressRotationSeconds,
+                _progressRecentContributorCount,
+                DraftAppearance()
+            ),
             _ => throw new InvalidOperationException("The selected overlay type is unsupported."),
         };
 
@@ -1011,6 +1132,8 @@ public partial class OverlaySourcesPanel
             OverlayType.Giveaway => OverlayAppearance.GiveawayDefault,
             OverlayType.EventFeed => OverlayAppearance.EventFeedDefault,
             OverlayType.ViewerQueue => OverlayAppearance.ViewerQueueDefault,
+            OverlayType.CommunityGoal => OverlayAppearance.CommunityGoalDefault,
+            OverlayType.ViewerFundedBounty => OverlayAppearance.ViewerFundedBountyDefault,
             _ => OverlayAppearance.GuessingDefault,
         };
 
@@ -1066,6 +1189,8 @@ public partial class OverlaySourcesPanel
             OverlayType.Giveaway => "Giveaway",
             OverlayType.EventFeed => "Event feed",
             OverlayType.ViewerQueue => "Viewer Queue",
+            OverlayType.CommunityGoal => "Community goal",
+            OverlayType.ViewerFundedBounty => "Viewer-funded bounty",
             _ => "Unsupported",
         };
 
@@ -1167,6 +1292,30 @@ public partial class OverlaySourcesPanel
             _ => throw new ArgumentOutOfRangeException(nameof(sample), sample, null),
         };
 
+    private static string SampleLabel(ProgressOverlaySampleState sample) =>
+        sample switch
+        {
+            ProgressOverlaySampleState.Active => "Active",
+            ProgressOverlaySampleState.ProgressUpdate => "Progress update",
+            ProgressOverlaySampleState.Completed => "Completed",
+            ProgressOverlaySampleState.Failed => "Failed",
+            ProgressOverlaySampleState.Expired => "Expired",
+            ProgressOverlaySampleState.Empty => "No public item",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample)),
+        };
+
+    private static string SampleToken(ProgressOverlaySampleState sample) =>
+        sample switch
+        {
+            ProgressOverlaySampleState.Active => "active",
+            ProgressOverlaySampleState.ProgressUpdate => "progress-update",
+            ProgressOverlaySampleState.Completed => "completed",
+            ProgressOverlaySampleState.Failed => "failed",
+            ProgressOverlaySampleState.Expired => "expired",
+            ProgressOverlaySampleState.Empty => "empty",
+            _ => throw new ArgumentOutOfRangeException(nameof(sample)),
+        };
+
     private string InventoryPresenceLabel(OverlayInstanceView overlay) =>
         OtherConnectionCount(overlay) > 0
             ? "Browser Source connected"
@@ -1210,6 +1359,8 @@ public partial class OverlaySourcesPanel
         Live,
         Representative,
     }
+
+    private sealed record ProgressOverlayOption(Guid Id, string Label);
 
     private enum OverlaySourceStage
     {

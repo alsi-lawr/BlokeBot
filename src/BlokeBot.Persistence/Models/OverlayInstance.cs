@@ -19,6 +19,12 @@ public enum OverlayType
 
     [PersistedToken("viewer-queue")]
     ViewerQueue,
+
+    [PersistedToken("community-goal")]
+    CommunityGoal,
+
+    [PersistedToken("viewer-funded-bounty")]
+    ViewerFundedBounty,
 }
 
 public enum OverlayEventFeedKind

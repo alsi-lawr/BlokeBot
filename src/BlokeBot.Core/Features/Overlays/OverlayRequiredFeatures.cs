@@ -11,6 +11,9 @@ internal static class OverlayRequiredFeatures
             OverlayType.Giveaway => HostFeatureFlags.Overlays | HostFeatureFlags.Points,
             OverlayType.EventFeed => HostFeatureFlags.Overlays,
             OverlayType.ViewerQueue => HostFeatureFlags.Overlays | HostFeatureFlags.PlayWithViewers,
+            OverlayType.CommunityGoal => HostFeatureFlags.Overlays
+                | HostFeatureFlags.CommunityProgression,
+            OverlayType.ViewerFundedBounty => HostFeatureFlags.Overlays | HostFeatureFlags.Bounties,
             _ => HostFeatureFlags.Overlays,
         };
 

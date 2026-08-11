@@ -1,4 +1,6 @@
 @using BlokeBot.Core.Features.HostedChannels
+@using BlokeBot.Core.Features.Bounties
+@using BlokeBot.Core.Features.CommunityProgression
 @using BlokeBot.Core.Features.PlayWithViewers
 @using BlokeBot.Persistence.Models
 @inherits AuthenticatedPageComponent
@@ -9,6 +11,8 @@
 @inject NavigationManager _navigation
 @inject IJSRuntime _js
 @inject PlayQueueService _queues
+@inject BountyService _bounties
+@inject CommunityProgressionService _progression
 
         @if (_isLoading)
         {
@@ -108,7 +112,8 @@
                                     <select id="overlay-type"
                                             class="input"
                                             disabled="@(!_isCreating)"
-                                            @bind="_draftType">
+                                            @bind="_draftType"
+                                            @bind:after="DraftTypeChanged">
                                         <option value="@OverlayType.Empty">Empty</option>
                                         <option value="@OverlayType.CuePlayer">Cue player</option>
                                         <option value="@OverlayType.EventFeed">Event feed</option>
@@ -124,9 +129,17 @@
                                         {
                                             <option value="@OverlayType.Giveaway">Points giveaway</option>
                                         }
+                                        @if (_communityProgressionFeatureEnabled || _draftType is OverlayType.CommunityGoal)
+                                        {
+                                            <option value="@OverlayType.CommunityGoal">Community goal</option>
+                                        }
+                                        @if (_bountiesFeatureEnabled || _draftType is OverlayType.ViewerFundedBounty)
+                                        {
+                                            <option value="@OverlayType.ViewerFundedBounty">Viewer-funded bounty</option>
+                                        }
                                     </select>
                                     <p class="text-xs leading-5 text-muted-foreground">
-                                        Type is fixed after creation. Guessing round, Points giveaway, and Viewer Queue appear only while their feature is on.
+                                        Type is fixed after creation. Feature-owned sources appear only while their inherited Channel Setup tool is on.
                                     </p>
                                 </div>
                             </div>
@@ -178,6 +191,14 @@
                                                              Value="@(_previewMode is OverlayPreviewMode.Representative ? _viewerQueuePreviewSample : (ViewerQueueOverlaySampleState?)null)"
                                                              ValueChanged="@((ViewerQueueOverlaySampleState? sample) => SetPreviewSample(sample!.Value))" />
                                     }
+                                    else if (previewOverlay.Type is OverlayType.CommunityGoal or OverlayType.ViewerFundedBounty)
+                                    {
+                                        <StudioSegmentedPill TValue="ProgressOverlaySampleState?"
+                                                             AriaLabel="Progress overlay sample state"
+                                                             Options="_progressSampleOptions"
+                                                             Value="@(_previewMode is OverlayPreviewMode.Representative ? _progressPreviewSample : (ProgressOverlaySampleState?)null)"
+                                                             ValueChanged="@((ProgressOverlaySampleState? sample) => SetPreviewSample(sample!.Value))" />
+                                    }
                                 </div>
 
                                 <div class="relative mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]"
@@ -194,6 +215,7 @@
                                             data-show-join-command="@_draftShowJoinCommand.ToString().ToLowerInvariant()"
                                             data-current-rows="@_viewerQueueCurrentRows"
                                             data-next-rows="@_viewerQueueNextRows"
+                                            data-rotation-seconds="@_progressRotationSeconds"
                                             src="@_previewUrl"
                                             title="@($"{previewOverlay.Name} overlay preview")"
                                             referrerpolicy="no-referrer"></iframe>
@@ -363,6 +385,75 @@
                                     </div>
                                     <p class="mt-3 text-sm leading-6 text-muted-foreground">
                                         Giveaway state, entrant count, winners, prizes, and the canonical Points join alias come from Points. Entrant identities and private eligibility data are never published.
+                                    </p>
+                                }
+                            }
+                            else if (_draftType is OverlayType.CommunityGoal or OverlayType.ViewerFundedBounty)
+                            {
+                                var requiredFeatureEnabled = _draftType is OverlayType.CommunityGoal
+                                    ? _communityProgressionFeatureEnabled
+                                    : _bountiesFeatureEnabled;
+                                var sourceOptions = _draftType is OverlayType.CommunityGoal
+                                    ? _communityGoalOptions
+                                    : _bountyOptions;
+                                @if (!requiredFeatureEnabled)
+                                {
+                                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4"
+                                         data-overlay-disabled-recovery>
+                                        <p class="text-sm font-semibold text-slate-950">This @(TypeLabel(_draftType).ToLowerInvariant()) overlay is paused.</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-700">
+                                            @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") is off. The saved source configuration and domain history stay in place, but projection, preview, live publication, tests, reconnect state, and animations remain blocked.
+                                            <a class="font-semibold text-blue-700 underline" href="host">Turn @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") on in Channel setup</a>
+                                            to show current authoritative state without replaying suppressed progress or completion animations.
+                                        </p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="studio-grid" data-progress-overlay-settings>
+                                        <div class="studio-span-8 space-y-2">
+                                            <label class="label" for="progress-overlay-selection">Goal or bounty selection</label>
+                                            <select id="progress-overlay-selection" class="input" @bind="_progressSelectedItemId">
+                                                <option value="">Rotate current public @(_draftType is OverlayType.CommunityGoal ? "communal goals" : "bounties")</option>
+                                                @foreach (var option in sourceOptions)
+                                                {
+                                                    <option value="@option.Id">Only @option.Label</option>
+                                                }
+                                            </select>
+                                            <p class="text-xs leading-5 text-muted-foreground">A selected item stays fixed. Rotation uses up to 12 current public items and restarts from current state after reconnect.</p>
+                                        </div>
+                                        <div class="studio-span-4 space-y-2">
+                                            <label class="label" for="progress-overlay-rotation">Rotate every (seconds)</label>
+                                            <input id="progress-overlay-rotation"
+                                                   class="input"
+                                                   type="number"
+                                                   min="@OverlayConfiguration.ProgressOverlayV1.MinimumRotationSeconds"
+                                                   max="@OverlayConfiguration.ProgressOverlayV1.MaximumRotationSeconds"
+                                                   disabled="@(_progressSelectedItemId is not null)"
+                                                   @bind="_progressRotationSeconds" />
+                                        </div>
+                                        @if (_draftType is OverlayType.ViewerFundedBounty)
+                                        {
+                                            <div class="studio-span-4 space-y-2">
+                                                <label class="label" for="progress-overlay-contributors">Recent contributor callouts</label>
+                                                <select id="progress-overlay-contributors" class="input" @bind="_progressRecentContributorCount">
+                                                    @for (var count = 0; count <= OverlayConfiguration.ProgressOverlayV1.MaximumRecentContributorCount; count++)
+                                                    {
+                                                        <option value="@count">@(count == 0 ? "Hidden" : $"Latest {count}")</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        }
+                                    </div>
+                                    <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                                        @if (_draftType is OverlayType.CommunityGoal)
+                                        {
+                                            <text>Only public communal definitions are projected. Hidden seasons, viewer-scoped progress, Twitch user IDs, balances, moderator notes, and private audit data never reach the Browser Source.</text>
+                                        }
+                                        else
+                                        {
+                                            <text>Only public bounties and public pledge login/amount data are projected. Private bounties, Twitch user IDs, balances, moderation reasons, and internal accounting never reach the Browser Source.</text>
+                                        }
                                     </p>
                                 }
                             }

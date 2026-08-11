@@ -196,6 +196,44 @@ internal sealed record ViewerQueueV1OverlayLiveEnvelope
     public required ViewerQueueV1OverlayLivePayload Payload { get; init; }
 }
 
+internal sealed record CommunityGoalV1OverlayLivePayload
+{
+    public string OverlayType => "communityGoal";
+    public int SchemaVersion => 1;
+    public required int RotationSeconds { get; init; }
+    public required string Animation { get; init; }
+    public required ProgressOverlayPresentationState State { get; init; }
+}
+
+internal sealed record CommunityGoalV1OverlayLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required string EventType { get; init; }
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+    public required CommunityGoalV1OverlayLivePayload Payload { get; init; }
+}
+
+internal sealed record ViewerFundedBountyV1OverlayLivePayload
+{
+    public string OverlayType => "viewerFundedBounty";
+    public int SchemaVersion => 1;
+    public required int RotationSeconds { get; init; }
+    public required string Animation { get; init; }
+    public required ProgressOverlayPresentationState State { get; init; }
+}
+
+internal sealed record ViewerFundedBountyV1OverlayLiveEnvelope
+{
+    public int ProtocolVersion => 1;
+    public required Guid ServerEpoch { get; init; }
+    public required long Sequence { get; init; }
+    public required string EventType { get; init; }
+    public required DateTimeOffset OccurredAtUtc { get; init; }
+    public required ViewerFundedBountyV1OverlayLivePayload Payload { get; init; }
+}
+
 internal sealed record CuePlayerV1OverlayLivePayload
 {
     public string OverlayType => "cuePlayer";

@@ -16,12 +16,17 @@ namespace BlokeBot.Core.Features.CommunityProgression;
 public sealed class CommunityProgressionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
-    TimeProvider clock
+    TimeProvider clock,
+    IEnumerable<ICommunityProgressionChangeObserver>? changeObservers = null
 ) : ICommunityAchievementGrantService
 {
     private const int _persistenceRetryCount = 20;
     private static readonly HostFeatureFlags _requiredFeature =
         HostFeatureFlags.CommunityProgression;
+    private readonly ICommunityProgressionChangeObserver[] _changeObservers =
+    [
+        .. changeObservers ?? [],
+    ];
 
     public async Task<CommunityOperationOutcome> CreateSeasonAsync(
         int hostId,
@@ -95,7 +100,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -193,7 +198,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -325,7 +330,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -489,7 +494,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -512,7 +517,7 @@ public sealed class CommunityProgressionService(
             () => ProcessEventAttemptAsync(hostId, sourceEvent, ct),
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: true, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: true, ct);
         return result;
     }
 
@@ -823,7 +828,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(hostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -832,7 +837,7 @@ public sealed class CommunityProgressionService(
         var hostIds = await LoadEnabledHostIdsAsync(ct);
         foreach (var hostId in hostIds)
         {
-            _ = await RetryAsync<bool>(
+            var changed = await RetryAsync<bool>(
                 async () =>
                 {
                     await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -876,6 +881,14 @@ public sealed class CommunityProgressionService(
                 },
                 ct
             );
+            if (changed)
+            {
+                _ = await events.PublishAsync(AppEventKind.CommunityProgressionChanged, ct);
+                foreach (var observer in _changeObservers)
+                {
+                    await observer.CommunityProgressionChangedAsync(hostId, ct);
+                }
+            }
         }
     }
 
@@ -1093,7 +1106,7 @@ public sealed class CommunityProgressionService(
             },
             ct
         );
-        await PublishIfChangedAsync(result, pointsChanged: false, ct);
+        await PublishIfChangedAsync(command.HostId, result, pointsChanged: false, ct);
         return result;
     }
 
@@ -1120,6 +1133,10 @@ public sealed class CommunityProgressionService(
                 AppEventKind.CommunityProgressionChanged,
                 cancellationToken
             );
+            foreach (var observer in _changeObservers)
+            {
+                await observer.CommunityProgressionChangedAsync(request.HostId, cancellationToken);
+            }
             _ = await events.PublishAsync(AppEventKind.PointsChanged, cancellationToken);
         }
         return result;
@@ -1941,6 +1958,7 @@ public sealed class CommunityProgressionService(
         );
 
     private async Task PublishIfChangedAsync(
+        int hostId,
         CommunityOperationOutcome result,
         bool pointsChanged,
         CancellationToken ct
@@ -1951,6 +1969,10 @@ public sealed class CommunityProgressionService(
             return;
         }
         _ = await events.PublishAsync(AppEventKind.CommunityProgressionChanged, ct);
+        foreach (var observer in _changeObservers)
+        {
+            await observer.CommunityProgressionChangedAsync(hostId, ct);
+        }
         if (pointsChanged)
         {
             _ = await events.PublishAsync(AppEventKind.PointsChanged, ct);

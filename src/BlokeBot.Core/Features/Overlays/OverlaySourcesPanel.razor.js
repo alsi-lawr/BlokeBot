@@ -43,6 +43,7 @@ export function initializeAppearance(dotnet) {
     showJoinCommand: activeFrame.dataset.showJoinCommand === "true",
     currentRows: Number(activeFrame.dataset.currentRows),
     nextRows: Number(activeFrame.dataset.nextRows),
+    rotationSeconds: Number(activeFrame.dataset.rotationSeconds),
   });
   const sendDraft = (requestId) => {
     activeFrame.contentWindow?.postMessage(

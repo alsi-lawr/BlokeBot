@@ -223,6 +223,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<IPointsGiveawayChangeObserver>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
+        _ = services.AddSingleton<IBountyChangeObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
+        _ = services.AddSingleton<ICommunityProgressionChangeObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
         _ = services.AddHostedService(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );

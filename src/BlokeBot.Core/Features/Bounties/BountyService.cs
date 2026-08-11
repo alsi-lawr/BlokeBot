@@ -18,7 +18,8 @@ internal sealed class BountyService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
-    IEnumerable<IBountyCompletionObserver>? completionObservers = null
+    IEnumerable<IBountyCompletionObserver>? completionObservers = null,
+    IEnumerable<IBountyChangeObserver>? changeObservers = null
 )
 {
     private const int _eventSchemaVersion = 1;
@@ -28,6 +29,7 @@ internal sealed class BountyService(
     [
         .. completionObservers ?? [],
     ];
+    private readonly IBountyChangeObserver[] _changeObservers = [.. changeObservers ?? []];
 
     public async Task<BountyResult<BountyView>> CreateAsync(
         int hostId,
@@ -53,7 +55,7 @@ internal sealed class BountyService(
         );
         if (result is BountyResult<BountyView>.Succeeded { WasIdempotent: false })
         {
-            await PublishChangesAsync(pointsChanged: false, ct);
+            await PublishChangesAsync(hostId, pointsChanged: false, ct);
         }
 
         return result;
@@ -83,7 +85,7 @@ internal sealed class BountyService(
         );
         if (result is BountyResult<BountyPledgeView>.Succeeded { WasIdempotent: false })
         {
-            await PublishChangesAsync(pointsChanged: true, ct);
+            await PublishChangesAsync(hostId, pointsChanged: true, ct);
         }
 
         return result;
@@ -120,7 +122,7 @@ internal sealed class BountyService(
                     or BountyTransitionAction.Cancel
                     or BountyTransitionAction.Reject
                     or BountyTransitionAction.Expire;
-            await PublishChangesAsync(pointsChanged, ct);
+            await PublishChangesAsync(hostId, pointsChanged, ct);
         }
 
         if (
@@ -167,7 +169,7 @@ internal sealed class BountyService(
         );
         if (result is BountyResult<BountyView>.Succeeded { WasIdempotent: false })
         {
-            await PublishChangesAsync(pointsChanged: false, ct);
+            await PublishChangesAsync(hostId, pointsChanged: false, ct);
         }
 
         return result;
@@ -1480,9 +1482,13 @@ internal sealed class BountyService(
             ct
         );
 
-    private async Task PublishChangesAsync(bool pointsChanged, CancellationToken ct)
+    private async Task PublishChangesAsync(int hostId, bool pointsChanged, CancellationToken ct)
     {
         _ = await events.PublishAsync(AppEventKind.BountiesChanged, ct);
+        foreach (var observer in _changeObservers)
+        {
+            await observer.BountyChangedAsync(hostId, ct);
+        }
         if (pointsChanged)
         {
             _ = await events.PublishAsync(AppEventKind.PointsChanged, ct);

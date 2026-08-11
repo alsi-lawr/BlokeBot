@@ -21,7 +21,11 @@ public sealed class OverlayDashboardUiTests
         _ = context.Services.AddSingleton<IModeratorAuthorityService>(
             new GrantedModeratorAuthority()
         );
-        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -73,7 +77,11 @@ public sealed class OverlayDashboardUiTests
         _ = context.Services.AddSingleton<IModeratorAuthorityService>(
             new GrantedModeratorAuthority()
         );
-        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
 
         var page = context.Render<OverlaysPage>();
 
@@ -130,7 +138,11 @@ public sealed class OverlayDashboardUiTests
         _ = context.Services.AddSingleton<IModeratorAuthorityService>(
             new GrantedModeratorAuthority()
         );
-        _ = context.Services.AddBlokeBotPlayWithViewers().AddBlokeBotOverlays();
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
         var page = context.Render<OverlaysPage>();
 
         page.WaitForAssertion(() =>
@@ -171,6 +183,42 @@ public sealed class OverlayDashboardUiTests
                 .GetAttribute("src")
                 .ShouldEndWith("?mode=representative&sample=completed");
         });
+    }
+
+    [Test]
+    public async Task DisabledInheritedParent_KeepsSavedEditorRecoveryAndHidesNewTypeDiscovery()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedCommunityGoalAsync(database, HostFeatureFlags.Overlays);
+        await using var context = UiTestContextFactory.Create(database, seed.HostId);
+        _ = context.Services.AddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthority()
+        );
+        _ = context
+            .Services.AddBlokeBotPlayWithViewers()
+            .AddBlokeBotBounties()
+            .AddBlokeBotCommunityProgression()
+            .AddBlokeBotOverlays();
+
+        var page = context.Render<OverlaysPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            _ = page.FindAll("[data-overlay-disabled-recovery]").ShouldHaveSingleItem();
+            page.FindAll("[data-appearance-preview]").ShouldBeEmpty();
+            page.Find("#overlay-type")
+                .QuerySelectorAll("option")
+                .Any(option => option.GetAttribute("value") == OverlayType.CommunityGoal.ToString())
+                .ShouldBeTrue();
+        });
+
+        page.Find("[data-action='new-overlay']").Click();
+        page.WaitForAssertion(() =>
+            page.Find("#overlay-type")
+                .QuerySelectorAll("option")
+                .Any(option => option.GetAttribute("value") == OverlayType.CommunityGoal.ToString())
+                .ShouldBeFalse()
+        );
     }
 
     private static AngleSharp.Dom.IElement FindButton(
@@ -237,6 +285,42 @@ public sealed class OverlayDashboardUiTests
             IsEnabled = true,
             ConfigurationJson =
                 """{"schemaVersion":1,"showGuessCount":true,"resultDurationSeconds":8}""",
+            AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
+            KeyVersion = 1,
+            Revision = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        _ = db.OverlayInstances.Add(overlay);
+        _ = await db.SaveChangesAsync();
+        return new OverlaySeed(host.Id, overlay.PublicId, PrivateAccessKey);
+    }
+
+    private static async Task<OverlaySeed> SeedCommunityGoalAsync(
+        SqliteBlokeBotDbFactory database,
+        HostFeatureFlags features
+    )
+    {
+        const string PrivateAccessKey = "community-goal-component-key-0000000000000";
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            TwitchUserId = "community-streamer-id",
+            Login = "community-streamer",
+            DisplayName = "Community Streamer",
+            EnabledFeatures = features,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        var overlay = new OverlayInstance
+        {
+            PublicId = Guid.Parse("996a3163-69c8-40f1-aaef-a4fc8632c6f2"),
+            HostId = host.Id,
+            Name = "Community goal",
+            Type = OverlayType.CommunityGoal,
+            IsEnabled = true,
+            ConfigurationJson = OverlayConfiguration.CommunityGoalV1.Default.ToPersistenceJson(),
             AccessKeyDigest = OverlayAccessKeyDigest.Compute(PrivateAccessKey),
             KeyVersion = 1,
             Revision = 1,

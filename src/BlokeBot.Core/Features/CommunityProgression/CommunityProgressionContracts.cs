@@ -9,6 +9,11 @@ public readonly record struct CommunityDefinitionId(Guid Value);
 
 public readonly record struct CommunityRewardId(Guid Value);
 
+public interface ICommunityProgressionChangeObserver
+{
+    ValueTask CommunityProgressionChangedAsync(int hostId, CancellationToken cancellationToken);
+}
+
 public readonly record struct CommunityDefinitionKey
 {
     public CommunityDefinitionKey(string value)
