@@ -486,6 +486,71 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "competitions.entrants",
+            db.CompetitionEntrants.Where(x =>
+                    x.Members.Any(member =>
+                        member.TwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(member.TwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == member.HostId && claim.Login == member.Login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.Id,
+                    x.HostId,
+                    x.CompetitionId,
+                    x.Name,
+                    x.SeedRank,
+                    x.RegisteredAtUtc,
+                })
+        );
+        await AddAsync(
+            "competitions.members",
+            db.CompetitionEntrantMembers.Where(x =>
+                (
+                    x.TwitchUserId == userId
+                    || (
+                        string.IsNullOrEmpty(x.TwitchUserId)
+                        && safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    )
+                ) && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "competitions.rewards",
+            db.CompetitionRewardReceipts.Where(x =>
+                (
+                    x.TwitchUserId == userId
+                    || (
+                        string.IsNullOrEmpty(x.TwitchUserId)
+                        && safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    )
+                ) && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "competitions.moderation-audits",
+            db.CompetitionAudits.Where(x =>
+                (
+                    x.ActorTwitchUserId == userId
+                    || (
+                        string.IsNullOrEmpty(x.ActorTwitchUserId)
+                        && safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    )
+                ) && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
             "bingo.participants",
             db.BingoParticipants.Where(x =>
                 (
@@ -982,6 +1047,27 @@ public static class ViewerPrivacyService
             subject.TwitchUserId,
             hostId,
             safeLoginClaimValues,
+            static value => LikeContainsPattern($"\"{value}\"")
+        );
+        var competitionLoginClaims = await db
+            .CompetitionEntrantMembers.Where(x =>
+                (
+                    x.TwitchUserId == userId
+                    || (
+                        string.IsNullOrEmpty(x.TwitchUserId)
+                        && safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    )
+                ) && (hostId == null || x.HostId == hostId)
+            )
+            .Select(x => new SafeLoginClaim(x.HostId, x.Login))
+            .Distinct()
+            .ToArrayAsync(ct);
+        var competitionIdentityClaims = IdentityTextClaims(
+            subject.TwitchUserId,
+            hostId,
+            competitionLoginClaims,
             static value => LikeContainsPattern($"\"{value}\"")
         );
 
@@ -1835,6 +1921,102 @@ public static class ViewerPrivacyService
                 .ExecuteDeleteAsync(ct);
         }
         Record("community.events", communityEvents);
+        Record(
+            "competitions.entrants",
+            await db
+                .CompetitionEntrants.Where(x =>
+                    x.Members.Any(member =>
+                        member.TwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(member.TwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == member.HostId && claim.Login == member.Login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, ErasedToken), ct)
+        );
+        Record(
+            "competitions.members",
+            await db
+                .CompetitionEntrantMembers.Where(x =>
+                    (
+                        x.TwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(x.TwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.Login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, ErasedToken)
+                            .SetProperty(x => x.Login, ErasedToken)
+                            .SetProperty(x => x.DisplayName, ErasedToken)
+                            .SetProperty(x => x.PrivateContact, string.Empty),
+                    ct
+                )
+        );
+        Record(
+            "competitions.rewards",
+            await db
+                .CompetitionRewardReceipts.Where(x =>
+                    (
+                        x.TwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(x.TwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.Login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, ErasedToken)
+                            .SetProperty(x => x.Login, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "competitions.moderation-audits",
+            await db
+                .CompetitionAudits.Where(x =>
+                    (
+                        x.ActorTwitchUserId == userId
+                        || (
+                            string.IsNullOrEmpty(x.ActorTwitchUserId)
+                            && safeLoginClaims.Any(claim =>
+                                claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken)
+                            .SetProperty(x => x.PrivateReason, string.Empty),
+                    ct
+                )
+        );
+        var competitionEvents = 0;
+        foreach (var claim in competitionIdentityClaims)
+        {
+            competitionEvents += await db
+                .CompetitionEvents.Where(x =>
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
+                )
+                .ExecuteDeleteAsync(ct);
+        }
+        Record("competitions.events", competitionEvents);
         Record(
             "play-queues.entries",
             await db

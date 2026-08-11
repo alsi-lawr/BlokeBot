@@ -56,6 +56,8 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute Bingo { get; } = new("bingo");
     public static FixedChatCommandRoute BingoJoin { get; } = new("bingojoin");
     public static FixedChatCommandRoute BingoLeave { get; } = new("bingoleave");
+    public static FixedChatCommandRoute Competitions { get; } = new("competitions");
+    public static FixedChatCommandRoute CompetitionJoin { get; } = new("competitionjoin");
 
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
@@ -97,6 +99,8 @@ public static class FixedChatCommandRoutes
                 Bingo.Value,
                 BingoJoin.Value,
                 BingoLeave.Value,
+                Competitions.Value,
+                CompetitionJoin.Value,
             ],
             StringComparer.OrdinalIgnoreCase
         );

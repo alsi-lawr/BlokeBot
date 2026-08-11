@@ -22,6 +22,7 @@ public enum PointLedgerKind
     BountyCompletionReward,
     CommunityProgressionReward,
     BingoReward,
+    CompetitionReward,
 }
 
 internal static class PointLedgerKindPersistence
@@ -44,6 +45,7 @@ internal static class PointLedgerKindPersistence
     private const string _bountyCompletionRewardToken = "BountyCompletionReward";
     private const string _communityProgressionRewardToken = "CommunityProgressionReward";
     private const string _bingoRewardToken = "BingoReward";
+    private const string _competitionRewardToken = "CompetitionReward";
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
@@ -65,6 +67,7 @@ internal static class PointLedgerKindPersistence
         _bountyCompletionRewardToken,
         _communityProgressionRewardToken,
         _bingoRewardToken,
+        _competitionRewardToken,
     ];
 
     public static string ToToken(PointLedgerKind kind) =>
@@ -88,6 +91,7 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.BountyCompletionReward => _bountyCompletionRewardToken,
             PointLedgerKind.CommunityProgressionReward => _communityProgressionRewardToken,
             PointLedgerKind.BingoReward => _bingoRewardToken,
+            PointLedgerKind.CompetitionReward => _competitionRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
 
@@ -112,6 +116,7 @@ internal static class PointLedgerKindPersistence
             _bountyCompletionRewardToken => PointLedgerKind.BountyCompletionReward,
             _communityProgressionRewardToken => PointLedgerKind.CommunityProgressionReward,
             _bingoRewardToken => PointLedgerKind.BingoReward,
+            _competitionRewardToken => PointLedgerKind.CompetitionReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
 }

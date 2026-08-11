@@ -22,6 +22,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.CommunityProgression,
         HostFeatureFlags.ViewerPassports,
         HostFeatureFlags.Bingo,
+        HostFeatureFlags.Competitions,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -116,6 +117,12 @@ public static class HostFeatureCatalog
                 "Bingo",
                 "Run shared, viewer, or team cards from typed stream events.",
                 enabledFeatures.Contains(HostFeatureFlags.Bingo)
+            ),
+            new(
+                HostFeatureFlags.Competitions,
+                "Tournaments & leagues",
+                "Run viewer brackets, round-robin leagues, and prediction leagues.",
+                enabledFeatures.Contains(HostFeatureFlags.Competitions)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

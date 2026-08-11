@@ -13,6 +13,7 @@ using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
+using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.Guessing.Configuration;
@@ -61,6 +62,33 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<ViewerPassportRuntime>();
         _ = services.AddSingleton<IChatMessageObserver>(static serviceProvider =>
             serviceProvider.GetRequiredService<ViewerPassportRuntime>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotCompetitions(this IServiceCollection services)
+    {
+        _ = services.AddAutomationCatalogModule<CompetitionAutomationCatalogModule>();
+        _ = services.AddSingleton<CompetitionService>();
+        _ = services.AddSingleton<
+            ICompetitionLifecycleAutomationDispatcher,
+            CompetitionLifecycleAutomationDispatcher
+        >();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICompetitionLifecycleObserver, CompetitionLifecycleBridge>()
+        );
+        _ = services.AddSingleton<
+            ICompetitionReminderWhisperSender,
+            CompetitionReminderWhisperSender
+        >();
+        _ = services.AddSingleton<ICompetitionReminderDelivery, CompetitionReminderDelivery>();
+        _ = services.AddSingleton<CompetitionReminderWorker>();
+        _ = services.AddHostedService(static services =>
+            services.GetRequiredService<CompetitionReminderWorker>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostFeatureChangeObserver, CompetitionFeatureObserver>()
         );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;

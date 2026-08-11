@@ -151,24 +151,29 @@ public sealed class OverlayInstancePersistenceTests
         await using (var db = await factory.CreateDbContextAsync())
         {
             await db.GetService<IMigrator>().MigrateAsync(_v090Migration);
-            var host = new BotHost
-            {
-                TwitchUserId = "host-id",
-                Login = "host",
-                DisplayName = "Host",
-                EnabledFeatures = HostFeatureFlags.All,
-                CreatedAtUtc = DateTime.UtcNow,
-            };
-            _ = db.Hosts.Add(host);
-            _ = await db.SaveChangesAsync();
+            _ = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO hosts
+                    (TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
+                     CommandsAliasesConfigured, CreatedAtUtc)
+                VALUES
+                    ({"host-id"}, {"host"}, {"Host"}, {0}, {(ulong)
+                    HostFeatureFlags.All}, {false}, {DateTime.UtcNow});
+                """
+            );
+            var hostId = await db
+                .Hosts.AsNoTracking()
+                .Where(value => value.Login == "host")
+                .Select(value => value.Id)
+                .SingleAsync();
             _ = db.OverlayInstances.Add(
-                Overlay(host.Id, Guid.NewGuid(), RandomDigest(30), """{"schemaVersion":1}""")
+                Overlay(hostId, Guid.NewGuid(), RandomDigest(30), """{"schemaVersion":1}""")
             );
             _ = await db.SaveChangesAsync();
             await db.Database.MigrateAsync();
 
             var goal = Overlay(
-                host.Id,
+                hostId,
                 Guid.NewGuid(),
                 RandomDigest(60),
                 """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":0,"appearance":{"x":1160,"y":80,"width":680,"height":300,"css":""}}"""
@@ -176,7 +181,7 @@ public sealed class OverlayInstancePersistenceTests
             goal.Type = OverlayType.CommunityGoal;
             _ = db.OverlayInstances.Add(goal);
             var bounty = Overlay(
-                host.Id,
+                hostId,
                 Guid.NewGuid(),
                 RandomDigest(90),
                 """{"schemaVersion":1,"selectedItemId":null,"rotationSeconds":20,"recentContributorCount":3,"appearance":{"x":1160,"y":80,"width":680,"height":340,"css":""}}"""

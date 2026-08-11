@@ -75,6 +75,7 @@ public partial class PageHelpButton
             _ when path.StartsWith("/passports/", StringComparison.Ordinal)
                     && path.EndsWith("/me", StringComparison.Ordinal) => _viewerPassportsHelp,
             "/bingo" => _bingoHelp,
+            "/competitions" => _competitionsHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -301,6 +302,33 @@ public partial class PageHelpButton
                     "Raw provider payloads, credentials, internal identifiers, private moderator notes, and internal audit reasons are never public.",
                     "Reversing a manual mark corrects the live card and evidence. Any completed win and its point, achievement, or title reward remain permanent and cannot grant again.",
                     "Achievements and titles come from predeclared Community progression achievements. Turning Bingo off retains all data while stopping commands, EventSub reconciliation, marking, rewards, public output, overlay events, and queued work; re-enable never replays suppressed events.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _competitionsHelp = new(
+        "Tournaments & leagues",
+        [
+            _featureSwitchHelp,
+            new(
+                "Run a competition",
+                "Create a draft with a tournament, round-robin, or prediction-league format, then open registration and generate the recorded schedule.",
+                [
+                    "Individuals and teams use the configured capacity, team size, minimum-points eligibility, seeding, standing points, and tiebreak rules.",
+                    "Prediction leagues use each fixture's entered scores as correct-prediction totals; configured standing points and tiebreaks rank the league.",
+                    "Random generation records its seed and BlokeBot algorithm version so the same entrant order reproduces the bracket or schedule.",
+                    "Confirmed result corrections retain the previous scores in private audit history and safely clear downstream tournament outcomes that no longer apply.",
+                    "Confirmed-win milestone and final-placement points or configured Community progression achievements are idempotent across retries and final-state evaluation.",
+                ]
+            ),
+            new(
+                "Privacy, reminders, and recovery",
+                "Public pages show only entrant identities, schedules, standings, confirmed scores, and archived results.",
+                [
+                    "Private member contact, lobby information, moderator notes, and audit reasons are never published or emitted in lifecycle payloads.",
+                    "Match reminders use permitted private delivery. Turning Tournaments & leagues off blocks pages, commands, registration, starts, results, advancement, reminders, rewards, lifecycle effects, and connected-provider work.",
+                    "Saved configuration and history remain. Re-enable resumes retained current state without replaying commands, events, timers, reminders, subscriptions, rewards, or provider actions suppressed while off.",
                 ]
             ),
         ]

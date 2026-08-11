@@ -1,0 +1,47 @@
+@page "/competitions/{Channel}"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject CompetitionService _service
+
+<PageTitle>BlokeBot | Competitions</PageTitle>
+
+<div class="mx-auto max-w-6xl space-y-6" data-public-competitions>
+    <PageHeader Kicker="Community progression"
+                Title="@(_board is null ? "Tournaments & leagues" : $"@{_board.HostLogin} competitions")"
+                Description="Authoritative brackets, schedules, standings, and archived results. Private contact and lobby information never appears here." />
+    @if (!_loaded)
+    {
+        <ApplicationCardCollection Owner="public-competition-cards"><div class="card p-8 text-sm text-muted-foreground">Loading competitions…</div></ApplicationCardCollection>
+    }
+    else if (_board is null)
+    {
+        <ApplicationCardCollection Owner="public-competition-cards"><div class="card p-8 text-sm text-muted-foreground" data-public-competitions-unavailable>No public competition data is available.</div></ApplicationCardCollection>
+    }
+    else
+    {
+        <ApplicationCardCollection Owner="public-competition-cards">
+            @foreach (var competition in _board.Active.Concat(_board.Archive))
+            {
+                <article class="task-panel" @key="competition.Id.Value">
+                    <header class="task-panel__header"><div><div class="flex flex-wrap items-center gap-2"><h2 class="task-panel__title">@competition.Name</h2><span class="status-pill status-pill--slate"><span class="status-pill__label">@competition.Status.Label()</span></span></div><p class="task-panel__description">@competition.Description</p></div><span class="text-xs text-muted-foreground">@competition.Format.Label() · @competition.Entrants.Count entrants</span></header>
+                    <div class="task-panel__body space-y-5">
+                        <div class="live-round-summary" aria-label="Public competition summary"><div class="live-round-summary__metric"><p class="live-round-summary__label">Format</p><p class="live-round-summary__value">@competition.Format.Label()</p></div><div class="live-round-summary__metric"><p class="live-round-summary__label">Status</p><p class="live-round-summary__value">@competition.Status.Label()</p></div><div class="live-round-summary__metric"><p class="live-round-summary__label">Schedule</p><p class="live-round-summary__value font-mono text-sm">@competition.Seed</p><p class="live-round-summary__detail">@competition.AlgorithmVersion</p></div></div>
+                        @if (competition.Standings.Count > 0)
+                        {
+                            <section><h3 class="mb-2 font-semibold text-[var(--app-text-strong)]">Standings</h3><div class="data-table-region" tabindex="0"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-muted-foreground"><th class="p-2">#</th><th class="p-2">Entrant</th><th class="p-2">Played</th><th class="p-2">W–D–L</th><th class="p-2">Score</th><th class="p-2">Points</th></tr></thead><tbody>@foreach (var row in competition.Standings){<tr class="border-t"><td class="p-2">@row.Rank</td><td class="p-2 font-semibold text-[var(--app-text-strong)]">@row.Name</td><td class="p-2">@row.Played</td><td class="p-2">@row.Wins–@row.Draws–@row.Losses</td><td class="p-2">@row.ScoreFor–@row.ScoreAgainst</td><td class="p-2 font-semibold">@row.Points</td></tr>}</tbody></table></div></section>
+                        }
+                        @if (competition.Matches.Count > 0)
+                        {
+                            <section><h3 class="mb-2 font-semibold text-[var(--app-text-strong)]">@(competition.Format == CompetitionFormat.Tournament ? "Bracket" : "Schedule")</h3><div class="competition-public-matches">@foreach (var round in competition.Matches.GroupBy(match => match.Round).OrderBy(group => group.Key)){<div class="competition-round"><h4>Round @round.Key</h4>@foreach (var match in round){<div class="competition-public-match"><span>@match.EntrantA</span><strong>@(match.ScoreA?.ToString() ?? "–")</strong><span>@match.EntrantB</span><strong>@(match.ScoreB?.ToString() ?? "–")</strong></div>}</div>}</div></section>
+                        }
+                        @if (competition.Status == CompetitionStatus.Registration)
+                        {
+                            <p class="page-state"><span><strong class="page-state__title">Registration is open</strong><span class="page-state__description block">Individual viewers can use <code>!competitionjoin</code>. Team registration is managed by channel moderators.</span></span></p>
+                        }
+                    </div>
+                </article>
+            }
+        </ApplicationCardCollection>
+    }
+</div>

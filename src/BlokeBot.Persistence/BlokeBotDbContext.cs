@@ -86,6 +86,17 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<BingoWin> BingoWins => Set<BingoWin>();
     public DbSet<BingoWinRecipient> BingoWinRecipients => Set<BingoWinRecipient>();
     public DbSet<BingoDomainEvent> BingoEvents => Set<BingoDomainEvent>();
+    public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionEntrant> CompetitionEntrants => Set<CompetitionEntrant>();
+    public DbSet<CompetitionEntrantMember> CompetitionEntrantMembers =>
+        Set<CompetitionEntrantMember>();
+    public DbSet<CompetitionMatch> CompetitionMatches => Set<CompetitionMatch>();
+    public DbSet<CompetitionMilestoneRewardRule> CompetitionMilestoneRewardRules =>
+        Set<CompetitionMilestoneRewardRule>();
+    public DbSet<CompetitionAudit> CompetitionAudits => Set<CompetitionAudit>();
+    public DbSet<CompetitionDomainEvent> CompetitionEvents => Set<CompetitionDomainEvent>();
+    public DbSet<CompetitionRewardReceipt> CompetitionRewardReceipts =>
+        Set<CompetitionRewardReceipt>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
     public DbSet<PointsGiveawayEntrant> PointsGiveawayEntrants => Set<PointsGiveawayEntrant>();
     public DbSet<PointsGiveawayWinner> PointsGiveawayWinners => Set<PointsGiveawayWinner>();
@@ -175,6 +186,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureCommunityProgression(modelBuilder);
         ConfigureViewerPassports(modelBuilder);
         ConfigureBingo(modelBuilder);
+        ConfigureCompetitions(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);

@@ -36,6 +36,7 @@ public partial class HostConfigPage
             {
                 HostFeatureFlags.Points => $"{_featureIconBase} text-emerald-600",
                 HostFeatureFlags.Bounties => $"{_featureIconBase} text-amber-700",
+                HostFeatureFlags.Competitions => $"{_featureIconBase} text-violet-700",
                 HostFeatureFlags.CommunityProgression => $"{_featureIconBase} text-fuchsia-700",
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
                 HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
@@ -78,6 +79,12 @@ public partial class HostConfigPage
                     <path d="M5 7h14v12H5z" />
                     <path d="M8 7V5h8v2" />
                     <path d="M9 12h6M12 9v6" />
+                </svg>
+                """,
+                HostFeatureFlags.Competitions => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 4h8v4c0 3-1.4 5-4 6-2.6-1-4-3-4-6V4Z" />
+                    <path d="M8 6H5v2c0 2 1.2 3.2 3.5 3.5M16 6h3v2c0 2-1.2 3.2-3.5 3.5M12 14v4M8 20h8" />
                 </svg>
                 """,
                 HostFeatureFlags.CommunityProgression => """
@@ -221,6 +228,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.Bounties => "Bounties",
+            HostFeatureFlags.Competitions => "Tournaments & leagues",
             HostFeatureFlags.CommunityProgression => "Community progression",
             HostFeatureFlags.ViewerPassports => "Viewer passports",
             HostFeatureFlags.Bingo => "Bingo",

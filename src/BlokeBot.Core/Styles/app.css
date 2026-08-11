@@ -15,6 +15,7 @@
 @import "./features/bounties.css";
 @import "./features/bingo.css";
 @import "./features/community-progression.css";
+@import "./features/competitions.css";
 @import "./components/application-card-layout.css";
 @import "./utilities/motion-components.css";
 @import "./components/scroll-panels.css";

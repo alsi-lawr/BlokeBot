@@ -11,6 +11,7 @@ using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
+using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.HostConfig.Page;
@@ -128,6 +129,7 @@ public static class BlokeBotApplication
             .AddBlokeBotCommunityProgression()
             .AddBlokeBotViewerPassports()
             .AddBlokeBotBingo()
+            .AddBlokeBotCompetitions()
             .AddBlokeBotRequestBoards()
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
@@ -158,6 +160,7 @@ public static class BlokeBotApplication
                 .AddCommandModule<CommunityProgressionCommandModule>()
                 .AddCommandModule<ViewerPassportCommandModule>()
                 .AddCommandModule<BingoCommandModule>()
+                .AddCommandModule<CompetitionCommandModule>()
                 .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<PlayQueueCommandModule>()
                 .AddCommandModule<MomentCommandModule>()
