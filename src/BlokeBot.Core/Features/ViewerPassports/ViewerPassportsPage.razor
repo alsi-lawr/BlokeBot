@@ -15,7 +15,7 @@
     <Actions>
         @if (_passport is { Visibility: not ViewerPassportVisibility.Private } passport)
         {
-            <a class="btn-secondary" href="@PublicUrl(passport)" target="_blank" rel="noopener">Open public profile</a>
+            <a class="btn-secondary" href="@PublicUrl(passport)" target="_blank" rel="noopener">Open public profile ↗</a>
         }
     </Actions>
     <ChildContent>
@@ -46,106 +46,151 @@
                 <p class="rounded-lg border p-3 text-sm font-semibold" role="@(_failed ? "alert" : "status")">@_feedback</p>
             }
 
-            <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">
-                <div class="card overflow-hidden" data-sticky-save-scope>
-                    <section class="grid gap-4 p-5">
-                        <div>
-                            <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Profile</h2>
-                            <p class="mt-1 text-sm text-muted-foreground">Your Twitch user ID keeps this passport together if your login changes.</p>
-                        </div>
-                        <div class="field space-y-2" data-field>
-                            <label class="label" for="passport-profile-line">Profile line</label>
-                            <textarea id="passport-profile-line"
-                                      class="input min-h-24 resize-y"
-                                      maxlength="@ViewerPassportLimits.ProfileLineMaximumLength"
-                                      @bind="_profileLine"
-                                      @bind:event="oninput"></textarea>
-                        </div>
-                        <p class="-mt-2 flex justify-between text-xs text-muted-foreground">
-                            <span>Channel moderation rules apply. Displayed as plain text.</span>
-                            <span>@_profileLine.Length / @ViewerPassportLimits.ProfileLineMaximumLength</span>
-                        </p>
-                        <div class="studio-grid">
-                            <div class="studio-span-6 space-y-2">
-                                <label class="label" for="passport-title">Display title</label>
-                                <select id="passport-title" class="input" @bind="_selectedTitle">
-                                    <option value="">No title</option>
-                                    @foreach (var reward in _passport.EarnedTitles)
-                                    {
-                                        <option value="@reward.Id">@reward.Name</option>
-                                    }
-                                </select>
+            <div class="passport-editor">
+                <div class="card passport-editor__form" data-sticky-save-scope>
+                    <details class="passport-editor__section" open>
+                        <summary>
+                            <span class="passport-editor__section-title">Profile</span>
+                            <span class="passport-editor__section-summary">Profile line, display title, and featured badge</span>
+                            <span class="passport-editor__chevron" aria-hidden="true">›</span>
+                        </summary>
+                        <div class="passport-editor__section-body">
+                            <p class="mb-4 text-sm text-muted-foreground">Your Twitch user ID keeps this passport together if your login changes.</p>
+                            <div class="passport-editor__fields">
+                                <div class="passport-editor__field--wide" data-field>
+                                    <label class="label" for="passport-profile-line">Profile line</label>
+                                    <textarea id="passport-profile-line"
+                                              class="input passport-editor__profile-line mt-2"
+                                              maxlength="@ViewerPassportLimits.ProfileLineMaximumLength"
+                                              @bind="_profileLine"
+                                              @bind:event="oninput"></textarea>
+                                    <p class="passport-editor__hint">
+                                        <span>Channel moderation rules apply. Displayed as plain text.</span>
+                                        <span>@_profileLine.Length / @ViewerPassportLimits.ProfileLineMaximumLength</span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <label class="label" for="passport-title">Display title</label>
+                                    <select id="passport-title" class="input mt-2" @bind="_selectedTitle">
+                                        <option value="">No title</option>
+                                        @foreach (var reward in _passport.EarnedTitles)
+                                        {
+                                            <option value="@reward.Id">@reward.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="label" for="passport-badge">Featured badge</label>
+                                    <select id="passport-badge" class="input mt-2" @bind="_selectedBadge">
+                                        <option value="">No badge</option>
+                                        @foreach (var reward in _passport.EarnedBadges)
+                                        {
+                                            <option value="@reward.Id">@reward.Name · @reward.PresentationToken</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
-                            <div class="studio-span-6 space-y-2">
-                                <label class="label" for="passport-badge">Featured badge</label>
-                                <select id="passport-badge" class="input" @bind="_selectedBadge">
-                                    <option value="">No badge</option>
-                                    @foreach (var reward in _passport.EarnedBadges)
-                                    {
-                                        <option value="@reward.Id">@reward.Name</option>
-                                    }
-                                </select>
+                        </div>
+                    </details>
+
+                    <details class="passport-editor__section" open>
+                        <summary>
+                            <span class="passport-editor__section-title">Who can see it</span>
+                            <span class="passport-editor__section-summary">Visibility and attendance choices</span>
+                            <span class="passport-editor__chevron" aria-hidden="true">›</span>
+                        </summary>
+                        <div class="passport-editor__section-body">
+                            <p class="mb-4 text-sm text-muted-foreground">Public presentation is opt-in. Saved activity stays private until you choose otherwise.</p>
+                            <div class="passport-visibility-options">
+                                @foreach (var option in _visibilityOptions)
+                                {
+                                    <label class="@VisibilityClass(option.Value)">
+                                        <input type="radio"
+                                               name="passport-visibility"
+                                               value="@option.Value"
+                                               @onchange="() => _visibility = option.Value"
+                                               checked="@(_visibility == option.Value)" />
+                                        <span>
+                                            <span class="passport-visibility-option__label">@option.Label</span>
+                                            <span class="passport-visibility-option__copy">@option.Description</span>
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                            <div class="passport-attendance">
+                                <span>
+                                    <span class="passport-attendance__label" id="passport-attendance-label">Show attendance streak</span>
+                                    <span class="passport-attendance__copy">Consecutive UTC days with a chat message, never watch time.</span>
+                                </span>
+                                <button type="button"
+                                        class="studio-toggle"
+                                        role="switch"
+                                        aria-checked="@(!_hideAttendance ? "true" : "false")"
+                                        aria-labelledby="passport-attendance-label"
+                                        @onclick="ToggleAttendance"></button>
                             </div>
                         </div>
-                    </section>
+                    </details>
 
-                    <section class="grid gap-4 border-t border-[var(--app-border)] p-5">
-                        <div>
-                            <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Who can see it</h2>
-                            <p class="mt-1 text-sm text-muted-foreground">Public presentation is opt-in. Saved activity stays private until you choose otherwise.</p>
+                    <details class="passport-editor__section">
+                        <summary>
+                            <span class="passport-editor__section-title">Privacy and data</span>
+                            <span class="passport-editor__section-summary">Export or reset your passport data</span>
+                            <span class="passport-editor__chevron" aria-hidden="true">›</span>
+                        </summary>
+                        <div class="passport-editor__section-body">
+                            <p class="mb-4 text-sm text-muted-foreground">Export your channel data or remove this passport and its chat-presence days.</p>
+                            <div class="passport-data-actions">
+                                <a class="btn-secondary" href="@ExportUrl()">Export my channel data</a>
+                                @if (!_confirmReset)
+                                {
+                                    <button class="btn-secondary passport-data-actions__reset" type="button" @onclick="() => _confirmReset = true">Reset passport</button>
+                                }
+                                else
+                                {
+                                    <span class="passport-reset-confirmation">
+                                        Remove this profile and its chat-presence days?
+                                        <button class="btn-secondary passport-data-actions__reset" type="button" @onclick="ResetAsync">Confirm reset</button>
+                                        <button class="btn-secondary" type="button" @onclick="() => _confirmReset = false">Cancel</button>
+                                    </span>
+                                }
+                            </div>
                         </div>
-                        <div class="grid gap-2">
-                            @foreach (var option in _visibilityOptions)
-                            {
-                                <label class="@VisibilityClass(option.Value)">
-                                    <input type="radio" name="passport-visibility" value="@option.Value" @onchange="() => _visibility = option.Value" checked="@(_visibility == option.Value)" />
-                                    <span><b class="block text-[var(--app-text-strong)]">@option.Label</b><span class="text-xs text-muted-foreground">@option.Description</span></span>
-                                </label>
-                            }
-                        </div>
-                        <label class="flex items-center justify-between gap-4 border-t border-[var(--app-border)] pt-4">
-                            <span><b class="block text-sm text-[var(--app-text-strong)]">Show attendance streak</b><span class="text-xs text-muted-foreground">Consecutive UTC days with a chat message, never watch time.</span></span>
-                            <input type="checkbox" checked="@(!_hideAttendance)" @onchange="ToggleAttendance" />
-                        </label>
-                    </section>
+                    </details>
 
-                    <section class="flex flex-wrap gap-2 border-t border-[var(--app-border)] p-5">
+                    <div class="passport-editor__save">
                         <StickySaveRegion Scope="StickySaveScope.Editor">
                             <button class="btn-primary" type="button" @onclick="SaveAsync">Save passport</button>
                         </StickySaveRegion>
-                        <a class="btn-secondary" href="@ExportUrl()">Export my channel data</a>
-                        @if (!_confirmReset)
-                        {
-                            <button class="btn-secondary text-red-700" type="button" @onclick="() => _confirmReset = true">Reset passport</button>
-                        }
-                        else
-                        {
-                            <span class="inline-flex flex-wrap items-center gap-2 rounded-lg border border-red-300 p-2 text-sm">
-                                Remove this profile and its chat-presence days?
-                                <button class="btn-secondary text-red-700" type="button" @onclick="ResetAsync">Confirm reset</button>
-                                <button class="btn-secondary" type="button" @onclick="() => _confirmReset = false">Cancel</button>
-                            </span>
-                        }
-                    </section>
+                    </div>
                 </div>
 
-                <aside class="card self-start p-5">
-                    <div class="flex items-center gap-3">
-                        <div class="grid h-12 w-12 place-items-center rounded-full bg-violet-600 text-lg font-black text-white">@Initials(_passport.DisplayName)</div>
-                        <div class="min-w-0">
-                            @if (_passport.SelectedTitle is { } title)
+                <aside class="card passport-preview" aria-label="Viewer passport preview">
+                    <div class="passport-preview__identity">
+                        <div class="passport-preview__avatar">@Initials(_passport.DisplayName)</div>
+                        <div class="passport-preview__identity-copy">
+                            @if (_previewTitle is not null || _previewBadge is not null)
                             {
-                                <span class="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">✦ @title.Name</span>
+                                <div class="passport-preview__rewards">
+                                    @if (_previewTitle is { } title)
+                                    {
+                                        <span class="passport-preview__reward">✦ @title.Name</span>
+                                    }
+                                    @if (_previewBadge is { } badge)
+                                    {
+                                        <span class="passport-preview__reward">@badge.PresentationToken @badge.Name</span>
+                                    }
+                                </div>
                             }
-                            <h2 class="truncate text-xl font-bold text-[var(--app-text-strong)]">@_passport.DisplayName</h2>
-                            <p class="text-xs text-muted-foreground">@($"@{_passport.Login}") · @_passport.HostDisplayName</p>
+                            <h2 class="passport-preview__name">@_passport.DisplayName</h2>
+                            <p class="passport-preview__meta">@($"@{_passport.Login}") · @_passport.HostDisplayName</p>
                         </div>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(_profileLine))
                     {
-                        <p class="my-4 border-y border-[var(--app-border)] py-4 text-sm text-[var(--app-text-strong)]">@_profileLine</p>
+                        <p class="passport-preview__line">@_profileLine</p>
                     }
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="passport-preview__stats">
                         @Stat(_passport.Statistics.Points, _passport.Statistics.PointsRank is { } rank ? $"points · rank #{rank}" : "points")
                         @Stat($"{_passport.Statistics.GuessAccuracyPercent}%", $"guess accuracy · {_passport.Statistics.GuessRounds} rounds")
                         @if (!_hideAttendance)
@@ -156,7 +201,7 @@
                         @Stat($"{_passport.Statistics.GamesWon} / {_passport.Statistics.GiveawaysWon}", "games / giveaways won")
                         @Stat($"{_passport.Statistics.BountiesSupported} / {_passport.Statistics.ApprovedMoments}", "bounties / moments")
                     </div>
-                    <p class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Preview shows only fields allowed by your current attendance choice. Visibility controls who receives the profile.</p>
+                    <p class="passport-preview__notice">Preview shows only fields allowed by your current visibility choices.</p>
                 </aside>
             </div>
         }
