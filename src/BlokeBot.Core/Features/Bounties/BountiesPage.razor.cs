@@ -13,7 +13,7 @@ public partial class BountiesPage
     private readonly Dictionary<Guid, string> _reasons = [];
     private readonly Dictionary<Guid, string> _extensions = [];
     private readonly HashSet<Guid> _openExtensions = [];
-    private BountyDraft _draft = BountyDraft.New();
+    private BountyDraft _draft = new();
     private BountyBoardFilter _boardFilter = BountyBoardFilter.Active;
     private bool _draftOpen;
     private bool _bountiesConfigured;
@@ -23,6 +23,8 @@ public partial class BountiesPage
     private string _feedback = string.Empty;
 
     private string _publicBoardUrl => $"/bounties/{Uri.EscapeDataString(HostLogin)}";
+
+    private DateTime _nowUtc => _clock.GetUtcNow().UtcDateTime;
 
     private IReadOnlyList<BountyModeratorView> _visibleItems =>
         [
@@ -40,6 +42,7 @@ public partial class BountiesPage
 
     protected override async Task OnInitializedAsync()
     {
+        _draft = BountyDraft.New(_nowUtc);
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
@@ -110,7 +113,7 @@ public partial class BountiesPage
                 _operationFailed = result is BountyResult<BountyView>.Rejected;
                 if (!_operationFailed)
                 {
-                    _draft = BountyDraft.New();
+                    _draft = BountyDraft.New(_nowUtc);
                     _boardFilter = BountyBoardFilter.Active;
                     await LoadAsync();
                 }
@@ -202,7 +205,7 @@ public partial class BountiesPage
     private string ExtensionFor(Guid id) =>
         _extensions.GetValueOrDefault(
             id,
-            DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            _nowUtc.AddDays(7).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
         );
 
     private void SetExtension(Guid id, string value) => _extensions[id] = value;
@@ -329,11 +332,11 @@ public partial class BountiesPage
             BountyRewardDistribution.Proportional;
         public string Reason { get; set; } = string.Empty;
 
-        public static BountyDraft New() =>
+        public static BountyDraft New(DateTime nowUtc) =>
             new()
             {
-                ExpiresAtUtc = DateTime
-                    .UtcNow.AddDays(7)
+                ExpiresAtUtc = nowUtc
+                    .AddDays(7)
                     .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
             };
     }

@@ -41,15 +41,19 @@
                 @foreach (var square in Card.Squares)
                 {
                     <div class="@CellClass(square)" data-bingo-marked="@square.Marked.ToString().ToLowerInvariant()" @key="square.Position">
+                        @if (square.Marked)
+                        {
+                            <span class="bingo-cell__marked" aria-label="Marked">✓</span>
+                        }
                         @if (square.Evidence.Count > 0)
                         {
                             <span class="bingo-cell__evidence" aria-label="@square.Evidence.Count evidence entries">@square.Evidence.Count</span>
                         }
                         <span class="bingo-cell__title">@square.Title</span>
                         <span class="bingo-cell__kind">@square.Kind.DisplayName()</span>
-                        @if (SquareAction is not null)
+                        @if (HasSquareAction(square))
                         {
-                            <span class="bingo-cell__action">@SquareAction(square)</span>
+                            <span class="bingo-cell__action">@SquareActionFor(square)</span>
                         }
                     </div>
                 }

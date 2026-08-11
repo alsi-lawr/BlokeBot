@@ -24,6 +24,13 @@ public partial class BingoPublicCard
     [Parameter]
     public RenderFragment<BingoSquareView>? SquareAction { get; set; }
 
+    /// <summary>
+    /// Identifies the squares whose action fragment produces a control, allowing the cell to reserve
+    /// room without changing public cards or squares that do not have an action.
+    /// </summary>
+    [Parameter]
+    public Func<BingoSquareView, bool>? SquareActionVisible { get; set; }
+
     [Parameter]
     public string EvidenceTitle { get; set; } = "Public evidence";
 
@@ -50,8 +57,14 @@ public partial class BingoPublicCard
     {
         var marked = square.Marked ? " bingo-cell--marked" : string.Empty;
         var win = _winningPositions.Contains(square.Position) ? " bingo-cell--win" : string.Empty;
-        return $"bingo-cell{marked}{win}";
+        var action = HasSquareAction(square) ? " bingo-cell--has-action" : string.Empty;
+        return $"bingo-cell{marked}{win}{action}";
     }
+
+    private bool HasSquareAction(BingoSquareView square) =>
+        SquareAction is not null && (SquareActionVisible?.Invoke(square) ?? true);
+
+    private RenderFragment SquareActionFor(BingoSquareView square) => SquareAction!(square);
 
     private string RewardSummary()
     {

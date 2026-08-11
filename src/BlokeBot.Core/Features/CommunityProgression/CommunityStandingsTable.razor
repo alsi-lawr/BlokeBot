@@ -1,15 +1,16 @@
 <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
     <table class="w-full text-left text-sm">
+        <caption class="sr-only">Season standings</caption>
         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-                <th class="px-4 py-3 font-semibold">Rank</th>
-                <th class="px-4 py-3 font-semibold">Viewer</th>
-                <th class="px-4 py-3 font-semibold">Completed</th>
-                <th class="px-4 py-3 font-semibold">Progress</th>
+                <th class="px-4 py-3 font-semibold" scope="col">Rank</th>
+                <th class="px-4 py-3 font-semibold" scope="col">Viewer</th>
+                <th class="px-4 py-3 font-semibold" scope="col">Completed</th>
+                <th class="px-4 py-3 font-semibold" scope="col">Progress</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-            @foreach (var standing in _visible)
+            @foreach (var standing in Standings)
             {
                 <tr @key="standing.TwitchUserId" class="motion-list__item">
                     <td class="px-4 py-3"><RankIndicator Rank="standing.Rank" /></td>

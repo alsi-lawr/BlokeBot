@@ -44,6 +44,7 @@ public sealed class BountyUiTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         _ = context.Services.AddSingleton(service);
+        _ = context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(_now));
         _ = context.AddAuthorization().SetNotAuthorized();
 
         var cut = context.Render<PublicBountyBoardPage>(parameters =>

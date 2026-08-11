@@ -10,6 +10,7 @@ public partial class PublicBingoPage
     /// <summary>Sections default to open, so only what a reader has closed is tracked.</summary>
     private readonly HashSet<string> _closed = [];
     private BingoPublicView? _view;
+    private string? _loadedChannel;
     private bool _loaded;
 
     [Parameter]
@@ -17,6 +18,13 @@ public partial class PublicBingoPage
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!string.Equals(_loadedChannel, Channel, StringComparison.OrdinalIgnoreCase))
+        {
+            _closed.Clear();
+            _loadedChannel = Channel;
+            _loaded = false;
+        }
+
         _view = await _bingo.GetPublicAsync(Channel, CancellationToken.None);
         _loaded = true;
     }

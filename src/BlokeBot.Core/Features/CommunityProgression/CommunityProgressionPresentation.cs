@@ -49,10 +49,10 @@ internal static class CommunityProgressionPresentation
     /// Wall-clock phrasing for a moment already known to the reader, so the exact instant stays
     /// available as the element title rather than being read out as a UTC run.
     /// </summary>
-    internal static string HumanMoment(DateTime utc)
+    internal static string HumanMoment(DateTime utc, DateTime nowUtc)
     {
         var moment = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-        var today = DateTime.UtcNow.Date;
+        var today = nowUtc.Date;
         var time = moment.ToString("HH:mm", CultureInfo.InvariantCulture);
         return moment.Date == today ? $"today {time}"
             : moment.Date == today.AddDays(-1) ? $"yesterday {time}"
@@ -64,11 +64,11 @@ internal static class CommunityProgressionPresentation
     internal static string ExactMoment(DateTime utc) =>
         DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToString("u", CultureInfo.InvariantCulture);
 
-    internal static string HumanDate(DateTime moment) =>
-        moment.Year == DateTime.UtcNow.Year
+    internal static string HumanDate(DateTime moment, DateTime nowUtc) =>
+        moment.Year == nowUtc.Year
             ? moment.ToString("d MMM", CultureInfo.InvariantCulture)
             : moment.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
 
-    internal static string SeasonRange(DateTime startsAtUtc, DateTime endsAtUtc) =>
-        $"{HumanDate(startsAtUtc)} to {HumanDate(endsAtUtc)}";
+    internal static string SeasonRange(DateTime startsAtUtc, DateTime endsAtUtc, DateTime nowUtc) =>
+        $"{HumanDate(startsAtUtc, nowUtc)} to {HumanDate(endsAtUtc, nowUtc)}";
 }

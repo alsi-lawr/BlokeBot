@@ -7,7 +7,14 @@
         }
         <span class="progression-row__amount"><b>@_amount</b> / @_target@_completions</span>
     </div>
-    <div class="@_meterClass"><span style="@_fillStyle"></span></div>
+    <div class="@_meterClass"
+         role="progressbar"
+         aria-label="@_meterLabel"
+         aria-valuemin="0"
+         aria-valuemax="100"
+         aria-valuenow="@_meterPercent">
+        <span style="@_fillStyle"></span>
+    </div>
     @if (!string.IsNullOrWhiteSpace(Note))
     {
         <p class="progression-row__meta">@Note</p>

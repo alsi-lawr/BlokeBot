@@ -7,6 +7,7 @@
 @inherits AuthenticatedPageComponent
 @inject BountyService _bounties
 @inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
+@inject TimeProvider _clock
 
 <PageTitle>BlokeBot | Bounties</PageTitle>
 
@@ -146,13 +147,9 @@
                                 @if (bounty.Contributors.Count > 0)
                                 {
                                     <div class="flex flex-wrap items-center gap-2">
-                                        @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                        @foreach (var contributor in bounty.Contributors)
                                         {
                                             <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
-                                        }
-                                        @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
-                                        {
-                                            <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
                                         }
                                     </div>
                                 }
@@ -188,7 +185,7 @@
                                     <p class="text-sm text-muted-foreground">@bounty.Description</p>
                                 </div>
                                 <div class="grid flex-none justify-items-end gap-[0.1rem] text-right">
-                                    <span class="text-[1.05rem] leading-[1.2] font-bold @BountyPresentation.CountdownClass(bounty)">@BountyPresentation.Countdown(bounty)</span>
+                                    <span class="text-[1.05rem] leading-[1.2] font-bold @BountyPresentation.CountdownClass(bounty, _nowUtc)">@BountyPresentation.Countdown(bounty, _nowUtc)</span>
                                     <span class="text-xs text-[var(--app-text-muted)]">@BountyPresentation.AbsoluteUtc(bounty.ExpiresAtUtc)</span>
                                 </div>
                                 <span class="bounty-disclosure__chevron self-center text-[1.05rem] leading-none" aria-hidden="true">›</span>
@@ -215,13 +212,9 @@
                                 @if (bounty.Contributors.Count > 0)
                                 {
                                     <div class="flex flex-wrap items-center gap-2">
-                                        @foreach (var contributor in BountyPresentation.VisibleContributors(bounty))
+                                        @foreach (var contributor in bounty.Contributors)
                                         {
                                             <span @key="contributor.Login" class="bounty-chip">@($"@{contributor.Login}") <span class="bounty-chip__amount">@contributor.PledgedAmount.ToDisplayString()</span></span>
-                                        }
-                                        @if (BountyPresentation.HiddenContributorCount(bounty) > 0)
-                                        {
-                                            <span class="bounty-chip bounty-chip__amount">+@BountyPresentation.HiddenContributorCount(bounty) more</span>
                                         }
                                     </div>
                                 }

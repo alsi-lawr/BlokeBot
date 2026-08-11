@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject CommunityProgressionService _progression
+@inject TimeProvider _clock
 
 <PageTitle>BlokeBot | Community progression</PageTitle>
 
@@ -88,7 +89,7 @@
                                 }
                                 else
                                 {
-                                    @foreach (var item in season.Progress.Take(20))
+                                    @foreach (var item in season.Progress)
                                     {
                                         <CommunityProgressMeterRow Name="@item.DisplayName"
                                                                    Tag="@item.DefinitionName"
@@ -111,7 +112,7 @@
                                     else
                                     {
                                         <div class="progression-unlock-list">
-                                            @foreach (var item in season.Unlocks.Take(20))
+                                            @foreach (var item in season.Unlocks)
                                             {
                                                 <CommunityUnlockRow Unlock="item" />
                                             }
@@ -129,12 +130,12 @@
                                     else
                                     {
                                         <div class="progression-unlock-list">
-                                            @foreach (var item in season.Completions.Take(20))
+                                            @foreach (var item in season.Completions)
                                             {
                                                 <div class="progression-unlock" @key="item.Id">
                                                     <b>@(item.DisplayName ?? "Community")</b>
                                                     <span>completed @item.DefinitionName</span>
-                                                    <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc)</span>
+                                                    <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc, _nowUtc)</span>
                                                 </div>
                                             }
                                         </div>

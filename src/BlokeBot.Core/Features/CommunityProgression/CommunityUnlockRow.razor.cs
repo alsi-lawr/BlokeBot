@@ -8,8 +8,13 @@ namespace BlokeBot.Core.Features.CommunityProgression;
 /// </summary>
 public partial class CommunityUnlockRow
 {
+    [Inject]
+    private TimeProvider _clock { get; set; } = default!;
+
     [Parameter, EditorRequired]
     public required CommunityUnlockView Unlock { get; set; }
 
     private string _login => $"@{Unlock.Login}";
+
+    private DateTime _nowUtc => _clock.GetUtcNow().UtcDateTime;
 }

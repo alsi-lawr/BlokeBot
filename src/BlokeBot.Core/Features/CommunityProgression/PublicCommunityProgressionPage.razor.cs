@@ -11,17 +11,20 @@ public partial class PublicCommunityProgressionPage
     private CommunityPublicView? _view;
     private bool _loaded;
 
+    private DateTime _nowUtc => _clock.GetUtcNow().UtcDateTime;
+
     protected override async Task OnParametersSetAsync()
     {
         _view = await _progression.GetPublicAsync(Channel, CancellationToken.None);
         _loaded = true;
     }
 
-    private static string SeasonSummary(CommunityPublicSeasonView season)
+    private string SeasonSummary(CommunityPublicSeasonView season)
     {
         var range = CommunityProgressionPresentation.SeasonRange(
             season.StartsAtUtc,
-            season.EndsAtUtc
+            season.EndsAtUtc,
+            _nowUtc
         );
         return season.Status switch
         {

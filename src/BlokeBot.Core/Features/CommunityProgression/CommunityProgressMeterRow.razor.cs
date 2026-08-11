@@ -34,5 +34,9 @@ public partial class CommunityProgressMeterRow
 
     private string _meterClass => CommunityProgressionPresentation.MeterClass(Amount, Target);
 
+    private string _meterLabel => $"{Name} progress";
+
+    private int _meterPercent => CommunityProgressionPresentation.MeterPercent(Amount, Target);
+
     private string _fillStyle => CommunityProgressionPresentation.MeterFillStyle(Amount, Target);
 }

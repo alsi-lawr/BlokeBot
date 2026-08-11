@@ -47,6 +47,7 @@ public partial class BingoPage
 
     protected override async Task OnInitializedAsync()
     {
+        _game = GameDraft.New(_clock.GetUtcNow().UtcDateTime);
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
@@ -598,11 +599,19 @@ public partial class BingoPage
     {
         public Guid TemplateId { get; set; }
         public BingoGameMode Mode { get; set; }
-        public string Seed { get; set; } =
-            DateTime.UtcNow.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
+        public string Seed { get; set; } = string.Empty;
         public string ParticipantCap { get; set; } = string.Empty;
         public string TeamCap { get; set; } = string.Empty;
         public string Teams { get; set; } = "Team Aurora, Team Nebula";
+
+        public static GameDraft New(DateTime nowUtc) =>
+            new()
+            {
+                Seed = nowUtc.ToString(
+                    "yyyyMMdd",
+                    System.Globalization.CultureInfo.InvariantCulture
+                ),
+            };
     }
 
     private sealed record CounterChoice(int Id, string Name);

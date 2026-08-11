@@ -685,7 +685,6 @@ public sealed class BingoService(
         var liveEntity = games.FirstOrDefault(value => value.Status == BingoGameStatus.Issued);
         var archiveEntities = games
             .Where(value => value.Status == BingoGameStatus.Archived)
-            .Take(20)
             .ToArray();
         var live = liveEntity is null ? null : await ToViewAsync(db, liveEntity, ct);
         var archive = new List<BingoGameView>(archiveEntities.Length);

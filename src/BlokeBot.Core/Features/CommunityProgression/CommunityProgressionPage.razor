@@ -6,6 +6,7 @@
 @inherits AuthenticatedPageComponent
 @inject CommunityProgressionService _progression
 @inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
+@inject TimeProvider _clock
 
 <PageTitle>BlokeBot | Community progression</PageTitle>
 
@@ -130,11 +131,11 @@
                                     </div>
                                     <div class="studio-span-4">
                                         <span class="label">Starts</span>
-                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.StartsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.StartsAtUtc)</p>
+                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.StartsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.StartsAtUtc, _nowUtc)</p>
                                     </div>
                                     <div class="studio-span-4">
                                         <span class="label">Ends</span>
-                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.EndsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.EndsAtUtc)</p>
+                                        <p class="text-sm" title="@CommunityProgressionPresentation.ExactMoment(season.EndsAtUtc)">@CommunityProgressionPresentation.HumanMoment(season.EndsAtUtc, _nowUtc)</p>
                                     </div>
                                     <div class="studio-span-4">
                                         <span class="label">Visibility</span>
@@ -430,7 +431,7 @@
                                                 else
                                                 {
                                                     <div class="progression-unlock-list">
-                                                        @foreach (var item in season.Unlocks.Take(20))
+                                                        @foreach (var item in season.Unlocks)
                                                         {
                                                             <CommunityUnlockRow Unlock="item" />
                                                         }
@@ -450,7 +451,7 @@
                                         }
                                         else
                                         {
-                                            @foreach (var item in season.Progress.Take(20))
+                                            @foreach (var item in season.Progress)
                                             {
                                                 <CommunityProgressMeterRow Name="@item.DisplayName"
                                                                            Tag="@item.DefinitionName"
@@ -472,12 +473,12 @@
                                         else
                                         {
                                             <div class="progression-unlock-list">
-                                                @foreach (var item in season.Completions.Take(20))
+                                                @foreach (var item in season.Completions)
                                                 {
                                                     <div class="progression-unlock" @key="item.Id">
                                                         <b>@(item.DisplayName ?? "Community")</b>
                                                         <span>completed @item.DefinitionName</span>
-                                                        <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc)</span>
+                                                        <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc, _nowUtc)</span>
                                                     </div>
                                                 }
                                             </div>

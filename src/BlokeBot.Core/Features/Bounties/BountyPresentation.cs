@@ -11,7 +11,6 @@ namespace BlokeBot.Core.Features.Bounties;
 /// </summary>
 internal static class BountyPresentation
 {
-    private const int _visibleContributors = 5;
     private static readonly TimeSpan _soonThreshold = TimeSpan.FromHours(24);
 
     public static bool IsTerminal(BountyStatus status) =>
@@ -41,14 +40,16 @@ internal static class BountyPresentation
             _ => "bounty-outcome bounty-outcome--slate",
         };
 
-    public static string Countdown(BountyView bounty) =>
-        Countdown(bounty.ExpiresAtUtc, DateTime.UtcNow);
+    public static string Countdown(BountyView bounty, DateTime nowUtc) =>
+        Countdown(bounty.ExpiresAtUtc, nowUtc);
 
-    public static bool DeadlineIsSoon(BountyView bounty) =>
-        bounty.ExpiresAtUtc - DateTime.UtcNow < _soonThreshold;
+    public static bool DeadlineIsSoon(BountyView bounty, DateTime nowUtc) =>
+        bounty.ExpiresAtUtc - nowUtc < _soonThreshold;
 
-    public static string CountdownClass(BountyView bounty) =>
-        DeadlineIsSoon(bounty) ? "text-[var(--tone-amber-fg)]" : "text-[var(--app-text-strong)]";
+    public static string CountdownClass(BountyView bounty, DateTime nowUtc) =>
+        DeadlineIsSoon(bounty, nowUtc)
+            ? "text-[var(--tone-amber-fg)]"
+            : "text-[var(--app-text-strong)]";
 
     private static string Countdown(DateTime expiresAtUtc, DateTime nowUtc) =>
         Countdown(expiresAtUtc - nowUtc);
@@ -98,19 +99,11 @@ internal static class BountyPresentation
             ? "No completion bonus"
             : $"Completion bonus {bounty.CompletionReward.ToDisplayString()} · {DistributionWord(bounty.RewardDistribution)} split";
 
-    public static IReadOnlyList<BountyContributorView> VisibleContributors(BountyView bounty) =>
-        bounty.Contributors.Count <= _visibleContributors
-            ? bounty.Contributors
-            : [.. bounty.Contributors.Take(_visibleContributors)];
-
-    public static int HiddenContributorCount(BountyView bounty) =>
-        Math.Max(0, bounty.Contributors.Count - _visibleContributors);
-
     public static IReadOnlyList<BountyTimelinePoint> Timeline(BountyView bounty)
     {
         var points = new List<BountyTimelinePoint>(3)
         {
-            new("Opened", ShortDate(bounty.CreatedAtUtc)),
+            new("Created", ShortDate(bounty.CreatedAtUtc)),
         };
         if (bounty.AcceptedAtUtc is { } accepted)
         {
@@ -149,10 +142,11 @@ internal static class BountyPresentation
         var when = ShortDate(ResolvedAt(bounty));
         if (bounty.Status == BountyStatus.Completed)
         {
-            var bonus = bounty.CompletionReward.IsZero
-                ? string.Empty
-                : $" · bonus {bounty.CompletionReward.ToDisplayString()} paid";
-            return $"{when} · {bounty.PledgedAmount.ToDisplayString()} spent{bonus}";
+            var bonus = CompletionBonusMeta(bounty);
+            var pledges = bounty.PledgedAmount.IsZero
+                ? "no pledges"
+                : $"{bounty.PledgedAmount.ToDisplayString()} spent";
+            return $"{when} · {pledges}{bonus}";
         }
 
         return bounty.PledgedAmount.IsZero ? $"{when} · no pledges"
@@ -185,19 +179,16 @@ internal static class BountyPresentation
     private static DateTime ResolvedAt(BountyView bounty) =>
         bounty.ResolvedAtUtc ?? bounty.UpdatedAtUtc;
 
-    private static string CompletionBonusClause(BountyView bounty)
-    {
-        if (bounty.CompletionReward.IsZero)
-        {
-            return " · no completion bonus";
-        }
+    private static string CompletionBonusClause(BountyView bounty) =>
+        bounty.CompletionReward.IsZero ? " · no completion bonus"
+        : bounty.PledgedAmount.IsZero
+            ? $" · completion bonus {bounty.CompletionReward.ToDisplayString()} not distributed because there were no contributors"
+        : $" · completion bonus {bounty.CompletionReward.ToDisplayString()} distributed, {DistributionWord(bounty.RewardDistribution)} split";
 
-        var recipients =
-            bounty.ContributorCount == 1
-                ? "1 contributor"
-                : $"{bounty.ContributorCount} contributors";
-        return $" · completion bonus {bounty.CompletionReward.ToDisplayString()} paid to {recipients}, {DistributionWord(bounty.RewardDistribution)} split";
-    }
+    private static string CompletionBonusMeta(BountyView bounty) =>
+        bounty.CompletionReward.IsZero ? string.Empty
+        : bounty.PledgedAmount.IsZero ? " · no bonus distributed"
+        : $" · bonus {bounty.CompletionReward.ToDisplayString()} distributed";
 
     private static string DistributionWord(BountyRewardDistribution distribution) =>
         distribution == BountyRewardDistribution.Equal ? "equal" : "proportional";

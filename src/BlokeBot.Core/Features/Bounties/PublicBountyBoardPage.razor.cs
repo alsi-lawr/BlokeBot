@@ -14,6 +14,8 @@ public partial class PublicBountyBoardPage
     private bool _operationFailed;
     private string _feedback = string.Empty;
 
+    private DateTime _nowUtc => _clock.GetUtcNow().UtcDateTime;
+
     [CascadingParameter]
     private Task<AuthenticationState> _authenticationState { get; set; } =
         Task.FromResult(new AuthenticationState(new()));

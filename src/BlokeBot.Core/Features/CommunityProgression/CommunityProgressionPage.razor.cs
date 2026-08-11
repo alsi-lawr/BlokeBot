@@ -11,7 +11,7 @@ public partial class CommunityProgressionPage
     private IReadOnlyList<CommunitySeasonView> _seasons = [];
     private readonly Dictionary<Guid, ScheduleEditDraft> _scheduleEdits = [];
     private readonly HashSet<string> _closedStages = [];
-    private SeasonDraft _season = SeasonDraft.New();
+    private SeasonDraft _season = new();
     private RewardDraft _reward = new();
     private DefinitionDraft _definition = new();
     private bool _enabled;
@@ -23,8 +23,11 @@ public partial class CommunityProgressionPage
 
     private string _publicUrl => $"/community/{Uri.EscapeDataString(HostLogin)}";
 
+    private DateTime _nowUtc => _clock.GetUtcNow().UtcDateTime;
+
     protected override async Task OnInitializedAsync()
     {
+        _season = SeasonDraft.New(_nowUtc);
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
@@ -71,7 +74,7 @@ public partial class CommunityProgressionPage
         );
         if (!_failed)
         {
-            _season = SeasonDraft.New();
+            _season = SeasonDraft.New(_nowUtc);
         }
     }
 
@@ -269,11 +272,12 @@ public partial class CommunityProgressionPage
         _ = open ? _closedStages.Remove(key) : _closedStages.Add(key);
     }
 
-    private static string SeasonSummary(CommunitySeasonView season)
+    private string SeasonSummary(CommunitySeasonView season)
     {
         var range = CommunityProgressionPresentation.SeasonRange(
             season.StartsAtUtc,
-            season.EndsAtUtc
+            season.EndsAtUtc,
+            _nowUtc
         );
         return season.Status switch
         {
@@ -304,7 +308,7 @@ public partial class CommunityProgressionPage
             CommunityEventRuleCatalog.Describe(definition.EventRule).Label
         );
 
-    private static string DefinitionCadence(CommunityDefinitionView definition)
+    private string DefinitionCadence(CommunityDefinitionView definition)
     {
         var localTime = definition.Schedule.LocalTime.ToString(
             "HH:mm",
@@ -315,7 +319,7 @@ public partial class CommunityProgressionPage
                 ? $"{definition.Schedule.Weekday ?? DayOfWeek.Monday} {localTime}"
                 : localTime;
         var next = definition.NextResetUtc is { } value
-            ? $", next {CommunityProgressionPresentation.HumanMoment(value.UtcDateTime)}"
+            ? $", next {CommunityProgressionPresentation.HumanMoment(value.UtcDateTime, _nowUtc)}"
             : string.Empty;
         return $"{definition.Schedule.Cadence}, resets {when} ({definition.TimeZoneId}){next}";
     }
@@ -363,15 +367,12 @@ public partial class CommunityProgressionPage
         public string StartsAtUtc { get; set; } = string.Empty;
         public string EndsAtUtc { get; set; } = string.Empty;
 
-        public static SeasonDraft New() =>
+        public static SeasonDraft New(DateTime nowUtc) =>
             new()
             {
-                StartsAtUtc = DateTime.UtcNow.ToString(
-                    "yyyy-MM-dd HH:mm",
-                    CultureInfo.InvariantCulture
-                ),
-                EndsAtUtc = DateTime
-                    .UtcNow.AddDays(30)
+                StartsAtUtc = nowUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+                EndsAtUtc = nowUtc
+                    .AddDays(30)
                     .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
             };
     }

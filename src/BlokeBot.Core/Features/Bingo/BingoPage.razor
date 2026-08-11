@@ -7,6 +7,7 @@
 @inject BingoService _bingo
 @inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
 @inject IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> _dbFactory
+@inject TimeProvider _clock
 
 <PageTitle>BlokeBot | Bingo</PageTitle>
 
@@ -358,7 +359,11 @@
                             <div class="bingo-card__pair" style="@game.Dimension.GridVariable()">
                                 @foreach (var card in game.Cards)
                                 {
-                                    <BingoPublicCard Game="game" Card="card" EvidenceTitle="Evidence" @key="card.Id.Value">
+                                    <BingoPublicCard Game="game"
+                                                     Card="card"
+                                                     EvidenceTitle="Evidence"
+                                                     SquareActionVisible="square => square.Kind == BingoSquareKind.Manual"
+                                                     @key="card.Id.Value">
                                         <SquareAction Context="square">
                                             @if (square.Kind == BingoSquareKind.Manual)
                                             {

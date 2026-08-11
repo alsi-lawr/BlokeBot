@@ -9,6 +9,9 @@ namespace BlokeBot.Core.Features.CommunityProgression;
 /// </summary>
 public partial class CommunitySeasonTimeline
 {
+    [Inject]
+    private TimeProvider _clock { get; set; } = default!;
+
     [Parameter, EditorRequired]
     public required DateTime StartsAtUtc { get; set; }
 
@@ -18,7 +21,7 @@ public partial class CommunitySeasonTimeline
     [Parameter]
     public string? TimeZoneId { get; set; }
 
-    private DateTime _now => DateTime.UtcNow;
+    private DateTime _now => _clock.GetUtcNow().UtcDateTime;
 
     private TimeSpan _span => EndsAtUtc - StartsAtUtc;
 
@@ -36,7 +39,7 @@ public partial class CommunitySeasonTimeline
     private string _todayStyle =>
         string.Create(CultureInfo.InvariantCulture, $"left:{Math.Round(_elapsedFraction * 100)}%");
 
-    private string _startLabel => CommunityProgressionPresentation.HumanDate(StartsAtUtc);
+    private string _startLabel => CommunityProgressionPresentation.HumanDate(StartsAtUtc, _now);
 
     private string _dayLabel =>
         _now < StartsAtUtc ? "Not started yet"
@@ -74,7 +77,7 @@ public partial class CommunitySeasonTimeline
             var zone = _zone;
             if (zone is null)
             {
-                return CommunityProgressionPresentation.HumanDate(EndsAtUtc);
+                return CommunityProgressionPresentation.HumanDate(EndsAtUtc, _now);
             }
 
             var local = TimeZoneInfo.ConvertTimeFromUtc(
@@ -83,7 +86,7 @@ public partial class CommunitySeasonTimeline
             );
             return string.Create(
                 CultureInfo.InvariantCulture,
-                $"{CommunityProgressionPresentation.HumanDate(local)}, {local:HH:mm}"
+                $"{CommunityProgressionPresentation.HumanDate(local, _now)}, {local:HH:mm}"
             );
         }
     }

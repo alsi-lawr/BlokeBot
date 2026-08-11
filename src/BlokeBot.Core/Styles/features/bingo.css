@@ -76,6 +76,14 @@
         text-transform: uppercase;
     }
 
+    .bingo-cell--has-action {
+        padding-bottom: 2.15rem;
+    }
+
+    .bingo-cell--has-action .bingo-cell__title {
+        -webkit-line-clamp: 2;
+    }
+
     .bingo-cell--marked {
         background: var(--app-affirmative-surface);
         border-color: var(--tone-green-ring);
@@ -144,8 +152,20 @@
         min-width: 1rem;
         padding: 0 0.25rem;
         position: absolute;
-        right: 0.28rem;
+        left: 0.28rem;
         top: 0.28rem;
+        z-index: 1;
+    }
+
+    .bingo-cell__marked {
+        color: var(--tone-green-solid);
+        font-size: 0.65rem;
+        font-weight: 900;
+        line-height: 1;
+        position: absolute;
+        right: 0.32rem;
+        top: 0.32rem;
+        z-index: 1;
     }
 
     .bingo-cell__action {
@@ -153,6 +173,7 @@
         left: 50%;
         position: absolute;
         transform: translateX(-50%);
+        z-index: 1;
     }
 
     /* Header, board and evidence log take the pair's own row tracks, so a card that carries a wins
@@ -322,6 +343,18 @@
     @media (max-width: 56rem) {
         .bingo-editor {
             grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    @media (max-width: 40rem) {
+        /* Mobile buttons retain their 40px touch target. The action already identifies a manual
+           square, so its redundant subtype yields the space instead of colliding with the control. */
+        .bingo-cell--has-action {
+            padding-bottom: 3rem;
+        }
+
+        .bingo-cell--has-action .bingo-cell__kind {
+            display: none;
         }
     }
 }
