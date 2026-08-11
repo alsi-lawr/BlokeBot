@@ -50,6 +50,7 @@
                         selection,
                         HostFeatureFlags.CommunityProgression
                     );
+                    var showCooperativeGame = FeatureIsVisible(session, selection, HostFeatureFlags.CooperativeGame);
                     var showViewerPassports = FeatureIsVisible(
                         session,
                         selection,
@@ -71,7 +72,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showViewerPassports || showBingo || showCompetitions || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showCooperativeGame || showViewerPassports || showBingo || showCompetitions || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -308,6 +309,24 @@
                             <span class="nav-menu__label min-w-0">Community</span>
                         </NavLink>
                         @RouteHelp("community", "Community progression")
+                    </div>
+                }
+
+                @if (showCooperativeGame)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="raid">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="raid"
+                                 aria-label="BlokeRaid"
+                                 aria-describedby="@RouteHelpReference("raid")"
+                                 aria-current="@CurrentRoute("raid")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-rose-700" aria-hidden="true">♜</span>
+                            <span class="nav-menu__label min-w-0">BlokeRaid</span>
+                        </NavLink>
+                        @RouteHelp("raid", "BlokeRaid")
                     </div>
                 }
 

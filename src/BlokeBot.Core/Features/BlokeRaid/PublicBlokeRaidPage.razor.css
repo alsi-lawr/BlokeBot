@@ -1,0 +1,110 @@
+.public-raid-page {
+    display: grid;
+    gap: 1rem;
+    width: min(58rem, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 2.5rem 0 4rem;
+}
+
+.public-raid-page > header h1 {
+    margin: 0.45rem 0 0.2rem;
+    color: var(--app-text-strong);
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+}
+
+.public-raid-page > header p,
+.public-raid-boss p,
+.public-raid-standings > p,
+.public-raid-recap p {
+    margin: 0;
+    color: var(--app-text-muted);
+}
+
+.public-raid-boss,
+.public-raid-standings,
+.public-raid-recap {
+    padding: 1.2rem;
+}
+
+.public-raid-boss > div:first-child,
+.public-raid-recap,
+.public-raid-standings li {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.public-raid-boss > div:first-child > span {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    border-radius: 0.8rem;
+    color: white;
+    font-size: 1.45rem;
+    background: radial-gradient(circle at 35% 35%, #d7ceff, #6544dd 52%, #281d70);
+}
+
+.public-raid-boss h2,
+.public-raid-standings h2,
+.public-raid-recap h2 {
+    margin: 0;
+    color: var(--app-text-strong);
+    font-size: 1.05rem;
+}
+
+.public-raid-boss > strong {
+    display: block;
+    margin-top: 1.1rem;
+    text-align: right;
+}
+
+.public-raid-meter {
+    height: 0.8rem;
+    margin: 0.45rem 0 0.65rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--app-surface-muted);
+}
+
+.public-raid-meter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #e43b60, #f27b54);
+}
+
+.public-raid-standings ol {
+    display: grid;
+    gap: 0.5rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.public-raid-standings li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    border-top: 1px solid var(--app-border);
+    padding-top: 0.65rem;
+}
+
+.public-raid-standings li small {
+    grid-column: 1 / -1;
+    color: var(--app-text-muted);
+}
+
+.public-raid-recap > div {
+    min-width: 0;
+}
+
+@media (max-width: 600px) {
+    .public-raid-page {
+        padding-top: 1.25rem;
+    }
+
+    .public-raid-recap {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

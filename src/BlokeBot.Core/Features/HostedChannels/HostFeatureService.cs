@@ -167,6 +167,56 @@ public sealed class HostFeatureService(
             host.CompetitionsAcceptWorkAfterUtc = now;
             host.CompetitionsPausedAtUtc = null;
         }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.CooperativeGame)
+            && !updated.Contains(HostFeatureFlags.CooperativeGame)
+        )
+        {
+            host.BlokeRaidPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.CooperativeGame)
+            && updated.Contains(HostFeatureFlags.CooperativeGame)
+        )
+        {
+            host.BlokeRaidAcceptWorkAfterUtc = now;
+            if (host.BlokeRaidPausedAtUtc is { } pausedAt)
+            {
+                var pausedFor = now - pausedAt;
+                var activeCampaigns = await db
+                    .BlokeRaidCampaigns.Where(value =>
+                        value.HostId == hostId && value.Status == BlokeRaidCampaignStatus.Active
+                    )
+                    .ToArrayAsync(ct);
+                foreach (var campaign in activeCampaigns)
+                {
+                    campaign.EndsAtUtc += pausedFor;
+                    campaign.Revision++;
+                }
+            }
+            var configuration = await db.BlokeRaidConfigurations.SingleOrDefaultAsync(
+                value => value.HostId == hostId,
+                ct
+            );
+            if (
+                configuration
+                    is {
+                        ResetPolicy: BlokeRaidResetPolicy.Weekly,
+                        NextWeeklyResetAtUtc: { } nextReset,
+                    }
+                && nextReset <= now
+            )
+            {
+                do
+                {
+                    nextReset = nextReset.AddDays(7);
+                } while (nextReset <= now);
+                configuration.NextWeeklyResetAtUtc = nextReset;
+                configuration.Revision++;
+                configuration.UpdatedAtUtc = now;
+            }
+            host.BlokeRaidPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         _ = await changes.NotifyChangedAsync(ct);

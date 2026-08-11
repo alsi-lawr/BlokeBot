@@ -10,6 +10,7 @@ using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
+using BlokeBot.Core.Features.BlokeRaid;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
@@ -54,6 +55,22 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotBlokeRaid(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<IBlokeRaidRandom, BlokeRaidRandom>();
+        _ = services.AddSingleton<BlokeRaidService>();
+        _ = services.AddSingleton<BlokeRaidRuntime>();
+        _ = services.AddSingleton<IBlokeRaidGuessingIntegration>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BlokeRaidRuntime>()
+        );
+        _ = services.AddSingleton<IGuessingChangeObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BlokeRaidRuntime>()
+        );
+        _ = services.AddHostedService<BlokeRaidScheduleWorker>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotViewerPassports(this IServiceCollection services)
     {
         _ = services.AddSingleton<ViewerPassportService>();

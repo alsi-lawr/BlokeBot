@@ -97,6 +97,11 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<CompetitionDomainEvent> CompetitionEvents => Set<CompetitionDomainEvent>();
     public DbSet<CompetitionRewardReceipt> CompetitionRewardReceipts =>
         Set<CompetitionRewardReceipt>();
+    public DbSet<BlokeRaidConfiguration> BlokeRaidConfigurations => Set<BlokeRaidConfiguration>();
+    public DbSet<BlokeRaidCampaign> BlokeRaidCampaigns => Set<BlokeRaidCampaign>();
+    public DbSet<BlokeRaidAction> BlokeRaidActions => Set<BlokeRaidAction>();
+    public DbSet<BlokeRaidContribution> BlokeRaidContributions => Set<BlokeRaidContribution>();
+    public DbSet<BlokeRaidDomainEvent> BlokeRaidEvents => Set<BlokeRaidDomainEvent>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
     public DbSet<PointsGiveawayEntrant> PointsGiveawayEntrants => Set<PointsGiveawayEntrant>();
     public DbSet<PointsGiveawayWinner> PointsGiveawayWinners => Set<PointsGiveawayWinner>();
@@ -187,6 +192,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureViewerPassports(modelBuilder);
         ConfigureBingo(modelBuilder);
         ConfigureCompetitions(modelBuilder);
+        ConfigureBlokeRaid(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);

@@ -20,6 +20,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Points,
         HostFeatureFlags.Bounties,
         HostFeatureFlags.CommunityProgression,
+        HostFeatureFlags.CooperativeGame,
         HostFeatureFlags.ViewerPassports,
         HostFeatureFlags.Bingo,
         HostFeatureFlags.Competitions,
@@ -105,6 +106,12 @@ public static class HostFeatureCatalog
                 "Community progression",
                 "Run seasons with quests, achievements, standings, and persistent rewards.",
                 enabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            ),
+            new(
+                HostFeatureFlags.CooperativeGame,
+                "Cooperative game",
+                "Run the persistent BlokeRaid channel boss campaign.",
+                enabledFeatures.Contains(HostFeatureFlags.CooperativeGame)
             ),
             new(
                 HostFeatureFlags.ViewerPassports,

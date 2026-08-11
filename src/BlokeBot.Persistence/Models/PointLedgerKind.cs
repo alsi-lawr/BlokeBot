@@ -23,6 +23,8 @@ public enum PointLedgerKind
     CommunityProgressionReward,
     BingoReward,
     CompetitionReward,
+    BlokeRaidSpecialSpend,
+    BlokeRaidVictoryReward,
 }
 
 internal static class PointLedgerKindPersistence
@@ -46,6 +48,8 @@ internal static class PointLedgerKindPersistence
     private const string _communityProgressionRewardToken = "CommunityProgressionReward";
     private const string _bingoRewardToken = "BingoReward";
     private const string _competitionRewardToken = "CompetitionReward";
+    private const string _blokeRaidSpecialSpendToken = "BlokeRaidSpecialSpend";
+    private const string _blokeRaidVictoryRewardToken = "BlokeRaidVictoryReward";
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
@@ -68,6 +72,8 @@ internal static class PointLedgerKindPersistence
         _communityProgressionRewardToken,
         _bingoRewardToken,
         _competitionRewardToken,
+        _blokeRaidSpecialSpendToken,
+        _blokeRaidVictoryRewardToken,
     ];
 
     public static string ToToken(PointLedgerKind kind) =>
@@ -92,6 +98,8 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.CommunityProgressionReward => _communityProgressionRewardToken,
             PointLedgerKind.BingoReward => _bingoRewardToken,
             PointLedgerKind.CompetitionReward => _competitionRewardToken,
+            PointLedgerKind.BlokeRaidSpecialSpend => _blokeRaidSpecialSpendToken,
+            PointLedgerKind.BlokeRaidVictoryReward => _blokeRaidVictoryRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
 
@@ -117,6 +125,8 @@ internal static class PointLedgerKindPersistence
             _communityProgressionRewardToken => PointLedgerKind.CommunityProgressionReward,
             _bingoRewardToken => PointLedgerKind.BingoReward,
             _competitionRewardToken => PointLedgerKind.CompetitionReward,
+            _blokeRaidSpecialSpendToken => PointLedgerKind.BlokeRaidSpecialSpend,
+            _blokeRaidVictoryRewardToken => PointLedgerKind.BlokeRaidVictoryReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
 }

@@ -19,6 +19,44 @@ namespace BlokeBot.Core.Tests;
 public sealed class ViewerCommandCatalogTests
 {
     [Test]
+    public async Task CooperativeGameSwitch_LoadingViewerCatalog_OmitsRaidCommandWhileOff()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                EnabledFeatures = HostFeatureFlags.CooperativeGame,
+                CreatedAtUtc = DateTime.UnixEpoch,
+            };
+            _ = db.Hosts.Add(host);
+            _ = await db.SaveChangesAsync();
+            hostId = host.Id;
+        }
+        var catalog = new ViewerCommandCatalogService(
+            dbFactory,
+            new StaticLivenessProvider(new HostStreamLivenessOutcome.Offline()),
+            new RecordingCueAdmissions(),
+            new UnavailableCustomCommandAutomationRuntime()
+        );
+
+        var enabled = await catalog.LoadForHostAsync(hostId, default);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.EnabledFeatures = HostFeatureFlags.None;
+            _ = await db.SaveChangesAsync();
+        }
+        var disabled = await catalog.LoadForHostAsync(hostId, default);
+
+        enabled.Names.ShouldContain("!raid");
+        disabled.Names.ShouldNotContain("!raid");
+    }
+
+    [Test]
     public async Task ViewerPassportsSwitch_LoadingViewerCatalog_OmitsOwnedCommandWhileOff()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

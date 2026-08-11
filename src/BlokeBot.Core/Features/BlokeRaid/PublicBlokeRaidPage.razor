@@ -1,0 +1,33 @@
+@page "/raid/{Channel}"
+@inject BlokeRaidService _raids
+@inject TimeProvider _clock
+
+<PageTitle>BlokeBot | BlokeRaid</PageTitle>
+
+<main class="public-raid-page">
+    @if (!_loaded)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading BlokeRaid…</div>
+    }
+    else if (_view is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground" data-public-raid-unavailable>BlokeRaid is not available for this channel.</div>
+    }
+    else
+    {
+        <header><span class="page-kicker">@_view.HostDisplayName</span><h1>BlokeRaid standings</h1><p>One persistent channel boss, built by every recorded contribution.</p></header>
+        @if (_view.ActiveCampaign is { } campaign)
+        {
+            <section class="card public-raid-boss"><div><span aria-hidden="true">♜</span><div><h2>@campaign.BossName</h2><p>Phase @campaign.CurrentPhase · ends @campaign.EndsAtUtc.ToString("ddd d MMM, HH:mm") UTC</p></div></div><strong>@campaign.CurrentHealth.ToString("N0") / @campaign.MaximumHealth.ToString("N0") health</strong><div class="public-raid-meter"><span style="width:@Percent(campaign.CurrentHealth, campaign.MaximumHealth)%"></span></div><p>Raid ward @campaign.CurrentWard.ToString("N0") / @campaign.MaximumWard.ToString("N0")</p></section>
+            <section class="card public-raid-standings"><h2>Current contributors</h2>@if (campaign.Contributions.Count == 0){<p>No contributions yet.</p>}else{<ol>@foreach (var row in campaign.Contributions){<li><span>@($"@{row.Viewer.Login}")</span><strong>@row.Total.ToString("N0")</strong><small>@row.Damage.ToString("N0") damage · @row.WardRestored.ToString("N0") ward · @row.CorrectGuessCount correct guesses</small></li>}</ol>}</section>
+        }
+        else
+        {
+            <div class="card p-8 text-sm text-muted-foreground">No BlokeRaid boss is active right now.</div>
+        }
+        @if (_view.CompletedRecap is { } recap)
+        {
+            <section class="card public-raid-recap"><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span><div><h2>Latest recap · @recap.BossName</h2><p>@recap.Contributions.Count contributors recorded @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage. Completed @(recap.CompletedAtUtc?.ToString("d MMM yyyy, HH:mm") ?? "—") UTC.</p></div></section>
+        }
+    }
+</main>

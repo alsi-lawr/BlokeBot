@@ -54,6 +54,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedPointsAsync(db, hostId, now, cancellationToken);
         await SeedBountyAsync(db, hostId, now, cancellationToken);
         await SeedCommunityProgressionAsync(db, hostId, now, cancellationToken);
+        await SeedBlokeRaidAsync(db, hostId, now, cancellationToken);
         await SeedViewerPassportsAsync(db, hostId, now, cancellationToken);
         await SeedBingoAsync(db, hostId, now, cancellationToken);
         await SeedCompetitionAsync(db, hostId, now, cancellationToken);
@@ -74,6 +75,260 @@ internal sealed class SimulationFixtureSeeder(
             AuthRole.Streamer
         );
     }
+
+    private static async Task SeedBlokeRaidAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            await db.BlokeRaidCampaigns.AnyAsync(value => value.HostId == hostId, cancellationToken)
+        )
+        {
+            return;
+        }
+
+        _ = db.BlokeRaidConfigurations.Add(
+            new BlokeRaidConfiguration
+            {
+                HostId = hostId,
+                Revision = 3,
+                ResetPolicy = BlokeRaidResetPolicy.Weekly,
+                WeeklyResetDay = (int)DayOfWeek.Monday,
+                WeeklyResetHourUtc = 9,
+                NextWeeklyResetAtUtc = now.AddDays(5).Date.AddHours(9),
+                UpdatedAtUtc = now.AddMinutes(-8),
+            }
+        );
+        var campaign = new BlokeRaidCampaign
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("d9ca8015-3c1d-460c-9efb-251b94a077aa"),
+            StartOperationKey = "simulation-active-raid",
+            Status = BlokeRaidCampaignStatus.Active,
+            BossName = "The Null Wyrm",
+            MaximumHealth = 25_000,
+            CurrentHealth = 12_480,
+            MaximumWard = 1_000,
+            CurrentWard = 840,
+            CurrentPhase = 2,
+            VictoryPointReward = "250",
+            ResetPolicy = BlokeRaidResetPolicy.Weekly,
+            StartedAtUtc = now.AddDays(-6).AddHours(-2),
+            EndsAtUtc = now.AddDays(1).AddHours(22),
+            Revision = 326,
+        };
+        campaign.Contributions.AddRange(
+            new BlokeRaidContribution
+            {
+                HostId = hostId,
+                ViewerTwitchUserId = "raid-mossybyte",
+                ViewerLogin = "mossybyte",
+                ViewerDisplayName = "MossyByte",
+                Damage = 2_090,
+                WardRestored = 328,
+                ActionCount = 58,
+                SpecialCount = 18,
+                CorrectGuessCount = 6,
+                LastContributedAtUtc = now.AddSeconds(-12),
+            },
+            new BlokeRaidContribution
+            {
+                HostId = hostId,
+                ViewerTwitchUserId = "raid-pixelknight",
+                ViewerLogin = "pixelknight",
+                ViewerDisplayName = "PixelKnight",
+                Damage = 1_845,
+                WardRestored = 186,
+                ActionCount = 47,
+                SpecialCount = 12,
+                CorrectGuessCount = 4,
+                LastContributedAtUtc = now.AddSeconds(-31),
+            },
+            new BlokeRaidContribution
+            {
+                HostId = hostId,
+                ViewerTwitchUserId = "raid-teacupmage",
+                ViewerLogin = "teacupmage",
+                ViewerDisplayName = "TeacupMage",
+                Damage = 1_402,
+                WardRestored = 474,
+                ActionCount = 45,
+                SpecialCount = 9,
+                CorrectGuessCount = 8,
+                LastContributedAtUtc = now.AddSeconds(-44),
+            },
+            new BlokeRaidContribution
+            {
+                HostId = hostId,
+                ViewerTwitchUserId = "raid-orbitalowl",
+                ViewerLogin = "orbitalowl",
+                ViewerDisplayName = "OrbitalOwl",
+                Damage = 1_311,
+                WardRestored = 221,
+                ActionCount = 36,
+                SpecialCount = 7,
+                CorrectGuessCount = 3,
+                LastContributedAtUtc = now.AddMinutes(-3),
+            }
+        );
+        campaign.Actions.AddRange(
+            RaidAction(
+                hostId,
+                "simulation-nova",
+                BlokeRaidActionKind.Special,
+                "raid-mossybyte",
+                "mossybyte",
+                "MossyByte",
+                12,
+                12_492,
+                12_480,
+                840,
+                840,
+                "75",
+                now.AddSeconds(-12)
+            ),
+            RaidAction(
+                hostId,
+                "simulation-attack",
+                BlokeRaidActionKind.Attack,
+                "raid-pixelknight",
+                "pixelknight",
+                "PixelKnight",
+                5,
+                12_497,
+                12_492,
+                833,
+                833,
+                "0",
+                now.AddSeconds(-31)
+            ),
+            RaidAction(
+                hostId,
+                "simulation-mend",
+                BlokeRaidActionKind.Mend,
+                "raid-teacupmage",
+                "teacupmage",
+                "TeacupMage",
+                7,
+                12_497,
+                12_497,
+                833,
+                840,
+                "0",
+                now.AddSeconds(-44)
+            ),
+            new BlokeRaidAction
+            {
+                HostId = hostId,
+                OperationKey = "guess:184",
+                Kind = BlokeRaidActionKind.CorrectGuess,
+                Source = BlokeRaidActionSource.Guessing,
+                StreamKey = "guessing:184",
+                Outcome = 24,
+                PointCost = "0",
+                BossHealthBefore = 12_521,
+                BossHealthAfter = 12_497,
+                WardBefore = 833,
+                WardAfter = 833,
+                PhaseAfter = 2,
+                GuessRoundId = 184,
+                Response = "Correct guessers dealt 24 damage to the boss.",
+                OccurredAtUtc = now.AddMinutes(-3),
+            }
+        );
+        campaign.Events.Add(
+            new BlokeRaidDomainEvent
+            {
+                HostId = hostId,
+                Kind = BlokeRaidEventKind.PhaseChanged,
+                OperationKey = $"phase:{campaign.PublicId:N}:2",
+                PublicPayload =
+                    "{\"phase\":2,\"health\":16250,\"response\":\"Its armour fractures. The raid drives into the exposed scales.\"}",
+                OccurredAtUtc = now.AddDays(-2),
+            }
+        );
+        var recap = new BlokeRaidCampaign
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("84734c96-ef5e-4f19-8a83-a81159068c13"),
+            StartOperationKey = "simulation-completed-raid",
+            Status = BlokeRaidCampaignStatus.Victory,
+            BossName = "The Static Colossus",
+            MaximumHealth = 18_000,
+            CurrentHealth = 0,
+            MaximumWard = 750,
+            CurrentWard = 612,
+            CurrentPhase = 3,
+            VictoryPointReward = "200",
+            ResetPolicy = BlokeRaidResetPolicy.Manual,
+            StartedAtUtc = now.AddDays(-16),
+            EndsAtUtc = now.AddDays(-9),
+            CompletedAtUtc = now.AddDays(-10).AddHours(-4),
+            VictoryRewardedAtUtc = now.AddDays(-10).AddHours(-4),
+            Revision = 441,
+            Contributions =
+            [
+                new BlokeRaidContribution
+                {
+                    HostId = hostId,
+                    ViewerTwitchUserId = "raid-mossybyte",
+                    ViewerLogin = "mossybyte",
+                    ViewerDisplayName = "MossyByte",
+                    Damage = 3_418,
+                    WardRestored = 410,
+                    ActionCount = 81,
+                    SpecialCount = 21,
+                    CorrectGuessCount = 7,
+                    LastContributedAtUtc = now.AddDays(-10).AddHours(-4),
+                },
+            ],
+        };
+        db.BlokeRaidCampaigns.AddRange(campaign, recap);
+    }
+
+    private static BlokeRaidAction RaidAction(
+        int hostId,
+        string operationKey,
+        BlokeRaidActionKind kind,
+        string userId,
+        string login,
+        string displayName,
+        int outcome,
+        int healthBefore,
+        int healthAfter,
+        int wardBefore,
+        int wardAfter,
+        string pointCost,
+        DateTime occurredAtUtc
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            OperationKey = operationKey,
+            Kind = kind,
+            Source = BlokeRaidActionSource.Chat,
+            ViewerTwitchUserId = userId,
+            ViewerLogin = login,
+            ViewerDisplayName = displayName,
+            StreamKey = "simulation-stream",
+            Outcome = outcome,
+            PointCost = pointCost,
+            BossHealthBefore = healthBefore,
+            BossHealthAfter = healthAfter,
+            WardBefore = wardBefore,
+            WardAfter = wardAfter,
+            PhaseAfter = 2,
+            Response = kind switch
+            {
+                BlokeRaidActionKind.Attack => $"Attack dealt {outcome} damage.",
+                BlokeRaidActionKind.Mend => $"The raid ward recovered {outcome}.",
+                _ => $"The point-funded special dealt {outcome} damage.",
+            },
+            OccurredAtUtc = occurredAtUtc,
+        };
 
     private static async Task SeedViewerPassportsAsync(
         BlokeBotDbContext db,
