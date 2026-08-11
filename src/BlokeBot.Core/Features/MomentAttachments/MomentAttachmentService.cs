@@ -545,7 +545,10 @@ internal sealed class MomentAttachmentService(
 
         var (feature, label) = destination switch
         {
-            MomentAttachmentDestination.Bounty => (HostFeatureFlags.Bounties, "Bounties"),
+            MomentAttachmentDestination.Bounty => (
+                HostFeatureFlags.Bounties | HostFeatureFlags.Points,
+                "Bounties and Points"
+            ),
             MomentAttachmentDestination.Achievement => (
                 HostFeatureFlags.CommunityProgression,
                 "Community progression"

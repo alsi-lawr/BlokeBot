@@ -323,6 +323,7 @@ public sealed class MomentAttachmentServiceTests
             var (destination, feature) in new[]
             {
                 (destinations[0], HostFeatureFlags.Bounties),
+                (destinations[0], HostFeatureFlags.Points),
                 (destinations[1], HostFeatureFlags.CommunityProgression),
                 (destinations[2], HostFeatureFlags.Competitions),
             }
@@ -333,7 +334,34 @@ public sealed class MomentAttachmentServiceTests
                 await service.GetManagementAsync(fixture.AlphaHostId, destination, default)
             ).Availability.ShouldBe(MomentAttachmentSectionAvailability.ParentDisabled);
             (await service.GetPublicAsync("alpha", destination, default)).ShouldBeNull();
+            _ = (
+                await service.AttachAsync(
+                    session,
+                    fixture.AlphaHostId,
+                    destination,
+                    fixture.AlphaMomentId,
+                    default
+                )
+            )
+                .ShouldBeOfType<MomentAttachmentMutationOutcome.Rejected>()
+                .Reason.ShouldBeOfType<MomentAttachmentRejection.ParentDisabled>();
+            _ = (
+                await service.DetachAsync(
+                    session,
+                    fixture.AlphaHostId,
+                    destination,
+                    fixture.AlphaMomentId,
+                    default
+                )
+            )
+                .ShouldBeOfType<MomentAttachmentMutationOutcome.Rejected>()
+                .Reason.ShouldBeOfType<MomentAttachmentRejection.ParentDisabled>();
+            eventCount.ShouldBe(3);
             await SetFeaturesAsync(database, fixture.AlphaHostId, _fixtureFeatures);
+            _ = (
+                await service.GetManagementAsync(fixture.AlphaHostId, destination, default)
+            ).Attached.ShouldHaveSingleItem();
+            eventCount.ShouldBe(3);
         }
         eventCount.ShouldBe(3);
     }
@@ -398,6 +426,7 @@ public sealed class MomentAttachmentServiceTests
     private const HostFeatureFlags _fixtureFeatures =
         HostFeatureFlags.Moments
         | HostFeatureFlags.Bounties
+        | HostFeatureFlags.Points
         | HostFeatureFlags.CommunityProgression
         | HostFeatureFlags.Competitions;
 

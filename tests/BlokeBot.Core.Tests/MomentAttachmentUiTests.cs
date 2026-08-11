@@ -73,6 +73,7 @@ public sealed class MomentAttachmentUiTests
             DisplayName = "Streamer",
             EnabledFeatures =
                 HostFeatureFlags.Bounties
+                | HostFeatureFlags.Points
                 | (momentsEnabled ? HostFeatureFlags.Moments : HostFeatureFlags.None),
             CreatedAtUtc = DateTime.UtcNow,
         };
