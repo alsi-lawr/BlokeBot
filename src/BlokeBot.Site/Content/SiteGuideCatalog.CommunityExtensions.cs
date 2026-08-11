@@ -25,7 +25,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Enable the opt-in feature",
                     Steps =
                     [
-                        "A channel owner or permitted moderator chooses the channel, opens Channel setup, turns on Viewer passports under Chat tools and saves. The switch is off for every channel until this happens.",
+                        "A channel owner or permitted moderator chooses the channel, opens Channel setup and turns on Viewer passports under Chat tools. The feature card persists the change immediately; the switch is off for every channel until selected.",
                         "The viewer signs in with Twitch and opens /passports/{channel}/me. BlokeBot keys the passport to that Twitch user ID, so a later login or display-name change updates the same profile instead of creating another one.",
                         "A new passport starts Private with attendance hidden. Saving a different visibility is the viewer's explicit opt-in to broader presentation.",
                     ],
@@ -105,7 +105,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Enable and assign authority",
                     Steps =
                     [
-                        "The channel owner or a permitted moderator opens Channel setup, turns on Tournaments & leagues under Chat tools and saves. It is a distinct switch and starts off for every channel.",
+                        "The channel owner or a permitted moderator opens Channel setup and turns on Tournaments & leagues under Chat tools. The feature card persists the change immediately; this distinct switch starts off for every channel.",
                         "Owners and permitted moderators create competitions, register or remove entrants, move the lifecycle, enter or correct results, send permitted reminders and archive records. A moderator can act only for the selected channel.",
                         "Viewers use !competitions for the current public competition and !competitionjoin during individual registration. Team registration and private contact details are handled by authorised staff in the dashboard.",
                     ],
@@ -201,7 +201,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Connect and opt in",
                     Steps =
                     [
-                        "Connect the selected Twitch channel, then have its owner or permitted moderator turn on Raid & collaboration in Channel setup and save. The distinct switch starts off for every channel.",
+                        "Connect the selected Twitch channel, then have its owner or permitted moderator turn on Raid & collaboration in Channel setup. The feature card persists the change immediately; this distinct switch starts off for every channel.",
                         "The owner or a moderator permitted for the selected channel configures welcome and shortlist settings and operates the hub. Viewers do not approve channels or start provider actions.",
                         "The channel owner reconnects the Twitch integration with raid management access when Confirm and start raid reports missing authority.",
                     ],
@@ -281,7 +281,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Enable and configure the game",
                     Steps =
                     [
-                        "A channel owner or permitted moderator opens Channel setup, turns on Cooperative game under Chat tools and saves. The switch is off for every channel until selected.",
+                        "A channel owner or permitted moderator opens Channel setup and turns on Cooperative game under Chat tools. The feature card persists the change immediately; the switch is off for every channel until selected.",
                         "Open BlokeRaid at /raid and configure the boss name, health, shared ward, duration, deterministic phase thresholds and public responses.",
                         "Set outcome range, cooldown and per-stream limit for Attack, Mend and Nova; set Nova's point cost, damage per correct Guessing result and the per-contributor victory point reward.",
                         "Choose Manual or Weekly reset. Weekly reset uses the configured UTC weekday and hour. Select Save configuration, then start one campaign.",

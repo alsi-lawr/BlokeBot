@@ -351,8 +351,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose the correct channel and open Channel setup.",
-                        "Open Chat tools and turn on each feature this channel will use.",
-                        "Save the feature changes.",
+                        "Open Chat tools and turn on each feature this channel will use. Each feature card persists its on or off state immediately.",
                         "Open the new navigation item and finish its settings before using it live.",
                     ],
                     Note =
@@ -406,7 +405,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Choose the channel you intend to show on stream. The owner or a permitted moderator can manage its Browser Sources.",
-                        "Open Channel setup, turn on Overlays and save. Guessing, Points and Play with viewers must also be on before their matching Browser Sources can preview or display.",
+                        "Open Channel setup and turn on Overlays. The feature card persists the change immediately. Guessing, Points and Play with viewers must also be on before their matching Browser Sources can preview or display.",
                         "Use broadcasting software with web Browser Sources, such as OBS Studio.",
                         "Open Overlays under Chat tools. Sources, Cues and Media are fragment-addressed tabs of one page at /overlays#sources, /overlays#cues and /overlays#media in BlokeBot.",
                     ],
@@ -1061,7 +1060,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose the channel, open Channel setup and turn on Points and Bounties under Chat tools. Both switches are required before Bounties appears in normal navigation or accepts work.",
-                        "Save the switches, open Bounties and use the Page help (?) button if you need the in-dashboard summary.",
+                        "The feature cards persist those switch changes immediately. Open Bounties and use the Page help (?) button if you need the in-dashboard summary.",
                         "A channel owner or permitted moderator creates and settles bounties. A participant needs a Twitch chat identity and enough available BlokeBot points to pledge.",
                     ],
                     Note =
@@ -1172,7 +1171,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Choose authority and visibility",
                     Steps =
                     [
-                        "Choose the channel, open Channel setup, turn on Community progression under Chat tools and save.",
+                        "Choose the channel, open Channel setup and turn on Community progression under Chat tools. The feature card persists the change immediately.",
                         "A channel owner or permitted moderator creates seasons, definitions and rewards and controls lifecycle and reset schedules. Participant progress comes from authenticated Twitch chat and supported Twitch or BlokeBot events.",
                         "Choose Public to publish participant Twitch identities and progression, or Hidden to publish no progression data. Private moderator notes stay on the management page in both modes.",
                     ],
@@ -1282,7 +1281,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Enable the required tools",
                     Steps =
                     [
-                        "Choose the channel, open Channel setup, turn on Bingo under Chat tools and save.",
+                        "Choose the channel, open Channel setup and turn on Bingo under Chat tools. The feature card persists the change immediately.",
                         "A channel owner or permitted moderator creates templates, opens games, manages the joining roster, issues cards, confirms or reverses manual marks and archives the game. Viewers join or leave before issue and follow cards in chat or on the public page.",
                         "Turn on Points before opening a game whose template awards points. Turn on Community progression and predeclare a viewer achievement that accepts external grants; attach a title reward to that achievement when the Bingo win should unlock a title.",
                     ],
@@ -1399,7 +1398,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose the channel in the top bar and open Channel setup.",
-                        "Open Chat tools, turn on Native Twitch and save the change.",
+                        "Open Chat tools and turn on Native Twitch. The feature card persists the change immediately.",
                         "Open Native Twitch in the Chat tools navigation, then choose Shoutouts, Polls, Clips & markers, Rewards & redemptions or Predictions.",
                     ],
                     Paragraphs =
@@ -2079,7 +2078,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose the channel in the top bar and open Channel setup.",
-                        "Open Chat tools, turn on Automations and save the change.",
+                        "Open Chat tools and turn on Automations. The feature card persists the change immediately.",
                         "Open Automations in the navigation, then Twitch events, to see the event sources and the Twitch approval each one needs.",
                     ],
                     Paragraphs =
