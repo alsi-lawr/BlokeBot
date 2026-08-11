@@ -8,6 +8,10 @@
             {
                 <p class="bingo-card__who">@string.Join(", ", Card.Participants.Select(value => $"{value.DisplayName} (@{value.Login})"))</p>
             }
+            @if (!string.IsNullOrWhiteSpace(_rewardSummary))
+            {
+                <p class="bingo-card__who">@_rewardSummary</p>
+            }
         </div>
         @if (Card.Wins.Count > 0)
         {
@@ -21,11 +25,6 @@
             </div>
         }
     </div>
-
-    @if (Card.Wins.Any(win => win.RewardRecipients.Count > 0))
-    {
-        <p class="bingo-card__who">@_rewardSummary</p>
-    }
 
     <div class="bingo-board">
         <div class="bingo-board__scroll" tabindex="0" aria-label="Scrollable @Game.Dimension.Value by @Game.Dimension.Value Bingo card">

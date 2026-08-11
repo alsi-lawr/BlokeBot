@@ -15,6 +15,9 @@ public partial class BingoPage
     private const string _squaresStageKey = "bingo-squares";
     private const string _openerKey = "bingo-opener";
 
+    /// <summary>The dimension every new template starts on, independent of the last one edited.</summary>
+    private const int _defaultDimension = 5;
+
     private static readonly IReadOnlyList<StudioSegmentedOption<BingoGameMode>> _cardModes =
     [
         new(BingoGameMode.Shared, "Shared"),
@@ -26,7 +29,7 @@ public partial class BingoPage
     private IReadOnlyList<BingoModeratorGameView> _games = [];
     private IReadOnlyList<CounterChoice> _counters = [];
     private IReadOnlyList<string> _achievementKeys = [];
-    private TemplateDraft _template = TemplateDraft.New(3);
+    private TemplateDraft _template = TemplateDraft.New(_defaultDimension);
     private GameDraft _game = new();
     private readonly Dictionary<string, string> _privateNotes = [];
     private readonly Dictionary<string, string> _teamMoves = [];
@@ -140,9 +143,11 @@ public partial class BingoPage
 
     private void StartNewTemplate()
     {
-        _template = TemplateDraft.New(_template.Dimension);
+        _template = TemplateDraft.New(_defaultDimension);
         _selectedSquare = 0;
     }
+
+    private void ToggleFullCard() => _template.FullCard = !_template.FullCard;
 
     private void EditTemplate(BingoTemplateView template)
     {
