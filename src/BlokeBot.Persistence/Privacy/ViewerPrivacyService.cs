@@ -2,6 +2,7 @@ using System.Data;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Persistence.Privacy;
@@ -91,7 +92,11 @@ public static class ViewerPrivacyService
         var idKey = scope.IdIdentityKey;
         var passportIds = scope.PassportIds;
         var safeLoginClaims = SafeLoginClaims(db, passportIds);
-        var safeGlobalLoginClaims = SafeGlobalLoginClaims(db, safeLoginClaims);
+        var safeGlobalLoginClaims = SafeGlobalLoginClaims(
+            db,
+            safeLoginClaims,
+            scope.GlobalAliasOwnerUserId
+        );
         var linkedLedgerClaims = await ResolveLinkedLedgerClaimsAsync(
             db,
             userId,
@@ -957,7 +962,11 @@ public static class ViewerPrivacyService
         var idKey = scope.IdIdentityKey;
         var passportIds = scope.PassportIds;
         var safeLoginClaims = SafeLoginClaims(db, passportIds);
-        var safeGlobalLoginClaims = SafeGlobalLoginClaims(db, safeLoginClaims);
+        var safeGlobalLoginClaims = SafeGlobalLoginClaims(
+            db,
+            safeLoginClaims,
+            scope.GlobalAliasOwnerUserId
+        );
         var linkedLedgerClaims = await ResolveLinkedLedgerClaimsAsync(
             db,
             userId,
@@ -2144,6 +2153,7 @@ public static class ViewerPrivacyService
             hostId == null || passport.HostId == hostId
         );
         long[] passportIds;
+        var globalAliasOwnerUserId = subject.TwitchUserId ?? UnmatchableValue;
         if (subject.TwitchUserId is not null)
         {
             passportIds = await passports
@@ -2180,11 +2190,16 @@ public static class ViewerPrivacyService
                 && matches.All(match => match.TwitchUserId == stableOwners[0])
                     ? matches.Select(match => match.PassportId).ToArray()
                     : [];
+            if (passportIds.Length > 0)
+            {
+                globalAliasOwnerUserId = stableOwners[0];
+            }
         }
         return new(
             userId,
             subject.TwitchUserId is null ? UnmatchableValue : subject.IdIdentityKey,
-            passportIds
+            passportIds,
+            globalAliasOwnerUserId
         );
     }
 
@@ -2201,10 +2216,24 @@ public static class ViewerPrivacyService
 
     private static IQueryable<ViewerPassportLogin> SafeGlobalLoginClaims(
         BlokeBotDbContext db,
-        IQueryable<ViewerPassportLogin> safeLoginClaims
+        IQueryable<ViewerPassportLogin> safeLoginClaims,
+        string globalAliasOwnerUserId
     ) =>
         safeLoginClaims.Where(alias =>
-            !db.ViewerPassportAmbiguousLogins.Any(ambiguous => ambiguous.Login == alias.Login)
+            globalAliasOwnerUserId != UnmatchableValue
+            && !db.ViewerPassportAmbiguousLogins.Any(ambiguous => ambiguous.Login == alias.Login)
+            && !db.ViewerPassports.Any(passport =>
+                (
+                    passport.Login == alias.Login
+                    || db.ViewerPassportLogins.Any(claim =>
+                        claim.PassportId == passport.Id && claim.Login == alias.Login
+                    )
+                )
+                && (
+                    string.IsNullOrEmpty(passport.TwitchUserId)
+                    || passport.TwitchUserId != globalAliasOwnerUserId
+                )
+            )
         );
 
     private static async Task<LinkedLedgerClaims> ResolveLinkedLedgerClaimsAsync(
@@ -2277,7 +2306,8 @@ public static class ViewerPrivacyService
     private sealed record PrivacyIdentityScope(
         string UserId,
         string IdIdentityKey,
-        long[] PassportIds
+        long[] PassportIds,
+        string GlobalAliasOwnerUserId
     );
 
     private sealed record PassportOwner(long PassportId, string TwitchUserId);
@@ -2291,6 +2321,16 @@ public static class ViewerPrivacyService
     private sealed record SafeLoginClaim(int HostId, string Login);
 
     private sealed record PrivacyTextClaim(int? HostId, string Pattern);
+
+    private sealed record TrackedEntrySnapshot(
+        object Entity,
+        EntityState State,
+        PropertyValues CurrentValues,
+        PropertyValues OriginalValues,
+        TrackedPropertySnapshot[] Properties
+    );
+
+    private sealed record TrackedPropertySnapshot(string Name, bool IsModified, bool IsTemporary);
 
     private static async Task<T> ExecuteConsistentSnapshotAsync<T>(
         BlokeBotDbContext db,
@@ -2311,29 +2351,39 @@ public static class ViewerPrivacyService
             );
         }
 
+        var trackerSnapshot = CaptureTrackerSnapshot(db);
+        IDbContextTransaction transaction;
         try
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(
+            transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable,
                 cancellationToken
             );
+        }
+        catch (Exception exception) when (IsSqliteSerializationFailure(exception))
+        {
+            RestoreTrackerSnapshot(db, trackerSnapshot);
+            return safeResult();
+        }
+
+        await using (transaction)
+        {
             try
             {
                 var result = await operation();
                 await transaction.CommitAsync(cancellationToken);
                 return result;
             }
-            catch (Exception exception) when (IsSqliteSerializationFailure(exception))
+            catch (Exception exception)
             {
-                await transaction.RollbackAsync(CancellationToken.None);
-                db.ChangeTracker.Clear();
-                return safeResult();
+                var rolledBack = await TryRollbackTransactionAsync(transaction);
+                RestoreTrackerSnapshot(db, trackerSnapshot);
+                if (rolledBack && IsSqliteSerializationFailure(exception))
+                {
+                    return safeResult();
+                }
+                throw;
             }
-        }
-        catch (Exception exception) when (IsSqliteSerializationFailure(exception))
-        {
-            db.ChangeTracker.Clear();
-            return safeResult();
         }
     }
 
@@ -2347,9 +2397,12 @@ public static class ViewerPrivacyService
     {
         if (!transaction.SupportsSavepoints)
         {
-            return await operation();
+            throw new NotSupportedException(
+                "Viewer privacy operations require savepoint support inside an ambient transaction."
+            );
         }
 
+        var trackerSnapshot = CaptureTrackerSnapshot(db);
         var savepoint = $"ViewerPrivacy_{Guid.NewGuid():N}";
         try
         {
@@ -2357,7 +2410,7 @@ public static class ViewerPrivacyService
         }
         catch (Exception exception) when (IsSqliteSerializationFailure(exception))
         {
-            db.ChangeTracker.Clear();
+            RestoreTrackerSnapshot(db, trackerSnapshot);
             return safeResult();
         }
 
@@ -2367,20 +2420,126 @@ public static class ViewerPrivacyService
             await transaction.ReleaseSavepointAsync(savepoint, cancellationToken);
             return result;
         }
-        catch (Exception exception) when (IsSqliteSerializationFailure(exception))
+        catch (Exception exception)
         {
-            try
+            var rolledBack = await TryRollbackAndReleaseSavepointAsync(transaction, savepoint);
+            RestoreTrackerSnapshot(db, trackerSnapshot);
+            if (rolledBack && IsSqliteSerializationFailure(exception))
             {
-                await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
-                await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
+                return safeResult();
             }
-            catch (Exception rollbackException)
-                when (IsSqliteSerializationFailure(rollbackException))
+            throw;
+        }
+    }
+
+    private static TrackedEntrySnapshot[] CaptureTrackerSnapshot(BlokeBotDbContext db)
+    {
+        var autoDetectChanges = db.ChangeTracker.AutoDetectChangesEnabled;
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
+        {
+            return db
+                .ChangeTracker.Entries()
+                .Select(entry => new TrackedEntrySnapshot(
+                    entry.Entity,
+                    entry.State,
+                    entry.CurrentValues.Clone(),
+                    entry.OriginalValues.Clone(),
+                    entry
+                        .Properties.Select(property => new TrackedPropertySnapshot(
+                            property.Metadata.Name,
+                            property.IsModified,
+                            property.IsTemporary
+                        ))
+                        .ToArray()
+                ))
+                .ToArray();
+        }
+        finally
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = autoDetectChanges;
+        }
+    }
+
+    private static void RestoreTrackerSnapshot(
+        BlokeBotDbContext db,
+        IReadOnlyCollection<TrackedEntrySnapshot> snapshots
+    )
+    {
+        var autoDetectChanges = db.ChangeTracker.AutoDetectChangesEnabled;
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
+        {
+            var originalEntities = snapshots
+                .Select(snapshot => snapshot.Entity)
+                .ToHashSet(ReferenceEqualityComparer.Instance);
+            foreach (
+                var introduced in db
+                    .ChangeTracker.Entries()
+                    .Where(entry => !originalEntities.Contains(entry.Entity))
+                    .ToArray()
+            )
             {
-                await transaction.RollbackAsync(CancellationToken.None);
+                introduced.State = EntityState.Detached;
             }
-            db.ChangeTracker.Clear();
-            return safeResult();
+
+            foreach (var snapshot in snapshots)
+            {
+                var entry = db.Entry(snapshot.Entity);
+                if (entry.State == EntityState.Detached)
+                {
+                    entry.State =
+                        snapshot.State == EntityState.Deleted
+                            ? EntityState.Unchanged
+                            : snapshot.State;
+                }
+                entry.CurrentValues.SetValues(snapshot.CurrentValues);
+                entry.OriginalValues.SetValues(snapshot.OriginalValues);
+                entry.State = snapshot.State;
+                entry.CurrentValues.SetValues(snapshot.CurrentValues);
+                entry.OriginalValues.SetValues(snapshot.OriginalValues);
+                foreach (var propertySnapshot in snapshot.Properties)
+                {
+                    var property = entry.Property(propertySnapshot.Name);
+                    property.IsTemporary = propertySnapshot.IsTemporary;
+                    property.IsModified = propertySnapshot.IsModified;
+                }
+            }
+        }
+        finally
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = autoDetectChanges;
+        }
+    }
+
+    private static async Task<bool> TryRollbackTransactionAsync(IDbContextTransaction transaction)
+    {
+        try
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task<bool> TryRollbackAndReleaseSavepointAsync(
+        IDbContextTransaction transaction,
+        string savepoint
+    )
+    {
+        try
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, CancellationToken.None);
+            await transaction.ReleaseSavepointAsync(savepoint, CancellationToken.None);
+            return true;
+        }
+        catch
+        {
+            _ = await TryRollbackTransactionAsync(transaction);
+            return false;
         }
     }
 

@@ -1,7 +1,9 @@
+using System.Data.Common;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Privacy;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 
 namespace BlokeBot.Persistence.Tests;
@@ -358,6 +360,105 @@ public sealed class ViewerPassportPrivacySafetyTests
     }
 
     [Test]
+    public async Task HostlessStableId_SiteAccessRequiresOneGlobalAliasOwner()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int ownerHostId;
+        int otherHostId;
+        await using (var seed = await factory.CreateDbContextAsync())
+        {
+            var ownerHost = Host("owner-host");
+            var otherHost = Host("other-host");
+            var unknownHost = Host("unknown-host");
+            seed.Hosts.AddRange(ownerHost, otherHost, unknownHost);
+            _ = await seed.SaveChangesAsync();
+            ownerHostId = ownerHost.Id;
+            otherHostId = otherHost.Id;
+            _ = await AddPassportAsync(
+                seed,
+                ownerHost.Id,
+                "owner-id",
+                "owner_current",
+                ["shared", "ownerless", "unique"]
+            );
+            _ = await AddPassportAsync(
+                seed,
+                otherHost.Id,
+                "other-id",
+                "other_current",
+                ["shared", "other_current"]
+            );
+            _ = await AddPassportAsync(
+                seed,
+                unknownHost.Id,
+                "",
+                "unknown_current",
+                ["ownerless", "unknown_current"]
+            );
+            seed.SiteAccessEntries.AddRange(
+                SiteAccess("shared"),
+                SiteAccess("ownerless"),
+                SiteAccess("unique")
+            );
+            seed.PointBalances.AddRange(
+                Balance(ownerHost.Id, "shared", "10"),
+                Balance(ownerHost.Id, "ownerless", "20"),
+                Balance(ownerHost.Id, "unique", "30"),
+                Balance(otherHost.Id, "shared", "40")
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+
+        await using (var exportDb = await factory.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                exportDb,
+                PrivacySubject.Create("owner-id", null),
+                hostId: null,
+                default
+            );
+            export
+                .Sections["access.site-entries"]
+                .Cast<SiteAccessEntry>()
+                .Single()
+                .Login.ShouldBe("unique");
+            export
+                .Sections["points.balances"]
+                .Cast<PointBalance>()
+                .Select(value => value.Login)
+                .Order()
+                .ToArray()
+                .ShouldBe(["ownerless", "shared", "unique"]);
+        }
+
+        await using (var eraseDb = await factory.CreateDbContextAsync())
+        {
+            var report = await ViewerPrivacyService.EraseAsync(
+                eraseDb,
+                PrivacySubject.Create("owner-id", null),
+                hostId: null,
+                default
+            );
+            report.ChangedRows["access.site-entries"].ShouldBe(1);
+            report.ChangedRows["points.balances"].ShouldBe(3);
+        }
+
+        await using var verify = await factory.CreateDbContextAsync();
+        (
+            await verify
+                .SiteAccessEntries.OrderBy(value => value.Login)
+                .Select(value => value.Login)
+                .ToArrayAsync()
+        ).ShouldBe(["ownerless", "shared"]);
+        var retainedBalance = await verify.PointBalances.SingleAsync();
+        retainedBalance.HostId.ShouldBe(otherHostId);
+        retainedBalance.Login.ShouldBe("shared");
+        (
+            await verify.ViewerPassports.AnyAsync(value => value.HostId == ownerHostId)
+        ).ShouldBeFalse();
+    }
+
+    [Test]
     public async Task MarkerWriteLock_MakesExportAndErasureFailClosedWithoutPartialMutation()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -568,6 +669,153 @@ public sealed class ViewerPassportPrivacySafetyTests
         (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(0);
     }
 
+    [Test]
+    public async Task AmbientUnexpectedFailure_RollsBackPrivacyWorkBeforeCallerCommit()
+    {
+        var failure = new PointLedgerMutationFailure();
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync(failure);
+        int hostId;
+        await using (var seed = await factory.CreateDbContextAsync())
+        {
+            var host = Host("channel");
+            _ = seed.Hosts.Add(host);
+            _ = await seed.SaveChangesAsync();
+            hostId = host.Id;
+            _ = await AddPassportAsync(seed, hostId, "owner-id", "owner", ["owner"]);
+            _ = seed.PointBalances.Add(Balance(hostId, "owner", "10"));
+            _ = await seed.SaveChangesAsync();
+        }
+
+        await using (var erase = await factory.CreateDbContextAsync())
+        {
+            await using var transaction = await erase.Database.BeginTransactionAsync();
+            var callerEntry = SiteAccess("caller-pending");
+            _ = erase.SiteAccessEntries.Add(callerEntry);
+            failure.Enabled = true;
+            var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
+                _ = await ViewerPrivacyService.EraseAsync(
+                    erase,
+                    PrivacySubject.Create("owner-id", null),
+                    hostId,
+                    default
+                )
+            );
+            exception.Message.ShouldBe(PointLedgerMutationFailure.Message);
+            exception.ShouldBeSameAs(failure.Exception);
+            failure.MatchedCommands.ShouldBe(1);
+            erase.Entry(callerEntry).State.ShouldBe(EntityState.Added);
+            failure.Enabled = false;
+            _ = await erase.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var verify = await factory.CreateDbContextAsync();
+        (await verify.PointBalances.SingleAsync()).Login.ShouldBe("owner");
+        (await verify.ViewerPassports.SingleAsync()).TwitchUserId.ShouldBe("owner-id");
+        (await verify.ViewerPassportLogins.SingleAsync()).Login.ShouldBe("owner");
+        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(0);
+        (
+            await verify.SiteAccessEntries.AnyAsync(value => value.Login == "caller-pending")
+        ).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task AmbientBusyFallback_PreservesCallerTrackedStatesAndValues()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync(
+            new DeferredSqliteTransactionInterceptor()
+        );
+        int hostId;
+        await using (var seed = await factory.CreateDbContextAsync())
+        {
+            var host = Host("channel");
+            _ = seed.Hosts.Add(host);
+            _ = await seed.SaveChangesAsync();
+            hostId = host.Id;
+            _ = await AddPassportAsync(seed, hostId, "owner-id", "owner", ["owner"]);
+            _ = seed.PointBalances.Add(Balance(hostId, "owner", "10"));
+            _ = seed.HostModAccessEntries.Add(
+                new()
+                {
+                    HostId = hostId,
+                    Login = "caller-delete",
+                    Kind = AccessListEntryKind.Blacklist,
+                    CreatedAtUtc = _now,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+
+        await using var request = await factory.CreateDbContextAsync();
+        var modifiedHost = await request.Hosts.SingleAsync(value => value.Id == hostId);
+        var deletedEntry = await request.HostModAccessEntries.SingleAsync();
+        var unchangedBalance = await request.PointBalances.SingleAsync();
+        modifiedHost.DisplayName = "caller-modified";
+        _ = request.HostModAccessEntries.Remove(deletedEntry);
+        var addedEntry = SiteAccess("caller-added");
+        _ = request.SiteAccessEntries.Add(addedEntry);
+        request.ChangeTracker.DetectChanges();
+        var originalDisplayName = request
+            .Entry(modifiedHost)
+            .Property(x => x.DisplayName)
+            .OriginalValue;
+        var originalDeletedLogin = request.Entry(deletedEntry).Property(x => x.Login).OriginalValue;
+
+        await using var requestTransaction = await request.Database.BeginTransactionAsync();
+        await using var markerWriter = await factory.CreateDbContextAsync();
+        await using var markerTransaction = await markerWriter.Database.BeginTransactionAsync();
+        _ = markerWriter.ViewerPassportAmbiguousLogins.Add(
+            new()
+            {
+                HostId = hostId,
+                Login = "owner",
+                DetectedAtUtc = _now,
+            }
+        );
+        _ = await markerWriter.SaveChangesAsync();
+
+        SetShortBusyTimeout(request);
+        var report = await ViewerPrivacyService.EraseAsync(
+            request,
+            PrivacySubject.Create("owner-id", null),
+            hostId,
+            default
+        );
+        report.TotalChangedRows.ShouldBe(0);
+        request.Entry(modifiedHost).State.ShouldBe(EntityState.Modified);
+        modifiedHost.DisplayName.ShouldBe("caller-modified");
+        request
+            .Entry(modifiedHost)
+            .Property(x => x.DisplayName)
+            .OriginalValue.ShouldBe(originalDisplayName);
+        request.Entry(deletedEntry).State.ShouldBe(EntityState.Deleted);
+        deletedEntry.Login.ShouldBe("caller-delete");
+        request
+            .Entry(deletedEntry)
+            .Property(x => x.Login)
+            .OriginalValue.ShouldBe(originalDeletedLogin);
+        request.Entry(addedEntry).State.ShouldBe(EntityState.Added);
+        addedEntry.Login.ShouldBe("caller-added");
+        request.Entry(unchangedBalance).State.ShouldBe(EntityState.Unchanged);
+        unchangedBalance.Login.ShouldBe("owner");
+
+        await markerTransaction.CommitAsync();
+        _ = await request.SaveChangesAsync();
+        await requestTransaction.CommitAsync();
+
+        await using var verify = await factory.CreateDbContextAsync();
+        (await verify.Hosts.SingleAsync(value => value.Id == hostId)).DisplayName.ShouldBe(
+            "caller-modified"
+        );
+        (await verify.HostModAccessEntries.CountAsync()).ShouldBe(0);
+        (
+            await verify.SiteAccessEntries.AnyAsync(value => value.Login == "caller-added")
+        ).ShouldBeTrue();
+        (await verify.PointBalances.SingleAsync()).Login.ShouldBe("owner");
+        (await verify.ViewerPassports.SingleAsync()).TwitchUserId.ShouldBe("owner-id");
+        (await verify.ViewerPassportAmbiguousLogins.SingleAsync()).Login.ShouldBe("owner");
+    }
+
     private static async Task<ViewerPassport> AddPassportAsync(
         BlokeBotDbContext db,
         int hostId,
@@ -765,6 +1013,67 @@ public sealed class ViewerPassportPrivacySafetyTests
             UpdatedAtUtc = _now,
         };
 
+    private static SiteAccessEntry SiteAccess(string login) =>
+        new()
+        {
+            Login = login,
+            Kind = AccessListEntryKind.Whitelist,
+            CreatedAtUtc = _now,
+        };
+
     private static void SetShortBusyTimeout(BlokeBotDbContext db) =>
         ((SqliteConnection)db.Database.GetDbConnection()).DefaultTimeout = 1;
+
+    private sealed class PointLedgerMutationFailure : DbCommandInterceptor
+    {
+        internal const string Message = "Injected point-ledger mutation failure.";
+        private int _matchedCommands;
+
+        internal bool Enabled { get; set; }
+
+        internal InvalidOperationException Exception { get; } = new(Message);
+
+        internal int MatchedCommands => Volatile.Read(ref _matchedCommands);
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                !Enabled
+                || !command.CommandText.Contains(
+                    "\"point_ledger_entries\"",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return ValueTask.FromResult(result);
+            }
+
+            _ = Interlocked.Increment(ref _matchedCommands);
+            throw Exception;
+        }
+    }
+
+    private sealed class DeferredSqliteTransactionInterceptor : DbTransactionInterceptor
+    {
+        public override ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection,
+            TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            var transaction = ((SqliteConnection)connection).BeginTransaction(
+                eventData.IsolationLevel,
+                deferred: true
+            );
+            return ValueTask.FromResult(
+                InterceptionResult<DbTransaction>.SuppressWithResult(transaction)
+            );
+        }
+    }
 }
