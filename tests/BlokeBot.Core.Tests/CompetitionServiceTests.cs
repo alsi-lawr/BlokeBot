@@ -1,8 +1,10 @@
+using System.Data.Common;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -380,18 +382,209 @@ public sealed class CompetitionServiceTests
         grants.Keys.Count(x => x.Contains(":wins:2:", StringComparison.Ordinal)).ShouldBe(1);
     }
 
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CompletionDisableBeforeTransactionGate_MutatesAndPublishesNothing(
+        bool reenableWithNewerWatermark
+    )
+    {
+        var interleaving = new CompletionTransactionStartingInterleaving();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(interleaving);
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Competitions);
+        await SeedAchievementsAsync(database, hostId);
+        var grants = new RecordingGrants();
+        var observer = new RecordingObserver();
+        var service = Service(database, grants, observer);
+        var completion = await PrepareRewardingCompletionAsync(service, hostId);
+        observer.Events.Clear();
+        interleaving.Arm();
+
+        var completing = service.CompleteAsync(hostId, completion, CancellationToken.None);
+        await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            await SetCompetitionFeatureAsync(database, hostId, enabled: false);
+            if (reenableWithNewerWatermark)
+            {
+                await SetCompetitionFeatureAsync(
+                    database,
+                    hostId,
+                    enabled: true,
+                    acceptWorkAfterUtc: _now.AddSeconds(1).UtcDateTime
+                );
+            }
+        }
+        finally
+        {
+            interleaving.Release();
+        }
+
+        _ = (
+            await completing.WaitAsync(TimeSpan.FromSeconds(5))
+        ).ShouldBeOfType<CompetitionOutcome.FeatureDisabled>();
+        grants.Keys.ShouldBeEmpty();
+        observer.Events.ShouldBeEmpty();
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.Competitions.SingleAsync()).Status.ShouldBe(CompetitionStatus.Running);
+        (await verify.CompetitionRewardReceipts.CountAsync()).ShouldBe(0);
+        (
+            await verify.PointLedgerEntries.CountAsync(x =>
+                x.Kind == PointLedgerKind.CompetitionReward
+            )
+        ).ShouldBe(0);
+        (
+            await verify.CompetitionAudits.CountAsync(x =>
+                x.Action == CompetitionAuditAction.Completed
+            )
+        ).ShouldBe(0);
+        (
+            await verify.CompetitionEvents.CountAsync(x =>
+                x.Kind == CompetitionEventKind.Completed
+                || x.Kind == CompetitionEventKind.RewardsGranted
+            )
+        ).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task AchievementDisableAfterRewardCommit_SuppressesAndNeverReplaysAfterEnable()
+    {
+        var interleaving = new CompletionTransactionCommittedInterleaving();
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync(interleaving);
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.Competitions);
+        await SeedAchievementsAsync(database, hostId);
+        var grants = new RecordingGrants();
+        var service = Service(database, grants: grants);
+        var completion = await PrepareRewardingCompletionAsync(service, hostId);
+        interleaving.Arm();
+
+        var completing = service.CompleteAsync(hostId, completion, CancellationToken.None);
+        await interleaving.Entered.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            await SetCompetitionFeatureAsync(database, hostId, enabled: false);
+        }
+        finally
+        {
+            interleaving.Release();
+        }
+
+        _ = Success(await completing.WaitAsync(TimeSpan.FromSeconds(5)));
+        grants.Keys.ShouldBeEmpty();
+        await using (var committed = await database.CreateDbContextAsync())
+        {
+            (await committed.CompetitionRewardReceipts.CountAsync()).ShouldBe(3);
+            (
+                await committed.PointLedgerEntries.CountAsync(x =>
+                    x.Kind == PointLedgerKind.CompetitionReward
+                )
+            ).ShouldBe(3);
+            (
+                await committed.CompetitionRewardReceipts.CountAsync(x =>
+                    x.AchievementGrantedAtUtc != null
+                )
+            ).ShouldBe(0);
+        }
+
+        await SetCompetitionFeatureAsync(
+            database,
+            hostId,
+            enabled: true,
+            acceptWorkAfterUtc: _now.AddSeconds(1).UtcDateTime
+        );
+        _ = Success(await service.CompleteAsync(hostId, completion, default));
+
+        grants.Keys.ShouldBeEmpty();
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify.CompetitionRewardReceipts.CountAsync(x =>
+                x.AchievementGrantedAtUtc != null
+            )
+        ).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task PostEnableCompletion_GrantsEachAchievementOnceAndRetryIsIdempotent()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.None);
+        await SeedAchievementsAsync(database, hostId);
+        await SetCompetitionFeatureAsync(
+            database,
+            hostId,
+            enabled: true,
+            acceptWorkAfterUtc: _now.UtcDateTime
+        );
+        var grants = new RecordingGrants();
+        var service = Service(
+            database,
+            grants: grants,
+            clock: new FixedTimeProvider(_now.AddSeconds(1))
+        );
+        var completion = await PrepareRewardingCompletionAsync(service, hostId);
+
+        _ = Success(await service.CompleteAsync(hostId, completion, default));
+        _ = Success(await service.CompleteAsync(hostId, completion, default));
+
+        grants.Keys.Count.ShouldBe(3);
+        grants.Keys.Distinct().Count().ShouldBe(3);
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.CompetitionRewardReceipts.CountAsync()).ShouldBe(3);
+        (
+            await verify.CompetitionRewardReceipts.CountAsync(x =>
+                x.AchievementGrantedAtUtc != null
+            )
+        ).ShouldBe(3);
+        (
+            await verify.PointLedgerEntries.CountAsync(x =>
+                x.Kind == PointLedgerKind.CompetitionReward
+            )
+        ).ShouldBe(3);
+    }
+
     private static CompetitionService Service(
         SqliteBlokeBotDbFactory database,
         RecordingGrants? grants = null,
-        RecordingObserver? observer = null
+        RecordingObserver? observer = null,
+        TimeProvider? clock = null
     ) =>
         new(
             database,
             TestEventBus.Create<AppEventKind>(),
             grants ?? new RecordingGrants(),
             observer is null ? [] : [observer],
-            new FixedTimeProvider(_now)
+            clock ?? new FixedTimeProvider(_now)
         );
+
+    private static async Task<CompetitionTransition> PrepareRewardingCompletionAsync(
+        CompetitionService service,
+        int hostId
+    )
+    {
+        var draft = Draft(CompetitionFormat.RoundRobin, achievements: true) with
+        {
+            MilestoneRewards = [new(1, new(25), "two-wins")],
+        };
+        _ = Success(await service.CreateAsync(hostId, draft, default));
+        var competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        _ = Success(await service.OpenRegistrationAsync(hostId, Transition(competition), default));
+        competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        foreach (var login in new[] { "one", "two" })
+        {
+            await RegisterAsync(service, hostId, competition, login);
+            competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        }
+        _ = Success(
+            await service.StartAsync(hostId, Transition(competition), _now.UtcDateTime, default)
+        );
+        competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        var match = competition.Matches.Single();
+        _ = Success(
+            await service.ConfirmResultAsync(hostId, Result(competition, match, 2, 0), default)
+        );
+        competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        return Transition(competition);
+    }
 
     private static async Task<CompetitionView> CreateAndOpenAsync(
         CompetitionService service,
@@ -501,6 +694,22 @@ public sealed class CompetitionServiceTests
         return host.Id;
     }
 
+    private static async Task SetCompetitionFeatureAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        bool enabled,
+        DateTime? acceptWorkAfterUtc = null
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var host = await db.Hosts.SingleAsync(x => x.Id == hostId);
+        host.EnabledFeatures = enabled
+            ? host.EnabledFeatures | HostFeatureFlags.Competitions
+            : host.EnabledFeatures & ~HostFeatureFlags.Competitions;
+        host.CompetitionsAcceptWorkAfterUtc = acceptWorkAfterUtc;
+        _ = await db.SaveChangesAsync();
+    }
+
     private static async Task SeedAchievementsAsync(SqliteBlokeBotDbFactory database, int hostId)
     {
         await using var db = await database.CreateDbContextAsync();
@@ -576,6 +785,78 @@ public sealed class CompetitionServiceTests
         {
             Events.Add(competitionEvent);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class CompletionTransactionStartingInterleaving : DbTransactionInterceptor
+    {
+        private readonly TaskCompletionSource _entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _armed;
+        private int _intercepted;
+
+        internal Task Entered => _entered.Task;
+
+        internal void Arm() => Volatile.Write(ref _armed, 1);
+
+        internal void Release() => _release.SetResult();
+
+        public override async ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection,
+            TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                Volatile.Read(ref _armed) == 0
+                || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0
+            )
+            {
+                return result;
+            }
+            _entered.SetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return result;
+        }
+    }
+
+    private sealed class CompletionTransactionCommittedInterleaving : DbTransactionInterceptor
+    {
+        private readonly TaskCompletionSource _entered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _armed;
+        private int _intercepted;
+
+        internal Task Entered => _entered.Task;
+
+        internal void Arm() => Volatile.Write(ref _armed, 1);
+
+        internal void Release() => _release.SetResult();
+
+        public override async Task TransactionCommittedAsync(
+            DbTransaction transaction,
+            TransactionEndEventData eventData,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                Volatile.Read(ref _armed) == 0
+                || Interlocked.CompareExchange(ref _intercepted, 1, 0) != 0
+            )
+            {
+                return;
+            }
+            _entered.SetResult();
+            await _release.Task.WaitAsync(cancellationToken);
         }
     }
 

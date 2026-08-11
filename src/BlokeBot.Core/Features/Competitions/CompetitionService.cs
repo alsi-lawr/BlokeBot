@@ -580,6 +580,7 @@ public sealed class CompetitionService(
         CancellationToken ct
     )
     {
+        var operationOccurredAt = timeProvider.GetUtcNow().UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         if (!await FeatureEnabledAsync(db, hostId, ct))
         {
@@ -619,8 +620,13 @@ public sealed class CompetitionService(
         }
         var placements = Placement(competition);
         var standings = Standings(competition);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (!await AcceptsWorkAsync(db, hostId, operationOccurredAt, ct))
+        {
+            await transaction.RollbackAsync(ct);
+            return new CompetitionOutcome.FeatureDisabled();
+        }
+        var now = operationOccurredAt;
         competition.Status = CompetitionStatus.Completed;
         competition.CompletedAtUtc = now;
         competition.UpdatedAtUtc = now;
@@ -1070,6 +1076,11 @@ public sealed class CompetitionService(
             )
         )
         {
+            await using var gateDb = await dbFactory.CreateDbContextAsync(ct);
+            if (!await AcceptsWorkAsync(gateDb, competition.HostId, reward.GrantedAtUtc, ct))
+            {
+                continue;
+            }
             var result = await achievements.GrantAsync(
                 new(
                     competition.HostId,
@@ -1378,6 +1389,25 @@ public sealed class CompetitionService(
             x => x.Id == hostId && (x.EnabledFeatures & _requiredFeature) == _requiredFeature,
             ct
         );
+
+    private static Task<bool> AcceptsWorkAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime occurredAtUtc,
+        CancellationToken ct
+    ) =>
+        db
+            .Hosts.AsNoTracking()
+            .AnyAsync(
+                host =>
+                    host.Id == hostId
+                    && (host.EnabledFeatures & _requiredFeature) == _requiredFeature
+                    && (
+                        host.CompetitionsAcceptWorkAfterUtc == null
+                        || occurredAtUtc >= host.CompetitionsAcceptWorkAfterUtc
+                    ),
+                ct
+            );
 
     private static CompetitionOutcome.Invalid? Validate(CompetitionDraft draft) =>
         string.IsNullOrWhiteSpace(draft.Name) || draft.Name.Trim().Length > 160
