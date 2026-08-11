@@ -289,12 +289,18 @@
         padding: 0.7rem 0.9rem;
     }
 
-    .progression-warning label {
+    .progression-confirm {
         align-items: center;
-        cursor: pointer;
         display: flex;
         font-weight: 650;
-        gap: 0.5rem;
+        gap: 0.75rem;
+        justify-content: space-between;
+    }
+
+    /* Overrides the width: 100% of .input, which is imported after this sheet in the same layer. */
+    select.progression-select {
+        max-width: 100%;
+        width: auto;
     }
 
     .progression-preview {
