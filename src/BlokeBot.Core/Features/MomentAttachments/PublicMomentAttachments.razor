@@ -1,0 +1,20 @@
+@if (_projection is { Moments.Count: > 0 } projection)
+{
+    <section class="moment-attachments-public" data-public-moment-attachments>
+        <header><span>Moments</span><strong>@projection.Destination.Title</strong></header>
+        <div class="moment-attachments-public__list">
+            @foreach (var moment in projection.Moments)
+            {
+                <article @key="moment.Id">
+                    <span class="moment-attachments__thumb" aria-hidden="true"><span>▶</span></span>
+                    <div><strong>@moment.Title</strong><span>@moment.Category · @moment.CapturedAtUtc.ToString("d MMM")</span></div>
+                    @if (moment.ProviderUrl is { } providerUrl)
+                    {
+                        <a class="btn-secondary" href="@providerUrl" target="_blank" rel="noopener">Watch</a>
+                    }
+                </article>
+            }
+        </div>
+        <p>Only currently approved, public-safe Moment fields appear.</p>
+    </section>
+}

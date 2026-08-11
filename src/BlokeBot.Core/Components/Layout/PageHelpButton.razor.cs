@@ -127,6 +127,16 @@ public partial class PageHelpButton
         ]
     );
 
+    private static readonly HelpSection _momentAttachmentHelp = new(
+        "Moment attachments",
+        "Attach approved Moments from this channel inside a bounty, achievement, or confirmed result. Moment titles, categories, clips, and moderation state remain owned by Moments and are read by reference.",
+        [
+            "Attachments inherit Moments plus this destination feature and add no Channel setup switch. If either parent is off, discovery, changes, public output, events, and downstream presentation stop before effects.",
+            "The embedded section uses the normal Channel setup recovery. Saved valid links are retained while disabled; re-enabling exposes them without replaying suppressed activity.",
+            "Hidden, rejected, merged, deleted, or otherwise unavailable Moments are absent everywhere. Public views receive only current approved public-safe fields, never moderator notes or rejection reasons.",
+        ]
+    );
+
     private static readonly HelpPage _homeHelp = new(
         "Home",
         [
@@ -205,6 +215,7 @@ public partial class PageHelpButton
         "Bounties",
         [
             _featureSwitchHelp,
+            _momentAttachmentHelp,
             new(
                 "Fund and settle challenges",
                 "Create a draft, open funding, then accept and resolve the challenge. Bounties require Points to be on.",
@@ -231,6 +242,7 @@ public partial class PageHelpButton
         "Community progression",
         [
             _featureSwitchHelp,
+            _momentAttachmentHelp,
             new(
                 "Seasons, progress, and privacy",
                 "Create a draft season, add typed quests, achievements, and persistent rewards, then open it for supported BlokeBot and Twitch events.",
@@ -338,6 +350,7 @@ public partial class PageHelpButton
         "Tournaments & leagues",
         [
             _featureSwitchHelp,
+            _momentAttachmentHelp,
             new(
                 "Run a competition",
                 "Create a draft with a tournament, round-robin, or prediction-league format, then open registration and generate the recorded schedule.",

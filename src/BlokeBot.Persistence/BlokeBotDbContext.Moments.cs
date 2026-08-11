@@ -56,6 +56,7 @@ public sealed partial class BlokeBotDbContext
                     )
             );
             _ = b.HasKey(static x => x.Id);
+            _ = b.HasAlternateKey(static x => new { x.HostId, x.Id });
             _ = b.Property(static x => x.PublicId).HasConversion<string>();
             _ = b.Property(static x => x.StreamIdentity).HasMaxLength(128);
             _ = b.Property(static x => x.State)
@@ -106,6 +107,65 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasMany(static x => x.Votes)
                 .WithOne(static x => x.Candidate)
                 .HasForeignKey(static x => x.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        _ = modelBuilder.Entity<MomentAttachment>(static b =>
+        {
+            _ = b.ToTable(
+                "moment_attachments",
+                static table =>
+                    table.HasCheckConstraint(
+                        "CK_moment_attachments_OneDestination",
+                        "(BountyId IS NOT NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NULL) OR "
+                            + "(BountyId IS NULL AND CommunityDefinitionId IS NOT NULL AND CompetitionMatchId IS NULL) OR "
+                            + "(BountyId IS NULL AND CommunityDefinitionId IS NULL AND CompetitionMatchId IS NOT NULL)"
+                    )
+            );
+            _ = b.HasKey(static x => x.Id);
+            _ = b.HasIndex(static x => new
+                {
+                    x.HostId,
+                    x.BountyId,
+                    x.MomentCandidateId,
+                })
+                .IsUnique()
+                .HasFilter("\"BountyId\" IS NOT NULL");
+            _ = b.HasIndex(static x => new
+                {
+                    x.HostId,
+                    x.CommunityDefinitionId,
+                    x.MomentCandidateId,
+                })
+                .IsUnique()
+                .HasFilter("\"CommunityDefinitionId\" IS NOT NULL");
+            _ = b.HasIndex(static x => new
+                {
+                    x.HostId,
+                    x.CompetitionMatchId,
+                    x.MomentCandidateId,
+                })
+                .IsUnique()
+                .HasFilter("\"CompetitionMatchId\" IS NOT NULL");
+            _ = b.HasOne(static x => x.MomentCandidate)
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.MomentCandidateId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = b.HasOne(static x => x.Bounty)
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.BountyId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = b.HasOne(static x => x.CommunityDefinition)
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.CommunityDefinitionId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+            _ = b.HasOne(static x => x.CompetitionMatch)
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.CompetitionMatchId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

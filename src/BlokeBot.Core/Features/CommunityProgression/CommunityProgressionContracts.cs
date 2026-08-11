@@ -374,11 +374,19 @@ public sealed record CommunityPublicSeasonView(
     CommunitySeasonStatus Status,
     DateTime StartsAtUtc,
     DateTime EndsAtUtc,
+    IReadOnlyList<CommunityPublicDefinitionView> Definitions,
     IReadOnlyList<CommunityStandingView> Standings,
     IReadOnlyList<CommunityViewerProgressView> Progress,
     IReadOnlyList<CommunityCommunalProgressView> CommunalProgress,
     IReadOnlyList<CommunityCompletionView> Completions,
     IReadOnlyList<CommunityUnlockView> Unlocks
+);
+
+public sealed record CommunityPublicDefinitionView(
+    CommunityDefinitionId Id,
+    string Name,
+    CommunityDefinitionKind Kind,
+    long Target
 );
 
 public sealed record CommunityPublicView(

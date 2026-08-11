@@ -1,0 +1,118 @@
+@using Microsoft.AspNetCore.Components
+@inherits AuthenticatedPageComponent
+
+@if (_view is null)
+{
+    <section class="moment-attachments moment-attachments--loading" aria-label="Moment attachments">
+        <p>Loading attached Moments…</p>
+    </section>
+}
+else if (_view.Availability == MomentAttachmentSectionAvailability.ParentDisabled)
+{
+    <section class="moment-attachments moment-attachments--disabled" data-moment-attachments-disabled>
+        <div>
+            <h3>Moment attachments are unavailable</h3>
+            <p>Turn on @_view.DisabledParents in Channel setup. Saved links stay retained, and re-enabling exposes valid links without replaying suppressed activity.</p>
+        </div>
+        <a class="btn-secondary" href="/host#chat-tools">Open Channel setup</a>
+    </section>
+}
+else if (_view.Availability == MomentAttachmentSectionAvailability.Available && _view.Destination is { } destination)
+{
+    <section class="moment-attachments" data-moment-attachments data-destination-kind="@destination.Kind">
+        <div class="moment-attachments__context" aria-label="Selected attachment destination">
+            <div class="moment-attachments__context-main">
+                <span>@destination.Kind</span>
+                <strong>@destination.Title</strong>
+                <small>@destination.Context</small>
+            </div>
+            <div><span>State</span><strong>@destination.State</strong></div>
+            <div><span>Visibility</span><strong>@destination.Visibility</strong></div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_feedback))
+        {
+            <p class="moment-attachments__feedback" role="@(_failed ? "alert" : "status")">@_feedback</p>
+        }
+
+        <div class="moment-attachments__workspace @(_pickerOpen ? "moment-attachments__workspace--picker" : null)">
+            <div class="moment-attachments__editor">
+                <header class="moment-attachments__heading">
+                    <div>
+                        <div class="moment-attachments__title-line">
+                            <h3>Attached moments</h3>
+                            <span class="moment-attachments__count">@_view.Attached.Count</span>
+                        </div>
+                        <p>Approved Moments connected to this @destination.Kind.ToLowerInvariant().</p>
+                    </div>
+                    <button class="btn-secondary" type="button" aria-expanded="@_pickerOpen" @onclick="OpenPicker">Add moment</button>
+                </header>
+
+                <div class="moment-attachments__list">
+                    @if (_view.Attached.Count == 0)
+                    {
+                        <p class="moment-attachments__empty">No moments attached.</p>
+                    }
+                    else
+                    {
+                        @foreach (var moment in _view.Attached)
+                        {
+                            <article class="moment-attachments__row" @key="moment.Id" data-attached-moment="@moment.Id">
+                                <span class="moment-attachments__thumb" aria-hidden="true"><span>▶</span></span>
+                                <div class="moment-attachments__copy">
+                                    <div class="moment-attachments__moment-title">
+                                        <strong>@moment.Title</strong>
+                                        <span class="status-pill status-pill--green"><span class="status-pill__label">✓ Approved</span></span>
+                                    </div>
+                                    <p>@MomentMeta(moment)</p>
+                                    <a href="@moment.SourceUrl" target="_blank" rel="noopener">Open in Moments <span aria-hidden="true">↗</span></a>
+                                </div>
+                                <button class="btn-secondary moment-attachments__remove" type="button" @onclick="() => DetachAsync(moment)">Remove</button>
+                            </article>
+                        }
+                    }
+                </div>
+
+                <p class="moment-attachments__reference-note"><span aria-hidden="true">↗</span><span>Titles and clip details stay in Moments and update here by reference.</span></p>
+            </div>
+
+            @if (_pickerOpen)
+            {
+                <aside class="moment-attachments__picker" aria-label="Add approved Moment">
+                    <header>
+                        <div><h3>Add approved moment</h3><p>to @destination.Title</p></div>
+                        <button class="btn-secondary" type="button" @onclick="ClosePicker">Close</button>
+                    </header>
+                    <div class="moment-attachments__picker-body">
+                        <p class="moment-attachments__scope"><span aria-hidden="true">▣</span><strong>@(Host?.DisplayName ?? SelectedHostLogin)</strong><span>· approved Moments only</span></p>
+                        <label class="sr-only" for="@_searchId">Search approved Moments</label>
+                        <input id="@_searchId" class="input" type="search" placeholder="Search title or category" @bind="_search" @bind:event="oninput" />
+                        <div class="moment-attachments__choices">
+                            @foreach (var moment in PickerMoments())
+                            {
+                                <label class="moment-attachments__choice @(_selectedMomentId == moment.Id && !moment.IsAttached ? "moment-attachments__choice--selected" : null) @(moment.IsAttached ? "moment-attachments__choice--attached" : null)" @key="moment.Id">
+                                    <input type="radio"
+                                           name="@_choiceName"
+                                           value="@moment.Id"
+                                           checked="@(_selectedMomentId == moment.Id)"
+                                           disabled="@moment.IsAttached"
+                                           @onchange="() => _selectedMomentId = moment.Id" />
+                                    <span><strong>@moment.Title</strong><small>@MomentMeta(moment)</small>@if (moment.IsAttached){<b>✓ Attached</b>}</span>
+                                </label>
+                            }
+                            @if (PickerMoments().Count == 0)
+                            {
+                                <p class="moment-attachments__empty">No approved Moments match this search.</p>
+                            }
+                        </div>
+                        <footer>
+                            <button class="btn-secondary" type="button" @onclick="ClosePicker">Cancel</button>
+                            <button class="btn-primary" type="button" disabled="@(_selectedMomentId is null)" @onclick="AttachAsync">Attach selected</button>
+                            <p>Channel managers can change links for this destination.</p>
+                        </footer>
+                    </div>
+                </aside>
+            }
+        </div>
+    </section>
+}

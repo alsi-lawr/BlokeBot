@@ -1,4 +1,5 @@
 @page "/community/{Channel}"
+@using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
@@ -44,6 +45,12 @@
                     </summary>
                     <div class="progression-card__body">
                         <CommunitySeasonTimeline StartsAtUtc="season.StartsAtUtc" EndsAtUtc="season.EndsAtUtc" />
+
+                        @foreach (var definition in season.Definitions.Where(value => value.Kind == CommunityDefinitionKind.Achievement))
+                        {
+                            <PublicMomentAttachments Channel="@Channel"
+                                                     Destination="@(new MomentAttachmentDestination.Achievement(definition.Id))" />
+                        }
 
                         <div class="grid min-w-0 gap-5 lg:grid-cols-2">
                             <details class="progression-disclosure progression-section" open>

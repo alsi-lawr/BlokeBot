@@ -1,5 +1,6 @@
 @page "/competitions"
 @using BlokeBot.Core.Components.Layout
+@using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Core.Features.Points.Balances
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
@@ -155,6 +156,12 @@
                             else if (_activeTab == "schedule")
                             {
                                 <div class="competition-schedule">@foreach (var round in competition.Matches.GroupBy(x => x.Round).OrderBy(x => x.Key)){<section><h3>Round @round.Key</h3>@foreach (var match in round){<button class="competition-fixture @(match.Id == _selectedMatchId ? "competition-fixture--selected" : null)" type="button" disabled="@(match.EntrantAId is null || match.EntrantBId is null)" @onclick="() => SelectMatch(match.Id)"><span>@match.EntrantA <strong>@(match.ScoreA?.ToString() ?? "–")</strong></span><span>@match.EntrantB <strong>@(match.ScoreB?.ToString() ?? "–")</strong></span><small>@match.Status · @(match.ScheduledAtUtc?.ToString("u") ?? "Unscheduled")</small></button>}</section>}</div>
+                                @if (_selectedMatch is { Status: CompetitionMatchStatus.Confirmed } attachmentMatch)
+                                {
+                                    <MomentAttachmentsSection SelectedHostId="HostId"
+                                                              SelectedHostLogin="@HostLogin"
+                                                              Destination="@(new MomentAttachmentDestination.TournamentResult(attachmentMatch.Id))" />
+                                }
                             }
                             else if (_activeTab == "entrants")
                             {

@@ -86,6 +86,21 @@ public sealed class MomentCandidate
     public List<MomentVote> Votes { get; set; } = [];
 }
 
+public sealed class MomentAttachment
+{
+    public long Id { get; set; }
+    public int HostId { get; set; }
+    public long MomentCandidateId { get; set; }
+    public MomentCandidate MomentCandidate { get; set; } = null!;
+    public long? BountyId { get; set; }
+    public Bounty? Bounty { get; set; }
+    public long? CommunityDefinitionId { get; set; }
+    public CommunityDefinition? CommunityDefinition { get; set; }
+    public long? CompetitionMatchId { get; set; }
+    public CompetitionMatch? CompetitionMatch { get; set; }
+    public DateTime AttachedAtUtc { get; set; }
+}
+
 public sealed class MomentCaptureRequest
 {
     public long Id { get; set; }

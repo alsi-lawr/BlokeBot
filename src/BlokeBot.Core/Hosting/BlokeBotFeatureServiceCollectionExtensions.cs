@@ -31,6 +31,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
+using BlokeBot.Core.Features.MomentAttachments;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.PlayWithViewers;
@@ -232,6 +233,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotMoments(this IServiceCollection services)
     {
         _ = services.AddSingleton<MomentHubService>();
+        _ = services.AddSingleton<MomentAttachmentService>();
         _ = services.AddSingleton<IMomentProviderOperations, MomentProviderOperations>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;

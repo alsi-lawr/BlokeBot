@@ -1405,6 +1405,18 @@ public sealed class CommunityProgressionService(
     )
     {
         var activity = await LoadSeasonActivityAsync(db, season, ct);
+        var definitions = await db
+            .CommunityDefinitions.AsNoTracking()
+            .Where(value => value.HostId == season.HostId && value.SeasonId == season.Id)
+            .OrderBy(value => value.CreatedAtUtc)
+            .ThenBy(value => value.Id)
+            .Select(value => new CommunityPublicDefinitionView(
+                new(value.PublicId),
+                value.Name,
+                value.Kind,
+                value.Target
+            ))
+            .ToArrayAsync(ct);
         return new(
             new(season.PublicId),
             season.Name,
@@ -1412,6 +1424,7 @@ public sealed class CommunityProgressionService(
             season.Status,
             season.StartsAtUtc,
             season.EndsAtUtc,
+            definitions,
             activity
                 .Standings.Where(value =>
                     Visible(value.TwitchUserId, value.Login, excludedTwitchUserIds, excludedLogins)

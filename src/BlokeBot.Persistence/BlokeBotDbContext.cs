@@ -162,6 +162,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<PlayQueueDomainEvent> PlayQueueEvents => Set<PlayQueueDomainEvent>();
     public DbSet<MomentHubSettings> MomentHubSettings => Set<MomentHubSettings>();
     public DbSet<MomentCandidate> MomentCandidates => Set<MomentCandidate>();
+    public DbSet<MomentAttachment> MomentAttachments => Set<MomentAttachment>();
     public DbSet<MomentCaptureRequest> MomentCaptureRequests => Set<MomentCaptureRequest>();
     public DbSet<MomentContributor> MomentContributors => Set<MomentContributor>();
     public DbSet<MomentSuggestion> MomentSuggestions => Set<MomentSuggestion>();
