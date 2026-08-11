@@ -64,6 +64,8 @@ internal sealed class SimulationFixtureSeeder(
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
         await SeedMomentAsync(db, hostId, now, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await SeedMomentAttachmentsAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await SeedOverlayAsync(db, hostId, now, cancellationToken);
@@ -981,8 +983,8 @@ internal sealed class SimulationFixtureSeeder(
             PublicId = Guid.Parse("6db0bd9a-9e69-49c5-a4bd-b6fa2604d30c"),
             HostId = hostId,
             Key = "first-cheer",
-            Name = "Bring the energy",
-            Description = "Cheer during the summer climb.",
+            Name = "Perfect comeback",
+            Description = "Win after falling behind during the summer climb.",
             Kind = CommunityDefinitionKind.Achievement,
             Scope = CommunityProgressScope.Viewer,
             CompletionMode = CommunityCompletionMode.OneTime,
@@ -2155,7 +2157,7 @@ internal sealed class SimulationFixtureSeeder(
         }
 
         var capturedAt = now.AddMinutes(-12);
-        _ = db.MomentCandidates.Add(
+        db.MomentCandidates.AddRange(
             new MomentCandidate
             {
                 PublicId = Guid.Parse("75a75ee9-cfed-47da-ad88-762f67f8c0a5"),
@@ -2190,6 +2192,82 @@ internal sealed class SimulationFixtureSeeder(
                         CreatedAtUtc = now.AddMinutes(-8),
                     },
                 ],
+            },
+            new MomentCandidate
+            {
+                PublicId = Guid.Parse("a2d6bb24-208b-46e4-a6f4-09fa3b307356"),
+                HostId = hostId,
+                StreamIdentity = "stream-2057",
+                State = MomentCandidateState.Approved,
+                PublicTitle = "Zero-health comeback",
+                PublicCategory = "Challenge run",
+                CapturedAtUtc = now.AddDays(-8).AddMinutes(-31),
+                LastCapturedAtUtc = now.AddDays(-8).AddMinutes(-31),
+                ApprovedAtUtc = now.AddDays(-8).AddMinutes(-25),
+            },
+            new MomentCandidate
+            {
+                PublicId = Guid.Parse("b534da56-eb18-45d2-94cf-c5b787728b55"),
+                HostId = hostId,
+                StreamIdentity = "stream-2098",
+                State = MomentCandidateState.Approved,
+                PublicTitle = "Bracket reset denied",
+                PublicCategory = "Tournament",
+                CapturedAtUtc = now.AddDays(-1).AddMinutes(-27),
+                LastCapturedAtUtc = now.AddDays(-1).AddMinutes(-27),
+                ApprovedAtUtc = now.AddDays(-1).AddMinutes(-20),
+            }
+        );
+    }
+
+    private static async Task SeedMomentAttachmentsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.MomentAttachments.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+
+        var bountyId = await db
+            .Bounties.Where(value =>
+                value.HostId == hostId
+                && value.PublicId == Guid.Parse("3e25c2dc-6bc2-41fc-8808-055677f26195")
+            )
+            .Select(value => value.Id)
+            .SingleAsync(cancellationToken);
+        var achievementId = await db
+            .CommunityDefinitions.Where(value =>
+                value.HostId == hostId
+                && value.PublicId == Guid.Parse("6db0bd9a-9e69-49c5-a4bd-b6fa2604d30c")
+            )
+            .Select(value => value.Id)
+            .SingleAsync(cancellationToken);
+        var moments = await db
+            .MomentCandidates.Where(value => value.HostId == hostId)
+            .Where(value =>
+                value.PublicId == Guid.Parse("75a75ee9-cfed-47da-ad88-762f67f8c0a5")
+                || value.PublicId == Guid.Parse("a2d6bb24-208b-46e4-a6f4-09fa3b307356")
+            )
+            .ToDictionaryAsync(value => value.PublicId, cancellationToken);
+
+        db.MomentAttachments.AddRange(
+            new MomentAttachment
+            {
+                HostId = hostId,
+                MomentCandidateId = moments[Guid.Parse("75a75ee9-cfed-47da-ad88-762f67f8c0a5")].Id,
+                BountyId = bountyId,
+                AttachedAtUtc = now.AddMinutes(-9),
+            },
+            new MomentAttachment
+            {
+                HostId = hostId,
+                MomentCandidateId = moments[Guid.Parse("a2d6bb24-208b-46e4-a6f4-09fa3b307356")].Id,
+                CommunityDefinitionId = achievementId,
+                AttachedAtUtc = now.AddMinutes(-7),
             }
         );
     }

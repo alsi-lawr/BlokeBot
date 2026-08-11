@@ -1,4 +1,5 @@
 @page "/competitions/{Channel}"
+@using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
@@ -33,7 +34,29 @@
                         }
                         @if (competition.Matches.Count > 0)
                         {
-                            <section><h3 class="mb-2 font-semibold text-[var(--app-text-strong)]">@(competition.Format == CompetitionFormat.Tournament ? "Bracket" : "Schedule")</h3><div class="competition-public-matches">@foreach (var round in competition.Matches.GroupBy(match => match.Round).OrderBy(group => group.Key)){<div class="competition-round"><h4>Round @round.Key</h4>@foreach (var match in round){<div class="competition-public-match"><span>@match.EntrantA</span><strong>@(match.ScoreA?.ToString() ?? "–")</strong><span>@match.EntrantB</span><strong>@(match.ScoreB?.ToString() ?? "–")</strong></div>}</div>}</div></section>
+                            <section>
+                                <h3 class="mb-2 font-semibold text-[var(--app-text-strong)]">@(competition.Format == CompetitionFormat.Tournament ? "Bracket" : "Schedule")</h3>
+                                <div class="competition-public-matches">
+                                    @foreach (var round in competition.Matches.GroupBy(match => match.Round).OrderBy(group => group.Key))
+                                    {
+                                        <div class="competition-round">
+                                            <h4>Round @round.Key</h4>
+                                            @foreach (var match in round)
+                                            {
+                                                <div class="competition-public-match">
+                                                    <span>@match.EntrantA</span><strong>@(match.ScoreA?.ToString() ?? "–")</strong>
+                                                    <span>@match.EntrantB</span><strong>@(match.ScoreB?.ToString() ?? "–")</strong>
+                                                </div>
+                                                @if (match.Status == CompetitionMatchStatus.Confirmed)
+                                                {
+                                                    <PublicMomentAttachments Channel="@Channel"
+                                                                             Destination="@(new MomentAttachmentDestination.TournamentResult(match.Id))" />
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </section>
                         }
                         @if (competition.Status == CompetitionStatus.Registration)
                         {

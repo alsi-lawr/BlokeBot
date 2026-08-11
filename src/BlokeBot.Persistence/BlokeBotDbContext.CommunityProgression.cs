@@ -33,6 +33,7 @@ public sealed partial class BlokeBotDbContext
         {
             _ = entity.ToTable("community_definitions");
             _ = entity.HasKey(value => value.Id);
+            _ = entity.HasAlternateKey(value => new { value.HostId, value.Id });
             _ = entity.HasIndex(value => new { value.HostId, value.PublicId }).IsUnique();
             _ = entity.HasIndex(value => new { value.HostId, value.Key }).IsUnique();
             _ = entity.Property(value => value.Key).HasMaxLength(80);

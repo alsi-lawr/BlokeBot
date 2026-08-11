@@ -43,6 +43,7 @@ public sealed class BountyUiTests
         _ = await CreateAndOpenAsync(service, hostId, "PRIVATE-BOUNTY", BountyVisibility.Private);
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        UiTestContextFactory.AddMomentAttachmentServices(context, database);
         _ = context.Services.AddSingleton(service);
         _ = context.Services.AddSingleton<TimeProvider>(new FixedTimeProvider(_now));
         _ = context.AddAuthorization().SetNotAuthorized();

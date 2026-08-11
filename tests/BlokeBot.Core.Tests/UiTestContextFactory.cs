@@ -1,10 +1,12 @@
 using System.Security.Claims;
+using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.MomentAttachments;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
@@ -13,6 +15,7 @@ using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Tests;
 
@@ -45,6 +48,7 @@ internal static class UiTestContextFactory
         _ = context.Services.AddScoped<DashboardFragmentState>();
         _ = context.Services.AddSingleton<HostedChannelChangeNotifier>();
         _ = context.Services.AddSingleton<HostFeatureService>();
+        AddMomentAttachmentServices(context, dbFactory);
         _ = context.Services.AddBlokeBotAlerts();
         _ = context.Services.AddSingleton<IMessageLibraryChatterSource>(
             new UnavailableMessageLibraryChatterSource()
@@ -73,6 +77,20 @@ internal static class UiTestContextFactory
         return new UiTestContext(context, authorization);
     }
 
+    public static void AddMomentAttachmentServices(
+        BunitContext context,
+        SqliteBlokeBotDbFactory dbFactory
+    )
+    {
+        context.Services.TryAddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
+        context.Services.TryAddSingleton(TestEventBus.Create<AppEventKind>());
+        context.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        context.Services.TryAddSingleton<IModeratorAuthorityService>(
+            new GrantedModeratorAuthorityService()
+        );
+        context.Services.TryAddSingleton<MomentAttachmentService>();
+    }
+
     internal sealed record UiTestContext(
         BunitContext Context,
         BunitAuthorizationContext Authorization
@@ -93,5 +111,14 @@ internal static class UiTestContextFactory
             Task.FromResult(
                 new TwitchAnnouncementReadiness(TwitchAnnouncementAvailability.Unavailable, "bot")
             );
+    }
+
+    private sealed class GrantedModeratorAuthorityService : IModeratorAuthorityService
+    {
+        public Task<ModeratorAuthorityOutcome> AuthorizeAsync(
+            AuthenticatedSession session,
+            int requestedHostId,
+            CancellationToken ct
+        ) => Task.FromResult<ModeratorAuthorityOutcome>(new ModeratorAuthorityOutcome.Granted());
     }
 }

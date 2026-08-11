@@ -1,0 +1,455 @@
+.moment-attachments {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    background: var(--app-surface-solid);
+}
+
+.moment-attachments button,
+.moment-attachments a.btn-secondary,
+.moment-attachments input[type="search"],
+.moment-attachments-public .btn-secondary {
+    min-height: 44px;
+}
+
+.moment-attachments--loading,
+.moment-attachments--disabled {
+    padding: 1rem;
+    color: var(--app-text-muted);
+    font-size: 0.82rem;
+}
+
+.moment-attachments--disabled {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.moment-attachments--disabled h3 {
+    color: var(--app-text-strong);
+    font-size: 0.95rem;
+}
+
+.moment-attachments--disabled p {
+    max-width: 46rem;
+    margin-top: 0.25rem;
+}
+
+.moment-attachments__context {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(7rem, 0.55fr));
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-surface-muted);
+}
+
+.moment-attachments__context > div {
+    min-width: 0;
+    padding: 0.75rem 0.9rem;
+}
+
+.moment-attachments__context > div + div {
+    border-left: 1px solid var(--app-border);
+}
+
+.moment-attachments__context span,
+.moment-attachments__context small {
+    display: block;
+    color: var(--app-text-muted);
+    font-size: 0.67rem;
+}
+
+.moment-attachments__context span {
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.moment-attachments__context strong {
+    display: block;
+    margin-top: 0.15rem;
+    overflow-wrap: anywhere;
+    color: var(--app-text-strong);
+    font-size: 0.82rem;
+}
+
+.moment-attachments__feedback {
+    margin: 0.75rem 0.9rem 0;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    color: var(--app-text-medium);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.moment-attachments__workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.moment-attachments__workspace--picker {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+}
+
+.moment-attachments__editor {
+    min-width: 0;
+    padding: 0.95rem;
+}
+
+.moment-attachments__heading,
+.moment-attachments__title-line,
+.moment-attachments__picker > header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.moment-attachments__heading {
+    justify-content: space-between;
+}
+
+.moment-attachments__heading h3,
+.moment-attachments__picker h3 {
+    color: var(--app-text-strong);
+    font-size: 0.92rem;
+}
+
+.moment-attachments__heading p,
+.moment-attachments__picker header p {
+    margin-top: 0.15rem;
+    color: var(--app-text-muted);
+    font-size: 0.74rem;
+}
+
+.moment-attachments__count {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--app-surface-muted);
+    color: var(--app-text-muted);
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.moment-attachments__list {
+    margin-top: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: 0.65rem;
+}
+
+.moment-attachments__row {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem;
+}
+
+.moment-attachments__row + .moment-attachments__row {
+    border-top: 1px solid var(--app-border);
+}
+
+.moment-attachments__thumb {
+    position: relative;
+    width: 4.5rem;
+    aspect-ratio: 16 / 10;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: radial-gradient(circle at 70% 28%, rgb(96 165 250 / 0.55), transparent 36%), linear-gradient(145deg, #1f3b52, #172235);
+    color: white;
+}
+
+.moment-attachments__thumb span {
+    position: relative;
+}
+
+.moment-attachments__copy {
+    min-width: 0;
+}
+
+.moment-attachments__moment-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.moment-attachments__moment-title > strong {
+    overflow-wrap: anywhere;
+    color: var(--app-text-strong);
+    font-size: 0.82rem;
+}
+
+.moment-attachments__copy p,
+.moment-attachments__copy a,
+.moment-attachments__reference-note {
+    color: var(--app-text-muted);
+    font-size: 0.7rem;
+}
+
+.moment-attachments__copy p {
+    margin-top: 0.18rem;
+    overflow-wrap: anywhere;
+}
+
+.moment-attachments__copy a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    color: #2563eb;
+    font-weight: 750;
+}
+
+.moment-attachments__remove {
+    color: var(--tone-red-fg);
+}
+
+.moment-attachments__empty {
+    padding: 1rem;
+    background: var(--app-surface-muted);
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    text-align: center;
+}
+
+.moment-attachments__reference-note {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.65rem;
+}
+
+.moment-attachments__picker {
+    min-width: 0;
+    border-left: 1px solid var(--app-border);
+    background: var(--app-surface-solid);
+}
+
+.moment-attachments__picker > header {
+    min-height: 4rem;
+    justify-content: space-between;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.moment-attachments__picker-body {
+    padding: 0.8rem;
+}
+
+.moment-attachments__scope {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.65rem;
+    color: var(--app-text-muted);
+    font-size: 0.68rem;
+}
+
+.moment-attachments__scope strong {
+    color: var(--app-text-medium);
+}
+
+.moment-attachments__choices {
+    max-height: 20rem;
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.moment-attachments__choice {
+    min-height: 4.25rem;
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.55rem;
+    padding: 0.65rem;
+    border: 1px solid var(--app-border);
+    border-radius: 0.55rem;
+    background: var(--app-surface-solid);
+    cursor: pointer;
+}
+
+.moment-attachments__choice:hover {
+    border-color: var(--app-control-hover-border);
+    background: var(--app-control-hover);
+}
+
+.moment-attachments__choice--selected {
+    border-color: #60a5fa;
+    background: rgb(59 130 246 / 0.1);
+}
+
+.moment-attachments__choice--attached {
+    background: var(--app-surface-muted);
+    cursor: default;
+}
+
+.moment-attachments__choice input {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.15rem;
+    accent-color: #2563eb;
+}
+
+.moment-attachments__choice strong,
+.moment-attachments__choice small,
+.moment-attachments__choice b {
+    display: block;
+}
+
+.moment-attachments__choice strong {
+    color: var(--app-text-strong);
+    font-size: 0.76rem;
+}
+
+.moment-attachments__choice small {
+    margin-top: 0.16rem;
+    color: var(--app-text-muted);
+    font-size: 0.66rem;
+    overflow-wrap: anywhere;
+}
+
+.moment-attachments__choice b {
+    margin-top: 0.18rem;
+    color: #047857;
+    font-size: 0.68rem;
+}
+
+.moment-attachments__picker footer {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--app-border);
+}
+
+.moment-attachments__picker footer p {
+    grid-column: 1 / -1;
+    color: var(--app-text-muted);
+    font-size: 0.65rem;
+}
+
+.moment-attachments-public {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    border: 1px solid var(--app-border);
+    border-radius: 0.65rem;
+    background: var(--app-surface-muted);
+}
+
+.moment-attachments-public > header span,
+.moment-attachments-public > header strong {
+    display: block;
+}
+
+.moment-attachments-public > header span {
+    color: var(--app-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.moment-attachments-public > header strong {
+    color: var(--app-text-strong);
+    font-size: 0.82rem;
+}
+
+.moment-attachments-public__list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.moment-attachments-public article {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 3.85rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.moment-attachments-public .moment-attachments__thumb {
+    width: 3.85rem;
+}
+
+.moment-attachments-public article strong,
+.moment-attachments-public article span {
+    display: block;
+}
+
+.moment-attachments-public article strong {
+    color: var(--app-text-strong);
+    font-size: 0.76rem;
+}
+
+.moment-attachments-public article span,
+.moment-attachments-public > p {
+    color: var(--app-text-muted);
+    font-size: 0.66rem;
+}
+
+@media (max-width: 880px) {
+    .moment-attachments__workspace--picker {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .moment-attachments__picker {
+        border-top: 1px solid var(--app-border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .moment-attachments--disabled {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .moment-attachments__context {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .moment-attachments__context-main {
+        grid-column: 1 / -1;
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .moment-attachments__context > div:nth-child(2) {
+        border-left: 0;
+    }
+
+    .moment-attachments__row {
+        grid-template-columns: 3.85rem minmax(0, 1fr);
+    }
+
+    .moment-attachments__row .moment-attachments__thumb {
+        width: 3.85rem;
+    }
+
+    .moment-attachments__remove {
+        grid-column: 1 / -1;
+        justify-self: end;
+        min-width: 6.5rem;
+    }
+
+    .moment-attachments-public article {
+        grid-template-columns: 3.85rem minmax(0, 1fr);
+    }
+
+    .moment-attachments-public article .btn-secondary {
+        grid-column: 1 / -1;
+        justify-self: end;
+    }
+}

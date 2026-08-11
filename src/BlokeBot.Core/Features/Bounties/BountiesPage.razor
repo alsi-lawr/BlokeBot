@@ -1,5 +1,6 @@
 @page "/bounties"
 @using BlokeBot.Core.Components.Studio
+@using BlokeBot.Core.Features.MomentAttachments
 @using BlokeBot.Core.Features.Points.Balances
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
@@ -165,6 +166,9 @@
                                         </ul>
                                     </details>
                                 }
+                                <MomentAttachmentsSection SelectedHostId="HostId"
+                                                          SelectedHostLogin="@HostLogin"
+                                                          Destination="@(new MomentAttachmentDestination.Bounty(bounty.PublicId))" />
                             </div>
                         </details>
                     }
@@ -272,6 +276,9 @@
                                         </ul>
                                     </details>
                                 }
+                                <MomentAttachmentsSection SelectedHostId="HostId"
+                                                          SelectedHostLogin="@HostLogin"
+                                                          Destination="@(new MomentAttachmentDestination.Bounty(bounty.PublicId))" />
                             </div>
                         </details>
                     }

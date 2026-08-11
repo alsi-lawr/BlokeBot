@@ -169,6 +169,7 @@ public sealed class CompetitionUiTests
         ).ShouldBeOfType<CompetitionOutcome.Succeeded>();
 
         using var context = new BunitContext();
+        UiTestContextFactory.AddMomentAttachmentServices(context, database);
         _ = context.Services.AddSingleton(service);
         _ = context.AddAuthorization().SetNotAuthorized();
         var cut = context.Render<PublicCompetitionsPage>(parameters =>
