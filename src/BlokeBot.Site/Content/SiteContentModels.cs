@@ -18,7 +18,15 @@ internal sealed record SiteGuideSection
 {
     internal required string Heading { get; init; }
 
-    internal string? Anchor { get; init; }
+    internal string Anchor =>
+        string.Join(
+            '-',
+            Heading
+                .ToLowerInvariant()
+                .Split(' ', '-')
+                .Select(word => new string(word.Where(char.IsAsciiLetterOrDigit).ToArray()))
+                .Where(word => word.Length > 0)
+        );
 
     internal SiteMedia? Media { get; init; }
 

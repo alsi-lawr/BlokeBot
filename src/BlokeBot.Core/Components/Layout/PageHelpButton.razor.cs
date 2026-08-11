@@ -69,6 +69,9 @@ public partial class PageHelpButton
             "/custom-commands/settings" => _customCommandsHelp,
             "/host" => _hostConfigHelp,
             "/requests" => _requestBoardsHelp,
+            "/bounties" => _bountiesHelp,
+            "/community" => _communityProgressionHelp,
+            "/bingo" => _bingoHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -187,6 +190,90 @@ public partial class PageHelpButton
                 "Open a saved board to approve, queue, accept, complete, reject, or merge viewer submissions.",
                 [
                     "Public notes are visible to viewers. Private moderator notes and rejection reasons stay private.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _bountiesHelp = new(
+        "Bounties",
+        [
+            _featureSwitchHelp,
+            new(
+                "Fund and settle challenges",
+                "Create a draft, open funding, then accept and resolve the challenge. Bounties require Points to be on.",
+                [
+                    "Pledges are held from each viewer's host-scoped login balance and requests above the target are capped to the remaining amount.",
+                    "Accepting below target is allowed. Funding and accepted bounties can be extended or expire.",
+                    "Cancellation and expiry refund pledges. Each bounty chooses whether failure refunds or spends them.",
+                    "Completion spends pledges and can distribute a fixed bonus equally or proportionally.",
+                ]
+            ),
+            new(
+                "Identity, visibility, and recovery",
+                "Point settlement and contributor grouping use the recorded normalized Twitch login, not Twitch user ID.",
+                [
+                    "A later Twitch rename does not move a balance or combine historical logins.",
+                    "Public bounties show recorded contributor logins and pledge amounts. Private bounties show no public data. Moderator reasons remain private.",
+                    "Turning Bounties off retains all configuration and history. Direct links recover through Channel setup, and turning it back on does not replay suppressed commands, events, or expiries.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _communityProgressionHelp = new(
+        "Community progression",
+        [
+            _featureSwitchHelp,
+            new(
+                "Seasons, progress, and privacy",
+                "Create a draft season, add typed quests, achievements, and persistent rewards, then open it for supported BlokeBot and Twitch events.",
+                [
+                    "Public mode shows participant Twitch identities, live individual progress, standings, completed achievements, reward unlocks, equipped rewards, and archived history. Hidden mode publishes nothing.",
+                    "Private moderator notes and internal audit records never appear on the public page.",
+                    "Closing freezes a standings snapshot and immutable completion history. Archiving keeps viewer unlocks and equipped selections.",
+                ]
+            ),
+            new(
+                "Resets and schedule edits",
+                "Daily and weekly repeatable quests use the channel time zone and the local boundary shown beside each definition.",
+                [
+                    "A daylight-saving gap moves forward to the first valid instant. An overlap uses the first occurrence and never resets again at the second.",
+                    "After downtime BlokeBot performs at most one rollover into the current period; it never replays every missed period.",
+                    "Saving an active schedule edit immediately closes the current period and resets active repeatable progress. You must confirm that consequence before saving; retries and multiple instances apply it once.",
+                ]
+            ),
+            new(
+                "Persistent rewards and recovery",
+                "Titles, supported badge icons, cosmetic accents, and points are granted atomically when progress completes.",
+                [
+                    "Viewers equip one unlocked title, badge, and accent for this host with !equiptitle, !equipbadge, and !equipaccent.",
+                    "Turning Community progression off blocks commands, events, timers, automation, rewards, and public output while preserving saved data. Re-enable resumes from the current period without replaying suppressed work.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _bingoHelp = new(
+        "Stream-event Bingo",
+        [
+            _featureSwitchHelp,
+            new(
+                "Templates, cards, and joining",
+                "Build reusable 3×3, 4×4, or 5×5 templates from typed automatic squares and moderator-confirmed moments.",
+                [
+                    "A saved revision, dimension, seed, and assignment identity reproduce each shared, viewer, or team card after later template edits.",
+                    "Viewers join before issue. Owners and moderators can move or remove them until issuing cards freezes the roster and assignments.",
+                    "Automatic choices are limited to connected Twitch and BlokeBot sources. Subjective moments stay manual; Bingo does not run scripts, image recognition, or speech recognition.",
+                ]
+            ),
+            new(
+                "Public evidence, corrections, and rewards",
+                "Public cards show participant Twitch identities or team names, typed evidence, wins, and archives.",
+                [
+                    "Raw provider payloads, credentials, internal identifiers, private moderator notes, and internal audit reasons are never public.",
+                    "Reversing a manual mark corrects the live card and evidence. Any completed win and its point, achievement, or title reward remain permanent and cannot grant again.",
+                    "Achievements and titles come from predeclared Community progression achievements. Turning Bingo off retains all data while stopping commands, EventSub reconciliation, marking, rewards, public output, overlay events, and queued work; re-enable never replays suppressed events.",
                 ]
             ),
         ]

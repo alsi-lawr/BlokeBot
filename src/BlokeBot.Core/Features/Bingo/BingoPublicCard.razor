@@ -1,0 +1,88 @@
+@using BlokeBot.Persistence.Models
+
+<article class="bingo-card" data-bingo-card>
+    <div class="bingo-card__head">
+        <div class="min-w-0">
+            <h3 class="bingo-card__title">@Card.AssignmentName</h3>
+            @if (Card.Participants.Count > 0)
+            {
+                <p class="bingo-card__who">@string.Join(", ", Card.Participants.Select(value => $"{value.DisplayName} (@{value.Login})"))</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(_rewardSummary))
+            {
+                <p class="bingo-card__who">@_rewardSummary</p>
+            }
+        </div>
+        @if (Card.Wins.Count > 0)
+        {
+            <div class="bingo-card__chips">
+                @foreach (var win in Card.Wins)
+                {
+                    <span class="status-pill status-pill--gold" @key="win.Id">
+                        <span class="status-pill__label">★ @win.Kind.Label() · @win.CompletedAtUtc.Stamp()</span>
+                    </span>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="bingo-board">
+        <div class="bingo-board__scroll" tabindex="0" aria-label="Scrollable @Game.Dimension.Value by @Game.Dimension.Value Bingo card">
+            @if (_letters.Count > 0)
+            {
+                <div class="bingo-board__letters" style="@Game.Dimension.GridVariable()" aria-hidden="true">
+                    @foreach (var letter in _letters)
+                    {
+                        <span class="bingo-board__letter">@letter</span>
+                    }
+                </div>
+            }
+            <div class="bingo-board__grid" style="@Game.Dimension.GridVariable()">
+                @foreach (var square in Card.Squares)
+                {
+                    <div class="@CellClass(square)" data-bingo-marked="@square.Marked.ToString().ToLowerInvariant()" @key="square.Position">
+                        @if (square.Marked)
+                        {
+                            <span class="bingo-cell__marked" aria-label="Marked">✓</span>
+                        }
+                        @if (square.Evidence.Count > 0)
+                        {
+                            <span class="bingo-cell__evidence" aria-label="@square.Evidence.Count evidence entries">@square.Evidence.Count</span>
+                        }
+                        <span class="bingo-cell__title">@square.Title</span>
+                        <span class="bingo-cell__kind">@square.Kind.DisplayName()</span>
+                        @if (HasSquareAction(square))
+                        {
+                            <span class="bingo-cell__action">@SquareActionFor(square)</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (_evidence.Count > 0)
+    {
+        <StudioFold Bare
+                    Key="@_foldKey"
+                    Label="@_evidenceLabel"
+                    Open="_evidenceOpen"
+                    OpenChanged="value => _evidenceOpen = value">
+            <ul class="bingo-evidence">
+                @foreach (var entry in _evidence)
+                {
+                    <li class="bingo-evidence__entry">
+                        <span class="bingo-evidence__square">Sq @(entry.Square.Position + 1)</span>
+                        <span class="bingo-evidence__action">@entry.Evidence.Action.Label()</span>
+                        <span>@entry.Evidence.EventKind.DisplayName() · @entry.Evidence.Summary</span>
+                        @if (entry.Evidence.Participant is { } participant)
+                        {
+                            <span>@participant.DisplayName (@("@" + participant.Login))</span>
+                        }
+                        <span>· @entry.Evidence.OccurredAtUtc.Stamp()</span>
+                    </li>
+                }
+            </ul>
+        </StudioFold>
+    }
+</article>

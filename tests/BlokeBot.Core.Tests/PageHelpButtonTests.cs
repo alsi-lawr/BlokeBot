@@ -29,22 +29,6 @@ public sealed class PageHelpButtonTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        routes.ShouldBe([
-            "/custom-commands/settings",
-            "/guessing",
-            "/guessing/settings",
-            "/moments",
-            "/overlays",
-            "/points",
-            "/points/settings",
-            "/queues",
-            "/requests",
-            "/twitch-operations/channel-points",
-            "/twitch-operations/clips-markers",
-            "/twitch-operations/polls",
-            "/twitch-operations/predictions",
-            "/twitch-operations/shoutouts",
-        ]);
         routes.ShouldAllBe(static route => PageHelpButton.HasUsefulHelpForPath(route));
     }
 

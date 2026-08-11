@@ -1,0 +1,151 @@
+@page "/community/{Channel}"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject CommunityProgressionService _progression
+@inject TimeProvider _clock
+
+<PageTitle>BlokeBot | Community progression</PageTitle>
+
+<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+    <div class="mx-auto max-w-6xl space-y-6">
+        <PageHeader Kicker="Community" Title="Season progression" Description="Public standings, quests, achievements, and persistent rewards." />
+        @if (!_loaded)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Loading public progression…</div>
+        }
+        else if (_view is null)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Public Community progression is unavailable for this channel.</div>
+        }
+        else if (_view.Seasons.Count == 0)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">No public seasons have opened yet.</div>
+        }
+        else
+        {
+            @foreach (var season in _view.Seasons)
+            {
+                <details class="card progression-disclosure progression-card"
+                         @key="season.Id"
+                         data-public-season="@season.Id.Value"
+                         open="@(season.Status != CommunitySeasonStatus.Archived)">
+                    <summary>
+                        <div class="grid min-w-0 gap-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-xl font-semibold text-[var(--app-text-strong)]">@season.Name</h2>
+                                <span class="@CommunityProgressionPresentation.StatusPillClass(season.Status)">
+                                    <span class="status-pill__dot"></span><span class="status-pill__label">@season.Status</span>
+                                </span>
+                            </div>
+                            <p class="text-sm text-muted-foreground">@SeasonSummary(season)</p>
+                        </div>
+                        <span class="progression-chevron" aria-hidden="true">›</span>
+                    </summary>
+                    <div class="progression-card__body">
+                        <CommunitySeasonTimeline StartsAtUtc="season.StartsAtUtc" EndsAtUtc="season.EndsAtUtc" />
+
+                        <div class="grid min-w-0 gap-5 lg:grid-cols-2">
+                            <details class="progression-disclosure progression-section" open>
+                                <summary>@CommunityProgressionPresentation.StandingsHeading(season.Status)<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                <div class="progression-section__body">
+                                    @if (season.Standings.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No participants yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <CommunityStandingsTable Standings="season.Standings" />
+                                    }
+                                </div>
+                            </details>
+                            <details class="progression-disclosure progression-section" open>
+                                <summary>Channel-wide goals<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                <div class="progression-section__body">
+                                    @if (season.CommunalProgress.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No communal goals are active.</p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in season.CommunalProgress)
+                                        {
+                                            <CommunityProgressMeterRow Name="@item.DefinitionName"
+                                                                       Amount="item.Amount"
+                                                                       Target="item.Target"
+                                                                       CompletionCount="item.CompletionCount" />
+                                        }
+                                    }
+                                </div>
+                            </details>
+                        </div>
+
+                        <details class="progression-disclosure progression-section" open>
+                            <summary>Current viewer progress<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                            <div class="progression-section__body">
+                                @if (season.Progress.Count == 0)
+                                {
+                                    <p class="text-sm text-muted-foreground">No viewer progress yet.</p>
+                                }
+                                else
+                                {
+                                    @foreach (var item in season.Progress)
+                                    {
+                                        <CommunityProgressMeterRow Name="@item.DisplayName"
+                                                                   Tag="@item.DefinitionName"
+                                                                   Amount="item.Amount"
+                                                                   Target="item.Target"
+                                                                   CompletionCount="item.CompletionCount" />
+                                    }
+                                }
+                            </div>
+                        </details>
+
+                        <div class="grid min-w-0 gap-5 lg:grid-cols-2">
+                            <details class="progression-disclosure progression-section" open>
+                                <summary>Reward unlocks<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                <div class="progression-section__body">
+                                    @if (season.Unlocks.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No rewards unlocked yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="progression-unlock-list">
+                                            @foreach (var item in season.Unlocks)
+                                            {
+                                                <CommunityUnlockRow Unlock="item" />
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                            <details class="progression-disclosure progression-section" open>
+                                <summary>Completed achievements and history<span class="progression-chevron" aria-hidden="true">›</span></summary>
+                                <div class="progression-section__body">
+                                    @if (season.Completions.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No completions yet.</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="progression-unlock-list">
+                                            @foreach (var item in season.Completions)
+                                            {
+                                                <div class="progression-unlock" @key="item.Id">
+                                                    <b>@(item.DisplayName ?? "Community")</b>
+                                                    <span>completed @item.DefinitionName</span>
+                                                    <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(item.CompletedAtUtc)">@CommunityProgressionPresentation.HumanMoment(item.CompletedAtUtc, _nowUtc)</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </details>
+            }
+        }
+    </div>
+</main>

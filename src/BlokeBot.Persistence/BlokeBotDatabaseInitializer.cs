@@ -9,5 +9,6 @@ public sealed class BlokeBotDatabaseInitializer(IDbContextFactory<BlokeBotDbCont
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await HetznerBaselineBridge.ApplyAsync(db, cancellationToken);
         await db.Database.MigrateAsync(cancellationToken);
+        await BingoAssignmentKeyMigration.ApplyAsync(db, cancellationToken);
     }
 }

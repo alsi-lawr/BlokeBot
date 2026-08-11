@@ -14,6 +14,15 @@ internal static class SimulationViewCatalog
         ["guessing-settings"] = "/guessing/settings",
         ["points"] = "/points",
         ["points-settings"] = "/points/settings",
+        ["bounties"] = "/bounties",
+        ["public-bounties"] =
+            $"/bounties/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["community"] = "/community",
+        ["public-community"] =
+            $"/community/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["bingo"] = "/bingo",
+        ["public-bingo"] =
+            $"/bingo/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["custom-commands"] = "/custom-commands/settings#commands",
         ["automation-events"] = "/automations/events",
         ["overlays"] = "/overlays#sources",

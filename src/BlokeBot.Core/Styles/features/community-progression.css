@@ -1,0 +1,333 @@
+@layer components {
+    .progression-disclosure {
+        min-width: 0;
+    }
+
+    .progression-disclosure > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 0.5rem;
+        list-style: none;
+    }
+
+    .progression-disclosure > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .progression-disclosure > summary:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--app-focus-border) 34%, transparent);
+        outline-offset: -3px;
+    }
+
+    .progression-chevron {
+        color: var(--app-text-muted);
+        flex: none;
+        font-size: 1.05rem;
+        line-height: 1;
+        transition: transform 250ms ease;
+    }
+
+    .progression-disclosure[open] > summary .progression-chevron {
+        transform: rotate(90deg);
+    }
+
+    .progression-card > summary {
+        align-items: flex-start;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .progression-card > summary > :first-child {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .progression-card[open] > summary {
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .progression-card__body {
+        display: grid;
+        gap: 1.1rem;
+        grid-template-columns: minmax(0, 1fr);
+        padding: 1.25rem;
+    }
+
+    .progression-section > summary {
+        color: var(--app-text-strong);
+        font-size: 0.95rem;
+        font-weight: 750;
+    }
+
+    .progression-section > summary .progression-chevron {
+        font-size: 0.95rem;
+    }
+
+    .progression-section__body {
+        margin-top: 0.5rem;
+        min-width: 0;
+    }
+
+    .progression-tag {
+        align-items: center;
+        color: var(--app-text-muted);
+        display: inline-flex;
+        font-size: 0.72rem;
+        font-weight: 650;
+    }
+
+    .progression-timeline {
+        display: grid;
+        gap: 0.4rem;
+    }
+
+    .progression-timeline__bar {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        height: 0.55rem;
+        position: relative;
+    }
+
+    .progression-timeline__fill {
+        background: var(--tone-blue-solid);
+        border-radius: inherit;
+        inset: 0 auto 0 0;
+        position: absolute;
+    }
+
+    .progression-timeline__today {
+        background: var(--app-text-strong);
+        border-radius: 1px;
+        bottom: -0.35rem;
+        position: absolute;
+        top: -0.35rem;
+        width: 2px;
+    }
+
+    .progression-timeline__labels {
+        color: var(--app-text-muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        gap: 0.5rem;
+        justify-content: space-between;
+    }
+
+    .progression-timeline__labels b {
+        color: var(--app-text-strong);
+        font-weight: 650;
+    }
+
+    .progression-chips {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .progression-reward {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        color: var(--app-text-medium);
+        display: inline-flex;
+        font-size: 0.8rem;
+        font-weight: 650;
+        gap: 0.45rem;
+        padding: 0.35rem 0.8rem;
+    }
+
+    .progression-reward svg {
+        flex: none;
+        height: 1rem;
+        width: 1rem;
+    }
+
+    .progression-reward__kind {
+        color: var(--app-text-muted);
+        font-size: 0.65rem;
+        font-weight: 750;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .progression-reward--sky,
+    .progression-reward--violet,
+    .progression-reward--amber,
+    .progression-reward--emerald {
+        background: color-mix(in srgb, var(--progression-accent) 10%, var(--app-surface-solid));
+        border-color: color-mix(in srgb, var(--progression-accent) 38%, var(--app-border));
+        color: var(--progression-accent-fg);
+    }
+
+    .progression-reward--sky {
+        --progression-accent: #0ea5e9;
+        --progression-accent-fg: #0369a1;
+    }
+
+    .progression-reward--violet {
+        --progression-accent: #8b5cf6;
+        --progression-accent-fg: #6d28d9;
+    }
+
+    .progression-reward--amber {
+        --progression-accent: #f59e0b;
+        --progression-accent-fg: #b45309;
+    }
+
+    .progression-reward--emerald {
+        --progression-accent: #10b981;
+        --progression-accent-fg: #047857;
+    }
+
+    html[data-theme="dark"] .progression-reward--sky {
+        --progression-accent-fg: #7dd3fc;
+    }
+
+    html[data-theme="dark"] .progression-reward--violet {
+        --progression-accent-fg: #c4b5fd;
+    }
+
+    html[data-theme="dark"] .progression-reward--amber {
+        --progression-accent-fg: #fcd34d;
+    }
+
+    html[data-theme="dark"] .progression-reward--emerald {
+        --progression-accent-fg: #6ee7b7;
+    }
+
+    .progression-swatch {
+        background: var(--progression-accent);
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+        flex: none;
+        height: 0.85rem;
+        width: 0.85rem;
+    }
+
+    .progression-row {
+        border-top: 1px solid var(--app-border);
+        display: grid;
+        gap: 0.45rem;
+        padding: 0.85rem 0;
+    }
+
+    .progression-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+    }
+
+    .progression-row__head {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
+
+    .progression-row__name {
+        color: var(--app-text-strong);
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .progression-row__amount {
+        color: var(--app-text-muted);
+        font-size: 0.85rem;
+        margin-left: auto;
+    }
+
+    .progression-row__amount b {
+        color: var(--app-text-strong);
+        font-weight: 750;
+    }
+
+    .progression-row__meta {
+        color: var(--app-text-muted);
+        font-size: 0.78rem;
+    }
+
+    .progression-unlock-list {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .progression-unlock {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.6rem;
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.83rem;
+        gap: 0.55rem;
+        padding: 0.6rem 0.8rem;
+    }
+
+    .progression-unlock b {
+        color: var(--app-text-strong);
+        font-weight: 650;
+    }
+
+    .progression-unlock__time {
+        color: var(--app-text-muted);
+        font-size: 0.75rem;
+        margin-left: auto;
+    }
+
+    .progression-warning {
+        background: var(--app-warning-bg);
+        border: 1px solid var(--app-warning-border);
+        border-radius: 0.5rem;
+        color: var(--app-warning-text);
+        display: grid;
+        font-size: 0.82rem;
+        gap: 0.5rem;
+        padding: 0.7rem 0.9rem;
+    }
+
+    .progression-confirm {
+        align-items: center;
+        display: flex;
+        font-weight: 650;
+        gap: 0.75rem;
+        justify-content: space-between;
+    }
+
+    /* Overrides the width: 100% of .input, which is imported after this sheet in the same layer. */
+    select.progression-select {
+        max-width: 100%;
+        width: auto;
+    }
+
+    .progression-preview {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.65rem;
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .progression-preview__heading {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .progression-gate-action:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .progression-chevron {
+            transition-duration: 1ms;
+        }
+    }
+}

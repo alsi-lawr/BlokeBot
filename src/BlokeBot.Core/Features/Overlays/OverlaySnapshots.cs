@@ -621,6 +621,12 @@ internal sealed class OverlayStateProvider(
                 Prizes = ["500 points", "250 points"],
                 PointLabel = "points",
             },
+            OverlayEventFeedKind.BingoEvent => new OverlayEventPresentation.BingoEvent
+            {
+                HostId = instance.HostId,
+                SourceKey = "sample-bingo",
+                Summary = "Team Nebula completed row 2",
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         var kindConfiguration = configuration.Kinds[kind];
@@ -644,7 +650,8 @@ internal sealed class OverlayStateProvider(
                         {
                             OverlayEventFeedKind.PointAward => "Points awarded",
                             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
-                            _ => "Giveaway winner",
+                            OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
+                            _ => "Bingo",
                         },
                         EventFeedProjectionText.DecodeOnce(
                             EventFeedTemplateRenderer.Render(kindConfiguration, sample)

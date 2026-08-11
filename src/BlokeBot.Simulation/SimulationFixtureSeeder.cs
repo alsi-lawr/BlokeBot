@@ -1,5 +1,6 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
@@ -46,6 +47,9 @@ internal sealed class SimulationFixtureSeeder(
 
         await SeedGuessingAsync(db, hostId, now, cancellationToken);
         await SeedPointsAsync(db, hostId, now, cancellationToken);
+        await SeedBountyAsync(db, hostId, now, cancellationToken);
+        await SeedCommunityProgressionAsync(db, hostId, now, cancellationToken);
+        await SeedBingoAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -62,6 +66,924 @@ internal sealed class SimulationFixtureSeeder(
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             AuthRole.Streamer
         );
+    }
+
+    private static async Task SeedBingoAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var templatePublicId = Guid.Parse("e234243b-ae40-47dd-bae3-e9e456369e91");
+        if (
+            await db.BingoTemplates.AnyAsync(
+                value => value.PublicId == templatePublicId,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        var template = new BingoTemplate
+        {
+            HostId = hostId,
+            PublicId = templatePublicId,
+            CreationOperationId = Guid.Parse("6c098a89-ee48-49ec-87c2-a4ccb1f61724"),
+            Name = "Tonight's stream moments",
+            CurrentRevision = 3,
+            CreatedAtUtc = now.AddDays(-14),
+            UpdatedAtUtc = now.AddMinutes(-50),
+        };
+        var revision = new BingoTemplateRevision
+        {
+            HostId = hostId,
+            OperationId = Guid.Parse("fe4c7846-ad3b-4d18-b725-ced8fb76619f"),
+            Template = template,
+            Revision = 3,
+            Dimension = 4,
+            FullCardWinEnabled = true,
+            LinePointsReward = "250",
+            LineAchievementKey = "bingo-winner",
+            FullCardPointsReward = "1000",
+            FullCardAchievementKey = "bingo-winner",
+            CreatedByTwitchUserId = "1000",
+            CreatedByLogin = "streamer",
+            CreatedAtUtc = now.AddMinutes(-50),
+        };
+        var squareKinds = new[]
+        {
+            BingoSquareKind.Manual,
+            BingoSquareKind.IncomingRaid,
+            BingoSquareKind.BountyCompleted,
+            BingoSquareKind.GuessingResult,
+            BingoSquareKind.GiveawayStarted,
+            BingoSquareKind.StreamCategoryChanged,
+        };
+        var titles = new[]
+        {
+            "Chat predicts the plot twist",
+            "A raid brings the party",
+            "Community bounty completed",
+            "Blue wins the guessing round",
+            "Giveaway opens",
+            "Category changes to Just Chatting",
+            "Streamer says 'one more try'",
+            "Incoming raid with 10+ viewers",
+            "No-winner guessing result",
+            "Moderator calls a clutch save",
+            "Giveaway opens after a win",
+            "Second bounty completed",
+            "Category changes mid-stream",
+            "Chat spots a hidden detail",
+            "A raid lands during the break",
+            "Streamer thanks the team",
+        };
+        for (var index = 0; index < 16; index++)
+        {
+            var kind = squareKinds[index % squareKinds.Length];
+            revision.Squares.Add(
+                new BingoSquare
+                {
+                    HostId = hostId,
+                    Key = $"moment-{index + 1}",
+                    SortOrder = index,
+                    Title = titles[index],
+                    Kind = kind,
+                    Threshold = kind == BingoSquareKind.IncomingRaid ? 10 : null,
+                    FilterToken = kind switch
+                    {
+                        BingoSquareKind.GuessingResult => "blue",
+                        BingoSquareKind.StreamCategoryChanged => "509658",
+                        _ => null,
+                    },
+                    PrivateModeratorNote =
+                        kind == BingoSquareKind.Manual
+                            ? "Confirm only when the moment is clear on stream."
+                            : string.Empty,
+                }
+            );
+        }
+        var archiveTemplate = new BingoTemplate
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("95d4f8bb-2e3b-43dc-aabd-418f0498761b"),
+            CreationOperationId = Guid.Parse("664461c4-cc46-4427-a905-86d5be1c8ca3"),
+            Name = "Five-by-five stream archive",
+            CurrentRevision = 1,
+            CreatedAtUtc = now.AddDays(-4),
+            UpdatedAtUtc = now.AddDays(-3),
+        };
+        var archiveRevision = new BingoTemplateRevision
+        {
+            HostId = hostId,
+            OperationId = Guid.Parse("338c88dd-39b4-4fb9-9c97-52e4d43cc6b4"),
+            Template = archiveTemplate,
+            Revision = 1,
+            Dimension = 5,
+            FullCardWinEnabled = true,
+            LinePointsReward = "250",
+            LineAchievementKey = "bingo-winner",
+            FullCardPointsReward = "1000",
+            FullCardAchievementKey = "bingo-winner",
+            CreatedByTwitchUserId = "1000",
+            CreatedByLogin = "streamer",
+            CreatedAtUtc = now.AddDays(-3),
+        };
+        for (var index = 0; index < 25; index++)
+        {
+            var kind = squareKinds[index % squareKinds.Length];
+            archiveRevision.Squares.Add(
+                new BingoSquare
+                {
+                    HostId = hostId,
+                    Key = $"archive-moment-{index + 1}",
+                    SortOrder = index,
+                    Title = $"Archived stream moment {index + 1}",
+                    Kind = kind,
+                    Threshold = kind == BingoSquareKind.IncomingRaid ? 10 : null,
+                    FilterToken = kind switch
+                    {
+                        BingoSquareKind.GuessingResult => "blue",
+                        BingoSquareKind.StreamCategoryChanged => "509658",
+                        _ => null,
+                    },
+                }
+            );
+        }
+        var game = new BingoGame
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("3201ca21-ef80-4b70-8558-f677474d58f3"),
+            CreationOperationId = Guid.Parse("45942ff8-3f3e-4344-a7a1-82a7bc19e4c1"),
+            TemplateRevision = revision,
+            TemplateName = template.Name,
+            TemplateRevisionNumber = 3,
+            Dimension = 4,
+            Seed = "neon-night-42",
+            Mode = BingoGameMode.Team,
+            Status = BingoGameStatus.Issued,
+            ParticipantCap = 12,
+            TeamCap = 2,
+            FullCardWinEnabled = true,
+            LinePointsReward = "250",
+            LineAchievementKey = "bingo-winner",
+            FullCardPointsReward = "1000",
+            FullCardAchievementKey = "bingo-winner",
+            CreatedAtUtc = now.AddMinutes(-45),
+            IssuedAtUtc = now.AddMinutes(-35),
+        };
+        var aurora = new BingoTeam
+        {
+            HostId = hostId,
+            Game = game,
+            PublicId = Guid.Parse("425fd611-c9ea-4cff-aa71-2cfd33d290da"),
+            Name = "Team Aurora",
+            SortOrder = 0,
+        };
+        var nebula = new BingoTeam
+        {
+            HostId = hostId,
+            Game = game,
+            PublicId = Guid.Parse("edc6beea-e866-41d8-aebc-e9d4ec563950"),
+            Name = "Team Nebula",
+            SortOrder = 1,
+        };
+        var auroraCard = new BingoCard
+        {
+            HostId = hostId,
+            Game = game,
+            PublicId = Guid.Parse("caf9c96f-5326-45c0-9cb7-0849359d5bf9"),
+            AssignmentKey = $"team:{aurora.PublicId:N}",
+            AssignmentName = aurora.Name,
+            IssuedAtUtc = now.AddMinutes(-35),
+        };
+        var nebulaCard = new BingoCard
+        {
+            HostId = hostId,
+            Game = game,
+            PublicId = Guid.Parse("249491e1-50b8-4ef9-bdba-30a2c03fb8a7"),
+            AssignmentKey = $"team:{nebula.PublicId:N}",
+            AssignmentName = nebula.Name,
+            IssuedAtUtc = now.AddMinutes(-35),
+        };
+        var participants = new[]
+        {
+            Participant(hostId, game, aurora, auroraCard, "2001", "nightowl", "NightOwl", now),
+            Participant(hostId, game, aurora, auroraCard, "2002", "pixelpilot", "PixelPilot", now),
+            Participant(hostId, game, nebula, nebulaCard, "2003", "cozycactus", "CozyCactus", now),
+        };
+        var archivedGame = new BingoGame
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("69e9e686-06cc-4879-ae59-fd0279f1d820"),
+            CreationOperationId = Guid.Parse("fe7fc0cb-2e5b-4199-a967-22a05d7dc271"),
+            TemplateRevision = archiveRevision,
+            TemplateName = archiveTemplate.Name,
+            TemplateRevisionNumber = 1,
+            Dimension = 5,
+            Seed = "archive-night-17",
+            Mode = BingoGameMode.Shared,
+            Status = BingoGameStatus.Archived,
+            FullCardWinEnabled = true,
+            LinePointsReward = "250",
+            LineAchievementKey = "bingo-winner",
+            FullCardPointsReward = "1000",
+            FullCardAchievementKey = "bingo-winner",
+            CreatedAtUtc = now.AddDays(-3),
+            IssuedAtUtc = now.AddDays(-3).AddMinutes(10),
+            CompletedAtUtc = now.AddDays(-3).AddHours(2),
+            ArchivedAtUtc = now.AddDays(-3).AddHours(3),
+        };
+        var archivedCard = new BingoCard
+        {
+            HostId = hostId,
+            Game = archivedGame,
+            PublicId = Guid.Parse("4a9676d5-da3f-4edc-bd79-83a2eb2bc557"),
+            AssignmentKey = "shared",
+            AssignmentName = "Everyone",
+            IssuedAtUtc = now.AddDays(-3).AddMinutes(10),
+        };
+        var archivedParticipant = new BingoParticipant
+        {
+            HostId = hostId,
+            Game = archivedGame,
+            Card = archivedCard,
+            TwitchUserId = "2004",
+            Login = "archivist",
+            DisplayName = "Archivist",
+            JoinedAtUtc = now.AddDays(-3).AddMinutes(5),
+        };
+        db.BingoTemplates.AddRange(template, archiveTemplate);
+        db.BingoGames.AddRange(game, archivedGame);
+        db.BingoTeams.AddRange(aurora, nebula);
+        db.BingoCards.AddRange(auroraCard, nebulaCard, archivedCard);
+        db.BingoParticipants.AddRange(participants);
+        _ = db.BingoParticipants.Add(archivedParticipant);
+        _ = await db.SaveChangesAsync(cancellationToken);
+
+        var layout = BingoCardLayout.Generate(
+            game.Seed,
+            game.TemplateRevisionNumber,
+            new(game.Dimension),
+            auroraCard.AssignmentKey,
+            revision.Squares.Select(value => new BingoSquareKey(value.Key))
+        );
+        var summaries = new[]
+        {
+            "Moderator confirmed this square",
+            "Incoming raid from @friendlyraider with 42 viewers",
+            "Bounty completed",
+            "Guessing result: Blue",
+        };
+        for (var position = 0; position < 4; position++)
+        {
+            var key = layout[position].Value;
+            var definition = revision.Squares.Single(value => value.Key == key);
+            var mark = new BingoMark
+            {
+                HostId = hostId,
+                GameId = game.Id,
+                CardId = auroraCard.Id,
+                SquareKey = key,
+                Position = position,
+                IsActive = position != 2,
+                FirstMarkedAtUtc = now.AddMinutes(-25 + position),
+                ChangedAtUtc = now.AddMinutes(-10 + position),
+            };
+            mark.Evidence.Add(
+                new BingoEvidence
+                {
+                    HostId = hostId,
+                    GameId = game.Id,
+                    CardId = auroraCard.Id,
+                    Action = BingoEvidenceAction.Marked,
+                    Source =
+                        definition.Kind == BingoSquareKind.Manual
+                            ? BingoEvidenceSource.Manual
+                            : BingoEvidenceSource.Automatic,
+                    EventKind = definition.Kind,
+                    Summary = summaries[position],
+                    ParticipantTwitchUserId = position == 1 ? "raid-42" : null,
+                    ParticipantLogin = position == 1 ? "friendlyraider" : null,
+                    ParticipantDisplayName = position == 1 ? "FriendlyRaider" : null,
+                    OccurredAtUtc = now.AddMinutes(-25 + position),
+                    RecordedAtUtc = now.AddMinutes(-25 + position),
+                }
+            );
+            if (position == 2)
+            {
+                mark.Evidence.Add(
+                    new BingoEvidence
+                    {
+                        HostId = hostId,
+                        GameId = game.Id,
+                        CardId = auroraCard.Id,
+                        Action = BingoEvidenceAction.Reversed,
+                        Source = BingoEvidenceSource.Manual,
+                        EventKind = definition.Kind,
+                        Summary = "Moderator reversed this square",
+                        OccurredAtUtc = now.AddMinutes(-10),
+                        RecordedAtUtc = now.AddMinutes(-10),
+                    }
+                );
+            }
+            _ = db.BingoMarks.Add(mark);
+        }
+        var win = new BingoWin
+        {
+            HostId = hostId,
+            GameId = game.Id,
+            CardId = auroraCard.Id,
+            PublicId = Guid.Parse("fc68be0e-8e72-407c-9798-46614dcdbabf"),
+            Kind = BingoWinKind.Row,
+            RuleIndex = 0,
+            RuleKey = "row:0",
+            PointsReward = "250",
+            AchievementKey = "bingo-winner",
+            CompletedAtUtc = now.AddMinutes(-20),
+            RewardsCompletedAtUtc = now.AddMinutes(-20),
+        };
+        foreach (var participant in participants.Where(value => value.Team == aurora))
+        {
+            win.Recipients.Add(
+                new BingoWinRecipient
+                {
+                    HostId = hostId,
+                    TwitchUserId = participant.TwitchUserId,
+                    Login = participant.Login,
+                    DisplayName = participant.DisplayName,
+                    PointsGranted = true,
+                    AchievementGranted = true,
+                }
+            );
+        }
+        _ = db.BingoWins.Add(win);
+        _ = db.BingoModerationAudit.Add(
+            new BingoModerationAudit
+            {
+                HostId = hostId,
+                GameId = game.Id,
+                OperationId = Guid.Parse("446134d1-cf56-475a-9ef2-c548090e52e0"),
+                Action = "reverse",
+                ActorTwitchUserId = "1000",
+                ActorLogin = "streamer",
+                PrivateNote =
+                    "Corrected after reviewing the moment; the earlier win remains rewarded.",
+                OccurredAtUtc = now.AddMinutes(-10),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static BingoParticipant Participant(
+        int hostId,
+        BingoGame game,
+        BingoTeam team,
+        BingoCard card,
+        string twitchUserId,
+        string login,
+        string displayName,
+        DateTime now
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            Game = game,
+            Team = team,
+            Card = card,
+            TwitchUserId = twitchUserId,
+            Login = login,
+            DisplayName = displayName,
+            JoinedAtUtc = now.AddMinutes(-40),
+        };
+
+    private static async Task SeedBountyAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("3e25c2dc-6bc2-41fc-8808-055677f26195");
+        if (await db.Bounties.AnyAsync(value => value.PublicId == publicId, cancellationToken))
+        {
+            return;
+        }
+
+        _ = db.Bounties.Add(
+            new Bounty
+            {
+                HostId = hostId,
+                PublicId = publicId,
+                CreationOperationId = Guid.Parse("2fc49a64-88e8-4e64-a311-b93c91c1482f"),
+                CreationFingerprint = "simulation-bounty",
+                Title = "Community speedrun challenge",
+                Description = "Fund a no-reset attempt before the end of tonight's stream.",
+                Status = BountyStatus.Funding,
+                Visibility = BountyVisibility.Public,
+                FailurePledgePolicy = BountyFailurePledgePolicy.Refund,
+                RewardDistribution = BountyRewardDistribution.Proportional,
+                FundingTarget = "1500",
+                PledgedAmount = "900",
+                ContributorCount = 2,
+                CompletionReward = "300",
+                ExpiresAtUtc = now.AddHours(4),
+                Revision = 2,
+                CreatedAtUtc = now.AddMinutes(-35),
+                UpdatedAtUtc = now.AddMinutes(-12),
+                Pledges =
+                [
+                    new BountyPledge
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("73605d09-c245-429a-a4ba-ec4319dc14e7"),
+                        CommandFingerprint = "simulation-nightowl-pledge",
+                        ContributorTwitchUserId = "simulation-nightowl-id",
+                        ContributorLogin = "nightowl",
+                        Amount = "600",
+                        State = BountyPledgeState.Reserved,
+                        CreatedAtUtc = now.AddMinutes(-20),
+                        UpdatedAtUtc = now.AddMinutes(-20),
+                    },
+                    new BountyPledge
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("41259cd6-8247-4494-9aba-10e99990d50d"),
+                        CommandFingerprint = "simulation-chatregular-pledge",
+                        ContributorTwitchUserId = "simulation-chatregular-id",
+                        ContributorLogin = "chatregular",
+                        Amount = "300",
+                        State = BountyPledgeState.Reserved,
+                        CreatedAtUtc = now.AddMinutes(-12),
+                        UpdatedAtUtc = now.AddMinutes(-12),
+                    },
+                ],
+                Audits =
+                [
+                    new BountyModerationAudit
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("9b088d25-f405-4e5e-88d2-98a419618c5f"),
+                        CommandFingerprint = "simulation-created",
+                        Action = BountyAuditAction.Created,
+                        FromStatus = BountyStatus.Proposed,
+                        ToStatus = BountyStatus.Proposed,
+                        ActorTwitchUserId = SimulationMode.UserId,
+                        ActorLogin = SimulationMode.Login,
+                        Reason = "Prepared for the community challenge segment.",
+                        BountyRevision = 1,
+                        OccurredAtUtc = now.AddMinutes(-35),
+                    },
+                    new BountyModerationAudit
+                    {
+                        HostId = hostId,
+                        OperationId = Guid.Parse("d0d33038-0f9d-401e-b56d-07ef8b02246d"),
+                        CommandFingerprint = "simulation-opened",
+                        Action = BountyAuditAction.FundingOpened,
+                        FromStatus = BountyStatus.Proposed,
+                        ToStatus = BountyStatus.Funding,
+                        ActorTwitchUserId = SimulationMode.UserId,
+                        ActorLogin = SimulationMode.Login,
+                        Reason = "Funding opened after the warm-up run.",
+                        BountyRevision = 2,
+                        OccurredAtUtc = now.AddMinutes(-30),
+                    },
+                ],
+            }
+        );
+    }
+
+    private static async Task SeedCommunityProgressionAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("107163c8-39d5-4ba5-896f-142f72245568");
+        if (
+            await db.CommunitySeasons.AnyAsync(
+                value => value.PublicId == publicId,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        var season = new CommunitySeason
+        {
+            PublicId = publicId,
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("446c12d3-8aef-4317-9140-ac043286aa8c"),
+            Name = "Summer community climb",
+            Description = "Complete stream quests together and unlock permanent channel flair.",
+            ModeratorNotes = "Simulation-only private note",
+            Status = CommunitySeasonStatus.Open,
+            Visibility = CommunityVisibility.Public,
+            StartsAtUtc = now.AddDays(-5),
+            EndsAtUtc = now.AddDays(25),
+            OpenedAtUtc = now.AddDays(-5),
+            Revision = 2,
+            CreatedAtUtc = now.AddDays(-6),
+            UpdatedAtUtc = now.AddMinutes(-4),
+        };
+        var title = new CommunityRewardDefinition
+        {
+            PublicId = Guid.Parse("6cfdc3df-2f55-440c-b273-54e1b80ad5dc"),
+            HostId = hostId,
+            Key = "trailblazer",
+            Kind = CommunityRewardKind.Title,
+            Name = "Trailblazer",
+            PresentationToken = "trailblazer",
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var badge = new CommunityRewardDefinition
+        {
+            PublicId = Guid.Parse("add90a84-85fe-4798-aa74-e92810d8dc94"),
+            HostId = hostId,
+            Key = "summer-star",
+            Kind = CommunityRewardKind.Badge,
+            Name = "Summer star",
+            PresentationToken = "star",
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var bingoTitle = new CommunityRewardDefinition
+        {
+            PublicId = Guid.Parse("9a099c12-28ed-4ca0-8ba6-fc51ef37521d"),
+            HostId = hostId,
+            Key = "bingo-caller",
+            Kind = CommunityRewardKind.Title,
+            Name = "Bingo caller",
+            PresentationToken = "bingo-caller",
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var achievement = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("6db0bd9a-9e69-49c5-a4bd-b6fa2604d30c"),
+            HostId = hostId,
+            Key = "first-cheer",
+            Name = "Bring the energy",
+            Description = "Cheer during the summer climb.",
+            Kind = CommunityDefinitionKind.Achievement,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.OneTime,
+            EventRule = CommunityEventRuleKind.Cheer,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 1,
+            PointsReward = "100",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var daily = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("470d3ef9-8c31-48f5-9c03-79f5c497360d"),
+            HostId = hostId,
+            Key = "daily-chat",
+            Name = "Daily regular",
+            Description = "Join five chat moments each day.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.ChatMessage,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 5,
+            PointsReward = "25",
+            ResetCadence = CommunityResetCadence.Daily,
+            ResetLocalTime = "06:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var bingoAchievement = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("9cb52fb5-5445-4332-8fe9-c49eadde947c"),
+            HostId = hostId,
+            Key = "bingo-winner",
+            Name = "Bingo winner",
+            Description = "Complete a configured Bingo win rule.",
+            Kind = CommunityDefinitionKind.Achievement,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.OneTime,
+            EventRule = CommunityEventRuleKind.ExternalGrant,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 1,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        var communal = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("bcd1434c-16c9-4d29-83cb-a2ceeffb0e22"),
+            HostId = hostId,
+            Key = "community-bounty-drive",
+            Name = "Community bounty drive",
+            Description = "Complete four channel bounties together.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Communal,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.BountyCompleted,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 4,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-6),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        db.CommunityRewardDefinitions.AddRange(title, badge, bingoTitle);
+        db.CommunityDefinitions.AddRange(achievement, daily, communal, bingoAchievement);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        db.CommunityDefinitionRewards.AddRange(
+            new CommunityDefinitionReward
+            {
+                DefinitionId = achievement.Id,
+                RewardDefinitionId = title.Id,
+            },
+            new CommunityDefinitionReward
+            {
+                DefinitionId = achievement.Id,
+                RewardDefinitionId = badge.Id,
+            },
+            new CommunityDefinitionReward
+            {
+                DefinitionId = bingoAchievement.Id,
+                RewardDefinitionId = bingoTitle.Id,
+            }
+        );
+        var completion = new CommunityCompletion
+        {
+            PublicId = Guid.Parse("69655fd8-eb0e-4e73-8dd2-47d4b506bf92"),
+            HostId = hostId,
+            SeasonId = season.Id,
+            DefinitionId = achievement.Id,
+            SubjectKey = "viewer:3000",
+            ViewerTwitchUserId = "3000",
+            ViewerLogin = "nightowl",
+            ViewerDisplayName = "NightOwl",
+            DefinitionKey = achievement.Key,
+            DefinitionName = achievement.Name,
+            Sequence = 1,
+            PointsGranted = "100",
+            RewardSnapshot =
+                "[{\"key\":\"trailblazer\",\"kind\":\"Title\",\"name\":\"Trailblazer\"}]",
+            SourceOperationKey = "simulation-cheer",
+            CompletedAtUtc = now.AddHours(-2),
+        };
+        _ = db.CommunityCompletions.Add(completion);
+        db.CommunityProgress.AddRange(
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:3000",
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                Amount = 1,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddHours(-2),
+            },
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = daily.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                Amount = 3,
+                CompletionCount = 2,
+                PeriodKey = "v1:Daily:simulation",
+                UpdatedAtUtc = now.AddMinutes(-4),
+            },
+            new CommunityProgress
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = communal.Id,
+                SubjectKey = "communal",
+                Amount = 3,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddMinutes(-6),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+        db.CommunityRewardUnlocks.AddRange(
+            new CommunityRewardUnlock
+            {
+                HostId = hostId,
+                RewardDefinitionId = title.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                CompletionId = completion.Id,
+                GrantedAtUtc = completion.CompletedAtUtc,
+            },
+            new CommunityRewardUnlock
+            {
+                HostId = hostId,
+                RewardDefinitionId = badge.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                ViewerDisplayName = "NightOwl",
+                CompletionId = completion.Id,
+                GrantedAtUtc = completion.CompletedAtUtc,
+            }
+        );
+        _ = db.CommunityEquippedRewards.Add(
+            new CommunityEquippedReward
+            {
+                HostId = hostId,
+                Kind = CommunityRewardKind.Title,
+                RewardDefinitionId = title.Id,
+                ViewerTwitchUserId = "3000",
+                ViewerLogin = "nightowl",
+                LastOperationId = Guid.Parse("f02c9d94-b393-4bf6-816b-84a031da8f9c"),
+                EquippedAtUtc = now.AddHours(-1),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await SeedArchivedCommunitySeasonAsync(db, hostId, now, cancellationToken);
+        await SeedHiddenCommunitySeasonAsync(db, hostId, now, cancellationToken);
+    }
+
+    private static async Task SeedArchivedCommunitySeasonAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var season = new CommunitySeason
+        {
+            PublicId = Guid.Parse("b24a1144-4bd0-43b2-b71e-5f4043c92bb8"),
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("6a26aa7b-0779-47cd-8024-49c135397785"),
+            Name = "Spring launch legacy",
+            Description = "Archived standings from the channel launch season.",
+            ModeratorNotes = "Archived simulation note",
+            Status = CommunitySeasonStatus.Archived,
+            Visibility = CommunityVisibility.Public,
+            StartsAtUtc = now.AddDays(-90),
+            EndsAtUtc = now.AddDays(-60),
+            OpenedAtUtc = now.AddDays(-90),
+            ClosedAtUtc = now.AddDays(-60),
+            ArchivedAtUtc = now.AddDays(-45),
+            Revision = 4,
+            CreatedAtUtc = now.AddDays(-91),
+            UpdatedAtUtc = now.AddDays(-45),
+        };
+        var achievement = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("217fc626-f6c2-470a-a0dd-1aebbc23053d"),
+            HostId = hostId,
+            Key = "launch-regular",
+            Name = "Launch regular",
+            Description = "Joined the launch season.",
+            Kind = CommunityDefinitionKind.Achievement,
+            Scope = CommunityProgressScope.Viewer,
+            CompletionMode = CommunityCompletionMode.OneTime,
+            EventRule = CommunityEventRuleKind.ChatMessage,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 1,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-91),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        _ = db.CommunityDefinitions.Add(achievement);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = db.CommunityProgress.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                Amount = 1,
+                CompletionCount = 1,
+                UpdatedAtUtc = now.AddDays(-70),
+            }
+        );
+        _ = db.CommunityCompletions.Add(
+            new()
+            {
+                PublicId = Guid.Parse("41557a98-cebd-4c0d-b738-9582b37e1bc8"),
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = achievement.Id,
+                SubjectKey = "viewer:simulation-chatregular-id",
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                DefinitionKey = achievement.Key,
+                DefinitionName = achievement.Name,
+                Sequence = 1,
+                PointsGranted = "0",
+                RewardSnapshot = "[]",
+                SourceOperationKey = "simulation-archived-chat",
+                CompletedAtUtc = now.AddDays(-70),
+            }
+        );
+        _ = db.CommunitySeasonStandings.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                ViewerTwitchUserId = "simulation-chatregular-id",
+                ViewerLogin = "chatregular",
+                ViewerDisplayName = "ChatRegular",
+                CompletedCount = 1,
+                ProgressAmount = 1,
+                Rank = 1,
+                SnapshottedAtUtc = now.AddDays(-60),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedHiddenCommunitySeasonAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var season = new CommunitySeason
+        {
+            PublicId = Guid.Parse("1d528657-799a-4340-ad28-960a13e79fca"),
+            HostId = hostId,
+            CreationOperationId = Guid.Parse("3841c2ea-e038-476f-be28-a2dd43bd40de"),
+            Name = "Moderator-only surprise season",
+            Description = "A hidden progression workspace for moderators.",
+            ModeratorNotes = "Never public simulation material",
+            Status = CommunitySeasonStatus.Open,
+            Visibility = CommunityVisibility.Hidden,
+            StartsAtUtc = now.AddDays(-4),
+            EndsAtUtc = now.AddDays(20),
+            OpenedAtUtc = now.AddDays(-4),
+            Revision = 2,
+            CreatedAtUtc = now.AddDays(-7),
+            UpdatedAtUtc = now.AddMinutes(-3),
+        };
+        var communal = new CommunityDefinition
+        {
+            PublicId = Guid.Parse("f0fd3b15-aafb-4dc4-aa86-76d8f33f26f8"),
+            HostId = hostId,
+            Key = "secret-channel-goal",
+            Name = "Secret channel goal",
+            Description = "Hidden communal progress.",
+            Kind = CommunityDefinitionKind.Quest,
+            Scope = CommunityProgressScope.Communal,
+            CompletionMode = CommunityCompletionMode.Repeatable,
+            EventRule = CommunityEventRuleKind.BountyCompleted,
+            Increment = CommunityProgressIncrement.Occurrence,
+            Target = 10,
+            PointsReward = "0",
+            ResetCadence = CommunityResetCadence.None,
+            ResetLocalTime = "00:00",
+            ScheduleRevision = 1,
+            CreatedAtUtc = now.AddDays(-7),
+            Season = season,
+        };
+        _ = db.CommunitySeasons.Add(season);
+        _ = db.CommunityDefinitions.Add(communal);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = db.CommunityProgress.Add(
+            new()
+            {
+                HostId = hostId,
+                SeasonId = season.Id,
+                DefinitionId = communal.Id,
+                SubjectKey = "communal",
+                Amount = 7,
+                CompletionCount = 0,
+                UpdatedAtUtc = now.AddMinutes(-3),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedOverlayAsync(

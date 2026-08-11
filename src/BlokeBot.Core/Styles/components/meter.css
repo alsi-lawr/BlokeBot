@@ -1,0 +1,20 @@
+@layer components {
+    .meter {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        height: 0.6rem;
+        overflow: hidden;
+    }
+
+    .meter > span {
+        background: var(--tone-blue-solid);
+        border-radius: inherit;
+        display: block;
+        height: 100%;
+    }
+
+    .meter--full > span {
+        background: var(--tone-green-solid);
+    }
+}

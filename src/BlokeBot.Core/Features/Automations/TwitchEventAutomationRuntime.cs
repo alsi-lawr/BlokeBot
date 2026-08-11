@@ -53,6 +53,11 @@ public sealed class TwitchEventAutomationRuntime(
             cancellation
         );
 
+    public Task ChannelUpdatedAsync(
+        EventSubChannelUpdateEvent channelUpdate,
+        CancellationToken cancellation
+    ) => Task.CompletedTask;
+
     public Task FollowReceivedAsync(EventSubFollowEvent follow, CancellationToken cancellation) =>
         HandleAsync(
             follow.BroadcasterUserId,

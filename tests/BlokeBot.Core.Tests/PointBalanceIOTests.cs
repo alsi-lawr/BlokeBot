@@ -144,6 +144,68 @@ public sealed class PointBalanceIOTests
     }
 
     [Test]
+    public async Task RefundableRequestReservation_ReducesAvailableCreditCapacity()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var reserved = new PointAmount(10);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            var board = new RequestBoard
+            {
+                HostId = hostId,
+                Slug = "requests",
+                Title = "Requests",
+                PointCost = reserved.ToString(),
+                RefundPolicy = RequestBoardRefundPolicy.RejectedOrWithdrawn,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            };
+            _ = seed.RequestBoards.Add(board);
+            _ = seed.RequestSubmissions.Add(
+                new RequestSubmission
+                {
+                    HostId = hostId,
+                    Board = board,
+                    OperationId = Guid.NewGuid(),
+                    SubmitterLogin = "viewer",
+                    Title = "Reserved request",
+                    NormalizedTitle = "reserved request",
+                    Status = RequestSubmissionStatus.Pending,
+                    PointReservationState = RequestPointReservationState.Reserved,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            _ = seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "viewer",
+                    Amount = (PointAmount.MaximumValue - reserved.Value).ToString(
+                        CultureInfo.InvariantCulture
+                    ),
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+
+        var result = await new PointBalanceService(dbFactory)
+            .Add(hostId, "viewer", new PointAmount(1), "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
+
+        _ = result
+            .Match(
+                static _ => throw new InvalidOperationException("Expected the credit to fail."),
+                static failure => failure
+            )
+            .ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.PointLedgerEntries.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task MissingBalance_Deleting_ReturnsUnknownUserWithoutMutation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

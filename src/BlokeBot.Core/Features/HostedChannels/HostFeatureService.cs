@@ -21,7 +21,8 @@ public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
     IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
-    IEnumerable<IHostFeatureChangeObserver> featureObservers
+    IEnumerable<IHostFeatureChangeObserver> featureObservers,
+    TimeProvider timeProvider
 )
 {
     public HostFeatureService(
@@ -29,7 +30,15 @@ public sealed class HostFeatureService(
         HostedChannelChangeNotifier changes,
         IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
     )
-        : this(dbFactory, changes, nativeTwitchObservers, []) { }
+        : this(dbFactory, changes, nativeTwitchObservers, [], TimeProvider.System) { }
+
+    public HostFeatureService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        HostedChannelChangeNotifier changes,
+        IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers,
+        IEnumerable<IHostFeatureChangeObserver> featureObservers
+    )
+        : this(dbFactory, changes, nativeTwitchObservers, featureObservers, TimeProvider.System) { }
 
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
         CancellationToken ct
@@ -104,6 +113,45 @@ public sealed class HostFeatureService(
             return;
         }
 
+        var bountyRequirements = HostFeatureFlags.Bounties | HostFeatureFlags.Points;
+        if (
+            host.EnabledFeatures.Contains(bountyRequirements)
+            && !updated.Contains(bountyRequirements)
+        )
+        {
+            host.BountiesPausedAtUtc ??= timeProvider.GetUtcNow().UtcDateTime;
+        }
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            && !updated.Contains(HostFeatureFlags.CommunityProgression)
+        )
+        {
+            host.CommunityProgressionPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            && updated.Contains(HostFeatureFlags.CommunityProgression)
+        )
+        {
+            host.CommunityProgressionAcceptEventsAfterUtc = now;
+            host.CommunityProgressionPausedAtUtc = null;
+        }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.Bingo)
+            && !updated.Contains(HostFeatureFlags.Bingo)
+        )
+        {
+            host.BingoPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.Bingo)
+            && updated.Contains(HostFeatureFlags.Bingo)
+        )
+        {
+            host.BingoAcceptEventsAfterUtc = now;
+            host.BingoPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         _ = await changes.NotifyChangedAsync(ct);

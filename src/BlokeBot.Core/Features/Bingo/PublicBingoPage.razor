@@ -1,0 +1,135 @@
+@page "/bingo/{Channel}"
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject BingoService _bingo
+
+<PageTitle>BlokeBot | Bingo</PageTitle>
+
+<div class="mx-auto max-w-6xl space-y-6" data-public-bingo>
+    <PageHeader Kicker="Community progression"
+                Title="@(_view is null ? "Stream-event Bingo" : $"@{_view.HostLogin} Bingo")"
+                Description="Live cards, public evidence, wins, and archived games. Private moderator notes are never published." />
+
+    @if (!_loaded)
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading Bingo…</div>
+        </ApplicationCardCollection>
+    }
+    else if (_view is null)
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground" data-public-bingo-unavailable>No public Bingo game is available.</div>
+        </ApplicationCardCollection>
+    }
+    else
+    {
+        <ApplicationCardCollection Owner="public-bingo-page-cards">
+            @if (_view.LiveGame is { } live)
+            {
+                <BingoDisclosure Key="@live.DisclosureKey()"
+                                 Open="@IsOpen(live.DisclosureKey())"
+                                 OpenChanged="value => SetOpen(live.DisclosureKey(), value)">
+                    <Header>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">@live.TemplateName</h2>
+                            <span class="@live.Status.PillClass()"><span class="status-pill__dot"></span><span class="status-pill__label">@live.Status.Label()</span></span>
+                        </div>
+                        <p class="text-sm text-muted-foreground">@ModeDescription(live)</p>
+                    </Header>
+                    <ChildContent>
+                        <div class="live-round-summary" aria-label="Bingo game summary">
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Mode</p>
+                                <p class="live-round-summary__value">@live.Mode.Label()</p>
+                                <p class="live-round-summary__detail">@CardCount(live)</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Grid</p>
+                                <p class="live-round-summary__value">@live.Dimension.GridLabel()</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Revision</p>
+                                <p class="live-round-summary__value">rev @live.TemplateRevision</p>
+                                <p class="live-round-summary__detail">frozen at issue</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Seed</p>
+                                <p class="live-round-summary__value font-mono">@live.Seed</p>
+                                <p class="live-round-summary__detail">recorded</p>
+                            </div>
+                            <div class="live-round-summary__metric">
+                                <p class="live-round-summary__label">Wins</p>
+                                <p class="live-round-summary__value">@live.WinCount()</p>
+                                <p class="live-round-summary__detail">@live.WinDetail()</p>
+                            </div>
+                        </div>
+
+                        @if (live.Teams.Count > 0)
+                        {
+                            <div class="bingo-roster">
+                                @foreach (var team in live.Teams)
+                                {
+                                    <span class="bingo-roster__chip pr-[0.7rem]" @key="team.Id.Value">
+                                        @team.Name
+                                        <span class="bingo-roster__login">@string.Join(", ", team.Members.Select(value => $"@{value.Login}"))</span>
+                                    </span>
+                                }
+                            </div>
+                        }
+
+                        <div class="bingo-card__pair" style="@live.Dimension.GridVariable()">
+                            @foreach (var card in live.Cards)
+                            {
+                                <BingoPublicCard Game="live" Card="card" @key="card.Id.Value" />
+                            }
+                        </div>
+                    </ChildContent>
+                </BingoDisclosure>
+            }
+            else
+            {
+                <div class="card p-8 text-sm text-muted-foreground">No Bingo cards are live right now.</div>
+            }
+
+            @if (_view.Archive.Count > 0)
+            {
+                <BingoDisclosure Key="@_archiveKey"
+                                 Open="@IsOpen(_archiveKey)"
+                                 OpenChanged="value => SetOpen(_archiveKey, value)">
+                    <Header>
+                        <h2 class="text-lg font-semibold text-[var(--app-text-strong)]">Archive</h2>
+                        <p class="text-sm text-muted-foreground">Completed games with their final cards, wins, and evidence.</p>
+                    </Header>
+                    <ChildContent>
+                        @foreach (var game in _view.Archive)
+                        {
+                            <BingoDisclosure Key="@game.DisclosureKey()"
+                                             Class="bg-[var(--app-surface-solid)] shadow-none"
+                                             Open="@IsOpen(game.DisclosureKey())"
+                                             OpenChanged="value => SetOpen(game.DisclosureKey(), value)"
+                                             @key="game.Id.Value">
+                                <Header>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="status-pill status-pill--slate"><span class="status-pill__label">Archived</span></span>
+                                        <h3 class="font-semibold text-[var(--app-text-strong)]">@game.TemplateName</h3>
+                                    </div>
+                                    <p class="text-sm text-muted-foreground">@ArchiveSummary(game)</p>
+                                </Header>
+                                <ChildContent>
+                                    <div class="bingo-card__pair" style="@game.Dimension.GridVariable()">
+                                        @foreach (var card in game.Cards)
+                                        {
+                                            <BingoPublicCard Game="game" Card="card" @key="card.Id.Value" />
+                                        }
+                                    </div>
+                                </ChildContent>
+                            </BingoDisclosure>
+                        }
+                    </ChildContent>
+                </BingoDisclosure>
+            }
+        </ApplicationCardCollection>
+    }
+</div>

@@ -12,6 +12,7 @@ internal sealed partial class EventSubChannelSession
         EventSubOperationSubscriptionKind.RewardRedemptions,
         EventSubOperationSubscriptionKind.Predictions,
         EventSubOperationSubscriptionKind.AutomationStream,
+        EventSubOperationSubscriptionKind.AutomationChannelUpdates,
         EventSubOperationSubscriptionKind.AutomationFollows,
         EventSubOperationSubscriptionKind.AutomationSubscriptions,
         EventSubOperationSubscriptionKind.AutomationCheers,
@@ -637,6 +638,8 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Predictions => subscription.PredictionSubscriptions,
             EventSubOperationSubscriptionKind.AutomationStream =>
                 subscription.AutomationStreamSubscriptions,
+            EventSubOperationSubscriptionKind.AutomationChannelUpdates =>
+                subscription.AutomationChannelUpdateSubscriptions,
             EventSubOperationSubscriptionKind.AutomationFollows =>
                 subscription.AutomationFollowSubscriptions,
             EventSubOperationSubscriptionKind.AutomationSubscriptions =>
@@ -683,6 +686,10 @@ internal sealed partial class EventSubChannelSession
             {
                 AutomationStreamSubscriptions = state,
             },
+            EventSubOperationSubscriptionKind.AutomationChannelUpdates => subscription with
+            {
+                AutomationChannelUpdateSubscriptions = state,
+            },
             EventSubOperationSubscriptionKind.AutomationFollows => subscription with
             {
                 AutomationFollowSubscriptions = state,
@@ -724,6 +731,7 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Predictions =>
                 EventSubAuthorizationContext.PredictionsAuthority,
             EventSubOperationSubscriptionKind.AutomationStream
+            or EventSubOperationSubscriptionKind.AutomationChannelUpdates
             or EventSubOperationSubscriptionKind.AutomationFollows
             or EventSubOperationSubscriptionKind.AutomationChatNotifications =>
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
@@ -754,6 +762,7 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Predictions =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
             EventSubOperationSubscriptionKind.AutomationStream
+            or EventSubOperationSubscriptionKind.AutomationChannelUpdates
             or EventSubOperationSubscriptionKind.AutomationFollows
             or EventSubOperationSubscriptionKind.AutomationChatNotifications =>
                 AccessTokenUnavailableReason.MissingRefreshToken,

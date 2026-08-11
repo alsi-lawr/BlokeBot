@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Identity;
@@ -20,9 +21,12 @@ internal sealed class CustomCommandExecutionService(
     IHostStreamLivenessProvider streams,
     IOverlayCueAdmissionService overlayCues,
     ICustomCommandAutomationRuntime automations,
-    TimeProvider clock
+    TimeProvider clock,
+    IEnumerable<IBingoCounterEventSink>? bingoCounters = null
 )
 {
+    private readonly IBingoCounterEventSink[] _bingoCounters = [.. bingoCounters ?? []];
+
     public async ValueTask<CustomCommandExecutionOutcome> ExecuteAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
@@ -236,6 +240,36 @@ internal sealed class CustomCommandExecutionService(
 
         _ = await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+
+        if (
+            command.Action is CounterCustomCommandAction completedCounter
+            && completedCounter.Counter is not null
+            && count is { } counterValue
+            && context.Message.Tags.TryGetValue("id", out var invocationId)
+            && !string.IsNullOrWhiteSpace(invocationId)
+        )
+        {
+            var viewer = context.Message.Tags.TryGetValue("user-id", out var viewerId)
+                ? new BingoViewer(
+                    viewerId,
+                    context.Message.Login,
+                    context.Message.Tags.GetValueOrDefault("display-name", context.Message.Login)
+                )
+                : null;
+            foreach (var observer in _bingoCounters)
+            {
+                await observer.CounterChangedAsync(
+                    host.Id,
+                    invocationId,
+                    completedCounter.Counter.Id,
+                    completedCounter.Counter.Name,
+                    counterValue,
+                    viewer,
+                    clock.GetUtcNow(),
+                    ct
+                );
+            }
+        }
 
         var reply = selectedMessage is null
             ? null

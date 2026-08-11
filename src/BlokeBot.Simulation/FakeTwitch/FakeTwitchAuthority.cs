@@ -275,19 +275,22 @@ public sealed class FakeTwitchAuthority
                 or "channel.shoutout.create"
                 or "channel.shoutout.receive";
         var raidSubscription = type is "channel.raid";
+        var channelUpdateSubscription = type is "channel.update";
         var broadcasterSubscription =
-            type
-            is "channel.poll.begin"
-                or "channel.poll.progress"
-                or "channel.poll.end"
-                or "channel.prediction.begin"
-                or "channel.prediction.progress"
-                or "channel.prediction.lock"
-                or "channel.prediction.end"
-                or "channel.channel_points_custom_reward_redemption.add"
-                or "channel.channel_points_custom_reward_redemption.update";
+            channelUpdateSubscription
+            || type
+                is "channel.poll.begin"
+                    or "channel.poll.progress"
+                    or "channel.poll.end"
+                    or "channel.prediction.begin"
+                    or "channel.prediction.progress"
+                    or "channel.prediction.lock"
+                    or "channel.prediction.end"
+                    or "channel.cheer"
+                    or "channel.channel_points_custom_reward_redemption.add"
+                    or "channel.channel_points_custom_reward_redemption.update";
         if (
-            version != "1"
+            version != (channelUpdateSubscription ? "2" : "1")
             || (!botSubscription && !raidSubscription && !broadcasterSubscription)
             || !condition.TryGetValue(
                 raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
@@ -357,6 +360,7 @@ public sealed class FakeTwitchAuthority
                 messageId,
                 "notification",
                 subscription.Type,
+                subscription.Version,
                 body,
                 cancellationToken
             );
@@ -402,6 +406,7 @@ public sealed class FakeTwitchAuthority
             $"fake-eventsub-revocation-{subscriptionId}",
             "revocation",
             revoked.Type,
+            revoked.Version,
             body,
             cancellationToken
         );
@@ -672,6 +677,7 @@ public sealed class FakeTwitchAuthority
                     $"fake-eventsub-verification-{subscription.Id}",
                     "webhook_callback_verification",
                     subscription.Type,
+                    subscription.Version,
                     verificationBody,
                     CancellationToken.None
                 )
@@ -712,6 +718,7 @@ public sealed class FakeTwitchAuthority
                     messageId,
                     "notification",
                     subscription.Type,
+                    subscription.Version,
                     body,
                     CancellationToken.None
                 );
@@ -737,6 +744,7 @@ public sealed class FakeTwitchAuthority
         string messageId,
         string messageType,
         string subscriptionType,
+        string subscriptionVersion,
         byte[] body,
         CancellationToken cancellationToken
     )
@@ -761,7 +769,7 @@ public sealed class FakeTwitchAuthority
         request.Headers.Add("Twitch-Eventsub-Message-Timestamp", timestamp);
         request.Headers.Add("Twitch-Eventsub-Message-Signature", signature);
         request.Headers.Add("Twitch-Eventsub-Subscription-Type", subscriptionType);
-        request.Headers.Add("Twitch-Eventsub-Subscription-Version", "1");
+        request.Headers.Add("Twitch-Eventsub-Subscription-Version", subscriptionVersion);
         using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
         return await client.SendAsync(request, cancellationToken);
     }
@@ -783,6 +791,7 @@ public sealed class FakeTwitchAuthority
         subscription.Type switch
         {
             "channel.chat.message" => ChatEvents(subscription),
+            "channel.update" => ChannelUpdateEvents(subscription),
             "channel.poll.begin" => PollEvents(subscription),
             _ => [],
         };
@@ -834,6 +843,24 @@ public sealed class FakeTwitchAuthority
                 message_id = "chat-message-0003",
                 message = new { text = "!welcome" },
                 badges = Array.Empty<object>(),
+            }
+        );
+    }
+
+    private IEnumerable<byte[]> ChannelUpdateEvents(FakeTwitchSubscription subscription)
+    {
+        yield return Notification(
+            subscription,
+            new
+            {
+                broadcaster_user_id = Definition.AuthorizedUser.Id,
+                broadcaster_user_login = Definition.AuthorizedUser.Login,
+                broadcaster_user_name = Definition.AuthorizedUser.DisplayName,
+                title = "Bingo night",
+                language = "en",
+                category_id = "509658",
+                category_name = "Just Chatting",
+                content_classification_labels = Array.Empty<string>(),
             }
         );
     }

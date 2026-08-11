@@ -81,10 +81,28 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new { x.HostId, x.CreatedAtUtc });
             _ = b.HasIndex(static x => new { x.HostId, x.OperationKey }).IsUnique();
             _ = b.HasIndex(static x => x.RequestSubmissionId);
+            _ = b.HasIndex(static x => new { x.HostId, x.BountyPledgeId });
+            _ = b.HasIndex(static x => new { x.HostId, x.BountyRewardId });
+            _ = b.HasIndex(static x => new { x.HostId, x.CommunityCompletionId });
             _ = b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(static x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
+            _ = b.HasOne<BountyPledge>()
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.BountyPledgeId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            _ = b.HasOne<BountyContributorReward>()
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.BountyRewardId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            _ = b.HasOne<CommunityCompletion>()
+                .WithMany()
+                .HasForeignKey(static x => new { x.HostId, x.CommunityCompletionId })
+                .HasPrincipalKey(static x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         _ = modelBuilder.Entity<PointsGiveaway>(static b =>

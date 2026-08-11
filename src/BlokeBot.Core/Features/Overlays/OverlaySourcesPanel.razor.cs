@@ -42,6 +42,10 @@ public partial class OverlaySourcesPanel
     private string _giveawayEventTemplate = "{winners} won {prizes}";
     private OverlayEventFeedPriority _giveawayEventPriority = OverlayEventFeedPriority.High;
     private int _giveawayEventDuration = 8;
+    private bool _bingoEventEnabled = true;
+    private string _bingoEventTemplate = "{summary}";
+    private OverlayEventFeedPriority _bingoEventPriority = OverlayEventFeedPriority.High;
+    private int _bingoEventDuration = 8;
     private IReadOnlyList<PlayQueueSummary> _queueOptions = [];
     private int _viewerQueueId;
     private int _viewerQueueCurrentRows = OverlayConfiguration.ViewerQueueV1.DefaultCurrentRows;
@@ -262,6 +266,7 @@ public partial class OverlaySourcesPanel
                 (_pointEventEnabled, "Point awards"),
                 (_guessEventEnabled, "guessing winners"),
                 (_giveawayEventEnabled, "giveaway winners"),
+                (_bingoEventEnabled, "Bingo events"),
             }
                 .Where(kind => kind.Item1)
                 .Select(kind => kind.Item2),
@@ -506,6 +511,13 @@ public partial class OverlaySourcesPanel
                 ref _giveawayEventTemplate,
                 ref _giveawayEventPriority,
                 ref _giveawayEventDuration
+            );
+            LoadEventKind(
+                feed.Kinds[OverlayEventFeedKind.BingoEvent],
+                ref _bingoEventEnabled,
+                ref _bingoEventTemplate,
+                ref _bingoEventPriority,
+                ref _bingoEventDuration
             );
         }
         if (overlay.Configuration is OverlayConfiguration.ViewerQueueV1 queue)
@@ -962,6 +974,12 @@ public partial class OverlaySourcesPanel
                         _giveawayEventPriority,
                         _giveawayEventDuration
                     ),
+                    [OverlayEventFeedKind.BingoEvent] = new(
+                        _bingoEventEnabled,
+                        _bingoEventTemplate,
+                        _bingoEventPriority,
+                        _bingoEventDuration
+                    ),
                 },
                 DraftAppearance()
             ),
@@ -1081,6 +1099,7 @@ public partial class OverlaySourcesPanel
             OverlayEventFeedKind.PointAward => "point-award",
             OverlayEventFeedKind.GuessingWinner => "guessing-winner",
             OverlayEventFeedKind.GiveawayWinner => "giveaway-winner",
+            OverlayEventFeedKind.BingoEvent => "bingo-event",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -1090,6 +1109,7 @@ public partial class OverlaySourcesPanel
             OverlayEventFeedKind.PointAward => "Point award",
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
+            OverlayEventFeedKind.BingoEvent => "Bingo event",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

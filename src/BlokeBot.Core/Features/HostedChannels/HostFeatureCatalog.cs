@@ -18,6 +18,9 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Overlays,
         HostFeatureFlags.Guessing,
         HostFeatureFlags.Points,
+        HostFeatureFlags.Bounties,
+        HostFeatureFlags.CommunityProgression,
+        HostFeatureFlags.Bingo,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -88,6 +91,24 @@ public static class HostFeatureCatalog
                 "Points",
                 "Track viewer points, run giveaways, and let moderators change balances.",
                 enabledFeatures.Contains(HostFeatureFlags.Points)
+            ),
+            new(
+                HostFeatureFlags.Bounties,
+                "Bounties",
+                "Let viewers fund channel challenges with points. Requires Points to be on.",
+                enabledFeatures.Contains(HostFeatureFlags.Bounties)
+            ),
+            new(
+                HostFeatureFlags.CommunityProgression,
+                "Community progression",
+                "Run seasons with quests, achievements, standings, and persistent rewards.",
+                enabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            ),
+            new(
+                HostFeatureFlags.Bingo,
+                "Bingo",
+                "Run shared, viewer, or team cards from typed stream events.",
+                enabledFeatures.Contains(HostFeatureFlags.Bingo)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

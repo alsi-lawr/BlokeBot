@@ -862,7 +862,7 @@ main {
 
 .directory-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.75rem 1.5rem;
   padding: 2rem;
   border: 0.0625rem solid var(--line);
@@ -1079,7 +1079,7 @@ main {
   display: grid;
   width: min(100% - 2rem, 78rem);
   margin-inline: auto;
-  padding-block: clamp(3.5rem, 8vw, 7rem);
+  padding-block: clamp(2rem, 3.5vw, 2.5rem) clamp(3.5rem, 8vw, 7rem);
   grid-template-columns: minmax(11.5rem, 13.5rem) minmax(0, 1fr);
   gap: clamp(2rem, 5vw, 4.5rem);
   align-items: start;
@@ -1613,8 +1613,14 @@ main {
 
 .footer-brand {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 1rem;
+}
+
+.footer-brand > div {
+  min-width: 0;
 }
 
 .footer-mark {
@@ -1629,6 +1635,7 @@ main {
 
 .footer-meta {
   margin-top: 0.35rem !important;
+  overflow-wrap: anywhere;
   color: #8595a0;
   font-size: 0.84rem;
 }
@@ -1711,10 +1718,6 @@ main {
   .tool-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .directory-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 52rem) {
@@ -1745,6 +1748,7 @@ main {
 
   .guide-layout {
     grid-template-columns: 1fr;
+    row-gap: 1.25rem;
   }
 
   .guide-sidebar {
@@ -1760,7 +1764,7 @@ main {
 
   .guide-sidebar__disclosure > summary {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.65rem;
     padding: 0.35rem;
@@ -1885,6 +1889,10 @@ main {
 }
 
 @media (max-width: 38rem) {
+  .device-showcase__glow {
+    inset-inline: 0;
+  }
+
   .header-actions {
     align-items: flex-end;
   }
@@ -1892,6 +1900,41 @@ main {
   .site-header nav {
     display: grid;
     grid-template-columns: repeat(2, auto);
+  }
+
+  .breadcrumb {
+    margin-bottom: 0.75rem;
+  }
+
+  .guide-layout {
+    padding-top: 1rem;
+  }
+
+  .guide-article .article-header .eyebrow {
+    margin-bottom: 0.5rem;
+  }
+
+  .guide-article .article-header h1 {
+    margin-bottom: 0.75rem;
+    font-size: 2.4rem;
+  }
+
+  .guide-article .article-header .lede {
+    margin-bottom: 0;
+  }
+
+  .anchor-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 0;
+  }
+
+  .anchor-chips a {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.76rem;
+    line-height: 1.25;
   }
 
   .hero h1 {

@@ -146,6 +146,30 @@ public sealed class ViewerCommandCatalogService(
                 .Select(value => new { value.IsOpen, value.VotingEnabled })
                 .ToArrayAsync(ct)
             : [];
+        var publicBounties = enabledFeatures.Contains(
+            HostFeatureFlags.Bounties | HostFeatureFlags.Points
+        )
+            ? await db
+                .Bounties.AsNoTracking()
+                .Where(value =>
+                    value.HostId == hostId && value.Visibility == BountyVisibility.Public
+                )
+                .Select(value => value.Status)
+                .ToArrayAsync(ct)
+            : [];
+        var bingoStatus = enabledFeatures.Contains(HostFeatureFlags.Bingo)
+            ? await db
+                .BingoGames.AsNoTracking()
+                .Where(value =>
+                    value.HostId == hostId
+                    && (
+                        value.Status == BingoGameStatus.Joining
+                        || value.Status == BingoGameStatus.Issued
+                    )
+                )
+                .Select(value => (BingoGameStatus?)value.Status)
+                .SingleOrDefaultAsync(ct)
+            : null;
         var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
             ? await db
                 .PlayQueues.AsNoTracking()
@@ -236,6 +260,37 @@ public sealed class ViewerCommandCatalogService(
         )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.RequestVote));
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.Bounties | HostFeatureFlags.Points))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bounties));
+            if (publicBounties.Length > 0)
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bounty));
+            }
+            if (publicBounties.Contains(BountyStatus.Funding))
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BountyPledge));
+            }
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.CommunityProgression))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Progress));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipTitle));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipBadge));
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipAccent));
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.Bingo) && bingoStatus is not null)
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bingo));
+            if (bingoStatus == BingoGameStatus.Joining)
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoJoin));
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoLeave));
+            }
         }
 
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)

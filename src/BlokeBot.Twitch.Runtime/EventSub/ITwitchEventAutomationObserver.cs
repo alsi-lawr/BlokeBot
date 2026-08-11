@@ -14,6 +14,11 @@ public interface ITwitchEventAutomationObserver
         CancellationToken cancellation
     );
 
+    Task ChannelUpdatedAsync(
+        EventSubChannelUpdateEvent channelUpdate,
+        CancellationToken cancellation
+    );
+
     Task FollowReceivedAsync(EventSubFollowEvent follow, CancellationToken cancellation);
 
     Task SubscriptionReceivedAsync(
@@ -57,7 +62,7 @@ public interface ITwitchEventAutomationObserver
 /// automation feature owner implements this so subscription lifecycle follows host connections and
 /// enabled flows.
 /// </summary>
-public interface IAutomationEventSubRequirementSource
+public interface IEventSubRequirementSource
 {
     ValueTask<bool> RequiresAsync(
         string channel,
@@ -65,6 +70,8 @@ public interface IAutomationEventSubRequirementSource
         CancellationToken cancellation
     );
 }
+
+public interface IAutomationEventSubRequirementSource : IEventSubRequirementSource;
 
 public enum AutomationEventSubRequirement
 {
@@ -74,6 +81,7 @@ public enum AutomationEventSubRequirement
     Cheers,
     HypeTrain,
     ChatNotifications,
+    ChannelUpdates,
     IncomingRaids,
 
     /// <summary>
@@ -119,6 +127,17 @@ public sealed record EventSubStreamOfflineEvent(
     string BroadcasterUserId,
     string BroadcasterUserLogin,
     string BroadcasterUserName
+);
+
+public sealed record EventSubChannelUpdateEvent(
+    string MessageId,
+    DateTimeOffset MessageTimestamp,
+    string BroadcasterUserId,
+    string BroadcasterUserLogin,
+    string BroadcasterUserName,
+    string CategoryId,
+    string CategoryName,
+    string StreamTitle
 );
 
 public sealed record EventSubFollowEvent(

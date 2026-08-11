@@ -188,7 +188,7 @@ public abstract record OverlayConfiguration
                 || dto.SchemaVersion != 1
                 || dto.OverflowPolicy is null
                 || dto.Kinds is null
-                || dto.Kinds.Count != 3
+                || dto.Kinds.Count is not (3 or 4)
                 || dto.Kinds.Any(static pair =>
                     pair.Value is null || pair.Value.Template is null || pair.Value.Priority is null
                 )
@@ -197,38 +197,47 @@ public abstract record OverlayConfiguration
                 throw new ArgumentException();
             }
             var expected = new[] { "pointAward", "guessingWinner", "giveawayWinner" };
-            return !dto
-                .Kinds.Keys.Order(StringComparer.Ordinal)
-                .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
-                ? throw new ArgumentException()
-                : (OverlayConfigurationParseResult)
-                    new OverlayConfigurationParseResult.Valid(
-                        new EventFeedV1(
-                            dto.Capacity,
-                            PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
-                            dto.Kinds.ToDictionary(
-                                static pair =>
-                                    PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
-                                static pair => new EventFeedKindConfiguration(
-                                    pair.Value!.Enabled,
-                                    pair.Value.Template!,
-                                    PersistedEnumTokens<OverlayEventFeedPriority>.Parse(
-                                        pair.Value.Priority!
-                                    ),
-                                    pair.Value.DurationSeconds
-                                )
-                            ),
-                            dto.Appearance is null
-                                ? OverlayAppearance.EventFeedDefault
-                                : ParseAppearance(dto.Appearance)
-                        )
-                    );
+            if (dto.Kinds.Count == 4)
+            {
+                expected = [.. expected, "bingoEvent"];
+            }
+            if (
+                !dto
+                    .Kinds.Keys.Order(StringComparer.Ordinal)
+                    .SequenceEqual(expected.Order(StringComparer.Ordinal), StringComparer.Ordinal)
+            )
+            {
+                throw new ArgumentException();
+            }
+            var kinds = dto.Kinds.ToDictionary(
+                static pair => PersistedEnumTokens<OverlayEventFeedKind>.Parse(pair.Key),
+                static pair => new EventFeedKindConfiguration(
+                    pair.Value!.Enabled,
+                    pair.Value.Template!,
+                    PersistedEnumTokens<OverlayEventFeedPriority>.Parse(pair.Value.Priority!),
+                    pair.Value.DurationSeconds
+                )
+            );
+            _ = kinds.TryAdd(
+                OverlayEventFeedKind.BingoEvent,
+                OverlayConfiguration.EventFeedV1.Default.Kinds[OverlayEventFeedKind.BingoEvent]
+            );
+            return new OverlayConfigurationParseResult.Valid(
+                new EventFeedV1(
+                    dto.Capacity,
+                    PersistedEnumTokens<EventFeedOverflowPolicy>.Parse(dto.OverflowPolicy),
+                    kinds,
+                    dto.Appearance is null
+                        ? OverlayAppearance.EventFeedDefault
+                        : ParseAppearance(dto.Appearance)
+                )
+            );
         }
         catch (Exception exception)
             when (exception is JsonException or ArgumentException or FormatException)
         {
             return new OverlayConfigurationParseResult.Invalid(
-                "An event feed configuration must use EventFeedV1 with capacity 1 to 25, dropNewest or replaceNewestSameKind overflow, and exact pointAward, guessingWinner, and giveawayWinner settings."
+                "An event feed configuration must use EventFeedV1 with supported capacity, overflow, and event-kind settings."
             );
         }
     }
@@ -479,7 +488,7 @@ public abstract record OverlayConfiguration
                 throw new ArgumentOutOfRangeException(nameof(capacity));
             }
             if (
-                kinds.Count != 3
+                kinds.Count != Enum.GetValues<OverlayEventFeedKind>().Length
                 || Enum.GetValues<OverlayEventFeedKind>().Any(kind => !kinds.ContainsKey(kind))
             )
             {
@@ -559,6 +568,12 @@ public abstract record OverlayConfiguration
                         OverlayEventFeedPriority.High,
                         8
                     ),
+                    [OverlayEventFeedKind.BingoEvent] = new(
+                        true,
+                        "{summary}",
+                        OverlayEventFeedPriority.High,
+                        8
+                    ),
                 },
                 OverlayAppearance.EventFeedDefault
             );
@@ -584,6 +599,7 @@ public abstract record OverlayConfiguration
                     "prizes",
                     "pointLabel",
                 ],
+                OverlayEventFeedKind.BingoEvent => ["summary"],
                 _ => throw new ArgumentOutOfRangeException(nameof(kind)),
             };
             var remaining = template;

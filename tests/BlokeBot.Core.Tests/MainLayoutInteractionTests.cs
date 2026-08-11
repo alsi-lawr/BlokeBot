@@ -88,6 +88,60 @@ public sealed class DesktopRailInteractionTests
 public sealed class NavMenuInteractionTests
 {
     [Test]
+    [Arguments(HostFeatureFlags.Bingo, true)]
+    [Arguments(HostFeatureFlags.None, false)]
+    public async Task BingoDestination_FollowsFeatureGate(
+        HostFeatureFlags enabledFeatures,
+        bool expected
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, enabledFeatures);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var cut = context.Render<NavMenu>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var destinations = cut.FindAll("a[href='bingo']");
+            if (expected)
+            {
+                destinations.ShouldNotBeEmpty();
+            }
+            else
+            {
+                destinations.ShouldBeEmpty();
+            }
+        });
+    }
+
+    [Test]
+    [Arguments(HostFeatureFlags.CommunityProgression, true)]
+    [Arguments(HostFeatureFlags.None, false)]
+    public async Task CommunityProgressionDestination_FollowsFeatureGate(
+        HostFeatureFlags enabledFeatures,
+        bool expected
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, enabledFeatures);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var cut = context.Render<NavMenu>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var destinations = cut.FindAll("a[href='community']");
+            if (expected)
+            {
+                destinations.ShouldNotBeEmpty();
+            }
+            else
+            {
+                destinations.ShouldBeEmpty();
+            }
+        });
+    }
+
+    [Test]
     public async Task IconRail_GroupOpensAndEscapeCloses()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

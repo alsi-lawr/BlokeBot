@@ -473,6 +473,741 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("automation_node_runs", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AssignmentKey")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AssignmentName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("IssuedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IssuedLayout")
+                        .HasMaxLength(16000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId", "AssignmentKey")
+                        .IsUnique();
+
+                    b.HasIndex("GameId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_cards", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoDomainEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicPayload")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "OperationKey")
+                        .IsUnique();
+
+                    b.ToTable("bingo_events", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoEventReceipt", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceEventId")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "Kind", "SourceEventId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_event_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoEvidence", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EventKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("MarkId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParticipantDisplayName")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParticipantLogin")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ParticipantTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MarkId");
+
+                    b.ToTable("bingo_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoGame", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ArchivedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Dimension")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FullCardAchievementKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FullCardPointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("FullCardWinEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("IssuedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LineAchievementKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinePointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ParticipantCap")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RosterRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Seed")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TeamCap")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("TemplateRevisionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TemplateRevisionNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Joining', 'Issued')");
+
+                    b.HasIndex("TemplateRevisionId");
+
+                    b.HasIndex("HostId", "CreationOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "Status");
+
+                    b.ToTable("bingo_games", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bingo_games_Dimension", "Dimension IN (3, 4, 5)");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoMark", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FirstMarkedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SquareKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId", "SquareKey")
+                        .IsUnique();
+
+                    b.ToTable("bingo_marks", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoModerationAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("MarkId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrivateNote")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "OperationId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_moderation_audit", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoParticipant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("JoinedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("TeamId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId");
+
+                    b.HasIndex("TeamId");
+
+                    b.HasIndex("GameId", "TwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_participants", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoSquare", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FilterToken")
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrivateModeratorNote")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TemplateRevisionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("Threshold")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateRevisionId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("TemplateRevisionId", "SortOrder")
+                        .IsUnique();
+
+                    b.ToTable("bingo_squares", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTeam", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("GameId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_teams", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CurrentRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "CreationOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_templates", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplateRevision", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Dimension")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FullCardAchievementKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FullCardPointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("FullCardWinEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LineAchievementKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LinePointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("TemplateId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("bingo_template_revisions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bingo_template_revisions_Dimension", "Dimension IN (3, 4, 5)");
+
+                            t.HasCheckConstraint("CK_bingo_template_revisions_Revision", "Revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoWin", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AchievementKey")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RewardsCompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RuleIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RuleKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId");
+
+                    b.HasIndex("CardId", "RuleKey")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_wins", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoWinRecipient", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AchievementGranted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("PointsGranted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("WinId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WinId", "TwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("bingo_win_recipients", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BotHost", b =>
                 {
                     b.Property<int>("Id")
@@ -482,10 +1217,19 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("AutomationGeneration")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("BingoAcceptEventsAfterUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("BingoPausedAtUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("BotRuntimeState")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("BotRuntimeStateChangedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("BountiesPausedAtUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ChannelBotAuthorizedAtUtc")
@@ -500,6 +1244,12 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.Property<string>("CommandsDefaultConflictAlias")
                         .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CommunityProgressionAcceptEventsAfterUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CommunityProgressionPausedAtUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -619,6 +1369,343 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("reply_settings", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.Bounty", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("AcceptedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompletionReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ContributorCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FailurePledgePolicy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FundingTarget")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PledgedAmount")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RewardDistribution")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "CreationOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ExpiresAtUtc", "Id");
+
+                    b.ToTable("bounties", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bounties_ContributorCount", "ContributorCount >= 0");
+
+                            t.HasCheckConstraint("CK_bounties_FailurePledgePolicy", "FailurePledgePolicy IN ('Refund', 'Spend')");
+
+                            t.HasCheckConstraint("CK_bounties_Revision", "Revision > 0");
+
+                            t.HasCheckConstraint("CK_bounties_RewardDistribution", "RewardDistribution IN ('Equal', 'Proportional')");
+
+                            t.HasCheckConstraint("CK_bounties_Status", "Status IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+
+                            t.HasCheckConstraint("CK_bounties_Visibility", "Visibility IN ('Private', 'Public')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyContributorReward", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Amount")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("BountyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "BountyId", "Login")
+                        .IsUnique()
+                        .HasFilter("\"Login\" <> '[erased]'");
+
+                    b.ToTable("bounty_contributor_rewards", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyDomainEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("BountyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BountyPublicId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicPayload")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "BountyId");
+
+                    b.HasIndex("HostId", "OperationKey")
+                        .IsUnique()
+                        .HasFilter("\"OperationKey\" IS NOT NULL");
+
+                    b.ToTable("bounty_events", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bounty_events_Kind", "Kind IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'FundingTargetReached', 'Pledged', 'PledgesConsumed', 'PledgesRefunded', 'RewardsDistributed')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyModerationAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("BountyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("BountyRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CommandFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "BountyId");
+
+                    b.HasIndex("HostId", "OperationId")
+                        .IsUnique();
+
+                    b.ToTable("bounty_moderation_audit", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_Action", "Action IN ('Accepted', 'Cancelled', 'Completed', 'Created', 'Expired', 'Extended', 'Failed', 'FundingOpened', 'Rejected')");
+
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_FromStatus", "FromStatus IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+
+                            t.HasCheckConstraint("CK_bounty_moderation_audit_ToStatus", "ToStatus IN ('Accepted', 'Cancelled', 'Completed', 'Expired', 'Failed', 'Funding', 'Proposed')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyPledge", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Amount")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("BountyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CommandFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContributorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContributorTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "BountyId");
+
+                    b.HasIndex("HostId", "OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "ContributorLogin", "State");
+
+                    b.ToTable("bounty_pledges", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_bounty_pledges_State", "State IN ('Consumed', 'Refunded', 'Reserved')");
+                        });
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CommandAlias", b =>
                 {
                     b.Property<int>("Id")
@@ -652,6 +1739,737 @@ namespace BlokeBot.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_command_aliases_Kind", "Kind IN ('AddPoints', 'CancelGiveaway', 'Commands', 'EndGiveaway', 'Gamble', 'Giveaway', 'GivePoints', 'Guess', 'Guesses', 'Join', 'Points', 'RemovePoints', 'Start', 'Stop', 'Win')");
                         });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrivateNote")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("HostId", "Action", "OperationKey")
+                        .IsUnique();
+
+                    b.ToTable("community_audits", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityCompletion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DefinitionKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DefinitionName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PeriodKey")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PointsGranted")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RewardSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SourceOperationKey")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubjectKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerDisplayName")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerLogin")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId");
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId", "SubjectKey", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("community_completions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CompletionMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventRule")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FilterToken")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Increment")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PointsReward")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResetCadence")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResetLocalTime")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ResetWeekday")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ScheduleRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Target")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("HostId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("community_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinitionReward", b =>
+                {
+                    b.Property<long>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("RewardDefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("DefinitionId", "RewardDefinitionId");
+
+                    b.HasIndex("RewardDefinitionId");
+
+                    b.ToTable("community_definition_rewards", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDomainEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublicPayload")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("HostId", "Kind", "OperationKey")
+                        .IsUnique();
+
+                    b.ToTable("community_events", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityEquippedReward", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("EquippedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LastOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RewardDefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ViewerLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RewardDefinitionId");
+
+                    b.HasIndex("HostId", "ViewerTwitchUserId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("community_equipped_rewards", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityExternalGrantReceipt", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CompletionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "CompletionId");
+
+                    b.HasIndex("HostId", "Source", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("community_external_grant_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityProgress", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CompletionCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PeriodKey")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SubjectKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerDisplayName")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerLogin")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId");
+
+                    b.HasIndex("HostId", "DefinitionId", "SubjectKey")
+                        .IsUnique();
+
+                    b.ToTable("community_progress", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityResetPeriod", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("DefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OperationKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PeriodKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RolloverKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefinitionId");
+
+                    b.HasIndex("HostId", "DefinitionId", "OperationKey")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "DefinitionId", "PeriodKey")
+                        .IsUnique();
+
+                    b.ToTable("community_reset_periods", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityRewardDefinition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PresentationToken")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("HostId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("community_reward_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityRewardUnlock", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CompletionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("GrantedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("RewardDefinitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ViewerDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RewardDefinitionId");
+
+                    b.HasIndex("HostId", "CompletionId");
+
+                    b.HasIndex("HostId", "RewardDefinitionId", "ViewerTwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("community_reward_unlocks", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySeason", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ArchivedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ModeratorNotes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("OpenedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "CreationOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("HostId", "Status");
+
+                    b.ToTable("community_seasons", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySeasonStanding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CompletedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ProgressAmount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("SeasonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("SnapshottedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ViewerTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeasonId");
+
+                    b.HasIndex("HostId", "SeasonId", "ViewerTwitchUserId")
+                        .IsUnique();
+
+                    b.ToTable("community_season_standings", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySourceEventReceipt", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ProcessedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceEventId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "SourceKind", "SourceEventId")
+                        .IsUnique();
+
+                    b.ToTable("community_source_event_receipts", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncement", b =>
@@ -2131,7 +3949,7 @@ namespace BlokeBot.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Duration", "DurationSeconds BETWEEN 1 AND 30");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('giveawayWinner', 'guessingWinner', 'pointAward')");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "Lifecycle IN ('active', 'consumed', 'queued', 'suppressed')");
 
@@ -2707,6 +4525,15 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("BountyPledgeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("BountyRewardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CommunityCompletionId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("CounterpartyLogin")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
@@ -2750,6 +4577,12 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasIndex("RequestSubmissionId");
 
+                    b.HasIndex("HostId", "BountyPledgeId");
+
+                    b.HasIndex("HostId", "BountyRewardId");
+
+                    b.HasIndex("HostId", "CommunityCompletionId");
+
                     b.HasIndex("HostId", "CreatedAtUtc");
 
                     b.HasIndex("HostId", "OperationKey")
@@ -2757,7 +4590,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.ToTable("point_ledger_entries", null, t =>
                         {
-                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "Kind IN ('Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward')");
+                            t.HasCheckConstraint("CK_point_ledger_entries_Kind", "Kind IN ('Add', 'Remove', 'DeleteBalance', 'TransferOut', 'TransferIn', 'GambleWin', 'GambleLoss', 'GiveawayWin', 'GuessWin', 'RequestReservation', 'RequestRefund', 'MomentReward', 'BountyPledgeReservation', 'BountyPledgeRefund', 'BountyPledgeConsumption', 'BountyCompletionReward', 'CommunityProgressionReward', 'BingoReward')");
                         });
                 });
 
@@ -3584,6 +5417,8 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.HasIndex("HostId", "OperationId")
                         .IsUnique();
+
+                    b.HasIndex("HostId", "SubmitterLogin", "PointReservationState");
 
                     b.HasIndex("BoardId", "Status", "Priority", "QueuePosition");
 
@@ -4637,6 +6472,180 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Run");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoGame", "Game")
+                        .WithMany("Cards")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoDomainEvent", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoEventReceipt", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoEvidence", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoMark", "Mark")
+                        .WithMany("Evidence")
+                        .HasForeignKey("MarkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Mark");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoGame", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BingoTemplateRevision", "TemplateRevision")
+                        .WithMany()
+                        .HasForeignKey("TemplateRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TemplateRevision");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoMark", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoCard", "Card")
+                        .WithMany("Marks")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoModerationAudit", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoParticipant", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoCard", "Card")
+                        .WithMany("Participants")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("BlokeBot.Persistence.Models.BingoGame", "Game")
+                        .WithMany("Participants")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BingoTeam", "Team")
+                        .WithMany("Participants")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Card");
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoSquare", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoTemplateRevision", "TemplateRevision")
+                        .WithMany("Squares")
+                        .HasForeignKey("TemplateRevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TemplateRevision");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTeam", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoGame", "Game")
+                        .WithMany("Teams")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplate", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplateRevision", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoTemplate", "Template")
+                        .WithMany("Revisions")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoWin", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoCard", "Card")
+                        .WithMany("Wins")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BingoGame", "Game")
+                        .WithMany("Wins")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoWinRecipient", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BingoWin", "Win")
+                        .WithMany("Recipients")
+                        .HasForeignKey("WinId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Win");
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BotReplySettings", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.GuessRoundProfile", "GuessRoundProfile")
@@ -4646,6 +6655,63 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("GuessRoundProfile");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.Bounty", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyContributorReward", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.Bounty", "Bounty")
+                        .WithMany("Rewards")
+                        .HasForeignKey("HostId", "BountyId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bounty");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyDomainEvent", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.Bounty", "Bounty")
+                        .WithMany("Events")
+                        .HasForeignKey("HostId", "BountyId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bounty");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyModerationAudit", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.Bounty", "Bounty")
+                        .WithMany("Audits")
+                        .HasForeignKey("HostId", "BountyId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bounty");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BountyPledge", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.Bounty", "Bounty")
+                        .WithMany("Pledges")
+                        .HasForeignKey("HostId", "BountyId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Bounty");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CommandAlias", b =>
@@ -4663,6 +6729,222 @@ namespace BlokeBot.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("GuessRoundProfile");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityAudit", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunitySeason", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityCompletion", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunitySeason", "Season")
+                        .WithMany("Definitions")
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Season");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinitionReward", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityDefinition", "Definition")
+                        .WithMany("Rewards")
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityRewardDefinition", "RewardDefinition")
+                        .WithMany()
+                        .HasForeignKey("RewardDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Definition");
+
+                    b.Navigation("RewardDefinition");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDomainEvent", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunitySeason", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityEquippedReward", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityRewardDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("RewardDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityExternalGrantReceipt", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityCompletion", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "CompletionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityProgress", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityResetPeriod", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityRewardDefinition", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunitySeason", "Season")
+                        .WithMany("Rewards")
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Season");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityRewardUnlock", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityRewardDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("RewardDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityCompletion", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "CompletionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySeason", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySeasonStanding", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunitySeason", null)
+                        .WithMany()
+                        .HasForeignKey("SeasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySourceEventReceipt", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncement", b =>
@@ -5273,6 +7555,24 @@ namespace BlokeBot.Persistence.Migrations
                         .HasForeignKey("HostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.BountyPledge", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "BountyPledgeId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BlokeBot.Persistence.Models.BountyContributorReward", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "BountyRewardId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BlokeBot.Persistence.Models.CommunityCompletion", null)
+                        .WithMany()
+                        .HasForeignKey("HostId", "CommunityCompletionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.PointsGiveaway", b =>
@@ -5584,6 +7884,74 @@ namespace BlokeBot.Persistence.Migrations
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomationFlowRun", b =>
                 {
                     b.Navigation("NodeRuns");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoCard", b =>
+                {
+                    b.Navigation("Marks");
+
+                    b.Navigation("Participants");
+
+                    b.Navigation("Wins");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoGame", b =>
+                {
+                    b.Navigation("Cards");
+
+                    b.Navigation("Participants");
+
+                    b.Navigation("Teams");
+
+                    b.Navigation("Wins");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoMark", b =>
+                {
+                    b.Navigation("Evidence");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTeam", b =>
+                {
+                    b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplate", b =>
+                {
+                    b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoTemplateRevision", b =>
+                {
+                    b.Navigation("Squares");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.BingoWin", b =>
+                {
+                    b.Navigation("Recipients");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.Bounty", b =>
+                {
+                    b.Navigation("Audits");
+
+                    b.Navigation("Events");
+
+                    b.Navigation("Pledges");
+
+                    b.Navigation("Rewards");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunityDefinition", b =>
+                {
+                    b.Navigation("Rewards");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CommunitySeason", b =>
+                {
+                    b.Navigation("Definitions");
+
+                    b.Navigation("Rewards");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.CustomAnnouncement", b =>

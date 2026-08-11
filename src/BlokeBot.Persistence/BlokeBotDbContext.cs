@@ -40,6 +40,46 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<ActivePublicChatPin> ActivePublicChatPins => Set<ActivePublicChatPin>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
+    public DbSet<Bounty> Bounties => Set<Bounty>();
+    public DbSet<BountyPledge> BountyPledges => Set<BountyPledge>();
+    public DbSet<BountyContributorReward> BountyContributorRewards =>
+        Set<BountyContributorReward>();
+    public DbSet<BountyModerationAudit> BountyModerationAudits => Set<BountyModerationAudit>();
+    public DbSet<BountyDomainEvent> BountyEvents => Set<BountyDomainEvent>();
+    public DbSet<CommunitySeason> CommunitySeasons => Set<CommunitySeason>();
+    public DbSet<CommunityDefinition> CommunityDefinitions => Set<CommunityDefinition>();
+    public DbSet<CommunityRewardDefinition> CommunityRewardDefinitions =>
+        Set<CommunityRewardDefinition>();
+    public DbSet<CommunityDefinitionReward> CommunityDefinitionRewards =>
+        Set<CommunityDefinitionReward>();
+    public DbSet<CommunityProgress> CommunityProgress => Set<CommunityProgress>();
+    public DbSet<CommunityCompletion> CommunityCompletions => Set<CommunityCompletion>();
+    public DbSet<CommunityRewardUnlock> CommunityRewardUnlocks => Set<CommunityRewardUnlock>();
+    public DbSet<CommunityEquippedReward> CommunityEquippedRewards =>
+        Set<CommunityEquippedReward>();
+    public DbSet<CommunitySourceEventReceipt> CommunitySourceEventReceipts =>
+        Set<CommunitySourceEventReceipt>();
+    public DbSet<CommunityExternalGrantReceipt> CommunityExternalGrantReceipts =>
+        Set<CommunityExternalGrantReceipt>();
+    public DbSet<CommunityResetPeriod> CommunityResetPeriods => Set<CommunityResetPeriod>();
+    public DbSet<CommunitySeasonStanding> CommunitySeasonStandings =>
+        Set<CommunitySeasonStanding>();
+    public DbSet<CommunityAudit> CommunityAudits => Set<CommunityAudit>();
+    public DbSet<CommunityDomainEvent> CommunityEvents => Set<CommunityDomainEvent>();
+    public DbSet<BingoTemplate> BingoTemplates => Set<BingoTemplate>();
+    public DbSet<BingoTemplateRevision> BingoTemplateRevisions => Set<BingoTemplateRevision>();
+    public DbSet<BingoSquare> BingoSquares => Set<BingoSquare>();
+    public DbSet<BingoGame> BingoGames => Set<BingoGame>();
+    public DbSet<BingoTeam> BingoTeams => Set<BingoTeam>();
+    public DbSet<BingoParticipant> BingoParticipants => Set<BingoParticipant>();
+    public DbSet<BingoCard> BingoCards => Set<BingoCard>();
+    public DbSet<BingoMark> BingoMarks => Set<BingoMark>();
+    public DbSet<BingoEvidence> BingoEvidence => Set<BingoEvidence>();
+    public DbSet<BingoModerationAudit> BingoModerationAudit => Set<BingoModerationAudit>();
+    public DbSet<BingoEventReceipt> BingoEventReceipts => Set<BingoEventReceipt>();
+    public DbSet<BingoWin> BingoWins => Set<BingoWin>();
+    public DbSet<BingoWinRecipient> BingoWinRecipients => Set<BingoWinRecipient>();
+    public DbSet<BingoDomainEvent> BingoEvents => Set<BingoDomainEvent>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
     public DbSet<PointsGiveawayEntrant> PointsGiveawayEntrants => Set<PointsGiveawayEntrant>();
     public DbSet<PointsGiveawayWinner> PointsGiveawayWinners => Set<PointsGiveawayWinner>();
@@ -125,6 +165,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureAnnouncements(modelBuilder);
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
+        ConfigureBounties(modelBuilder);
+        ConfigureCommunityProgression(modelBuilder);
+        ConfigureBingo(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);

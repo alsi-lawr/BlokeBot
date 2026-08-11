@@ -23,6 +23,8 @@ internal abstract record EventSubNotification
 
     internal sealed record StreamOffline(EventSubStreamOfflineEvent Event) : EventSubNotification;
 
+    internal sealed record ChannelUpdate(EventSubChannelUpdateEvent Event) : EventSubNotification;
+
     internal sealed record Follow(EventSubFollowEvent Event) : EventSubNotification;
 
     internal sealed record Subscription(EventSubSubscriptionEvent Event) : EventSubNotification;
@@ -129,6 +131,13 @@ internal abstract record EventSubNotification
                     static value => new StreamOffline(value)
                 )
                 : new Unknown(),
+            "channel.update" when subscriptionVersion == "2" =>
+                payload.Deserialize<EventSubChannelUpdateWireEvent>(options) is { } channelUpdate
+                    ? Normalized(
+                        channelUpdate.ToDomain(envelope.Metadata),
+                        static value => new ChannelUpdate(value)
+                    )
+                    : new Unknown(),
             "channel.follow" => payload.Deserialize<EventSubFollowWireEvent>(options) is { } follow
                 ? Normalized(follow.ToDomain(envelope.Metadata), static value => new Follow(value))
                 : new Unknown(),

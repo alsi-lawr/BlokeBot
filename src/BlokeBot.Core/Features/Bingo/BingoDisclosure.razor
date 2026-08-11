@@ -1,0 +1,32 @@
+<section class="@_sectionClass" @attributes="AdditionalAttributes">
+    <div class="flex flex-wrap items-center gap-3 px-5 py-4 @(Open ? "border-b border-[var(--app-border)]" : null)">
+        <button type="button"
+                class="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1 text-left focus-visible:rounded-md focus-visible:shadow-[var(--app-focus-shadow)] focus-visible:outline-none"
+                aria-expanded="@(Open ? "true" : "false")"
+                aria-controls="@_bodyId"
+                @onclick="Toggle">
+            @Header
+        </button>
+        @if (Actions is not null)
+        {
+            <div class="flex flex-wrap items-center gap-2">
+                @Actions
+            </div>
+        }
+        <button type="button"
+                class="flex-none cursor-pointer self-center text-[1.05rem] leading-none text-[var(--app-text-muted)] transition-transform duration-[250ms] ease-[ease] motion-reduce:duration-[1ms] @(Open ? "rotate-90" : null)"
+                tabindex="-1"
+                aria-hidden="true"
+                @onclick="Toggle">›</button>
+    </div>
+    @* The spring animates grid-template-rows, so the clip child must own the overflow. *@
+    <div id="@_bodyId"
+         class="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:duration-[1ms] @(Open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")"
+         inert="@(!Open)">
+        <div class="min-w-0 overflow-hidden">
+            <div class="grid gap-4 px-5 py-4">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+</section>

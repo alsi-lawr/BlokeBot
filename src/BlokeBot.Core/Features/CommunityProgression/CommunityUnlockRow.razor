@@ -1,0 +1,10 @@
+<div class="progression-unlock">
+    <b>@_login</b>
+    <span>unlocked</span>
+    <CommunityRewardChip Kind="Unlock.Kind" Name="@Unlock.Name" PresentationToken="@Unlock.PresentationToken" />
+    @if (Unlock.Equipped)
+    {
+        <span class="status-pill status-pill--green"><span class="status-pill__label">Equipped</span></span>
+    }
+    <span class="progression-unlock__time" title="@CommunityProgressionPresentation.ExactMoment(Unlock.GrantedAtUtc)">@CommunityProgressionPresentation.HumanMoment(Unlock.GrantedAtUtc, _nowUtc)</span>
+</div>

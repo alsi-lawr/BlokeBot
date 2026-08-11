@@ -69,6 +69,38 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
     }
 
     [Test]
+    public async Task ChannelUpdateEnvelope_MapsCategoryAndDispatchesToAutomationObservers()
+    {
+        var envelope = Envelope(
+            """
+            {
+              "subscription": { "type": "channel.update", "version": "2" },
+              "event": {
+                "broadcaster_user_id": "host-id",
+                "broadcaster_user_login": "host_login",
+                "broadcaster_user_name": "Host Display",
+                "category_id": "509658",
+                "category_name": "Just Chatting",
+                "title": "Bingo night"
+              }
+            }
+            """
+        );
+        var channelUpdate = EventSubNotification
+            .Parse(envelope, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldBeOfType<EventSubNotification.ChannelUpdate>()
+            .Event;
+        channelUpdate.MessageId.ShouldBe("automation-message-1");
+        channelUpdate.CategoryId.ShouldBe("509658");
+        channelUpdate.CategoryName.ShouldBe("Just Chatting");
+        var observer = new RecordingAutomationObserver();
+
+        await CreateHandler(observer).DispatchNotificationAsync(envelope, "{}", default);
+
+        observer.Deliveries.ShouldBe(["channel-update"]);
+    }
+
+    [Test]
     public void SubscriptionEnvelopes_ParsingTypedNotifications_MapTierGiftAndAnonymity()
     {
         var subscription = Parse(
@@ -595,6 +627,79 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         operations.CreateCount("channel").ShouldBe(3);
     }
 
+    [Test]
+    public async Task ChannelOperations_ConsumesEventRequirementsAcrossFeatureGateChanges()
+    {
+        var requirements = new MutableEventSubRequirementSource(
+            AutomationEventSubRequirement.Follows
+        );
+        var operations = new EventSubChannelOperations(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            new DisabledNativeTwitchFeatures(),
+            eventRequirements: [requirements]
+        );
+
+        requirements.Enabled = true;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationFollows,
+                default
+            )
+        ).ShouldBeTrue();
+
+        requirements.Enabled = false;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationFollows,
+                default
+            )
+        ).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task ChannelOperations_ConsumesChannelUpdateRequirementAcrossBingoGateChanges()
+    {
+        var requirements = new MutableEventSubRequirementSource(
+            AutomationEventSubRequirement.ChannelUpdates
+        );
+        var operations = new EventSubChannelOperations(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            new DisabledNativeTwitchFeatures(),
+            eventRequirements: [requirements]
+        );
+
+        requirements.Enabled = true;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationChannelUpdates,
+                default
+            )
+        ).ShouldBeTrue();
+        requirements.Enabled = false;
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.AutomationChannelUpdates,
+                default
+            )
+        ).ShouldBeFalse();
+    }
+
     private static EventSubDeliveryHandler CreateHandler(RecordingAutomationObserver observer) =>
         new(
             null!,
@@ -669,6 +774,22 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
         ) => ValueTask.FromResult(false);
     }
 
+    private sealed class MutableEventSubRequirementSource(AutomationEventSubRequirement requirement)
+        : IEventSubRequirementSource
+    {
+        internal bool Enabled { get; set; }
+
+        public ValueTask<bool> RequiresAsync(
+            string channel,
+            AutomationEventSubRequirement requested,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Enabled && requested == requirement);
+        }
+    }
+
     private sealed class RecordingShoutoutObserver : IShoutoutEventObserver
     {
         internal int Deliveries { get; private set; }
@@ -710,6 +831,11 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
             EventSubStreamOfflineEvent streamOffline,
             CancellationToken cancellation
         ) => Record("stream-offline");
+
+        public Task ChannelUpdatedAsync(
+            EventSubChannelUpdateEvent channelUpdate,
+            CancellationToken cancellation
+        ) => Record("channel-update");
 
         public Task FollowReceivedAsync(
             EventSubFollowEvent follow,

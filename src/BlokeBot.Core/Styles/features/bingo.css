@@ -1,0 +1,360 @@
+@layer components {
+    /* Win, focus and selection rings are painted outside the cell border box. The scroll container
+       clips on both axes once overflow-x is auto, so the widest ring is reserved as real space
+       inside the scrolled grid rather than left to spill. */
+    .bingo-board,
+    .bingo-card__pair {
+        --bingo-ring-space: 4px;
+    }
+
+    /* The card grid is driven by --bingo-dimension so a 3x3, 4x4 and 5x5 board share one rule.
+       Cells stay square, so the board reads as a bingo card rather than a list of tiles. */
+    .bingo-board {
+        display: grid;
+        gap: 0.6rem;
+        min-width: 0;
+    }
+
+    .bingo-board__scroll {
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+    }
+
+    .bingo-board__letters,
+    .bingo-board__grid {
+        display: grid;
+        gap: 0.45rem;
+        grid-template-columns: repeat(var(--bingo-dimension), minmax(4.6rem, 1fr));
+        min-width: calc((var(--bingo-dimension) * 5.05rem) + (var(--bingo-ring-space) * 2));
+        padding-inline: var(--bingo-ring-space);
+    }
+
+    .bingo-board__grid {
+        padding-block: var(--bingo-ring-space);
+    }
+
+    .bingo-board__letter {
+        color: var(--app-text-muted);
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-align: center;
+    }
+
+    .bingo-cell {
+        align-items: center;
+        aspect-ratio: 1;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.65rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        justify-content: center;
+        overflow: hidden;
+        padding: 0.45rem 0.4rem 0.3rem;
+        position: relative;
+        text-align: center;
+    }
+
+    .bingo-cell__title {
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        color: var(--app-text-strong);
+        display: -webkit-box;
+        font-size: 0.7rem;
+        font-weight: 650;
+        line-height: 1.2;
+        overflow: hidden;
+    }
+
+    .bingo-cell__kind {
+        color: var(--app-text-muted);
+        font-size: 0.56rem;
+        font-weight: 750;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .bingo-cell--has-action {
+        padding-bottom: 2.15rem;
+    }
+
+    .bingo-cell--has-action .bingo-cell__title {
+        -webkit-line-clamp: 2;
+    }
+
+    .bingo-cell--marked {
+        background: var(--app-affirmative-surface);
+        border-color: var(--tone-green-ring);
+    }
+
+    /* The daub is a translucent ring so the square title stays readable underneath it. */
+    .bingo-cell--marked::after {
+        aspect-ratio: 1;
+        border: 2.5px solid var(--tone-green-solid);
+        border-radius: 50%;
+        content: "";
+        left: 50%;
+        opacity: 0.5;
+        pointer-events: none;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-8deg);
+        width: 62%;
+    }
+
+    .bingo-cell--win {
+        border-color: transparent;
+        box-shadow: 0 0 0 2px var(--tone-gold-ring);
+    }
+
+    .bingo-cell--button {
+        cursor: pointer;
+        transition:
+            background-color 140ms ease,
+            border-color 140ms ease;
+    }
+
+    .bingo-cell--button:hover {
+        border-color: var(--app-control-hover-border);
+    }
+
+    .bingo-cell--button:focus-visible {
+        outline: none;
+        box-shadow: var(--app-focus-shadow);
+    }
+
+    .bingo-cell--selected {
+        border-color: var(--app-focus-border);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-focus-border) 20%, transparent);
+    }
+
+    .bingo-cell--empty {
+        background: transparent;
+        border-style: dashed;
+        color: var(--app-text-muted);
+        font-size: 0.75rem;
+        font-weight: 650;
+    }
+
+    .bingo-cell__evidence {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        color: var(--app-text-muted);
+        display: inline-flex;
+        font-size: 0.6rem;
+        font-weight: 750;
+        height: 1rem;
+        justify-content: center;
+        min-width: 1rem;
+        padding: 0 0.25rem;
+        position: absolute;
+        left: 0.28rem;
+        top: 0.28rem;
+        z-index: 1;
+    }
+
+    .bingo-cell__marked {
+        color: var(--tone-green-solid);
+        font-size: 0.65rem;
+        font-weight: 900;
+        line-height: 1;
+        position: absolute;
+        right: 0.32rem;
+        top: 0.32rem;
+        z-index: 1;
+    }
+
+    .bingo-cell__action {
+        bottom: 0.3rem;
+        left: 50%;
+        position: absolute;
+        transform: translateX(-50%);
+        z-index: 1;
+    }
+
+    /* Header, board and evidence log take the pair's own row tracks, so a card that carries a wins
+       line or an extra participant line cannot push its grid below its neighbour's. The card must
+       therefore emit those three children in that order and nothing else at top level. */
+    .bingo-card {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        box-shadow: var(--app-shadow-sm);
+        display: grid;
+        grid-row: span 3;
+        grid-template-rows: subgrid;
+        min-width: 0;
+        padding: 1rem;
+        row-gap: 0.75rem;
+    }
+
+    .bingo-card__head {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: space-between;
+    }
+
+    .bingo-card__title {
+        color: var(--app-text-strong);
+        font-size: 1rem;
+        font-weight: 750;
+        margin: 0;
+    }
+
+    .bingo-card__who {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        margin: 0;
+    }
+
+    .bingo-card__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    /* A card only shares a row when both grids fit at their natural cell size; otherwise the pair
+       collapses to one column rather than forcing the board into its own horizontal scroll. */
+    .bingo-card__pair {
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: repeat(
+            auto-fit,
+            minmax(
+                min(
+                    100%,
+                    calc(
+                        (var(--bingo-dimension, 4) * 5.05rem) + 2rem +
+                            (var(--bingo-ring-space) * 2)
+                    )
+                ),
+                1fr
+            )
+        );
+        grid-template-rows: repeat(3, auto);
+    }
+
+    /* Evidence lives under the card as a log, so cells never carry prose. */
+    .bingo-evidence {
+        display: grid;
+        gap: 0.35rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .bingo-evidence__entry {
+        align-items: baseline;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.5rem;
+        color: var(--app-text-muted);
+        display: flex;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        gap: 0.45rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    .bingo-evidence__square {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.35rem;
+        color: var(--app-text-medium);
+        flex: none;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 0.05rem 0.35rem;
+    }
+
+    .bingo-evidence__action {
+        color: var(--app-text-strong);
+        font-weight: 650;
+    }
+
+    .bingo-editor {
+        align-items: start;
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    }
+
+    .bingo-editor__pane {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.65rem;
+        display: grid;
+        gap: 0.8rem;
+        padding: 1rem;
+    }
+
+    .bingo-editor__pane-head {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
+        justify-content: space-between;
+    }
+
+    .bingo-editor__pane-title {
+        color: var(--app-text-strong);
+        font-size: 0.9rem;
+        font-weight: 750;
+        margin: 0;
+    }
+
+    .bingo-editor__pane-position {
+        color: var(--app-text-muted);
+        font-size: 0.72rem;
+        font-weight: 650;
+    }
+
+    .bingo-roster {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .bingo-roster__chip {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 999px;
+        color: var(--app-text-medium);
+        display: inline-flex;
+        font-size: 0.8rem;
+        font-weight: 600;
+        gap: 0.4rem;
+        padding: 0.25rem 0.35rem 0.25rem 0.7rem;
+    }
+
+    .bingo-roster__login {
+        color: var(--app-text-muted);
+        font-weight: 500;
+    }
+
+    @media (max-width: 56rem) {
+        .bingo-editor {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    @media (max-width: 40rem) {
+        /* Mobile buttons retain their 40px touch target. The action already identifies a manual
+           square, so its redundant subtype yields the space instead of colliding with the control. */
+        .bingo-cell--has-action {
+            padding-bottom: 3rem;
+        }
+
+        .bingo-cell--has-action .bingo-cell__kind {
+            display: none;
+        }
+    }
+}

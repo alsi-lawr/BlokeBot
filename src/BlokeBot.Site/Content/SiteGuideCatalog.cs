@@ -18,9 +18,14 @@ internal static class SiteGuideCatalog
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
+            ]
+        ),
+        new(
+            "Stream presentation",
+            [
                 GuideLink("Browser Sources", "overlays"),
-                GuideLink("Cues", "overlays#cues"),
-                GuideLink("Media library", "overlays#media"),
+                GuideLink("Cues", "overlays/cues"),
+                GuideLink("Media library", "overlays/media"),
             ]
         ),
         new(
@@ -29,6 +34,14 @@ internal static class SiteGuideCatalog
                 GuideLink("Request boards", "community/request-boards"),
                 GuideLink("Play with viewers", "community/play-with-viewers"),
                 GuideLink("Moments", "community/moments"),
+            ]
+        ),
+        new(
+            "Community progression",
+            [
+                GuideLink("Viewer-funded bounties", "community/bounties"),
+                GuideLink("Seasons and achievements", "community/progression"),
+                GuideLink("Stream-event Bingo", "community/bingo"),
             ]
         ),
         new(
@@ -159,7 +172,7 @@ internal static class SiteGuideCatalog
                     [
                         "Home gives a short introduction and public leaderboard shortcut.",
                         "Channel setup contains connections, moderator access and feature switches.",
-                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points, Custom commands and Overlays feature.",
+                        "Chat tools contains the interaction, progression, game, points, command, overlay and enabled Native Twitch tools selected for this channel.",
                         "Expand Native Twitch to move between its five focused task pages.",
                     ],
                     Paragraphs =
@@ -305,7 +318,7 @@ internal static class SiteGuideCatalog
                     Heading = "Start with every tool off",
                     Paragraphs =
                     [
-                        "A new channel starts with all twelve available Chat Tools features disabled: Shoutouts, Polls, Clips & markers, Rewards & redemptions, Predictions, Request boards, Play with viewers, Moments, Overlays, Guessing game, Points and Custom commands.",
+                        "A new channel starts with every available Chat Tools feature disabled. This includes Native Twitch operations, community interaction and progression, games, Points, Custom commands and Overlays.",
                         "Channels migrated from an earlier BlokeBot release keep their effective feature behavior. Review their switches after upgrading rather than assuming the new-channel default was applied.",
                     ],
                     Bullets =
@@ -338,6 +351,9 @@ internal static class SiteGuideCatalog
                         new SiteLink("Request boards", "community/request-boards"),
                         new SiteLink("Play with viewers", "community/play-with-viewers"),
                         new SiteLink("Moments and recaps", "community/moments"),
+                        new SiteLink("Viewer-funded bounties", "community/bounties"),
+                        new SiteLink("Seasons and achievements", "community/progression"),
+                        new SiteLink("Stream-event Bingo", "community/bingo"),
                         new SiteLink("Commands and scheduled messages", "commands"),
                         new SiteLink("Guessing games", "guessing"),
                         new SiteLink("Points", "points"),
@@ -511,24 +527,32 @@ internal static class SiteGuideCatalog
                         "Rename keeps the private URL. Disable stops display while retaining setup. Rotate revokes the old URL. Delete permanently removes the source.",
                     ],
                 },
-                new SiteGuideSection
-                {
-                    Heading = "Build and trigger reusable Cues",
-                    Anchor = "cues",
-                    Paragraphs =
-                    [
-                        "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
-                    ],
-                    Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-cues.png",
-                        LightPhoneSource: "media/phone-light-overlay-cues.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
-                        LightLaptopSource: "media/laptop-light-overlay-cues.png",
-                        PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
-                        LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
-                        "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
-                    ),
-                },
+            ],
+            Next =
+            [
+                new SiteLink("Build and trigger reusable Cues", "overlays/cues"),
+                new SiteLink("Manage media for Cues", "overlays/media"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/cues",
+            Eyebrow = "Stream presentation · Cues",
+            Title = "Build and trigger reusable Cues",
+            Summary =
+                "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-cues.png",
+                LightPhoneSource: "media/phone-light-overlay-cues.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
+                LightLaptopSource: "media/laptop-light-overlay-cues.png",
+                PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
+                LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
+                "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
+            ),
+            Sections =
+            [
                 new SiteGuideSection
                 {
                     Heading = "Prepare a Cue player",
@@ -590,24 +614,32 @@ internal static class SiteGuideCatalog
                         "If the layer layout is wrong, correct its timing, order or percentage geometry, save, and run one new test.",
                     ],
                 },
-                new SiteGuideSection
-                {
-                    Heading = "Manage media for Cues",
-                    Anchor = "media",
-                    Paragraphs =
-                    [
-                        "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
-                    ],
-                    Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-media.png",
-                        LightPhoneSource: "media/phone-light-overlay-media.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-media.png",
-                        LightLaptopSource: "media/laptop-light-overlay-media.png",
-                        PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
-                        LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
-                        "Media stays in the selected channel's private storage and is available to its Cues."
-                    ),
-                },
+            ],
+            Next =
+            [
+                new SiteLink("Manage media for Cues", "overlays/media"),
+                new SiteLink("Create Custom Commands", "commands"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays/media",
+            Eyebrow = "Stream presentation · Media library",
+            Title = "Manage media for Cues",
+            Summary =
+                "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlay-media.png",
+                LightPhoneSource: "media/phone-light-overlay-media.png",
+                DarkLaptopSource: "media/laptop-dark-overlay-media.png",
+                LightLaptopSource: "media/laptop-light-overlay-media.png",
+                PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
+                LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
+                "Media stays in the selected channel's private storage and is available to its Cues."
+            ),
+            Sections =
+            [
                 new SiteGuideSection
                 {
                     Heading = "Upload accepted browser media",
@@ -905,6 +937,353 @@ internal static class SiteGuideCatalog
                 },
             ],
             Next = [new SiteLink("Use Native Twitch tools", "twitch-operations")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/bounties",
+            Eyebrow = "Community progression · Bounties",
+            Title = "Fund channel challenges with viewer points",
+            Summary =
+                "Open a clear challenge, let viewers reserve points toward it and settle every outcome without hiding who contributed.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/progression/phone-dark-bounties-public-board.png",
+                LightPhoneSource: "media/community/progression/phone-light-bounties-public-board.png",
+                DarkLaptopSource: "media/community/progression/laptop-dark-bounties-setup.png",
+                LightLaptopSource: "media/community/progression/laptop-light-bounties-setup.png",
+                PhoneAlt: "The Sample Channel public bounty board showing a funding challenge, total, deadline and recorded contributor Twitch logins.",
+                LaptopAlt: "The Sample Channel Bounties management page showing the proposed-bounty setup fields, visibility and point settlement choices.",
+                "Owners and moderators configure Bounties in the dashboard; participants fund Public challenges on the board or in chat."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Turn on Bounties and Points",
+                    Steps =
+                    [
+                        "Choose the channel, open Channel setup and turn on Points and Bounties under Chat tools. Both switches are required before Bounties appears in normal navigation or accepts work.",
+                        "Save the switches, open Bounties and use the Page help (?) button if you need the in-dashboard summary.",
+                        "A channel owner or permitted moderator creates and settles bounties. A participant needs a Twitch chat identity and enough available BlokeBot points to pledge.",
+                    ],
+                    Note =
+                        "Bounties use BlokeBot points. Twitch Channel Points cannot be debited or paid out by this feature.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create a proposal and open funding",
+                    Steps =
+                    [
+                        "Enter the public title and description, funding target, UTC expiry and optional fixed completion-bonus pool.",
+                        "Choose Public or Private visibility, what a Failed outcome does with pledges, and Equal or Proportional completion-bonus distribution.",
+                        "Put staff-only context in Private moderator note, then select Create proposed bounty. Proposed is a draft and cannot receive pledges.",
+                        "Review the selected channel and values, add a Private audit reason, then select Open funding.",
+                    ],
+                    Paragraphs =
+                    [
+                        "The lifecycle is Proposed, Funding, Accepted and one terminal outcome: Completed, Failed, Expired or Cancelled. Reject is a distinct audited action whose stored outcome is Cancelled.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Pledge and follow progress",
+                    Bullets =
+                    [
+                        "The public board is /bounties/{channel}. Replace the value in braces with the channel login. Public bounties show the title, description, state, funding total, target, deadline, bonus, terminal history and recorded contributors.",
+                        "A signed-in participant enters Pledge points on the board, or uses chat. BlokeBot reserves the accepted amount from that channel's available point balance.",
+                        "A pledge request above the amount still needed is capped to the target remainder; it does not overfund the bounty. A repeated delivery records the pledge only once.",
+                        "Owners and moderators may Accept while Funding before or after the target is reached. Reaching the target does not accept the challenge automatically.",
+                    ],
+                    Code = "!bounties\n!bounty <bounty-id>\n!bountypledge <bounty-id> <points>",
+                    Note =
+                        "The words in angle brackets describe a value. Use the public bounty reference shown by BlokeBot without typing the brackets.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Moderate deadlines and outcomes",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/progression/phone-dark-bounties-disabled.png",
+                        LightPhoneSource: "media/community/progression/phone-light-bounties-disabled.png",
+                        DarkLaptopSource: "media/community/progression/laptop-dark-bounties-moderation.png",
+                        LightLaptopSource: "media/community/progression/laptop-light-bounties-moderation.png",
+                        PhoneAlt: "The Sample Channel Bounties direct route showing retained-state recovery while the feature is off.",
+                        LaptopAlt: "The Sample Channel funding bounty showing contributor logins, pledge totals, moderator actions, a private audit reason and expiry extension.",
+                        "Funding and moderation remain reviewable in the dashboard; a retained signed-in direct route points back to Channel setup while Bounties is off."
+                    ),
+                    Bullets =
+                    [
+                        "Funding and Accepted bounties can be extended before they become terminal, and either can expire. Check the UTC expiry before extending.",
+                        "Accepted bounties can Complete, Fail or be Cancelled. Every action records the authenticated actor, time, action and private audit reason.",
+                        "Completed consumes all reserved pledges. Its fixed bonus pool is split across contributing logins using the selected Equal or Proportional rule and cannot grant twice.",
+                        "Reject, Cancel and Expire refund every reserved pledge. Fail applies the bounty's chosen Refund pledges or Spend pledges policy exactly once.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Reload before acting if another moderator changed the bounty. A stale transition is rejected rather than overwriting the newer state.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Understand identity and privacy",
+                    Bullets =
+                    [
+                        "A Public bounty exposes each recorded normalized Twitch login and its total pledge amount. A Private bounty publishes no bounty data.",
+                        "Point debits, refunds, contributor grouping and bonuses use that host-scoped recorded login. A later Twitch rename does not move the balance or combine historical logins.",
+                        "Private moderator notes, private audit reasons, raw provider data and internal identifiers are never part of the public board or chat summary.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover without double settlement",
+                    Bullets =
+                    [
+                        "If Points is off, turn it on in Channel setup; saved bounty work remains unchanged while the dependency is unavailable.",
+                        "If a pledge is rejected for balance, state, expiry or validation, correct the visible cause and submit once. If a pledge or transition is already visible, reload instead of repeating it.",
+                        "Turning Bounties off hides navigation, commands and public data and stops pledges, moderation, expiry work, ledger changes and emitted events. Saved bounties, pledges and history remain.",
+                        "Re-enable Bounties and Points to continue from retained current state. Commands, expiries, events and other work suppressed while off are not replayed.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Build seasons and achievements", "community/progression"),
+                new SiteLink("Review viewer points", "points"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/progression",
+            Eyebrow = "Community progression · Seasons",
+            Title = "Run seasons, quests and achievements",
+            Summary =
+                "Turn supported channel events into individual or communal progress, then preserve standings and viewer-earned rewards beyond the season.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/progression/phone-dark-community-progression-public.png",
+                LightPhoneSource: "media/community/progression/phone-light-community-progression-public.png",
+                DarkLaptopSource: "media/community/progression/laptop-dark-community-progression-setup.png",
+                LightLaptopSource: "media/community/progression/laptop-light-community-progression-setup.png",
+                PhoneAlt: "The Sample Channel public season page showing named standings and current viewer quest progress on a narrow screen.",
+                LaptopAlt: "The Sample Channel Community progression page showing new-season dates, Public visibility and private moderator notes.",
+                "The management page starts the season contract; the public page makes named standings and progress visible when the season is Public."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Choose authority and visibility",
+                    Steps =
+                    [
+                        "Choose the channel, open Channel setup, turn on Community progression under Chat tools and save.",
+                        "A channel owner or permitted moderator creates seasons, definitions and rewards and controls lifecycle and reset schedules. Participant progress comes from authenticated Twitch chat and supported Twitch or BlokeBot events.",
+                        "Choose Public to publish participant Twitch identities and progression, or Hidden to publish no progression data. Private moderator notes stay on the management page in both modes.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Public seasons show Twitch display names and recorded logins in standings, individual quest and achievement progress, communal goals, completions, equipped rewards, unlock history and archived history. They never expose raw provider payloads, provider credentials, internal IDs, moderator notes or internal audit material.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create the season contract",
+                    Steps =
+                    [
+                        "Create a Draft season with a name, public description, UTC start and end and Public or Hidden visibility.",
+                        "While it is Draft, add host-scoped Title, Badge icon or Cosmetic accent rewards. Select only supported presentation tokens; arbitrary CSS is not accepted.",
+                        "Add Quest or Achievement definitions. Choose per-viewer or channel-wide communal progress, One-time or Repeatable completion, a target, optional point and persistent-reward keys, and one supported typed event rule.",
+                        "Open the season only after the definition and reward inventory is complete. Progress events outside the open season's start and end are not counted.",
+                    ],
+                    Bullets =
+                    [
+                        "Typed rules cover chat messages, follows, subscriptions, cheers, incoming raids, reward redemptions, completed bounties and predeclared external achievement grants.",
+                        "Definitions allow only supported rule, owner, increment and filter combinations. A rejected combination remains unsaved; choose a compatible option instead of treating the event as generic text.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Follow individual and communal progress",
+                    Bullets =
+                    [
+                        "A matching host-scoped event advances each applicable active definition once. Event-value rules use the supported numeric value, while occurrence rules add one.",
+                        "Per-viewer definitions update that participant's current progress, completions and standings. Communal definitions combine qualifying events into one channel-wide goal.",
+                        "Participants use !progress for a short view of their current Public season progress and /community/{channel} for standings, goals, completions and rewards.",
+                        "Hidden seasons remain manageable by authorised staff, but !progress reports that progression is hidden and the public route publishes no season data.",
+                    ],
+                    Code =
+                        "!progress\n!equiptitle <reward-key>\n!equipbadge <reward-key>\n!equipaccent <reward-key>",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Schedule repeatable resets",
+                    Bullets =
+                    [
+                        "Daily and weekly repeatable definitions use the channel timezone, the configured local time and, for weekly resets, the configured weekday. The page shows the next UTC reset.",
+                        "A local time in a daylight-saving gap moves forward to the first valid instant. An overlapping local time uses its first occurrence and does not reset again at the second.",
+                        "After downtime, BlokeBot rolls at most once into the current period. It does not replay every missed daily or weekly period.",
+                        "Saving a schedule change while a period is active closes that period immediately and resets active repeatable progress. Select Reset active progress now before Save schedule and roll over immediately; the confirmed change applies once across retries and multiple instances.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Grant and equip persistent rewards",
+                    Bullets =
+                    [
+                        "A completion grants its configured points, title, badge icon and supported cosmetic accent atomically. Retrying the same completion does not grant twice.",
+                        "Viewer unlocks survive season closure and archival. A viewer can equip one unlocked title, badge and accent for this host with the chat commands shown above.",
+                        "Equipping checks reward ownership and host scope. It changes the current selection without rewriting the immutable season completion record.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Close archive and recover",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/progression/phone-dark-community-progression-disabled.png",
+                        LightPhoneSource: "media/community/progression/phone-light-community-progression-disabled.png",
+                        DarkLaptopSource: "media/community/progression/laptop-dark-community-progression-archive.png",
+                        LightLaptopSource: "media/community/progression/laptop-light-community-progression-archive.png",
+                        PhoneAlt: "The Sample Channel Community progression direct route showing retained-state recovery while the feature is off.",
+                        LaptopAlt: "The Sample Channel public progression page showing completed achievement history, persistent reward unlocks and an archived season standings snapshot.",
+                        "Closing preserves a final standings snapshot and completion history; disabling preserves the same data and routes staff back to Channel setup."
+                    ),
+                    Bullets =
+                    [
+                        "Close and snapshot standings freezes final standings and completion history. Archive keeps that snapshot and every persistent viewer unlock and equipped selection.",
+                        "If expected progress is absent, confirm the selected channel, open season dates, rule type, scope, filter, current period and Public or Hidden choice before sending another event.",
+                        "Turning Community progression off stops commands, event processing, timers, automation, rewards and public output before mutation. Seasons, progress, schedules, rewards and history remain saved.",
+                        "Re-enable to continue in the current period. BlokeBot does not replay suppressed events or every reset period missed while the feature was off.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Run Stream-event Bingo", "community/bingo"),
+                new SiteLink("Use viewer-funded bounties", "community/bounties"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/bingo",
+            Eyebrow = "Community progression · Bingo",
+            Title = "Run Stream-event Bingo",
+            Summary =
+                "Issue deterministic shared, viewer or team cards, mark supported stream moments and keep public evidence and rewards reviewable.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/progression/phone-dark-bingo-public-card.png",
+                LightPhoneSource: "media/community/progression/phone-light-bingo-public-card.png",
+                DarkLaptopSource: "media/community/progression/laptop-dark-bingo-setup.png",
+                LightLaptopSource: "media/community/progression/laptop-light-bingo-setup.png",
+                PhoneAlt: "The Sample Channel public Bingo page showing a team card, participant Twitch logins and a narrow-screen horizontal-scroll affordance.",
+                LaptopAlt: "The Sample Channel Bingo management page showing template revision, Shared board mode, recorded seed, optional participant cap and the Open viewer joining action.",
+                "Hosts open a game from a saved template revision; participants see the frozen card assignment and public identity boundary."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Enable the required tools",
+                    Steps =
+                    [
+                        "Choose the channel, open Channel setup, turn on Bingo under Chat tools and save.",
+                        "A channel owner or permitted moderator creates templates, opens games, manages the joining roster, issues cards, confirms or reverses manual marks and archives the game. Viewers join or leave before issue and follow cards in chat or on the public page.",
+                        "Turn on Points before opening a game whose template awards points. Turn on Community progression and predeclare a viewer achievement that accepts external grants; attach a title reward to that achievement when the Bingo win should unlock a title.",
+                    ],
+                    Note =
+                        "A Stream category changed square also needs the selected channel's Twitch integration. Bingo owns the host-scoped channel.update subscription and keeps it absent while Bingo is off.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Build a deterministic template",
+                    Steps =
+                    [
+                        "Choose a 3 × 3, 4 × 4 or 5 × 5 grid and provide enough squares to fill it.",
+                        "Give every square a public title and stable key, then choose Manual confirmation, Incoming raid, Bounty completed, Guessing result, Giveaway started, Stream category changed or Counter reached.",
+                        "Set only the supported threshold, counter or filter for that typed source. Put subjective staff guidance in Private moderator note.",
+                        "Configure the line reward used by row, column and diagonal wins and, when wanted, enable a full-card win and reward. Save the revision.",
+                    ],
+                    Paragraphs =
+                    [
+                        "The issued card keeps the saved dimension, template revision, recorded seed and assignment identity. Later template edits do not alter frozen cards, square positions or win lines.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Open joining and freeze the roster",
+                    Bullets =
+                    [
+                        "Choose Shared board, Unique per viewer or Teams, enter a recorded seed and optionally set a host participant cap. Team games can also set a host team cap and team names.",
+                        "There is no product-wide participant cap. With no host cap, every joined viewer receives the applicable card and supported events update all cards synchronously; there is no hidden batching queue or rate-limit machinery.",
+                        "Viewers use !bingojoin, adding a team name for team games, and !bingoleave while joining is open. Owners and moderators may move or remove participants and keep private roster notes.",
+                        "Select Issue and freeze cards only after checking the roster and teams. Issuing closes joining and permanently freezes participant, team and card assignments for that game.",
+                    ],
+                    Code = "!bingo\n!bingojoin [team name]\n!bingoleave",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Mark events and correct mistakes",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/progression/phone-dark-bingo-evidence.png",
+                        LightPhoneSource: "media/community/progression/phone-light-bingo-evidence.png",
+                        DarkLaptopSource: "media/community/progression/laptop-dark-bingo-moderation.png",
+                        LightLaptopSource: "media/community/progression/laptop-light-bingo-moderation.png",
+                        PhoneAlt: "The Sample Channel public Team Aurora Bingo card showing marked squares, normalized event evidence, a reversal and a retained rewarded win on a narrow screen.",
+                        LaptopAlt: "The Sample Channel Bingo moderator page showing a frozen 4 by 4 team card, automatic marks and manual Confirm controls with private notes.",
+                        "Typed automatic evidence and manual correction stay visible on the public card, while moderator notes remain in the authorised dashboard."
+                    ),
+                    Bullets =
+                    [
+                        "Automatic squares mark once from a matching host-scoped event. Retries, restarts and provider replay do not mark the same source event twice.",
+                        "Manual squares change only when an owner or moderator selects Confirm. Use Reverse to correct a mistaken manual mark; both confirmation and reversal remain visible as public normalized evidence.",
+                        "A card completes rows, columns, diagonals and the configured full-card rule from its persisted grid. Points and Community achievement or title rewards grant once per completed win rule.",
+                        "If a reversed mark had already completed and rewarded a win, the live square is corrected but that completed win and reward remain immutable. Re-marking cannot grant it again; points and persistent unlocks are not clawed back.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Know what the public can see",
+                    Bullets =
+                    [
+                        "The public route /bingo/{channel} shows participant Twitch display names and recorded logins or team names, assigned cards, marks, wins and archived games.",
+                        "Normalized evidence may show the supported event kind, occurrence time, matched square and relevant public participant display name and login. Manual confirmation and reversal are public evidence too.",
+                        "Raw provider payloads, provider credentials, internal identifiers, private moderator notes and internal audit reasons are never public.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Publish overlays and archives",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/progression/phone-dark-bingo-disabled.png",
+                        LightPhoneSource: "media/community/progression/phone-light-bingo-disabled.png",
+                        DarkLaptopSource: "media/community/progression/laptop-dark-bingo-archive.png",
+                        LightLaptopSource: "media/community/progression/laptop-light-bingo-archive.png",
+                        PhoneAlt: "The Sample Channel Bingo direct route showing retained templates, cards, evidence, wins, rewards and archives while Bingo is off.",
+                        LaptopAlt: "The Sample Channel public Bingo archive showing a completed five by five Shared card at desktop width.",
+                        "Archives retain the dealt grid and public evidence; a disabled signed-in route keeps the saved game intact and points back to Channel setup."
+                    ),
+                    Bullets =
+                    [
+                        "Enable Overlays and add an Event feed Browser Source when the stream should show Bingo issue, mark, reversal, win and archive summaries. Keep the private Browser Source URL out of chat and screenshots.",
+                        "Archive a finished game to move its frozen cards, evidence and wins into Completed history on the public page.",
+                        "If joining is closed, a cap is reached or a team name is invalid, correct that visible condition before trying again. Once issued, roster and assignment changes are intentionally unavailable.",
+                        "If an automatic square does not mark, check the square type and filter, source feature, selected channel and applicable Twitch connection. Do not replace a subjective moment with an invented automatic source.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover after turning Bingo off",
+                    Bullets =
+                    [
+                        "Turning Bingo off hides normal navigation and public data and stops commands, joins, marking, rewards, overlay events, queued work and channel.update subscription reconciliation before mutation.",
+                        "Templates, rosters, issued cards, normalized evidence, wins, rewards and archives remain saved. A retained signed-in direct route links to Channel setup.",
+                        "Re-enable to continue from retained current state. Events, commands, subscriptions and other work suppressed while Bingo was off are not replayed.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Build Community rewards", "community/progression"),
+                new SiteLink("Add an Event feed overlay", "overlays"),
+            ],
         };
 
         yield return new SiteGuidePage
@@ -1779,7 +2158,7 @@ internal static class SiteGuideCatalog
                         "Play overlay cue plays a saved Cue through a chosen Cue player Browser Source. The cue, the Cue player and the Overlays feature must all be enabled for playback.",
                         "A replaced or deleted cue or Cue player makes the action fail rather than silently playing something else.",
                     ],
-                    Links = [new SiteLink("Build reusable Cues", "overlays#cues")],
+                    Links = [new SiteLink("Build reusable Cues", "overlays/cues")],
                 },
                 new SiteGuideSection
                 {

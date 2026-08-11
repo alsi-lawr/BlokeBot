@@ -1118,7 +1118,16 @@ public sealed class MomentHubService(
                 _ = db.PointBalances.Add(balance);
             }
             var current = PointAmount.ParseAbsolute(balance.Amount);
-            if (current.Value + amount.Value > PointAmount.MaximumValue)
+            if (
+                !await PointCreditCapacity.CanCreditAsync(
+                    db,
+                    candidate.HostId,
+                    contributor.NormalizedLogin,
+                    current,
+                    amount.Value,
+                    ct
+                )
+            )
             {
                 throw new InvalidOperationException("Moment reward would exceed the point limit.");
             }

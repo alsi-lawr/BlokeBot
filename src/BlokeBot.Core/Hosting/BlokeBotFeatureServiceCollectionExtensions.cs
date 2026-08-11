@@ -9,7 +9,10 @@ using BlokeBot.Core.Features.Admin.Authorization;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Automations;
+using BlokeBot.Core.Features.Bingo;
+using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Guessing.Commands;
 using BlokeBot.Core.Features.Guessing.Configuration;
@@ -49,6 +52,95 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotBingo(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<BingoService>();
+        _ = services.AddSingleton<BingoRuntime>();
+        _ = services.AddSingleton<ITwitchEventAutomationObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        _ = services.AddSingleton<IEventSubRequirementSource>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostFeatureChangeObserver, BingoFeatureObserver>()
+        );
+        _ = services.AddSingleton<IBountyCompletionObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        _ = services.AddSingleton<IGuessingChangeObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        _ = services.AddSingleton<IPointsGiveawayChangeObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        _ = services.AddSingleton<IBingoCounterEventSink>(static serviceProvider =>
+            serviceProvider.GetRequiredService<BingoRuntime>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IBingoOverlayEventObserver, BingoOverlayEventPublisher>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotCommunityProgression(
+        this IServiceCollection services
+    )
+    {
+        _ = services.AddSingleton<CommunityProgressionService>();
+        _ = services.AddSingleton<ICommunityAchievementGrantService>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionService>()
+        );
+        _ = services.AddSingleton<CommunityProgressionRuntime>();
+        _ = services.AddSingleton<ITwitchEventAutomationObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        _ = services.AddSingleton<IChatMessageObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        _ = services.AddSingleton<IEventSubRequirementSource>(static serviceProvider =>
+            serviceProvider.GetRequiredService<CommunityProgressionRuntime>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IHostFeatureChangeObserver,
+                CommunityProgressionFeatureObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IBountyCompletionObserver,
+                BountyCommunityProgressionObserver
+            >()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, CommunityProgressionScheduleWorker>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotBounties(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<BountyService>();
+        _ = services.AddSingleton<BountyPauseObserver>();
+        _ = services.AddSingleton<IHostFeatureChangeObserver>(static services =>
+            services.GetRequiredService<BountyPauseObserver>()
+        );
+        _ = services.AddSingleton(
+            new BountyExpirySchedulerPolicy
+            {
+                PollInterval = TimeSpan.FromSeconds(30),
+                BatchSize = 100,
+            }
+        );
+        _ = services.AddSingleton<BountyExpiryScheduler>();
+        _ = services.AddHostedService(static sp => sp.GetRequiredService<BountyExpiryScheduler>());
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotAppCommands(this IServiceCollection services)
     {
         _ = services.AddSingleton<CommandAliasRegistry>();
