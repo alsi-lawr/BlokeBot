@@ -348,6 +348,7 @@ public sealed class ViewerPrivacyServiceTests
             "ViewerPassport.DisplayName",
             "ViewerPassport.Login",
             "ViewerPassport.TwitchUserId",
+            "ViewerPassportLogin.Login",
         };
         var excluded = new Dictionary<string, string>(StringComparer.Ordinal)
         {

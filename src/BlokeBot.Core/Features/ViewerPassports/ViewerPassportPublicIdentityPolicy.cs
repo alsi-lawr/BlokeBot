@@ -43,11 +43,20 @@ public sealed class ViewerPassportPublicIdentityPolicy(
             )
             .Select(value => new { value.TwitchUserId, value.Login })
             .ToArrayAsync(cancellationToken);
+        var hiddenLogins = await (
+            from login in db.ViewerPassportLogins.AsNoTracking()
+            join passport in db.ViewerPassports.AsNoTracking()
+                on login.PassportId equals passport.Id
+            where
+                passport.HostId == hostId && passport.Visibility != ViewerPassportVisibility.Public
+            select login.Login
+        ).ToArrayAsync(cancellationToken);
         return new(
             hidden.Select(value => value.TwitchUserId).ToHashSet(StringComparer.Ordinal),
             hidden
                 .Where(value => !string.IsNullOrWhiteSpace(value.Login))
                 .Select(value => value.Login)
+                .Concat(hiddenLogins)
                 .ToHashSet(StringComparer.Ordinal)
         );
     }

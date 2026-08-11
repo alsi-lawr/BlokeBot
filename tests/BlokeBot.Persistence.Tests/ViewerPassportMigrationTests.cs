@@ -10,6 +10,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class ViewerPassportMigrationTests
 {
     private const string _previousMigration = "20260810154030_v0.9.0_BingoOpaqueAssignments";
+    private const string _passportMigration = "20260811035655_v0.10.0_ViewerPassports";
 
     [Test]
     public async Task Upgrade_AddsPassportSchemaAndLeavesEveryExistingHostOff()
@@ -52,6 +53,41 @@ public sealed class ViewerPassportMigrationTests
     }
 
     [Test]
+    public async Task Upgrade_BackfillsTheCurrentLoginAsTheFirstRememberedLogin()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using (var before = await factory.CreateDbContextAsync())
+        {
+            await before.GetService<IMigrator>().MigrateAsync(_passportMigration);
+            _ = await before.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
+                     CommandsAliasesConfigured, CreatedAtUtc)
+                VALUES
+                    (1, 'host-id', 'host', 'Host', 0, 0, 0, '2026-08-11T00:00:00Z');
+
+                INSERT INTO viewer_passports
+                    (Id, HostId, TwitchUserId, Login, DisplayName, ProfileLine, Visibility,
+                     HideAttendance, CreatedAtUtc, UpdatedAtUtc)
+                VALUES
+                    (1, 1, 'viewer-id', 'remember_me', 'Viewer', '', 'Private', 1,
+                     '2026-08-01T00:00:00Z', '2026-08-11T00:00:00Z');
+                """
+            );
+            await before.Database.MigrateAsync();
+        }
+
+        await using var upgraded = await factory.CreateDbContextAsync();
+        var login = await upgraded.ViewerPassportLogins.SingleAsync();
+        login.HostId.ShouldBe(1);
+        login.PassportId.ShouldBe(1);
+        login.Login.ShouldBe("remember_me");
+        login.FirstSeenAtUtc.ShouldBe(new DateTime(2026, 8, 1));
+        login.LastSeenAtUtc.ShouldBe(new DateTime(2026, 8, 11));
+    }
+
+    [Test]
     public async Task ViewerPrivacyErasure_ReportsAndRemovesProfileAndAttendance()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -88,6 +124,16 @@ public sealed class ViewerPassportMigrationTests
                     FirstSeenAtUtc = DateTime.UtcNow,
                 }
             );
+            _ = seed.ViewerPassportLogins.Add(
+                new()
+                {
+                    HostId = host.Id,
+                    PassportId = passport.Id,
+                    Login = "viewer",
+                    FirstSeenAtUtc = DateTime.UtcNow,
+                    LastSeenAtUtc = DateTime.UtcNow,
+                }
+            );
             _ = await seed.SaveChangesAsync();
         }
 
@@ -100,11 +146,13 @@ public sealed class ViewerPassportMigrationTests
                 default
             );
             report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows["viewer-passports.logins"].ShouldBe(1);
             report.ChangedRows["viewer-passports.attendance-days"].ShouldBe(1);
         }
 
         await using var verify = await factory.CreateDbContextAsync();
         (await verify.ViewerPassports.CountAsync()).ShouldBe(0);
+        (await verify.ViewerPassportLogins.CountAsync()).ShouldBe(0);
         (await verify.ViewerPassportAttendanceDays.CountAsync()).ShouldBe(0);
     }
 }

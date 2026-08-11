@@ -67,6 +67,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<CommunityAudit> CommunityAudits => Set<CommunityAudit>();
     public DbSet<CommunityDomainEvent> CommunityEvents => Set<CommunityDomainEvent>();
     public DbSet<ViewerPassport> ViewerPassports => Set<ViewerPassport>();
+    public DbSet<ViewerPassportLogin> ViewerPassportLogins => Set<ViewerPassportLogin>();
     public DbSet<ViewerPassportAttendanceDay> ViewerPassportAttendanceDays =>
         Set<ViewerPassportAttendanceDay>();
     public DbSet<BingoTemplate> BingoTemplates => Set<BingoTemplate>();

@@ -467,16 +467,49 @@ public static class ViewerPrivacyService
         await AddAsync(
             "viewer-passports.profiles",
             db.ViewerPassports.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || x.Login == login
+                    || db.ViewerPassportLogins.Any(alias =>
+                        alias.PassportId == x.Id && alias.Login == login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
+        );
+        await AddAsync(
+            "viewer-passports.logins",
+            db.ViewerPassportLogins.Where(x =>
+                    db.ViewerPassports.Any(passport =>
+                        passport.Id == x.PassportId
+                        && (
+                            passport.TwitchUserId == userId
+                            || passport.Login == login
+                            || db.ViewerPassportLogins.Any(alias =>
+                                alias.PassportId == passport.Id && alias.Login == login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.HostId,
+                    x.Login,
+                    x.FirstSeenAtUtc,
+                    x.LastSeenAtUtc,
+                })
         );
         await AddAsync(
             "viewer-passports.attendance-days",
             db.ViewerPassportAttendanceDays.Where(x =>
                     db.ViewerPassports.Any(passport =>
                         passport.Id == x.PassportId
-                        && (passport.TwitchUserId == userId || passport.Login == login)
+                        && (
+                            passport.TwitchUserId == userId
+                            || passport.Login == login
+                            || db.ViewerPassportLogins.Any(alias =>
+                                alias.PassportId == passport.Id && alias.Login == login
+                            )
+                        )
                     ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
@@ -1372,12 +1405,35 @@ public static class ViewerPrivacyService
         }
         Record("community.events", communityEvents);
         Record(
+            "viewer-passports.logins",
+            await db.ViewerPassportLogins.CountAsync(
+                x =>
+                    db.ViewerPassports.Any(passport =>
+                        passport.Id == x.PassportId
+                        && (
+                            passport.TwitchUserId == userId
+                            || passport.Login == login
+                            || db.ViewerPassportLogins.Any(alias =>
+                                alias.PassportId == passport.Id && alias.Login == login
+                            )
+                        )
+                    ) && (hostId == null || x.HostId == hostId),
+                ct
+            )
+        );
+        Record(
             "viewer-passports.attendance-days",
             await db.ViewerPassportAttendanceDays.CountAsync(
                 x =>
                     db.ViewerPassports.Any(passport =>
                         passport.Id == x.PassportId
-                        && (passport.TwitchUserId == userId || passport.Login == login)
+                        && (
+                            passport.TwitchUserId == userId
+                            || passport.Login == login
+                            || db.ViewerPassportLogins.Any(alias =>
+                                alias.PassportId == passport.Id && alias.Login == login
+                            )
+                        )
                     ) && (hostId == null || x.HostId == hostId),
                 ct
             )
@@ -1386,8 +1442,13 @@ public static class ViewerPrivacyService
             "viewer-passports.profiles",
             await db
                 .ViewerPassports.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || x.Login == login
+                        || db.ViewerPassportLogins.Any(alias =>
+                            alias.PassportId == x.Id && alias.Login == login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );

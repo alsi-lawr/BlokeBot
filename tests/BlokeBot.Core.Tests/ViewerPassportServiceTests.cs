@@ -1,5 +1,7 @@
+using BlokeBot.Core.Features.Guessing.History;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -67,6 +69,130 @@ public sealed class ViewerPassportServiceTests
                 value.HostId == firstHost && value.TwitchUserId == "viewer-id"
             )
         ).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PrivateRename_HidesRememberedLoginsFromPublicLegacyLeaderboards()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(hostId, "viewer-id", "old_login"), default));
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            _ = seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "old_login",
+                    Amount = "125",
+                    UpdatedAtUtc = _now.UtcDateTime,
+                }
+            );
+            SeedCompletedGuess(seed, hostId, "old_login");
+            _ = await seed.SaveChangesAsync();
+        }
+        await using (var inspect = await database.CreateDbContextAsync())
+        {
+            var vote = await inspect.Votes.Include(value => value.GuessRound).SingleAsync();
+            vote.GuessName.ShouldBe("blue");
+            vote.GuessRound.ShouldNotBeNull().WinningName.ShouldBe("blue");
+        }
+
+        var renamed = Success(
+            await service.SaveAsync(Save(hostId, "viewer-id", "new_login"), default)
+        );
+        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            hostId,
+            default
+        );
+
+        exclusions.Logins.Order().ShouldBe(["new_login", "old_login"]);
+        (
+            await new PointBalanceService(database).GetPublicLeaderboardAsync(
+                hostId,
+                10,
+                exclusions.Logins,
+                default
+            )
+        ).ShouldBeEmpty();
+        (
+            await new GuessingHistoryService(database).LoadPublicLeaderboardAsync(
+                hostId,
+                new GuessHistoryQuery { Page = 1, PageSize = 10 },
+                exclusions.Logins,
+                default
+            )
+        ).Entries.ShouldBeEmpty();
+        renamed.Statistics.Points.ShouldBe("125");
+        renamed.Statistics.GuessRounds.ShouldBe(1);
+        renamed.Statistics.CorrectGuesses.ShouldBe(1);
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify
+                .ViewerPassportLogins.OrderBy(value => value.Login)
+                .Select(value => value.Login)
+                .ToArrayAsync()
+        ).ShouldBe(["new_login", "old_login"]);
+    }
+
+    [Test]
+    public async Task GamesWon_CountsDistinctBingoGamesAndNotCorrectGuesses()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(hostId, "viewer-id", "viewer"), default));
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            SeedCompletedGuess(seed, hostId, "viewer");
+            _ = await seed.SaveChangesAsync();
+        }
+        await using (var inspect = await database.CreateDbContextAsync())
+        {
+            var vote = await inspect.Votes.Include(value => value.GuessRound).SingleAsync();
+            string.Equals(
+                    vote.GuessName,
+                    vote.GuessRound.ShouldNotBeNull().WinningName,
+                    StringComparison.OrdinalIgnoreCase
+                )
+                .ShouldBeTrue();
+        }
+
+        var beforeWin = (
+            await service.GetSelfAsync(hostId, new("viewer-id", "viewer", "Viewer"), default)
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport.Statistics;
+        beforeWin.CorrectGuesses.ShouldBe(1);
+        beforeWin.GamesWon.ShouldBe(0);
+
+        await SeedBingoWinsAsync(database, hostId, "viewer-id");
+        await using (var inspect = await database.CreateDbContextAsync())
+        {
+            (await inspect.BingoWinRecipients.CountAsync()).ShouldBe(2);
+            (
+                await (
+                    from recipient in inspect.BingoWinRecipients
+                    join win in inspect.BingoWins on recipient.WinId equals win.Id
+                    where
+                        recipient.HostId == hostId
+                        && recipient.TwitchUserId == "viewer-id"
+                        && win.HostId == hostId
+                    select win.GameId
+                )
+                    .Distinct()
+                    .CountAsync()
+            ).ShouldBe(1);
+        }
+
+        var afterWin = (
+            await service.GetSelfAsync(hostId, new("viewer-id", "viewer", "Viewer"), default)
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport.Statistics;
+        afterWin.CorrectGuesses.ShouldBe(1);
+        afterWin.GamesWon.ShouldBe(1);
     }
 
     [Test]
@@ -292,6 +418,7 @@ public sealed class ViewerPassportServiceTests
             await service.ExportAsync(hostId, viewer, default)
         ).ShouldBeOfType<ViewerPassportExportOutcome.Succeeded>();
         export.Sections.Keys.ShouldContain("viewer-passports.profiles");
+        export.Sections.Keys.ShouldContain("viewer-passports.logins");
         export.Sections.Keys.ShouldContain("viewer-passports.attendance-days");
         _ = (
             await service.ResetAsync(hostId, "viewer-id", default)
@@ -299,6 +426,7 @@ public sealed class ViewerPassportServiceTests
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.ViewerPassports.CountAsync()).ShouldBe(0);
+        (await verify.ViewerPassportLogins.CountAsync()).ShouldBe(0);
         (await verify.ViewerPassportAttendanceDays.CountAsync()).ShouldBe(0);
         (await verify.PointBalances.SingleAsync()).Amount.ShouldBe("42");
     }
@@ -422,6 +550,135 @@ public sealed class ViewerPassportServiceTests
         );
         _ = await db.SaveChangesAsync();
         return reward.Id;
+    }
+
+    private static void SeedCompletedGuess(BlokeBotDbContext db, int hostId, string login)
+    {
+        var profile = new GuessRoundProfile
+        {
+            HostId = hostId,
+            Name = $"Guess {Guid.NewGuid():N}",
+            Slug = $"guess-{Guid.NewGuid():N}",
+            ReplySettings = new BotReplySettings(),
+        };
+        _ = db.Rounds.Add(
+            new GuessRound
+            {
+                HostId = hostId,
+                GuessRoundProfile = profile,
+                Status = GuessRoundStatus.Completed,
+                StartedAtUtc = _now.AddMinutes(-5).UtcDateTime,
+                ClosedAtUtc = _now.UtcDateTime,
+                WinningName = "blue",
+                Votes =
+                [
+                    new GuessVote
+                    {
+                        Login = login,
+                        GuessName = "blue",
+                        GuessedAtUtc = _now.AddMinutes(-2).UtcDateTime,
+                    },
+                ],
+            }
+        );
+    }
+
+    private static async Task SeedBingoWinsAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        string twitchUserId
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var template = new BingoTemplate
+        {
+            HostId = hostId,
+            PublicId = Guid.NewGuid(),
+            CreationOperationId = Guid.NewGuid(),
+            Name = "Passport games won",
+            CurrentRevision = 1,
+            CreatedAtUtc = _now.UtcDateTime,
+            UpdatedAtUtc = _now.UtcDateTime,
+        };
+        _ = db.BingoTemplates.Add(template);
+        _ = await db.SaveChangesAsync();
+        var revision = new BingoTemplateRevision
+        {
+            HostId = hostId,
+            OperationId = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Revision = 1,
+            Dimension = 3,
+            CreatedByTwitchUserId = "host-id",
+            CreatedByLogin = "channel",
+            CreatedAtUtc = _now.UtcDateTime,
+        };
+        _ = db.BingoTemplateRevisions.Add(revision);
+        _ = await db.SaveChangesAsync();
+        var game = new BingoGame
+        {
+            HostId = hostId,
+            PublicId = Guid.NewGuid(),
+            CreationOperationId = Guid.NewGuid(),
+            TemplateRevisionId = revision.Id,
+            TemplateName = template.Name,
+            TemplateRevisionNumber = 1,
+            Dimension = 3,
+            Seed = "passport-game",
+            Mode = BingoGameMode.Shared,
+            Status = BingoGameStatus.Completed,
+            CreatedAtUtc = _now.AddHours(-1).UtcDateTime,
+            CompletedAtUtc = _now.UtcDateTime,
+        };
+        _ = db.BingoGames.Add(game);
+        _ = await db.SaveChangesAsync();
+        var card = new BingoCard
+        {
+            HostId = hostId,
+            GameId = game.Id,
+            PublicId = Guid.NewGuid(),
+            AssignmentKey = "shared",
+            AssignmentName = "Shared card",
+            IssuedAtUtc = _now.AddMinutes(-30).UtcDateTime,
+        };
+        _ = db.BingoCards.Add(card);
+        _ = await db.SaveChangesAsync();
+        var wins = new[]
+        {
+            new BingoWin
+            {
+                HostId = hostId,
+                GameId = game.Id,
+                CardId = card.Id,
+                PublicId = Guid.NewGuid(),
+                Kind = BingoWinKind.Row,
+                RuleKey = "row:0",
+                CompletedAtUtc = _now.AddMinutes(-10).UtcDateTime,
+            },
+            new BingoWin
+            {
+                HostId = hostId,
+                GameId = game.Id,
+                CardId = card.Id,
+                PublicId = Guid.NewGuid(),
+                Kind = BingoWinKind.Column,
+                RuleKey = "column:0",
+                CompletedAtUtc = _now.AddMinutes(-5).UtcDateTime,
+            },
+        };
+        db.BingoWins.AddRange(wins);
+        _ = await db.SaveChangesAsync();
+        db.BingoWinRecipients.AddRange(
+            wins.Select(win => new BingoWinRecipient
+            {
+                HostId = hostId,
+                WinId = win.Id,
+                TwitchUserId = twitchUserId,
+                Login = "viewer",
+                DisplayName = "Viewer",
+            })
+        );
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task SetFeaturesAsync(

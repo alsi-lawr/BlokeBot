@@ -28,6 +28,17 @@ public sealed class ViewerPassport
     public DateTime UpdatedAtUtc { get; set; }
 }
 
+public sealed class ViewerPassportLogin
+{
+    public long Id { get; set; }
+    public int HostId { get; set; }
+    public long PassportId { get; set; }
+    public ViewerPassport? Passport { get; set; }
+    public string Login { get; set; } = string.Empty;
+    public DateTime FirstSeenAtUtc { get; set; }
+    public DateTime LastSeenAtUtc { get; set; }
+}
+
 public sealed class ViewerPassportAttendanceDay
 {
     public long Id { get; set; }

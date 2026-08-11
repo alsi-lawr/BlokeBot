@@ -120,6 +120,24 @@ internal sealed class SimulationFixtureSeeder(
         };
         db.ViewerPassports.AddRange(streamer, nightOwl);
         _ = await db.SaveChangesAsync(cancellationToken);
+        db.ViewerPassportLogins.AddRange(
+            new ViewerPassportLogin
+            {
+                HostId = hostId,
+                PassportId = streamer.Id,
+                Login = streamer.Login,
+                FirstSeenAtUtc = streamer.CreatedAtUtc,
+                LastSeenAtUtc = streamer.UpdatedAtUtc,
+            },
+            new ViewerPassportLogin
+            {
+                HostId = hostId,
+                PassportId = nightOwl.Id,
+                Login = nightOwl.Login,
+                FirstSeenAtUtc = nightOwl.CreatedAtUtc,
+                LastSeenAtUtc = nightOwl.UpdatedAtUtc,
+            }
+        );
         for (var offset = 0; offset < 6; offset++)
         {
             db.ViewerPassportAttendanceDays.AddRange(
@@ -343,7 +361,7 @@ internal sealed class SimulationFixtureSeeder(
         };
         var participants = new[]
         {
-            Participant(hostId, game, aurora, auroraCard, "2001", "nightowl", "NightOwl", now),
+            Participant(hostId, game, aurora, auroraCard, "3000", "nightowl", "NightOwl", now),
             Participant(hostId, game, aurora, auroraCard, "2002", "pixelpilot", "PixelPilot", now),
             Participant(hostId, game, nebula, nebulaCard, "2003", "cozycactus", "CozyCactus", now),
         };
