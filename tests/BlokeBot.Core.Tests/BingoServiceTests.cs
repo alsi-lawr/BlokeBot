@@ -680,13 +680,6 @@ public sealed class BingoServiceTests
                 )
                 .Concat(
                     await verify
-                        .BingoModerationAudit.Select(value =>
-                            value.ActorTwitchUserId + value.ActorLogin + value.PrivateNote
-                        )
-                        .ToArrayAsync()
-                )
-                .Concat(
-                    await verify
                         .OverlayEventFeedItems.Select(value =>
                             value.SourceKey + value.Title + value.Body
                         )
@@ -697,6 +690,12 @@ public sealed class BingoServiceTests
         {
             retainedText.ShouldNotContain(identity, Case.Insensitive);
         }
+        (
+            await verify.BingoModerationAudit.CountAsync(value =>
+                value.PrivateNote == "Alice Display verified before issue."
+                && value.ActorTwitchUserId == "moderator-id"
+            )
+        ).ShouldBe(1);
     }
 
     [Test]

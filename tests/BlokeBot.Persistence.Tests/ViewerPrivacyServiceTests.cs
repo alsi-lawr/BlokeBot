@@ -248,6 +248,162 @@ public sealed class ViewerPrivacyServiceTests
     }
 
     [Test]
+    public async Task ConflictingNativeIds_BlockAliasFallbackAcrossIntegratedDomains()
+    {
+        const string ConflictingId = "conflicting-id";
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedAsync(factory);
+
+        await using (var conflict = await factory.CreateDbContextAsync())
+        {
+            _ = await conflict
+                .CustomCommandAllowedUsers.Where(value => value.Login == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .CustomCommandInvocationResetAudits.Where(value => value.ActorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.ActorTwitchUserId, ConflictingId)
+                        .SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .WhisperQuotaRecipients.Where(value => value.RecipientLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.RecipientTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .ShoutoutHistory.Where(value => value.TargetLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .ShoutoutCooldowns.Where(value => value.TargetLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .AutomaticRaidShoutoutOutcomes.Where(value => value.SourceLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.SourceTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .TwitchRewardRedemptions.Where(value => value.UserLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.UserId, ConflictingId)
+                );
+            _ = await conflict
+                .TwitchClips.Where(value => value.CreatorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.CreatorTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .PlayQueueEntries.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .MomentContributors.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .MomentVotes.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .OverlayInstanceEvents.Where(value => value.ActorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.ActorUserId, ConflictingId)
+                );
+        }
+
+        await using (var exportDb = await factory.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                exportDb,
+                PrivacySubject.Create(_aliceId, _alice),
+                fixture.HostAId,
+                default
+            );
+            foreach (
+                var section in new[]
+                {
+                    "commands.allowed-users",
+                    "commands.reset-audits",
+                    "whispers.recipients",
+                    "shoutouts.history",
+                    "shoutouts.cooldowns",
+                    "shoutouts.raid-outcomes",
+                    "channel-points.redemptions",
+                    "clips.created",
+                    "play-queues.entries",
+                    "moments.contributors",
+                    "moments.votes",
+                    "overlays.actor-events",
+                }
+            )
+            {
+                export.Sections.ShouldNotContainKey(section);
+            }
+            export.Sections.ShouldContainKey("points.balances");
+            export.Sections.ShouldContainKey("guessing.votes");
+        }
+
+        await using (var erase = await factory.CreateDbContextAsync())
+        {
+            _ = await ViewerPrivacyService.EraseAsync(
+                erase,
+                PrivacySubject.Create(_aliceId, _alice),
+                fixture.HostAId,
+                default
+            );
+        }
+
+        await using var verify = await factory.CreateDbContextAsync();
+        (
+            await verify.CustomCommandAllowedUsers.SingleAsync(value => value.Login == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        var reset = await verify.CustomCommandInvocationResetAudits.SingleAsync();
+        reset.ActorTwitchUserId.ShouldBe(ConflictingId);
+        reset.ActorLogin.ShouldBe(_alice);
+        reset.TargetTwitchUserId.ShouldBe(ConflictingId);
+        reset.TargetLogin.ShouldBe(_alice);
+        (
+            await verify.WhisperQuotaRecipients.SingleAsync(value => value.RecipientLogin == _alice)
+        ).RecipientTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.ShoutoutHistory.SingleAsync(value => value.TargetLogin == _alice)
+        ).TargetTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.TwitchRewardRedemptions.SingleAsync(value => value.UserLogin == _alice)
+        ).UserId.ShouldBe(ConflictingId);
+        (
+            await verify.TwitchClips.SingleAsync(value => value.CreatorLogin == _alice)
+        ).CreatorTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.PlayQueueEntries.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.MomentContributors.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.MomentVotes.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.OverlayInstanceEvents.SingleAsync(value => value.ActorLogin == _alice)
+        ).ActorUserId.ShouldBe(ConflictingId);
+    }
+
+    [Test]
     public void EveryIdentityBearingColumn_IsDeclaredHandledOrDeliberatelyExcluded()
     {
         // Tripwire: a new persisted column that can carry a viewer's Twitch identity must be
