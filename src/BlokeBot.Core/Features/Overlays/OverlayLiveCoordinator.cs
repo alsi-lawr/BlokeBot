@@ -20,6 +20,7 @@ internal sealed class OverlayLiveCoordinator(
 )
     : IHostedService,
         IOverlayLivePublisher,
+        IOverlayEventFeedLivePublisher,
         IOverlayLivePresence,
         IOverlayCueTransport,
         IAsyncDisposable,
@@ -78,6 +79,28 @@ internal sealed class OverlayLiveCoordinator(
 
     public void PublishTest(ResolvedOverlayInstance instance) =>
         QueuePublication(instance, OverlayLivePublicationKind.Test);
+
+    void IOverlayEventFeedLivePublisher.PublishSuppression(
+        ResolvedOverlayInstance instance,
+        EventFeedStatePresentation state
+    ) =>
+        PublishProjection(
+            new OverlayPublication(
+                instance,
+                OverlayLivePublicationKind.Suppression,
+                PlayQueueOverlayTransition.None
+            ),
+            new OverlaySnapshotProjection.EventFeedV1(
+                new EventFeedV1OverlaySnapshot
+                {
+                    ServerEpoch = serverEpoch.Value,
+                    Sequence = instance.Revision.Value,
+                    GeneratedAtUtc = timeProvider.GetUtcNow(),
+                    Animation = "none",
+                    State = state,
+                }
+            )
+        );
 
     void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan) =>
         PublishCueMessage(
@@ -573,9 +596,10 @@ internal sealed class OverlayLiveCoordinator(
                         Payload = new EventFeedV1OverlayLivePayload
                         {
                             Animation =
-                                publication.Kind is OverlayLivePublicationKind.Test
-                                    ? "sample"
-                                    : "card",
+                                publication.Kind is OverlayLivePublicationKind.Test ? "sample"
+                                : publication.Kind is OverlayLivePublicationKind.Suppression
+                                    ? "none"
+                                : "card",
                             State = feed.Snapshot.State,
                         },
                     }

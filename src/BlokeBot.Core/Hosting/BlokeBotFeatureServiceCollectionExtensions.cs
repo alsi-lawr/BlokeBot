@@ -255,6 +255,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         _ = services.AddSingleton<IOverlayLivePublisher>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );
+        _ = services.AddSingleton<IOverlayEventFeedLivePublisher>(static serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
         _ = services.AddSingleton<IOverlayLivePresence>(static serviceProvider =>
             serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
         );

@@ -4,8 +4,11 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Hosting;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -16,7 +19,7 @@ public sealed class CommunityProgressionServiceTests
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Test]
-    public async Task CompletedAchievement_PresentsSafeHostScopedCardOnceAfterCommit()
+    public async Task ExternalAchievementGrant_PresentsSafeHostScopedCardOnceAfterCommit()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTimeProvider(_now);
@@ -24,14 +27,16 @@ public sealed class CommunityProgressionServiceTests
         var otherHostId = await SeedHostAsync(database, "beta");
         await SetFeatureAsync(database, hostId, HostFeatureFlags.All);
         await SetFeatureAsync(database, otherHostId, HostFeatureFlags.All);
-        var feed = new OverlayEventFeedService(
-            database,
-            clock,
-            new OverlayPublisherServices(),
-            NullLogger<OverlayEventFeedService>.Instance
-        );
-        var achievementPublisher = new CommunityAchievementOverlayEventPublisher(database, [feed]);
-        var service = CreateService(database, clock, achievementObserver: achievementPublisher);
+        var services = new ServiceCollection();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        _ = services.AddSingleton<TimeProvider>(clock);
+        _ = services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        _ = services.AddBlokeBotCommunityProgression();
+        _ = services.AddBlokeBotOverlays();
+        await using var provider = services.BuildServiceProvider();
+        var service = provider.GetRequiredService<CommunityProgressionService>();
+        var feed = provider.GetRequiredService<OverlayEventFeedService>();
         _ = await SeedEventFeedAsync(database, hostId, "Alpha feed", clock.GetUtcNow());
         var otherOverlayId = await SeedEventFeedAsync(
             database,
@@ -44,7 +49,7 @@ public sealed class CommunityProgressionServiceTests
             service,
             hostId,
             CommunityVisibility.Public,
-            CommunityEventRuleKind.ChatMessage,
+            CommunityEventRuleKind.ExternalGrant,
             CommunityCompletionMode.OneTime,
             CommunityResetSchedule.None,
             points: 25,
@@ -54,15 +59,22 @@ public sealed class CommunityProgressionServiceTests
             rewardPresentationToken: "private-reward-token"
         );
         await OpenAsync(service, setup.Season, setup.Revision, hostId);
-        var sourceEvent = new CommunitySourceEvent.ChatMessage(
+        var request = new CommunityExternalGrantRequest(
+            hostId,
+            "test",
             "achievement-message",
+            new("private-definition-key"),
             new CommunityViewer("private-viewer-id", "viewerlogin", "Viewer Name"),
             _now
         );
 
-        _ = Success(await service.ProcessEventAsync(hostId, sourceEvent, default));
-        Success(await service.ProcessEventAsync(hostId, sourceEvent, default))
+        var granted = (
+            await service.GrantAsync(request, default)
+        ).ShouldBeOfType<CommunityExternalGrantOutcome.Granted>();
+        (await service.GrantAsync(request, default))
+            .ShouldBeOfType<CommunityExternalGrantOutcome.Granted>()
             .WasIdempotent.ShouldBeTrue();
+        granted.WasIdempotent.ShouldBeFalse();
 
         await using var db = await database.CreateDbContextAsync();
         var persisted = (await db.OverlayEventFeedItems.ToListAsync()).ShouldHaveSingleItem();
@@ -1029,15 +1041,13 @@ public sealed class CommunityProgressionServiceTests
     private static CommunityProgressionService CreateService(
         SqliteBlokeBotDbFactory database,
         TimeProvider clock,
-        ICommunityProgressionChangeObserver? observer = null,
-        ICommunityAchievementCompletionObserver? achievementObserver = null
+        ICommunityProgressionChangeObserver? observer = null
     ) =>
         new(
             database,
             TestEventBus.Create<AppEventKind>(),
             clock,
-            observer is null ? null : [observer],
-            achievementObserver is null ? null : [achievementObserver]
+            observer is null ? null : [observer]
         );
 
     private static async Task<long> SeedEventFeedAsync(
@@ -1065,21 +1075,6 @@ public sealed class CommunityProgressionServiceTests
         _ = db.OverlayInstances.Add(overlay);
         _ = await db.SaveChangesAsync();
         return overlay.Id;
-    }
-
-    private sealed class OverlayPublisherServices : IServiceProvider
-    {
-        private readonly IOverlayLivePublisher _publisher = new NoopOverlayPublisher();
-
-        public object? GetService(Type serviceType) =>
-            serviceType == typeof(IOverlayLivePublisher) ? _publisher : null;
-    }
-
-    private sealed class NoopOverlayPublisher : IOverlayLivePublisher
-    {
-        public void PublishState(ResolvedOverlayInstance instance) { }
-
-        public void PublishTest(ResolvedOverlayInstance instance) { }
     }
 
     private sealed class CommunityProgressionChangeObserver : ICommunityProgressionChangeObserver

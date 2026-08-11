@@ -385,38 +385,115 @@ public sealed class EventFeedOverlayTests
     }
 
     [Test]
-    public async Task AchievementParentGating_DropsSuppressedWorkAndNeverReplaysAfterEnable()
+    public async Task RegisteredParentDisables_ClearConnectedAchievementAndNeverReplay()
     {
         await using var fixture = await Fixture.CreateAsync(
             capacity: 10,
             EventFeedOverflowPolicy.DropNewest
         );
-        await fixture.SetFeaturesAsync(HostFeatureFlags.Overlays);
-        await fixture.PresentAchievementAsync("suppressed", "First viewer");
-        await fixture.SetFeaturesAsync(HostFeatureFlags.All);
-
-        var restored = await fixture.Service.ReadAsync(fixture.Instance, CancellationToken.None);
-        restored!.Active.ShouldBeNull();
-        await fixture.PresentAchievementAsync("accepted", "Second viewer");
-        await fixture.SetFeaturesAsync(
-            HostFeatureFlags.All & ~HostFeatureFlags.CommunityProgression
+        var services = new ServiceCollection();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(fixture.Database);
+        _ = services.AddSingleton<TimeProvider>(fixture.Clock);
+        _ = services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        _ = services.AddSingleton<HostedChannelChangeNotifier>();
+        _ = services.AddSingleton<HostFeatureService>();
+        _ = services.AddBlokeBotOverlays();
+        await using var provider = services.BuildServiceProvider();
+        var presenter = provider.GetRequiredService<IOverlayEventPresenter>();
+        var features = provider.GetRequiredService<HostFeatureService>();
+        var coordinator = provider.GetRequiredService<OverlayLiveCoordinator>();
+        await coordinator.StartAsync(CancellationToken.None);
+        var communityConnection = await OpenEmptyAsync();
+        await PresentAsync(communityConnection, "community-disable", "First viewer");
+        await DisableAndAssertClearAsync(
+            fixture.HostId,
+            HostFeatureFlags.CommunityProgression,
+            communityConnection
         );
-        await fixture.Service.SuppressSourceAsync(
+        await features.EnableAsync(
             fixture.HostId,
             HostFeatureFlags.CommunityProgression,
             CancellationToken.None
         );
-        await fixture.SetFeaturesAsync(HostFeatureFlags.All);
-
-        var enabledAgain = await fixture.Service.ReadAsync(
-            fixture.Instance,
+        var overlaysConnection = await OpenEmptyAsync();
+        await PresentAsync(overlaysConnection, "overlays-disable", "Second viewer");
+        await DisableAndAssertClearAsync(
+            fixture.HostId,
+            HostFeatureFlags.Overlays,
+            overlaysConnection
+        );
+        await features.EnableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Overlays,
             CancellationToken.None
         );
-        enabledAgain!.Active.ShouldBeNull();
-        enabledAgain.Pending.ShouldBeEmpty();
+        _ = await OpenEmptyAsync();
+        await coordinator.StopAsync(CancellationToken.None);
+
         await using var db = await fixture.Database.CreateDbContextAsync();
-        db.OverlayEventFeedItems.ShouldHaveSingleItem()
-            .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Suppressed);
+        (await db.OverlayEventFeedItems.ToListAsync()).ShouldAllBe(x =>
+            x.Lifecycle == OverlayEventFeedLifecycle.Suppressed
+        );
+
+        async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenEmptyAsync()
+        {
+            var connection = (
+                await coordinator.OpenAsync(
+                    fixture.Instance,
+                    coordinator.Generation,
+                    CancellationToken.None
+                )
+            )
+                .ShouldBeOfType<OverlayLiveOpenResult.Opened>()
+                .Connection;
+            var baseline = (
+                await ReadLiveAsync(connection)
+            ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedBaseline>();
+            baseline.Envelope.Payload.State.Active.ShouldBeNull();
+            baseline.Envelope.Payload.State.Pending.ShouldBeEmpty();
+            return connection;
+        }
+
+        async Task PresentAsync(
+            OverlayLiveCoordinator.OverlayLiveConnection connection,
+            string sourceKey,
+            string viewer
+        )
+        {
+            await presenter.PresentAsync(Achievement(sourceKey, viewer), CancellationToken.None);
+            (await ReadLiveAsync(connection))
+                .ShouldBeOfType<OverlayLiveTransportMessage.EventFeedEvent>()
+                .Envelope.Payload.State.Active!.Body.ShouldContain(viewer);
+        }
+
+        async Task DisableAndAssertClearAsync(
+            int hostId,
+            HostFeatureFlags feature,
+            OverlayLiveCoordinator.OverlayLiveConnection connection
+        )
+        {
+            await features.DisableAsync(hostId, feature, CancellationToken.None);
+            var clear = (
+                await ReadLiveAsync(connection)
+            ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedEvent>();
+            clear.Envelope.Payload.Animation.ShouldBe("none");
+            clear.Envelope.Payload.State.Active.ShouldBeNull();
+            clear.Envelope.Payload.State.Pending.ShouldBeEmpty();
+        }
+
+        OverlayEventPresentation.AchievementCompletion Achievement(
+            string sourceKey,
+            string viewer
+        ) =>
+            new()
+            {
+                HostId = fixture.HostId,
+                SourceKey = sourceKey,
+                Viewer = viewer,
+                Achievement = "Community trailblazer",
+                Rewards = "250 points, Trailblazer",
+            };
     }
 
     [Test]
@@ -462,7 +539,7 @@ public sealed class EventFeedOverlayTests
                 )
                 .ShouldAllBe(x => x.Lifecycle == OverlayEventFeedLifecycle.Suppressed);
             rows.Single(x => x.SourceKey == "guess-first")
-                .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Queued);
+                .Lifecycle.ShouldBe(OverlayEventFeedLifecycle.Active);
         }
         await features.EnableAsync(fixture.HostId, HostFeatureFlags.Points, CancellationToken.None);
         var guessingActive = await feed.ReadAsync(fixture.Instance, CancellationToken.None);
@@ -854,16 +931,24 @@ public sealed class EventFeedOverlayTests
 
     private sealed class PublisherServices : IServiceProvider
     {
-        private readonly IOverlayLivePublisher _publisher = new Publisher();
+        private readonly Publisher _publisher = new();
 
         public object? GetService(Type serviceType) =>
-            serviceType == typeof(IOverlayLivePublisher) ? _publisher : null;
+            serviceType == typeof(IOverlayLivePublisher)
+            || serviceType == typeof(IOverlayEventFeedLivePublisher)
+                ? _publisher
+                : null;
     }
 
-    private sealed class Publisher : IOverlayLivePublisher
+    private sealed class Publisher : IOverlayLivePublisher, IOverlayEventFeedLivePublisher
     {
         public void PublishState(ResolvedOverlayInstance instance) { }
 
         public void PublishTest(ResolvedOverlayInstance instance) { }
+
+        public void PublishSuppression(
+            ResolvedOverlayInstance instance,
+            EventFeedStatePresentation state
+        ) { }
     }
 }
