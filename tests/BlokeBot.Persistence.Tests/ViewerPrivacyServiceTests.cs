@@ -49,7 +49,7 @@ public sealed class ViewerPrivacyServiceTests
             );
             bobLedger.Login.ShouldBe(_bob);
             bobLedger.CounterpartyLogin.ShouldBeNull();
-            bobLedger.Note.ShouldBe("gift from alice");
+            bobLedger.Note.ShouldBeEmpty();
 
             (await db.PointsGiveawayEntrants.CountAsync(x => x.Login == _alice)).ShouldBe(0);
             (await db.PointsGiveawayEntrants.CountAsync(x => x.Login == _bob)).ShouldBe(1);
@@ -225,6 +225,8 @@ public sealed class ViewerPrivacyServiceTests
                 "clips.created",
                 "request-boards.submissions",
                 "request-boards.votes",
+                "viewer-passports.profiles",
+                "viewer-passports.logins",
                 "play-queues.entries",
                 "play-queues.participation",
                 "play-queues.exclusions",
@@ -445,6 +447,39 @@ public sealed class ViewerPrivacyServiceTests
         _ = await db.SaveChangesAsync();
         var a = hostA.Id;
         var b = hostB.Id;
+        var passports = new[]
+        {
+            new ViewerPassport
+            {
+                HostId = a,
+                TwitchUserId = _aliceId,
+                Login = _alice,
+                DisplayName = "Alice",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+            new ViewerPassport
+            {
+                HostId = b,
+                TwitchUserId = _aliceId,
+                Login = _alice,
+                DisplayName = "Alice",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+        };
+        db.ViewerPassports.AddRange(passports);
+        _ = await db.SaveChangesAsync();
+        db.ViewerPassportLogins.AddRange(
+            passports.Select(passport => new ViewerPassportLogin
+            {
+                HostId = passport.HostId,
+                PassportId = passport.Id,
+                Login = _alice,
+                FirstSeenAtUtc = now,
+                LastSeenAtUtc = now,
+            })
+        );
 
         var profile = new GuessRoundProfile
         {

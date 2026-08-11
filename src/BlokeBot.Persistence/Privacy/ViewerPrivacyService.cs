@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace BlokeBot.Persistence.Privacy;
 
 /// <summary>
-/// Identifies the Twitch identity a privacy request concerns. At least one of the Twitch user id
-/// and the login must be supplied; matching uses whichever parts are present.
+/// Identifies the Twitch identity a privacy request concerns. A Twitch user id is authoritative;
+/// login-only attribution requires a unique, non-ambiguous viewer-passport claim.
 /// </summary>
 public sealed record PrivacySubject
 {
@@ -21,9 +21,6 @@ public sealed record PrivacySubject
 
     internal string IdIdentityKey =>
         TwitchUserId is null ? ViewerPrivacyService.UnmatchableValue : $"id:{TwitchUserId}";
-
-    internal string LoginIdentityKey =>
-        Login is null ? ViewerPrivacyService.UnmatchableValue : $"login:{Login}";
 
     public static PrivacySubject Create(string? twitchUserId, string? login)
     {
@@ -73,21 +70,12 @@ public static class ViewerPrivacyService
     )
     {
         var sections = new Dictionary<string, IReadOnlyList<object>>(StringComparer.Ordinal);
-        var hasStableId = subject.TwitchUserId is not null;
-        var userId = subject.TwitchUserId ?? UnmatchableValue;
-        var loginIsAmbiguous = await IsAmbiguousLoginAsync(db, subject.Login, hostId, ct);
-        var login = loginIsAmbiguous ? UnmatchableValue : subject.Login ?? UnmatchableValue;
-        var idKey = subject.IdIdentityKey;
-        var loginKey = loginIsAmbiguous ? UnmatchableValue : subject.LoginIdentityKey;
-        var passportIds = MatchingPassportIds(
-            db,
-            hostId,
-            hasStableId,
-            userId,
-            login,
-            loginIsAmbiguous
-        );
-        var legacyLoginClaims = LegacyLoginClaims(db, passportIds);
+        var scope = await ResolveIdentityScopeAsync(db, subject, hostId, ct);
+        var userId = scope.UserId;
+        var idKey = scope.IdIdentityKey;
+        var passportIds = scope.PassportIds;
+        var safeLoginClaims = SafeLoginClaims(db, passportIds);
+        var safeGlobalLoginClaims = SafeGlobalLoginClaims(db, safeLoginClaims);
 
         async Task AddAsync<T>(string section, IQueryable<T> query)
             where T : class
@@ -101,7 +89,7 @@ public static class ViewerPrivacyService
 
         await AddAsync(
             "hosts.channels",
-            db.Hosts.Where(x => x.TwitchUserId == userId || x.Login == login)
+            db.Hosts.Where(x => x.TwitchUserId == userId)
                 .Select(x => new
                 {
                     x.Id,
@@ -116,11 +104,8 @@ public static class ViewerPrivacyService
             "guessing.votes",
             db.Votes.Where(x =>
                     (hostId == null || x.GuessRound!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
                     )
                 )
                 .Select(x => new
@@ -137,21 +122,21 @@ public static class ViewerPrivacyService
             "points.balances",
             db.PointBalances.Where(x =>
                 (hostId == null || x.HostId == hostId)
-                && (
-                    x.Login == login
-                    || legacyLoginClaims.Any(claim =>
-                        claim.HostId == x.HostId && claim.Login == x.Login
-                    )
-                )
+                && safeLoginClaims.Any(claim => claim.HostId == x.HostId && claim.Login == x.Login)
             )
         );
         await AddAsync(
             "points.ledger",
             db.PointLedgerEntries.Where(x =>
                 (
-                    x.Login == login
-                    || x.ActorLogin == login
-                    || x.CounterpartyLogin == login
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId
+                        && (
+                            claim.Login == x.Login
+                            || claim.Login == x.ActorLogin
+                            || claim.Login == x.CounterpartyLogin
+                        )
+                    )
                     || (
                         x.BountyPledgeId != null
                         && db.BountyPledges.Any(pledge =>
@@ -159,7 +144,10 @@ public static class ViewerPrivacyService
                             && pledge.Id == x.BountyPledgeId
                             && (
                                 pledge.ContributorTwitchUserId == userId
-                                || pledge.ContributorLogin == login
+                                || safeLoginClaims.Any(claim =>
+                                    claim.HostId == pledge.HostId
+                                    && claim.Login == pledge.ContributorLogin
+                                )
                             )
                         )
                     )
@@ -168,7 +156,12 @@ public static class ViewerPrivacyService
                         && db.BountyContributorRewards.Any(reward =>
                             reward.HostId == x.HostId
                             && reward.Id == x.BountyRewardId
-                            && (reward.TwitchUserId == userId || reward.Login == login)
+                            && (
+                                reward.TwitchUserId == userId
+                                || safeLoginClaims.Any(claim =>
+                                    claim.HostId == reward.HostId && claim.Login == reward.Login
+                                )
+                            )
                         )
                     )
                     || (
@@ -178,7 +171,10 @@ public static class ViewerPrivacyService
                             && completion.Id == x.CommunityCompletionId
                             && (
                                 completion.ViewerTwitchUserId == userId
-                                || completion.ViewerLogin == login
+                                || safeLoginClaims.Any(claim =>
+                                    claim.HostId == completion.HostId
+                                    && claim.Login == completion.ViewerLogin
+                                )
                             )
                         )
                     )
@@ -189,11 +185,8 @@ public static class ViewerPrivacyService
             "points.giveaway-entries",
             db.PointsGiveawayEntrants.Where(x =>
                     (hostId == null || x.Giveaway!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
                     )
                 )
                 .Select(x => new
@@ -209,11 +202,8 @@ public static class ViewerPrivacyService
             "points.giveaway-wins",
             db.PointsGiveawayWinners.Where(x =>
                     (hostId == null || x.Giveaway!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
                     )
                 )
                 .Select(x => new
@@ -228,8 +218,12 @@ public static class ViewerPrivacyService
         await AddAsync(
             "commands.allowed-users",
             db.CustomCommandAllowedUsers.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -259,16 +253,20 @@ public static class ViewerPrivacyService
             db.CustomCommandInvocationResetAudits.Where(x =>
                 (
                     x.ActorTwitchUserId == userId
-                    || x.ActorLogin == login
                     || x.TargetTwitchUserId == userId
-                    || x.TargetLogin == login
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId
+                        && (claim.Login == x.ActorLogin || claim.Login == x.TargetLogin)
+                    )
                 ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "alerts.acknowledgements",
             db.DurableAlerts.Where(x =>
-                    x.AcknowledgedByLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.AcknowledgedByLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -281,19 +279,27 @@ public static class ViewerPrivacyService
         );
         await AddAsync(
             "access.site-entries",
-            db.SiteAccessEntries.Where(x => x.Login == login && hostId == null)
+            db.SiteAccessEntries.Where(x =>
+                hostId == null && safeGlobalLoginClaims.Any(claim => claim.Login == x.Login)
+            )
         );
         await AddAsync(
             "access.mod-entries",
             db.HostModAccessEntries.Where(x =>
-                x.Login == login && (hostId == null || x.HostId == hostId)
+                safeLoginClaims.Any(claim => claim.HostId == x.HostId && claim.Login == x.Login)
+                && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "whispers.recipients",
             db.WhisperQuotaRecipients.Where(x =>
-                    (x.RecipientTwitchUserId == userId || x.RecipientLogin == login)
-                    && (hostId == null || x.WhisperQuotaBucket.HostId == hostId)
+                    (
+                        x.RecipientTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.WhisperQuotaBucket.HostId
+                            && claim.Login == x.RecipientLogin
+                        )
+                    ) && (hostId == null || x.WhisperQuotaBucket.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -309,38 +315,56 @@ public static class ViewerPrivacyService
             db.ShoutoutHistory.Where(x =>
                 (
                     x.SourceTwitchUserId == userId
-                    || x.SourceLogin == login
                     || x.TargetTwitchUserId == userId
-                    || x.TargetLogin == login
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId
+                        && (claim.Login == x.SourceLogin || claim.Login == x.TargetLogin)
+                    )
                 ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "shoutouts.cooldowns",
             db.ShoutoutCooldowns.Where(x =>
-                (x.TargetTwitchUserId == userId || x.TargetLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TargetTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.TargetLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "shoutouts.raid-outcomes",
             db.AutomaticRaidShoutoutOutcomes.Where(x =>
-                (x.SourceTwitchUserId == userId || x.SourceLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.SourceTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.SourceLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "channel-points.redemptions",
             db.TwitchRewardRedemptions.Where(x =>
-                (x.UserId == userId || x.UserLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.UserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.UserLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "clips.created",
             db.TwitchClips.Where(x =>
-                    (x.CreatorTwitchUserId == userId || x.CreatorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.CreatorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.CreatorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -355,7 +379,9 @@ public static class ViewerPrivacyService
         await AddAsync(
             "request-boards.submissions",
             db.RequestSubmissions.Where(x =>
-                    x.SubmitterLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -374,7 +400,9 @@ public static class ViewerPrivacyService
         await AddAsync(
             "request-boards.votes",
             db.RequestSubmissionVotes.Where(x =>
-                    x.VoterLogin == login && (hostId == null || x.Submission!.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                    ) && (hostId == null || x.Submission!.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -388,29 +416,45 @@ public static class ViewerPrivacyService
         await AddAsync(
             "bounties.pledges",
             db.BountyPledges.Where(x =>
-                (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ContributorTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ContributorLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bounties.rewards",
             db.BountyContributorRewards.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bounties.moderation-audits",
             db.BountyModerationAudits.Where(x =>
-                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ActorTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bingo.participants",
             db.BingoParticipants.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
@@ -418,7 +462,10 @@ public static class ViewerPrivacyService
             db.BingoCards.Where(x =>
                     x.Game!.Mode == BingoGameMode.UniquePerViewer
                     && x.Participants.Any(participant =>
-                        participant.TwitchUserId == userId || participant.Login == login
+                        participant.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == participant.Login
+                        )
                     )
                     && (hostId == null || x.HostId == hostId)
                 )
@@ -434,71 +481,111 @@ public static class ViewerPrivacyService
         await AddAsync(
             "bingo.evidence",
             db.BingoEvidence.Where(x =>
-                (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ParticipantTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ParticipantLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bingo.win-recipients",
             db.BingoWinRecipients.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bingo.moderation-audits",
             db.BingoModerationAudit.Where(x =>
-                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ActorTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "bingo.template-revisions",
             db.BingoTemplateRevisions.Where(x =>
-                (x.CreatedByTwitchUserId == userId || x.CreatedByLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.CreatedByTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.CreatedByLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.progress",
             db.CommunityProgress.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.completions",
             db.CommunityCompletions.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.reward-unlocks",
             db.CommunityRewardUnlocks.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.equipped-rewards",
             db.CommunityEquippedRewards.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.standings",
             db.CommunitySeasonStandings.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "community.moderation-audits",
             db.CommunityAudits.Where(x =>
-                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ActorTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
@@ -535,9 +622,14 @@ public static class ViewerPrivacyService
             db.PlayQueueEntries.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
@@ -556,15 +648,23 @@ public static class ViewerPrivacyService
         await AddAsync(
             "play-queues.participation",
             db.PlayQueueParticipation.Where(x =>
-                (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.IdentityKey == idKey
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && x.IdentityKey == "login:" + claim.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "play-queues.exclusions",
             db.PlayQueueExclusions.Where(x =>
-                (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.IdentityKey == idKey
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && x.IdentityKey == "login:" + claim.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
@@ -572,9 +672,14 @@ public static class ViewerPrivacyService
             db.MomentContributors.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .Select(x => new
@@ -591,8 +696,13 @@ public static class ViewerPrivacyService
         await AddAsync(
             "moments.capture-requests",
             db.MomentCaptureRequests.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.Candidate!.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -606,8 +716,13 @@ public static class ViewerPrivacyService
         await AddAsync(
             "moments.suggestions",
             db.MomentSuggestions.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.Candidate!.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -625,9 +740,14 @@ public static class ViewerPrivacyService
             db.MomentVotes.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .Select(x => new
@@ -643,13 +763,17 @@ public static class ViewerPrivacyService
         await AddAsync(
             "moments.moderation-audits",
             db.MomentModerationAudit.Where(x =>
-                x.ActorLogin == login && (hostId == null || x.HostId == hostId)
+                safeLoginClaims.Any(claim =>
+                    claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                ) && (hostId == null || x.HostId == hostId)
             )
         );
         await AddAsync(
             "moments.merges",
             db.MomentMerges.Where(x =>
-                    x.ActorLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -665,8 +789,12 @@ public static class ViewerPrivacyService
         await AddAsync(
             "overlays.actor-events",
             db.OverlayInstanceEvents.Where(x =>
-                    (x.ActorUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -704,140 +832,85 @@ public static class ViewerPrivacyService
     )
     {
         var changed = new Dictionary<string, int>(StringComparer.Ordinal);
-        var hasStableId = subject.TwitchUserId is not null;
-        var userId = subject.TwitchUserId ?? UnmatchableValue;
-        var loginIsAmbiguous = await IsAmbiguousLoginAsync(db, subject.Login, hostId, ct);
-        var login = loginIsAmbiguous ? UnmatchableValue : subject.Login ?? UnmatchableValue;
-        var idKey = subject.IdIdentityKey;
-        var loginKey = loginIsAmbiguous ? UnmatchableValue : subject.LoginIdentityKey;
-        var passportIds = MatchingPassportIds(
-            db,
+        var scope = await ResolveIdentityScopeAsync(db, subject, hostId, ct);
+        var userId = scope.UserId;
+        var idKey = scope.IdIdentityKey;
+        var passportIds = scope.PassportIds;
+        var safeLoginClaims = SafeLoginClaims(db, passportIds);
+        var safeGlobalLoginClaims = SafeGlobalLoginClaims(db, safeLoginClaims);
+        var safeLoginClaimValues = await safeLoginClaims
+            .Select(value => new SafeLoginClaim(value.HostId, value.Login))
+            .Distinct()
+            .ToArrayAsync(ct);
+        var quotedIdentityClaims = IdentityTextClaims(
+            subject.TwitchUserId,
             hostId,
-            hasStableId,
-            userId,
-            login,
-            loginIsAmbiguous
+            safeLoginClaimValues,
+            static value => LikeContainsPattern($"\"{value}\"")
         );
-        var legacyLoginClaims = LegacyLoginClaims(db, passportIds);
-        var quotedNeedles = new List<string>();
-        if (subject.Login is not null && !loginIsAmbiguous)
-        {
-            quotedNeedles.Add($"%\"{subject.Login}\"%");
-        }
-
-        if (subject.TwitchUserId is not null)
-        {
-            quotedNeedles.Add($"%\"{subject.TwitchUserId}\"%");
-        }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var bountyPledges = await db
             .BountyPledges.Where(x =>
-                (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ContributorTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ContributorLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
-            .Select(x => new { x.Id, x.ContributorLogin })
+            .Select(x => x.Id)
             .ToListAsync(ct);
-        var bountyPledgeIds = bountyPledges.Select(x => x.Id).ToList();
-        foreach (
-            var recordedLogin in bountyPledges
-                .Select(x => x.ContributorLogin)
-                .Where(value => !string.IsNullOrWhiteSpace(value) && value != ErasedToken)
-                .Distinct(StringComparer.Ordinal)
-        )
-        {
-            quotedNeedles.Add($"%\"{recordedLogin}\"%");
-        }
+        var bountyPledgeIds = bountyPledges;
         var bountyRewardIds = await db
             .BountyContributorRewards.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
             .Select(x => x.Id)
             .ToListAsync(ct);
         var communityCompletionIds = await db
             .CommunityCompletions.Where(x =>
-                (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.ViewerTwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
             .Select(x => x.Id)
             .ToListAsync(ct);
         var bingoParticipants = await db
             .BingoParticipants.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
+                (
+                    x.TwitchUserId == userId
+                    || safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                ) && (hostId == null || x.HostId == hostId)
             )
-            .Select(x => new
-            {
-                x.CardId,
-                x.TwitchUserId,
-                x.Login,
-                x.DisplayName,
-            })
+            .Where(x => x.CardId != null)
+            .Select(x => x.CardId!.Value)
             .ToListAsync(ct);
-        var bingoEvidenceIdentities = await db
-            .BingoEvidence.Where(x =>
-                (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
-                && (hostId == null || x.HostId == hostId)
-            )
-            .Select(x => new
-            {
-                x.ParticipantTwitchUserId,
-                x.ParticipantLogin,
-                x.ParticipantDisplayName,
-            })
-            .ToListAsync(ct);
-        var bingoRecipientIdentities = await db
-            .BingoWinRecipients.Where(x =>
-                (x.TwitchUserId == userId || x.Login == login)
-                && (hostId == null || x.HostId == hostId)
-            )
-            .Select(x => new
-            {
-                x.TwitchUserId,
-                x.Login,
-                x.DisplayName,
-            })
-            .ToListAsync(ct);
-        var uniqueBingoCardIds = bingoParticipants
-            .Where(value => value.CardId is not null)
-            .Select(value => value.CardId!.Value)
-            .ToArray();
         var uniqueBingoCards = await db
             .BingoCards.Where(x =>
-                uniqueBingoCardIds.Contains(x.Id)
+                bingoParticipants.Contains(x.Id)
                 && x.Game!.Mode == BingoGameMode.UniquePerViewer
                 && (hostId == null || x.HostId == hostId)
             )
-            .Select(x => new { x.Id, x.AssignmentName })
+            .Select(x => x.Id)
             .ToListAsync(ct);
-        var uniqueBingoCardIdsToErase = uniqueBingoCards.Select(value => value.Id).ToArray();
-        var bingoIdentityPatterns = new[] { subject.TwitchUserId, subject.Login }
-            .Concat(
-                bingoParticipants.SelectMany(value =>
-                    new[] { value.TwitchUserId, value.Login, value.DisplayName }
-                )
-            )
-            .Concat(
-                bingoEvidenceIdentities.SelectMany(value =>
-                    new[]
-                    {
-                        value.ParticipantTwitchUserId,
-                        value.ParticipantLogin,
-                        value.ParticipantDisplayName,
-                    }
-                )
-            )
-            .Concat(
-                bingoRecipientIdentities.SelectMany(value =>
-                    new[] { value.TwitchUserId, value.Login, value.DisplayName }
-                )
-            )
-            .Concat(uniqueBingoCards.Select(value => value.AssignmentName))
-            .Where(value => !string.IsNullOrWhiteSpace(value) && value != ErasedToken)
-            .Select(value => LikeContainsPattern(value!))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var uniqueBingoCardIdsToErase = uniqueBingoCards.ToArray();
+        var identityContentClaims = IdentityTextClaims(
+            subject.TwitchUserId,
+            hostId,
+            safeLoginClaimValues,
+            LikeContainsPattern
+        );
 
         void Record(string section, int rows)
         {
@@ -852,11 +925,8 @@ public static class ViewerPrivacyService
             await db
                 .Votes.Where(x =>
                     (hostId == null || x.GuessRound!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
                     )
                 )
                 .ExecuteDeleteAsync(ct)
@@ -866,11 +936,8 @@ public static class ViewerPrivacyService
             await db
                 .PointBalances.Where(x =>
                     (hostId == null || x.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
                     )
                 )
                 .ExecuteDeleteAsync(ct)
@@ -879,7 +946,8 @@ public static class ViewerPrivacyService
             "points.ledger.subject-rows",
             await db
                 .PointLedgerEntries.Where(x =>
-                    x.Login == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim => claim.HostId == x.HostId && claim.Login == x.Login)
+                    && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -893,10 +961,15 @@ public static class ViewerPrivacyService
             "points.ledger.actor-references",
             await db
                 .PointLedgerEntries.Where(x =>
-                    x.ActorLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(x => x.ActorLogin, (string?)null),
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorLogin, (string?)null)
+                            .SetProperty(x => x.Note, string.Empty),
                     ct
                 )
         );
@@ -904,13 +977,29 @@ public static class ViewerPrivacyService
             "points.ledger.counterparty-references",
             await db
                 .PointLedgerEntries.Where(x =>
-                    x.CounterpartyLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.CounterpartyLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(x => x.CounterpartyLogin, (string?)null),
+                    setters =>
+                        setters
+                            .SetProperty(x => x.CounterpartyLogin, (string?)null)
+                            .SetProperty(x => x.Note, string.Empty),
                     ct
                 )
         );
+        var pointLedgerPrivateNotes = 0;
+        foreach (var claim in identityContentClaims)
+        {
+            pointLedgerPrivateNotes += await db
+                .PointLedgerEntries.Where(x =>
+                    EF.Functions.Like(x.Note, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
+                )
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Note, string.Empty), ct);
+        }
+        Record("points.ledger.private-notes", pointLedgerPrivateNotes);
         if (bountyPledgeIds.Count > 0 || bountyRewardIds.Count > 0)
         {
             Record(
@@ -937,11 +1026,8 @@ public static class ViewerPrivacyService
             await db
                 .PointsGiveawayEntrants.Where(x =>
                     (hostId == null || x.Giveaway!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
                     )
                 )
                 .ExecuteDeleteAsync(ct)
@@ -951,11 +1037,8 @@ public static class ViewerPrivacyService
             await db
                 .PointsGiveawayWinners.Where(x =>
                     (hostId == null || x.Giveaway!.HostId == hostId)
-                    && (
-                        x.Login == login
-                        || legacyLoginClaims.Any(claim =>
-                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
-                        )
+                    && safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
                     )
                 )
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Login, ErasedToken), ct)
@@ -964,8 +1047,12 @@ public static class ViewerPrivacyService
             "commands.allowed-users",
             await db
                 .CustomCommandAllowedUsers.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -981,8 +1068,12 @@ public static class ViewerPrivacyService
             "commands.reset-audits.actor",
             await db
                 .CustomCommandInvocationResetAudits.Where(x =>
-                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -996,8 +1087,12 @@ public static class ViewerPrivacyService
             "commands.reset-audits.target",
             await db
                 .CustomCommandInvocationResetAudits.Where(x =>
-                    (x.TargetTwitchUserId == userId || x.TargetLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TargetTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.TargetLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1011,7 +1106,9 @@ public static class ViewerPrivacyService
             "alerts.acknowledgements",
             await db
                 .DurableAlerts.Where(x =>
-                    x.AcknowledgedByLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.AcknowledgedByLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(x => x.AcknowledgedByLogin, (string?)null),
@@ -1022,7 +1119,11 @@ public static class ViewerPrivacyService
         {
             Record(
                 "access.site-entries",
-                await db.SiteAccessEntries.Where(x => x.Login == login).ExecuteDeleteAsync(ct)
+                await db
+                    .SiteAccessEntries.Where(x =>
+                        safeGlobalLoginClaims.Any(claim => claim.Login == x.Login)
+                    )
+                    .ExecuteDeleteAsync(ct)
             );
         }
 
@@ -1030,7 +1131,8 @@ public static class ViewerPrivacyService
             "access.mod-entries",
             await db
                 .HostModAccessEntries.Where(x =>
-                    x.Login == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim => claim.HostId == x.HostId && claim.Login == x.Login)
+                    && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1038,8 +1140,13 @@ public static class ViewerPrivacyService
             "whispers.recipients",
             await db
                 .WhisperQuotaRecipients.Where(x =>
-                    (x.RecipientTwitchUserId == userId || x.RecipientLogin == login)
-                    && (hostId == null || x.WhisperQuotaBucket.HostId == hostId)
+                    (
+                        x.RecipientTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.WhisperQuotaBucket.HostId
+                            && claim.Login == x.RecipientLogin
+                        )
+                    ) && (hostId == null || x.WhisperQuotaBucket.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1049,9 +1156,11 @@ public static class ViewerPrivacyService
                 .ShoutoutHistory.Where(x =>
                     (
                         x.SourceTwitchUserId == userId
-                        || x.SourceLogin == login
                         || x.TargetTwitchUserId == userId
-                        || x.TargetLogin == login
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId
+                            && (claim.Login == x.SourceLogin || claim.Login == x.TargetLogin)
+                        )
                     ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
@@ -1060,8 +1169,12 @@ public static class ViewerPrivacyService
             "shoutouts.cooldowns",
             await db
                 .ShoutoutCooldowns.Where(x =>
-                    (x.TargetTwitchUserId == userId || x.TargetLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TargetTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.TargetLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1069,8 +1182,12 @@ public static class ViewerPrivacyService
             "shoutouts.raid-outcomes",
             await db
                 .AutomaticRaidShoutoutOutcomes.Where(x =>
-                    (x.SourceTwitchUserId == userId || x.SourceLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.SourceTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.SourceLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1078,8 +1195,12 @@ public static class ViewerPrivacyService
             "channel-points.redemptions",
             await db
                 .TwitchRewardRedemptions.Where(x =>
-                    (x.UserId == userId || x.UserLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.UserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.UserLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1087,8 +1208,12 @@ public static class ViewerPrivacyService
             "clips.creator-references",
             await db
                 .TwitchClips.Where(x =>
-                    (x.CreatorTwitchUserId == userId || x.CreatorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.CreatorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.CreatorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1101,7 +1226,9 @@ public static class ViewerPrivacyService
 
         var votedSubmissionIds = await db
             .RequestSubmissionVotes.Where(x =>
-                x.VoterLogin == login && (hostId == null || x.Submission!.HostId == hostId)
+                safeLoginClaims.Any(claim =>
+                    claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                ) && (hostId == null || x.Submission!.HostId == hostId)
             )
             .Select(x => x.SubmissionId)
             .Distinct()
@@ -1110,7 +1237,9 @@ public static class ViewerPrivacyService
             "request-boards.votes",
             await db
                 .RequestSubmissionVotes.Where(x =>
-                    x.VoterLogin == login && (hostId == null || x.Submission!.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.Submission!.HostId && claim.Login == x.VoterLogin
+                    ) && (hostId == null || x.Submission!.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1128,17 +1257,19 @@ public static class ViewerPrivacyService
             "request-boards.submissions",
             await db
                 .RequestSubmissions.Where(x =>
-                    x.SubmitterLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.SubmitterLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
         var requestBoardEvents = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             requestBoardEvents += await db
                 .RequestBoardEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
@@ -1148,8 +1279,12 @@ public static class ViewerPrivacyService
             "bounties.pledges",
             await db
                 .BountyPledges.Where(x =>
-                    (x.ContributorTwitchUserId == userId || x.ContributorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ContributorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ContributorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1170,8 +1305,12 @@ public static class ViewerPrivacyService
             "bounties.rewards",
             await db
                 .BountyContributorRewards.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1185,8 +1324,12 @@ public static class ViewerPrivacyService
             "bounties.moderation-audits",
             await db
                 .BountyModerationAudits.Where(x =>
-                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1198,12 +1341,12 @@ public static class ViewerPrivacyService
                 )
         );
         var bountyEvents = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             bountyEvents += await db
                 .BountyEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
@@ -1222,8 +1365,12 @@ public static class ViewerPrivacyService
             "bingo.participants",
             await db
                 .BingoParticipants.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1238,8 +1385,12 @@ public static class ViewerPrivacyService
             "bingo.evidence",
             await db
                 .BingoEvidence.Where(x =>
-                    (x.ParticipantTwitchUserId == userId || x.ParticipantLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ParticipantTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ParticipantLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1255,8 +1406,12 @@ public static class ViewerPrivacyService
             "bingo.win-recipients",
             await db
                 .BingoWinRecipients.Where(x =>
-                    (x.TwitchUserId == userId || x.Login == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.TwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1271,8 +1426,12 @@ public static class ViewerPrivacyService
             "bingo.moderation-audits",
             await db
                 .BingoModerationAudit.Where(x =>
-                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1287,8 +1446,12 @@ public static class ViewerPrivacyService
             "bingo.template-revisions",
             await db
                 .BingoTemplateRevisions.Where(x =>
-                    (x.CreatedByTwitchUserId == userId || x.CreatedByLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.CreatedByTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.CreatedByLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1302,12 +1465,12 @@ public static class ViewerPrivacyService
         var bingoAuditText = 0;
         var bingoEvents = 0;
         var bingoOverlayItems = 0;
-        foreach (var pattern in bingoIdentityPatterns)
+        foreach (var claim in identityContentClaims)
         {
             bingoEvidenceText += await db
                 .BingoEvidence.Where(x =>
-                    EF.Functions.Like(x.Summary, pattern, "\\")
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.Summary, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(x => x.Summary, "Bingo event recorded"),
@@ -1315,8 +1478,8 @@ public static class ViewerPrivacyService
                 );
             bingoAuditText += await db
                 .BingoModerationAudit.Where(x =>
-                    EF.Functions.Like(x.PrivateNote, pattern, "\\")
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PrivateNote, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(x => x.PrivateNote, string.Empty),
@@ -1325,18 +1488,18 @@ public static class ViewerPrivacyService
             bingoEvents += await db
                 .BingoEvents.Where(x =>
                     (
-                        EF.Functions.Like(x.OperationKey, pattern, "\\")
-                        || EF.Functions.Like(x.PublicPayload, pattern, "\\")
-                    ) && (hostId == null || x.HostId == hostId)
+                        EF.Functions.Like(x.OperationKey, claim.Pattern, "\\")
+                        || EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    ) && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
             bingoOverlayItems += await db
                 .OverlayEventFeedItems.Where(x =>
                     (
-                        EF.Functions.Like(x.SourceKey, pattern, "\\")
-                        || EF.Functions.Like(x.Title, pattern, "\\")
-                        || EF.Functions.Like(x.Body, pattern, "\\")
-                    ) && (hostId == null || x.HostId == hostId)
+                        EF.Functions.Like(x.SourceKey, claim.Pattern, "\\")
+                        || EF.Functions.Like(x.Title, claim.Pattern, "\\")
+                        || EF.Functions.Like(x.Body, claim.Pattern, "\\")
+                    ) && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
@@ -1367,8 +1530,12 @@ public static class ViewerPrivacyService
             "community.equipped-rewards",
             await db
                 .CommunityEquippedRewards.Where(x =>
-                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ViewerTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1376,8 +1543,12 @@ public static class ViewerPrivacyService
             "community.reward-unlocks",
             await db
                 .CommunityRewardUnlocks.Where(x =>
-                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ViewerTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1385,8 +1556,12 @@ public static class ViewerPrivacyService
             "community.progress",
             await db
                 .CommunityProgress.Where(x =>
-                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ViewerTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1394,8 +1569,12 @@ public static class ViewerPrivacyService
             "community.completions",
             await db
                 .CommunityCompletions.Where(x =>
-                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ViewerTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1411,8 +1590,12 @@ public static class ViewerPrivacyService
             "community.standings",
             await db
                 .CommunitySeasonStandings.Where(x =>
-                    (x.ViewerTwitchUserId == userId || x.ViewerLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ViewerTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ViewerLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1427,8 +1610,12 @@ public static class ViewerPrivacyService
             "community.moderation-audits",
             await db
                 .CommunityAudits.Where(x =>
-                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorTwitchUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1440,43 +1627,30 @@ public static class ViewerPrivacyService
                 )
         );
         var communityEvents = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             communityEvents += await db
                 .CommunityEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
         Record("community.events", communityEvents);
-        Record(
-            "viewer-passports.logins",
-            await db.ViewerPassportLogins.CountAsync(
-                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
-                ct
-            )
-        );
-        Record(
-            "viewer-passports.attendance-days",
-            await db.ViewerPassportAttendanceDays.CountAsync(
-                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
-                ct
-            )
-        );
-        Record(
-            "viewer-passports.profiles",
-            await db.ViewerPassports.Where(x => passportIds.Contains(x.Id)).ExecuteDeleteAsync(ct)
-        );
         Record(
             "play-queues.entries",
             await db
                 .PlayQueueEntries.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
@@ -1485,8 +1659,12 @@ public static class ViewerPrivacyService
             "play-queues.participation",
             await db
                 .PlayQueueParticipation.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1494,18 +1672,22 @@ public static class ViewerPrivacyService
             "play-queues.exclusions",
             await db
                 .PlayQueueExclusions.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
         var playQueueEvents = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             playQueueEvents += await db
                 .PlayQueueEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
@@ -1517,9 +1699,14 @@ public static class ViewerPrivacyService
                 .MomentContributors.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
@@ -1528,8 +1715,13 @@ public static class ViewerPrivacyService
             "moments.capture-requests",
             await db
                 .MomentCaptureRequests.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.Candidate!.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1537,8 +1729,13 @@ public static class ViewerPrivacyService
             "moments.suggestions",
             await db
                 .MomentSuggestions.Where(x =>
-                    (x.IdentityKey == idKey || x.IdentityKey == loginKey)
-                    && (hostId == null || x.Candidate!.HostId == hostId)
+                    (
+                        x.IdentityKey == idKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && x.IdentityKey == "login:" + claim.Login
+                        )
+                    ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -1548,9 +1745,14 @@ public static class ViewerPrivacyService
                 .MomentVotes.Where(x =>
                     (
                         x.TwitchUserId == userId
-                        || x.NormalizedLogin == login
                         || x.IdentityKey == idKey
-                        || x.IdentityKey == loginKey
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.Candidate!.HostId
+                            && (
+                                claim.Login == x.NormalizedLogin
+                                || x.IdentityKey == "login:" + claim.Login
+                            )
+                        )
                     ) && (hostId == null || x.Candidate!.HostId == hostId)
                 )
                 .ExecuteDeleteAsync(ct)
@@ -1559,7 +1761,9 @@ public static class ViewerPrivacyService
             "moments.moderation-audits",
             await db
                 .MomentModerationAudit.Where(x =>
-                    x.ActorLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1573,7 +1777,9 @@ public static class ViewerPrivacyService
             "moments.merges",
             await db
                 .MomentMerges.Where(x =>
-                    x.ActorLogin == login && (hostId == null || x.HostId == hostId)
+                    safeLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1584,12 +1790,12 @@ public static class ViewerPrivacyService
                 )
         );
         var momentEvents = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             momentEvents += await db
                 .MomentEvents.Where(x =>
-                    EF.Functions.Like(x.PublicPayload, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.PublicPayload, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
@@ -1599,8 +1805,12 @@ public static class ViewerPrivacyService
             "overlays.actor-events",
             await db
                 .OverlayInstanceEvents.Where(x =>
-                    (x.ActorUserId == userId || x.ActorLogin == login)
-                    && (hostId == null || x.HostId == hostId)
+                    (
+                        x.ActorUserId == userId
+                        || safeLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.ActorLogin
+                        )
+                    ) && (hostId == null || x.HostId == hostId)
                 )
                 .ExecuteUpdateAsync(
                     setters =>
@@ -1610,20 +1820,19 @@ public static class ViewerPrivacyService
                     ct
                 )
         );
-        if (subject.Login is not null)
+        var overlayEventFeedItems = 0;
+        foreach (var claim in identityContentClaims)
         {
-            Record(
-                "overlays.event-feed",
-                await db
-                    .OverlayEventFeedItems.Where(x =>
-                        (
-                            EF.Functions.Like(x.Title, $"%{login}%")
-                            || EF.Functions.Like(x.Body, $"%{login}%")
-                        ) && (hostId == null || x.HostId == hostId)
-                    )
-                    .ExecuteDeleteAsync(ct)
-            );
+            overlayEventFeedItems += await db
+                .OverlayEventFeedItems.Where(x =>
+                    (
+                        EF.Functions.Like(x.Title, claim.Pattern, "\\")
+                        || EF.Functions.Like(x.Body, claim.Pattern, "\\")
+                    ) && (claim.HostId == null || x.HostId == claim.HostId)
+                )
+                .ExecuteDeleteAsync(ct);
         }
+        Record("overlays.event-feed", overlayEventFeedItems);
 
         Record(
             "public-chat.pin-operations",
@@ -1648,17 +1857,37 @@ public static class ViewerPrivacyService
                 )
         );
         var automationRuns = 0;
-        foreach (var needle in quotedNeedles)
+        foreach (var claim in quotedIdentityClaims)
         {
             automationRuns += await db
                 .AutomationFlowRuns.Where(x =>
-                    EF.Functions.Like(x.ContextJson, needle)
-                    && (hostId == null || x.HostId == hostId)
+                    EF.Functions.Like(x.ContextJson, claim.Pattern, "\\")
+                    && (claim.HostId == null || x.HostId == claim.HostId)
                 )
                 .ExecuteDeleteAsync(ct);
         }
 
         Record("automations.runs", automationRuns);
+
+        await ViewerPassportAmbiguityTombstones.PersistForPassportsAsync(db, passportIds, ct);
+        Record(
+            "viewer-passports.logins",
+            await db.ViewerPassportLogins.CountAsync(
+                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
+                ct
+            )
+        );
+        Record(
+            "viewer-passports.attendance-days",
+            await db.ViewerPassportAttendanceDays.CountAsync(
+                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
+                ct
+            )
+        );
+        Record(
+            "viewer-passports.profiles",
+            await db.ViewerPassports.Where(x => passportIds.Contains(x.Id)).ExecuteDeleteAsync(ct)
+        );
 
         await transaction.CommitAsync(ct);
         return new ViewerErasureReport(changed);
@@ -1679,34 +1908,45 @@ public static class ViewerPrivacyService
                     cancellationToken
                 );
 
-    private static IQueryable<long> MatchingPassportIds(
+    private static async Task<PrivacyIdentityScope> ResolveIdentityScopeAsync(
         BlokeBotDbContext db,
+        PrivacySubject subject,
         int? hostId,
-        bool hasStableId,
-        string userId,
-        string login,
-        bool loginIsAmbiguous
-    ) =>
-        db
-            .ViewerPassports.Where(passport =>
-                (hostId == null || passport.HostId == hostId)
-                && (
-                    hasStableId
-                        ? passport.TwitchUserId == userId
-                        : !loginIsAmbiguous
-                            && (
-                                passport.Login == login
-                                || db.ViewerPassportLogins.Any(alias =>
-                                    alias.PassportId == passport.Id && alias.Login == login
-                                )
-                            )
+        CancellationToken cancellationToken
+    )
+    {
+        var userId = subject.TwitchUserId ?? UnmatchableValue;
+        var passports = db.ViewerPassports.Where(passport =>
+            hostId == null || passport.HostId == hostId
+        );
+        var passportIds =
+            subject.TwitchUserId is not null
+                ? await passports
+                    .Where(passport => passport.TwitchUserId == userId)
+                    .Select(passport => passport.Id)
+                    .ToArrayAsync(cancellationToken)
+            : subject.Login is null
+            || await IsAmbiguousLoginAsync(db, subject.Login, hostId, cancellationToken)
+                ? []
+            : await passports
+                .Where(passport =>
+                    passport.Login == subject.Login
+                    || db.ViewerPassportLogins.Any(alias =>
+                        alias.PassportId == passport.Id && alias.Login == subject.Login
+                    )
                 )
-            )
-            .Select(passport => passport.Id);
+                .Select(passport => passport.Id)
+                .ToArrayAsync(cancellationToken);
+        return new(
+            userId,
+            subject.TwitchUserId is null ? UnmatchableValue : subject.IdIdentityKey,
+            passportIds
+        );
+    }
 
-    private static IQueryable<ViewerPassportLogin> LegacyLoginClaims(
+    private static IQueryable<ViewerPassportLogin> SafeLoginClaims(
         BlokeBotDbContext db,
-        IQueryable<long> passportIds
+        IReadOnlyCollection<long> passportIds
     ) =>
         db.ViewerPassportLogins.Where(alias =>
             passportIds.Contains(alias.PassportId)
@@ -1714,6 +1954,38 @@ public static class ViewerPrivacyService
                 ambiguous.HostId == alias.HostId && ambiguous.Login == alias.Login
             )
         );
+
+    private static IQueryable<ViewerPassportLogin> SafeGlobalLoginClaims(
+        BlokeBotDbContext db,
+        IQueryable<ViewerPassportLogin> safeLoginClaims
+    ) =>
+        safeLoginClaims.Where(alias =>
+            !db.ViewerPassportAmbiguousLogins.Any(ambiguous => ambiguous.Login == alias.Login)
+        );
+
+    private static PrivacyTextClaim[] IdentityTextClaims(
+        string? twitchUserId,
+        int? hostId,
+        IReadOnlyCollection<SafeLoginClaim> safeLoginClaims,
+        Func<string, string> pattern
+    ) =>
+        safeLoginClaims
+            .Select(value => new PrivacyTextClaim(value.HostId, pattern(value.Login)))
+            .Concat(
+                twitchUserId is null ? [] : [new PrivacyTextClaim(hostId, pattern(twitchUserId))]
+            )
+            .Distinct()
+            .ToArray();
+
+    private sealed record PrivacyIdentityScope(
+        string UserId,
+        string IdIdentityKey,
+        long[] PassportIds
+    );
+
+    private sealed record SafeLoginClaim(int HostId, string Login);
+
+    private sealed record PrivacyTextClaim(int? HostId, string Pattern);
 
     private static string LikeContainsPattern(string value) =>
         $"%{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";

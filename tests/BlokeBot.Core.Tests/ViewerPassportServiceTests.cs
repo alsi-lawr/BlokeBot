@@ -5,6 +5,8 @@ using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Privacy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -685,8 +687,17 @@ public sealed class ViewerPassportServiceTests
             report.ChangedRows["points.giveaway-wins"].ShouldBe(1);
         }
         await using var verify = await database.CreateDbContextAsync();
-        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
-        (await verify.ViewerPassportAmbiguousLogins.SingleAsync()).HostId.ShouldBe(ambiguousHost);
+        (
+            await verify
+                .ViewerPassportAmbiguousLogins.OrderBy(value => value.HostId)
+                .ThenBy(value => value.Login)
+                .Select(value => new { value.HostId, value.Login })
+                .ToArrayAsync()
+        ).ShouldBe([
+            new { HostId = ambiguousHost, Login = "old_name" },
+            new { HostId = uniqueHost, Login = "new_name" },
+            new { HostId = uniqueHost, Login = "old_name" },
+        ]);
         (await verify.PointBalances.CountAsync(value => value.HostId == uniqueHost)).ShouldBe(0);
         (await verify.Votes.CountAsync(value => value.GuessRound!.HostId == uniqueHost)).ShouldBe(
             0
@@ -738,6 +749,190 @@ public sealed class ViewerPassportServiceTests
                 .Order()
                 .ToArrayAsync()
         ).ShouldBe(["first-id", "second-id"]);
+    }
+
+    [Test]
+    public async Task ResetBeforeReuse_TombstonesAliasesAcrossMigrationDownUpAndKeepsHostsIsolated()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using (var migrate = await database.CreateDbContextAsync())
+        {
+            await migrate.Database.MigrateAsync();
+        }
+        var firstHost = await SeedHostAsync(database, "first", HostFeatureFlags.ViewerPassports);
+        var secondHost = await SeedHostAsync(database, "second", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(firstHost, "owner-id", "old_name"), default));
+        await SeedLegacyActivityAsync(database, firstHost, "old_name", "75");
+        _ = Success(await service.SaveAsync(Save(firstHost, "owner-id", "new_name"), default));
+
+        _ = (
+            await service.ResetAsync(firstHost, "owner-id", default)
+        ).ShouldBeOfType<ViewerPassportResetOutcome.Succeeded>();
+        await using (var rollback = await database.CreateDbContextAsync())
+        {
+            await rollback
+                .GetService<IMigrator>()
+                .MigrateAsync("20260811051820_v0.10.0_ViewerPassportLoginHistory");
+            (
+                await rollback
+                    .ViewerPassportAmbiguousLogins.OrderBy(value => value.Login)
+                    .Select(value => value.Login)
+                    .ToArrayAsync()
+            ).ShouldBe(["new_name", "old_name"]);
+            await rollback.Database.MigrateAsync();
+        }
+
+        var recreated = Success(
+            await service.SaveAsync(
+                Save(firstHost, "owner-id", "old_name") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+        recreated.Statistics.Points.ShouldBe("0");
+        recreated.Statistics.GuessRounds.ShouldBe(0);
+        recreated.Statistics.GiveawaysWon.ShouldBe(0);
+
+        var reused = Success(
+            await service.SaveAsync(
+                Save(firstHost, "next-id", "old_name") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+        reused.Statistics.Points.ShouldBe("0");
+        reused.Statistics.GuessRounds.ShouldBe(0);
+        reused.Statistics.GiveawaysWon.ShouldBe(0);
+        _ = (
+            await service.GetVisibleAsync(
+                "first",
+                "old_name",
+                ViewerPassportAudience.Anonymous,
+                default
+            )
+        ).ShouldBeOfType<ViewerPassportQueryOutcome.NotFound>();
+        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            firstHost,
+            default
+        );
+        exclusions.Logins.ShouldContain("old_name");
+        exclusions.Logins.ShouldContain("new_name");
+        (
+            await new PointBalanceService(database).GetPublicLeaderboardAsync(
+                firstHost,
+                10,
+                exclusions.Logins,
+                default
+            )
+        ).ShouldBeEmpty();
+
+        _ = Success(
+            await service.SaveAsync(
+                Save(secondHost, "isolated-id", "old_name") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            _ = seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = secondHost,
+                    Login = "old_name",
+                    Amount = "12",
+                    UpdatedAtUtc = _now.UtcDateTime,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+        (
+            await service.GetVisibleAsync(
+                "second",
+                "old_name",
+                ViewerPassportAudience.Anonymous,
+                default
+            )
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport.Statistics.Points.ShouldBe("12");
+    }
+
+    [Test]
+    public async Task ErasureBeforeReuse_TombstonesTheLoginAndDetachesFutureHistory()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(hostId, "owner-id", "reused_name"), default));
+        await using (var seed = await database.CreateDbContextAsync())
+        {
+            _ = seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "reused_name",
+                    Amount = "25",
+                    UpdatedAtUtc = _now.UtcDateTime,
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+        }
+        await using (var erase = await database.CreateDbContextAsync())
+        {
+            var report = await ViewerPrivacyService.EraseAsync(
+                erase,
+                PrivacySubject.Create("owner-id", "caller_supplied_mismatch"),
+                hostId,
+                default
+            );
+            report.ChangedRows["points.balances"].ShouldBe(1);
+            report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+        }
+        await using (var laterHistory = await database.CreateDbContextAsync())
+        {
+            _ = laterHistory.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "reused_name",
+                    Amount = "40",
+                    UpdatedAtUtc = _now.AddMinutes(1).UtcDateTime,
+                }
+            );
+            _ = await laterHistory.SaveChangesAsync();
+        }
+
+        var nextOwner = Success(
+            await service.SaveAsync(
+                Save(hostId, "next-id", "reused_name") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+        nextOwner.Statistics.Points.ShouldBe("0");
+        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            hostId,
+            default
+        );
+        exclusions.Logins.ShouldContain("reused_name");
+        (
+            await new PointBalanceService(database).GetPublicLeaderboardAsync(
+                hostId,
+                10,
+                exclusions.Logins,
+                default
+            )
+        ).ShouldBeEmpty();
     }
 
     private static ViewerPassportService CreateService(SqliteBlokeBotDbFactory database) =>

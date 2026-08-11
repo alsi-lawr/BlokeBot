@@ -427,30 +427,48 @@ public sealed class ViewerPassportService(
         CancellationToken cancellationToken
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var host = await db.Hosts.SingleOrDefaultAsync(
-            value => value.Id == hostId,
-            cancellationToken
-        );
-        if (host is null)
+        var gate = Gate(twitchUserId);
+        await gate.WaitAsync(cancellationToken);
+        try
         {
-            return new ViewerPassportResetOutcome.NotFound();
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var host = await db.Hosts.SingleOrDefaultAsync(
+                value => value.Id == hostId,
+                cancellationToken
+            );
+            if (host is null)
+            {
+                return new ViewerPassportResetOutcome.NotFound();
+            }
+            if (!host.EnabledFeatures.Contains(HostFeatureFlags.ViewerPassports))
+            {
+                return new ViewerPassportResetOutcome.FeatureDisabled();
+            }
+            var passport = await db.ViewerPassports.SingleOrDefaultAsync(
+                value => value.HostId == hostId && value.TwitchUserId == twitchUserId,
+                cancellationToken
+            );
+            if (passport is null)
+            {
+                return new ViewerPassportResetOutcome.Succeeded(false);
+            }
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            await ViewerPassportAmbiguityTombstones.PersistForPassportsAsync(
+                db,
+                [passport.Id],
+                cancellationToken
+            );
+            _ = db.ViewerPassports.Remove(passport);
+            _ = await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new ViewerPassportResetOutcome.Succeeded(true);
         }
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.ViewerPassports))
+        finally
         {
-            return new ViewerPassportResetOutcome.FeatureDisabled();
+            _ = gate.Release();
         }
-        var passport = await db.ViewerPassports.SingleOrDefaultAsync(
-            value => value.HostId == hostId && value.TwitchUserId == twitchUserId,
-            cancellationToken
-        );
-        if (passport is null)
-        {
-            return new ViewerPassportResetOutcome.Succeeded(false);
-        }
-        _ = db.ViewerPassports.Remove(passport);
-        _ = await db.SaveChangesAsync(cancellationToken);
-        return new ViewerPassportResetOutcome.Succeeded(true);
     }
 
     public async Task<ViewerPassportExportOutcome> ExportAsync(

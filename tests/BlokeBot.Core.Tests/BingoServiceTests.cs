@@ -448,6 +448,31 @@ public sealed class BingoServiceTests
         var game = (await service.GetModeratorGamesAsync(hostId, default)).Single().Game;
         var alice = new BingoViewer("alice-id", "alice", "Alice Display");
         var bob = new BingoViewer("bob-id", "bob", "Bob Display");
+        await using (var identity = await database.CreateDbContextAsync())
+        {
+            var passport = new ViewerPassport
+            {
+                HostId = hostId,
+                TwitchUserId = alice.TwitchUserId,
+                Login = alice.Login,
+                DisplayName = alice.DisplayName,
+                CreatedAtUtc = _now.UtcDateTime,
+                UpdatedAtUtc = _now.UtcDateTime,
+            };
+            _ = identity.ViewerPassports.Add(passport);
+            _ = await identity.SaveChangesAsync();
+            _ = identity.ViewerPassportLogins.Add(
+                new()
+                {
+                    HostId = hostId,
+                    PassportId = passport.Id,
+                    Login = alice.Login,
+                    FirstSeenAtUtc = _now.UtcDateTime,
+                    LastSeenAtUtc = _now.UtcDateTime,
+                }
+            );
+            _ = await identity.SaveChangesAsync();
+        }
         _ = Success(
             await service.JoinAsync(
                 hostId,

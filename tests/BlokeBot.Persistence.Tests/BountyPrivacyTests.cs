@@ -24,6 +24,27 @@ public sealed class BountyPrivacyTests
             _ = seed.Hosts.Add(host);
             _ = await seed.SaveChangesAsync();
             hostId = host.Id;
+            var passport = new ViewerPassport
+            {
+                HostId = hostId,
+                TwitchUserId = "viewer-id",
+                Login = "viewer",
+                DisplayName = "Viewer",
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            };
+            _ = seed.ViewerPassports.Add(passport);
+            _ = await seed.SaveChangesAsync();
+            _ = seed.ViewerPassportLogins.Add(
+                new()
+                {
+                    HostId = hostId,
+                    PassportId = passport.Id,
+                    Login = "viewer",
+                    FirstSeenAtUtc = DateTime.UtcNow,
+                    LastSeenAtUtc = DateTime.UtcNow,
+                }
+            );
             var bounty = Bounty(hostId);
             _ = seed.Bounties.Add(bounty);
             _ = await seed.SaveChangesAsync();

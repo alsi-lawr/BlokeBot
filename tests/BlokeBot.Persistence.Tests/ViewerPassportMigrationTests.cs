@@ -13,6 +13,8 @@ public sealed class ViewerPassportMigrationTests
     private const string _passportMigration = "20260811035655_v0.10.0_ViewerPassports";
     private const string _loginHistoryMigration =
         "20260811051820_v0.10.0_ViewerPassportLoginHistory";
+    private const string _ambiguityMigration =
+        "20260811062237_v0.10.0_ViewerPassportAmbiguousLogins";
 
     [Test]
     public async Task Upgrade_AddsPassportSchemaAndLeavesEveryExistingHostOff()
@@ -135,6 +137,89 @@ public sealed class ViewerPassportMigrationTests
         (
             await upgraded.ViewerPassportAmbiguousLogins.CountAsync(value => value.HostId == 2)
         ).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task RollbackAndReupgrade_PreservesOwnerlessAmbiguityTombstones()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using (var migrate = await factory.CreateDbContextAsync())
+        {
+            await migrate.Database.MigrateAsync();
+        }
+        await using (var seed = await factory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                TwitchUserId = "host-id",
+                Login = "host",
+                DisplayName = "Host",
+                CreatedAtUtc = new DateTime(2026, 8, 11),
+            };
+            _ = seed.Hosts.Add(host);
+            _ = await seed.SaveChangesAsync();
+            var passport = new ViewerPassport
+            {
+                HostId = host.Id,
+                TwitchUserId = "viewer-id",
+                Login = "current_name",
+                DisplayName = "Viewer",
+                CreatedAtUtc = new DateTime(2026, 8, 1),
+                UpdatedAtUtc = new DateTime(2026, 8, 11),
+            };
+            _ = seed.ViewerPassports.Add(passport);
+            _ = await seed.SaveChangesAsync();
+            seed.ViewerPassportLogins.AddRange(
+                new()
+                {
+                    HostId = host.Id,
+                    PassportId = passport.Id,
+                    Login = "current_name",
+                    FirstSeenAtUtc = new DateTime(2026, 8, 5),
+                    LastSeenAtUtc = new DateTime(2026, 8, 11),
+                },
+                new()
+                {
+                    HostId = host.Id,
+                    PassportId = passport.Id,
+                    Login = "old_name",
+                    FirstSeenAtUtc = new DateTime(2026, 8, 1),
+                    LastSeenAtUtc = new DateTime(2026, 8, 5),
+                }
+            );
+            _ = await seed.SaveChangesAsync();
+            await ViewerPassportAmbiguityTombstones.PersistForPassportsAsync(
+                seed,
+                [passport.Id],
+                default
+            );
+            _ = seed.ViewerPassports.Remove(passport);
+            _ = await seed.SaveChangesAsync();
+        }
+
+        await using (var rollback = await factory.CreateDbContextAsync())
+        {
+            await rollback.GetService<IMigrator>().MigrateAsync(_loginHistoryMigration);
+            (
+                await rollback
+                    .ViewerPassportAmbiguousLogins.OrderBy(value => value.Login)
+                    .Select(value => value.Login)
+                    .ToArrayAsync()
+            ).ShouldBe(["current_name", "old_name"]);
+            (await rollback.Database.GetAppliedMigrationsAsync()).ShouldNotContain(
+                _ambiguityMigration
+            );
+            await rollback.Database.MigrateAsync();
+        }
+
+        await using var upgraded = await factory.CreateDbContextAsync();
+        (
+            await upgraded
+                .ViewerPassportAmbiguousLogins.OrderBy(value => value.Login)
+                .Select(value => value.Login)
+                .ToArrayAsync()
+        ).ShouldBe(["current_name", "old_name"]);
+        (await upgraded.Database.GetAppliedMigrationsAsync()).ShouldContain(_ambiguityMigration);
     }
 
     [Test]
