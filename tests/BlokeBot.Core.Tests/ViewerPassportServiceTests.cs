@@ -3,6 +3,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Persistence.Privacy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -431,6 +432,314 @@ public sealed class ViewerPassportServiceTests
         (await verify.PointBalances.SingleAsync()).Amount.ShouldBe("42");
     }
 
+    [Test]
+    public async Task ReusedLogin_FailsClosedAcrossPublicStatsPrivacyErasureAndReset()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        var firstIdentity = new ViewerPassportIdentity("first-id", "shared", "First");
+        var secondIdentity = new ViewerPassportIdentity("second-id", "shared", "Second");
+        _ = Success(await service.SaveAsync(Save(hostId, "first-id", "shared"), default));
+        await SeedLegacyActivityAsync(database, hostId, "shared", "75");
+        _ = Success(
+            await service.SaveAsync(
+                Save(hostId, "second-id", "shared") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+
+        var first = (
+            await service.GetVisibleByIdentityAsync(
+                "channel",
+                firstIdentity,
+                new("first-id", false),
+                default
+            )
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        var second = (
+            await service.GetVisibleByIdentityAsync(
+                "channel",
+                secondIdentity,
+                new("second-id", false),
+                default
+            )
+        )
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        var publicProfile = await service.GetVisibleAsync(
+            "channel",
+            "shared",
+            ViewerPassportAudience.Anonymous,
+            default
+        );
+
+        first.TwitchUserId.ShouldBe("first-id");
+        second.TwitchUserId.ShouldBe("second-id");
+        _ = publicProfile.ShouldBeOfType<ViewerPassportQueryOutcome.NotFound>();
+        foreach (var statistics in new[] { first.Statistics, second.Statistics })
+        {
+            statistics.Points.ShouldBe("0");
+            statistics.PointsRank.ShouldBeNull();
+            statistics.GuessRounds.ShouldBe(0);
+            statistics.CorrectGuesses.ShouldBe(0);
+            statistics.GiveawaysWon.ShouldBe(0);
+        }
+
+        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            hostId,
+            default
+        );
+        exclusions.Logins.ShouldContain("shared");
+        (
+            await new PointBalanceService(database).GetPublicLeaderboardAsync(
+                hostId,
+                10,
+                exclusions.Logins,
+                default
+            )
+        ).ShouldBeEmpty();
+        (
+            await new GuessingHistoryService(database).LoadPublicLeaderboardAsync(
+                hostId,
+                new GuessHistoryQuery { Page = 1, PageSize = 10 },
+                exclusions.Logins,
+                default
+            )
+        ).Entries.ShouldBeEmpty();
+
+        foreach (var identity in new[] { firstIdentity, secondIdentity })
+        {
+            var export = (
+                await service.ExportAsync(hostId, identity, default)
+            ).ShouldBeOfType<ViewerPassportExportOutcome.Succeeded>();
+            export.Sections.ShouldNotContainKey("points.balances");
+            export.Sections.ShouldNotContainKey("guessing.votes");
+            export.Sections.ShouldNotContainKey("points.giveaway-entries");
+            export.Sections.ShouldNotContainKey("points.giveaway-wins");
+            export
+                .Sections["viewer-passports.profiles"]
+                .Cast<ViewerPassport>()
+                .Single()
+                .TwitchUserId.ShouldBe(identity.TwitchUserId);
+        }
+        await using (var loginOnly = await database.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                loginOnly,
+                PrivacySubject.Create(null, "shared"),
+                hostId,
+                default
+            );
+            export.Sections.ShouldNotContainKey("viewer-passports.profiles");
+            export.Sections.ShouldNotContainKey("points.balances");
+            export.Sections.ShouldNotContainKey("guessing.votes");
+            export.Sections.ShouldNotContainKey("points.giveaway-wins");
+        }
+        await using (var stableOnly = await database.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                stableOnly,
+                PrivacySubject.Create("first-id", null),
+                hostId,
+                default
+            );
+            export
+                .Sections["viewer-passports.profiles"]
+                .Cast<ViewerPassport>()
+                .Single()
+                .TwitchUserId.ShouldBe("first-id");
+            export.Sections.ShouldNotContainKey("points.balances");
+        }
+
+        await using (var eraseFirst = await database.CreateDbContextAsync())
+        {
+            var report = await ViewerPrivacyService.EraseAsync(
+                eraseFirst,
+                PrivacySubject.Create("first-id", null),
+                hostId,
+                default
+            );
+            report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows.ShouldNotContainKey("points.balances");
+            report.ChangedRows.ShouldNotContainKey("guessing.votes");
+            report.ChangedRows.ShouldNotContainKey("points.giveaway-wins");
+        }
+        _ = (
+            await service.ResetAsync(hostId, "second-id", default)
+        ).ShouldBeOfType<ViewerPassportResetOutcome.Succeeded>();
+        await SetFeaturesAsync(database, hostId, HostFeatureFlags.None);
+
+        var sticky = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            hostId,
+            default
+        );
+        sticky.Logins.ShouldContain("shared");
+        await using (var eraseLogin = await database.CreateDbContextAsync())
+        {
+            var report = await ViewerPrivacyService.EraseAsync(
+                eraseLogin,
+                PrivacySubject.Create(null, "shared"),
+                hostId,
+                default
+            );
+            report.TotalChangedRows.ShouldBe(0);
+        }
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassports.CountAsync()).ShouldBe(0);
+        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
+        (await verify.PointBalances.CountAsync(value => value.Login == "shared")).ShouldBe(1);
+        (await verify.Votes.CountAsync(value => value.Login == "shared")).ShouldBe(1);
+        (await verify.PointsGiveawayEntrants.CountAsync(value => value.Login == "shared")).ShouldBe(
+            1
+        );
+        (await verify.PointsGiveawayWinners.CountAsync(value => value.Login == "shared")).ShouldBe(
+            1
+        );
+    }
+
+    [Test]
+    public async Task UniqueAlias_RemainsAttributedWithinItsHost()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var ambiguousHost = await SeedHostAsync(
+            database,
+            "ambiguous",
+            HostFeatureFlags.ViewerPassports
+        );
+        var uniqueHost = await SeedHostAsync(database, "unique", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+        _ = Success(await service.SaveAsync(Save(ambiguousHost, "first-id", "old_name"), default));
+        _ = Success(await service.SaveAsync(Save(ambiguousHost, "second-id", "old_name"), default));
+        _ = Success(await service.SaveAsync(Save(uniqueHost, "owner-id", "old_name"), default));
+        await SeedLegacyActivityAsync(database, uniqueHost, "old_name", "90");
+        var renamed = Success(
+            await service.SaveAsync(
+                Save(uniqueHost, "owner-id", "new_name") with
+                {
+                    Visibility = ViewerPassportVisibility.Public,
+                },
+                default
+            )
+        );
+
+        renamed.Statistics.Points.ShouldBe("90");
+        renamed.Statistics.GuessRounds.ShouldBe(1);
+        renamed.Statistics.CorrectGuesses.ShouldBe(1);
+        renamed.Statistics.GiveawaysWon.ShouldBe(1);
+        var exclusions = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
+            uniqueHost,
+            default
+        );
+        exclusions.Logins.ShouldNotContain("old_name");
+        (
+            await new PointBalanceService(database).GetPublicLeaderboardAsync(
+                uniqueHost,
+                10,
+                exclusions.Logins,
+                default
+            )
+        )
+            .Single()
+            .Login.ShouldBe("old_name");
+
+        var stableExport = (
+            await service.ExportAsync(uniqueHost, new("owner-id", "new_name", "Owner"), default)
+        ).ShouldBeOfType<ViewerPassportExportOutcome.Succeeded>();
+        stableExport.Sections.ShouldContainKey("points.balances");
+        stableExport.Sections.ShouldContainKey("guessing.votes");
+        stableExport.Sections.ShouldContainKey("points.giveaway-wins");
+        await using (var loginOnly = await database.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                loginOnly,
+                PrivacySubject.Create(null, "old_name"),
+                uniqueHost,
+                default
+            );
+            export
+                .Sections["viewer-passports.profiles"]
+                .Cast<ViewerPassport>()
+                .Single()
+                .TwitchUserId.ShouldBe("owner-id");
+            export.Sections.ShouldContainKey("points.balances");
+        }
+
+        await using (var erase = await database.CreateDbContextAsync())
+        {
+            var report = await ViewerPrivacyService.EraseAsync(
+                erase,
+                PrivacySubject.Create("owner-id", "new_name"),
+                uniqueHost,
+                default
+            );
+            report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows["points.balances"].ShouldBe(1);
+            report.ChangedRows["guessing.votes"].ShouldBe(1);
+            report.ChangedRows["points.giveaway-entries"].ShouldBe(1);
+            report.ChangedRows["points.giveaway-wins"].ShouldBe(1);
+        }
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportAmbiguousLogins.SingleAsync()).HostId.ShouldBe(ambiguousHost);
+        (await verify.PointBalances.CountAsync(value => value.HostId == uniqueHost)).ShouldBe(0);
+        (await verify.Votes.CountAsync(value => value.GuessRound!.HostId == uniqueHost)).ShouldBe(
+            0
+        );
+        (
+            await verify.PointsGiveawayEntrants.CountAsync(value =>
+                value.Giveaway!.HostId == uniqueHost
+            )
+        ).ShouldBe(0);
+        (
+            await verify.PointsGiveawayWinners.SingleAsync(value =>
+                value.Giveaway!.HostId == uniqueHost
+            )
+        ).Login.ShouldBe(ViewerPrivacyService.ErasedToken);
+    }
+
+    [Test]
+    public async Task ConcurrentChatClaims_MarkReuseAndRememberBothOwners()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var service = CreateService(database);
+
+        var results = await Task.WhenAll(
+            service.RecordChatPresenceAsync(
+                "channel",
+                new("first-id", "shared", "First"),
+                _now,
+                default
+            ),
+            service.RecordChatPresenceAsync(
+                "channel",
+                new("second-id", "shared", "Second"),
+                _now,
+                default
+            )
+        );
+
+        results.ShouldAllBe(value => value);
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportLogins.CountAsync(value => value.Login == "shared")).ShouldBe(
+            2
+        );
+        (
+            await verify
+                .ViewerPassportLogins.Where(value => value.Login == "shared")
+                .Select(value => value.Passport!.TwitchUserId)
+                .Order()
+                .ToArrayAsync()
+        ).ShouldBe(["first-id", "second-id"]);
+    }
+
     private static ViewerPassportService CreateService(SqliteBlokeBotDbFactory database) =>
         new(database, new PointBalanceService(database), new FixedTimeProvider(_now));
 
@@ -581,6 +890,42 @@ public sealed class ViewerPassportServiceTests
                 ],
             }
         );
+    }
+
+    private static async Task SeedLegacyActivityAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        string login,
+        string points
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        _ = db.PointBalances.Add(
+            new PointBalance
+            {
+                HostId = hostId,
+                Login = login,
+                Amount = points,
+                UpdatedAtUtc = _now.UtcDateTime,
+            }
+        );
+        SeedCompletedGuess(db, hostId, login);
+        _ = db.PointsGiveaways.Add(
+            new PointsGiveaway
+            {
+                HostId = hostId,
+                Status = PointsGiveawayStatus.Completed,
+                StartedAtUtc = _now.AddMinutes(-10).UtcDateTime,
+                EndsAtUtc = _now.AddMinutes(-5).UtcDateTime,
+                CompletedAtUtc = _now.UtcDateTime,
+                Entrants =
+                [
+                    new PointsGiveawayEntrant { Login = login, JoinedAtUtc = _now.UtcDateTime },
+                ],
+                Winners = [new PointsGiveawayWinner { Login = login, Payout = "25" }],
+            }
+        );
+        _ = await db.SaveChangesAsync();
     }
 
     private static async Task SeedBingoWinsAsync(

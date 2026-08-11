@@ -29,11 +29,7 @@ internal static class ViewerPassportEndpoints
                         session.Login,
                         session.DisplayText
                     );
-                    var self = await passports.GetSelfAsync(
-                        channel,
-                        identity,
-                        cancellationToken
-                    );
+                    var self = await passports.GetSelfAsync(channel, identity, cancellationToken);
                     if (self is not ViewerPassportQueryOutcome.Available { Passport: var passport })
                     {
                         return Results.NotFound();

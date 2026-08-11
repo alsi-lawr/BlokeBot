@@ -27,6 +27,11 @@ public sealed class ViewerPassportPublicIdentityPolicy(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var ambiguousLogins = await db
+            .ViewerPassportAmbiguousLogins.AsNoTracking()
+            .Where(value => value.HostId == hostId)
+            .Select(value => value.Login)
+            .ToArrayAsync(cancellationToken);
         var enabled = await db
             .Hosts.AsNoTracking()
             .Where(value => value.Id == hostId)
@@ -34,7 +39,10 @@ public sealed class ViewerPassportPublicIdentityPolicy(
             .SingleOrDefaultAsync(cancellationToken);
         if (!enabled.Contains(HostFeatureFlags.ViewerPassports))
         {
-            return ViewerPassportPublicExclusions.None;
+            return new(
+                ViewerPassportPublicExclusions.None.TwitchUserIds,
+                ambiguousLogins.ToHashSet(StringComparer.Ordinal)
+            );
         }
         var hidden = await db
             .ViewerPassports.AsNoTracking()
@@ -57,6 +65,7 @@ public sealed class ViewerPassportPublicIdentityPolicy(
                 .Where(value => !string.IsNullOrWhiteSpace(value.Login))
                 .Select(value => value.Login)
                 .Concat(hiddenLogins)
+                .Concat(ambiguousLogins)
                 .ToHashSet(StringComparer.Ordinal)
         );
     }

@@ -31,10 +31,7 @@ public partial class PublicViewerPassportPage
         var outcome = await _passports.GetVisibleAsync(
             Channel,
             Viewer,
-            new(
-                context.Session.IsAuthenticated ? context.Session.UserId : null,
-                manager
-            ),
+            new(context.Session.IsAuthenticated ? context.Session.UserId : null, manager),
             CancellationToken.None
         );
         _featureDisabled = outcome is ViewerPassportQueryOutcome.FeatureDisabled;
@@ -50,18 +47,19 @@ public partial class PublicViewerPassportPage
         return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
 
-    private static RenderFragment Stat(string value, string label) => builder =>
-    {
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "rounded-xl bg-[var(--app-surface-muted)] p-3");
-        builder.OpenElement(2, "b");
-        builder.AddAttribute(3, "class", "block text-lg text-[var(--app-text-strong)]");
-        builder.AddContent(4, value);
-        builder.CloseElement();
-        builder.OpenElement(5, "span");
-        builder.AddAttribute(6, "class", "text-xs text-muted-foreground");
-        builder.AddContent(7, label);
-        builder.CloseElement();
-        builder.CloseElement();
-    };
+    private static RenderFragment Stat(string value, string label) =>
+        builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "rounded-xl bg-[var(--app-surface-muted)] p-3");
+            builder.OpenElement(2, "b");
+            builder.AddAttribute(3, "class", "block text-lg text-[var(--app-text-strong)]");
+            builder.AddContent(4, value);
+            builder.CloseElement();
+            builder.OpenElement(5, "span");
+            builder.AddAttribute(6, "class", "text-xs text-muted-foreground");
+            builder.AddContent(7, label);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
 }

@@ -73,10 +73,21 @@ public static class ViewerPrivacyService
     )
     {
         var sections = new Dictionary<string, IReadOnlyList<object>>(StringComparer.Ordinal);
+        var hasStableId = subject.TwitchUserId is not null;
         var userId = subject.TwitchUserId ?? UnmatchableValue;
-        var login = subject.Login ?? UnmatchableValue;
+        var loginIsAmbiguous = await IsAmbiguousLoginAsync(db, subject.Login, hostId, ct);
+        var login = loginIsAmbiguous ? UnmatchableValue : subject.Login ?? UnmatchableValue;
         var idKey = subject.IdIdentityKey;
-        var loginKey = subject.LoginIdentityKey;
+        var loginKey = loginIsAmbiguous ? UnmatchableValue : subject.LoginIdentityKey;
+        var passportIds = MatchingPassportIds(
+            db,
+            hostId,
+            hasStableId,
+            userId,
+            login,
+            loginIsAmbiguous
+        );
+        var legacyLoginClaims = LegacyLoginClaims(db, passportIds);
 
         async Task AddAsync<T>(string section, IQueryable<T> query)
             where T : class
@@ -104,7 +115,13 @@ public static class ViewerPrivacyService
         await AddAsync(
             "guessing.votes",
             db.Votes.Where(x =>
-                    x.Login == login && (hostId == null || x.GuessRound!.HostId == hostId)
+                    (hostId == null || x.GuessRound!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .Select(x => new
                 {
@@ -118,7 +135,15 @@ public static class ViewerPrivacyService
         );
         await AddAsync(
             "points.balances",
-            db.PointBalances.Where(x => x.Login == login && (hostId == null || x.HostId == hostId))
+            db.PointBalances.Where(x =>
+                (hostId == null || x.HostId == hostId)
+                && (
+                    x.Login == login
+                    || legacyLoginClaims.Any(claim =>
+                        claim.HostId == x.HostId && claim.Login == x.Login
+                    )
+                )
+            )
         );
         await AddAsync(
             "points.ledger",
@@ -163,7 +188,13 @@ public static class ViewerPrivacyService
         await AddAsync(
             "points.giveaway-entries",
             db.PointsGiveawayEntrants.Where(x =>
-                    x.Login == login && (hostId == null || x.Giveaway!.HostId == hostId)
+                    (hostId == null || x.Giveaway!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .Select(x => new
                 {
@@ -177,7 +208,13 @@ public static class ViewerPrivacyService
         await AddAsync(
             "points.giveaway-wins",
             db.PointsGiveawayWinners.Where(x =>
-                    x.Login == login && (hostId == null || x.Giveaway!.HostId == hostId)
+                    (hostId == null || x.Giveaway!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .Select(x => new
                 {
@@ -466,29 +503,12 @@ public static class ViewerPrivacyService
         );
         await AddAsync(
             "viewer-passports.profiles",
-            db.ViewerPassports.Where(x =>
-                (
-                    x.TwitchUserId == userId
-                    || x.Login == login
-                    || db.ViewerPassportLogins.Any(alias =>
-                        alias.PassportId == x.Id && alias.Login == login
-                    )
-                ) && (hostId == null || x.HostId == hostId)
-            )
+            db.ViewerPassports.Where(x => passportIds.Contains(x.Id))
         );
         await AddAsync(
             "viewer-passports.logins",
             db.ViewerPassportLogins.Where(x =>
-                    db.ViewerPassports.Any(passport =>
-                        passport.Id == x.PassportId
-                        && (
-                            passport.TwitchUserId == userId
-                            || passport.Login == login
-                            || db.ViewerPassportLogins.Any(alias =>
-                                alias.PassportId == passport.Id && alias.Login == login
-                            )
-                        )
-                    ) && (hostId == null || x.HostId == hostId)
+                    passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -501,16 +521,7 @@ public static class ViewerPrivacyService
         await AddAsync(
             "viewer-passports.attendance-days",
             db.ViewerPassportAttendanceDays.Where(x =>
-                    db.ViewerPassports.Any(passport =>
-                        passport.Id == x.PassportId
-                        && (
-                            passport.TwitchUserId == userId
-                            || passport.Login == login
-                            || db.ViewerPassportLogins.Any(alias =>
-                                alias.PassportId == passport.Id && alias.Login == login
-                            )
-                        )
-                    ) && (hostId == null || x.HostId == hostId)
+                    passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId)
                 )
                 .Select(x => new
                 {
@@ -693,12 +704,23 @@ public static class ViewerPrivacyService
     )
     {
         var changed = new Dictionary<string, int>(StringComparer.Ordinal);
+        var hasStableId = subject.TwitchUserId is not null;
         var userId = subject.TwitchUserId ?? UnmatchableValue;
-        var login = subject.Login ?? UnmatchableValue;
+        var loginIsAmbiguous = await IsAmbiguousLoginAsync(db, subject.Login, hostId, ct);
+        var login = loginIsAmbiguous ? UnmatchableValue : subject.Login ?? UnmatchableValue;
         var idKey = subject.IdIdentityKey;
-        var loginKey = subject.LoginIdentityKey;
+        var loginKey = loginIsAmbiguous ? UnmatchableValue : subject.LoginIdentityKey;
+        var passportIds = MatchingPassportIds(
+            db,
+            hostId,
+            hasStableId,
+            userId,
+            login,
+            loginIsAmbiguous
+        );
+        var legacyLoginClaims = LegacyLoginClaims(db, passportIds);
         var quotedNeedles = new List<string>();
-        if (subject.Login is not null)
+        if (subject.Login is not null && !loginIsAmbiguous)
         {
             quotedNeedles.Add($"%\"{subject.Login}\"%");
         }
@@ -829,7 +851,13 @@ public static class ViewerPrivacyService
             "guessing.votes",
             await db
                 .Votes.Where(x =>
-                    x.Login == login && (hostId == null || x.GuessRound!.HostId == hostId)
+                    (hostId == null || x.GuessRound!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.GuessRound!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -837,7 +865,13 @@ public static class ViewerPrivacyService
             "points.balances",
             await db
                 .PointBalances.Where(x =>
-                    x.Login == login && (hostId == null || x.HostId == hostId)
+                    (hostId == null || x.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -902,7 +936,13 @@ public static class ViewerPrivacyService
             "points.giveaway-entries",
             await db
                 .PointsGiveawayEntrants.Where(x =>
-                    x.Login == login && (hostId == null || x.Giveaway!.HostId == hostId)
+                    (hostId == null || x.Giveaway!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .ExecuteDeleteAsync(ct)
         );
@@ -910,7 +950,13 @@ public static class ViewerPrivacyService
             "points.giveaway-wins",
             await db
                 .PointsGiveawayWinners.Where(x =>
-                    x.Login == login && (hostId == null || x.Giveaway!.HostId == hostId)
+                    (hostId == null || x.Giveaway!.HostId == hostId)
+                    && (
+                        x.Login == login
+                        || legacyLoginClaims.Any(claim =>
+                            claim.HostId == x.Giveaway!.HostId && claim.Login == x.Login
+                        )
+                    )
                 )
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Login, ErasedToken), ct)
         );
@@ -1407,50 +1453,20 @@ public static class ViewerPrivacyService
         Record(
             "viewer-passports.logins",
             await db.ViewerPassportLogins.CountAsync(
-                x =>
-                    db.ViewerPassports.Any(passport =>
-                        passport.Id == x.PassportId
-                        && (
-                            passport.TwitchUserId == userId
-                            || passport.Login == login
-                            || db.ViewerPassportLogins.Any(alias =>
-                                alias.PassportId == passport.Id && alias.Login == login
-                            )
-                        )
-                    ) && (hostId == null || x.HostId == hostId),
+                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
                 ct
             )
         );
         Record(
             "viewer-passports.attendance-days",
             await db.ViewerPassportAttendanceDays.CountAsync(
-                x =>
-                    db.ViewerPassports.Any(passport =>
-                        passport.Id == x.PassportId
-                        && (
-                            passport.TwitchUserId == userId
-                            || passport.Login == login
-                            || db.ViewerPassportLogins.Any(alias =>
-                                alias.PassportId == passport.Id && alias.Login == login
-                            )
-                        )
-                    ) && (hostId == null || x.HostId == hostId),
+                x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
                 ct
             )
         );
         Record(
             "viewer-passports.profiles",
-            await db
-                .ViewerPassports.Where(x =>
-                    (
-                        x.TwitchUserId == userId
-                        || x.Login == login
-                        || db.ViewerPassportLogins.Any(alias =>
-                            alias.PassportId == x.Id && alias.Login == login
-                        )
-                    ) && (hostId == null || x.HostId == hostId)
-                )
-                .ExecuteDeleteAsync(ct)
+            await db.ViewerPassports.Where(x => passportIds.Contains(x.Id)).ExecuteDeleteAsync(ct)
         );
         Record(
             "play-queues.entries",
@@ -1647,6 +1663,57 @@ public static class ViewerPrivacyService
         await transaction.CommitAsync(ct);
         return new ViewerErasureReport(changed);
     }
+
+    private static Task<bool> IsAmbiguousLoginAsync(
+        BlokeBotDbContext db,
+        string? login,
+        int? hostId,
+        CancellationToken cancellationToken
+    ) =>
+        login is null
+            ? Task.FromResult(false)
+            : db
+                .ViewerPassportAmbiguousLogins.AsNoTracking()
+                .AnyAsync(
+                    value => value.Login == login && (hostId == null || value.HostId == hostId),
+                    cancellationToken
+                );
+
+    private static IQueryable<long> MatchingPassportIds(
+        BlokeBotDbContext db,
+        int? hostId,
+        bool hasStableId,
+        string userId,
+        string login,
+        bool loginIsAmbiguous
+    ) =>
+        db
+            .ViewerPassports.Where(passport =>
+                (hostId == null || passport.HostId == hostId)
+                && (
+                    hasStableId
+                        ? passport.TwitchUserId == userId
+                        : !loginIsAmbiguous
+                            && (
+                                passport.Login == login
+                                || db.ViewerPassportLogins.Any(alias =>
+                                    alias.PassportId == passport.Id && alias.Login == login
+                                )
+                            )
+                )
+            )
+            .Select(passport => passport.Id);
+
+    private static IQueryable<ViewerPassportLogin> LegacyLoginClaims(
+        BlokeBotDbContext db,
+        IQueryable<long> passportIds
+    ) =>
+        db.ViewerPassportLogins.Where(alias =>
+            passportIds.Contains(alias.PassportId)
+            && !db.ViewerPassportAmbiguousLogins.Any(ambiguous =>
+                ambiguous.HostId == alias.HostId && ambiguous.Login == alias.Login
+            )
+        );
 
     private static string LikeContainsPattern(string value) =>
         $"%{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";

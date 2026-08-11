@@ -64,6 +64,19 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        _ = modelBuilder.Entity<ViewerPassportAmbiguousLogin>(entity =>
+        {
+            _ = entity.ToTable("viewer_passport_ambiguous_logins");
+            _ = entity.HasKey(value => value.Id);
+            _ = entity.HasIndex(value => new { value.HostId, value.Login }).IsUnique();
+            _ = entity.Property(value => value.Login).HasMaxLength(128);
+            _ = entity
+                .HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(value => value.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         _ = modelBuilder.Entity<ViewerPassportAttendanceDay>(entity =>
         {
             _ = entity.ToTable("viewer_passport_attendance_days");

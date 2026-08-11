@@ -7,12 +7,15 @@ public sealed class ViewerPassportProjectionService(ViewerPassportService passpo
         string viewerLogin,
         CancellationToken cancellationToken
     ) =>
-        (await passports.GetVisibleAsync(
-            channelLogin,
-            viewerLogin,
-            ViewerPassportAudience.Anonymous,
-            cancellationToken
-        )) is ViewerPassportQueryOutcome.Available { Passport: var passport }
+        (
+            await passports.GetVisibleAsync(
+                channelLogin,
+                viewerLogin,
+                ViewerPassportAudience.Anonymous,
+                cancellationToken
+            )
+        )
+            is ViewerPassportQueryOutcome.Available { Passport: var passport }
         && passport.Visibility == Persistence.Models.ViewerPassportVisibility.Public
             ? new ViewerPassportOverlayData(
                 passport.DisplayName,
@@ -31,12 +34,15 @@ public sealed class ViewerPassportProjectionService(ViewerPassportService passpo
         string viewerLogin,
         CancellationToken cancellationToken
     ) =>
-        (await passports.GetVisibleAsync(
-            channelLogin,
-            viewerLogin,
-            ViewerPassportAudience.Anonymous,
-            cancellationToken
-        )) is ViewerPassportQueryOutcome.Available { Passport: var passport }
+        (
+            await passports.GetVisibleAsync(
+                channelLogin,
+                viewerLogin,
+                ViewerPassportAudience.Anonymous,
+                cancellationToken
+            )
+        )
+            is ViewerPassportQueryOutcome.Available { Passport: var passport }
         && passport.Visibility == Persistence.Models.ViewerPassportVisibility.Public
             ? new ViewerPassportAutomationPayload(
                 passport.TwitchUserId,

@@ -11,9 +11,21 @@ public partial class ViewerPassportsPage
 
     private readonly IReadOnlyList<VisibilityOption> _visibilityOptions =
     [
-        new(ViewerPassportVisibility.Public, "Public", "Anyone with the link can see your selected profile fields."),
-        new(ViewerPassportVisibility.ChannelMembers, "Channel members", "Only signed-in viewers who participate in this channel."),
-        new(ViewerPassportVisibility.Private, "Private", "Only you and channel managers can open this passport."),
+        new(
+            ViewerPassportVisibility.Public,
+            "Public",
+            "Anyone with the link can see your selected profile fields."
+        ),
+        new(
+            ViewerPassportVisibility.ChannelMembers,
+            "Channel members",
+            "Only signed-in viewers who participate in this channel."
+        ),
+        new(
+            ViewerPassportVisibility.Private,
+            "Private",
+            "Only you and channel managers can open this passport."
+        ),
     ];
     private ViewerPassportView? _passport;
     private string _profileLine = string.Empty;
@@ -134,14 +146,9 @@ public partial class ViewerPassportsPage
     }
 
     private ViewerPassportIdentity Identity() =>
-        new(
-            PageContext.Session.UserId,
-            PageContext.Session.Login,
-            PageContext.Session.DisplayText
-        );
+        new(PageContext.Session.UserId, PageContext.Session.Login, PageContext.Session.DisplayText);
 
-    private void ToggleAttendance(ChangeEventArgs args) =>
-        _hideAttendance = args.Value is not true;
+    private void ToggleAttendance(ChangeEventArgs args) => _hideAttendance = args.Value is not true;
 
     private string VisibilityClass(ViewerPassportVisibility visibility) =>
         visibility == _visibility
@@ -152,9 +159,7 @@ public partial class ViewerPassportsPage
         long.TryParse(value, out var parsed) ? parsed : null;
 
     private string ExportUrl() =>
-        _passport is null
-            ? "#"
-            : $"/passports/{Uri.EscapeDataString(_passport.HostLogin)}/export";
+        _passport is null ? "#" : $"/passports/{Uri.EscapeDataString(_passport.HostLogin)}/export";
 
     private static string PublicUrl(ViewerPassportView passport) =>
         $"/passport/{Uri.EscapeDataString(passport.HostLogin)}/{Uri.EscapeDataString(passport.Login)}";
@@ -165,20 +170,21 @@ public partial class ViewerPassportsPage
         return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
 
-    private static RenderFragment Stat(string value, string label) => builder =>
-    {
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "rounded-xl bg-[var(--app-surface-muted)] p-3");
-        builder.OpenElement(2, "b");
-        builder.AddAttribute(3, "class", "block text-lg text-[var(--app-text-strong)]");
-        builder.AddContent(4, value);
-        builder.CloseElement();
-        builder.OpenElement(5, "span");
-        builder.AddAttribute(6, "class", "text-xs text-muted-foreground");
-        builder.AddContent(7, label);
-        builder.CloseElement();
-        builder.CloseElement();
-    };
+    private static RenderFragment Stat(string value, string label) =>
+        builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "rounded-xl bg-[var(--app-surface-muted)] p-3");
+            builder.OpenElement(2, "b");
+            builder.AddAttribute(3, "class", "block text-lg text-[var(--app-text-strong)]");
+            builder.AddContent(4, value);
+            builder.CloseElement();
+            builder.OpenElement(5, "span");
+            builder.AddAttribute(6, "class", "text-xs text-muted-foreground");
+            builder.AddContent(7, label);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
 
     private void Fail(string message)
     {

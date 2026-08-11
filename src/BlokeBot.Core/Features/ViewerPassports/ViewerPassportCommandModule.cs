@@ -22,9 +22,13 @@ internal sealed class ViewerPassportCommandModule(ViewerPassportService passport
         {
             return;
         }
-        var outcome = await passports.GetVisibleAsync(
+        var outcome = await passports.GetVisibleByIdentityAsync(
             context.Message.Channel,
-            context.Message.Login,
+            new(
+                twitchUserId,
+                context.Message.Login,
+                context.Message.Tags.GetValueOrDefault("display-name", context.Message.Login)
+            ),
             new(twitchUserId, false),
             cancellationToken
         );

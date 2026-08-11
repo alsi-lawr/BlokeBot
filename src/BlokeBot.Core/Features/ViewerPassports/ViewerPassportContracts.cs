@@ -108,9 +108,8 @@ public abstract record ViewerPassportExportOutcome
 {
     private ViewerPassportExportOutcome() { }
 
-    public sealed record Succeeded(
-        IReadOnlyDictionary<string, IReadOnlyList<object>> Sections
-    ) : ViewerPassportExportOutcome;
+    public sealed record Succeeded(IReadOnlyDictionary<string, IReadOnlyList<object>> Sections)
+        : ViewerPassportExportOutcome;
 
     public sealed record FeatureDisabled : ViewerPassportExportOutcome;
 

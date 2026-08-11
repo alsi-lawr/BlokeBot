@@ -370,6 +370,8 @@ public sealed class ViewerPrivacyServiceTests
             ["TwitchClip.BroadcasterTwitchUserId"] =
                 "Hosted channel identity; erased by channel removal.",
             ["TwitchClip.BroadcasterLogin"] = "Hosted channel identity; erased by channel removal.",
+            ["ViewerPassportAmbiguousLogin.Login"] =
+                "Sticky non-attributable ambiguity marker; erased only by channel removal.",
         };
 
         var model = DesignModel();

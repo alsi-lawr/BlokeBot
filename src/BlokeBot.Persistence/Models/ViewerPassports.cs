@@ -39,6 +39,14 @@ public sealed class ViewerPassportLogin
     public DateTime LastSeenAtUtc { get; set; }
 }
 
+public sealed class ViewerPassportAmbiguousLogin
+{
+    public long Id { get; set; }
+    public int HostId { get; set; }
+    public string Login { get; set; } = string.Empty;
+    public DateTime DetectedAtUtc { get; set; }
+}
+
 public sealed class ViewerPassportAttendanceDay
 {
     public long Id { get; set; }

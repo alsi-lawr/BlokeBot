@@ -11,6 +11,8 @@ public sealed class ViewerPassportMigrationTests
 {
     private const string _previousMigration = "20260810154030_v0.9.0_BingoOpaqueAssignments";
     private const string _passportMigration = "20260811035655_v0.10.0_ViewerPassports";
+    private const string _loginHistoryMigration =
+        "20260811051820_v0.10.0_ViewerPassportLoginHistory";
 
     [Test]
     public async Task Upgrade_AddsPassportSchemaAndLeavesEveryExistingHostOff()
@@ -85,6 +87,54 @@ public sealed class ViewerPassportMigrationTests
         login.Login.ShouldBe("remember_me");
         login.FirstSeenAtUtc.ShouldBe(new DateTime(2026, 8, 1));
         login.LastSeenAtUtc.ShouldBe(new DateTime(2026, 8, 11));
+    }
+
+    [Test]
+    public async Task Upgrade_BackfillsOnlyHostScopedConflictingAliasesAsAmbiguous()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using (var before = await factory.CreateDbContextAsync())
+        {
+            await before.GetService<IMigrator>().MigrateAsync(_loginHistoryMigration);
+            _ = await before.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures,
+                     CommandsAliasesConfigured, CreatedAtUtc)
+                VALUES
+                    (1, 'first-host-id', 'first', 'First', 0, 0, 0, '2026-08-11T00:00:00Z'),
+                    (2, 'second-host-id', 'second', 'Second', 0, 0, 0, '2026-08-11T00:00:00Z');
+
+                INSERT INTO viewer_passports
+                    (Id, HostId, TwitchUserId, Login, DisplayName, ProfileLine, Visibility,
+                     HideAttendance, CreatedAtUtc, UpdatedAtUtc)
+                VALUES
+                    (1, 1, 'viewer-a', 'viewer_a', 'Viewer A', '', 'Private', 1,
+                     '2026-08-01T00:00:00Z', '2026-08-11T00:00:00Z'),
+                    (2, 1, 'viewer-b', 'viewer_b', 'Viewer B', '', 'Private', 1,
+                     '2026-08-02T00:00:00Z', '2026-08-11T00:00:00Z'),
+                    (3, 2, 'viewer-c', 'shared', 'Viewer C', '', 'Private', 1,
+                     '2026-08-03T00:00:00Z', '2026-08-11T00:00:00Z');
+
+                INSERT INTO viewer_passport_logins
+                    (HostId, PassportId, Login, FirstSeenAtUtc, LastSeenAtUtc)
+                VALUES
+                    (1, 1, 'shared', '2026-08-01T00:00:00Z', '2026-08-04T00:00:00Z'),
+                    (1, 2, 'shared', '2026-08-05T00:00:00Z', '2026-08-06T00:00:00Z'),
+                    (2, 3, 'shared', '2026-08-03T00:00:00Z', '2026-08-07T00:00:00Z');
+                """
+            );
+            await before.Database.MigrateAsync();
+        }
+
+        await using var upgraded = await factory.CreateDbContextAsync();
+        var ambiguous = await upgraded.ViewerPassportAmbiguousLogins.SingleAsync();
+        ambiguous.HostId.ShouldBe(1);
+        ambiguous.Login.ShouldBe("shared");
+        ambiguous.DetectedAtUtc.ShouldBe(new DateTime(2026, 8, 5));
+        (
+            await upgraded.ViewerPassportAmbiguousLogins.CountAsync(value => value.HostId == 2)
+        ).ShouldBe(0);
     }
 
     [Test]

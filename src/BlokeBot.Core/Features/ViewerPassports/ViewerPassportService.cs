@@ -18,6 +18,10 @@ public sealed class ViewerPassportService(
         .Range(0, 64)
         .Select(static _ => new SemaphoreSlim(1, 1))
         .ToArray();
+    private readonly SemaphoreSlim[] _loginClaimGates = Enumerable
+        .Range(0, 64)
+        .Select(static _ => new SemaphoreSlim(1, 1))
+        .ToArray();
 
     public async Task<ViewerPassportQueryOutcome> GetSelfAsync(
         int hostId,
@@ -76,15 +80,48 @@ public sealed class ViewerPassportService(
             : await GetSelfAsync(host.Id, viewer, cancellationToken);
     }
 
-    public async Task<ViewerPassportQueryOutcome> GetVisibleAsync(
+    public Task<ViewerPassportQueryOutcome> GetVisibleAsync(
         string channelLogin,
         string viewerLogin,
+        ViewerPassportAudience audience,
+        CancellationToken cancellationToken
+    ) =>
+        GetVisibleAsync(
+            channelLogin,
+            NormalizeLogin(viewerLogin),
+            targetTwitchUserId: null,
+            audience,
+            cancellationToken
+        );
+
+    public Task<ViewerPassportQueryOutcome> GetVisibleByIdentityAsync(
+        string channelLogin,
+        ViewerPassportIdentity viewer,
+        ViewerPassportAudience audience,
+        CancellationToken cancellationToken
+    )
+    {
+        var normalized = Normalize(viewer);
+        return normalized is null
+            ? Task.FromResult<ViewerPassportQueryOutcome>(new ViewerPassportQueryOutcome.NotFound())
+            : GetVisibleAsync(
+                channelLogin,
+                normalized.Login,
+                normalized.TwitchUserId,
+                audience,
+                cancellationToken
+            );
+    }
+
+    private async Task<ViewerPassportQueryOutcome> GetVisibleAsync(
+        string channelLogin,
+        string viewerLogin,
+        string? targetTwitchUserId,
         ViewerPassportAudience audience,
         CancellationToken cancellationToken
     )
     {
         var channel = NormalizeLogin(channelLogin);
-        var viewer = NormalizeLogin(viewerLogin);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
             .Hosts.AsNoTracking()
@@ -104,11 +141,27 @@ public sealed class ViewerPassportService(
         {
             return new ViewerPassportQueryOutcome.FeatureDisabled();
         }
+        if (
+            targetTwitchUserId is null
+            && await db
+                .ViewerPassportAmbiguousLogins.AsNoTracking()
+                .AnyAsync(
+                    value => value.HostId == host.Id && value.Login == viewerLogin,
+                    cancellationToken
+                )
+        )
+        {
+            return new ViewerPassportQueryOutcome.NotFound();
+        }
 
-        var passport = await db
-            .ViewerPassports.AsNoTracking()
-            .SingleOrDefaultAsync(
-                value => value.HostId == host.Id && value.Login == viewer,
+        var passports = db.ViewerPassports.AsNoTracking().Where(value => value.HostId == host.Id);
+        var passport = targetTwitchUserId is null
+            ? await passports.SingleOrDefaultAsync(
+                value => value.Login == viewerLogin,
+                cancellationToken
+            )
+            : await passports.SingleOrDefaultAsync(
+                value => value.TwitchUserId == targetTwitchUserId,
                 cancellationToken
             );
         return passport is null ? new ViewerPassportQueryOutcome.NotFound()
@@ -175,50 +228,75 @@ public sealed class ViewerPassportService(
                 return new ViewerPassportMutationOutcome.UnearnedReward();
             }
 
-            var now = clock.GetUtcNow().UtcDateTime;
-            var passport = await db.ViewerPassports.SingleOrDefaultAsync(
-                value =>
-                    value.HostId == command.HostId && value.TwitchUserId == identity.TwitchUserId,
-                cancellationToken
-            );
-            if (passport is null)
+            var claimGate = LoginClaimGate(command.HostId, identity.Login);
+            await claimGate.WaitAsync(cancellationToken);
+            try
             {
-                passport = new ViewerPassport
+                await using var transaction = await db.Database.BeginTransactionAsync(
+                    cancellationToken
+                );
+                var now = clock.GetUtcNow().UtcDateTime;
+                var passport = await db.ViewerPassports.SingleOrDefaultAsync(
+                    value =>
+                        value.HostId == command.HostId
+                        && value.TwitchUserId == identity.TwitchUserId,
+                    cancellationToken
+                );
+                if (passport is null)
                 {
-                    HostId = command.HostId,
-                    TwitchUserId = identity.TwitchUserId,
-                    CreatedAtUtc = now,
-                };
-                _ = db.ViewerPassports.Add(passport);
-            }
-            var previousLogin = passport.Login;
+                    passport = new ViewerPassport
+                    {
+                        HostId = command.HostId,
+                        TwitchUserId = identity.TwitchUserId,
+                        CreatedAtUtc = now,
+                    };
+                    _ = db.ViewerPassports.Add(passport);
+                }
+                var previousLogin = passport.Login;
 
-            await DetachReusedLoginAsync(
-                db,
-                command.HostId,
-                identity.TwitchUserId,
-                identity.Login,
-                now,
-                cancellationToken
-            );
-            passport.Login = identity.Login;
-            passport.DisplayName = identity.DisplayName;
-            passport.ProfileLine = profileLine;
-            passport.Visibility = command.Visibility;
-            passport.HideAttendance = command.HideAttendance;
-            passport.SelectedTitleRewardDefinitionId = command.SelectedTitleRewardId;
-            passport.SelectedBadgeRewardDefinitionId = command.SelectedBadgeRewardId;
-            passport.UpdatedAtUtc = now;
-            _ = await db.SaveChangesAsync(cancellationToken);
-            await RememberLoginAsync(db, passport, previousLogin, now, cancellationToken);
-            if (!string.Equals(previousLogin, identity.Login, StringComparison.Ordinal))
-            {
+                await ClaimLoginAsync(
+                    db,
+                    command.HostId,
+                    identity.TwitchUserId,
+                    identity.Login,
+                    now,
+                    cancellationToken
+                );
+                await DetachReusedLoginAsync(
+                    db,
+                    command.HostId,
+                    identity.TwitchUserId,
+                    identity.Login,
+                    now,
+                    cancellationToken
+                );
+                passport.Login = identity.Login;
+                passport.DisplayName = identity.DisplayName;
+                passport.ProfileLine = profileLine;
+                passport.Visibility = command.Visibility;
+                passport.HideAttendance = command.HideAttendance;
+                passport.SelectedTitleRewardDefinitionId = command.SelectedTitleRewardId;
+                passport.SelectedBadgeRewardDefinitionId = command.SelectedBadgeRewardId;
+                passport.UpdatedAtUtc = now;
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await RememberLoginAsync(db, passport, previousLogin, now, cancellationToken);
                 await RememberLoginAsync(db, passport, identity.Login, now, cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return new ViewerPassportMutationOutcome.Succeeded(
+                    await ToViewAsync(
+                        db,
+                        host,
+                        passport,
+                        includeEarnedRewards: true,
+                        cancellationToken
+                    )
+                );
             }
-            _ = await db.SaveChangesAsync(cancellationToken);
-            return new ViewerPassportMutationOutcome.Succeeded(
-                await ToViewAsync(db, host, passport, includeEarnedRewards: true, cancellationToken)
-            );
+            finally
+            {
+                _ = claimGate.Release();
+            }
         }
         finally
         {
@@ -256,67 +334,86 @@ public sealed class ViewerPassportService(
                 return false;
             }
 
-            var now = clock.GetUtcNow().UtcDateTime;
-            var passport = await db.ViewerPassports.SingleOrDefaultAsync(
-                value => value.HostId == host.Id && value.TwitchUserId == identity.TwitchUserId,
-                cancellationToken
-            );
-            if (passport is null)
+            var claimGate = LoginClaimGate(host.Id, identity.Login);
+            await claimGate.WaitAsync(cancellationToken);
+            try
             {
-                passport = new ViewerPassport
+                await using var transaction = await db.Database.BeginTransactionAsync(
+                    cancellationToken
+                );
+                var now = clock.GetUtcNow().UtcDateTime;
+                var passport = await db.ViewerPassports.SingleOrDefaultAsync(
+                    value => value.HostId == host.Id && value.TwitchUserId == identity.TwitchUserId,
+                    cancellationToken
+                );
+                if (passport is null)
                 {
-                    HostId = host.Id,
-                    TwitchUserId = identity.TwitchUserId,
-                    Visibility = ViewerPassportVisibility.Private,
-                    HideAttendance = true,
-                    CreatedAtUtc = now,
-                };
-                _ = db.ViewerPassports.Add(passport);
-            }
-            var previousLogin = passport.Login;
-
-            await DetachReusedLoginAsync(
-                db,
-                host.Id,
-                identity.TwitchUserId,
-                identity.Login,
-                now,
-                cancellationToken
-            );
-            passport.Login = identity.Login;
-            passport.DisplayName = identity.DisplayName;
-            passport.UpdatedAtUtc = now;
-            _ = await db.SaveChangesAsync(cancellationToken);
-            await RememberLoginAsync(db, passport, previousLogin, now, cancellationToken);
-            if (!string.Equals(previousLogin, identity.Login, StringComparison.Ordinal))
-            {
-                await RememberLoginAsync(db, passport, identity.Login, now, cancellationToken);
-            }
-            _ = await db.SaveChangesAsync(cancellationToken);
-
-            var date = DateOnly.FromDateTime(occurredAtUtc.UtcDateTime);
-            var recorded = await db.ViewerPassportAttendanceDays.AnyAsync(
-                value =>
-                    value.HostId == host.Id
-                    && value.PassportId == passport.Id
-                    && value.DateUtc == date,
-                cancellationToken
-            );
-            if (recorded)
-            {
-                return false;
-            }
-            _ = db.ViewerPassportAttendanceDays.Add(
-                new()
-                {
-                    HostId = host.Id,
-                    PassportId = passport.Id,
-                    DateUtc = date,
-                    FirstSeenAtUtc = occurredAtUtc.UtcDateTime,
+                    passport = new ViewerPassport
+                    {
+                        HostId = host.Id,
+                        TwitchUserId = identity.TwitchUserId,
+                        Visibility = ViewerPassportVisibility.Private,
+                        HideAttendance = true,
+                        CreatedAtUtc = now,
+                    };
+                    _ = db.ViewerPassports.Add(passport);
                 }
-            );
-            _ = await db.SaveChangesAsync(cancellationToken);
-            return true;
+                var previousLogin = passport.Login;
+
+                await ClaimLoginAsync(
+                    db,
+                    host.Id,
+                    identity.TwitchUserId,
+                    identity.Login,
+                    now,
+                    cancellationToken
+                );
+                await DetachReusedLoginAsync(
+                    db,
+                    host.Id,
+                    identity.TwitchUserId,
+                    identity.Login,
+                    now,
+                    cancellationToken
+                );
+                passport.Login = identity.Login;
+                passport.DisplayName = identity.DisplayName;
+                passport.UpdatedAtUtc = now;
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await RememberLoginAsync(db, passport, previousLogin, now, cancellationToken);
+                await RememberLoginAsync(db, passport, identity.Login, now, cancellationToken);
+                _ = await db.SaveChangesAsync(cancellationToken);
+
+                var date = DateOnly.FromDateTime(occurredAtUtc.UtcDateTime);
+                var recorded = await db.ViewerPassportAttendanceDays.AnyAsync(
+                    value =>
+                        value.HostId == host.Id
+                        && value.PassportId == passport.Id
+                        && value.DateUtc == date,
+                    cancellationToken
+                );
+                if (recorded)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return false;
+                }
+                _ = db.ViewerPassportAttendanceDays.Add(
+                    new()
+                    {
+                        HostId = host.Id,
+                        PassportId = passport.Id,
+                        DateUtc = date,
+                        FirstSeenAtUtc = occurredAtUtc.UtcDateTime,
+                    }
+                );
+                _ = await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return true;
+            }
+            finally
+            {
+                _ = claimGate.Release();
+            }
         }
         finally
         {
@@ -463,6 +560,12 @@ public sealed class ViewerPassportService(
         {
             _ = logins.Add(login);
         }
+        var ambiguousLogins = await db
+            .ViewerPassportAmbiguousLogins.AsNoTracking()
+            .Where(value => value.HostId == passport.HostId && logins.Contains(value.Login))
+            .Select(value => value.Login)
+            .ToArrayAsync(cancellationToken);
+        logins.ExceptWith(ambiguousLogins);
         var leaderboard = await balances.GetLeaderboardAsync(
             passport.HostId,
             int.MaxValue,
@@ -683,6 +786,51 @@ public sealed class ViewerPassportService(
         }
     }
 
+    private static async Task ClaimLoginAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string twitchUserId,
+        string login,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            await db.ViewerPassportAmbiguousLogins.AnyAsync(
+                value => value.HostId == hostId && value.Login == login,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+        var reused = await db
+            .ViewerPassports.AsNoTracking()
+            .AnyAsync(
+                value =>
+                    value.HostId == hostId
+                    && value.TwitchUserId != twitchUserId
+                    && (
+                        value.Login == login
+                        || db.ViewerPassportLogins.Any(alias =>
+                            alias.PassportId == value.Id && alias.Login == login
+                        )
+                    ),
+                cancellationToken
+            );
+        if (reused)
+        {
+            _ = db.ViewerPassportAmbiguousLogins.Add(
+                new()
+                {
+                    HostId = hostId,
+                    Login = login,
+                    DetectedAtUtc = now,
+                }
+            );
+        }
+    }
+
     private static async Task RememberLoginAsync(
         BlokeBotDbContext db,
         ViewerPassport passport,
@@ -753,6 +901,12 @@ public sealed class ViewerPassportService(
         _mutationGates[
             (twitchUserId.GetHashCode(StringComparison.Ordinal) & int.MaxValue)
                 % _mutationGates.Length
+        ];
+
+    private SemaphoreSlim LoginClaimGate(int hostId, string login) =>
+        _loginClaimGates[
+            (HashCode.Combine(hostId, login.GetHashCode(StringComparison.Ordinal)) & int.MaxValue)
+                % _loginClaimGates.Length
         ];
 
     private static async Task<bool> HostExistsAsync(
