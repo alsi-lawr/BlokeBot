@@ -37,6 +37,7 @@ internal sealed class OverlayLiveCoordinator(
     private readonly Dictionary<Guid, OverlayLiveConnection> _connections = [];
     private readonly Dictionary<OverlayIdentity, PresenceState> _presence = [];
     private readonly Dictionary<Guid, long> _sequences = [];
+    private readonly Dictionary<Guid, long> _suppressionGenerations = [];
     private readonly Dictionary<OverlayIdentity, GuessingOverlayPhase> _guessingPhases = [];
     private readonly Dictionary<OverlayIdentity, GiveawayOverlayPhase> _giveawayPhases = [];
     private readonly Dictionary<OverlayIdentity, ProgressOverlayFingerprint> _progressStates = [];
@@ -83,24 +84,33 @@ internal sealed class OverlayLiveCoordinator(
     void IOverlayEventFeedLivePublisher.PublishSuppression(
         ResolvedOverlayInstance instance,
         EventFeedStatePresentation state
-    ) =>
-        PublishProjection(
-            new OverlayPublication(
-                instance,
-                OverlayLivePublicationKind.Suppression,
-                PlayQueueOverlayTransition.None
-            ),
-            new OverlaySnapshotProjection.EventFeedV1(
-                new EventFeedV1OverlaySnapshot
-                {
-                    ServerEpoch = serverEpoch.Value,
-                    Sequence = instance.Revision.Value,
-                    GeneratedAtUtc = timeProvider.GetUtcNow(),
-                    Animation = "none",
-                    State = state,
-                }
-            )
+    )
+    {
+        var projection = new OverlaySnapshotProjection.EventFeedV1(
+            new EventFeedV1OverlaySnapshot
+            {
+                ServerEpoch = serverEpoch.Value,
+                Sequence = instance.Revision.Value,
+                GeneratedAtUtc = timeProvider.GetUtcNow(),
+                Animation = "none",
+                State = state,
+            }
         );
+        lock (_connectionsGate)
+        {
+            var suppressionGeneration = CurrentSuppressionGeneration(instance.OverlayId) + 1;
+            _suppressionGenerations[instance.OverlayId] = suppressionGeneration;
+            PublishProjectionLocked(
+                new OverlayPublication(
+                    instance,
+                    OverlayLivePublicationKind.Suppression,
+                    PlayQueueOverlayTransition.None,
+                    suppressionGeneration
+                ),
+                projection
+            );
+        }
+    }
 
     void IOverlayCueTransport.Start(ResolvedOverlayInstance target, OverlayCuePlaybackPlan plan) =>
         PublishCueMessage(
@@ -296,13 +306,20 @@ internal sealed class OverlayLiveCoordinator(
 
         try
         {
+            long suppressionGeneration;
+            lock (_connectionsGate)
+            {
+                suppressionGeneration = CurrentSuppressionGeneration(instance.OverlayId);
+            }
             var slot = _publicationSlots.GetOrAdd(
                 instance.OverlayId,
                 _ => new OverlayPublicationSlot(publication =>
                     PublishPendingAsync(publication, _stopping.Token)
                 )
             );
-            slot.Queue(new OverlayPublication(instance, kind, queueTransition));
+            slot.Queue(
+                new OverlayPublication(instance, kind, queueTransition, suppressionGeneration)
+            );
         }
         catch (Exception exception)
         {
@@ -382,40 +399,55 @@ internal sealed class OverlayLiveCoordinator(
     {
         lock (_connectionsGate)
         {
-            var identity = new OverlayIdentity(
-                publication.Instance.HostId,
-                publication.Instance.OverlayId
-            );
-            var targets = _connections
-                .Values.Where(connection =>
-                    connection.IsActive
-                    && connection.Generation == _generation
-                    && connection.Identity == identity
-                )
-                .ToArray();
-            if (targets.Length == 0)
-            {
-                return;
-            }
+            PublishProjectionLocked(publication, projection);
+        }
+    }
 
-            var nextSequence = CurrentSequence(publication.Instance.OverlayId) + 1;
-            _sequences[publication.Instance.OverlayId] = nextSequence;
-            var message = Event(publication, projection, identity, nextSequence);
-            foreach (var connection in targets)
+    private void PublishProjectionLocked(
+        OverlayPublication publication,
+        OverlaySnapshotProjection projection
+    )
+    {
+        if (
+            publication.SuppressionGeneration
+            != CurrentSuppressionGeneration(publication.Instance.OverlayId)
+        )
+        {
+            return;
+        }
+        var identity = new OverlayIdentity(
+            publication.Instance.HostId,
+            publication.Instance.OverlayId
+        );
+        var targets = _connections
+            .Values.Where(connection =>
+                connection.IsActive
+                && connection.Generation == _generation
+                && connection.Identity == identity
+            )
+            .ToArray();
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
+        var nextSequence = CurrentSequence(publication.Instance.OverlayId) + 1;
+        _sequences[publication.Instance.OverlayId] = nextSequence;
+        var message = Event(publication, projection, identity, nextSequence);
+        foreach (var connection in targets)
+        {
+            if (!connection.TryWrite(message))
             {
-                if (!connection.TryWrite(message))
-                {
-                    RemoveConnection(connection, timeProvider.GetUtcNow(), complete: false);
-                    connection.Invalidate(
-                        new OverlayLiveControlEnvelope
-                        {
-                            ServerEpoch = serverEpoch.Value,
-                            Sequence = nextSequence,
-                            EventType = "resync",
-                            OccurredAtUtc = timeProvider.GetUtcNow(),
-                        }
-                    );
-                }
+                RemoveConnection(connection, timeProvider.GetUtcNow(), complete: false);
+                connection.Invalidate(
+                    new OverlayLiveControlEnvelope
+                    {
+                        ServerEpoch = serverEpoch.Value,
+                        Sequence = nextSequence,
+                        EventType = "resync",
+                        OccurredAtUtc = timeProvider.GetUtcNow(),
+                    }
+                );
             }
         }
     }
@@ -1046,6 +1078,9 @@ internal sealed class OverlayLiveCoordinator(
 
     private long CurrentSequence(Guid overlayId) => _sequences.GetValueOrDefault(overlayId);
 
+    private long CurrentSuppressionGeneration(Guid overlayId) =>
+        _suppressionGenerations.GetValueOrDefault(overlayId);
+
     private static OverlayConnectionPresence EmptyPresence() =>
         new OverlayConnectionPresence
         {
@@ -1074,7 +1109,8 @@ internal sealed class OverlayLiveCoordinator(
     private sealed record OverlayPublication(
         ResolvedOverlayInstance Instance,
         OverlayLivePublicationKind Kind,
-        PlayQueueOverlayTransition QueueTransition
+        PlayQueueOverlayTransition QueueTransition,
+        long SuppressionGeneration
     );
 
     private sealed record ProgressOverlayFingerprint(
