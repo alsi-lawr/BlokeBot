@@ -18,6 +18,12 @@ public sealed record CompetitionMember(
     string PrivateContact
 );
 
+public sealed record CompetitionMilestoneRewardDraft(
+    int WinsRequired,
+    PointAmount Points,
+    string AchievementKey
+);
+
 public sealed record CompetitionDraft(
     Guid OperationId,
     string Name,
@@ -39,6 +45,7 @@ public sealed record CompetitionDraft(
     PointAmount RunnerUpPoints,
     string WinnerAchievementKey,
     string RunnerUpAchievementKey,
+    IReadOnlyList<CompetitionMilestoneRewardDraft> MilestoneRewards,
     string PrivateLobbyInformation,
     CompetitionActor Actor,
     string PrivateReason
@@ -131,6 +138,12 @@ public sealed record CompetitionAuditView(
     DateTime OccurredAtUtc
 );
 
+public sealed record CompetitionMilestoneRewardView(
+    int WinsRequired,
+    PointAmount Points,
+    string AchievementKey
+);
+
 public sealed record CompetitionView(
     CompetitionId Id,
     string HostLogin,
@@ -164,6 +177,7 @@ public sealed record CompetitionModeratorView(
     PointAmount RunnerUpPoints,
     string WinnerAchievementKey,
     string RunnerUpAchievementKey,
+    IReadOnlyList<CompetitionMilestoneRewardView> MilestoneRewards,
     int ReminderHoursBefore,
     string ReminderMessage,
     IReadOnlyList<CompetitionAuditView> Audit
@@ -176,6 +190,7 @@ public sealed record CompetitionPublicBoard(
 );
 
 public sealed record CompetitionLifecycleEvent(
+    Guid OccurrenceId,
     int HostId,
     CompetitionId CompetitionId,
     CompetitionEventKind Kind,
@@ -196,9 +211,15 @@ public sealed record CompetitionReminderRecipient(string Login, string TwitchUse
 public interface ICompetitionReminderDelivery
 {
     Task<bool> DeliverAsync(
-        string hostLogin,
-        string message,
-        IReadOnlyList<CompetitionReminderRecipient> recipients,
+        CompetitionReminderRequest request,
         CancellationToken cancellationToken
     );
 }
+
+public sealed record CompetitionReminderRequest(
+    int HostId,
+    string HostLogin,
+    DateTime ReminderDueAtUtc,
+    string Message,
+    IReadOnlyList<CompetitionReminderRecipient> Recipients
+);

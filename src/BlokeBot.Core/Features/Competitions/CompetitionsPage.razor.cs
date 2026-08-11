@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components.Layout;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Competitions;
 
@@ -12,11 +15,54 @@ public partial class CompetitionsPage
     private RegistrationModel _registration = new();
     private readonly Dictionary<Guid, ResultModel> _results = [];
     private readonly Dictionary<Guid, string> _notes = [];
+    private CompetitionId? _selectedCompetitionId;
+    private CompetitionMatchId? _selectedMatchId;
+    private string _activeTab = "standings";
+    private bool _isCreating;
     private bool _featureEnabled;
     private bool _failed;
     private string _feedback = string.Empty;
 
     private string _publicUrl => $"/competitions/{Uri.EscapeDataString(HostLogin)}";
+    private CompetitionModeratorView? _selected =>
+        _selectedCompetitionId is { } id
+            ? _competitions.SingleOrDefault(x => x.Competition.Id == id)
+            : null;
+    private CompetitionMatchView? _selectedMatch =>
+        _selectedMatchId is { } id
+            ? _selected?.Competition.Matches.SingleOrDefault(x => x.Id == id)
+            : null;
+    private static IReadOnlyList<SegmentedTabItem> _tabs { get; } =
+    [
+        new("standings", "Standings"),
+        new("schedule", "Schedule"),
+        new("entrants", "Entrants"),
+        new("settings", "Settings & history"),
+    ];
+    private IReadOnlyList<StudioRailGroup> _railGroups =>
+        [
+            new(
+                "Competitions",
+                [
+                    .. _competitions.Select(item => new StudioRailItem
+                    {
+                        Key = item.Competition.Id.Value.ToString("N"),
+                        Label = item.Competition.Name,
+                        Sub =
+                            $"{item.Competition.Status.Label()} · {item.Competition.Format.Label()}",
+                        On = item.Competition.Status is not CompetitionStatus.Archived,
+                        Selected = !_isCreating && item.Competition.Id == _selectedCompetitionId,
+                        ControlsId = "competition-workspace-inspector",
+                        Action = "select-competition",
+                        Select = EventCallback.Factory.Create(
+                            this,
+                            () => SelectCompetition(item.Competition.Id)
+                        ),
+                    }),
+                ],
+                "No competitions saved."
+            ),
+        ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -40,6 +86,7 @@ public partial class CompetitionsPage
         _competitions = _featureEnabled
             ? await _service.GetModeratorAsync(HostId, CancellationToken.None)
             : [];
+        ReconcileSelection();
     }
 
     private Task CreateAsync() =>
@@ -68,17 +115,26 @@ public partial class CompetitionsPage
                     PointAmount.ParseAbsolute(_draft.RunnerUpPoints),
                     _draft.WinnerAchievement,
                     _draft.RunnerUpAchievement,
+                    _draft
+                        .MilestoneRewards.Select(x => new CompetitionMilestoneRewardDraft(
+                            x.WinsRequired,
+                            PointAmount.ParseAbsolute(x.Points),
+                            x.AchievementKey
+                        ))
+                        .ToArray(),
                     _draft.PrivateLobbyInformation,
                     Actor(),
                     _draft.PrivateReason
                 ),
                 CancellationToken.None
             );
-            await FinishAsync(outcome, "Competition created.");
             if (outcome is CompetitionOutcome.Succeeded)
             {
+                _isCreating = false;
+                _selectedCompetitionId = null;
                 _draft = CompetitionDraftModel.New(_clock.GetUtcNow().UtcDateTime);
             }
+            await FinishAsync(outcome, "Competition created.");
         });
 
     private Task TransitionAsync(CompetitionView competition, string transition) =>
@@ -156,7 +212,7 @@ public partial class CompetitionsPage
     private Task ConfirmAsync(CompetitionView competition, CompetitionMatchView match) =>
         MutateAsync(async () =>
         {
-            var result = Result(match.Id.Value);
+            var result = Result(match);
             var outcome = await _service.ConfirmResultAsync(
                 HostId,
                 new(
@@ -178,6 +234,100 @@ public partial class CompetitionsPage
                     : "Result confirmed."
             );
         });
+
+    private void NewCompetition()
+    {
+        _isCreating = true;
+        _feedback = string.Empty;
+    }
+
+    private void SelectCompetition(CompetitionId id)
+    {
+        _isCreating = false;
+        _selectedCompetitionId = id;
+        _registration = new();
+        ReconcileSelectedMatch();
+    }
+
+    private void SelectMobileCompetition(string? value)
+    {
+        if (Guid.TryParse(value, out var id))
+        {
+            SelectCompetition(new(id));
+        }
+        else
+        {
+            NewCompetition();
+        }
+    }
+
+    private void SelectMatch(CompetitionMatchId id)
+    {
+        _selectedMatchId = id;
+        _activeTab = "schedule";
+    }
+
+    private void ReconcileSelection()
+    {
+        if (!_featureEnabled)
+        {
+            _selectedCompetitionId = null;
+            _selectedMatchId = null;
+            return;
+        }
+        if (_competitions.Count == 0)
+        {
+            _isCreating = true;
+            _selectedCompetitionId = null;
+            _selectedMatchId = null;
+            return;
+        }
+        if (
+            _selectedCompetitionId is null
+            || _competitions.All(x => x.Competition.Id != _selectedCompetitionId)
+        )
+        {
+            _selectedCompetitionId = _competitions[0].Competition.Id;
+        }
+        ReconcileSelectedMatch();
+    }
+
+    private void ReconcileSelectedMatch()
+    {
+        var matches = _selected?.Competition.Matches ?? [];
+        if (_selectedMatchId is not null && matches.Any(x => x.Id == _selectedMatchId))
+        {
+            return;
+        }
+        var selected = matches.FirstOrDefault(x =>
+            x.Status == CompetitionMatchStatus.Pending
+            && x.EntrantAId is not null
+            && x.EntrantBId is not null
+        );
+        selected ??= matches.LastOrDefault(x => x.Status == CompetitionMatchStatus.Confirmed);
+        _selectedMatchId = selected?.Id;
+    }
+
+    private static int CurrentRound(CompetitionView competition) =>
+        competition
+            .Matches.Where(x => x.Status == CompetitionMatchStatus.Pending)
+            .Select(x => x.Round)
+            .DefaultIfEmpty(competition.Matches.Select(x => x.Round).DefaultIfEmpty(0).Max())
+            .Min();
+
+    private static int TotalRounds(CompetitionView competition) =>
+        competition.Matches.Select(x => x.Round).DefaultIfEmpty(0).Max();
+
+    private void AddMilestoneReward()
+    {
+        if (_draft.MilestoneRewards.Count < 8)
+        {
+            _draft.MilestoneRewards.Add(new());
+        }
+    }
+
+    private void RemoveMilestoneReward(MilestoneRuleModel rule) =>
+        _ = _draft.MilestoneRewards.Remove(rule);
 
     private async Task MutateAsync(Func<Task> mutation)
     {
@@ -227,8 +377,14 @@ public partial class CompetitionsPage
 
     private void SetNote(Guid id, string value) => _notes[id] = value;
 
-    private ResultModel Result(Guid id) =>
-        _results.TryGetValue(id, out var result) ? result : _results[id] = new();
+    private ResultModel Result(CompetitionMatchView match) =>
+        _results.TryGetValue(match.Id.Value, out var result)
+            ? result
+            : _results[match.Id.Value] = new()
+            {
+                ScoreA = match.ScoreA ?? 0,
+                ScoreB = match.ScoreB ?? 0,
+            };
 
     private MemberModel Member(int index)
     {
@@ -262,11 +418,19 @@ public partial class CompetitionsPage
         public string RunnerUpPoints { get; set; } = "250";
         public string WinnerAchievement { get; set; } = string.Empty;
         public string RunnerUpAchievement { get; set; } = string.Empty;
+        public List<MilestoneRuleModel> MilestoneRewards { get; set; } = [];
         public string PrivateLobbyInformation { get; set; } = string.Empty;
         public string PrivateReason { get; set; } = string.Empty;
 
         public static CompetitionDraftModel New(DateTime now) =>
             new() { Seed = $"competition-{now:yyyyMMdd-HHmm}" };
+    }
+
+    private sealed class MilestoneRuleModel
+    {
+        public int WinsRequired { get; set; } = 1;
+        public string Points { get; set; } = "0";
+        public string AchievementKey { get; set; } = string.Empty;
     }
 
     private sealed class RegistrationModel

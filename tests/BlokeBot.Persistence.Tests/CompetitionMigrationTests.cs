@@ -47,6 +47,7 @@ public sealed class CompetitionMigrationTests
                       'competition_entrants',
                       'competition_entrant_members',
                       'competition_matches',
+                      'competition_milestone_reward_rules',
                       'competition_audits',
                       'competition_events',
                       'competition_reward_receipts'
@@ -54,6 +55,6 @@ public sealed class CompetitionMigrationTests
                 """
             )
             .SingleAsync();
-        tableCount.ShouldBe(7);
+        tableCount.ShouldBe(8);
     }
 }

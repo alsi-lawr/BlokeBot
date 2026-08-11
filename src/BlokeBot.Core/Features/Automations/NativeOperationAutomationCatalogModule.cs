@@ -56,6 +56,7 @@ public static class NativeOperationAutomations
             ["prediction-progressed"] = HostFeatureFlags.Predictions,
             ["prediction-locked"] = HostFeatureFlags.Predictions,
             ["prediction-ended"] = HostFeatureFlags.Predictions,
+            ["competition-lifecycle"] = HostFeatureFlags.Competitions,
             ["start-prediction"] = HostFeatureFlags.Predictions,
             ["lock-prediction"] = HostFeatureFlags.Predictions,
             ["cancel-prediction"] = HostFeatureFlags.Predictions,

@@ -126,6 +126,15 @@ public enum CompetitionEventKind
     RewardsGranted,
 }
 
+public enum CompetitionRewardKind
+{
+    [PersistedToken("Placement")]
+    Placement,
+
+    [PersistedToken("WinMilestone")]
+    WinMilestone,
+}
+
 public sealed class Competition
 {
     public long Id { get; set; }
@@ -165,7 +174,19 @@ public sealed class Competition
     public List<CompetitionMatch> Matches { get; set; } = [];
     public List<CompetitionAudit> Audits { get; set; } = [];
     public List<CompetitionDomainEvent> Events { get; set; } = [];
+    public List<CompetitionMilestoneRewardRule> MilestoneRewards { get; set; } = [];
     public List<CompetitionRewardReceipt> Rewards { get; set; } = [];
+}
+
+public sealed class CompetitionMilestoneRewardRule
+{
+    public long Id { get; set; }
+    public int HostId { get; set; }
+    public long CompetitionId { get; set; }
+    public int WinsRequired { get; set; }
+    public string Points { get; set; } = "0";
+    public string AchievementKey { get; set; } = string.Empty;
+    public Competition Competition { get; set; } = null!;
 }
 
 public sealed class CompetitionEntrant
@@ -262,7 +283,10 @@ public sealed class CompetitionRewardReceipt
     public long EntrantId { get; set; }
     public string TwitchUserId { get; set; } = string.Empty;
     public string Login { get; set; } = string.Empty;
-    public int Placement { get; set; }
+    public CompetitionRewardKind Kind { get; set; }
+    public string RewardKey { get; set; } = string.Empty;
+    public int? Placement { get; set; }
+    public int? WinsRequired { get; set; }
     public string PointsGranted { get; set; } = "0";
     public string AchievementKey { get; set; } = string.Empty;
     public DateTime GrantedAtUtc { get; set; }

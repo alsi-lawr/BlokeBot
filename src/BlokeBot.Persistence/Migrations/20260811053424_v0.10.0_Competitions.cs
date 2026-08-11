@@ -247,6 +247,40 @@ namespace BlokeBot.Persistence.Migrations
             );
 
             migrationBuilder.CreateTable(
+                name: "competition_milestone_reward_rules",
+                columns: table => new
+                {
+                    Id = table
+                        .Column<long>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    CompetitionId = table.Column<long>(type: "INTEGER", nullable: false),
+                    WinsRequired = table.Column<int>(type: "INTEGER", nullable: false),
+                    Points = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    AchievementKey = table.Column<string>(
+                        type: "TEXT",
+                        maxLength: 80,
+                        nullable: false
+                    ),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_competition_milestone_reward_rules", x => x.Id);
+                    table.CheckConstraint(
+                        "CK_competition_milestone_reward_rules_WinsRequired",
+                        "WinsRequired > 0"
+                    );
+                    table.ForeignKey(
+                        name: "FK_competition_milestone_reward_rules_competitions_HostId_CompetitionId",
+                        columns: x => new { x.HostId, x.CompetitionId },
+                        principalTable: "competitions",
+                        principalColumns: new[] { "HostId", "Id" },
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
+
+            migrationBuilder.CreateTable(
                 name: "competition_reward_receipts",
                 columns: table => new
                 {
@@ -262,7 +296,10 @@ namespace BlokeBot.Persistence.Migrations
                         nullable: false
                     ),
                     Login = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    Placement = table.Column<int>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    RewardKey = table.Column<string>(type: "TEXT", maxLength: 80, nullable: false),
+                    Placement = table.Column<int>(type: "INTEGER", nullable: true),
+                    WinsRequired = table.Column<int>(type: "INTEGER", nullable: true),
                     PointsGranted = table.Column<string>(
                         type: "TEXT",
                         maxLength: 128,
@@ -281,7 +318,11 @@ namespace BlokeBot.Persistence.Migrations
                     table.PrimaryKey("PK_competition_reward_receipts", x => x.Id);
                     table.CheckConstraint(
                         "CK_competition_reward_receipts_Placement",
-                        "Placement > 0"
+                        "Placement IS NULL OR Placement > 0"
+                    );
+                    table.CheckConstraint(
+                        "CK_competition_reward_receipts_WinsRequired",
+                        "WinsRequired IS NULL OR WinsRequired > 0"
                     );
                     table.ForeignKey(
                         name: "FK_competition_reward_receipts_competitions_HostId_CompetitionId",
@@ -510,9 +551,16 @@ namespace BlokeBot.Persistence.Migrations
             );
 
             migrationBuilder.CreateIndex(
-                name: "IX_competition_reward_receipts_HostId_CompetitionId_EntrantId_Login",
+                name: "IX_competition_milestone_reward_rules_HostId_CompetitionId_WinsRequired",
+                table: "competition_milestone_reward_rules",
+                columns: new[] { "HostId", "CompetitionId", "WinsRequired" },
+                unique: true
+            );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_competition_reward_receipts_HostId_CompetitionId_EntrantId_Login_RewardKey",
                 table: "competition_reward_receipts",
-                columns: new[] { "HostId", "CompetitionId", "EntrantId", "Login" },
+                columns: new[] { "HostId", "CompetitionId", "EntrantId", "Login", "RewardKey" },
                 unique: true
             );
 
@@ -547,6 +595,8 @@ namespace BlokeBot.Persistence.Migrations
             migrationBuilder.DropTable(name: "competition_events");
 
             migrationBuilder.DropTable(name: "competition_matches");
+
+            migrationBuilder.DropTable(name: "competition_milestone_reward_rules");
 
             migrationBuilder.DropTable(name: "competition_reward_receipts");
 

@@ -10,6 +10,7 @@ public sealed partial class BlokeBotDbContext
         ConfigureCompetition(modelBuilder);
         ConfigureCompetitionEntrants(modelBuilder);
         ConfigureCompetitionMatches(modelBuilder);
+        ConfigureCompetitionMilestoneRewards(modelBuilder);
         ConfigureCompetitionHistory(modelBuilder);
     }
 
@@ -178,6 +179,34 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+    private static void ConfigureCompetitionMilestoneRewards(ModelBuilder modelBuilder) =>
+        _ = modelBuilder.Entity<CompetitionMilestoneRewardRule>(b =>
+        {
+            _ = b.ToTable(
+                "competition_milestone_reward_rules",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_competition_milestone_reward_rules_WinsRequired",
+                        "WinsRequired > 0"
+                    )
+            );
+            _ = b.HasKey(x => x.Id);
+            _ = b.Property(x => x.Points).HasMaxLength(128);
+            _ = b.Property(x => x.AchievementKey).HasMaxLength(80);
+            _ = b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.CompetitionId,
+                    x.WinsRequired,
+                })
+                .IsUnique();
+            _ = b.HasOne(x => x.Competition)
+                .WithMany(x => x.MilestoneRewards)
+                .HasForeignKey(x => new { x.HostId, x.CompetitionId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
     private static void ConfigureCompetitionHistory(ModelBuilder modelBuilder)
     {
         _ = modelBuilder.Entity<CompetitionAudit>(b =>
@@ -215,14 +244,22 @@ public sealed partial class BlokeBotDbContext
             _ = b.ToTable(
                 "competition_reward_receipts",
                 t =>
-                    t.HasCheckConstraint(
+                {
+                    _ = t.HasCheckConstraint(
                         "CK_competition_reward_receipts_Placement",
-                        "Placement > 0"
-                    )
+                        "Placement IS NULL OR Placement > 0"
+                    );
+                    _ = t.HasCheckConstraint(
+                        "CK_competition_reward_receipts_WinsRequired",
+                        "WinsRequired IS NULL OR WinsRequired > 0"
+                    );
+                }
             );
             _ = b.HasKey(x => x.Id);
             _ = b.Property(x => x.TwitchUserId).HasMaxLength(128);
             _ = b.Property(x => x.Login).HasMaxLength(128);
+            _ = b.Property(x => x.Kind).HasPersistedTokenConversion();
+            _ = b.Property(x => x.RewardKey).HasMaxLength(80);
             _ = b.Property(x => x.PointsGranted).HasMaxLength(128);
             _ = b.Property(x => x.AchievementKey).HasMaxLength(80);
             _ = b.HasIndex(x => new
@@ -231,6 +268,7 @@ public sealed partial class BlokeBotDbContext
                     x.CompetitionId,
                     x.EntrantId,
                     x.Login,
+                    x.RewardKey,
                 })
                 .IsUnique();
             _ = b.HasOne(x => x.Competition)

@@ -104,6 +104,7 @@ public sealed class CompetitionService(
             NormalizeKey(draft.WinnerAchievementKey),
             NormalizeKey(draft.RunnerUpAchievementKey),
         }
+            .Concat(draft.MilestoneRewards.Select(x => NormalizeKey(x.AchievementKey)))
             .Where(key => key.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -121,7 +122,7 @@ public sealed class CompetitionService(
         )
         {
             return new CompetitionOutcome.Invalid(
-                "Placement achievements must reference predeclared viewer achievements that accept external grants."
+                "Competition rewards must reference predeclared viewer achievements that accept external grants."
             );
         }
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -156,6 +157,15 @@ public sealed class CompetitionService(
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
+        competition.MilestoneRewards.AddRange(
+            draft.MilestoneRewards.Select(rule => new CompetitionMilestoneRewardRule
+            {
+                HostId = hostId,
+                WinsRequired = rule.WinsRequired,
+                Points = rule.Points.ToString(),
+                AchievementKey = NormalizeKey(rule.AchievementKey),
+            })
+        );
         AddAudit(
             competition,
             draft.OperationId,
@@ -393,7 +403,9 @@ public sealed class CompetitionService(
                     Status = CompetitionMatchStatus.Pending,
                     ScheduledAtUtc = scheduled,
                     ReminderDueAtUtc =
-                        competition.ReminderHoursBefore > 0
+                        slot.EntrantA is not null
+                        && slot.EntrantB is not null
+                        && competition.ReminderHoursBefore > 0
                             ? scheduled.AddHours(-competition.ReminderHoursBefore)
                             : null,
                 }
@@ -606,6 +618,7 @@ public sealed class CompetitionService(
             );
         }
         var placements = Placement(competition);
+        var standings = Standings(competition);
         var now = timeProvider.GetUtcNow().UtcDateTime;
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         competition.Status = CompetitionStatus.Completed;
@@ -643,18 +656,45 @@ public sealed class CompetitionService(
                 ct
             );
         }
+        foreach (var rule in competition.MilestoneRewards.OrderBy(x => x.WinsRequired))
+        {
+            foreach (var standing in standings.Where(x => x.Wins >= rule.WinsRequired))
+            {
+                await GrantWinMilestoneAsync(
+                    db,
+                    competition,
+                    competition.Entrants.Single(x => x.Id == standing.EntrantId),
+                    rule,
+                    now,
+                    ct
+                );
+            }
+        }
+        var milestoneRecipients = competition.Rewards.Count(x =>
+            x.Kind == CompetitionRewardKind.WinMilestone
+        );
         var lifecycle = AddEvent(
             competition,
             command.OperationId,
             CompetitionEventKind.Completed,
-            new { competition.Name, Winner = placements[0].Name },
+            new
+            {
+                competition.Name,
+                Winner = placements[0].Name,
+                MilestoneRecipients = milestoneRecipients,
+            },
             now
         );
-        _ = AddEvent(
+        var rewardsLifecycle = AddEvent(
             competition,
             Guid.NewGuid(),
             CompetitionEventKind.RewardsGranted,
-            new { competition.Name, Recipients = competition.Rewards.Count },
+            new
+            {
+                competition.Name,
+                Recipients = competition.Rewards.Count,
+                MilestoneRecipients = milestoneRecipients,
+            },
             now
         );
         _ = await db.SaveChangesAsync(ct);
@@ -667,6 +707,7 @@ public sealed class CompetitionService(
                 PointAmount.ParseAbsolute(x.PointsGranted) > PointAmount.Zero
             )
         );
+        await PublishAsync(rewardsLifecycle, ct);
         return new CompetitionOutcome.Succeeded();
     }
 
@@ -830,6 +871,15 @@ public sealed class CompetitionService(
                 match.WinnerEntrantId = null;
                 match.Status = CompetitionMatchStatus.Pending;
                 match.ConfirmedAtUtc = null;
+                match.ReminderDeliveredAtUtc = null;
+                match.ReminderSuppressedAtUtc = null;
+                match.ReminderDueAtUtc =
+                    entrantA is not null
+                    && entrantB is not null
+                    && match.ScheduledAtUtc is { } scheduled
+                    && competition.ReminderHoursBefore > 0
+                        ? Max(scheduled.AddHours(-competition.ReminderHoursBefore), now)
+                        : null;
             }
         }
     }
@@ -853,6 +903,8 @@ public sealed class CompetitionService(
         return new Guid(bytes);
     }
 
+    private static DateTime Max(DateTime left, DateTime right) => left >= right ? left : right;
+
     private static bool CanComplete(Competition competition) =>
         competition.Format == CompetitionFormat.Tournament
             ? competition.Matches.OrderByDescending(x => x.Round).First().Status
@@ -874,7 +926,7 @@ public sealed class CompetitionService(
             .ToArray();
     }
 
-    private static async Task GrantPlacementAsync(
+    private static Task GrantPlacementAsync(
         BlokeBotDbContext db,
         Competition competition,
         CompetitionEntrant entrant,
@@ -883,17 +935,76 @@ public sealed class CompetitionService(
         string achievementKey,
         DateTime now,
         CancellationToken ct
+    ) =>
+        GrantRewardAsync(
+            db,
+            competition,
+            entrant,
+            CompetitionRewardKind.Placement,
+            $"placement:{placement}",
+            placement,
+            null,
+            points,
+            achievementKey,
+            $"Competition placement: {competition.Name} (#{placement})",
+            now,
+            ct
+        );
+
+    private static Task GrantWinMilestoneAsync(
+        BlokeBotDbContext db,
+        Competition competition,
+        CompetitionEntrant entrant,
+        CompetitionMilestoneRewardRule rule,
+        DateTime now,
+        CancellationToken ct
+    ) =>
+        GrantRewardAsync(
+            db,
+            competition,
+            entrant,
+            CompetitionRewardKind.WinMilestone,
+            $"wins:{rule.WinsRequired}",
+            null,
+            rule.WinsRequired,
+            PointAmount.ParseAbsolute(rule.Points),
+            rule.AchievementKey,
+            $"Competition win milestone: {competition.Name} ({rule.WinsRequired} wins)",
+            now,
+            ct
+        );
+
+    private static async Task GrantRewardAsync(
+        BlokeBotDbContext db,
+        Competition competition,
+        CompetitionEntrant entrant,
+        CompetitionRewardKind kind,
+        string rewardKey,
+        int? placement,
+        int? winsRequired,
+        PointAmount points,
+        string achievementKey,
+        string note,
+        DateTime now,
+        CancellationToken ct
     )
     {
         foreach (var member in entrant.Members)
         {
-            if (competition.Rewards.Any(x => x.EntrantId == entrant.Id && x.Login == member.Login))
+            if (
+                competition.Rewards.Any(x =>
+                    x.EntrantId == entrant.Id && x.Login == member.Login && x.RewardKey == rewardKey
+                )
+            )
             {
                 continue;
             }
             if (!points.IsZero)
             {
-                var balance = await db.PointBalances.SingleOrDefaultAsync(
+                var balance = db.PointBalances.Local.SingleOrDefault(x =>
+                    x.HostId == competition.HostId && x.Login == member.Login
+                );
+                balance ??= await db.PointBalances.SingleOrDefaultAsync(
                     x => x.HostId == competition.HostId && x.Login == member.Login,
                     ct
                 );
@@ -926,9 +1037,9 @@ public sealed class CompetitionService(
                         Login = member.Login,
                         Delta = points.ToString(),
                         BalanceAfter = updated.ToString(),
-                        Note = $"Competition placement: {competition.Name} (#{placement})",
+                        Note = note,
                         OperationKey =
-                            $"competition:{competition.PublicId:N}:placement:{placement}:{member.Login}",
+                            $"competition:{competition.PublicId:N}:{rewardKey}:{member.Login}",
                     }
                 );
             }
@@ -939,7 +1050,10 @@ public sealed class CompetitionService(
                     EntrantId = entrant.Id,
                     TwitchUserId = member.TwitchUserId,
                     Login = member.Login,
+                    Kind = kind,
+                    RewardKey = rewardKey,
                     Placement = placement,
+                    WinsRequired = winsRequired,
                     PointsGranted = points.ToString(),
                     AchievementKey = achievementKey,
                     GrantedAtUtc = now,
@@ -959,8 +1073,8 @@ public sealed class CompetitionService(
             var result = await achievements.GrantAsync(
                 new(
                     competition.HostId,
-                    "competition-placement",
-                    $"{competition.PublicId:N}:{reward.Placement}:{reward.Login}",
+                    "competition-reward",
+                    $"{competition.PublicId:N}:{reward.RewardKey}:{reward.Login}",
                     new(reward.AchievementKey),
                     new(reward.TwitchUserId, reward.Login, reward.Login),
                     new DateTimeOffset(reward.GrantedAtUtc, TimeSpan.Zero)
@@ -993,7 +1107,6 @@ public sealed class CompetitionService(
         bool pointsChanged = false
     )
     {
-        _ = await events.PublishAsync(AppEventKind.CompetitionsChanged, ct);
         if (pointsChanged)
         {
             _ = await events.PublishAsync(AppEventKind.PointsChanged, ct);
@@ -1026,6 +1139,7 @@ public sealed class CompetitionService(
             }
         );
         return new(
+            operationId,
             competition.HostId,
             new(competition.PublicId),
             kind,
@@ -1062,6 +1176,7 @@ public sealed class CompetitionService(
                 .ThenInclude(x => x.Members)
             .Include(x => x.Matches)
             .Include(x => x.Audits)
+            .Include(x => x.MilestoneRewards)
             .Include(x => x.Rewards);
 
     private static CompetitionModeratorView ToModerator(
@@ -1076,6 +1191,14 @@ public sealed class CompetitionService(
             PointAmount.ParseAbsolute(competition.RunnerUpPoints),
             competition.WinnerAchievementKey,
             competition.RunnerUpAchievementKey,
+            competition
+                .MilestoneRewards.OrderBy(x => x.WinsRequired)
+                .Select(x => new CompetitionMilestoneRewardView(
+                    x.WinsRequired,
+                    PointAmount.ParseAbsolute(x.Points),
+                    x.AchievementKey
+                ))
+                .ToArray(),
             competition.ReminderHoursBefore,
             competition.ReminderMessage,
             competition
@@ -1270,6 +1393,17 @@ public sealed class CompetitionService(
             ? new("Reminder lead time must be between 0 and 168 hours.")
         : draft.ReminderMessage.Trim().Length is 0 or > 500
             ? new("Reminder message must be between 1 and 500 characters.")
+        : draft.MilestoneRewards.Count > 8
+            ? new("No more than 8 win milestone rewards can be configured.")
+        : draft.MilestoneRewards.Any(x => x.WinsRequired <= 0)
+            ? new("Win milestone thresholds must be positive.")
+        : draft.MilestoneRewards.Select(x => x.WinsRequired).Distinct().Count()
+        != draft.MilestoneRewards.Count
+            ? new("Win milestone thresholds must be unique.")
+        : draft.MilestoneRewards.Any(x =>
+            x.Points.IsZero && string.IsNullOrWhiteSpace(x.AchievementKey)
+        )
+            ? new("Each win milestone must grant points or an achievement.")
         : string.IsNullOrWhiteSpace(draft.Seed) || draft.Seed.Trim().Length > 128
             ? new("A reproducible seed of at most 128 characters is required.")
         : draft.PrivateLobbyInformation.Trim().Length > 1000

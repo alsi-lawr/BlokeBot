@@ -292,7 +292,7 @@ public partial class PageHelpButton
                     "Prediction leagues use each fixture's entered scores as correct-prediction totals; configured standing points and tiebreaks rank the league.",
                     "Random generation records its seed and BlokeBot algorithm version so the same entrant order reproduces the bracket or schedule.",
                     "Confirmed result corrections retain the previous scores in private audit history and safely clear downstream tournament outcomes that no longer apply.",
-                    "Final placement points and configured Community progression achievements are idempotent across retries and recomputation.",
+                    "Confirmed-win milestone and final-placement points or configured Community progression achievements are idempotent across retries and final-state evaluation.",
                 ]
             ),
             new(

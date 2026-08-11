@@ -2929,6 +2929,42 @@ namespace BlokeBot.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CompetitionMilestoneRewardRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AchievementKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CompetitionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Points")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WinsRequired")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "CompetitionId", "WinsRequired")
+                        .IsUnique();
+
+                    b.ToTable("competition_milestone_reward_rules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_competition_milestone_reward_rules_WinsRequired", "WinsRequired > 0");
+                        });
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CompetitionRewardReceipt", b =>
                 {
                     b.Property<long>("Id")
@@ -2955,12 +2991,17 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Login")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Placement")
+                    b.Property<int?>("Placement")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("PointsGranted")
@@ -2968,19 +3009,29 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RewardKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TwitchUserId")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("WinsRequired")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("HostId", "CompetitionId", "EntrantId", "Login")
+                    b.HasIndex("HostId", "CompetitionId", "EntrantId", "Login", "RewardKey")
                         .IsUnique();
 
                     b.ToTable("competition_reward_receipts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_competition_reward_receipts_Placement", "Placement > 0");
+                            t.HasCheckConstraint("CK_competition_reward_receipts_Placement", "Placement IS NULL OR Placement > 0");
+
+                            t.HasCheckConstraint("CK_competition_reward_receipts_WinsRequired", "WinsRequired IS NULL OR WinsRequired > 0");
                         });
                 });
 
@@ -7552,6 +7603,18 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("WinnerEntrant");
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.CompetitionMilestoneRewardRule", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.Competition", "Competition")
+                        .WithMany("MilestoneRewards")
+                        .HasForeignKey("HostId", "CompetitionId")
+                        .HasPrincipalKey("HostId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Competition");
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.CompetitionRewardReceipt", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.Competition", "Competition")
@@ -8580,6 +8643,8 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Events");
 
                     b.Navigation("Matches");
+
+                    b.Navigation("MilestoneRewards");
 
                     b.Navigation("Rewards");
                 });

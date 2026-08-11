@@ -77,9 +77,13 @@ public sealed class CompetitionReminderWorker(
                 .Select(x => new CompetitionReminderRecipient(x.Login, x.TwitchUserId))
                 .ToArray();
             var sent = await delivery.DeliverAsync(
-                hostLogin,
-                RenderMessage(match, hostLogin),
-                recipients,
+                new(
+                    match.HostId,
+                    hostLogin,
+                    match.ReminderDueAtUtc!.Value,
+                    RenderMessage(match, hostLogin),
+                    recipients
+                ),
                 ct
             );
             if (!sent)

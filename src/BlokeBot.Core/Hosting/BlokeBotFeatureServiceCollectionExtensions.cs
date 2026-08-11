@@ -55,7 +55,19 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotCompetitions(this IServiceCollection services)
     {
+        _ = services.AddAutomationCatalogModule<CompetitionAutomationCatalogModule>();
         _ = services.AddSingleton<CompetitionService>();
+        _ = services.AddSingleton<
+            ICompetitionLifecycleAutomationDispatcher,
+            CompetitionLifecycleAutomationDispatcher
+        >();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICompetitionLifecycleObserver, CompetitionLifecycleBridge>()
+        );
+        _ = services.AddSingleton<
+            ICompetitionReminderWhisperSender,
+            CompetitionReminderWhisperSender
+        >();
         _ = services.AddSingleton<ICompetitionReminderDelivery, CompetitionReminderDelivery>();
         _ = services.AddSingleton<CompetitionReminderWorker>();
         _ = services.AddHostedService(static services =>

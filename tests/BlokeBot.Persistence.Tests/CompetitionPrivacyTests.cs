@@ -97,6 +97,8 @@ public sealed class CompetitionPrivacyTests
                     EntrantId = entrant.Id,
                     TwitchUserId = "viewer-id",
                     Login = "viewer",
+                    Kind = CompetitionRewardKind.Placement,
+                    RewardKey = "placement:1",
                     Placement = 1,
                     PointsGranted = "100",
                     GrantedAtUtc = now,

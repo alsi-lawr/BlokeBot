@@ -85,6 +85,8 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<CompetitionEntrantMember> CompetitionEntrantMembers =>
         Set<CompetitionEntrantMember>();
     public DbSet<CompetitionMatch> CompetitionMatches => Set<CompetitionMatch>();
+    public DbSet<CompetitionMilestoneRewardRule> CompetitionMilestoneRewardRules =>
+        Set<CompetitionMilestoneRewardRule>();
     public DbSet<CompetitionAudit> CompetitionAudits => Set<CompetitionAudit>();
     public DbSet<CompetitionDomainEvent> CompetitionEvents => Set<CompetitionDomainEvent>();
     public DbSet<CompetitionRewardReceipt> CompetitionRewardReceipts =>

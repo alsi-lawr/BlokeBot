@@ -1,6 +1,7 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Bingo;
+using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
@@ -1961,7 +1962,92 @@ internal sealed class SimulationFixtureSeeder(
                 OccurredAtUtc = now.AddDays(-4),
             }
         );
-        _ = db.Competitions.Add(competition);
+        competition.MilestoneRewards.Add(
+            new CompetitionMilestoneRewardRule
+            {
+                HostId = hostId,
+                WinsRequired = 3,
+                Points = "100",
+                AchievementKey = string.Empty,
+            }
+        );
+        var predictionLeague = new Competition
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("f54fead3-1c88-4c65-b492-68d13bb19cae"),
+            CreationOperationId = Guid.Parse("e65a9bf8-0751-40e1-b537-cfa0d079f3ea"),
+            Name = "Friday Prediction League",
+            Description = "A weekly correct-score prediction league.",
+            Format = CompetitionFormat.PredictionLeague,
+            EntryKind = CompetitionEntryKind.Individual,
+            Status = CompetitionStatus.Registration,
+            Seeding = CompetitionSeeding.Random,
+            Tiebreak = CompetitionTiebreak.ScoreForThenWins,
+            Capacity = 12,
+            TeamSize = 1,
+            WinPoints = 3,
+            DrawPoints = 1,
+            Seed = "friday-predictions-26",
+            AlgorithmVersion = CompetitionSchedule.AlgorithmVersion,
+            ReminderHoursBefore = 12,
+            ReminderMessage =
+                "Reminder: {competition} round {round} is scheduled for {scheduled}. {public_url}",
+            Revision = 4,
+            CreatedAtUtc = now.AddDays(-3),
+            UpdatedAtUtc = now.AddHours(-2),
+            RegistrationOpenedAtUtc = now.AddDays(-2),
+        };
+        foreach (var (name, index) in names.Take(3).Select((name, index) => (name, index)))
+        {
+            predictionLeague.Entrants.Add(
+                new CompetitionEntrant
+                {
+                    HostId = hostId,
+                    PublicId = Guid.Parse($"40000000-0000-4000-8000-{index + 1:000000000000}"),
+                    RegistrationOperationId = Guid.Parse(
+                        $"41000000-0000-4000-8000-{index + 1:000000000000}"
+                    ),
+                    Name = name,
+                    RegisteredAtUtc = now.AddDays(-2).AddMinutes(index),
+                    Members =
+                    [
+                        new()
+                        {
+                            HostId = hostId,
+                            TwitchUserId = $"prediction-viewer-{index + 1}",
+                            Login = name.ToLowerInvariant(),
+                            DisplayName = name,
+                        },
+                    ],
+                }
+            );
+        }
+        var archived = new Competition
+        {
+            HostId = hostId,
+            PublicId = Guid.Parse("f54fead3-1c88-4c65-b492-68d13bb19caf"),
+            CreationOperationId = Guid.Parse("e65a9bf8-0751-40e1-b537-cfa0d079f3eb"),
+            Name = "Spring Knockout",
+            Description = "Archived single-elimination results from the spring event.",
+            Format = CompetitionFormat.Tournament,
+            EntryKind = CompetitionEntryKind.Individual,
+            Status = CompetitionStatus.Archived,
+            Seeding = CompetitionSeeding.Seeded,
+            Tiebreak = CompetitionTiebreak.ScoreDifferenceThenScoreFor,
+            Capacity = 8,
+            TeamSize = 1,
+            WinPoints = 3,
+            DrawPoints = 1,
+            Seed = "spring-knockout-26",
+            AlgorithmVersion = CompetitionSchedule.AlgorithmVersion,
+            ReminderMessage = "Reminder",
+            Revision = 14,
+            CreatedAtUtc = now.AddDays(-90),
+            UpdatedAtUtc = now.AddDays(-60),
+            CompletedAtUtc = now.AddDays(-61),
+            ArchivedAtUtc = now.AddDays(-60),
+        };
+        db.Competitions.AddRange(competition, predictionLeague, archived);
     }
 
     private static async Task SeedAutomaticRaidShoutoutsAsync(
