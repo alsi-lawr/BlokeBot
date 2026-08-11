@@ -1078,6 +1078,8 @@ internal sealed class OverlayStateProvider(
                         ? value.Status != BountyStatus.Proposed
                             && value.Status != BountyStatus.Cancelled
                         : value.PublicId == configuration.SelectedItemId
+                            && value.Status != BountyStatus.Proposed
+                            && value.Status != BountyStatus.Cancelled
                 )
             )
             .OrderBy(value =>

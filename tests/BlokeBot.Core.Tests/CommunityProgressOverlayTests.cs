@@ -110,6 +110,18 @@ public sealed class CommunityProgressOverlayTests
                 .Snapshot.State.Items.ShouldHaveSingleItem()
                 .State.ShouldBe(transition.Item2);
         }
+        await SetBountyStatusAsync(database, seed.PublicBountyId, BountyStatus.Cancelled);
+        var selectedCancelledBounty = bounty with
+        {
+            Configuration = new OverlayConfiguration.ViewerFundedBountyV1(
+                seed.PublicBountyId,
+                20,
+                2
+            ),
+        };
+        (await provider.ProjectAsync(selectedCancelledBounty, CancellationToken.None))
+            .ShouldBeOfType<OverlaySnapshotProjection.ViewerFundedBountyV1>()
+            .Snapshot.State.Items.ShouldBeEmpty();
 
         await SetFeaturesAsync(
             database,
@@ -151,7 +163,7 @@ public sealed class CommunityProgressOverlayTests
     }
 
     [Test]
-    public async Task LiveTransitions_AreHostScopedCoalescedAndReconnectWithoutReplay()
+    public async Task LiveTransitions_AnimateNonFirstRotationAndReconnectWithoutReplay()
     {
         var provider = new MutableProgressProvider();
         var first = Instance(
@@ -165,7 +177,11 @@ public sealed class CommunityProgressOverlayTests
             OverlayType.ViewerFundedBounty,
             new OverlayConfiguration.ViewerFundedBountyV1(null, 20, 3)
         );
-        provider.Set(first, "30", ProgressOverlayItemState.Active);
+        provider.SetRotating(
+            first,
+            ("30", ProgressOverlayItemState.Active, 0),
+            ("10", ProgressOverlayItemState.Active, 0)
+        );
         provider.Set(otherHost, "40", ProgressOverlayItemState.Active);
         provider.Set(bounty, "50", ProgressOverlayItemState.Active);
         await using var coordinator = new OverlayLiveCoordinator(
@@ -185,7 +201,11 @@ public sealed class CommunityProgressOverlayTests
         _ = await ReadLiveAsync(otherConnection);
         _ = await ReadLiveAsync(bountyConnection);
 
-        provider.Set(first, "60", ProgressOverlayItemState.Active);
+        provider.SetRotating(
+            first,
+            ("30", ProgressOverlayItemState.Active, 0),
+            ("60", ProgressOverlayItemState.Active, 0)
+        );
         await coordinator.CommunityProgressionChangedAsync(1, CancellationToken.None);
         (await ReadLiveAsync(firstConnection))
             .ShouldBeOfType<OverlayLiveTransportMessage.CommunityGoalEvent>()
@@ -193,7 +213,11 @@ public sealed class CommunityProgressOverlayTests
         otherConnection.Messages.TryRead(out _).ShouldBeFalse();
         bountyConnection.Messages.TryRead(out _).ShouldBeFalse();
 
-        provider.Set(first, "0", ProgressOverlayItemState.Active, completionCount: 1);
+        provider.SetRotating(
+            first,
+            ("30", ProgressOverlayItemState.Active, 0),
+            ("0", ProgressOverlayItemState.Active, 1)
+        );
         await coordinator.CommunityProgressionChangedAsync(1, CancellationToken.None);
         (await ReadLiveAsync(firstConnection))
             .ShouldBeOfType<OverlayLiveTransportMessage.CommunityGoalEvent>()
@@ -204,7 +228,7 @@ public sealed class CommunityProgressOverlayTests
             await ReadLiveAsync(reconnect)
         ).ShouldBeOfType<OverlayLiveTransportMessage.CommunityGoalBaseline>();
         baseline.Envelope.Payload.Animation.ShouldBe("none");
-        baseline.Envelope.Payload.State.Items.ShouldHaveSingleItem().Current.ShouldBe("0");
+        baseline.Envelope.Payload.State.Items[1].Current.ShouldBe("0");
         await coordinator.StopAsync(CancellationToken.None);
     }
 
@@ -478,9 +502,14 @@ public sealed class CommunityProgressOverlayTests
 
     private sealed class MutableProgressProvider : IOverlayStateProvider
     {
+        private static readonly Guid[] _itemIds =
+        [
+            Guid.Parse("5cfbd8aa-d207-4fdb-9714-daf7f669c462"),
+            Guid.Parse("3d374cc7-eafc-44c4-90fd-28a58df9704c"),
+        ];
         private readonly Dictionary<
             (int HostId, Guid OverlayId),
-            ProgressOverlayItemPresentation
+            IReadOnlyList<ProgressOverlayItemPresentation>
         > _items = [];
 
         internal void Set(
@@ -488,19 +517,32 @@ public sealed class CommunityProgressOverlayTests
             string current,
             ProgressOverlayItemState state,
             int completionCount = 0
+        ) => SetRotating(instance, (current, state, completionCount));
+
+        internal void SetRotating(
+            ResolvedOverlayInstance instance,
+            params (string Current, ProgressOverlayItemState State, int CompletionCount)[] items
         ) =>
-            _items[(instance.HostId, instance.OverlayId)] = new(
-                Guid.Parse("5cfbd8aa-d207-4fdb-9714-daf7f669c462"),
-                "Context",
-                "Goal",
-                current,
-                "100",
-                int.Parse(current, System.Globalization.CultureInfo.InvariantCulture),
-                DateTimeOffset.UtcNow.AddDays(1),
-                state,
-                completionCount,
-                []
-            );
+            _items[(instance.HostId, instance.OverlayId)] = [
+                .. items.Select(
+                    (item, index) =>
+                        new ProgressOverlayItemPresentation(
+                            _itemIds[index],
+                            "Context",
+                            $"Goal {index + 1}",
+                            item.Current,
+                            "100",
+                            int.Parse(
+                                item.Current,
+                                System.Globalization.CultureInfo.InvariantCulture
+                            ),
+                            DateTimeOffset.UtcNow.AddDays(1),
+                            item.State,
+                            item.CompletionCount,
+                            []
+                        )
+                ),
+            ];
 
         public Task<OverlaySnapshotProjection> ProjectAsync(
             ResolvedOverlayInstance instance,
@@ -508,9 +550,9 @@ public sealed class CommunityProgressOverlayTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var state = new ProgressOverlayPresentationState([
-                _items[(instance.HostId, instance.OverlayId)],
-            ]);
+            var state = new ProgressOverlayPresentationState(
+                _items[(instance.HostId, instance.OverlayId)]
+            );
             return Task.FromResult<OverlaySnapshotProjection>(
                 instance.Configuration switch
                 {

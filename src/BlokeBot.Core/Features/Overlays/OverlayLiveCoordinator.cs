@@ -762,24 +762,60 @@ internal sealed class OverlayLiveCoordinator(
         var previous = _progressStates.GetValueOrDefault(identity);
         _progressStates[identity] = current;
         return kind is OverlayLivePublicationKind.Test || previous is null ? "none"
-            : previous.CompletionCount < current.CompletionCount ? "complete"
-            : previous.State is not ProgressOverlayItemState.Completed
-            && current.State is ProgressOverlayItemState.Completed
-                ? "complete"
-            : previous.ItemId != current.ItemId || previous.State != current.State ? "statusChange"
-            : previous.Current == current.Current ? "none"
-            : "progress";
+            : Completed(previous, current) ? "complete"
+            : !previous
+                .Items.Select(item => item.ItemId)
+                .SequenceEqual(current.Items.Select(item => item.ItemId))
+            || Changed(
+                previous,
+                current,
+                static (oldItem, newItem) => oldItem.State != newItem.State
+            )
+                ? "statusChange"
+            : Changed(
+                previous,
+                current,
+                static (oldItem, newItem) => oldItem.Current != newItem.Current
+            )
+                ? "progress"
+            : "none";
     }
 
+    private static bool Completed(
+        ProgressOverlayFingerprint previous,
+        ProgressOverlayFingerprint current
+    ) =>
+        Changed(
+            previous,
+            current,
+            static (oldItem, newItem) =>
+                oldItem.CompletionCount < newItem.CompletionCount
+                || (
+                    oldItem.State is not ProgressOverlayItemState.Completed
+                    && newItem.State is ProgressOverlayItemState.Completed
+                )
+        );
+
+    private static bool Changed(
+        ProgressOverlayFingerprint previous,
+        ProgressOverlayFingerprint current,
+        Func<ProgressOverlayItemFingerprint, ProgressOverlayItemFingerprint, bool> changed
+    ) =>
+        current.Items.Any(newItem =>
+            previous.Items.FirstOrDefault(oldItem => oldItem.ItemId == newItem.ItemId)
+                is { } oldItem
+            && changed(oldItem, newItem)
+        );
+
     private static ProgressOverlayFingerprint Fingerprint(ProgressOverlayPresentationState state) =>
-        state.Items.FirstOrDefault() is { } item
-            ? new ProgressOverlayFingerprint(
+        new([
+            .. state.Items.Select(item => new ProgressOverlayItemFingerprint(
                 item.Id,
                 item.Current,
                 item.State,
                 item.CompletionCount
-            )
-            : ProgressOverlayFingerprint.Empty;
+            )),
+        ]);
 
     private static GiveawayV1OverlayLivePayload GiveawayPayload(
         GiveawayV1OverlaySnapshot snapshot,
@@ -1018,15 +1054,15 @@ internal sealed class OverlayLiveCoordinator(
     );
 
     private sealed record ProgressOverlayFingerprint(
+        IReadOnlyList<ProgressOverlayItemFingerprint> Items
+    );
+
+    private sealed record ProgressOverlayItemFingerprint(
         Guid ItemId,
         string Current,
         ProgressOverlayItemState State,
         int CompletionCount
-    )
-    {
-        internal static ProgressOverlayFingerprint Empty { get; } =
-            new(Guid.Empty, string.Empty, ProgressOverlayItemState.Active, 0);
-    }
+    );
 
     private sealed class PresenceState
     {
