@@ -465,6 +465,28 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "viewer-passports.profiles",
+            db.ViewerPassports.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "viewer-passports.attendance-days",
+            db.ViewerPassportAttendanceDays.Where(x =>
+                    db.ViewerPassports.Any(passport =>
+                        passport.Id == x.PassportId
+                        && (passport.TwitchUserId == userId || passport.Login == login)
+                    ) && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.HostId,
+                    x.DateUtc,
+                    x.FirstSeenAtUtc,
+                })
+        );
+        await AddAsync(
             "play-queues.entries",
             db.PlayQueueEntries.Where(x =>
                     (
@@ -1349,6 +1371,26 @@ public static class ViewerPrivacyService
                 .ExecuteDeleteAsync(ct);
         }
         Record("community.events", communityEvents);
+        Record(
+            "viewer-passports.attendance-days",
+            await db.ViewerPassportAttendanceDays.CountAsync(
+                x =>
+                    db.ViewerPassports.Any(passport =>
+                        passport.Id == x.PassportId
+                        && (passport.TwitchUserId == userId || passport.Login == login)
+                    ) && (hostId == null || x.HostId == hostId),
+                ct
+            )
+        );
+        Record(
+            "viewer-passports.profiles",
+            await db
+                .ViewerPassports.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct)
+        );
         Record(
             "play-queues.entries",
             await db

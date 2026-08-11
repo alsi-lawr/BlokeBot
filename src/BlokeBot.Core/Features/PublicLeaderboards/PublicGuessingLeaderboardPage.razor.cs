@@ -38,9 +38,14 @@ public partial class PublicGuessingLeaderboardPage
 
         if (_featureEnabled)
         {
-            _leaderboard = await _history.LoadLeaderboardAsync(
+            var exclusions = await _passportPrivacy.ExclusionsAsync(
+                _host!.Id,
+                CancellationToken.None
+            );
+            _leaderboard = await _history.LoadPublicLeaderboardAsync(
                 _host!.Id,
                 new GuessHistoryQuery { Page = 1, PageSize = _publicPageSize },
+                exclusions.Logins,
                 CancellationToken.None
             );
         }

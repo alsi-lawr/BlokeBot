@@ -50,6 +50,11 @@
                         selection,
                         HostFeatureFlags.CommunityProgression
                     );
+                    var showViewerPassports = FeatureIsVisible(
+                        session,
+                        selection,
+                        HostFeatureFlags.ViewerPassports
+                    );
                     var showBingo = FeatureIsVisible(session, selection, HostFeatureFlags.Bingo);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
@@ -65,7 +70,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showBingo || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showViewerPassports || showBingo || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -302,6 +307,24 @@
                             <span class="nav-menu__label min-w-0">Community</span>
                         </NavLink>
                         @RouteHelp("community", "Community progression")
+                    </div>
+                }
+
+                @if (showViewerPassports)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="passports">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="passports"
+                                 aria-label="Viewer passports"
+                                 aria-describedby="@RouteHelpReference("passports")"
+                                 aria-current="@CurrentRoute("passports")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-indigo-700" aria-hidden="true">▣</span>
+                            <span class="nav-menu__label min-w-0">Viewer passports</span>
+                        </NavLink>
+                        @RouteHelp("passports", "Viewer passports")
                     </div>
                 }
 

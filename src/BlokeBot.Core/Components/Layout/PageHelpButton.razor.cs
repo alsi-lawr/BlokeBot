@@ -71,6 +71,9 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/bounties" => _bountiesHelp,
             "/community" => _communityProgressionHelp,
+            "/passports" => _viewerPassportsHelp,
+            _ when path.StartsWith("/passports/", StringComparison.Ordinal)
+                    && path.EndsWith("/me", StringComparison.Ordinal) => _viewerPassportsHelp,
             "/bingo" => _bingoHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
@@ -249,6 +252,30 @@ public partial class PageHelpButton
                 [
                     "Viewers equip one unlocked title, badge, and accent for this host with !equiptitle, !equipbadge, and !equipaccent.",
                     "Turning Community progression off blocks commands, events, timers, automation, rewards, and public output while preserving saved data. Re-enable resumes from the current period without replaying suppressed work.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _viewerPassportsHelp = new(
+        "Viewer passports",
+        [
+            _featureSwitchHelp,
+            new(
+                "Opt in and choose what is public",
+                "A passport starts private. Choose Public or Channel members only when you want selected profile fields and activity to be visible.",
+                [
+                    "Profile lines are limited to 160 characters, displayed as plain text, and remain subject to the channel's moderation policy.",
+                    "Attendance is based only on days when you chatted. It does not measure or claim exact watch time, and you can hide it independently.",
+                    "Only titles and badges already earned in this channel can be selected.",
+                ]
+            ),
+            new(
+                "Privacy and recovery",
+                "Export downloads the data this self-hosted BlokeBot deployment associates with your Twitch identity in this channel. Reset removes the passport and its chat-presence days without changing source feature history.",
+                [
+                    "Turning Viewer passports off blocks profile pages, commands, runtime updates, overlay data, automation payloads, export, and reset access.",
+                    "Saved passports and attendance remain stored while the feature is off. Turning it back on restores them without replaying suppressed chat or other work.",
                 ]
             ),
         ]

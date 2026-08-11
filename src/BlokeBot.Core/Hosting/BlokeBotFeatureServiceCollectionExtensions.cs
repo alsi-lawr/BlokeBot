@@ -43,6 +43,7 @@ using BlokeBot.Core.Features.Points.HostSetup;
 using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.SiteAccess;
+using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -52,6 +53,19 @@ namespace BlokeBot.Core.Hosting;
 
 public static class BlokeBotFeatureServiceCollectionExtensions
 {
+    public static IServiceCollection AddBlokeBotViewerPassports(this IServiceCollection services)
+    {
+        _ = services.AddSingleton<ViewerPassportService>();
+        _ = services.AddSingleton<ViewerPassportProjectionService>();
+        _ = services.AddSingleton<ViewerPassportPublicIdentityPolicy>();
+        _ = services.AddSingleton<ViewerPassportRuntime>();
+        _ = services.AddSingleton<IChatMessageObserver>(static serviceProvider =>
+            serviceProvider.GetRequiredService<ViewerPassportRuntime>()
+        );
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
     public static IServiceCollection AddBlokeBotBingo(this IServiceCollection services)
     {
         _ = services.AddSingleton<BingoService>();

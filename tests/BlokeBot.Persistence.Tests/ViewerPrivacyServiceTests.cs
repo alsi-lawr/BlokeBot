@@ -345,6 +345,9 @@ public sealed class ViewerPrivacyServiceTests
             "CommunitySeasonStanding.ViewerDisplayName",
             "CommunitySeasonStanding.ViewerLogin",
             "CommunitySeasonStanding.ViewerTwitchUserId",
+            "ViewerPassport.DisplayName",
+            "ViewerPassport.Login",
+            "ViewerPassport.TwitchUserId",
         };
         var excluded = new Dictionary<string, string>(StringComparer.Ordinal)
         {
