@@ -6,6 +6,12 @@ internal enum OverlayLivePublicationKind
 {
     State,
     Test,
+    Suppression,
+}
+
+internal interface IOverlayEventFeedLivePublisher
+{
+    void PublishSuppression(ResolvedOverlayInstance instance, EventFeedStatePresentation state);
 }
 
 internal sealed record EmptyV1OverlayLivePayload

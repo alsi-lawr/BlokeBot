@@ -169,11 +169,11 @@ public sealed class HostFeatureService(
         }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
-        _ = await changes.NotifyChangedAsync(ct);
         foreach (var observer in featureObservers)
         {
             await observer.FeatureChangedAsync(hostId, feature, updated.Contains(feature), ct);
         }
+        _ = await changes.NotifyChangedAsync(ct);
         if (!HostFeatureFlags.NativeTwitchFeatures.Contains(feature))
         {
             return;

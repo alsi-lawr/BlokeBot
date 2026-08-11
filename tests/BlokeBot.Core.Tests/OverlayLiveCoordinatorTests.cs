@@ -7,6 +7,49 @@ namespace BlokeBot.Core.Tests;
 public sealed class OverlayLiveCoordinatorTests
 {
     [Test]
+    public async Task Suppression_DiscardsCapturedPreFenceProjectionWithoutSequenceGap()
+    {
+        var provider = new BlockingCapturedEventFeedProvider();
+        await using var coordinator = Coordinator(provider);
+        await coordinator.StartAsync(CancellationToken.None);
+        var instance = EventFeedInstance();
+        var connection = await OpenAsync(coordinator, instance);
+        _ = (
+            await ReadAsync(connection)
+        ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedBaseline>();
+
+        try
+        {
+            coordinator.PublishState(instance);
+            await provider.ActiveProjectionCaptured;
+            ((IOverlayEventFeedLivePublisher)coordinator).PublishSuppression(
+                instance,
+                new EventFeedStatePresentation(null, [])
+            );
+            var clear = (
+                await ReadAsync(connection)
+            ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedEvent>();
+            clear.Envelope.Sequence.ShouldBe(1);
+            clear.Envelope.Payload.Animation.ShouldBe("none");
+            clear.Envelope.Payload.State.Active.ShouldBeNull();
+
+            provider.ReleaseCapturedProjection();
+            coordinator.PublishState(instance);
+            var current = (
+                await ReadAsync(connection)
+            ).ShouldBeOfType<OverlayLiveTransportMessage.EventFeedEvent>();
+            current.Envelope.Sequence.ShouldBe(2);
+            current.Envelope.Payload.State.Active.ShouldBeNull();
+            connection.Messages.TryRead(out _).ShouldBeFalse();
+        }
+        finally
+        {
+            provider.ReleaseCapturedProjection();
+            await coordinator.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Test]
     public async Task RapidPublications_CoalesceLatestPendingStateWithoutSequenceGap()
     {
         var provider = new BlockingSecondProjectionProvider();
@@ -70,6 +113,15 @@ public sealed class OverlayLiveCoordinatorTests
             new OverlayRevision(9)
         );
 
+    private static ResolvedOverlayInstance EventFeedInstance() =>
+        new(
+            71,
+            Guid.NewGuid(),
+            BlokeBot.Persistence.Models.OverlayType.EventFeed,
+            OverlayConfiguration.EventFeedV1.Default,
+            new OverlayRevision(9)
+        );
+
     private static async Task<OverlayLiveCoordinator.OverlayLiveConnection> OpenAsync(
         OverlayLiveCoordinator coordinator,
         ResolvedOverlayInstance instance
@@ -103,6 +155,14 @@ public sealed class OverlayLiveCoordinatorTests
         ).ShouldBeOfType<OverlayLiveTransportMessage.Event>();
     }
 
+    private static async Task<OverlayLiveTransportMessage> ReadAsync(
+        OverlayLiveCoordinator.OverlayLiveConnection connection
+    )
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        return await connection.Messages.ReadAsync(timeout.Token);
+    }
+
     private static OverlaySnapshotProjection Projection(ResolvedOverlayInstance instance) =>
         new OverlaySnapshotProjection.EmptyV1(
             new EmptyV1OverlaySnapshot
@@ -112,6 +172,66 @@ public sealed class OverlayLiveCoordinatorTests
                 GeneratedAtUtc = DateTimeOffset.UnixEpoch,
             }
         );
+
+    private sealed class BlockingCapturedEventFeedProvider : IOverlayStateProvider
+    {
+        private readonly TaskCompletionSource _activeProjectionCaptured = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _projectionCount;
+
+        internal Task ActiveProjectionCaptured => _activeProjectionCaptured.Task;
+
+        public async Task<OverlaySnapshotProjection> ProjectAsync(
+            ResolvedOverlayInstance instance,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var projectionCount = Interlocked.Increment(ref _projectionCount);
+            if (projectionCount == 2)
+            {
+                var captured = Projection(instance, active: true);
+                _ = _activeProjectionCaptured.TrySetResult();
+                await _release.Task.WaitAsync(cancellationToken);
+                return captured;
+            }
+            return Projection(instance, active: false);
+        }
+
+        internal void ReleaseCapturedProjection() => _release.TrySetResult();
+
+        private static OverlaySnapshotProjection Projection(
+            ResolvedOverlayInstance instance,
+            bool active
+        ) =>
+            new OverlaySnapshotProjection.EventFeedV1(
+                new EventFeedV1OverlaySnapshot
+                {
+                    ServerEpoch = Guid.Parse("11d40a78-9ff2-4ac7-b1d8-418078eed571"),
+                    Sequence = instance.Revision.Value,
+                    GeneratedAtUtc = DateTimeOffset.UnixEpoch,
+                    Animation = "none",
+                    State = new EventFeedStatePresentation(
+                        active
+                            ? new EventFeedCardPresentation(
+                                19,
+                                "achievementCompletion",
+                                "high",
+                                "Achievement unlocked",
+                                "Viewer unlocked Trailblazer",
+                                DateTimeOffset.UnixEpoch,
+                                DateTimeOffset.UnixEpoch.AddSeconds(8)
+                            )
+                            : null,
+                        []
+                    ),
+                }
+            );
+    }
 
     private sealed class BlockingSecondProjectionProvider : IOverlayStateProvider
     {

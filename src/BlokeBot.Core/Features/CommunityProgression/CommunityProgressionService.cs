@@ -17,7 +17,8 @@ public sealed class CommunityProgressionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
     TimeProvider clock,
-    IEnumerable<ICommunityProgressionChangeObserver>? changeObservers = null
+    IEnumerable<ICommunityProgressionChangeObserver>? changeObservers = null,
+    IEnumerable<ICommunityAchievementCompletionObserver>? achievementObservers = null
 ) : ICommunityAchievementGrantService
 {
     private const int _persistenceRetryCount = 20;
@@ -26,6 +27,10 @@ public sealed class CommunityProgressionService(
     private readonly ICommunityProgressionChangeObserver[] _changeObservers =
     [
         .. changeObservers ?? [],
+    ];
+    private readonly ICommunityAchievementCompletionObserver[] _achievementObservers =
+    [
+        .. achievementObservers ?? [],
     ];
 
     public async Task<CommunityOperationOutcome> CreateSeasonAsync(
@@ -518,6 +523,14 @@ public sealed class CommunityProgressionService(
             ct
         );
         await PublishIfChangedAsync(hostId, result, pointsChanged: true, ct);
+        if (result is CommunityOperationOutcome.Succeeded { WasIdempotent: false })
+        {
+            await NotifyAchievementCompletionsAsync(
+                hostId,
+                $"event:{sourceEvent.Kind}:{sourceEvent.SourceEventId}",
+                ct
+            );
+        }
         return result;
     }
 
@@ -1127,7 +1140,7 @@ public sealed class CommunityProgressionService(
             () => GrantAttemptAsync(request, cancellationToken),
             cancellationToken
         );
-        if (result is CommunityExternalGrantOutcome.Granted { WasIdempotent: false })
+        if (result is CommunityExternalGrantOutcome.Granted { WasIdempotent: false } granted)
         {
             _ = await events.PublishAsync(
                 AppEventKind.CommunityProgressionChanged,
@@ -1138,6 +1151,11 @@ public sealed class CommunityProgressionService(
                 await observer.CommunityProgressionChangedAsync(request.HostId, cancellationToken);
             }
             _ = await events.PublishAsync(AppEventKind.PointsChanged, cancellationToken);
+            await NotifyAchievementCompletionAsync(
+                request.HostId,
+                granted.CompletionId,
+                cancellationToken
+            );
         }
         return result;
     }
@@ -2025,6 +2043,46 @@ public sealed class CommunityProgressionService(
         if (pointsChanged)
         {
             _ = await events.PublishAsync(AppEventKind.PointsChanged, ct);
+        }
+    }
+
+    private async Task NotifyAchievementCompletionsAsync(
+        int hostId,
+        string operationKey,
+        CancellationToken ct
+    )
+    {
+        if (_achievementObservers.Length == 0)
+        {
+            return;
+        }
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var completionIds = await (
+            from completion in db.CommunityCompletions.AsNoTracking()
+            join definition in db.CommunityDefinitions.AsNoTracking()
+                on completion.DefinitionId equals definition.Id
+            where
+                completion.HostId == hostId
+                && completion.SourceOperationKey == operationKey
+                && definition.Kind == CommunityDefinitionKind.Achievement
+            orderby completion.Id
+            select completion.PublicId
+        ).ToArrayAsync(ct);
+        foreach (var completionId in completionIds)
+        {
+            await NotifyAchievementCompletionAsync(hostId, completionId, ct);
+        }
+    }
+
+    private async Task NotifyAchievementCompletionAsync(
+        int hostId,
+        Guid completionId,
+        CancellationToken ct
+    )
+    {
+        foreach (var observer in _achievementObservers)
+        {
+            await observer.AchievementCompletedAsync(hostId, completionId, ct);
         }
     }
 

@@ -1,6 +1,13 @@
 .overlay-preview-frame {
+    position: absolute;
+    inset: 0;
     background: transparent;
     color-scheme: only light;
+    opacity: 0;
+    visibility: hidden;
+}
+
+[data-appearance-canvas] > .overlay-preview-frame:not(:last-of-type) {
     opacity: 0;
     visibility: hidden;
 }

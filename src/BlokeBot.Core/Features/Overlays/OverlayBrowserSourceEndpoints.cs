@@ -721,6 +721,7 @@ internal static class OverlayBrowserSourceEndpoints
             "guessing-winner" => OverlayEventFeedKind.GuessingWinner,
             "giveaway-winner" => OverlayEventFeedKind.GiveawayWinner,
             "bingo-event" => OverlayEventFeedKind.BingoEvent,
+            "achievement-completion" => OverlayEventFeedKind.AchievementCompletion,
             _ => (OverlayEventFeedKind)(-1),
         };
         return Enum.IsDefined(kind);
@@ -733,6 +734,7 @@ internal static class OverlayBrowserSourceEndpoints
             OverlayEventFeedKind.GuessingWinner => "guessing-winner",
             OverlayEventFeedKind.GiveawayWinner => "giveaway-winner",
             OverlayEventFeedKind.BingoEvent => "bingo-event",
+            OverlayEventFeedKind.AchievementCompletion => "achievement-completion",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

@@ -80,7 +80,9 @@ export function initializeAppearance(dotnet) {
     requestDraftInstall();
   };
   const bindDraftSources = (nextFrame) => {
-    const selectionChanged = nextFrame !== activeFrame;
+    const previousFrame = activeFrame;
+    const selectionChanged = nextFrame !== previousFrame;
+    if (selectionChanged) hideFrame(previousFrame);
     activeFrame = nextFrame;
     if (!boundFrames.has(nextFrame)) {
       boundFrames.add(nextFrame);

@@ -49,6 +49,14 @@ public abstract record OverlayEventPresentation
         public override OverlayEventFeedKind Kind => OverlayEventFeedKind.BingoEvent;
         public required string Summary { get; init; }
     }
+
+    public sealed record AchievementCompletion : OverlayEventPresentation
+    {
+        public override OverlayEventFeedKind Kind => OverlayEventFeedKind.AchievementCompletion;
+        public required string Viewer { get; init; }
+        public required string Achievement { get; init; }
+        public required string Rewards { get; init; }
+    }
 }
 
 public interface IOverlayEventPresenter
@@ -161,6 +169,15 @@ internal sealed partial class EventFeedTemplateRenderer
             )
             {
                 ["summary"] = bingo.Summary,
+            },
+            OverlayEventPresentation.AchievementCompletion achievement => new Dictionary<
+                string,
+                string
+            >(StringComparer.Ordinal)
+            {
+                ["viewer"] = achievement.Viewer,
+                ["achievement"] = achievement.Achievement,
+                ["rewards"] = achievement.Rewards,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(presentation)),
         };
@@ -328,7 +345,12 @@ internal sealed class OverlayEventFeedService(
         {
             return;
         }
-        if (feature is HostFeatureFlags.Points or HostFeatureFlags.Guessing)
+        if (
+            feature
+            is HostFeatureFlags.Points
+                or HostFeatureFlags.Guessing
+                or HostFeatureFlags.CommunityProgression
+        )
         {
             await SuppressSourceAsync(hostId, feature, cancellationToken);
             return;
@@ -346,25 +368,26 @@ internal sealed class OverlayEventFeedService(
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            _ = await db
-                .OverlayEventFeedItems.Where(x =>
-                    x.HostId == hostId
-                    && (
-                        x.Lifecycle == OverlayEventFeedLifecycle.Active
-                        || x.Lifecycle == OverlayEventFeedLifecycle.Queued
-                    )
+            var activeOrQueued = db.OverlayEventFeedItems.Where(x =>
+                x.HostId == hostId
+                && (
+                    x.Lifecycle == OverlayEventFeedLifecycle.Active
+                    || x.Lifecycle == OverlayEventFeedLifecycle.Queued
                 )
-                .ExecuteUpdateAsync(
-                    setters =>
-                        setters
-                            .SetProperty(x => x.Lifecycle, OverlayEventFeedLifecycle.Suppressed)
-                            .SetProperty(x => x.DisplayDeadlineUtc, (DateTime?)null)
-                            .SetProperty(
-                                x => x.TombstoneExpiresAtUtc,
-                                now.Add(_tombstoneRetention)
-                            ),
-                    cancellationToken
-                );
+            );
+            var affectedOverlayIds = await activeOrQueued
+                .Select(x => x.OverlayInstanceId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
+            _ = await activeOrQueued.ExecuteUpdateAsync(
+                setters =>
+                    setters
+                        .SetProperty(x => x.Lifecycle, OverlayEventFeedLifecycle.Suppressed)
+                        .SetProperty(x => x.DisplayDeadlineUtc, (DateTime?)null)
+                        .SetProperty(x => x.TombstoneExpiresAtUtc, now.Add(_tombstoneRetention)),
+                cancellationToken
+            );
+            await PublishSuppressedStatesAsync(db, hostId, affectedOverlayIds, cancellationToken);
         }
         finally
         {
@@ -400,29 +423,7 @@ internal sealed class OverlayEventFeedService(
                 )
                 .Select(x => x.Id)
                 .SingleAsync(cancellationToken);
-            var items = await db
-                .OverlayEventFeedItems.AsNoTracking()
-                .Where(x =>
-                    x.HostId == instance.HostId
-                    && x.OverlayInstanceId == overlayId
-                    && (
-                        x.Lifecycle == OverlayEventFeedLifecycle.Active
-                        || x.Lifecycle == OverlayEventFeedLifecycle.Queued
-                    )
-                )
-                .OrderBy(x => x.EnqueuedAtUtc)
-                .ThenBy(x => x.Id)
-                .ToListAsync(cancellationToken);
-            return new EventFeedStatePresentation(
-                items
-                    .Where(x => x.Lifecycle == OverlayEventFeedLifecycle.Active)
-                    .Select(ToPresentation)
-                    .SingleOrDefault(),
-                items
-                    .Where(x => x.Lifecycle == OverlayEventFeedLifecycle.Queued)
-                    .Select(ToPresentation)
-                    .ToArray()
-            );
+            return await ReadStateAsync(db, instance.HostId, overlayId, cancellationToken);
         }
         finally
         {
@@ -445,6 +446,7 @@ internal sealed class OverlayEventFeedService(
                 HostFeatureFlags.Guessing => OverlayEventFeedKind.GuessingWinner,
                 HostFeatureFlags.Points => (OverlayEventFeedKind?)null,
                 HostFeatureFlags.Bingo => OverlayEventFeedKind.BingoEvent,
+                HostFeatureFlags.CommunityProgression => OverlayEventFeedKind.AchievementCompletion,
                 _ => null,
             };
             var query = db.OverlayEventFeedItems.Where(x =>
@@ -469,6 +471,10 @@ internal sealed class OverlayEventFeedService(
             {
                 return;
             }
+            var affectedOverlayIds = await query
+                .Select(x => x.OverlayInstanceId)
+                .Distinct()
+                .ToArrayAsync(cancellationToken);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             _ = await query.ExecuteUpdateAsync(
                 setters =>
@@ -478,6 +484,7 @@ internal sealed class OverlayEventFeedService(
                         .SetProperty(x => x.TombstoneExpiresAtUtc, now.Add(_tombstoneRetention)),
                 cancellationToken
             );
+            await PublishSuppressedStatesAsync(db, hostId, affectedOverlayIds, cancellationToken);
         }
         finally
         {
@@ -586,6 +593,70 @@ internal sealed class OverlayEventFeedService(
                 .GetRequiredService<IOverlayLivePublisher>()
                 .PublishState(ToResolved(overlay, configuration));
         }
+    }
+
+    private async Task PublishSuppressedStatesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        IReadOnlyCollection<long> affectedOverlayIds,
+        CancellationToken ct
+    )
+    {
+        if (affectedOverlayIds.Count == 0)
+        {
+            return;
+        }
+        var overlays = await db
+            .OverlayInstances.Where(x =>
+                x.HostId == hostId
+                && x.Type == OverlayType.EventFeed
+                && affectedOverlayIds.Contains(x.Id)
+            )
+            .OrderBy(x => x.Id)
+            .ToArrayAsync(ct);
+        var publisher = services.GetRequiredService<IOverlayEventFeedLivePublisher>();
+        foreach (var overlay in overlays)
+        {
+            var configuration = (OverlayConfiguration.EventFeedV1)
+                OverlayConfiguration.FromPersistence(overlay.Type, overlay.ConfigurationJson);
+            _ = await PruneAndAdvanceAsync(db, overlay, ct);
+            publisher.PublishSuppression(
+                ToResolved(overlay, configuration),
+                await ReadStateAsync(db, hostId, overlay.Id, ct)
+            );
+        }
+    }
+
+    private static async Task<EventFeedStatePresentation> ReadStateAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        long overlayId,
+        CancellationToken ct
+    )
+    {
+        var items = await db
+            .OverlayEventFeedItems.AsNoTracking()
+            .Where(x =>
+                x.HostId == hostId
+                && x.OverlayInstanceId == overlayId
+                && (
+                    x.Lifecycle == OverlayEventFeedLifecycle.Active
+                    || x.Lifecycle == OverlayEventFeedLifecycle.Queued
+                )
+            )
+            .OrderBy(x => x.EnqueuedAtUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync(ct);
+        return new EventFeedStatePresentation(
+            items
+                .Where(x => x.Lifecycle == OverlayEventFeedLifecycle.Active)
+                .Select(ToPresentation)
+                .SingleOrDefault(),
+            items
+                .Where(x => x.Lifecycle == OverlayEventFeedLifecycle.Queued)
+                .Select(ToPresentation)
+                .ToArray()
+        );
     }
 
     private async Task AdvanceAsync(
@@ -723,6 +794,17 @@ internal sealed class OverlayEventFeedService(
                 ct
             );
         }
+        if (
+            (enabledFeatures & HostFeatureFlags.CommunityProgression)
+            != HostFeatureFlags.CommunityProgression
+        )
+        {
+            suppressed += await SuppressRecoveredAsync(
+                activeOrQueued.Where(x => x.Kind == OverlayEventFeedKind.AchievementCompletion),
+                now,
+                ct
+            );
+        }
         return suppressed;
     }
 
@@ -792,6 +874,7 @@ internal sealed class OverlayEventFeedService(
                 HostFeatureFlags.Points,
             OverlayEventFeedKind.GuessingWinner => HostFeatureFlags.Guessing,
             OverlayEventFeedKind.BingoEvent => HostFeatureFlags.Bingo,
+            OverlayEventFeedKind.AchievementCompletion => HostFeatureFlags.CommunityProgression,
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
@@ -802,6 +885,7 @@ internal sealed class OverlayEventFeedService(
             OverlayEventFeedKind.GuessingWinner => "Guessing winner",
             OverlayEventFeedKind.GiveawayWinner => "Giveaway winner",
             OverlayEventFeedKind.BingoEvent => "Bingo",
+            OverlayEventFeedKind.AchievementCompletion => "Achievement unlocked",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 
