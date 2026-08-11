@@ -85,6 +85,7 @@
 
             <div class="settings-disclosure-stack">
                 <StudioStage Key="reward-editor"
+                             data-sticky-save-scope
                              Number="1"
                              Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")"
                              Summary="@_editorSummary"
@@ -187,7 +188,9 @@
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-3">
-                        <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                        <StickySaveRegion Scope="StickySaveScope.Editor" Active="@(_editingRewardId is not null)">
+                            <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                        </StickySaveRegion>
                         @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
                     </div>
                 </StudioStage>

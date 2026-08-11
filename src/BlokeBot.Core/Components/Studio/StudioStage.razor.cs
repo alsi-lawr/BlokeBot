@@ -23,6 +23,9 @@ public partial class StudioStage : IAsyncDisposable
     [Parameter, EditorRequired]
     public required string Title { get; set; }
 
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
     [Parameter]
     public string? Summary { get; set; }
 

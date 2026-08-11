@@ -457,7 +457,7 @@ public partial class PlayQueuesPage
         );
 
     private void SetCreateGuidance() =>
-        _feedback = "New queue ready. Complete its details, then Save queue to create it.";
+        _feedback = "New queue ready. Complete its details, then select Create queue.";
 
     private void SelectFirstField()
     {

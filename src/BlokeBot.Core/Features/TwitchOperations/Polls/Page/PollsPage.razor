@@ -95,6 +95,7 @@
 
         <div class="settings-disclosure-stack">
             <StudioStage Key="poll-template"
+                         data-sticky-save-scope
                          Number="1"
                          Title="New poll template"
                          Summary="@_editorSummary"
@@ -189,7 +190,9 @@
                         <p class="text-sm text-muted-foreground">Add choices to see the panel.</p>
                     }
                 </div>
-                <div class="mt-4"><button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button></div>
+                <StickySaveRegion Scope="StickySaveScope.Editor" class="mt-4">
+                    <button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button>
+                </StickySaveRegion>
             </StudioStage>
 
             <StudioStage Key="poll-results"

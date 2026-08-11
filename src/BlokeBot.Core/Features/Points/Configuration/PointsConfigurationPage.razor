@@ -11,11 +11,12 @@
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6">
+<div class="mx-auto max-w-7xl space-y-6" data-sticky-save-scope>
     <PageHeader Title="Points settings"
-                Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says.">
+                Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says." />
+    <StickySaveRegion>
         <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
-    </PageHeader>
+    </StickySaveRegion>
 
     @if (Host is null)
     {

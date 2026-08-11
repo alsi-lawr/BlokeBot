@@ -1,6 +1,8 @@
 @inject IJSRuntime _js
 
-<section class="studio-stage min-w-0 rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] transition-[border-color,box-shadow] duration-200 ease-[ease] motion-reduce:duration-[1ms] @(Open ? "studio-stage--open shadow-[var(--app-shadow-sm)]" : null)" data-stage="@Key">
+<section class="studio-stage min-w-0 rounded-[14px] border border-[var(--app-border)] bg-[var(--app-surface-solid)] transition-[border-color,box-shadow] duration-200 ease-[ease] motion-reduce:duration-[1ms] @(Open ? "studio-stage--open shadow-[var(--app-shadow-sm)]" : null)"
+         data-stage="@Key"
+         @attributes="AdditionalAttributes">
     <button type="button"
             class="studio-stage__header flex w-full cursor-pointer items-center gap-[0.85rem] rounded-[14px] px-[1.15rem] py-[0.9rem] text-left focus-visible:shadow-[inset_var(--app-focus-shadow)] focus-visible:outline-none"
             aria-expanded="@(Open ? "true" : "false")"

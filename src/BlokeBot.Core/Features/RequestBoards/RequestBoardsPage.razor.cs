@@ -447,7 +447,7 @@ public partial class RequestBoardsPage
         );
 
     private void SetCreateGuidance() =>
-        _feedback = "New board ready. Complete its details, then Save board to create it.";
+        _feedback = "New board ready. Complete its details, then select Create board.";
 
     private void SelectFirstField()
     {

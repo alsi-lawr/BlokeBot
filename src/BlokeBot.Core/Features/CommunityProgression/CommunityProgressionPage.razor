@@ -330,7 +330,7 @@
                                             @if (season.Status == CommunitySeasonStatus.Open && definition.CompletionMode == CommunityCompletionMode.Repeatable)
                                             {
                                                 var edit = ScheduleFor(definition);
-                                                <details class="progression-disclosure">
+                                                <details class="progression-disclosure" data-sticky-save-scope>
                                                     <summary class="progression-row__meta">Edit reset schedule<span class="progression-chevron" aria-hidden="true">›</span></summary>
                                                     <div class="studio-grid mt-3">
                                                         <div class="studio-span-4 space-y-2">
@@ -370,10 +370,12 @@
                                                             </div>
                                                         </div>
                                                         <div class="studio-span-12">
-                                                            <button class="btn-secondary progression-gate-action"
-                                                                    type="button"
-                                                                    disabled="@(!edit.Confirmed)"
-                                                                    @onclick="() => EditScheduleAsync(definition)">Save schedule and roll over</button>
+                                                            <StickySaveRegion Scope="StickySaveScope.Editor">
+                                                                <button class="btn-secondary progression-gate-action"
+                                                                        type="button"
+                                                                        disabled="@(!edit.Confirmed)"
+                                                                        @onclick="() => EditScheduleAsync(definition)">Save schedule and roll over</button>
+                                                            </StickySaveRegion>
                                                         </div>
                                                     </div>
                                                 </details>

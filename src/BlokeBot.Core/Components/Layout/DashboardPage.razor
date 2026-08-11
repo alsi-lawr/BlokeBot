@@ -1,7 +1,7 @@
 @using System.Diagnostics
 
-<div class="@_pageClass" @attributes="AdditionalAttributes">
-    @if (Actions is null && SaveFeedback is null)
+<div class="@_pageClass" data-sticky-save-scope @attributes="AdditionalAttributes">
+    @if (Actions is null)
     {
         <PageHeader Kicker="@Kicker"
                     Title="@Title"
@@ -12,21 +12,17 @@
         <PageHeader Kicker="@Kicker"
                     Title="@Title"
                     Description="@Description">
-            @if (SaveFeedback is not null)
-            {
-                <p class="dashboard-page__save-feedback"
-                   data-save-feedback="@SaveFeedback.Kind.ToString().ToLowerInvariant()"
-                   role="@_saveFeedbackRole">
-                    @SaveFeedback.Message
-                </p>
-            }
-            @if (Actions is not null)
-            {
-                <div class="dashboard-page__actions" data-persistent-page-actions>
-                    @Actions
-                </div>
-            }
+            <div class="dashboard-page__actions">
+                @Actions
+            </div>
         </PageHeader>
+    }
+
+    @if (SaveAction is not null)
+    {
+        <StickySaveRegion Feedback="SaveFeedback">
+            @SaveAction
+        </StickySaveRegion>
     }
 
     @switch (LoadState)
