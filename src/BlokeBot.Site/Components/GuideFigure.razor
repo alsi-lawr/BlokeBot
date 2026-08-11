@@ -1,0 +1,24 @@
+<figure class="guide-figure">
+    <img src="@Source"
+         width="@Width"
+         height="@Height"
+         alt="@Alt" />
+    <figcaption>@Caption</figcaption>
+</figure>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Source { get; set; }
+
+    [Parameter, EditorRequired]
+    public required int Width { get; set; }
+
+    [Parameter, EditorRequired]
+    public required int Height { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Alt { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Caption { get; set; }
+}

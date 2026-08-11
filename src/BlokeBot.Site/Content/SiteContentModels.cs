@@ -14,6 +14,8 @@ internal sealed record SiteMedia(
     string Caption
 );
 
+internal sealed record SiteFigure(string Source, int Width, int Height, string Alt, string Caption);
+
 internal sealed record SiteGuideSection
 {
     internal required string Heading { get; init; }
@@ -29,6 +31,8 @@ internal sealed record SiteGuideSection
         );
 
     internal SiteMedia? Media { get; init; }
+
+    internal SiteFigure? Figure { get; init; }
 
     internal IReadOnlyList<string> Paragraphs { get; init; } = [];
 
@@ -58,6 +62,8 @@ internal sealed record SiteGuidePage
     internal IReadOnlyList<SiteGuideSection> Sections { get; init; } = [];
 
     internal SiteMedia? Media { get; init; }
+
+    internal SiteFigure? Figure { get; init; }
 
     internal IReadOnlyList<SiteLink> Next { get; init; } = [];
 }

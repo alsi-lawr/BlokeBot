@@ -1,8 +1,9 @@
 namespace BlokeBot.Site.Content;
 
-internal static class SiteGuideCatalog
+internal static partial class SiteGuideCatalog
 {
     private static readonly IReadOnlyDictionary<string, SiteGuidePage> _pages = CreatePages()
+        .Concat(CreateCommunityExtensionPages())
         .ToDictionary(static page => page.Route, StringComparer.Ordinal);
 
     internal static IReadOnlyList<SiteGuidePage> All { get; } =
@@ -24,6 +25,11 @@ internal static class SiteGuideCatalog
             "Stream presentation",
             [
                 GuideLink("Browser Sources", "overlays"),
+                GuideLink("Goal & bounty overlays", "overlays#show-community-goals-and-bounties"),
+                GuideLink(
+                    "Achievement event feed",
+                    "overlays#present-achievements-in-the-event-feed"
+                ),
                 GuideLink("Cues", "overlays/cues"),
                 GuideLink("Media library", "overlays/media"),
             ]
@@ -34,6 +40,8 @@ internal static class SiteGuideCatalog
                 GuideLink("Request boards", "community/request-boards"),
                 GuideLink("Play with viewers", "community/play-with-viewers"),
                 GuideLink("Moments", "community/moments"),
+                GuideLink("Viewer passports", "community/passports"),
+                GuideLink("Raid & collaboration", "community/raid-collaboration"),
             ]
         ),
         new(
@@ -41,6 +49,13 @@ internal static class SiteGuideCatalog
             [
                 GuideLink("Viewer-funded bounties", "community/bounties"),
                 GuideLink("Seasons and achievements", "community/progression"),
+                GuideLink("Tournaments & leagues", "community/competitions"),
+                GuideLink("BlokeRaid", "community/blokeraid"),
+                GuideLink("Collectives", "community/collectives"),
+                GuideLink(
+                    "Approved Moment attachments",
+                    "community/moments#attach-approved-moments-to-progression"
+                ),
                 GuideLink("Stream-event Bingo", "community/bingo"),
             ]
         ),
@@ -477,6 +492,35 @@ internal static class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Show community goals and bounties",
+                    Figure = new SiteFigure(
+                        "media/community/v010/progression-overlay-setup-light-laptop.png",
+                        1308,
+                        840,
+                        "The Sample Channel Community milestone Browser Source editor showing source selection, rotation and representative progress states.",
+                        "The signed-in editor selects bounded authoritative data; the private Browser Source renders current public progress without exposing its URL."
+                    ),
+                    Steps =
+                    [
+                        "Create a Community goal or Viewer-funded bounty Browser Source. A community goal inherits Community progression and Overlays; a bounty inherits Bounties and Overlays. Bounties itself remains unavailable when its required Points switch is off.",
+                        "Choose one current public item or rotate current public items at the saved interval. A bounty can also show a bounded number of recent public contributor login and amount callouts.",
+                        "Use Representative to inspect Active, Progress update, Completed, Failed, Expired and Empty without changing the goal or bounty. Position it, save the source and use its private URL in OBS.",
+                    ],
+                    Bullets =
+                    [
+                        "Live contributions coalesce and update current progress without refresh. Reconnecting restores the latest authoritative state without replaying every prior contribution or completion animation.",
+                        "Community goal output contains public communal definitions only. It excludes Hidden seasons, per-viewer progress, identities and private notes.",
+                        "Bounty output contains public title, progress, target, percentage, expiry and lifecycle state plus only the configured public pledge callouts. It excludes private bounties, Twitch user IDs, balances, moderation reasons and internal accounting.",
+                        "If either inherited parent is off, the retained signed-in editor points to Channel setup while projection, preview, tests, live publication, reconnect state, rendering and animation stop. Saved source and domain history remain; re-enable restores current state without replaying suppressed updates, timers, queued work or animations.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Set up viewer-funded bounties", "community/bounties"),
+                        new SiteLink("Create communal season goals", "community/progression"),
+                    ],
+                },
+                new SiteGuideSection
+                {
                     Heading = "Event feed",
                     Media = new SiteMedia(
                         DarkPhoneSource: "media/phone-dark-overlay-event-feed.png",
@@ -485,14 +529,37 @@ internal static class SiteGuideCatalog
                         LightLaptopSource: "media/laptop-light-overlay-event-feed.png",
                         PhoneAlt: "Event feed Browser Source on a phone showing a representative channel event and compact source controls.",
                         LaptopAlt: "Event feed Browser Source showing its Preview, waiting-card limit and enabled event sources.",
-                        "One Event feed can present point awards, Guessing winners and Giveaway winners."
+                        "One Event feed can present point awards, Guessing winners, Giveaway winners, Bingo events and achievement completions."
                     ),
                     Bullets =
                     [
                         "Choose the maximum waiting cards and what happens when the feed is full.",
-                        "Turn point awards, Guessing winners and Giveaway winners on or off independently. Settings for an off source collapse without discarding its saved values.",
+                        "Turn point awards, Guessing winners, Giveaway winners, Bingo events and achievement completions on or off independently. Settings for an off source collapse without discarding its saved values.",
                         "For each enabled source, edit its message, priority and display time, then choose a Representative event to check the result.",
                         "If an expected card is missing, confirm its feature and event source are on. Re-enable the source for future events; events missed while it was off are not replayed.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Present achievements in the Event feed",
+                    Figure = new SiteFigure(
+                        "media/community/v010/achievement-feed-setup-dark-laptop.png",
+                        1308,
+                        840,
+                        "The Sample Channel Event feed Browser Source editor showing independently configurable event kinds including Achievement completion.",
+                        "Achievement completion is one bounded Event feed kind with its own message, priority, duration and representative preview."
+                    ),
+                    Bullets =
+                    [
+                        "Turn on both Overlays and Community progression, select the Event feed source and enable Achievement completion. No additional Channel setup switch is created.",
+                        "Set the public-safe template, priority and display time, then preview a Representative completion. Preview and test do not grant an achievement or mutate progression.",
+                        "A genuine supported achievement completion queues once and can show the public viewer name, achievement name and presentation-safe reward names or points. Twitch user IDs, balances, moderator notes, internal keys and reward tokens remain absent.",
+                        "Turning either parent off immediately clears an already connected achievement card and blocks projection, queueing, preview, publication, reconnect state and rendering. Other configured Event feed kinds can continue when their own requirements are met.",
+                        "Saved feed configuration and history remain. Re-enable accepts only new achievement completions; suppressed events, queued work, timers and animations do not replay, and stale pre-disable publication cannot reappear after the clear.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Configure seasons and achievements", "community/progression"),
                     ],
                 },
                 new SiteGuideSection
@@ -910,6 +977,37 @@ internal static class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Moderator note, rejection reason, audit text and Twitch failure details stay on the moderator view. Public recaps show only approved title, category, counts and the Twitch link.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Attach approved Moments to progression",
+                    Figure = new SiteFigure(
+                        "media/community/v010/moment-attachment-light-phone.png",
+                        462,
+                        956,
+                        "The Sample Channel public bounty on a narrow screen showing its attached approved Moment with public-safe title and Twitch media link.",
+                        "Authorised staff attach by reference in the destination; viewers receive only the Moment's current approved public-safe fields."
+                    ),
+                    Steps =
+                    [
+                        "Approve the Moment for the selected channel first. A channel owner or permitted moderator then opens the destination bounty, achievement or confirmed tournament match.",
+                        "Open its Moments section, choose a same-host approved Moment and attach it. The destination context remains visible so a confirmed result cannot be confused with another match.",
+                        "Use Remove in the same section to detach the reference. The Moment, Twitch clip or marker and moderation history remain owned by Moments and are not copied or deleted.",
+                    ],
+                    Bullets =
+                    [
+                        "A bounty attachment inherits Moments, Bounties and Bounties' effective Points requirement. An achievement attachment inherits Moments and Community progression. A match attachment inherits Moments and Tournaments & leagues. No attachment switch is added.",
+                        "Only approved, same-host, currently public-safe Moments are discoverable. Hidden, rejected, merged, deleted or otherwise unavailable Moments are suppressed from management, public destination pages, events and downstream presentation.",
+                        "A retained link to a temporarily hidden or rejected Moment becomes visible again if that same source Moment returns to Approved and every parent gate is available. No attach event or suppressed work is replayed when it reappears.",
+                        "Public destinations can show current title, category and Twitch media link. Moderator notes, rejection reasons, failure detail, internal IDs and audit text remain private.",
+                        "If a parent is off, the embedded section shows Channel setup recovery and blocks discovery, attach or detach, public relationships, events, overlays and automations before effects. Valid links remain saved and reappear from current state after re-enable without replay.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Manage viewer-funded bounties", "community/bounties"),
+                        new SiteLink("Manage achievements", "community/progression"),
+                        new SiteLink("Manage confirmed matches", "community/competitions"),
                     ],
                 },
                 new SiteGuideSection

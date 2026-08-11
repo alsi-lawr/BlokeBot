@@ -514,6 +514,27 @@ main {
   text-align: center;
 }
 
+.guide-figure {
+  display: grid;
+  justify-items: center;
+  margin: 2rem 0 2.5rem;
+}
+
+.guide-figure img {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.guide-figure figcaption {
+  max-width: 44rem;
+  margin-top: 0.8rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
 .role-strip {
   padding-block: clamp(4rem, 8vw, 7rem);
   border-top: 0.0625rem solid var(--line);

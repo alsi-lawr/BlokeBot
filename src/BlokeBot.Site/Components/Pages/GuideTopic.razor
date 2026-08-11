@@ -9,8 +9,13 @@
 @page "/community/request-boards"
 @page "/community/play-with-viewers"
 @page "/community/moments"
+@page "/community/passports"
 @page "/community/bounties"
 @page "/community/progression"
+@page "/community/competitions"
+@page "/community/raid-collaboration"
+@page "/community/blokeraid"
+@page "/community/collectives"
 @page "/community/bingo"
 @page "/twitch-operations"
 @page "/twitch-operations/shoutouts"
@@ -68,6 +73,16 @@
             </div>
         }
 
+        @if (_page.Figure is not null)
+        {
+            <GuideFigure
+                Source="@_page.Figure.Source"
+                Width="@_page.Figure.Width"
+                Height="@_page.Figure.Height"
+                Alt="@_page.Figure.Alt"
+                Caption="@_page.Figure.Caption" />
+        }
+
         @foreach (var section in _page.Sections)
         {
             <section id="@section.Anchor">
@@ -85,6 +100,16 @@
                             LaptopAlt="@section.Media.LaptopAlt"
                             Caption="@section.Media.Caption" />
                     </div>
+                }
+
+                @if (section.Figure is not null)
+                {
+                    <GuideFigure
+                        Source="@section.Figure.Source"
+                        Width="@section.Figure.Width"
+                        Height="@section.Figure.Height"
+                        Alt="@section.Figure.Alt"
+                        Caption="@section.Figure.Caption" />
                 }
 
                 @foreach (var paragraph in section.Paragraphs)

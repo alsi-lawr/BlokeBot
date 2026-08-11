@@ -20,7 +20,14 @@
                             @foreach (var link in group.Links)
                             {
                                 <li>
-                                    <NavLink href="@link.Href" Match="NavLinkMatch.All">@link.Label</NavLink>
+                                    @if (link.Href.Contains('#'))
+                                    {
+                                        <a href="@link.Href">@link.Label</a>
+                                    }
+                                    else
+                                    {
+                                        <NavLink href="@link.Href" Match="NavLinkMatch.All">@link.Label</NavLink>
+                                    }
                                 </li>
                             }
                         </ul>
