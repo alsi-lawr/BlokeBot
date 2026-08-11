@@ -6,8 +6,11 @@ namespace BlokeBot.Core.Components.Layout;
 public partial class StickySaveRegion
 {
     private ElementReference _element;
+    private Task? _initialization;
     private IJSObjectReference? _module;
     private IJSObjectReference? _registration;
+    private Task? _disposal;
+    private bool _disposed;
 
     [Parameter]
     public bool Active { get; set; } = true;
@@ -35,41 +38,111 @@ public partial class StickySaveRegion
             ? "alert"
             : "status";
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (!firstRender || _disposed)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        _module = await JS.InvokeAsync<IJSObjectReference>(
-            "import",
-            "./Components/Layout/StickySaveRegion.razor.js"
-        );
-        _registration = await _module.InvokeAsync<IJSObjectReference>("register", _element);
+        _initialization = InitializeAsync();
+        return _initialization;
     }
 
-    public async ValueTask DisposeAsync()
+    private async Task InitializeAsync()
     {
-        if (_registration is not null)
+        try
+        {
+            var module = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./Components/Layout/StickySaveRegion.razor.js"
+            );
+            if (_disposed)
+            {
+                await DisposeReferenceAsync(module);
+                return;
+            }
+
+            _module = module;
+            var registration = await module.InvokeAsync<IJSObjectReference>("register", _element);
+            if (_disposed)
+            {
+                await DisposeRegistrationAsync(registration);
+                return;
+            }
+
+            _registration = registration;
+        }
+        catch (Exception exception) when (_disposed && IsExpectedInteropShutdown(exception)) { }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _disposal ??= DisposeCoreAsync();
+        return new(_disposal);
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        try
+        {
+            if (_initialization is not null)
+            {
+                await _initialization;
+            }
+        }
+        catch (Exception exception) when (IsExpectedInteropShutdown(exception)) { }
+        finally
+        {
+            var registration = _registration;
+            _registration = null;
+            try
+            {
+                if (registration is not null)
+                {
+                    await DisposeRegistrationAsync(registration);
+                }
+            }
+            finally
+            {
+                var module = _module;
+                _module = null;
+                if (module is not null)
+                {
+                    await DisposeReferenceAsync(module);
+                }
+
+                GC.SuppressFinalize(this);
+            }
+        }
+    }
+
+    private static async ValueTask DisposeRegistrationAsync(IJSObjectReference registration)
+    {
+        try
         {
             try
             {
-                await _registration.InvokeVoidAsync("dispose");
-                await _registration.DisposeAsync();
+                await registration.InvokeVoidAsync("dispose");
             }
-            catch (JSDisconnectedException) { }
+            catch (Exception exception) when (IsExpectedInteropShutdown(exception)) { }
         }
-
-        if (_module is not null)
+        finally
         {
-            try
-            {
-                await _module.DisposeAsync();
-            }
-            catch (JSDisconnectedException) { }
+            await DisposeReferenceAsync(registration);
         }
-
-        GC.SuppressFinalize(this);
     }
+
+    private static async ValueTask DisposeReferenceAsync(IJSObjectReference reference)
+    {
+        try
+        {
+            await reference.DisposeAsync();
+        }
+        catch (Exception exception) when (IsExpectedInteropShutdown(exception)) { }
+    }
+
+    private static bool IsExpectedInteropShutdown(Exception exception) =>
+        exception is JSDisconnectedException or OperationCanceledException;
 }

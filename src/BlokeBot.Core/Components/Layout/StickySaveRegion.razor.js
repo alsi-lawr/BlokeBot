@@ -91,6 +91,14 @@ function scheduleOwnershipUpdate() {
     }
 }
 
+function updateOwnershipImmediately() {
+    if (updateFrame !== undefined) {
+        window.cancelAnimationFrame(updateFrame);
+        updateFrame = undefined;
+    }
+    updateOwnership();
+}
+
 function recordInteraction(event) {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
     const boundary = target?.closest("[data-sticky-save-scope]");
@@ -171,15 +179,34 @@ export function register(region) {
     }
 
     const activeObserver = new MutationObserver(scheduleOwnershipUpdate);
-    const registration = { activeObserver, boundary, boundaryState, region };
+    const visibilityObserver = new MutationObserver(updateOwnershipImmediately);
+    const registration = {
+        activeObserver,
+        boundary,
+        boundaryState,
+        region,
+        visibilityObserver,
+    };
     registrations.set(region, registration);
     boundaryState.registrations.add(registration);
     activeObserver.observe(region, { attributes: true, attributeFilter: ["data-save-active"] });
+    visibilityObserver.observe(boundary, {
+        attributes: true,
+        attributeFilter: ["hidden", "inert"],
+        subtree: true,
+    });
+    for (let ancestor = boundary.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        visibilityObserver.observe(ancestor, {
+            attributes: true,
+            attributeFilter: ["hidden", "inert"],
+        });
+    }
     scheduleOwnershipUpdate();
 
     return {
         dispose() {
             activeObserver.disconnect();
+            visibilityObserver.disconnect();
             registrations.delete(region);
             boundaryState.registrations.delete(registration);
             region.dataset.saveVisible = "false";
