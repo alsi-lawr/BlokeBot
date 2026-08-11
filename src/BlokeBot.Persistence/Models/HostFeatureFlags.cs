@@ -20,6 +20,7 @@ public enum HostFeatureFlags : ulong
     Bounties = 1UL << 13,
     CommunityProgression = 1UL << 14,
     Bingo = 1UL << 15,
+    ViewerPassports = 1UL << 16,
     NativeTwitchFeatures =
         Shoutouts | Polls | ClipsAndMarkers | RewardsAndRedemptions | Predictions,
     All =
@@ -38,5 +39,6 @@ public enum HostFeatureFlags : ulong
         | Automations
         | Bounties
         | CommunityProgression
-        | Bingo,
+        | Bingo
+        | ViewerPassports,
 }

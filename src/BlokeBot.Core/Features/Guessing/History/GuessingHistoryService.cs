@@ -61,6 +61,20 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
         int hostId,
         GuessHistoryQuery query,
         CancellationToken ct
+    ) => await LoadLeaderboardAsync(hostId, query, new HashSet<string>(), ct);
+
+    public async Task<GuessLeaderboardPage> LoadPublicLeaderboardAsync(
+        int hostId,
+        GuessHistoryQuery query,
+        IReadOnlySet<string> excludedLogins,
+        CancellationToken ct
+    ) => await LoadLeaderboardAsync(hostId, query, excludedLogins, ct);
+
+    private async Task<GuessLeaderboardPage> LoadLeaderboardAsync(
+        int hostId,
+        GuessHistoryQuery query,
+        IReadOnlySet<string> excludedLogins,
+        CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -73,6 +87,7 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
                 x.GuessRound != null
                 && x.GuessRound.GuessRoundProfile != null
                 && x.GuessRound.GuessRoundProfile.HostId == hostId
+                && !excludedLogins.Contains(x.Login)
             );
 
         if (query.FromUtc is { } fromUtc)

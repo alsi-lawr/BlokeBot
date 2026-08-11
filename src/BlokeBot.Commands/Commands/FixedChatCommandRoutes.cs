@@ -49,6 +49,7 @@ public static class FixedChatCommandRoutes
     public static FixedChatCommandRoute BountyReject { get; } = new("bountyreject");
     public static FixedChatCommandRoute BountyExtend { get; } = new("bountyextend");
     public static FixedChatCommandRoute Progress { get; } = new("progress");
+    public static FixedChatCommandRoute Passport { get; } = new("passport");
     public static FixedChatCommandRoute EquipTitle { get; } = new("equiptitle");
     public static FixedChatCommandRoute EquipBadge { get; } = new("equipbadge");
     public static FixedChatCommandRoute EquipAccent { get; } = new("equipaccent");
@@ -89,6 +90,7 @@ public static class FixedChatCommandRoutes
                 BountyReject.Value,
                 BountyExtend.Value,
                 Progress.Value,
+                Passport.Value,
                 EquipTitle.Value,
                 EquipBadge.Value,
                 EquipAccent.Value,

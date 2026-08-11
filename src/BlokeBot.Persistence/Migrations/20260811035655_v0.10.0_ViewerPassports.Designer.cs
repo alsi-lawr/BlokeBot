@@ -3,6 +3,7 @@ using System;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    partial class BlokeBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260811035655_v0.10.0_ViewerPassports")]
+    partial class v0100_ViewerPassports
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -6194,31 +6197,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("viewer_passports", (string)null);
                 });
 
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportAmbiguousLogin", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("DetectedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("HostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Login")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HostId", "Login")
-                        .IsUnique();
-
-                    b.ToTable("viewer_passport_ambiguous_logins", (string)null);
-                });
-
             modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportAttendanceDay", b =>
                 {
                     b.Property<long>("Id")
@@ -6245,41 +6223,6 @@ namespace BlokeBot.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("viewer_passport_attendance_days", (string)null);
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportLogin", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("FirstSeenAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("HostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("LastSeenAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Login")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("PassportId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PassportId");
-
-                    b.HasIndex("HostId", "Login");
-
-                    b.HasIndex("HostId", "PassportId", "Login")
-                        .IsUnique();
-
-                    b.ToTable("viewer_passport_logins", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.WhisperQuotaBucket", b =>
@@ -8014,15 +7957,6 @@ namespace BlokeBot.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportAmbiguousLogin", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
-                        .WithMany()
-                        .HasForeignKey("HostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportAttendanceDay", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -8036,23 +7970,6 @@ namespace BlokeBot.Persistence.Migrations
                         .HasForeignKey("PassportId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ViewerPassportLogin", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
-                        .WithMany()
-                        .HasForeignKey("HostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BlokeBot.Persistence.Models.ViewerPassport", "Passport")
-                        .WithMany()
-                        .HasForeignKey("PassportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Passport");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.WhisperQuotaBucket", b =>

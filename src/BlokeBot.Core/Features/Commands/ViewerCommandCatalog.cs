@@ -283,6 +283,11 @@ public sealed class ViewerCommandCatalogService(
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.EquipAccent));
         }
 
+        if (enabledFeatures.Contains(HostFeatureFlags.ViewerPassports))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Passport));
+        }
+
         if (enabledFeatures.Contains(HostFeatureFlags.Bingo) && bingoStatus is not null)
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Bingo));

@@ -20,6 +20,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Points,
         HostFeatureFlags.Bounties,
         HostFeatureFlags.CommunityProgression,
+        HostFeatureFlags.ViewerPassports,
         HostFeatureFlags.Bingo,
         HostFeatureFlags.CustomCommands,
     ];
@@ -103,6 +104,12 @@ public static class HostFeatureCatalog
                 "Community progression",
                 "Run seasons with quests, achievements, standings, and persistent rewards.",
                 enabledFeatures.Contains(HostFeatureFlags.CommunityProgression)
+            ),
+            new(
+                HostFeatureFlags.ViewerPassports,
+                "Viewer passports",
+                "Let viewers opt in to a channel profile with selected achievements and activity.",
+                enabledFeatures.Contains(HostFeatureFlags.ViewerPassports)
             ),
             new(
                 HostFeatureFlags.Bingo,

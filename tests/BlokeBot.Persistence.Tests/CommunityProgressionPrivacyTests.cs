@@ -26,6 +26,27 @@ public sealed class CommunityProgressionPrivacyTests
             _ = seed.Hosts.Add(host);
             _ = await seed.SaveChangesAsync();
             hostId = host.Id;
+            var passport = new ViewerPassport
+            {
+                HostId = hostId,
+                TwitchUserId = "viewer-id",
+                Login = "viewer",
+                DisplayName = "Viewer Name",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+            _ = seed.ViewerPassports.Add(passport);
+            _ = await seed.SaveChangesAsync();
+            _ = seed.ViewerPassportLogins.Add(
+                new()
+                {
+                    HostId = hostId,
+                    PassportId = passport.Id,
+                    Login = "viewer",
+                    FirstSeenAtUtc = now,
+                    LastSeenAtUtc = now,
+                }
+            );
             var season = new CommunitySeason
             {
                 PublicId = Guid.NewGuid(),

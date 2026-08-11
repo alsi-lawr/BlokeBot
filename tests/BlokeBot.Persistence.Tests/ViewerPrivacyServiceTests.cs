@@ -49,7 +49,7 @@ public sealed class ViewerPrivacyServiceTests
             );
             bobLedger.Login.ShouldBe(_bob);
             bobLedger.CounterpartyLogin.ShouldBeNull();
-            bobLedger.Note.ShouldBe("gift from alice");
+            bobLedger.Note.ShouldBeEmpty();
 
             (await db.PointsGiveawayEntrants.CountAsync(x => x.Login == _alice)).ShouldBe(0);
             (await db.PointsGiveawayEntrants.CountAsync(x => x.Login == _bob)).ShouldBe(1);
@@ -225,6 +225,8 @@ public sealed class ViewerPrivacyServiceTests
                 "clips.created",
                 "request-boards.submissions",
                 "request-boards.votes",
+                "viewer-passports.profiles",
+                "viewer-passports.logins",
                 "play-queues.entries",
                 "play-queues.participation",
                 "play-queues.exclusions",
@@ -243,6 +245,162 @@ public sealed class ViewerPrivacyServiceTests
         export.Sections["points.ledger"].Count.ShouldBe(2);
         export.Sections["guessing.votes"].Count.ShouldBe(1);
         export.Sections["request-boards.votes"].Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ConflictingNativeIds_BlockAliasFallbackAcrossIntegratedDomains()
+    {
+        const string ConflictingId = "conflicting-id";
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var fixture = await SeedAsync(factory);
+
+        await using (var conflict = await factory.CreateDbContextAsync())
+        {
+            _ = await conflict
+                .CustomCommandAllowedUsers.Where(value => value.Login == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .CustomCommandInvocationResetAudits.Where(value => value.ActorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.ActorTwitchUserId, ConflictingId)
+                        .SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .WhisperQuotaRecipients.Where(value => value.RecipientLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.RecipientTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .ShoutoutHistory.Where(value => value.TargetLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .ShoutoutCooldowns.Where(value => value.TargetLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.TargetTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .AutomaticRaidShoutoutOutcomes.Where(value => value.SourceLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.SourceTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .TwitchRewardRedemptions.Where(value => value.UserLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.UserId, ConflictingId)
+                );
+            _ = await conflict
+                .TwitchClips.Where(value => value.CreatorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.CreatorTwitchUserId, ConflictingId)
+                );
+            _ = await conflict
+                .PlayQueueEntries.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .MomentContributors.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .MomentVotes.Where(value => value.NormalizedLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters
+                        .SetProperty(value => value.TwitchUserId, ConflictingId)
+                        .SetProperty(value => value.IdentityKey, $"id:{ConflictingId}")
+                );
+            _ = await conflict
+                .OverlayInstanceEvents.Where(value => value.ActorLogin == _alice)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(value => value.ActorUserId, ConflictingId)
+                );
+        }
+
+        await using (var exportDb = await factory.CreateDbContextAsync())
+        {
+            var export = await ViewerPrivacyService.ExportAsync(
+                exportDb,
+                PrivacySubject.Create(_aliceId, _alice),
+                fixture.HostAId,
+                default
+            );
+            foreach (
+                var section in new[]
+                {
+                    "commands.allowed-users",
+                    "commands.reset-audits",
+                    "whispers.recipients",
+                    "shoutouts.history",
+                    "shoutouts.cooldowns",
+                    "shoutouts.raid-outcomes",
+                    "channel-points.redemptions",
+                    "clips.created",
+                    "play-queues.entries",
+                    "moments.contributors",
+                    "moments.votes",
+                    "overlays.actor-events",
+                }
+            )
+            {
+                export.Sections.ShouldNotContainKey(section);
+            }
+            export.Sections.ShouldContainKey("points.balances");
+            export.Sections.ShouldContainKey("guessing.votes");
+        }
+
+        await using (var erase = await factory.CreateDbContextAsync())
+        {
+            _ = await ViewerPrivacyService.EraseAsync(
+                erase,
+                PrivacySubject.Create(_aliceId, _alice),
+                fixture.HostAId,
+                default
+            );
+        }
+
+        await using var verify = await factory.CreateDbContextAsync();
+        (
+            await verify.CustomCommandAllowedUsers.SingleAsync(value => value.Login == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        var reset = await verify.CustomCommandInvocationResetAudits.SingleAsync();
+        reset.ActorTwitchUserId.ShouldBe(ConflictingId);
+        reset.ActorLogin.ShouldBe(_alice);
+        reset.TargetTwitchUserId.ShouldBe(ConflictingId);
+        reset.TargetLogin.ShouldBe(_alice);
+        (
+            await verify.WhisperQuotaRecipients.SingleAsync(value => value.RecipientLogin == _alice)
+        ).RecipientTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.ShoutoutHistory.SingleAsync(value => value.TargetLogin == _alice)
+        ).TargetTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.TwitchRewardRedemptions.SingleAsync(value => value.UserLogin == _alice)
+        ).UserId.ShouldBe(ConflictingId);
+        (
+            await verify.TwitchClips.SingleAsync(value => value.CreatorLogin == _alice)
+        ).CreatorTwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.PlayQueueEntries.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.MomentContributors.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.MomentVotes.SingleAsync(value => value.NormalizedLogin == _alice)
+        ).TwitchUserId.ShouldBe(ConflictingId);
+        (
+            await verify.OverlayInstanceEvents.SingleAsync(value => value.ActorLogin == _alice)
+        ).ActorUserId.ShouldBe(ConflictingId);
     }
 
     [Test]
@@ -345,6 +503,10 @@ public sealed class ViewerPrivacyServiceTests
             "CommunitySeasonStanding.ViewerDisplayName",
             "CommunitySeasonStanding.ViewerLogin",
             "CommunitySeasonStanding.ViewerTwitchUserId",
+            "ViewerPassport.DisplayName",
+            "ViewerPassport.Login",
+            "ViewerPassport.TwitchUserId",
+            "ViewerPassportLogin.Login",
         };
         var excluded = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -366,6 +528,8 @@ public sealed class ViewerPrivacyServiceTests
             ["TwitchClip.BroadcasterTwitchUserId"] =
                 "Hosted channel identity; erased by channel removal.",
             ["TwitchClip.BroadcasterLogin"] = "Hosted channel identity; erased by channel removal.",
+            ["ViewerPassportAmbiguousLogin.Login"] =
+                "Sticky non-attributable ambiguity marker; erased only by channel removal.",
         };
 
         var model = DesignModel();
@@ -439,6 +603,39 @@ public sealed class ViewerPrivacyServiceTests
         _ = await db.SaveChangesAsync();
         var a = hostA.Id;
         var b = hostB.Id;
+        var passports = new[]
+        {
+            new ViewerPassport
+            {
+                HostId = a,
+                TwitchUserId = _aliceId,
+                Login = _alice,
+                DisplayName = "Alice",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+            new ViewerPassport
+            {
+                HostId = b,
+                TwitchUserId = _aliceId,
+                Login = _alice,
+                DisplayName = "Alice",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+        };
+        db.ViewerPassports.AddRange(passports);
+        _ = await db.SaveChangesAsync();
+        db.ViewerPassportLogins.AddRange(
+            passports.Select(passport => new ViewerPassportLogin
+            {
+                HostId = passport.HostId,
+                PassportId = passport.Id,
+                Login = _alice,
+                FirstSeenAtUtc = now,
+                LastSeenAtUtc = now,
+            })
+        );
 
         var profile = new GuessRoundProfile
         {

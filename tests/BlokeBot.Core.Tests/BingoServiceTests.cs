@@ -448,6 +448,31 @@ public sealed class BingoServiceTests
         var game = (await service.GetModeratorGamesAsync(hostId, default)).Single().Game;
         var alice = new BingoViewer("alice-id", "alice", "Alice Display");
         var bob = new BingoViewer("bob-id", "bob", "Bob Display");
+        await using (var identity = await database.CreateDbContextAsync())
+        {
+            var passport = new ViewerPassport
+            {
+                HostId = hostId,
+                TwitchUserId = alice.TwitchUserId,
+                Login = alice.Login,
+                DisplayName = alice.DisplayName,
+                CreatedAtUtc = _now.UtcDateTime,
+                UpdatedAtUtc = _now.UtcDateTime,
+            };
+            _ = identity.ViewerPassports.Add(passport);
+            _ = await identity.SaveChangesAsync();
+            _ = identity.ViewerPassportLogins.Add(
+                new()
+                {
+                    HostId = hostId,
+                    PassportId = passport.Id,
+                    Login = alice.Login,
+                    FirstSeenAtUtc = _now.UtcDateTime,
+                    LastSeenAtUtc = _now.UtcDateTime,
+                }
+            );
+            _ = await identity.SaveChangesAsync();
+        }
         _ = Success(
             await service.JoinAsync(
                 hostId,
@@ -655,13 +680,6 @@ public sealed class BingoServiceTests
                 )
                 .Concat(
                     await verify
-                        .BingoModerationAudit.Select(value =>
-                            value.ActorTwitchUserId + value.ActorLogin + value.PrivateNote
-                        )
-                        .ToArrayAsync()
-                )
-                .Concat(
-                    await verify
                         .OverlayEventFeedItems.Select(value =>
                             value.SourceKey + value.Title + value.Body
                         )
@@ -672,6 +690,12 @@ public sealed class BingoServiceTests
         {
             retainedText.ShouldNotContain(identity, Case.Insensitive);
         }
+        (
+            await verify.BingoModerationAudit.CountAsync(value =>
+                value.PrivateNote == "Alice Display verified before issue."
+                && value.ActorTwitchUserId == "moderator-id"
+            )
+        ).ShouldBe(1);
     }
 
     [Test]

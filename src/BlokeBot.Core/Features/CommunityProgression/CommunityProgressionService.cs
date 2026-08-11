@@ -1323,10 +1323,26 @@ public sealed class CommunityProgressionService(
         {
             return null;
         }
+        var passportExclusions = host.EnabledFeatures.Contains(HostFeatureFlags.ViewerPassports)
+            ? await db
+                .ViewerPassports.AsNoTracking()
+                .Where(value =>
+                    value.HostId == host.Id && value.Visibility != ViewerPassportVisibility.Public
+                )
+                .Select(value => new { value.TwitchUserId, value.Login })
+                .ToArrayAsync(ct)
+            : [];
+        var excludedIds = passportExclusions
+            .Select(value => value.TwitchUserId)
+            .ToHashSet(StringComparer.Ordinal);
+        var excludedLogins = passportExclusions
+            .Where(value => !string.IsNullOrWhiteSpace(value.Login))
+            .Select(value => value.Login)
+            .ToHashSet(StringComparer.Ordinal);
         var result = new List<CommunityPublicSeasonView>();
         foreach (var season in seasons)
         {
-            result.Add(await ToPublicSeasonAsync(db, season, ct));
+            result.Add(await ToPublicSeasonAsync(db, season, excludedIds, excludedLogins, ct));
         }
         return new(host.Login, result);
     }
@@ -1348,6 +1364,8 @@ public sealed class CommunityProgressionService(
     private async Task<CommunityPublicSeasonView> ToPublicSeasonAsync(
         BlokeBotDbContext db,
         CommunitySeason season,
+        IReadOnlySet<string> excludedTwitchUserIds,
+        IReadOnlySet<string> excludedLogins,
         CancellationToken ct
     )
     {
@@ -1359,13 +1377,44 @@ public sealed class CommunityProgressionService(
             season.Status,
             season.StartsAtUtc,
             season.EndsAtUtc,
-            activity.Standings,
-            activity.Progress,
+            activity
+                .Standings.Where(value =>
+                    Visible(value.TwitchUserId, value.Login, excludedTwitchUserIds, excludedLogins)
+                )
+                .ToArray(),
+            activity
+                .Progress.Where(value =>
+                    Visible(value.TwitchUserId, value.Login, excludedTwitchUserIds, excludedLogins)
+                )
+                .ToArray(),
             activity.CommunalProgress,
-            activity.Completions,
-            activity.Unlocks
+            activity
+                .Completions.Where(value =>
+                    value.TwitchUserId is null
+                    || Visible(
+                        value.TwitchUserId,
+                        value.Login,
+                        excludedTwitchUserIds,
+                        excludedLogins
+                    )
+                )
+                .ToArray(),
+            activity
+                .Unlocks.Where(value =>
+                    Visible(value.TwitchUserId, value.Login, excludedTwitchUserIds, excludedLogins)
+                )
+                .ToArray()
         );
     }
+
+    private static bool Visible(
+        string twitchUserId,
+        string? login,
+        IReadOnlySet<string> excludedTwitchUserIds,
+        IReadOnlySet<string> excludedLogins
+    ) =>
+        !excludedTwitchUserIds.Contains(twitchUserId)
+        && (login is null || !excludedLogins.Contains(login));
 
     private async Task<CommunitySeasonActivity> LoadSeasonActivityAsync(
         BlokeBotDbContext db,

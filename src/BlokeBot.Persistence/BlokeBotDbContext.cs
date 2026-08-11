@@ -66,6 +66,12 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         Set<CommunitySeasonStanding>();
     public DbSet<CommunityAudit> CommunityAudits => Set<CommunityAudit>();
     public DbSet<CommunityDomainEvent> CommunityEvents => Set<CommunityDomainEvent>();
+    public DbSet<ViewerPassport> ViewerPassports => Set<ViewerPassport>();
+    public DbSet<ViewerPassportLogin> ViewerPassportLogins => Set<ViewerPassportLogin>();
+    public DbSet<ViewerPassportAmbiguousLogin> ViewerPassportAmbiguousLogins =>
+        Set<ViewerPassportAmbiguousLogin>();
+    public DbSet<ViewerPassportAttendanceDay> ViewerPassportAttendanceDays =>
+        Set<ViewerPassportAttendanceDay>();
     public DbSet<BingoTemplate> BingoTemplates => Set<BingoTemplate>();
     public DbSet<BingoTemplateRevision> BingoTemplateRevisions => Set<BingoTemplateRevision>();
     public DbSet<BingoSquare> BingoSquares => Set<BingoSquare>();
@@ -167,6 +173,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePoints(modelBuilder);
         ConfigureBounties(modelBuilder);
         ConfigureCommunityProgression(modelBuilder);
+        ConfigureViewerPassports(modelBuilder);
         ConfigureBingo(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);

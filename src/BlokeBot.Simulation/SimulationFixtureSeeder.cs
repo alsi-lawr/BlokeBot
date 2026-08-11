@@ -49,6 +49,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedPointsAsync(db, hostId, now, cancellationToken);
         await SeedBountyAsync(db, hostId, now, cancellationToken);
         await SeedCommunityProgressionAsync(db, hostId, now, cancellationToken);
+        await SeedViewerPassportsAsync(db, hostId, now, cancellationToken);
         await SeedBingoAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
@@ -66,6 +67,96 @@ internal sealed class SimulationFixtureSeeder(
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             AuthRole.Streamer
         );
+    }
+
+    private static async Task SeedViewerPassportsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.ViewerPassports.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+        var titleId = await db
+            .CommunityRewardDefinitions.Where(value =>
+                value.HostId == hostId && value.Key == "trailblazer"
+            )
+            .Select(value => value.Id)
+            .SingleAsync(cancellationToken);
+        var badgeId = await db
+            .CommunityRewardDefinitions.Where(value =>
+                value.HostId == hostId && value.Key == "summer-star"
+            )
+            .Select(value => value.Id)
+            .SingleAsync(cancellationToken);
+        var streamer = new ViewerPassport
+        {
+            HostId = hostId,
+            TwitchUserId = SimulationMode.UserId,
+            Login = SimulationMode.Login,
+            DisplayName = SimulationMode.DisplayName,
+            ProfileLine = "Building a welcoming corner for cosy chaos and unlikely comebacks.",
+            Visibility = ViewerPassportVisibility.Private,
+            HideAttendance = false,
+            CreatedAtUtc = now.AddDays(-20),
+            UpdatedAtUtc = now.AddMinutes(-8),
+        };
+        var nightOwl = new ViewerPassport
+        {
+            HostId = hostId,
+            TwitchUserId = "3000",
+            Login = "nightowl",
+            DisplayName = "NightOwl",
+            ProfileLine = "Here for cosy chaos, unlikely comebacks, and a proper brew.",
+            Visibility = ViewerPassportVisibility.Public,
+            HideAttendance = false,
+            SelectedTitleRewardDefinitionId = titleId,
+            SelectedBadgeRewardDefinitionId = badgeId,
+            CreatedAtUtc = now.AddDays(-18),
+            UpdatedAtUtc = now.AddMinutes(-4),
+        };
+        db.ViewerPassports.AddRange(streamer, nightOwl);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        db.ViewerPassportLogins.AddRange(
+            new ViewerPassportLogin
+            {
+                HostId = hostId,
+                PassportId = streamer.Id,
+                Login = streamer.Login,
+                FirstSeenAtUtc = streamer.CreatedAtUtc,
+                LastSeenAtUtc = streamer.UpdatedAtUtc,
+            },
+            new ViewerPassportLogin
+            {
+                HostId = hostId,
+                PassportId = nightOwl.Id,
+                Login = nightOwl.Login,
+                FirstSeenAtUtc = nightOwl.CreatedAtUtc,
+                LastSeenAtUtc = nightOwl.UpdatedAtUtc,
+            }
+        );
+        for (var offset = 0; offset < 6; offset++)
+        {
+            db.ViewerPassportAttendanceDays.AddRange(
+                new ViewerPassportAttendanceDay
+                {
+                    HostId = hostId,
+                    PassportId = streamer.Id,
+                    DateUtc = DateOnly.FromDateTime(now.AddDays(-offset)),
+                    FirstSeenAtUtc = now.AddDays(-offset).AddHours(-2),
+                },
+                new ViewerPassportAttendanceDay
+                {
+                    HostId = hostId,
+                    PassportId = nightOwl.Id,
+                    DateUtc = DateOnly.FromDateTime(now.AddDays(-offset)),
+                    FirstSeenAtUtc = now.AddDays(-offset).AddHours(-3),
+                }
+            );
+        }
     }
 
     private static async Task SeedBingoAsync(
@@ -270,7 +361,7 @@ internal sealed class SimulationFixtureSeeder(
         };
         var participants = new[]
         {
-            Participant(hostId, game, aurora, auroraCard, "2001", "nightowl", "NightOwl", now),
+            Participant(hostId, game, aurora, auroraCard, "3000", "nightowl", "NightOwl", now),
             Participant(hostId, game, aurora, auroraCard, "2002", "pixelpilot", "PixelPilot", now),
             Participant(hostId, game, nebula, nebulaCard, "2003", "cozycactus", "CozyCactus", now),
         };

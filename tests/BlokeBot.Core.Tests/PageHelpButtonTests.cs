@@ -40,4 +40,11 @@ public sealed class PageHelpButtonTests
             .ShouldBeEmpty();
         PageHelpButton.HasUsefulHelpForPath("/automations/events").ShouldBeFalse();
     }
+
+    [Test]
+    public void ViewerPassportEditorRoutes_HaveUsefulHelp()
+    {
+        PageHelpButton.HasUsefulHelpForPath("/passports").ShouldBeTrue();
+        PageHelpButton.HasUsefulHelpForPath("/passports/samplechannel/me").ShouldBeTrue();
+    }
 }

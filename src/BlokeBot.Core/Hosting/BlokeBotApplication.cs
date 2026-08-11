@@ -27,6 +27,7 @@ using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
+using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -125,6 +126,7 @@ public static class BlokeBotApplication
             )
             .AddBlokeBotBounties()
             .AddBlokeBotCommunityProgression()
+            .AddBlokeBotViewerPassports()
             .AddBlokeBotBingo()
             .AddBlokeBotRequestBoards()
             .AddBlokeBotPlayWithViewers()
@@ -154,6 +156,7 @@ public static class BlokeBotApplication
                 .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
                 .AddCommandModule<BountyCommandModule>()
                 .AddCommandModule<CommunityProgressionCommandModule>()
+                .AddCommandModule<ViewerPassportCommandModule>()
                 .AddCommandModule<BingoCommandModule>()
                 .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<PlayQueueCommandModule>()
@@ -235,6 +238,7 @@ public static class BlokeBotApplication
         }
 
         app.MapHostConfigEndpoints();
+        app.MapViewerPassportEndpoints();
         return app;
     }
 
