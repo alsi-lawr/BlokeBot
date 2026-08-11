@@ -57,9 +57,9 @@
                             <Field Id="season-end" Label="Ends (UTC)" @bind-Value="_season.EndsAtUtc" />
                         </div>
                         <div class="studio-span-12"><TextAreaField Id="season-description" Label="Public description" @bind-Value="_season.Description" /></div>
-                        <div class="studio-span-6">
+                        <div class="studio-span-6 space-y-2">
                             <label class="label" for="season-visibility">Visibility</label>
-                            <select id="season-visibility" class="input mt-1" @bind="_season.Visibility">
+                            <select id="season-visibility" class="input progression-select" @bind="_season.Visibility">
                                 <option value="@CommunityVisibility.Public">Public, participant Twitch identities and progress are visible</option>
                                 <option value="@CommunityVisibility.Hidden">Hidden, no public progression data</option>
                             </select>
@@ -157,19 +157,19 @@
                                     <div class="studio-grid">
                                         <div class="studio-span-6"><Field Id="@($"reward-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_reward.Key" /></div>
                                         <div class="studio-span-6"><Field Id="@($"reward-name-{season.Id.Value:N}")" Label="Display name" @bind-Value="_reward.Name" /></div>
-                                        <div class="studio-span-6">
+                                        <div class="studio-span-6 space-y-2">
                                             <label class="label" for="@($"reward-kind-{season.Id.Value:N}")">Type</label>
-                                            <select id="@($"reward-kind-{season.Id.Value:N}")" class="input mt-1" @bind="_reward.Kind">
+                                            <select id="@($"reward-kind-{season.Id.Value:N}")" class="input progression-select" @bind="_reward.Kind">
                                                 <option value="@CommunityRewardKind.Title">Title</option>
                                                 <option value="@CommunityRewardKind.Badge">Badge icon</option>
                                                 <option value="@CommunityRewardKind.CosmeticAccent">Cosmetic accent</option>
                                             </select>
                                         </div>
-                                        <div class="studio-span-6">
+                                        <div class="studio-span-6 space-y-2">
                                             @if (TokenOptions(_reward.Kind) is { Count: > 0 } tokens)
                                             {
                                                 <label class="label" for="@($"reward-token-{season.Id.Value:N}")">Presentation token</label>
-                                                <select id="@($"reward-token-{season.Id.Value:N}")" class="input mt-1" @bind="_reward.PresentationToken">
+                                                <select id="@($"reward-token-{season.Id.Value:N}")" class="input progression-select" @bind="_reward.PresentationToken">
                                                     @foreach (var token in tokens)
                                                     {
                                                         <option value="@token">@token</option>
@@ -216,39 +216,39 @@
                                 <div class="studio-grid">
                                     <div class="studio-span-6"><Field Id="@($"definition-key-{season.Id.Value:N}")" Label="Stable key" @bind-Value="_definition.Key" /></div>
                                     <div class="studio-span-6"><Field Id="@($"definition-name-{season.Id.Value:N}")" Label="Name" @bind-Value="_definition.Name" /></div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-kind-{season.Id.Value:N}")">Kind</label>
-                                        <select id="@($"definition-kind-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Kind">
+                                        <select id="@($"definition-kind-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.Kind">
                                             <option value="@CommunityDefinitionKind.Quest">Quest</option>
                                             <option value="@CommunityDefinitionKind.Achievement">Achievement</option>
                                         </select>
                                     </div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-scope-{season.Id.Value:N}")">Progress owner</label>
-                                        <select id="@($"definition-scope-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Scope">
+                                        <select id="@($"definition-scope-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.Scope">
                                             <option value="@CommunityProgressScope.Viewer">Per viewer</option>
                                             <option value="@CommunityProgressScope.Communal">Channel-wide communal</option>
                                         </select>
                                     </div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-completion-{season.Id.Value:N}")">Completion</label>
-                                        <select id="@($"definition-completion-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Completion">
+                                        <select id="@($"definition-completion-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.Completion">
                                             <option value="@CommunityCompletionMode.OneTime">One-time</option>
                                             <option value="@CommunityCompletionMode.Repeatable">Repeatable</option>
                                         </select>
                                     </div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-rule-{season.Id.Value:N}")">Supported event</label>
-                                        <select id="@($"definition-rule-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.EventRule">
+                                        <select id="@($"definition-rule-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.EventRule">
                                             @foreach (var rule in _availableEventRules)
                                             {
                                                 <option value="@rule.Kind">@rule.Label</option>
                                             }
                                         </select>
                                     </div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-increment-{season.Id.Value:N}")">Increment</label>
-                                        <select id="@($"definition-increment-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.Increment">
+                                        <select id="@($"definition-increment-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.Increment">
                                             <option value="@CommunityProgressIncrement.Occurrence">One per event</option>
                                             <option value="@CommunityProgressIncrement.EventValue">Event value (bits/viewers)</option>
                                         </select>
@@ -257,18 +257,18 @@
                                     <div class="studio-span-4"><Field Id="@($"definition-target-{season.Id.Value:N}")" Label="Target" @bind-Value="_definition.Target" /></div>
                                     <div class="studio-span-4"><Field Id="@($"definition-points-{season.Id.Value:N}")" Label="Points reward" @bind-Value="_definition.PointsReward" /></div>
                                     <div class="studio-span-4"><Field Id="@($"definition-rewards-{season.Id.Value:N}")" Label="Reward keys (comma separated)" @bind-Value="_definition.RewardKeys" /></div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-cadence-{season.Id.Value:N}")">Reset cadence</label>
-                                        <select id="@($"definition-cadence-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.ResetCadence">
+                                        <select id="@($"definition-cadence-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.ResetCadence">
                                             <option value="@CommunityResetCadence.None">None</option>
                                             <option value="@CommunityResetCadence.Daily">Daily</option>
                                             <option value="@CommunityResetCadence.Weekly">Weekly</option>
                                         </select>
                                     </div>
                                     <div class="studio-span-4"><Field Id="@($"definition-reset-time-{season.Id.Value:N}")" Label="Local reset time (HH:mm)" @bind-Value="_definition.ResetLocalTime" /></div>
-                                    <div class="studio-span-4">
+                                    <div class="studio-span-4 space-y-2">
                                         <label class="label" for="@($"definition-weekday-{season.Id.Value:N}")">Weekly day</label>
-                                        <select id="@($"definition-weekday-{season.Id.Value:N}")" class="input mt-1" @bind="_definition.ResetWeekday">
+                                        <select id="@($"definition-weekday-{season.Id.Value:N}")" class="input progression-select" @bind="_definition.ResetWeekday">
                                             @foreach (var day in Enum.GetValues<DayOfWeek>())
                                             {
                                                 <option value="@day">@day</option>
@@ -332,21 +332,21 @@
                                                 <details class="progression-disclosure">
                                                     <summary class="progression-row__meta">Edit reset schedule<span class="progression-chevron" aria-hidden="true">›</span></summary>
                                                     <div class="studio-grid mt-3">
-                                                        <div class="studio-span-4">
+                                                        <div class="studio-span-4 space-y-2">
                                                             <label class="label" for="@($"schedule-cadence-{definition.Id.Value:N}")">Cadence</label>
-                                                            <select id="@($"schedule-cadence-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.Cadence">
+                                                            <select id="@($"schedule-cadence-{definition.Id.Value:N}")" class="input progression-select" @bind="edit.Cadence">
                                                                 <option value="@CommunityResetCadence.None">None</option>
                                                                 <option value="@CommunityResetCadence.Daily">Daily</option>
                                                                 <option value="@CommunityResetCadence.Weekly">Weekly</option>
                                                             </select>
                                                         </div>
-                                                        <div class="studio-span-4">
+                                                        <div class="studio-span-4 space-y-2">
                                                             <label class="label" for="@($"schedule-time-{definition.Id.Value:N}")">New local reset time</label>
-                                                            <input id="@($"schedule-time-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.LocalTime" />
+                                                            <input id="@($"schedule-time-{definition.Id.Value:N}")" class="input" @bind="edit.LocalTime" />
                                                         </div>
-                                                        <div class="studio-span-4">
+                                                        <div class="studio-span-4 space-y-2">
                                                             <label class="label" for="@($"schedule-weekday-{definition.Id.Value:N}")">Weekly day</label>
-                                                            <select id="@($"schedule-weekday-{definition.Id.Value:N}")" class="input mt-1" @bind="edit.Weekday">
+                                                            <select id="@($"schedule-weekday-{definition.Id.Value:N}")" class="input progression-select" @bind="edit.Weekday">
                                                                 @foreach (var day in Enum.GetValues<DayOfWeek>())
                                                                 {
                                                                     <option value="@day">@day</option>
@@ -356,7 +356,16 @@
                                                         <div class="studio-span-12">
                                                             <div class="progression-warning">
                                                                 <span>Saving closes the current period immediately and resets active repeatable progress. One audited rollover in @definition.TimeZoneId, and missed periods are never replayed.</span>
-                                                                <label><input type="checkbox" @bind="edit.Confirmed" /> I understand, reset active progress now</label>
+                                                                <span class="progression-confirm">
+                                                                    <span id="@($"schedule-confirm-label-{definition.Id.Value:N}")">I understand, reset active progress now</span>
+                                                                    <button id="@($"schedule-confirm-{definition.Id.Value:N}")"
+                                                                            type="button"
+                                                                            class="studio-toggle"
+                                                                            role="switch"
+                                                                            aria-checked="@(edit.Confirmed ? "true" : "false")"
+                                                                            aria-labelledby="@($"schedule-confirm-label-{definition.Id.Value:N}")"
+                                                                            @onclick="() => ToggleScheduleConfirmation(definition)"></button>
+                                                                </span>
                                                             </div>
                                                         </div>
                                                         <div class="studio-span-12">

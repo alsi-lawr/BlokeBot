@@ -232,6 +232,12 @@ public partial class CommunityProgressionPage
             }
         );
 
+    private void ToggleScheduleConfirmation(CommunityDefinitionView definition)
+    {
+        var edit = ScheduleFor(definition);
+        edit.Confirmed = !edit.Confirmed;
+    }
+
     private ScheduleEditDraft ScheduleFor(CommunityDefinitionView definition)
     {
         if (_scheduleEdits.TryGetValue(definition.Id.Value, out var value))
