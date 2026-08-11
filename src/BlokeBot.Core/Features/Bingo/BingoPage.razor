@@ -55,7 +55,7 @@
                         </p>
                         @if (_templates.Count > 0)
                         {
-                            <div>
+                            <div class="space-y-2">
                                 <p class="label">Saved templates</p>
                                 <div class="flex flex-wrap gap-2">
                                     @foreach (var template in _templates)
@@ -71,29 +71,39 @@
                         }
                         <div class="studio-grid">
                             <div class="studio-span-4"><Field Id="bingo-template-name" Label="Template name" @bind-Value="_template.Name" /></div>
-                            <div class="studio-span-4">
+                            <div class="studio-span-4 space-y-2">
                                 <label class="label" for="bingo-dimension">Grid</label>
-                                <select id="bingo-dimension" class="input" value="@_template.Dimension" @onchange="ChangeDimension">
+                                <select id="bingo-dimension" class="input w-auto max-w-full" value="@_template.Dimension" @onchange="ChangeDimension">
                                     <option value="3">3 × 3</option>
                                     <option value="4">4 × 4</option>
                                     <option value="5">5 × 5</option>
                                 </select>
                             </div>
-                            <div class="studio-span-4 flex items-end">
-                                <label class="flex min-h-11 items-center gap-2 font-semibold"><input type="checkbox" @bind="_template.FullCard" /> Award full-card wins</label>
+                            <div class="studio-span-4">
+                                <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
+                                <span class="studio-switch-row mt-2 flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)] max-md:mt-0">
+                                    <span id="bingo-full-card-label">Award full-card wins</span>
+                                    <button id="bingo-full-card"
+                                            type="button"
+                                            class="studio-toggle"
+                                            role="switch"
+                                            aria-checked="@(_template.FullCard ? "true" : "false")"
+                                            aria-labelledby="bingo-full-card-label"
+                                            @onclick="ToggleFullCard"></button>
+                                </span>
                             </div>
                             <div class="studio-span-4"><Field Id="bingo-line-points" Label="Points per row/line" @bind-Value="_template.LinePoints" /></div>
-                            <div class="studio-span-8">
+                            <div class="studio-span-8 space-y-2">
                                 <label class="label" for="bingo-line-achievement">Achievement/title per row/line</label>
-                                <select id="bingo-line-achievement" class="input" @bind="_template.LineAchievement">
+                                <select id="bingo-line-achievement" class="input w-auto max-w-full" @bind="_template.LineAchievement">
                                     <option value="">No achievement</option>
                                     @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
                                 </select>
                             </div>
                             <div class="studio-span-4"><Field Id="bingo-full-points" Label="Points for full card" @bind-Value="_template.FullPoints" /></div>
-                            <div class="studio-span-8">
+                            <div class="studio-span-8 space-y-2">
                                 <label class="label" for="bingo-full-achievement">Achievement/title for full card</label>
-                                <select id="bingo-full-achievement" class="input" @bind="_template.FullAchievement" disabled="@(!_template.FullCard)">
+                                <select id="bingo-full-achievement" class="input w-auto max-w-full" @bind="_template.FullAchievement" disabled="@(!_template.FullCard)">
                                     <option value="">No achievement</option>
                                     @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
                                 </select>
@@ -156,9 +166,9 @@
                                 </div>
                                 <Field Id="bingo-square-title" Label="Public title" @bind-Value="selected.Title" />
                                 <Field Id="bingo-square-key" Label="Stable square key" @bind-Value="selected.Key" />
-                                <div>
+                                <div class="space-y-2">
                                     <label class="label" for="bingo-square-kind">Typed source</label>
-                                    <select id="bingo-square-kind" class="input" @bind="selected.Kind">
+                                    <select id="bingo-square-kind" class="input w-auto max-w-full" @bind="selected.Kind">
                                         <option value="@BingoSquareKind.Manual">Moderator confirmation</option>
                                         <option value="@BingoSquareKind.IncomingRaid">Incoming raid</option>
                                         <option value="@BingoSquareKind.BountyCompleted">Bounty completed</option>
@@ -170,16 +180,16 @@
                                 </div>
                                 @if (selected.Kind is BingoSquareKind.IncomingRaid or BingoSquareKind.CounterReached)
                                 {
-                                    <div>
+                                    <div class="space-y-2">
                                         <label class="label" for="bingo-square-threshold">Minimum / target</label>
                                         <input id="bingo-square-threshold" class="input" type="number" min="1" @bind="selected.Threshold" />
                                     </div>
                                 }
                                 @if (selected.Kind == BingoSquareKind.CounterReached)
                                 {
-                                    <div>
+                                    <div class="space-y-2">
                                         <label class="label" for="bingo-square-counter">Saved counter</label>
-                                        <select id="bingo-square-counter" class="input" @bind="selected.CounterId">
+                                        <select id="bingo-square-counter" class="input w-auto max-w-full" @bind="selected.CounterId">
                                             <option value="0">Choose counter</option>
                                             @foreach (var counter in _counters) { <option value="@counter.Id">@counter.Name</option> }
                                         </select>
@@ -218,13 +228,13 @@
                     </Header>
                     <ChildContent>
                         <div class="studio-grid">
-                            <div class="studio-span-4">
+                            <div class="studio-span-4 space-y-2">
                                 <label class="label" for="bingo-game-template">Template revision</label>
-                                <select id="bingo-game-template" class="input" @bind="_game.TemplateId">
+                                <select id="bingo-game-template" class="input w-auto max-w-full" @bind="_game.TemplateId">
                                     @foreach (var template in _templates) { <option value="@template.Id.Value">@template.Name · rev @template.Revision</option> }
                                 </select>
                             </div>
-                            <div class="studio-span-4">
+                            <div class="studio-span-4 space-y-2">
                                 <p class="label">Card mode</p>
                                 <StudioSegmentedPill TValue="BingoGameMode"
                                                      AriaLabel="Card mode"
@@ -313,7 +323,7 @@
                             <p class="text-sm text-muted-foreground">Viewers join with <span class="font-mono">!bingojoin</span>@(game.Mode == BingoGameMode.Team ? " followed by a team name" : string.Empty). Owner and moderator changes remain available until cards are issued.</p>
                             @foreach (var roster in Rosters(game))
                             {
-                                <div @key="roster.Key">
+                                <div class="space-y-2" @key="roster.Key">
                                     <p class="label">@roster.Label</p>
                                     <div class="bingo-roster">
                                         @foreach (var participant in roster.Members)

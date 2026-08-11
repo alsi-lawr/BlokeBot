@@ -1,4 +1,12 @@
 @layer components {
+    /* Win, focus and selection rings are painted outside the cell border box. The scroll container
+       clips on both axes once overflow-x is auto, so the widest ring is reserved as real space
+       inside the scrolled grid rather than left to spill. */
+    .bingo-board,
+    .bingo-card__pair {
+        --bingo-ring-space: 4px;
+    }
+
     /* The card grid is driven by --bingo-dimension so a 3x3, 4x4 and 5x5 board share one rule.
        Cells stay square, so the board reads as a bingo card rather than a list of tiles. */
     .bingo-board {
@@ -17,7 +25,12 @@
         display: grid;
         gap: 0.45rem;
         grid-template-columns: repeat(var(--bingo-dimension), minmax(4.6rem, 1fr));
-        min-width: calc(var(--bingo-dimension) * 5.05rem);
+        min-width: calc((var(--bingo-dimension) * 5.05rem) + (var(--bingo-ring-space) * 2));
+        padding-inline: var(--bingo-ring-space);
+    }
+
+    .bingo-board__grid {
+        padding-block: var(--bingo-ring-space);
     }
 
     .bingo-board__letter {
@@ -142,16 +155,20 @@
         transform: translateX(-50%);
     }
 
+    /* Header, board and evidence log take the pair's own row tracks, so a card that carries a wins
+       line or an extra participant line cannot push its grid below its neighbour's. The card must
+       therefore emit those three children in that order and nothing else at top level. */
     .bingo-card {
-        align-content: start;
         background: var(--app-surface-solid);
         border: 1px solid var(--app-border);
         border-radius: 0.75rem;
         box-shadow: var(--app-shadow-sm);
         display: grid;
-        gap: 0.75rem;
+        grid-row: span 3;
+        grid-template-rows: subgrid;
         min-width: 0;
         padding: 1rem;
+        row-gap: 0.75rem;
     }
 
     .bingo-card__head {
@@ -188,8 +205,18 @@
         gap: 1.25rem;
         grid-template-columns: repeat(
             auto-fit,
-            minmax(min(100%, calc((var(--bingo-dimension, 4) * 5.05rem) + 2rem)), 1fr)
+            minmax(
+                min(
+                    100%,
+                    calc(
+                        (var(--bingo-dimension, 4) * 5.05rem) + 2rem +
+                            (var(--bingo-ring-space) * 2)
+                    )
+                ),
+                1fr
+            )
         );
+        grid-template-rows: repeat(3, auto);
     }
 
     /* Evidence lives under the card as a log, so cells never carry prose. */
