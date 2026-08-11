@@ -78,6 +78,7 @@ public partial class PageHelpButton
             "/bingo" => _bingoHelp,
             "/competitions" => _competitionsHelp,
             "/raid-collaboration" => _raidCollaborationHelp,
+            "/collectives" => _collectivesHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
             "/overlays" => fragment switch
@@ -401,6 +402,40 @@ public partial class PageHelpButton
                     "Approval is your allowlist, not a safety or reputation score.",
                     "Prepare raid opens an explicit confirmation. BlokeBot never starts a raid directly from a recommendation.",
                     "An optional approved clip is fetched through Twitch only when it belongs to that channel and is recent.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _collectivesHelp = new(
+        "Collectives",
+        [
+            _featureSwitchHelp,
+            new(
+                "Explicit hosts, not federation",
+                "A collective is a server-owned allowlist inside this BlokeBot installation. Twitch raids, follows, shared moderators, and channel relationships never create membership or trust.",
+                [
+                    "The creating host starts as the first coordinator. Invited hosts accept or decline only for themselves, and active hosts may leave only for themselves.",
+                    "A coordinator can invite known hosts, withdraw invitations, edit shared workflow definitions, and end bounded participation without changing another host's private configuration.",
+                    "At least one active coordinator is always retained; transfer coordination before the final coordinator leaves or is removed.",
+                ]
+            ),
+            new(
+                "Bounded workflows and private authority",
+                "Tournament references, raid relays, and cross-channel goals share explicit allowlisted projections rather than host-owned records.",
+                [
+                    "Tournament references are read-only projections of the owning member's competition. Private contact and lobby information stay local.",
+                    "Each raid-relay host controls only its own Twitch handoff. Shared state contains aggregate viewer count, never viewer identity.",
+                    "Shared goals expose target, current and per-host totals, deadline, and status. Contributor identities, rewards, notes, source mappings, provider access, and moderator data are never shared.",
+                ]
+            ),
+            new(
+                "Disable, retain, resume",
+                "While Collectives is off, navigation and public output disappear and membership, workflow, runtime, queued, provider, retry, reconciliation, subscription, command, catalog, and automation boundaries stop before work begins.",
+                [
+                    "Membership, configuration, bounded history, local settings, and audits remain stored.",
+                    "Re-enable resumes retained current state from a new watermark. Suppressed invitations, events, timers, retries, relays, reconciliation, and provider actions are never replayed.",
+                    "This workspace has no second switch; use the single Collectives switch in Channel setup.",
                 ]
             ),
         ]

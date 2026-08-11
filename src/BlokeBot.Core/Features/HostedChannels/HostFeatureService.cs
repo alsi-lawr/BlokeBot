@@ -232,6 +232,21 @@ public sealed class HostFeatureService(
             }
             host.BlokeRaidPausedAtUtc = null;
         }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.Collectives)
+            && !updated.Contains(HostFeatureFlags.Collectives)
+        )
+        {
+            host.CollectivesPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.Collectives)
+            && updated.Contains(HostFeatureFlags.Collectives)
+        )
+        {
+            host.CollectivesAcceptWorkAfterUtc = now;
+            host.CollectivesPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         foreach (var observer in featureObservers)

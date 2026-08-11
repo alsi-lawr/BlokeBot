@@ -10,6 +10,7 @@ using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.BlokeRaid;
 using BlokeBot.Core.Features.Bounties;
+using BlokeBot.Core.Features.Collectives;
 using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.CommunityProgression;
 using BlokeBot.Core.Features.Competitions;
@@ -132,6 +133,7 @@ public static class BlokeBotApplication
             .AddBlokeBotBingo()
             .AddBlokeBotBlokeRaid()
             .AddBlokeBotCompetitions()
+            .AddBlokeBotCollectives()
             .AddBlokeBotRequestBoards()
             .AddBlokeBotPlayWithViewers()
             .AddBlokeBotMoments()
@@ -164,6 +166,7 @@ public static class BlokeBotApplication
                 .AddCommandModule<BingoCommandModule>()
                 .AddCommandModule<BlokeRaidCommandModule>()
                 .AddCommandModule<CompetitionCommandModule>()
+                .AddCommandModule<CollectiveCommandModule>()
                 .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<PlayQueueCommandModule>()
                 .AddCommandModule<MomentCommandModule>()

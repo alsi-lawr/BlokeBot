@@ -38,6 +38,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.Bounties => $"{_featureIconBase} text-amber-700",
                 HostFeatureFlags.Competitions => $"{_featureIconBase} text-violet-700",
                 HostFeatureFlags.RaidCollaboration => $"{_featureIconBase} text-purple-700",
+                HostFeatureFlags.Collectives => $"{_featureIconBase} text-teal-700",
                 HostFeatureFlags.CommunityProgression => $"{_featureIconBase} text-fuchsia-700",
                 HostFeatureFlags.CooperativeGame => $"{_featureIconBase} text-rose-700",
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
@@ -92,6 +93,14 @@ public partial class HostConfigPage
                 HostFeatureFlags.RaidCollaboration => """
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 7h11M11 3l4 4-4 4M20 17H9M13 13l-4 4 4 4" />
+                </svg>
+                """,
+                HostFeatureFlags.Collectives => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <circle cx="5" cy="7" r="2" />
+                    <circle cx="19" cy="7" r="2" />
+                    <path d="M7 8.5 10 11M17 8.5 14 11M9.5 14.5 7 18M14.5 14.5 17 18" />
                 </svg>
                 """,
                 HostFeatureFlags.CommunityProgression => """
@@ -235,6 +244,10 @@ public partial class HostConfigPage
                 "Its hub and fresh EventSub processing are available again; suppressed work is not replayed.",
             HostFeatureFlags.RaidCollaboration =>
                 "Its hub, raid processing, welcome actions, and provider calls are paused while saved history and settings remain.",
+            HostFeatureFlags.Collectives when enabled =>
+                "Retained collectives resume from a new watermark; suppressed work is not replayed.",
+            HostFeatureFlags.Collectives =>
+                "Membership, workflows, shared output, events, and provider effects pause while retained data remains.",
             _ when enabled => "Its chat commands and pages are available again.",
             _ => "Its chat commands and pages are unavailable until you enable it again.",
         };
@@ -247,6 +260,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Bounties => "Bounties",
             HostFeatureFlags.Competitions => "Tournaments & leagues",
             HostFeatureFlags.RaidCollaboration => "Raid & collaboration",
+            HostFeatureFlags.Collectives => "Collectives",
             HostFeatureFlags.CommunityProgression => "Community progression",
             HostFeatureFlags.ViewerPassports => "Viewer passports",
             HostFeatureFlags.Bingo => "Bingo",

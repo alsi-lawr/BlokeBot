@@ -59,6 +59,8 @@ internal sealed class SimulationFixtureSeeder(
         await SeedBingoAsync(db, hostId, now, cancellationToken);
         await SeedCompetitionAsync(db, hostId, now, cancellationToken);
         await SeedRaidCollaborationAsync(db, hostId, now, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        await SeedCollectivesAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -2734,6 +2736,228 @@ internal sealed class SimulationFixtureSeeder(
             )
         );
     }
+
+    private static async Task SeedCollectivesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("3f78b947-a0f8-4872-ae3b-a876a27e58a0");
+        if (await db.Collectives.AnyAsync(value => value.PublicId == publicId, cancellationToken))
+        {
+            return;
+        }
+        var hosts = new[]
+        {
+            (Login: "cozyworkshop", DisplayName: "CosyWorkshop", TwitchId: "cozy-id"),
+            (Login: "maplepixel", DisplayName: "MaplePixel", TwitchId: "maple-id"),
+            (Login: "bytebard", DisplayName: "ByteBard", TwitchId: "byte-id"),
+        };
+        foreach (var seed in hosts)
+        {
+            if (!await db.Hosts.AnyAsync(value => value.Login == seed.Login, cancellationToken))
+            {
+                _ = db.Hosts.Add(
+                    new BotHost
+                    {
+                        Login = seed.Login,
+                        DisplayName = seed.DisplayName,
+                        TwitchUserId = seed.TwitchId,
+                        EnabledFeatures = HostFeatureFlags.All,
+                        TimeZoneId = "UTC",
+                        CreatedAtUtc = now.AddDays(-60),
+                    }
+                );
+            }
+        }
+        _ = await db.SaveChangesAsync(cancellationToken);
+        var hostMap = await db
+            .Hosts.Where(value =>
+                value.Id == hostId || hosts.Select(host => host.Login).Contains(value.Login)
+            )
+            .ToDictionaryAsync(value => value.Login, cancellationToken);
+        var sample = await db.Hosts.SingleAsync(value => value.Id == hostId, cancellationToken);
+        var cosy = hostMap["cozyworkshop"];
+        var maple = hostMap["maplepixel"];
+        var byteHost = hostMap["bytebard"];
+        var collective = new Collective
+        {
+            PublicId = publicId,
+            CreationOperationId = Guid.Parse("9f5e198b-a204-4e03-8a55-dd0fb63669d8"),
+            Name = "Cosy Circuit",
+            Revision = 14,
+            CreatedAtUtc = now.AddDays(-12),
+            UpdatedAtUtc = now.AddMinutes(-2),
+            Memberships =
+            [
+                Membership(
+                    sample.Id,
+                    CollectiveMembershipRole.Coordinator,
+                    CollectiveMembershipStatus.Active,
+                    now.AddDays(-12)
+                ),
+                Membership(
+                    cosy.Id,
+                    CollectiveMembershipRole.Participant,
+                    CollectiveMembershipStatus.Active,
+                    now.AddDays(-10)
+                ),
+                Membership(
+                    maple.Id,
+                    CollectiveMembershipRole.Participant,
+                    CollectiveMembershipStatus.Active,
+                    now.AddDays(-8)
+                ),
+                Membership(
+                    byteHost.Id,
+                    CollectiveMembershipRole.Participant,
+                    CollectiveMembershipStatus.Pending,
+                    now.AddDays(-1)
+                ),
+            ],
+            TournamentReference = new()
+            {
+                OwnerHostId = sample.Id,
+                CompetitionPublicId = Guid.Parse("f54fead3-1c88-4c65-b492-68d13bb19cad"),
+                Name = "Summer Community Circuit",
+                Format = CompetitionFormat.RoundRobin,
+                Status = CompetitionStatus.Running,
+                Round = 3,
+                EntrantCount = 6,
+                ConfirmedResultCount = 6,
+                Revision = 7,
+                LastSourceEventAtUtc = now.AddMinutes(-2),
+                UpdatedAtUtc = now.AddMinutes(-2),
+            },
+            RaidRelay = new()
+            {
+                Name = "Weekend makers relay",
+                CurrentHostId = cosy.Id,
+                AggregateViewerCount = 93,
+                Status = CollectiveWorkflowStatus.Pending,
+                Revision = 5,
+                LastSourceEventAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                Handoffs =
+                [
+                    new()
+                    {
+                        OperationId = "simulation-relay-arrival-7d31",
+                        FromHostId = sample.Id,
+                        ToHostId = cosy.Id,
+                        AggregateViewerCount = 93,
+                        Status = CollectiveRaidHandoffStatus.Confirmed,
+                        OccurredAtUtc = now.AddMinutes(-3),
+                        UpdatedAtUtc = now.AddMinutes(-3),
+                    },
+                ],
+            },
+            Goal = new()
+            {
+                Name = "Build 12 comfort kits",
+                UnitName = "kit",
+                Target = 12,
+                Current = 8,
+                DeadlineUtc = now.AddDays(33).AddHours(8),
+                Status = CollectiveWorkflowStatus.Active,
+                Revision = 9,
+                UpdatedAtUtc = now.AddMinutes(-2),
+                HostTotals =
+                [
+                    GoalTotal(sample.Id, "00000000-0000-4000-8000-000000000301", 3, now),
+                    GoalTotal(cosy.Id, "00000000-0000-4000-8000-000000000302", 3, now),
+                    GoalTotal(maple.Id, "00000000-0000-4000-8000-000000000303", 2, now),
+                ],
+            },
+            Audits =
+            [
+                Audit(
+                    "simulation-reference-7d31",
+                    CollectiveAuditAction.TournamentReferenceChanged,
+                    sample.Id,
+                    sample.Id,
+                    now.AddMinutes(-2)
+                ),
+                Audit(
+                    "simulation-invitation-98a4",
+                    CollectiveAuditAction.HostInvited,
+                    sample.Id,
+                    byteHost.Id,
+                    now.AddDays(-1)
+                ),
+                Audit(
+                    "simulation-created-4410",
+                    CollectiveAuditAction.Created,
+                    sample.Id,
+                    sample.Id,
+                    now.AddDays(-12)
+                ),
+            ],
+        };
+        _ = db.Collectives.Add(collective);
+        _ = db.CollectiveLocalSettings.Add(
+            new CollectiveLocalSetting
+            {
+                Collective = collective,
+                HostId = sample.Id,
+                Notification = CollectiveLocalNotification.Moderators,
+                Revision = 2,
+                UpdatedAtUtc = now.AddHours(-2),
+            }
+        );
+        _ = await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static CollectiveMembership Membership(
+        int hostId,
+        CollectiveMembershipRole role,
+        CollectiveMembershipStatus status,
+        DateTime occurredAtUtc
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            Role = role,
+            Status = status,
+            AcceptWorkAfterUtc = occurredAtUtc,
+            InvitedAtUtc = occurredAtUtc,
+            RespondedAtUtc = status == CollectiveMembershipStatus.Pending ? null : occurredAtUtc,
+            UpdatedAtUtc = occurredAtUtc,
+        };
+
+    private static CollectiveGoalHostTotal GoalTotal(
+        int hostId,
+        string bountyPublicId,
+        long total,
+        DateTime now
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            SourceBountyPublicId = Guid.Parse(bountyPublicId),
+            Total = total,
+            LastSourceEventAtUtc = now.AddMinutes(-2),
+        };
+
+    private static CollectiveAudit Audit(
+        string operationId,
+        CollectiveAuditAction action,
+        int actingHostId,
+        int affectedHostId,
+        DateTime occurredAtUtc
+    ) =>
+        new()
+        {
+            OperationId = operationId,
+            Action = action,
+            ActingHostId = actingHostId,
+            AffectedHostId = affectedHostId,
+            ActorTwitchUserId = SimulationMode.UserId,
+            ActorLogin = SimulationMode.Login,
+            OccurredAtUtc = occurredAtUtc,
+        };
 
     private static RaidCollaborationHistoryEntry History(
         int hostId,

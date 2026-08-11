@@ -71,6 +71,9 @@ public sealed class HostFeatureTests
                     feature != HostFeatureFlags.Automations
                 )
             );
+        ((ulong)HostFeatureFlags.RaidCollaboration).ShouldBe(1UL << 18);
+        ((ulong)HostFeatureFlags.CooperativeGame).ShouldBe(1UL << 19);
+        ((ulong)HostFeatureFlags.Collectives).ShouldBe(1UL << 20);
     }
 
     [Test]

@@ -25,6 +25,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.Bingo,
         HostFeatureFlags.Competitions,
         HostFeatureFlags.RaidCollaboration,
+        HostFeatureFlags.Collectives,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -137,6 +138,12 @@ public static class HostFeatureCatalog
                 "Raid & collaboration",
                 "Welcome incoming raids and choose approved live channels with explainable filters.",
                 enabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
+            ),
+            new(
+                HostFeatureFlags.Collectives,
+                "Collectives",
+                "Coordinate bounded tournament, raid relay, and goal state across explicitly invited hosts.",
+                enabledFeatures.Contains(HostFeatureFlags.Collectives)
             ),
             new(
                 HostFeatureFlags.CustomCommands,
