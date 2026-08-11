@@ -1,10 +1,8 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components.Layout;
-using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
-using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.Competitions;
 
@@ -39,30 +37,6 @@ public partial class CompetitionsPage
         new("entrants", "Entrants"),
         new("settings", "Settings & history"),
     ];
-    private IReadOnlyList<StudioRailGroup> _railGroups =>
-        [
-            new(
-                "Competitions",
-                [
-                    .. _competitions.Select(item => new StudioRailItem
-                    {
-                        Key = item.Competition.Id.Value.ToString("N"),
-                        Label = item.Competition.Name,
-                        Sub =
-                            $"{item.Competition.Status.Label()} · {item.Competition.Format.Label()}",
-                        On = item.Competition.Status is not CompetitionStatus.Archived,
-                        Selected = !_isCreating && item.Competition.Id == _selectedCompetitionId,
-                        ControlsId = "competition-workspace-inspector",
-                        Action = "select-competition",
-                        Select = EventCallback.Factory.Create(
-                            this,
-                            () => SelectCompetition(item.Competition.Id)
-                        ),
-                    }),
-                ],
-                "No competitions saved."
-            ),
-        ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -317,6 +291,15 @@ public partial class CompetitionsPage
 
     private static int TotalRounds(CompetitionView competition) =>
         competition.Matches.Select(x => x.Round).DefaultIfEmpty(0).Max();
+
+    private static string StatusPillClass(CompetitionStatus status) =>
+        status switch
+        {
+            CompetitionStatus.Running => "status-pill status-pill--green",
+            CompetitionStatus.Registration => "status-pill status-pill--blue",
+            CompetitionStatus.Completed => "status-pill status-pill--violet",
+            _ => "status-pill status-pill--slate",
+        };
 
     private void AddMilestoneReward()
     {

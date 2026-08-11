@@ -14,12 +14,14 @@
 <DashboardPage Kicker="Community progression"
                Title="Tournaments &amp; leagues"
                Description="Run reproducible brackets, round-robin leagues, and prediction competitions without a spreadsheet."
-               Width="DashboardPageWidth.Wide">
+               Width="DashboardPageWidth.Wide"
+               data-competition-page="true">
     <Actions>
         @if (_featureEnabled && Host is not null)
         {
-            <a class="btn-secondary" href="@_publicUrl" target="_blank" rel="noopener">Open public results</a>
-            <button class="btn-primary" type="button" data-action="new-competition" disabled="@_isCreating" @onclick="NewCompetition">New competition</button>
+            <div class="competition-page-actions">
+                <button class="btn-primary" type="button" data-action="new-competition" disabled="@_isCreating" @onclick="NewCompetition">New competition</button>
+            </div>
         }
     </Actions>
     <ChildContent>
@@ -47,26 +49,53 @@
                 var summary = selectedSummary.Competition;
                 <div class="live-round-summary competition-summary" aria-label="Competition summary">
                     <div class="live-round-summary__metric live-round-summary__metric--wide"><p class="live-round-summary__label">Competition</p><p class="live-round-summary__value">@summary.Name</p></div>
-                    <div class="live-round-summary__metric"><p class="live-round-summary__label">Status</p><p class="live-round-summary__value"><span class="status-pill status-pill--slate"><span class="status-pill__label">@summary.Status.Label()</span></span></p></div>
+                    <div class="live-round-summary__metric"><p class="live-round-summary__label">Status</p><p class="live-round-summary__value"><span class="@StatusPillClass(summary.Status)"><span class="status-pill__dot" aria-hidden="true"></span><span class="status-pill__label">@summary.Status.Label()</span></span></p></div>
                     <div class="live-round-summary__metric"><p class="live-round-summary__label">Format</p><p class="live-round-summary__value">@summary.Format.Label()</p><p class="live-round-summary__detail">@summary.EntryKind.Label() · @summary.Entrants.Count / @summary.Capacity entrants</p></div>
                     <div class="live-round-summary__metric"><p class="live-round-summary__label">Round</p><p class="live-round-summary__value">@(TotalRounds(summary) == 0 ? "Not generated" : $"{CurrentRound(summary)} of {TotalRounds(summary)}")</p><p class="live-round-summary__detail">@summary.Matches.Count(x => x.Status == CompetitionMatchStatus.Confirmed) confirmed</p></div>
                 </div>
             }
 
-            <section class="studio competition-studio" aria-label="Competition studio" data-competition-workspace>
+            <section class="studio competition-studio @(_isCreating ? "competition-studio--creating" : null)" aria-label="Competition studio" data-competition-workspace>
                 <div class="competition-rail">
-                    <StudioRail AriaLabel="Saved competitions" SearchPlaceholder="Search" Groups="_railGroups">
-                        <Footer>
-                            <button class="btn-secondary w-full" type="button" data-action="rail-new-competition" disabled="@_isCreating" @onclick="NewCompetition">+ New competition</button>
-                        </Footer>
-                    </StudioRail>
+                    <header class="competition-rail__header">
+                        <h2>Competitions</h2>
+                        <button class="btn-secondary competition-rail__add" type="button" data-action="rail-new-competition" aria-label="New competition" disabled="@_isCreating" @onclick="NewCompetition">+</button>
+                    </header>
+                    <div class="competition-rail__list" aria-label="Saved competitions">
+                        @if (_competitions.Count == 0)
+                        {
+                            <p class="competition-rail__empty">No competitions saved.</p>
+                        }
+                        @foreach (var item in _competitions)
+                        {
+                            <button @key="item.Competition.Id"
+                                    type="button"
+                                    class="competition-rail__item @(!_isCreating && item.Competition.Id == _selectedCompetitionId ? "competition-rail__item--selected" : null)"
+                                    data-action="select-competition"
+                                    aria-current="@(!_isCreating && item.Competition.Id == _selectedCompetitionId ? "true" : "false")"
+                                    aria-controls="competition-workspace-inspector"
+                                    @onclick="() => SelectCompetition(item.Competition.Id)">
+                                <strong>@item.Competition.Name</strong>
+                                <span>@item.Competition.Status.Label() · @item.Competition.Format.Label()</span>
+                            </button>
+                        }
+                    </div>
+                    <div class="competition-rail__footer">
+                        <a class="competition-quiet-link" href="@_publicUrl" target="_blank" rel="noopener">Open public results</a>
+                        @if (!_isCreating && _selected is { } railSelection)
+                        {
+                            var competition = railSelection.Competition;
+                            <div class="competition-lifecycle-actions" aria-label="Competition lifecycle">
+                                @if (competition.Status == CompetitionStatus.Draft) { <button class="btn-secondary" type="button" data-action="open-registration" @onclick='() => TransitionAsync(competition, "open")'>Open registration</button> }
+                                @if (competition.Status == CompetitionStatus.Registration) { <button class="btn-secondary" type="button" data-action="start-competition" @onclick='() => TransitionAsync(competition, "start")'>Generate &amp; start</button> }
+                                @if (competition.Status == CompetitionStatus.Running) { <button class="btn-secondary" type="button" data-action="complete-competition" @onclick='() => TransitionAsync(competition, "complete")'>Complete competition</button> }
+                                @if (competition.Status == CompetitionStatus.Completed) { <button class="btn-secondary" type="button" data-action="archive-competition" @onclick='() => TransitionAsync(competition, "archive")'>Archive competition</button> }
+                            </div>
+                        }
+                    </div>
                 </div>
 
                 <div id="competition-workspace-inspector" class="studio__inspector competition-inspector">
-                    @if (_competitions.Count > 0)
-                    {
-                        <div class="competition-mobile-selector"><label class="label" for="competition-mobile-select">Competition</label><select id="competition-mobile-select" class="input" value="@(_isCreating ? string.Empty : _selectedCompetitionId?.Value.ToString())" @onchange="args => SelectMobileCompetition(args.Value?.ToString())"><option value="">New competition</option>@foreach (var option in _competitions){<option value="@option.Competition.Id.Value">@option.Competition.Name · @option.Competition.Status.Label()</option>}</select></div>
-                    }
                     @if (_isCreating)
                     {
                         <header class="competition-inspector__header">
@@ -109,15 +138,6 @@
                     else if (_selected is { } selected)
                     {
                         var competition = selected.Competition;
-                        <header class="competition-inspector__header">
-                            <div><div class="flex flex-wrap items-center gap-2"><h2 class="studio__title">@competition.Name</h2><span class="status-pill status-pill--slate"><span class="status-pill__label">@competition.Status.Label()</span></span></div><p class="studio__subtitle">@competition.Format.Label() · revision @competition.Revision</p></div>
-                            <div class="competition-inspector__actions">
-                                @if (competition.Status == CompetitionStatus.Draft) { <button class="btn-primary" type="button" data-action="open-registration" @onclick='() => TransitionAsync(competition, "open")'>Open registration</button> }
-                                @if (competition.Status == CompetitionStatus.Registration) { <button class="btn-primary" type="button" data-action="start-competition" @onclick='() => TransitionAsync(competition, "start")'>Generate &amp; start</button> }
-                                @if (competition.Status == CompetitionStatus.Running) { <button class="btn-primary" type="button" data-action="complete-competition" @onclick='() => TransitionAsync(competition, "complete")'>Complete</button> }
-                                @if (competition.Status == CompetitionStatus.Completed) { <button class="btn-primary" type="button" data-action="archive-competition" @onclick='() => TransitionAsync(competition, "archive")'>Archive</button> }
-                            </div>
-                        </header>
                         <div class="competition-tabs"><SegmentedTabs Id="competition-tabs" AriaLabel="Competition workspace" Items="_tabs" ActiveKey="_activeTab" ActiveKeyChanged="@(key => _activeTab = key)" /></div>
                         <div id="@SegmentedTabs.PanelId("competition-tabs", _activeTab)" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId("competition-tabs", _activeTab)" class="competition-inspector__body">
                             @if (_activeTab == "standings")
@@ -125,7 +145,11 @@
                                 <div class="data-table-region" tabindex="0"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-muted-foreground"><th class="p-2">#</th><th class="p-2">Entrant</th><th class="p-2">Played</th><th class="p-2">W–D–L</th><th class="p-2">Score</th><th class="p-2">Points</th></tr></thead><tbody>@foreach (var row in competition.Standings){<tr class="border-t"><td class="p-2">@row.Rank</td><td class="p-2 font-semibold text-[var(--app-text-strong)]">@row.Name</td><td class="p-2">@row.Played</td><td class="p-2">@row.Wins–@row.Draws–@row.Losses</td><td class="p-2">@row.ScoreFor–@row.ScoreAgainst</td><td class="p-2 font-semibold">@row.Points</td></tr>}</tbody></table></div>
                                 @if (competition.Matches.LastOrDefault(x => x.Status == CompetitionMatchStatus.Confirmed) is { } latest)
                                 {
-                                    <div class="competition-latest-result"><span>Latest result · Round @latest.Round</span><strong>@latest.EntrantA @latest.ScoreA–@latest.ScoreB @latest.EntrantB</strong></div>
+                                    <div class="competition-latest-result">
+                                        <div class="competition-latest-result__meta"><span>Latest result · Round @latest.Round</span><span>✓ Confirmed</span></div>
+                                        <div class="competition-latest-result__pair"><strong>@latest.EntrantA</strong><strong>@latest.ScoreA</strong></div>
+                                        <div class="competition-latest-result__pair"><strong>@latest.EntrantB</strong><strong>@latest.ScoreB</strong></div>
+                                    </div>
                                 }
                             }
                             else if (_activeTab == "schedule")
@@ -158,7 +182,7 @@
                 {
                     var competition = resultOwner.Competition;
                     <aside class="competition-result-panel @(_activeTab == "schedule" ? "competition-result-panel--mobile-visible" : null)" aria-label="Contextual result entry">
-                        <header><div><p class="live-round-summary__label">Result entry</p><h2>@(_selectedMatch is { } chosen ? $"Round {chosen.Round}" : "No playable match")</h2></div></header>
+                        <header><h2>Enter result</h2>@if (_selectedMatch is { } chosen) { <span class="status-pill status-pill--green"><span class="status-pill__label">Round @chosen.Round</span></span> }</header>
                         <div class="competition-result-panel__body">
                             @if (competition.Status == CompetitionStatus.Running && _selectedMatch is { } match)
                             {
@@ -178,6 +202,32 @@
                         </div>
                     </aside>
                 }
+
+                <div class="competition-mobile-management">
+                    <details>
+                        <summary>Competition controls</summary>
+                        <div class="competition-mobile-management__body">
+                            @if (_competitions.Count > 0)
+                            {
+                                <div><label class="label" for="competition-mobile-select">Competition</label><select id="competition-mobile-select" class="input" value="@(_isCreating ? string.Empty : _selectedCompetitionId?.Value.ToString())" @onchange="args => SelectMobileCompetition(args.Value?.ToString())"><option value="">New competition</option>@foreach (var option in _competitions){<option value="@option.Competition.Id.Value">@option.Competition.Name · @option.Competition.Status.Label()</option>}</select></div>
+                            }
+                            <div class="competition-mobile-management__links">
+                                <button class="btn-secondary" type="button" data-action="mobile-new-competition" disabled="@_isCreating" @onclick="NewCompetition">New competition</button>
+                                <a class="btn-secondary" href="@_publicUrl" target="_blank" rel="noopener">Open public results</a>
+                            </div>
+                            @if (!_isCreating && _selected is { } mobileSelection)
+                            {
+                                var competition = mobileSelection.Competition;
+                                <div class="competition-lifecycle-actions" aria-label="Competition lifecycle">
+                                    @if (competition.Status == CompetitionStatus.Draft) { <button class="btn-secondary" type="button" data-action="mobile-open-registration" @onclick='() => TransitionAsync(competition, "open")'>Open registration</button> }
+                                    @if (competition.Status == CompetitionStatus.Registration) { <button class="btn-secondary" type="button" data-action="mobile-start-competition" @onclick='() => TransitionAsync(competition, "start")'>Generate &amp; start</button> }
+                                    @if (competition.Status == CompetitionStatus.Running) { <button class="btn-secondary" type="button" data-action="mobile-complete-competition" @onclick='() => TransitionAsync(competition, "complete")'>Complete competition</button> }
+                                    @if (competition.Status == CompetitionStatus.Completed) { <button class="btn-secondary" type="button" data-action="mobile-archive-competition" @onclick='() => TransitionAsync(competition, "archive")'>Archive competition</button> }
+                                </div>
+                            }
+                        </div>
+                    </details>
+                </div>
             </section>
         }
     </ChildContent>
