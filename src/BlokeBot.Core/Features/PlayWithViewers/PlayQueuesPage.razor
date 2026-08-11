@@ -74,7 +74,7 @@
                             aria-label="Queue open"
                             @onclick="() => _draft.IsOpen = !_draft.IsOpen"></button>
                     <StickySaveRegion Scope="StickySaveScope.Editor" Active="@(!_isCreating)">
-                        <button class="btn-primary" type="button" @onclick="SaveAsync">Save queue</button>
+                        <button class="btn-primary" type="button" @onclick="SaveAsync">@(_isCreating ? "Create queue" : "Save queue")</button>
                     </StickySaveRegion>
                 </header>
 
@@ -82,7 +82,7 @@
                     @if (_isCreating)
                     {
                         <p id="queue-create-guidance" class="text-sm text-muted-foreground">
-                            Complete the queue details, then select Save queue to create it. The viewer-page link is available after Save.
+                            Complete the queue details, then select Create queue. The viewer-page link is available after creation.
                         </p>
                     }
                     @if (!string.IsNullOrWhiteSpace(_feedback))
@@ -178,7 +178,7 @@
                                                                 Bare
                                                                 Label="Priority & private note"
                                                                 Open="@_openEntryFolds.IsOpen(entry.EntryId)"
-                                                                OpenChanged="@(open => SetEntryEditorOpen(entry.EntryId, open))">
+                                                                OpenChanged="@(open => _openEntryFolds.Set(entry.EntryId, open))">
                                                         <div class="studio-grid">
                                                             <div class="studio-span-4">
                                                                 <Field Id="@($"queue-priority-{entry.EntryId}")" Label="Priority (-1000 to 1000)" @bind-Value="entryDraft.Priority" />
@@ -190,8 +190,7 @@
                                                                        @bind-Value="entryDraft.PrivateNote" />
                                                             </div>
                                                             <div class="studio-span-12">
-                                                                <StickySaveRegion Scope="StickySaveScope.Editor"
-                                                                                  Active="@(_activeEntryEditorId == entry.EntryId)">
+                                                                <StickySaveRegion Scope="StickySaveScope.Editor">
                                                                     <button class="btn-secondary" type="button" @onclick="() => SaveEntryAsync(entry.EntryId)">Save viewer</button>
                                                                 </StickySaveRegion>
                                                             </div>

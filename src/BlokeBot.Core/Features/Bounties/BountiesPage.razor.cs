@@ -13,7 +13,6 @@ public partial class BountiesPage
     private readonly Dictionary<Guid, string> _reasons = [];
     private readonly Dictionary<Guid, string> _extensions = [];
     private readonly HashSet<Guid> _openExtensions = [];
-    private Guid? _activeExtensionId;
     private BountyDraft _draft = new();
     private BountyBoardFilter _boardFilter = BountyBoardFilter.Active;
     private bool _draftOpen;
@@ -218,11 +217,6 @@ public partial class BountiesPage
         if (!_openExtensions.Remove(id))
         {
             _ = _openExtensions.Add(id);
-            _activeExtensionId = id;
-        }
-        else if (_activeExtensionId == id)
-        {
-            _activeExtensionId = null;
         }
     }
 

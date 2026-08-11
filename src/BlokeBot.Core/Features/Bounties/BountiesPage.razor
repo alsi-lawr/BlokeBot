@@ -254,8 +254,7 @@
                                         </div>
                                         <div class="studio-span-8">
                                             <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
-                                            <StickySaveRegion Scope="StickySaveScope.Editor"
-                                                              Active="@(_activeExtensionId == bounty.PublicId)">
+                                            <StickySaveRegion Scope="StickySaveScope.Editor">
                                                 <button class="btn-secondary mt-2 max-md:mt-0" type="button" @onclick="() => ExtendAsync(bounty)">Save new expiry</button>
                                             </StickySaveRegion>
                                         </div>

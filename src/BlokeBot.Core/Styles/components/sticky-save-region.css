@@ -114,12 +114,19 @@
             min-height: 4.75rem;
         }
 
-        .sticky-save-region[data-save-active="true"][data-save-visible="true"]
+        .sticky-save-region:not([data-save-scope="modal"])[data-save-active="true"][data-save-visible="true"]
             .sticky-save-region__surface {
             bottom: max(0.5rem, var(--app-save-safe-area-inset));
-            left: 0.5rem;
+            left: auto;
             max-width: calc(100vw - 1rem);
             right: 0.5rem;
+            width: max-content;
+        }
+
+        .sticky-save-region:not([data-save-scope="modal"])[data-save-has-feedback="true"][data-save-active="true"][data-save-visible="true"]
+            .sticky-save-region__surface {
+            left: 0.5rem;
+            width: auto;
         }
 
         .sticky-save-region__feedback {

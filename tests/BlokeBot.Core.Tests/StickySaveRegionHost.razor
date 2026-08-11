@@ -1,17 +1,20 @@
 @using BlokeBot.Core.Components.Layout
 
 <div data-sticky-save-scope>
-    <StickySaveRegion Scope="StickySaveScope.Editor" Active="@(ActiveEditor == 1)">
+    <StickySaveRegion Scope="StickySaveScope.Editor" Active="@FirstActive">
         <button type="button" data-editor="1" disabled="@Disabled">Action</button>
     </StickySaveRegion>
-    <StickySaveRegion Scope="StickySaveScope.Editor" Active="@(ActiveEditor == 2)">
+    <StickySaveRegion Scope="StickySaveScope.Editor" Active="@SecondActive">
         <button type="button" data-editor="2" disabled="@Disabled">Action</button>
     </StickySaveRegion>
 </div>
 
 @code {
     [Parameter]
-    public int ActiveEditor { get; set; }
+    public bool FirstActive { get; set; } = true;
+
+    [Parameter]
+    public bool SecondActive { get; set; } = true;
 
     [Parameter]
     public bool Disabled { get; set; }

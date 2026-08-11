@@ -62,12 +62,12 @@ device_scale = 1.0
 width = 390
 height = 844
 
-[devices.desktop-light-disabled-save]
+[devices.desktop-light-disabled-community-save]
 mobile = false
 touch = false
 device_scale = 1.0
 
-[devices.desktop-light-disabled-save.viewport]
+[devices.desktop-light-disabled-community-save.viewport]
 width = 1440
 height = 900
 
@@ -123,10 +123,10 @@ local captures = {
     view = "modal-save",
     login = "guessing-settings",
   },
-  ["desktop-light-disabled-save"] = {
+  ["desktop-light-disabled-community-save"] = {
     theme = "light",
-    view = "disabled-save",
-    login = "custom-commands",
+    view = "disabled-community-save",
+    login = "community",
   },
 }
 
@@ -178,8 +178,10 @@ local function assert_active_geometry(minimum_target)
         const regions = [...document.querySelectorAll(
           ".sticky-save-region[data-save-active='true'][data-save-visible='true']"
         )];
-        if (regions.length === 0) throw new Error("No active visible Save region");
-        const region = regions.at(-1);
+        if (regions.length !== 1) {
+          throw new Error(`Expected one visible Save owner, got ${regions.length}`);
+        }
+        const region = regions[0];
         const surface = region.querySelector(".sticky-save-region__surface");
         const button = region.querySelector("button, .btn-primary, .btn-secondary");
         const surfaceRect = surface.getBoundingClientRect();
@@ -203,6 +205,16 @@ local function assert_active_geometry(minimum_target)
         if (buttonRect.height + 0.5 < %d) {
           throw new Error(
             `Save target is too short: ${buttonRect.height}; min-height ${getComputedStyle(button).minHeight}`
+          );
+        }
+        if (
+          innerWidth <= 480 &&
+          !modal &&
+          region.dataset.saveHasFeedback === "false" &&
+          surfaceRect.width > buttonRect.width + 20
+        ) {
+          throw new Error(
+            `No-feedback mobile surface is not compact: ${surfaceRect.width}/${buttonRect.width}`
           );
         }
         if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) {
@@ -265,28 +277,49 @@ local function prepare_repeated(theme)
         button.textContent.includes("Priority & private note")
       );
       if (folds.length < 2) throw new Error("Two repeated editors were not found");
+      folds[0].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       folds[0].click();
+      folds[1].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       folds[1].click();
       return true;
     })()
   ]=])
   viset.page.evaluate(open_two)
   viset.page.wait_for(
-    "document.querySelectorAll(\".sticky-save-region[data-save-active='true']\").length === 2",
+    "document.querySelectorAll(\".sticky-save-region[data-save-active='true']\").length >= 3",
+    "10s"
+  )
+  viset.page.wait_for(
+    "document.querySelectorAll(\".sticky-save-region[data-save-visible='true']\").length === 1",
     "10s"
   )
   viset.page.evaluate(viset.javascript([=[
     (() => {
-      const activeEditors = [...document.querySelectorAll("[data-waiting-row]")].filter(row =>
+      const rows = [...document.querySelectorAll("[data-waiting-row]")];
+      const activeEditors = rows.filter(row =>
         row.querySelector(".sticky-save-region[data-save-active='true']")
       );
-      if (activeEditors.length !== 1) {
-        throw new Error(`Expected one active repeated editor, got ${activeEditors.length}`);
+      if (activeEditors.length < 2) {
+        throw new Error(`Expected two enrolled repeated editors, got ${activeEditors.length}`);
       }
-      activeEditors[0].scrollIntoView({ block: "center" });
+      activeEditors[1].scrollIntoView({ block: "center" });
+      activeEditors[1].querySelector("input")?.focus({ preventScroll: true });
       return true;
     })()
   ]=]))
+  viset.page.wait_for(
+    viset.javascript([=[
+      (() => {
+        const activeEditors = [...document.querySelectorAll("[data-waiting-row]")].filter(row =>
+          row.querySelector(".sticky-save-region[data-save-active='true']")
+        );
+        return activeEditors.length >= 2 &&
+          activeEditors[1].querySelector(".sticky-save-region").dataset.saveVisible === "true" &&
+          document.querySelectorAll(".sticky-save-region[data-save-visible='true']").length === 1;
+      })()
+    ]=]),
+    "10s"
+  )
 end
 
 local function prepare_dynamic_save()
@@ -317,6 +350,49 @@ local function prepare_dynamic_save()
       return true;
     })()
   ]=]))
+  viset.page.wait_for(
+    "document.querySelector(\"[data-stage='reward-editor'] .sticky-save-region\").dataset.saveVisible === 'true'",
+    "10s"
+  )
+end
+
+local function prepare_disabled_community()
+  viset.page.evaluate(viset.javascript([=[
+    (() => {
+      const disclosures = [...document.querySelectorAll(
+        "details.progression-disclosure[data-sticky-save-scope]"
+      )];
+      if (disclosures.length < 2) {
+        throw new Error(`Two schedule disclosures were not found: ${disclosures.length}`);
+      }
+      for (const disclosure of disclosures.slice(0, 2)) {
+        const summary = disclosure.querySelector("summary");
+        summary.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        summary.click();
+      }
+      disclosures[1].scrollIntoView({ block: "center" });
+      return true;
+    })()
+  ]=]))
+  viset.page.wait_for(
+    viset.javascript([=[
+      (() => {
+        const disclosures = [...document.querySelectorAll(
+          "details.progression-disclosure[data-sticky-save-scope][open]"
+        )];
+        const regions = disclosures.map(disclosure =>
+          disclosure.querySelector(".sticky-save-region")
+        );
+        return regions.length >= 2 &&
+          regions.every(region =>
+            region.dataset.saveActive === "true" && region.querySelector("button").disabled
+          ) &&
+          regions[1].dataset.saveVisible === "true" &&
+          document.querySelectorAll(".sticky-save-region[data-save-visible='true']").length === 1;
+      })()
+    ]=]),
+    "10s"
+  )
 end
 
 local function prepare_modal()
@@ -380,28 +456,38 @@ local succeeded, failure = pcall(function()
       "[...document.querySelectorAll('button')].some(button => button.textContent.includes('Create reward'))",
       "10s"
     )
+    viset.page.wait_for(
+      "!document.querySelector(\"[data-stage='reward-editor'] .studio-stage__body\").hasAttribute('inert')",
+      "10s"
+    )
+    viset.page.wait_for(
+      "document.querySelector(\"[data-stage='reward-editor'] .sticky-save-region button\").getBoundingClientRect().height > 0",
+      "10s"
+    )
     viset.page.evaluate(viset.javascript([=[
       (() => {
         const region = document.querySelector("[data-stage='reward-editor'] .sticky-save-region");
         if (region.dataset.saveActive !== "false") throw new Error("Create enrolled as Save");
-        region.scrollIntoView({ block: "end" });
-        window.scrollBy(0, 80);
+        region.scrollIntoView({ block: "center" });
         return true;
       })()
     ]=]))
+    viset.page.wait_for(
+      viset.javascript([=[
+        (() => {
+          const button = document.querySelector("[data-stage='reward-editor'] .sticky-save-region button");
+          const rect = button.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.bottom <= innerHeight;
+        })()
+      ]=]),
+      "10s"
+    )
   elseif view == "dynamic-save" then
     prepare_dynamic_save()
   elseif view == "modal-save" then
     prepare_modal()
-  elseif view == "disabled-save" then
-    viset.page.evaluate(viset.javascript([=[
-      (() => {
-        const button = document.querySelector("[aria-label='Save custom commands']");
-        if (!button.disabled) throw new Error("Expected stable disabled Save state");
-        window.scrollBy(0, 500);
-        return true;
-      })()
-    ]=]))
+  elseif view == "disabled-community-save" then
+    prepare_disabled_community()
   end
 
   viset.sleep("350ms")

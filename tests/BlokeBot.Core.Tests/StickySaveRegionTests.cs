@@ -51,32 +51,29 @@ public sealed class StickySaveRegionTests
         );
 
         region.Find("[data-save-feedback]").GetAttribute("role").ShouldBe(expectedRole);
+        region.Find(".sticky-save-region").GetAttribute("data-save-has-feedback").ShouldBe("true");
     }
 
     [Test]
-    public void EnrollmentChanges_PreserveOneDisabledAction()
+    public void ArbitrationEnrollment_PreservesEveryDisabledAction()
     {
         using var context = CreateContext();
         var host = context.Render<StickySaveRegionHost>(parameters =>
-            parameters
-                .Add(component => component.ActiveEditor, 1)
-                .Add(component => component.Disabled, true)
+            parameters.Add(component => component.Disabled, true)
         );
 
-        host.FindAll("[data-save-active='true']").Count.ShouldBe(1);
-        host.FindAll("button").Count.ShouldBe(2);
-        host.FindAll("button:disabled").Count.ShouldBe(2);
+        _ = host.Find("[data-save-active='true'] [data-editor='1']:disabled").ShouldNotBeNull();
+        _ = host.Find("[data-save-active='true'] [data-editor='2']:disabled").ShouldNotBeNull();
 
         host.Render(parameters =>
             parameters
-                .Add(component => component.ActiveEditor, 2)
+                .Add(component => component.FirstActive, false)
+                .Add(component => component.SecondActive, true)
                 .Add(component => component.Disabled, true)
         );
 
-        host.FindAll("[data-save-active='true']").Count.ShouldBe(1);
-        host.Find("[data-save-active='true'] button").GetAttribute("data-editor").ShouldBe("2");
-        host.FindAll("button").Count.ShouldBe(2);
-        host.FindAll("button:disabled").Count.ShouldBe(2);
+        _ = host.Find("[data-save-active='false'] [data-editor='1']:disabled").ShouldNotBeNull();
+        _ = host.Find("[data-save-active='true'] [data-editor='2']:disabled").ShouldNotBeNull();
     }
 
     [Test]
@@ -94,6 +91,7 @@ public sealed class StickySaveRegionTests
 
         region.FindAll("button").Count.ShouldBe(1);
         region.Find(".sticky-save-region").GetAttribute("data-save-active").ShouldBe("false");
+        region.Find(".sticky-save-region").GetAttribute("data-save-has-feedback").ShouldBe("false");
     }
 
     private static BunitContext CreateContext()

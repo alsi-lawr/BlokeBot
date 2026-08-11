@@ -4,6 +4,7 @@
 <div @ref="_element"
      class="@_class"
      data-save-active="@Active.ToString().ToLowerInvariant()"
+     data-save-has-feedback="@((Feedback is not null).ToString().ToLowerInvariant())"
      data-save-scope="@Scope.ToString().ToLowerInvariant()"
      data-save-visible="false"
      @attributes="AdditionalAttributes">

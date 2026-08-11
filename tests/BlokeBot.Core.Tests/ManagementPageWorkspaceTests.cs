@@ -40,12 +40,12 @@ public sealed class ManagementPageWorkspaceTests
 
         page.Find("#request-board-slug").Input("clips");
         page.Find("#request-board-name").Input("Clip reviews");
-        FindButton(page, "Save board").Click();
+        FindEditorAction(page, saveIntent: false).Click();
         _ = page.WaitForElement("a[href='/requests/streamer/clips']");
         (await CountAsync(database, board: true)).ShouldBe(1);
 
         page.Find("#request-board-name").Input("Updated clip reviews");
-        FindButton(page, "Save board").Click();
+        FindEditorAction(page, saveIntent: true).Click();
         await using (var db = await database.CreateDbContextAsync())
         {
             (await db.RequestBoards.SingleAsync()).Title.ShouldBe("Updated clip reviews");
@@ -54,7 +54,7 @@ public sealed class ManagementPageWorkspaceTests
         FindButton(page, "+ New board").Click();
         page.Find("#request-board-name").Input("Unsaved board");
         page.Find("#request-board-submission-limit").Input("not-a-number");
-        FindButton(page, "Save board").Click();
+        FindEditorAction(page, saveIntent: false).Click();
         _ = page.WaitForElement("[role='alert']");
         (await CountAsync(database, board: true)).ShouldBe(1);
         page.Find("#request-board-name").GetAttribute("value").ShouldBe("Unsaved board");
@@ -90,7 +90,7 @@ public sealed class ManagementPageWorkspaceTests
         page.Find("#queue-slug").Input("community");
         page.Find("#queue-name").Input("Community games");
         page.Find("#queue-activity").Input("Example game");
-        FindButton(page, "Save queue").Click();
+        FindEditorAction(page, saveIntent: false).Click();
         _ = page.WaitForElement("a[href='/queues/streamer/community']");
         (await CountAsync(database, board: false)).ShouldBe(1);
         await using (var db = await database.CreateDbContextAsync())
@@ -99,7 +99,7 @@ public sealed class ManagementPageWorkspaceTests
         }
 
         page.Find("#queue-name").Input("Updated community games");
-        FindButton(page, "Save queue").Click();
+        FindEditorAction(page, saveIntent: true).Click();
         await using (var db = await database.CreateDbContextAsync())
         {
             (await db.PlayQueues.SingleAsync()).Name.ShouldBe("Updated community games");
@@ -108,7 +108,7 @@ public sealed class ManagementPageWorkspaceTests
         FindButton(page, "+ New queue").Click();
         page.Find("#queue-name").Input("Unsaved queue");
         page.Find("#queue-capacity").Input("not-a-number");
-        FindButton(page, "Save queue").Click();
+        FindEditorAction(page, saveIntent: false).Click();
         _ = page.WaitForElement("[role='alert']");
         (await CountAsync(database, board: false)).ShouldBe(1);
         page.Find("#queue-name").GetAttribute("value").ShouldBe("Unsaved queue");
@@ -125,6 +125,15 @@ public sealed class ManagementPageWorkspaceTests
     )
         where TComponent : IComponent =>
         page.FindAll("button").Single(button => button.TextContent.Trim() == label);
+
+    private static IElement FindEditorAction<TComponent>(
+        IRenderedComponent<TComponent> page,
+        bool saveIntent
+    )
+        where TComponent : IComponent =>
+        page.Find(
+            $".sticky-save-region[data-save-active='{saveIntent.ToString().ToLowerInvariant()}'] button"
+        );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
     {
