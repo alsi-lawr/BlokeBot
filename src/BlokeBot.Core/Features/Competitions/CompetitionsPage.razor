@@ -1,0 +1,113 @@
+@page "/competitions"
+@using BlokeBot.Core.Features.Points.Balances
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject CompetitionService _service
+@inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
+@inject TimeProvider _clock
+
+<PageTitle>BlokeBot | Tournaments &amp; leagues</PageTitle>
+
+<DashboardPage Kicker="Community progression"
+               Title="Tournaments &amp; leagues"
+               Description="Run reproducible brackets, round-robin leagues, and prediction competitions without a spreadsheet."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        @if (_featureEnabled && Host is not null)
+        {
+            <a class="btn-secondary" href="@_publicUrl" target="_blank" rel="noopener">Open public results</a>
+        }
+    </Actions>
+    <ChildContent>
+        @if (Host is null)
+        {
+            <ApplicationCardCollection Owner="competition-page-cards"><div class="card p-8 text-sm text-muted-foreground">Choose a channel to manage competitions.</div></ApplicationCardCollection>
+        }
+        else if (!_featureEnabled)
+        {
+            <ApplicationCardCollection Owner="competition-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground" data-competitions-disabled-recovery>
+                    Tournaments &amp; leagues is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved formats, entrants, schedules, results, audit history, and archives are retained. Re-enable resumes current state without replaying suppressed commands, reminders, rewards, events, or provider work.
+                </div>
+            </ApplicationCardCollection>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <p class="card p-3 text-sm font-semibold" role="@(_failed ? "alert" : "status")">@_feedback</p>
+            }
+
+            <div class="settings-disclosure-stack">
+                <StudioStage Key="competition-new" Number="1" Title="New competition" Summary="Format, eligibility, standings rules, reminders, and placement rewards">
+                    <div class="studio-grid">
+                        <div class="studio-span-8"><Field Id="competition-name" Label="Name" @bind-Value="_draft.Name" /></div>
+                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-format">Format</label><select id="competition-format" class="input" @bind="_draft.Format"><option value="@CompetitionFormat.Tournament">Tournament bracket</option><option value="@CompetitionFormat.RoundRobin">Round robin</option><option value="@CompetitionFormat.PredictionLeague">Prediction league</option></select></div>
+                        <div class="studio-span-12"><TextAreaField Id="competition-description" Label="Public description" @bind-Value="_draft.Description" /></div>
+                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-entry-kind">Entry</label><select id="competition-entry-kind" class="input" @bind="_draft.EntryKind"><option value="@CompetitionEntryKind.Individual">Individuals</option><option value="@CompetitionEntryKind.Team">Teams</option></select></div>
+                        <div class="studio-span-4"><label class="label" for="competition-capacity">Entrant capacity</label><input id="competition-capacity" class="input" type="number" min="2" max="128" @bind="_draft.Capacity" /></div>
+                        <div class="studio-span-4"><label class="label" for="competition-team-size">Members per team</label><input id="competition-team-size" class="input" type="number" min="1" max="32" @bind="_draft.TeamSize" /></div>
+                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-seeding">Schedule order</label><select id="competition-seeding" class="input" @bind="_draft.Seeding"><option value="@CompetitionSeeding.Random">Seeded random</option><option value="@CompetitionSeeding.Seeded">Moderator ranks</option></select></div>
+                        <div class="studio-span-4"><Field Id="competition-seed" Label="Reproducible seed" @bind-Value="_draft.Seed" /></div>
+                        <div class="studio-span-4"><Field Id="competition-minimum-points" Label="Minimum points eligibility" @bind-Value="_draft.MinimumPoints" /></div>
+                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-tiebreak">Tiebreak</label><select id="competition-tiebreak" class="input" @bind="_draft.Tiebreak"><option value="@CompetitionTiebreak.ScoreDifferenceThenScoreFor">Score difference, then score for</option><option value="@CompetitionTiebreak.ScoreForThenWins">Score for, then wins</option></select></div>
+                        <div class="studio-span-8 grid grid-cols-3 gap-3"><div><label class="label" for="competition-win-points">Win</label><input id="competition-win-points" class="input" type="number" min="0" @bind="_draft.WinPoints" /></div><div><label class="label" for="competition-draw-points">Draw</label><input id="competition-draw-points" class="input" type="number" min="0" @bind="_draft.DrawPoints" /></div><div><label class="label" for="competition-loss-points">Loss</label><input id="competition-loss-points" class="input" type="number" min="0" @bind="_draft.LossPoints" /></div></div>
+                        <div class="studio-span-4"><label class="label" for="competition-reminder">Reminder hours before</label><input id="competition-reminder" class="input" type="number" min="0" max="168" @bind="_draft.ReminderHoursBefore" /></div>
+                        <div class="studio-span-8"><Field Id="competition-reminder-message" Label="Reminder message" @bind-Value="_draft.ReminderMessage" /><p class="mt-1 text-xs text-muted-foreground">Tokens: {competition}, {round}, {scheduled}, {public_url}</p></div>
+                        <div class="studio-span-4"><Field Id="competition-winner-points" Label="Winner points" @bind-Value="_draft.WinnerPoints" /></div>
+                        <div class="studio-span-4"><Field Id="competition-runner-points" Label="Runner-up points" @bind-Value="_draft.RunnerUpPoints" /></div>
+                        <div class="studio-span-4"><Field Id="competition-winner-achievement" Label="Winner achievement key" @bind-Value="_draft.WinnerAchievement" /></div>
+                        <div class="studio-span-4"><Field Id="competition-runner-achievement" Label="Runner-up achievement key" @bind-Value="_draft.RunnerUpAchievement" /></div>
+                        <div class="studio-span-12"><TextAreaField Id="competition-lobby" Label="Private contact / lobby information" @bind-Value="_draft.PrivateLobbyInformation" /><p class="mt-1 text-xs text-muted-foreground">Used for moderator coordination and private delivery only; never included in public views or lifecycle payloads.</p></div>
+                        <div class="studio-span-12"><TextAreaField Id="competition-create-note" Label="Private moderator note" @bind-Value="_draft.PrivateReason" /></div>
+                        <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateAsync">Create draft competition</button></div>
+                    </div>
+                </StudioStage>
+            </div>
+
+            <div class="competition-workspace" data-competition-workspace>
+                @if (_competitions.Count == 0)
+                {
+                    <div class="card p-8 text-sm text-muted-foreground">No competitions yet. Create a draft above.</div>
+                }
+                @foreach (var item in _competitions)
+                {
+                    var competition = item.Competition;
+                    <article class="task-panel" @key="competition.Id.Value">
+                        <header class="task-panel__header">
+                            <div><div class="flex flex-wrap items-center gap-2"><h2 class="task-panel__title">@competition.Name</h2><span class="status-pill status-pill--slate"><span class="status-pill__label">@competition.Status.Label()</span></span></div><p class="task-panel__description">@competition.Format.Label() · @competition.EntryKind.Label() · @competition.Entrants.Count / @competition.Capacity entrants · revision @competition.Revision</p></div>
+                            <div class="task-panel__actions">
+                                @if (competition.Status == CompetitionStatus.Draft) { <button class="btn-primary" type="button" @onclick='() => TransitionAsync(competition, "open")'>Open registration</button> }
+                                @if (competition.Status == CompetitionStatus.Registration) { <button class="btn-primary" type="button" @onclick='() => TransitionAsync(competition, "start")'>Generate &amp; start</button> }
+                                @if (competition.Status == CompetitionStatus.Running) { <button class="btn-primary" type="button" @onclick='() => TransitionAsync(competition, "complete")'>Complete</button> }
+                                @if (competition.Status == CompetitionStatus.Completed) { <button class="btn-primary" type="button" @onclick='() => TransitionAsync(competition, "archive")'>Archive</button> }
+                            </div>
+                        </header>
+                        <div class="task-panel__body space-y-5">
+                            <div class="live-round-summary" aria-label="Competition summary"><div class="live-round-summary__metric"><p class="live-round-summary__label">Format</p><p class="live-round-summary__value">@competition.Format.Label()</p></div><div class="live-round-summary__metric"><p class="live-round-summary__label">Schedule seed</p><p class="live-round-summary__value font-mono text-sm">@competition.Seed</p><p class="live-round-summary__detail">@competition.AlgorithmVersion</p></div><div class="live-round-summary__metric"><p class="live-round-summary__label">Tiebreak</p><p class="live-round-summary__value text-sm">@competition.Tiebreak.Label()</p></div><div class="live-round-summary__metric"><p class="live-round-summary__label">Rewards</p><p class="live-round-summary__value text-sm">@item.WinnerPoints.ToDisplayString() / @item.RunnerUpPoints.ToDisplayString()</p><p class="live-round-summary__detail">winner / runner-up</p></div></div>
+
+                            @if (competition.Status == CompetitionStatus.Registration)
+                            {
+                                <section class="competition-registration"><h3 class="font-semibold text-[var(--app-text-strong)]">Register @(competition.EntryKind == CompetitionEntryKind.Team ? "team" : "viewer")</h3><div class="studio-grid"><div class="studio-span-6"><Field Id="@($"entrant-name-{competition.Id.Value:N}")" Label="Public entrant name" @bind-Value="_registration.Name" /></div><div class="studio-span-6"><label class="label" for="@($"entrant-rank-{competition.Id.Value:N}")">Seed rank (optional)</label><input id="@($"entrant-rank-{competition.Id.Value:N}")" class="input" type="number" min="1" @bind="_registration.SeedRank" /></div>@for (var index = 0; index < competition.TeamSize; index++){ var member = Member(index); <div class="studio-span-12 competition-member"><strong>Member @(index + 1)</strong><div class="grid gap-3 md:grid-cols-4"><Field Id="@($"entrant-login-{index}")" Label="Login" @bind-Value="member.Login" /><Field Id="@($"entrant-display-{index}")" Label="Display name" @bind-Value="member.DisplayName" /><Field Id="@($"entrant-id-{index}")" Label="Twitch user ID" @bind-Value="member.TwitchUserId" /><Field Id="@($"entrant-contact-{index}")" Label="Private contact" @bind-Value="member.PrivateContact" /></div></div>}<div class="studio-span-12"><TextAreaField Id="@($"entrant-note-{competition.Id.Value:N}")" Label="Private registration note" @bind-Value="_registration.PrivateReason" /></div><div class="studio-span-12"><button class="btn-secondary" type="button" @onclick="() => RegisterAsync(competition)">Register entrant</button></div></div></section>
+                            }
+
+                            @if (competition.Standings.Count > 0)
+                            {
+                                <div class="data-table-region" tabindex="0"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-muted-foreground"><th class="p-2">#</th><th class="p-2">Entrant</th><th class="p-2">Played</th><th class="p-2">W–D–L</th><th class="p-2">Score</th><th class="p-2">Points</th></tr></thead><tbody>@foreach (var row in competition.Standings){<tr class="border-t"><td class="p-2">@row.Rank</td><td class="p-2 font-semibold text-[var(--app-text-strong)]">@row.Name</td><td class="p-2">@row.Played</td><td class="p-2">@row.Wins–@row.Draws–@row.Losses</td><td class="p-2">@row.ScoreFor–@row.ScoreAgainst</td><td class="p-2 font-semibold">@row.Points</td></tr>}</tbody></table></div>
+                            }
+
+                            @if (competition.Matches.Count > 0)
+                            {
+                                <section><h3 class="mb-2 font-semibold text-[var(--app-text-strong)]">Schedule &amp; results</h3><div class="competition-match-list">@foreach (var match in competition.Matches){<div class="competition-match"><div><span class="text-xs text-muted-foreground">Round @match.Round · match @(match.Position + 1)</span><p class="font-semibold text-[var(--app-text-strong)]">@match.EntrantA <span class="text-muted-foreground">vs</span> @match.EntrantB</p></div><div class="competition-score"><input class="input" type="number" min="0" aria-label="@match.EntrantA score" @bind="Result(match.Id.Value).ScoreA" /><span>–</span><input class="input" type="number" min="0" aria-label="@match.EntrantB score" @bind="Result(match.Id.Value).ScoreB" /></div><input class="input" aria-label="Private result note" placeholder="Private correction note" @bind="Result(match.Id.Value).PrivateReason" /><button class="btn-secondary" type="button" disabled="@(match.EntrantAId is null || match.EntrantBId is null)" @onclick="() => ConfirmAsync(competition, match)">@(match.Status == CompetitionMatchStatus.Confirmed ? "Correct" : "Confirm")</button></div>}</div></section>
+                            }
+                            <div class="studio-grid"><div class="studio-span-8"><TextAreaField Id="@($"competition-note-{competition.Id.Value:N}")" Label="Private transition note" Value="@Note(competition.Id.Value)" ValueChanged="value => SetNote(competition.Id.Value, value)" /></div><div class="studio-span-4 text-xs text-muted-foreground"><strong class="text-[var(--app-text-strong)]">Private coordination</strong><p>@(string.IsNullOrWhiteSpace(item.PrivateLobbyInformation) ? "No lobby information saved." : item.PrivateLobbyInformation)</p></div></div>
+                            <details><summary class="cursor-pointer font-semibold text-[var(--app-text-strong)]">Audit history · @item.Audit.Count</summary><ul class="mt-2 space-y-2 text-sm text-muted-foreground">@foreach (var audit in item.Audit){<li><strong>@audit.Action</strong> by @audit.ActorLogin · @audit.OccurredAtUtc.ToString("u") @if (!string.IsNullOrWhiteSpace(audit.PrivateReason)){<span>· @audit.PrivateReason</span>}</li>}</ul></details>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </ChildContent>
+</DashboardPage>

@@ -50,6 +50,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedBountyAsync(db, hostId, now, cancellationToken);
         await SeedCommunityProgressionAsync(db, hostId, now, cancellationToken);
         await SeedBingoAsync(db, hostId, now, cancellationToken);
+        await SeedCompetitionAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
         await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
@@ -1817,6 +1818,150 @@ internal sealed class SimulationFixtureSeeder(
                     .Login,
             }
         );
+    }
+
+    private static async Task SeedCompetitionAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        var publicId = Guid.Parse("f54fead3-1c88-4c65-b492-68d13bb19cad");
+        if (await db.Competitions.AnyAsync(value => value.PublicId == publicId, cancellationToken))
+        {
+            return;
+        }
+        var competition = new Competition
+        {
+            HostId = hostId,
+            PublicId = publicId,
+            CreationOperationId = Guid.Parse("e65a9bf8-0751-40e1-b537-cfa0d079f3e9"),
+            Name = "Summer Community Circuit",
+            Description =
+                "Seven rounds of friendly community matches with a final placement reward.",
+            Format = CompetitionFormat.RoundRobin,
+            EntryKind = CompetitionEntryKind.Individual,
+            Status = CompetitionStatus.Running,
+            Seeding = CompetitionSeeding.Random,
+            Tiebreak = CompetitionTiebreak.ScoreDifferenceThenScoreFor,
+            Capacity = 8,
+            TeamSize = 1,
+            MinimumPoints = "100",
+            WinPoints = 3,
+            DrawPoints = 1,
+            LossPoints = 0,
+            Seed = "summer-circuit-26",
+            AlgorithmVersion = "blokebot-shuffle-v1",
+            ReminderHoursBefore = 24,
+            ReminderMessage =
+                "Reminder: {competition} round {round} is scheduled for {scheduled}. {public_url}",
+            WinnerPoints = "500",
+            RunnerUpPoints = "250",
+            WinnerAchievementKey = "circuit-champion",
+            PrivateLobbyInformation = "Lobby details are shared with entrants by whisper.",
+            Revision = 9,
+            CreatedAtUtc = now.AddDays(-10),
+            UpdatedAtUtc = now.AddMinutes(-15),
+            RegistrationOpenedAtUtc = now.AddDays(-9),
+            StartedAtUtc = now.AddDays(-4),
+        };
+        var names = new[]
+        {
+            "PixelPilot",
+            "NightOwl",
+            "CozyCactus",
+            "ByteBard",
+            "MapleMage",
+            "NovaNomad",
+        };
+        foreach (var (name, index) in names.Select((name, index) => (name, index)))
+        {
+            competition.Entrants.Add(
+                new CompetitionEntrant
+                {
+                    HostId = hostId,
+                    PublicId = Guid.Parse($"00000000-0000-4000-8000-{index + 1:000000000000}"),
+                    RegistrationOperationId = Guid.Parse(
+                        $"10000000-0000-4000-8000-{index + 1:000000000000}"
+                    ),
+                    Name = name,
+                    RegisteredAtUtc = now.AddDays(-8).AddMinutes(index),
+                    Members =
+                    [
+                        new()
+                        {
+                            HostId = hostId,
+                            TwitchUserId = $"competition-viewer-{index + 1}",
+                            Login = name.ToLowerInvariant(),
+                            DisplayName = name,
+                            PrivateContact = $"{name.ToLowerInvariant()} private contact",
+                        },
+                    ],
+                }
+            );
+        }
+        var scores = new[]
+        {
+            (0, 1, 3, 1),
+            (2, 3, 2, 2),
+            (4, 5, 0, 1),
+            (0, 2, 2, 0),
+            (1, 4, 3, 2),
+            (3, 5, 1, 0),
+        };
+        foreach (var (fixture, index) in scores.Select((fixture, index) => (fixture, index)))
+        {
+            competition.Matches.Add(
+                new CompetitionMatch
+                {
+                    HostId = hostId,
+                    PublicId = Guid.Parse($"20000000-0000-4000-8000-{index + 1:000000000000}"),
+                    Round = (index / 3) + 1,
+                    Position = index % 3,
+                    EntrantA = competition.Entrants[fixture.Item1],
+                    EntrantB = competition.Entrants[fixture.Item2],
+                    ScoreA = fixture.Item3,
+                    ScoreB = fixture.Item4,
+                    WinnerEntrant =
+                        fixture.Item3 == fixture.Item4
+                            ? null
+                            : competition.Entrants[
+                                fixture.Item3 > fixture.Item4 ? fixture.Item1 : fixture.Item2
+                            ],
+                    Status = CompetitionMatchStatus.Confirmed,
+                    ScheduledAtUtc = now.AddDays(index - 6),
+                    ConfirmedAtUtc = now.AddDays(index - 6).AddHours(2),
+                }
+            );
+        }
+        competition.Matches.Add(
+            new CompetitionMatch
+            {
+                HostId = hostId,
+                PublicId = Guid.Parse("20000000-0000-4000-8000-000000000099"),
+                Round = 3,
+                Position = 0,
+                EntrantA = competition.Entrants[0],
+                EntrantB = competition.Entrants[3],
+                Status = CompetitionMatchStatus.Pending,
+                ScheduledAtUtc = now.AddDays(1),
+                ReminderDueAtUtc = now,
+            }
+        );
+        competition.Audits.Add(
+            new CompetitionAudit
+            {
+                HostId = hostId,
+                OperationId = Guid.Parse("30000000-0000-4000-8000-000000000001"),
+                Action = CompetitionAuditAction.Started,
+                ActorTwitchUserId = "1000",
+                ActorLogin = "streamer",
+                PrivateReason = "Schedule approved for the summer circuit.",
+                OccurredAtUtc = now.AddDays(-4),
+            }
+        );
+        _ = db.Competitions.Add(competition);
     }
 
     private static async Task SeedAutomaticRaidShoutoutsAsync(

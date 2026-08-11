@@ -370,6 +370,43 @@ public static class ViewerPrivacyService
             )
         );
         await AddAsync(
+            "competitions.entrants",
+            db.CompetitionEntrants.Where(x =>
+                    x.Members.Any(member => member.TwitchUserId == userId || member.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .Select(x => new
+                {
+                    x.Id,
+                    x.HostId,
+                    x.CompetitionId,
+                    x.Name,
+                    x.SeedRank,
+                    x.RegisteredAtUtc,
+                })
+        );
+        await AddAsync(
+            "competitions.members",
+            db.CompetitionEntrantMembers.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "competitions.rewards",
+            db.CompetitionRewardReceipts.Where(x =>
+                (x.TwitchUserId == userId || x.Login == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
+            "competitions.moderation-audits",
+            db.CompetitionAudits.Where(x =>
+                (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                && (hostId == null || x.HostId == hostId)
+            )
+        );
+        await AddAsync(
             "bingo.participants",
             db.BingoParticipants.Where(x =>
                 (x.TwitchUserId == userId || x.Login == login)
@@ -1349,6 +1386,74 @@ public static class ViewerPrivacyService
                 .ExecuteDeleteAsync(ct);
         }
         Record("community.events", communityEvents);
+        Record(
+            "competitions.entrants",
+            await db
+                .CompetitionEntrants.Where(x =>
+                    x.Members.Any(member => member.TwitchUserId == userId || member.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, ErasedToken), ct)
+        );
+        Record(
+            "competitions.members",
+            await db
+                .CompetitionEntrantMembers.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, ErasedToken)
+                            .SetProperty(x => x.Login, ErasedToken)
+                            .SetProperty(x => x.DisplayName, ErasedToken)
+                            .SetProperty(x => x.PrivateContact, string.Empty),
+                    ct
+                )
+        );
+        Record(
+            "competitions.rewards",
+            await db
+                .CompetitionRewardReceipts.Where(x =>
+                    (x.TwitchUserId == userId || x.Login == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.TwitchUserId, ErasedToken)
+                            .SetProperty(x => x.Login, ErasedToken),
+                    ct
+                )
+        );
+        Record(
+            "competitions.moderation-audits",
+            await db
+                .CompetitionAudits.Where(x =>
+                    (x.ActorTwitchUserId == userId || x.ActorLogin == login)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(x => x.ActorTwitchUserId, ErasedToken)
+                            .SetProperty(x => x.ActorLogin, ErasedToken)
+                            .SetProperty(x => x.PrivateReason, string.Empty),
+                    ct
+                )
+        );
+        var competitionEvents = 0;
+        foreach (var needle in quotedNeedles)
+        {
+            competitionEvents += await db
+                .CompetitionEvents.Where(x =>
+                    EF.Functions.Like(x.PublicPayload, needle)
+                    && (hostId == null || x.HostId == hostId)
+                )
+                .ExecuteDeleteAsync(ct);
+        }
+        Record("competitions.events", competitionEvents);
         Record(
             "play-queues.entries",
             await db

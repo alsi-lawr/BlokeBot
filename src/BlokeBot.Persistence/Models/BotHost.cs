@@ -32,6 +32,10 @@ public sealed class BotHost
 
     public DateTime? BingoAcceptEventsAfterUtc { get; set; }
 
+    public DateTime? CompetitionsPausedAtUtc { get; set; }
+
+    public DateTime? CompetitionsAcceptWorkAfterUtc { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

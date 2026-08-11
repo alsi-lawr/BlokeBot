@@ -152,6 +152,21 @@ public sealed class HostFeatureService(
             host.BingoAcceptEventsAfterUtc = now;
             host.BingoPausedAtUtc = null;
         }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.Competitions)
+            && !updated.Contains(HostFeatureFlags.Competitions)
+        )
+        {
+            host.CompetitionsPausedAtUtc ??= now;
+        }
+        if (
+            !host.EnabledFeatures.Contains(HostFeatureFlags.Competitions)
+            && updated.Contains(HostFeatureFlags.Competitions)
+        )
+        {
+            host.CompetitionsAcceptWorkAfterUtc = now;
+            host.CompetitionsPausedAtUtc = null;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         _ = await changes.NotifyChangedAsync(ct);

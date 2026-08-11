@@ -170,6 +170,17 @@ public sealed class ViewerCommandCatalogService(
                 .Select(value => (BingoGameStatus?)value.Status)
                 .SingleOrDefaultAsync(ct)
             : null;
+        var competitionRegistration =
+            enabledFeatures.Contains(HostFeatureFlags.Competitions)
+            && await db
+                .Competitions.AsNoTracking()
+                .AnyAsync(
+                    value =>
+                        value.HostId == hostId
+                        && value.Status == CompetitionStatus.Registration
+                        && value.EntryKind == CompetitionEntryKind.Individual,
+                    ct
+                );
         var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
             ? await db
                 .PlayQueues.AsNoTracking()
@@ -290,6 +301,15 @@ public sealed class ViewerCommandCatalogService(
             {
                 candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoJoin));
                 candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.BingoLeave));
+            }
+        }
+
+        if (enabledFeatures.Contains(HostFeatureFlags.Competitions))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Competitions));
+            if (competitionRegistration)
+            {
+                candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.CompetitionJoin));
             }
         }
 

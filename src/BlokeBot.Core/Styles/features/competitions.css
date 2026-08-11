@@ -1,0 +1,90 @@
+@layer components {
+    .competition-workspace {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .competition-registration,
+    .competition-member {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.65rem;
+        padding: 1rem;
+    }
+
+    .competition-match-list {
+        display: grid;
+        gap: 0.6rem;
+    }
+
+    .competition-match {
+        align-items: end;
+        border-top: 1px solid var(--app-border);
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(12rem, 1fr) auto minmax(10rem, 0.8fr) auto;
+        padding-block: 0.75rem;
+    }
+
+    .competition-score {
+        align-items: center;
+        display: grid;
+        gap: 0.35rem;
+        grid-template-columns: 4rem auto 4rem;
+    }
+
+    .competition-score .input {
+        min-width: 0;
+        text-align: center;
+    }
+
+    .competition-public-matches {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    }
+
+    .competition-round {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.65rem;
+        padding: 0.9rem;
+    }
+
+    .competition-round h4 {
+        color: var(--app-text-muted);
+        font-size: 0.72rem;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+    }
+
+    .competition-public-match {
+        display: grid;
+        gap: 0.35rem 0.75rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-block: 0.45rem;
+    }
+
+    .competition-public-match + .competition-public-match {
+        border-top: 1px solid var(--app-border);
+    }
+
+    .competition-public-match span {
+        color: var(--app-text-strong);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 48rem) {
+        .competition-match {
+            align-items: stretch;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .competition-score {
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        }
+    }
+}
