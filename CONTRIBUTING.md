@@ -22,6 +22,10 @@ restores and builds the solution before running the complete Microsoft Testing P
 
 Use `--treenode-filter` for focused TUnit/Microsoft Testing Platform runs. Format C# with `dotnet csharpier format .`.
 
+EF Core migrations are generated artifacts. Verify that the model has no pending migration, but do
+not add tests for generated migrations, database-provider constraints, or transaction semantics.
+Tests should exercise BlokeBot behaviour rather than reproduce EF Core or the configured provider.
+
 For Nix changes:
 
 ```console
