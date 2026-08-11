@@ -3,6 +3,7 @@ using System;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    partial class BlokeBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260811140225_v0.10.0_BlokeRaid")]
+    partial class v0100_BlokeRaid
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -66,47 +69,6 @@ namespace BlokeBot.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("active_public_chat_pins", (string)null);
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ApprovedRaidChannel", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("ApprovedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ApprovedClipId")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("HostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Login")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TwitchUserId")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HostId", "Login")
-                        .IsUnique();
-
-                    b.ToTable("approved_raid_channels", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidProcessedEvent", b =>
@@ -1738,12 +1700,6 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(512)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("RaidCollaborationAcceptEventsAfterUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("RaidCollaborationPausedAtUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<bool?>("StartupMessageEnabled")
@@ -4978,7 +4934,7 @@ namespace BlokeBot.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Duration", "DurationSeconds BETWEEN 1 AND 30");
 
-                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('achievementCompletion', 'bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
+                            t.HasCheckConstraint("CK_overlay_event_feed_items_Kind", "Kind IN ('bingoEvent', 'giveawayWinner', 'guessingWinner', 'pointAward')");
 
                             t.HasCheckConstraint("CK_overlay_event_feed_items_Lifecycle", "Lifecycle IN ('active', 'consumed', 'queued', 'suppressed')");
 
@@ -6099,143 +6055,6 @@ namespace BlokeBot.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_public_chat_send_receipts_Delivery", "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR (length(DeliveredDeduplicationKey) = 64 AND DeliveredAtUtc IS NOT NULL)");
                         });
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationHistoryEntry", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Category")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Direction")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("HostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OtherDisplayName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OtherLogin")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OtherTwitchUserId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProviderMessageId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ProviderStreamId")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ShoutoutOutcome")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ViewerCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("WelcomeOutcome")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HostId", "OccurredAtUtc");
-
-                    b.HasIndex("HostId", "ProviderMessageId")
-                        .IsUnique();
-
-                    b.ToTable("raid_collaboration_history", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_raid_collaboration_history_Direction", "Direction IN ('Incoming', 'Outgoing')");
-
-                            t.HasCheckConstraint("CK_raid_collaboration_history_ShoutoutOutcome", "ShoutoutOutcome IN ('Cooldown', 'Deduplicated', 'NotConfigured', 'Rejected', 'Sent', 'Suppressed', 'TargetOffline')");
-
-                            t.HasCheckConstraint("CK_raid_collaboration_history_WelcomeOutcome", "WelcomeOutcome IN ('Deduplicated', 'Delivered', 'NotConfigured', 'Rejected', 'Suppressed')");
-                        });
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("DeduplicationWindowMinutes")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(60);
-
-                    b.Property<string>("EligibleCategories")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("HostId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("en");
-
-                    b.Property<bool>("NativeShoutoutEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("RelationshipCooldownHours")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(336);
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("WelcomeEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("WelcomeMessage")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT")
-                        .HasDefaultValue("Welcome {display_name} and community!");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HostId")
-                        .IsUnique();
-
-                    b.ToTable("raid_collaboration_settings", (string)null);
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyDeliverySetting", b =>
@@ -7702,15 +7521,6 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("BlokeBot.Persistence.Models.ApprovedRaidChannel", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
-                        .WithMany()
-                        .HasForeignKey("HostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidProcessedEvent", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -9126,24 +8936,6 @@ namespace BlokeBot.Persistence.Migrations
                         .WithOne()
                         .HasForeignKey("BlokeBot.Persistence.Models.PublicChatPinOperation", "OutboxMessageId")
                         .OnDelete(DeleteBehavior.Cascade);
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationHistoryEntry", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
-                        .WithMany()
-                        .HasForeignKey("HostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("BlokeBot.Persistence.Models.RaidCollaborationSettings", b =>
-                {
-                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
-                        .WithMany()
-                        .HasForeignKey("HostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyDeliverySetting", b =>

@@ -20,6 +20,9 @@ internal static class SimulationViewCatalog
         ["community"] = "/community",
         ["public-community"] =
             $"/community/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["raid"] = "/raid",
+        ["public-raid"] =
+            $"/raid/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
         ["passports"] = "/passports",
         ["public-passport"] =
             $"/passport/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}/nightowl",

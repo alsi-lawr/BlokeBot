@@ -1,0 +1,505 @@
+.raid-feedback {
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 650;
+}
+
+.raid-layout,
+.raid-activity-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(17rem, 0.75fr);
+    gap: 1rem;
+}
+
+.raid-boss {
+    position: relative;
+    overflow: hidden;
+    padding: 1.25rem;
+}
+
+.raid-boss::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 0.28rem;
+    background: linear-gradient(90deg, #7048ff, #e44777, #f5a036);
+}
+
+.raid-boss__header,
+.raid-boss__identity,
+.raid-meter__label,
+.raid-ward,
+.raid-table-card > header,
+.raid-history-card > header,
+.raid-config > summary,
+.raid-recaps > summary,
+.raid-empty-campaign,
+.raid-empty-campaign > div,
+.raid-recaps__body article > div {
+    display: flex;
+    align-items: center;
+}
+
+.raid-boss__header,
+.raid-meter__label,
+.raid-table-card > header,
+.raid-history-card > header,
+.raid-config > summary,
+.raid-recaps > summary,
+.raid-empty-campaign {
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.raid-boss__identity,
+.raid-empty-campaign > div {
+    gap: 0.85rem;
+}
+
+.raid-boss__icon {
+    display: inline-grid;
+    width: 3.6rem;
+    height: 3.6rem;
+    flex: none;
+    place-items: center;
+    border-radius: 0.9rem;
+    color: white;
+    font-size: 1.75rem;
+    background: radial-gradient(circle at 35% 35%, #d7ceff, #6544dd 52%, #281d70);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
+}
+
+.raid-boss h2,
+.raid-control h2,
+.raid-table-card h2,
+.raid-history-card h2,
+.raid-config h2,
+.raid-recaps h2,
+.raid-empty-campaign h2 {
+    margin: 0;
+    color: var(--app-text-strong);
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.raid-boss h2 {
+    font-size: 1.35rem;
+}
+
+.raid-boss__identity p {
+    margin: 0.18rem 0 0;
+    color: #7048ff;
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.raid-boss__age {
+    color: var(--app-text-muted);
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.raid-meter__label {
+    margin-top: 1.2rem;
+    color: var(--app-text-medium);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.raid-meter__label strong {
+    color: var(--app-text-strong);
+    font-size: 1rem;
+}
+
+.raid-meter {
+    height: 0.72rem;
+    margin-top: 0.42rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--app-surface-muted);
+}
+
+.raid-meter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.raid-meter--health span {
+    background: linear-gradient(90deg, #e43b60, #f27b54);
+}
+
+.raid-meter--ward span {
+    background: linear-gradient(90deg, #2b8ce5, #63b9f5);
+}
+
+.raid-ward {
+    gap: 0.8rem;
+    margin-top: 0.65rem;
+}
+
+.raid-ward .raid-meter__label {
+    min-width: 8.5rem;
+    margin: 0;
+    gap: 0.5rem;
+}
+
+.raid-ward .raid-meter__label strong {
+    font-size: 0.72rem;
+}
+
+.raid-ward .raid-meter {
+    flex: 1;
+    height: 0.48rem;
+    margin: 0;
+}
+
+.raid-phase-response {
+    display: flex;
+    gap: 0.7rem;
+    margin-top: 1rem;
+    border: 1px solid color-mix(in srgb, #7048ff, transparent 68%);
+    border-radius: 0.72rem;
+    padding: 0.75rem;
+    background: color-mix(in srgb, #7048ff, var(--app-surface-solid) 94%);
+}
+
+.raid-phase-response strong {
+    font-size: 0.75rem;
+}
+
+.raid-phase-response p,
+.raid-control > p,
+.raid-config summary p,
+.raid-recaps summary p,
+.raid-empty-campaign p,
+.raid-recaps__body p {
+    margin: 0.15rem 0 0;
+    color: var(--app-text-muted);
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+
+.raid-action-rules {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.62rem;
+    margin-top: 1rem;
+}
+
+.raid-action-rules > div {
+    min-width: 0;
+    border: 1px solid var(--app-border);
+    border-radius: 0.7rem;
+    padding: 0.7rem;
+    background: var(--app-surface-muted);
+}
+
+.raid-action-rules strong {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.raid-action-rules p {
+    margin: 0.22rem 0 0.38rem;
+    color: var(--app-text-muted);
+    font-size: 0.65rem;
+}
+
+.raid-action-rules code {
+    color: #7048ff;
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+.raid-control {
+    padding: 1rem;
+}
+
+.raid-control dl {
+    margin: 0.5rem 0 0;
+}
+
+.raid-control dl > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--app-border);
+    padding: 0.75rem 0;
+    font-size: 0.72rem;
+}
+
+.raid-control dt {
+    color: var(--app-text-muted);
+}
+
+.raid-control dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 700;
+}
+
+.raid-control__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+    margin-top: 0.8rem;
+}
+
+.raid-control > p {
+    margin-top: 0.7rem;
+}
+
+.raid-activity-layout,
+.raid-config,
+.raid-recaps,
+.raid-empty-campaign {
+    margin-top: 1rem;
+}
+
+.raid-table-card,
+.raid-history-card,
+.raid-config,
+.raid-recaps {
+    overflow: hidden;
+}
+
+.raid-table-card > header,
+.raid-history-card > header,
+.raid-config > summary,
+.raid-recaps > summary {
+    border-bottom: 1px solid var(--app-border);
+    padding: 0.9rem 1rem;
+}
+
+.raid-table-card header span,
+.raid-history-card header span {
+    color: var(--app-text-muted);
+    font-size: 0.68rem;
+}
+
+.raid-table-card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+}
+
+.raid-table-card th,
+.raid-table-card td {
+    border-top: 1px solid var(--app-border);
+    padding: 0.62rem 0.8rem;
+    text-align: left;
+}
+
+.raid-table-card th {
+    color: var(--app-text-muted);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.raid-rank {
+    color: #7048ff;
+    font-weight: 800;
+}
+
+.raid-history-card > div {
+    padding: 0.25rem 1rem 0.65rem;
+}
+
+.raid-outcome {
+    display: grid;
+    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.55rem;
+    border-bottom: 1px solid var(--app-border);
+    padding: 0.65rem 0;
+}
+
+.raid-outcome:last-child {
+    border-bottom: 0;
+}
+
+.raid-outcome__icon {
+    display: grid;
+    width: 1.8rem;
+    height: 1.8rem;
+    place-items: center;
+    border-radius: 0.5rem;
+    background: var(--app-surface-muted);
+}
+
+.raid-outcome strong,
+.raid-outcome p,
+.raid-outcome time,
+.raid-empty {
+    font-size: 0.66rem;
+}
+
+.raid-outcome p {
+    margin: 0.1rem 0 0;
+    color: var(--app-text-muted);
+}
+
+.raid-outcome time {
+    color: var(--app-text-muted);
+}
+
+.raid-empty {
+    padding: 1rem 0;
+    color: var(--app-text-muted);
+}
+
+.raid-empty-campaign {
+    padding: 1.25rem;
+}
+
+.raid-config > summary,
+.raid-recaps > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.raid-config > summary::-webkit-details-marker,
+.raid-recaps > summary::-webkit-details-marker {
+    display: none;
+}
+
+.raid-config[open] > summary > span,
+.raid-recaps[open] > summary > span {
+    transform: rotate(90deg);
+}
+
+.raid-config__body {
+    display: grid;
+    gap: 1.1rem;
+    padding: 1rem;
+}
+
+.raid-rule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.raid-rule-editor {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem 0.6rem;
+    min-width: 0;
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    padding: 0.8rem;
+    background: var(--app-surface-muted);
+}
+
+.raid-rule-editor legend {
+    grid-column: 1 / -1;
+    padding: 0 0.25rem;
+    color: var(--app-text-strong);
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.raid-rule-editor .label {
+    align-self: end;
+    font-size: 0.62rem;
+}
+
+.raid-rule-editor .input {
+    min-width: 0;
+}
+
+.raid-recaps__body {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.7rem;
+    padding: 1rem;
+}
+
+.raid-recaps__body article {
+    border: 1px solid var(--app-border);
+    border-radius: 0.7rem;
+    padding: 0.8rem;
+    background: var(--app-surface-muted);
+}
+
+.raid-recaps__body article > div {
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+@media (max-width: 760px) {
+    .raid-layout,
+    .raid-activity-layout {
+        display: block;
+    }
+
+    .raid-control,
+    .raid-history-card,
+    .raid-config,
+    .raid-recaps {
+        margin-top: 0.8rem;
+    }
+
+    .raid-boss {
+        padding: 1rem;
+    }
+
+    .raid-boss__icon {
+        width: 3rem;
+        height: 3rem;
+        font-size: 1.4rem;
+    }
+
+    .raid-boss h2 {
+        font-size: 1.05rem;
+    }
+
+    .raid-boss__age {
+        font-size: 0.62rem;
+    }
+
+    .raid-action-rules {
+        grid-template-columns: 1fr;
+    }
+
+    .raid-action-rules > div {
+        display: grid;
+        grid-template-columns: 1fr auto;
+    }
+
+    .raid-action-rules p {
+        grid-column: 1;
+    }
+
+    .raid-action-rules code {
+        grid-row: 1 / 3;
+        grid-column: 2;
+        align-self: center;
+    }
+
+    .raid-control__actions {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .raid-table-card th:nth-child(n + 5),
+    .raid-table-card td:nth-child(n + 5) {
+        display: none;
+    }
+
+    .raid-rule-grid,
+    .raid-recaps__body {
+        grid-template-columns: 1fr;
+    }
+
+    .raid-empty-campaign {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

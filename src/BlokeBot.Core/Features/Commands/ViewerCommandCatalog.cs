@@ -318,6 +318,11 @@ public sealed class ViewerCommandCatalogService(
             }
         }
 
+        if (enabledFeatures.Contains(HostFeatureFlags.CooperativeGame))
+        {
+            candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Raid));
+        }
+
         if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Queue));

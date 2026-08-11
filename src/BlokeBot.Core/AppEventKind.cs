@@ -18,5 +18,6 @@ public enum AppEventKind
     BingoChanged,
     CompetitionsChanged,
     RaidCollaborationChanged,
+    BlokeRaidChanged,
     OverlaysChanged,
 }

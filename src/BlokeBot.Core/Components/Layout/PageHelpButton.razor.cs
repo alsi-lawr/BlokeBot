@@ -71,6 +71,7 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/bounties" => _bountiesHelp,
             "/community" => _communityProgressionHelp,
+            "/raid" => _blokeRaidHelp,
             "/passports" => _viewerPassportsHelp,
             _ when path.StartsWith("/passports/", StringComparison.Ordinal)
                     && path.EndsWith("/me", StringComparison.Ordinal) => _viewerPassportsHelp,
@@ -254,6 +255,31 @@ public partial class PageHelpButton
                 [
                     "Viewers equip one unlocked title, badge, and accent for this host with !equiptitle, !equipbadge, and !equipaccent.",
                     "Turning Community progression off blocks commands, events, timers, automation, rewards, and public output while preserving saved data. Re-enable resumes from the current period without replaying suppressed work.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _blokeRaidHelp = new(
+        "BlokeRaid",
+        [
+            _featureSwitchHelp,
+            new(
+                "Run one persistent channel boss",
+                "Start one active boss campaign, then let viewers attack, mend the shared ward, or spend BlokeBot points on Nova across multiple streams.",
+                [
+                    "Each action has its own configurable outcome range, cooldown, and per-stream limit. The resolved outcome is recorded so restarts never reroll it.",
+                    "Correct Guessing results use the configured damage per distinct correct recorded login and are applied once by round ID.",
+                    "Victory rewards every recorded contributor through the host-scoped point ledger. Titles, achievements, and automation-triggered effects are not part of this version.",
+                ]
+            ),
+            new(
+                "Phases, resets, and recovery",
+                "Health and ward stay within their configured bounds. Crossing a health threshold selects its saved deterministic phase response.",
+                [
+                    "Manual reset ends the current campaign and starts a fresh recorded boss. Weekly reset runs at the chosen UTC day and hour; missed disabled periods are never replayed.",
+                    "Turning Cooperative game off hides navigation and public standings and blocks commands, guessing effects, spending, rewards, resets, schedules, and emitted events before mutation.",
+                    "Saved configuration, active state, contributions, outcomes, and recaps are retained. Re-enable resumes the retained campaign with its expiry moved past the disabled interval.",
                 ]
             ),
         ]

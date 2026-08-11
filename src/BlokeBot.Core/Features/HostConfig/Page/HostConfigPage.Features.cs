@@ -39,6 +39,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.Competitions => $"{_featureIconBase} text-violet-700",
                 HostFeatureFlags.RaidCollaboration => $"{_featureIconBase} text-purple-700",
                 HostFeatureFlags.CommunityProgression => $"{_featureIconBase} text-fuchsia-700",
+                HostFeatureFlags.CooperativeGame => $"{_featureIconBase} text-rose-700",
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
                 HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
                 HostFeatureFlags.CustomCommands => $"{_featureIconBase} text-violet-600",
@@ -96,6 +97,12 @@ public partial class HostConfigPage
                 HostFeatureFlags.CommunityProgression => """
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 3 15 9l6 1-4.5 4.5 1 6.5-5.5-3-5.5 3 1-6.5L3 10l6-1 3-6Z" />
+                </svg>
+                """,
+                HostFeatureFlags.CooperativeGame => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 20h10M9 20v-4h6v4M8 4h8l1 4-2 3H9L7 8l1-4Z" />
+                    <path d="M10 8h.01M14 8h.01M10 13h4" />
                 </svg>
                 """,
                 HostFeatureFlags.ViewerPassports => """
