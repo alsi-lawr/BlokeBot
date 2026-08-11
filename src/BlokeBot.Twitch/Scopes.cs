@@ -14,4 +14,5 @@ public static class Scopes
     public const string UserReadModeratedChannels = "user:read:moderated_channels";
     public const string ModeratorReadShoutouts = "moderator:read:shoutouts";
     public const string ModeratorManageShoutouts = "moderator:manage:shoutouts";
+    public const string ChannelManageRaids = "channel:manage:raids";
 }

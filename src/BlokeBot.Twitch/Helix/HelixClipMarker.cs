@@ -12,7 +12,10 @@ public sealed record HelixClip(
     string BroadcasterLogin,
     string CreatorId,
     string CreatorLogin,
-    string? VideoId
+    string? VideoId,
+    string Title,
+    DateTimeOffset CreatedAt,
+    decimal DurationSeconds
 );
 
 public abstract record HelixClipCreateOutcome
@@ -132,8 +135,29 @@ internal sealed record HelixClipWire
     [JsonPropertyName("video_id")]
     public string? VideoId { get; init; }
 
+    [JsonPropertyName("title")]
+    public string Title { get; init; } = string.Empty;
+
+    [JsonPropertyName("created_at")]
+    public DateTimeOffset CreatedAt { get; init; }
+
+    [JsonPropertyName("duration")]
+    public decimal DurationSeconds { get; init; }
+
     public HelixClip ToDomain() =>
-        new(Id, Url, EditUrl, BroadcasterId, BroadcasterLogin, CreatorId, CreatorLogin, VideoId);
+        new(
+            Id,
+            Url,
+            EditUrl,
+            BroadcasterId,
+            BroadcasterLogin,
+            CreatorId,
+            CreatorLogin,
+            VideoId,
+            Title,
+            CreatedAt,
+            DurationSeconds
+        );
 }
 
 internal sealed record HelixStreamMarkerResponse

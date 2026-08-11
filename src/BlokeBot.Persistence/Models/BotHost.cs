@@ -36,6 +36,10 @@ public sealed class BotHost
 
     public DateTime? CompetitionsAcceptWorkAfterUtc { get; set; }
 
+    public DateTime? RaidCollaborationPausedAtUtc { get; set; }
+
+    public DateTime? RaidCollaborationAcceptEventsAfterUtc { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

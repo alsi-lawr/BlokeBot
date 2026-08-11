@@ -37,6 +37,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.Points => $"{_featureIconBase} text-emerald-600",
                 HostFeatureFlags.Bounties => $"{_featureIconBase} text-amber-700",
                 HostFeatureFlags.Competitions => $"{_featureIconBase} text-violet-700",
+                HostFeatureFlags.RaidCollaboration => $"{_featureIconBase} text-purple-700",
                 HostFeatureFlags.CommunityProgression => $"{_featureIconBase} text-fuchsia-700",
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
                 HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
@@ -85,6 +86,11 @@ public partial class HostConfigPage
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M8 4h8v4c0 3-1.4 5-4 6-2.6-1-4-3-4-6V4Z" />
                     <path d="M8 6H5v2c0 2 1.2 3.2 3.5 3.5M16 6h3v2c0 2-1.2 3.2-3.5 3.5M12 14v4M8 20h8" />
+                </svg>
+                """,
+                HostFeatureFlags.RaidCollaboration => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h11M11 3l4 4-4 4M20 17H9M13 13l-4 4 4 4" />
                 </svg>
                 """,
                 HostFeatureFlags.CommunityProgression => """
@@ -218,6 +224,10 @@ public partial class HostConfigPage
                 "Its dashboard and Browser Sources are available again.",
             HostFeatureFlags.Overlays =>
                 "Its dashboard and Browser Sources are unavailable until you enable it again.",
+            HostFeatureFlags.RaidCollaboration when enabled =>
+                "Its hub and fresh EventSub processing are available again; suppressed work is not replayed.",
+            HostFeatureFlags.RaidCollaboration =>
+                "Its hub, raid processing, welcome actions, and provider calls are paused while saved history and settings remain.",
             _ when enabled => "Its chat commands and pages are available again.",
             _ => "Its chat commands and pages are unavailable until you enable it again.",
         };
@@ -229,6 +239,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.Bounties => "Bounties",
             HostFeatureFlags.Competitions => "Tournaments & leagues",
+            HostFeatureFlags.RaidCollaboration => "Raid & collaboration",
             HostFeatureFlags.CommunityProgression => "Community progression",
             HostFeatureFlags.ViewerPassports => "Viewer passports",
             HostFeatureFlags.Bingo => "Bingo",

@@ -1,5 +1,6 @@
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -12,6 +13,12 @@ internal static class SimulationServiceCollectionExtensions
     {
         _ = services.Replace(
             ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider())
+        );
+        _ = services.Replace(
+            ServiceDescriptor.Singleton<
+                IRaidCollaborationProvider,
+                SimulationRaidCollaborationProvider
+            >()
         );
         _ = services.AddSingleton<SimulationCommandCatalogScenario>();
         _ = services.Replace(
@@ -90,5 +97,69 @@ internal static class SimulationServiceCollectionExtensions
     {
         public Task<bool> ExistsAsync(string login, CancellationToken ct) =>
             Task.FromResult(!string.IsNullOrWhiteSpace(login));
+    }
+
+    private sealed class SimulationRaidCollaborationProvider(TimeProvider clock)
+        : IRaidCollaborationProvider
+    {
+        public Task<RaidChannelSnapshotOutcome> LoadLiveChannelAsync(
+            int hostId,
+            string login,
+            string? approvedClipId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<RaidChannelSnapshotOutcome>(
+                login switch
+                {
+                    "maplepixel" => new RaidChannelSnapshotOutcome.Available(
+                        new(
+                            "maple-id",
+                            "maplepixel",
+                            "MaplePixel",
+                            "maple-stream",
+                            "Celeste",
+                            "en",
+                            "Golden berries and good company",
+                            126,
+                            new(
+                                "maple-clip",
+                                "https://clips.twitch.tv/MapleClip",
+                                "Golden berry, finally",
+                                clock.GetUtcNow().AddDays(-4),
+                                27.4m
+                            )
+                        )
+                    ),
+                    "cozyworkshop" => new RaidChannelSnapshotOutcome.Available(
+                        new(
+                            "cozy-id",
+                            "cozyworkshop",
+                            "CozyWorkshop",
+                            "cozy-stream",
+                            "Makers & Crafting",
+                            "en",
+                            "Building a tiny arcade cabinet",
+                            74,
+                            null
+                        )
+                    ),
+                    _ => new RaidChannelSnapshotOutcome.Offline(login),
+                }
+            );
+
+        public Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
+            int hostId,
+            string targetTwitchUserId,
+            string targetLogin,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<ConfirmedRaidStartOutcome>(
+                new ConfirmedRaidStartOutcome.Started(targetLogin)
+            );
+
+        public Task<bool> HasRaidManagementAuthorizationAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(true);
     }
 }

@@ -97,6 +97,65 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
     }
 
     [Test]
+    public async Task RaidCollaborationSwitch_CreatesIncomingAndOutgoingRaidSubscriptions()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.Raids,
+            true
+        );
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.OutgoingRaids,
+            true
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        operations
+            .OperationKinds("channel")
+            .ShouldBe([
+                null,
+                EventSubOperationSubscriptionKind.Raids,
+                EventSubOperationSubscriptionKind.OutgoingRaids,
+            ]);
+        operations.CreateCount("channel").ShouldBe(3);
+    }
+
+    [Test]
+    public async Task RaidCollaborationFeature_RequiresBothRaidDirectionsWithoutShoutouts()
+    {
+        var operations = new EventSubChannelOperations(
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            null!,
+            new RaidCollaborationOnlyFeatures()
+        );
+
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.Raids,
+                default
+            )
+        ).ShouldBeTrue();
+        (
+            await operations.NativeTwitchFeatureIsEnabledAsync(
+                "channel",
+                EventSubOperationSubscriptionKind.OutgoingRaids,
+                default
+            )
+        ).ShouldBeTrue();
+    }
+
+    [Test]
     public async Task RaidCleanupFailure_DisableRetriesBeforeReenableAndRetainsChat()
     {
         var operations = new ScriptedChannelOperations();
@@ -296,5 +355,14 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
             default:
                 throw new ArgumentOutOfRangeException(nameof(groupIndex));
         }
+    }
+
+    private sealed class RaidCollaborationOnlyFeatures : INativeTwitchFeatureStateProvider
+    {
+        public ValueTask<bool> IsEnabledAsync(
+            string channel,
+            NativeTwitchFeature feature,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromResult(feature == NativeTwitchFeature.RaidCollaboration);
     }
 }

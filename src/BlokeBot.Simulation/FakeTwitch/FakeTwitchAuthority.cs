@@ -51,6 +51,7 @@ public sealed record FakeTwitchScenarioDefinition
                 "channel:manage:polls",
                 "clips:edit",
                 "channel:manage:broadcast",
+                "channel:manage:raids",
                 "channel:read:redemptions",
                 "channel:manage:redemptions",
                 "channel:read:predictions",
@@ -275,6 +276,10 @@ public sealed class FakeTwitchAuthority
                 or "channel.shoutout.create"
                 or "channel.shoutout.receive";
         var raidSubscription = type is "channel.raid";
+        var raidConditionKey =
+            raidSubscription && condition.ContainsKey("from_broadcaster_user_id")
+                ? "from_broadcaster_user_id"
+                : "to_broadcaster_user_id";
         var channelUpdateSubscription = type is "channel.update";
         var broadcasterSubscription =
             channelUpdateSubscription
@@ -293,7 +298,7 @@ public sealed class FakeTwitchAuthority
             version != (channelUpdateSubscription ? "2" : "1")
             || (!botSubscription && !raidSubscription && !broadcasterSubscription)
             || !condition.TryGetValue(
-                raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
+                raidSubscription ? raidConditionKey : "broadcaster_user_id",
                 out var broadcasterId
             )
             || broadcasterId != Definition.AuthorizedUser.Id

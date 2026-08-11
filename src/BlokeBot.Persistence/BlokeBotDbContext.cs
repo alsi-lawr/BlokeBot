@@ -119,6 +119,14 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         Set<AutomaticRaidShoutoutOutcome>();
     public DbSet<HostBroadcasterAuthorization> HostBroadcasterAuthorizations =>
         Set<HostBroadcasterAuthorization>();
+
+    public DbSet<RaidCollaborationSettings> RaidCollaborationSettings =>
+        Set<RaidCollaborationSettings>();
+
+    public DbSet<ApprovedRaidChannel> ApprovedRaidChannels => Set<ApprovedRaidChannel>();
+
+    public DbSet<RaidCollaborationHistoryEntry> RaidCollaborationHistory =>
+        Set<RaidCollaborationHistoryEntry>();
     public DbSet<TwitchPollTemplate> TwitchPollTemplates => Set<TwitchPollTemplate>();
     public DbSet<TwitchPollTemplateChoice> TwitchPollTemplateChoices =>
         Set<TwitchPollTemplateChoice>();
@@ -194,6 +202,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureChannelPoints(modelBuilder);
         ConfigurePredictions(modelBuilder);
         ConfigureRequestBoards(modelBuilder);
+        ConfigureRaidCollaboration(modelBuilder);
         ConfigurePlayWithViewers(modelBuilder);
         ConfigureMoments(modelBuilder);
         ConfigureOverlays(modelBuilder);

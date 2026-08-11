@@ -239,6 +239,50 @@ public sealed class HelixClient(
         }
     }
 
+    public async Task<HelixRaidStartOutcome> StartRaidAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string targetBroadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            endpointPolicy.HelixEndpoint("raids").AbsoluteUri
+            + "?"
+            + QueryString.Create(
+                new Dictionary<string, string?>
+                {
+                    ["from_broadcaster_id"] = broadcasterId,
+                    ["to_broadcaster_id"] = targetBroadcasterId,
+                }
+            );
+        using var request = HelixRequest.Create(HttpMethod.Post, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return new HelixRaidStartOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound)
+        {
+            return new HelixRaidStartOutcome.InvalidTarget();
+        }
+        if (response.StatusCode is HttpStatusCode.Conflict)
+        {
+            return new HelixRaidStartOutcome.AlreadyPending();
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixRaidStartOutcome.Unavailable();
+        }
+        var payload = await response.Content.ReadFromJsonAsync<RaidStartResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault() is { } raid
+            ? new HelixRaidStartOutcome.Started(raid.CreatedAt, raid.IsMature)
+            : new HelixRaidStartOutcome.Unavailable();
+    }
+
     public async Task<ShoutoutSendResult> SendShoutoutAsync(
         HelixRequestContext context,
         string broadcasterId,
@@ -955,7 +999,17 @@ public sealed class HelixClient(
             cancellationToken
         );
         return payload?.Data.FirstOrDefault() is { } stream
-            ? new HelixStream(stream.Id, stream.UserId, stream.UserLogin, stream.ViewerCount)
+            ? new HelixStream(
+                stream.Id,
+                stream.UserId,
+                stream.UserLogin,
+                stream.UserName,
+                stream.GameName,
+                stream.Title,
+                stream.Language,
+                stream.ViewerCount,
+                stream.StartedAt
+            )
             : null;
     }
 
@@ -1406,6 +1460,21 @@ public sealed class HelixClient(
     {
         [JsonPropertyName("data")]
         public required ImmutableArray<ChannelInformationItem> Data { get; init; }
+    }
+
+    private sealed record RaidStartResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<RaidStartItem> Data { get; init; }
+    }
+
+    private sealed record RaidStartItem
+    {
+        [JsonPropertyName("created_at")]
+        public required DateTimeOffset CreatedAt { get; init; }
+
+        [JsonPropertyName("is_mature")]
+        public required bool IsMature { get; init; }
     }
 
     private sealed record ChannelInformationItem

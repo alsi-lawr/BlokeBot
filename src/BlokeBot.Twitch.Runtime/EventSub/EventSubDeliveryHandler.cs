@@ -282,17 +282,35 @@ internal sealed class EventSubDeliveryHandler(
     )
     {
         // Automation observers gate on their own feature switch, not on Shoutouts.
-        await NotifyAutomationObserversAsync(
-            (observer, token) => observer.IncomingRaidReceivedAsync(incomingRaid, token),
-            cancellationToken
-        );
-        if (
-            !await nativeTwitch.IsEnabledAsync(
-                incomingRaid.ToBroadcasterUserLogin,
-                NativeTwitchFeature.Shoutouts,
+        if (incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Incoming)
+        {
+            await NotifyAutomationObserversAsync(
+                (observer, token) => observer.IncomingRaidReceivedAsync(incomingRaid, token),
                 cancellationToken
-            )
-        )
+            );
+        }
+        var targetEnabled =
+            incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Incoming
+            && (
+                await nativeTwitch.IsEnabledAsync(
+                    incomingRaid.ToBroadcasterUserLogin,
+                    NativeTwitchFeature.Shoutouts,
+                    cancellationToken
+                )
+                || await nativeTwitch.IsEnabledAsync(
+                    incomingRaid.ToBroadcasterUserLogin,
+                    NativeTwitchFeature.RaidCollaboration,
+                    cancellationToken
+                )
+            );
+        var sourceEnabled =
+            incomingRaid.SubscriptionDirection is EventSubRaidSubscriptionDirection.Outgoing
+            && await nativeTwitch.IsEnabledAsync(
+                incomingRaid.FromBroadcasterUserLogin,
+                NativeTwitchFeature.RaidCollaboration,
+                cancellationToken
+            );
+        if (!targetEnabled && !sourceEnabled)
         {
             return;
         }

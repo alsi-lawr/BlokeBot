@@ -8,6 +8,7 @@ internal sealed partial class EventSubChannelSession
     [
         EventSubOperationSubscriptionKind.Shoutouts,
         EventSubOperationSubscriptionKind.Raids,
+        EventSubOperationSubscriptionKind.OutgoingRaids,
         EventSubOperationSubscriptionKind.Polls,
         EventSubOperationSubscriptionKind.RewardRedemptions,
         EventSubOperationSubscriptionKind.Predictions,
@@ -632,6 +633,8 @@ internal sealed partial class EventSubChannelSession
         {
             EventSubOperationSubscriptionKind.Shoutouts => subscription.ShoutoutSubscriptions,
             EventSubOperationSubscriptionKind.Raids => subscription.RaidSubscriptions,
+            EventSubOperationSubscriptionKind.OutgoingRaids =>
+                subscription.OutgoingRaidSubscriptions,
             EventSubOperationSubscriptionKind.Polls => subscription.PollSubscriptions,
             EventSubOperationSubscriptionKind.RewardRedemptions =>
                 subscription.RewardRedemptionSubscriptions,
@@ -669,6 +672,10 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Raids => subscription with
             {
                 RaidSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.OutgoingRaids => subscription with
+            {
+                OutgoingRaidSubscriptions = state,
             },
             EventSubOperationSubscriptionKind.Polls => subscription with
             {
@@ -724,6 +731,8 @@ internal sealed partial class EventSubChannelSession
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
             EventSubOperationSubscriptionKind.Raids =>
                 EventSubAuthorizationContext.ConfiguredBotAuthority,
+            EventSubOperationSubscriptionKind.OutgoingRaids =>
+                EventSubAuthorizationContext.ConfiguredBotAuthority,
             EventSubOperationSubscriptionKind.Polls =>
                 EventSubAuthorizationContext.BroadcasterAuthority,
             EventSubOperationSubscriptionKind.RewardRedemptions =>
@@ -754,6 +763,8 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Shoutouts =>
                 AccessTokenUnavailableReason.MissingRefreshToken,
             EventSubOperationSubscriptionKind.Raids =>
+                AccessTokenUnavailableReason.MissingRefreshToken,
+            EventSubOperationSubscriptionKind.OutgoingRaids =>
                 AccessTokenUnavailableReason.MissingRefreshToken,
             EventSubOperationSubscriptionKind.Polls =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,

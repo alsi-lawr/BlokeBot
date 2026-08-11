@@ -22,8 +22,14 @@ public enum HostFeatureFlags : ulong
     Bingo = 1UL << 15,
     ViewerPassports = 1UL << 16,
     Competitions = 1UL << 17,
+    RaidCollaboration = 1UL << 18,
     NativeTwitchFeatures =
-        Shoutouts | Polls | ClipsAndMarkers | RewardsAndRedemptions | Predictions,
+        Shoutouts
+        | Polls
+        | ClipsAndMarkers
+        | RewardsAndRedemptions
+        | Predictions
+        | RaidCollaboration,
     All =
         Guessing
         | Points
@@ -42,5 +48,6 @@ public enum HostFeatureFlags : ulong
         | CommunityProgression
         | Bingo
         | ViewerPassports
-        | Competitions,
+        | Competitions
+        | RaidCollaboration,
 }

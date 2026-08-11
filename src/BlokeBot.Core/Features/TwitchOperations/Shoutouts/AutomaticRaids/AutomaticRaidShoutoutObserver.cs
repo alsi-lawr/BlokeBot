@@ -23,6 +23,11 @@ public sealed class AutomaticRaidShoutoutObserver(
         CancellationToken cancellationToken
     )
     {
+        if (incomingRaid.SubscriptionDirection is not EventSubRaidSubscriptionDirection.Incoming)
+        {
+            return;
+        }
+
         if (!HasUsableIdentity(incomingRaid))
         {
             return;

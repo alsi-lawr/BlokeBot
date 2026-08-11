@@ -57,6 +57,7 @@
                     );
                     var showBingo = FeatureIsVisible(session, selection, HostFeatureFlags.Bingo);
                     var showCompetitions = FeatureIsVisible(session, selection, HostFeatureFlags.Competitions);
+                    var showRaidCollaboration = FeatureIsVisible(session, selection, HostFeatureFlags.RaidCollaboration);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showOverlays = FeatureIsVisible(session, selection, HostFeatureFlags.Overlays);
                     var showRequestBoards = FeatureIsVisible(session, selection, HostFeatureFlags.RequestBoards);
@@ -71,7 +72,7 @@
                     var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showViewerPassports || showBingo || showCompetitions || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
+                        showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showViewerPassports || showBingo || showCompetitions || showRaidCollaboration || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -254,6 +255,24 @@
                                      @onclick="NotifyNavigatedAsync">Predictions</NavLink>
                             }
                         </div>
+                    </div>
+                }
+
+                @if (showRaidCollaboration)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="raid-collaboration">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="raid-collaboration"
+                                 aria-label="Raid and collaboration"
+                                 aria-describedby="@RouteHelpReference("raid-collaboration")"
+                                 aria-current="@CurrentRoute("raid-collaboration")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">⇄</span>
+                            <span class="nav-menu__label min-w-0">Raid &amp; collaboration</span>
+                        </NavLink>
+                        @RouteHelp("raid-collaboration", "Raid & collaboration")
                     </div>
                 }
 

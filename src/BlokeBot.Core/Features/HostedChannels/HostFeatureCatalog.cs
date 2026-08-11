@@ -23,6 +23,7 @@ public static class HostFeatureCatalog
         HostFeatureFlags.ViewerPassports,
         HostFeatureFlags.Bingo,
         HostFeatureFlags.Competitions,
+        HostFeatureFlags.RaidCollaboration,
         HostFeatureFlags.CustomCommands,
     ];
 
@@ -123,6 +124,12 @@ public static class HostFeatureCatalog
                 "Tournaments & leagues",
                 "Run viewer brackets, round-robin leagues, and prediction leagues.",
                 enabledFeatures.Contains(HostFeatureFlags.Competitions)
+            ),
+            new(
+                HostFeatureFlags.RaidCollaboration,
+                "Raid & collaboration",
+                "Welcome incoming raids and choose approved live channels with explainable filters.",
+                enabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
             ),
             new(
                 HostFeatureFlags.CustomCommands,

@@ -17,5 +17,13 @@ public sealed record EventSubIncomingRaidEvent(
     string ToBroadcasterUserId,
     string ToBroadcasterUserLogin,
     string ToBroadcasterUserName,
-    int ViewerCount
+    int ViewerCount,
+    EventSubRaidSubscriptionDirection SubscriptionDirection =
+        EventSubRaidSubscriptionDirection.Incoming
 );
+
+public enum EventSubRaidSubscriptionDirection
+{
+    Incoming,
+    Outgoing,
+}

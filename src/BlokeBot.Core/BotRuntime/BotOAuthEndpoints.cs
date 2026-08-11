@@ -368,7 +368,9 @@ internal static class BotOAuthEndpoints
                             .CreateAuthorizationUriForScopes(
                                 readyStates.Issue(session.UserId, selectedHost.Id),
                                 OAuthAuthorizationScopeSet.Create(
-                                    HostBroadcasterAuthorizationService.MilestoneScopes
+                                    context.Request.Query.ContainsKey("raid")
+                                        ? HostBroadcasterAuthorizationService.RaidManagementScopes
+                                        : HostBroadcasterAuthorizationService.MilestoneScopes
                                 )
                             )
                             .Match<IResult>(

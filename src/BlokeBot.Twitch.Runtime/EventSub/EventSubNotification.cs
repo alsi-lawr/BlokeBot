@@ -91,7 +91,8 @@ internal abstract record EventSubNotification
             "channel.raid" when subscriptionVersion == "1" => ParseIncomingRaid(
                 payload,
                 options,
-                envelope.Metadata
+                envelope.Metadata,
+                RaidDirection(envelope.Subscription)
             ),
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
@@ -207,14 +208,23 @@ internal abstract record EventSubNotification
     private static EventSubNotification ParseIncomingRaid(
         JsonElement payload,
         JsonSerializerOptions options,
-        EventSubMetadata metadata
+        EventSubMetadata metadata,
+        EventSubRaidSubscriptionDirection direction
     ) =>
         payload.Deserialize<EventSubIncomingRaidWireEvent>(options) switch
         {
-            { } incomingRaid when incomingRaid.ToDomain(metadata) is { } normalized =>
+            { } incomingRaid when incomingRaid.ToDomain(metadata, direction) is { } normalized =>
                 new IncomingRaid(normalized),
             _ => new Unknown(),
         };
+
+    private static EventSubRaidSubscriptionDirection RaidDirection(JsonElement? subscription) =>
+        subscription is { ValueKind: JsonValueKind.Object } value
+        && value.TryGetProperty("condition", out var condition)
+        && condition.ValueKind is JsonValueKind.Object
+        && condition.TryGetProperty("from_broadcaster_user_id", out _)
+            ? EventSubRaidSubscriptionDirection.Outgoing
+            : EventSubRaidSubscriptionDirection.Incoming;
 
     private static EventSubNotification ParsePrediction(
         EventSubPredictionWireEvent prediction,

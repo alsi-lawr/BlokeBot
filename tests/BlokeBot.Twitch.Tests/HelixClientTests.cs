@@ -45,7 +45,12 @@ public sealed class HelixClientTests
 
         var stream = await client.GetStreamAsync(Context(), "Streamer", CancellationToken.None);
 
-        stream.ShouldNotBeNull().Id.ShouldBe("stream-id");
+        var live = stream.ShouldNotBeNull();
+        live.Id.ShouldBe("stream-id");
+        live.GameName.ShouldBe("Example Game");
+        live.Title.ShouldBe("Representative stream");
+        live.Language.ShouldBe("en");
+        live.ViewerCount.ShouldBe(42);
     }
 
     [Test]
@@ -490,6 +495,34 @@ public sealed class HelixClientTests
         );
 
         _ = result.ShouldBeOfType<ShoutoutSendResult.Sent>();
+    }
+
+    [Test]
+    public async Task ConfirmedRaid_StartsThroughSupportedHelixEndpoint()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(static request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Post);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/raids");
+            request.RequestUri.Query.ShouldContain("from_broadcaster_id=source-id");
+            request.RequestUri.Query.ShouldContain("to_broadcaster_id=target-id");
+            return JsonResponse(
+                """{"data":[{"created_at":"2026-08-11T12:00:00Z","is_mature":false}]}"""
+            );
+        });
+        var client = new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+
+        var result = await client.StartRaidAsync(
+            Context(),
+            "source-id",
+            "target-id",
+            CancellationToken.None
+        );
+
+        result
+            .ShouldBeOfType<HelixRaidStartOutcome.Started>()
+            .CreatedAt.ShouldBe(new DateTimeOffset(2026, 8, 11, 12, 0, 0, TimeSpan.Zero));
     }
 
     [Test]
