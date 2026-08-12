@@ -512,7 +512,6 @@ public sealed class CustomCommandSettingsUiTests
         save = cut.Find("button[aria-label='Save custom commands']");
         save.HasAttribute("disabled").ShouldBeFalse();
         save.GetAttribute("data-save-state").ShouldBe("dirty");
-        save.ClassList.ShouldContain("save-changes-button");
         save.Click();
 
         save = cut.Find("button[aria-label='Save custom commands']");

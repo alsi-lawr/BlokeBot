@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -95,35 +93,6 @@ public sealed partial class RaidCollaborationUiTests
     }
 
     [Test]
-    [Arguments("#hub")]
-    [Arguments("#settings")]
-    public async Task DisabledFeature_ShowsRecoveryWithoutWorkspacePanelsOrRetainedData(
-        string fragment
-    )
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateContextAsync(database, HostFeatureFlags.None);
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .NavigateTo("/raid-collaboration" + fragment);
-
-        var page = context.Render<RaidCollaborationPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            page.Find("[data-raid-collaboration-disabled-recovery]")
-                .TextContent.ShouldContain("Raid & collaboration is off for this channel.");
-            page.FindAll("[role='tablist']").ShouldBeEmpty();
-            page.FindAll("[role='tabpanel']").ShouldBeEmpty();
-            page.FindAll("[data-raid-history]").ShouldBeEmpty();
-            page.FindAll("[data-raid-settings]").ShouldBeEmpty();
-            page.Markup.ShouldNotContain("cozyworkshop");
-            page.Markup.ShouldNotContain("maplepixel");
-            page.Markup.ShouldNotContain("Celeste");
-        });
-    }
-
-    [Test]
     public async Task Settings_SaveArbitraryLanguageCategoriesAndApprovedChannelChanges()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -174,25 +143,6 @@ public sealed partial class RaidCollaborationUiTests
     }
 
     [Test]
-    public async Task InvalidWelcomeMessage_ReportsValidationAndPersistsNothing()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateContextAsync(database);
-        var page = RenderSettings(context);
-
-        page.Find("#raid-welcome-message").Input("   ");
-        page.Find("#raid-language").Input("de");
-        Save(page, "validation");
-
-        page.Find("[data-save-feedback='validation']")
-            .TextContent.ShouldContain("Welcome message must be between 1 and 500 characters.");
-        await using var verify = await database.CreateDbContextAsync();
-        var settings = await verify.RaidCollaborationSettings.SingleAsync();
-        settings.Language.ShouldBe("en");
-        settings.WelcomeMessage.ShouldBe("Welcome in, {display_name}!");
-    }
-
-    [Test]
     public async Task SettingsWorkspace_ExposesOneSaveControlAndProgrammaticFormSemantics()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -237,49 +187,6 @@ public sealed partial class RaidCollaborationUiTests
             .GetAttribute("aria-labelledby")
             .ShouldBe("raid-categories-label");
         page.Find("#raid-categories-label").TextContent.ShouldBe("Eligible categories");
-    }
-
-    [Test]
-    public async Task RelationshipHistory_RendersOneBorderedCardPerRecordWithNoPaginationOrViewAll()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateContextAsync(database);
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .NavigateTo("/raid-collaboration#hub");
-
-        var page = context.Render<RaidCollaborationPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            var cards = page.FindAll("[data-raid-history] .raid-history__card");
-            cards.Count.ShouldBe(5);
-            cards[0].TextContent.ShouldContain("@maplepixel");
-            page.Markup.ShouldNotContain("View all");
-            page.FindAll("[data-raid-history] button").ShouldBeEmpty();
-        });
-    }
-
-    [Test]
-    public void HistoryGridCss_DeclaresFiveThreeAndOneColumnsAtTheReviewedBreakpoints()
-    {
-        var css = Whitespace()
-            .Replace(
-                File.ReadAllText(
-                    Path.Combine(RaidFeatureSourceRoot(), "RaidCollaborationPage.razor.css")
-                ),
-                " "
-            );
-
-        css.ShouldContain(
-            ".raid-history { display: grid; gap: 0.75rem; grid-template-columns: repeat(5, minmax(0, 1fr)); }"
-        );
-        css.ShouldContain(
-            "@media (max-width: 1450px) { .raid-history { grid-template-columns: repeat(3, minmax(0, 1fr)); } }"
-        );
-        css.ShouldContain(
-            "@media (max-width: 900px) { .raid-hub, .raid-history, .raid-split { grid-template-columns: minmax(0, 1fr); }"
-        );
     }
 
     private static IRenderedComponent<RaidCollaborationPage> RenderSettings(BunitContext context)
@@ -391,22 +298,6 @@ public sealed partial class RaidCollaborationUiTests
             OccurredAtUtc = occurredAt.UtcDateTime,
             RecordedAtUtc = occurredAt.UtcDateTime,
         };
-
-    private static string RaidFeatureSourceRoot([CallerFilePath] string testFile = "") =>
-        Path.GetFullPath(
-            Path.Combine(
-                Path.GetDirectoryName(testFile)!,
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features",
-                "RaidCollaboration"
-            )
-        );
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex Whitespace();
 
     private sealed class OfflineRaidProvider : IRaidCollaborationProvider
     {

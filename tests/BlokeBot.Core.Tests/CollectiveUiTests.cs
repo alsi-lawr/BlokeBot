@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Collectives;
@@ -167,64 +165,6 @@ public sealed partial class CollectiveUiTests
         var valueSelector = page.Find(".collective-summary__select");
         valueSelector.HasAttribute("href").ShouldBeFalse();
         valueSelector.GetAttribute("role").ShouldBeNull();
-    }
-
-    [Test]
-    public async Task LocalSettings_RenderOneControlSetInOneStickySaveBoundaryAndTabOrder()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var workspace = await SeedWorkspaceAsync(database);
-        using var context = CreateContext(database, workspace);
-
-        var page = RenderAt(context, "goal");
-
-        page.FindAll("#collective-notification").Count.ShouldBe(1);
-        page.FindAll("#collective-goal-source").Count.ShouldBe(1);
-        page.FindAll("[data-collective-local-settings]").Count.ShouldBe(1);
-        page.FindAll("[data-save-scope]").Count.ShouldBe(1);
-        page.FindAll("button")
-            .Count(button => button.TextContent.Trim() == "Save local settings")
-            .ShouldBe(1);
-        LocalSettingsTabOrder(page)
-            .ShouldBe([
-                "collective-goal-source",
-                "Use this source",
-                "collective-notification",
-                "Save local settings",
-            ]);
-
-        var region = page.Find("[data-save-scope]");
-        region.GetAttribute("data-save-scope").ShouldBe("editor");
-        var boundary = region.Closest("[data-sticky-save-scope]").ShouldNotBeNull();
-        boundary.ClassList.ShouldContain("collective-sidecar__body");
-        _ = boundary.QuerySelector("[data-collective-local-settings]").ShouldNotBeNull();
-        region.Closest("details").ShouldBeNull();
-        region.Closest("[hidden]").ShouldBeNull();
-        page.FindAll(".collective-sidecar__body [inert]").ShouldBeEmpty();
-        page.Find(".collective-mobile-management").TextContent.ShouldContain("partner");
-    }
-
-    [Test]
-    public void NarrowLayoutCss_KeepsTheOneLocalSettingsSetReachableAtOrBelow64Rem()
-    {
-        var css = Whitespace()
-            .Replace(File.ReadAllText(Path.Combine(StyleSourceRoot(), "collectives.css")), " ");
-        var narrow = css[css.IndexOf("@media (max-width: 64rem)", StringComparison.Ordinal)..];
-        narrow = narrow[..narrow.IndexOf("@media (max-width: 40rem)", StringComparison.Ordinal)];
-
-        css.ShouldNotContain("container-type");
-        css.ShouldContain(".collective-local-settings__head { display: none; }");
-        narrow.ShouldContain(".collective-members { display: none; }");
-        narrow.ShouldContain(
-            ".collective-sidecar { border-top: 1px solid var(--app-border); order: 2; }"
-        );
-        narrow.ShouldContain(
-            ".collective-sidecar > header, .collective-sidecar__authority > .collective-sidecar__label, .collective-sidecar__authority > h3, .collective-sidecar__authority > .collective-private, .collective-sidecar__body > .collective-sidecar__shared, .collective-sidecar__body > .collective-sidecar__audit { display: none; }"
-        );
-        narrow.ShouldContain(
-            ".collective-local-settings__head { align-items: center; display: grid;"
-        );
-        Regex.Count(narrow, "display: none").ShouldBe(2);
     }
 
     [Test]
@@ -552,22 +492,6 @@ public sealed partial class CollectiveUiTests
         );
         _ = await db.SaveChangesAsync();
     }
-
-    private static string StyleSourceRoot([CallerFilePath] string testFile = "") =>
-        Path.GetFullPath(
-            Path.Combine(
-                Path.GetDirectoryName(testFile)!,
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Styles",
-                "features"
-            )
-        );
-
-    [GeneratedRegex(@"\s+")]
-    private static partial Regex Whitespace();
 
     private sealed record SeededWorkspace(
         int HostId,

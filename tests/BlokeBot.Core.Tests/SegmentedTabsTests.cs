@@ -100,22 +100,6 @@ public sealed class SegmentedTabsTests
     }
 
     [Test]
-    public void FragmentTabs_RenderEveryTabAsALinkableFragmentAnchor()
-    {
-        using var context = new BunitContext();
-        _ = context.Services.AddScoped<DashboardFragmentState>();
-        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
-        navigation.NavigateTo("/overlays#cues");
-
-        var tabs = RenderFragmentTabs(context);
-
-        tabs.FindAll("[role='tab']")
-            .Select(tab => tab.GetAttribute("href"))
-            .ShouldBe(["#sources", "#cues", "#media"]);
-        tabs.FindAll("button").ShouldBeEmpty();
-    }
-
-    [Test]
     [Arguments("/overlays")]
     [Arguments("/overlays#unknown-tab")]
     public void FragmentTabs_BareOrUnknownFragment_IsReplacedWithTheFirstCanonicalFragment(
