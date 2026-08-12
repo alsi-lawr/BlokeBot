@@ -29,7 +29,6 @@ internal static class SiteRoutes
         "/community/collectives",
         "/community/bingo",
         "/twitch-operations",
-        "/twitch-operations/shoutouts",
         "/twitch-operations/polls",
         "/twitch-operations/clips-markers",
         "/twitch-operations/channel-points",

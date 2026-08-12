@@ -1,6 +1,7 @@
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -25,7 +26,9 @@ public partial class RaidCollaborationPage
     private ConfigurationDraft _draft = new();
     private string _workspaceKey = _hubKey;
     private string _categoryDraft = string.Empty;
+    private string _shoutoutTarget = string.Empty;
     private string? _preparedRaidLogin;
+    private string? _approvingLogin;
     private string _operationFeedback = string.Empty;
     private bool _operationFailed;
     private bool _loading = true;
@@ -33,10 +36,11 @@ public partial class RaidCollaborationPage
     private bool _loadFailed;
     private bool _saving;
     private PageSaveFeedback? _saveFeedback;
+    private IReadOnlyList<AutomaticRaidShoutoutValidationError> _shoutoutErrors = [];
 
     private static string DescriptionFor(string key) =>
         key == _settingsKey
-            ? "Choose how raids are welcomed and shortlisted."
+            ? "Choose how raids are welcomed, shouted out, and shortlisted."
             : "Welcome new communities and choose where to raid next.";
 
     protected override async Task OnInitializedAsync()
@@ -45,16 +49,20 @@ public partial class RaidCollaborationPage
         _ = await LoadPageContextAsync();
         _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
-                [AppEventKind.HostedChannelsChanged, AppEventKind.RaidCollaborationChanged],
+                [
+                    AppEventKind.HostedChannelsChanged,
+                    AppEventKind.RaidCollaborationChanged,
+                    AppEventKind.TwitchOperationsChanged,
+                ],
                 InvokeAsync,
-                LoadAsync,
+                RefreshAsync,
                 StateHasChanged
             )
         );
-        await LoadAsync();
+        await RefreshAsync();
     }
 
-    private async Task LoadAsync()
+    private async Task RefreshAsync()
     {
         _loading = true;
         _disabled = false;
@@ -67,7 +75,7 @@ public partial class RaidCollaborationPage
             _loading = false;
             return;
         }
-        var outcome = await _service.LoadAsync(HostId, CancellationToken.None);
+        var outcome = await _service.LoadAsync(HostId, _shoutoutTarget, CancellationToken.None);
         switch (outcome)
         {
             case RaidCollaborationLoadOutcome.Loaded loaded:
@@ -104,12 +112,19 @@ public partial class RaidCollaborationPage
                 {
                     case RaidCollaborationSaveOutcome.Saved saved:
                         _draft = ConfigurationDraft.From(saved.Configuration);
+                        _shoutoutErrors = [];
                         _saveFeedback = new("Settings saved.", PageSaveFeedbackKind.Success);
                         await LoadDashboardWithoutReplacingFeedbackAsync(hostId);
                         break;
                     case RaidCollaborationSaveOutcome.Invalid invalid:
+                        _shoutoutErrors = invalid.ShoutoutErrors;
                         _saveFeedback = new(
-                            string.Join(" ", invalid.Errors),
+                            string.Join(
+                                " ",
+                                invalid.Errors.Concat(
+                                    invalid.ShoutoutErrors.Select(error => error.Message)
+                                )
+                            ),
                             PageSaveFeedbackKind.Validation
                         );
                         break;
@@ -134,7 +149,7 @@ public partial class RaidCollaborationPage
     private async Task LoadDashboardWithoutReplacingFeedbackAsync(int hostId)
     {
         if (
-            await _service.LoadAsync(hostId, CancellationToken.None)
+            await _service.LoadAsync(hostId, _shoutoutTarget, CancellationToken.None)
             is RaidCollaborationLoadOutcome.Loaded loaded
         )
         {
@@ -142,27 +157,45 @@ public partial class RaidCollaborationPage
         }
     }
 
-    private async Task SendShoutoutAsync(string login)
+    private Task SendShortlistShoutoutAsync(string login) =>
+        RunShoutoutAsync(
+            login,
+            () => _service.SendShortlistShoutoutAsync(HostId, login, CancellationToken.None)
+        );
+
+    private Task SendShoutoutAsync() =>
+        RunShoutoutAsync(
+            _shoutoutTarget,
+            () => _service.SendShoutoutAsync(HostId, _shoutoutTarget, CancellationToken.None)
+        );
+
+    private async Task RunShoutoutAsync(string login, Func<Task<ShoutoutOperationOutcome>> send)
     {
         _operationFeedback = string.Empty;
         await RunSelectedHostMutationAsync(
             HostId,
             async () =>
             {
-                var outcome = await _service.SendShoutoutAsync(
-                    HostId,
-                    login,
-                    CancellationToken.None
-                );
-                (_operationFeedback, _operationFailed) = outcome switch
+                (_operationFeedback, _operationFailed) = await send() switch
                 {
-                    ShoutoutOperationOutcome.Sent => ($"Shoutout sent to @{login}.", false),
+                    ShoutoutOperationOutcome.Sent sent => (
+                        $"Shoutout sent to @{sent.TargetLogin}.",
+                        false
+                    ),
                     ShoutoutOperationOutcome.CooldownActive cooldown => (
                         $"Shoutout cooldown is active until {cooldown.EligibleAtUtc.ToLocalTime():g}.",
                         true
                     ),
                     ShoutoutOperationOutcome.CooldownUnknown => (
                         "Twitch did not confirm the cooldown state.",
+                        true
+                    ),
+                    ShoutoutOperationOutcome.TargetNotFound missing => (
+                        $"Twitch user @{missing.TargetLogin} was not found.",
+                        true
+                    ),
+                    ShoutoutOperationOutcome.SelfTarget => (
+                        "You cannot shout out the selected channel.",
                         true
                     ),
                     ShoutoutOperationOutcome.TargetOffline => (
@@ -175,6 +208,48 @@ public partial class RaidCollaborationPage
                 await LoadDashboardWithoutReplacingFeedbackAsync(HostId);
             }
         );
+    }
+
+    private bool IsApproved(string login) =>
+        _dashboard is { } dashboard
+        && dashboard.Configuration.ApprovedChannels.Any(channel =>
+            string.Equals(channel.Login, login, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private async Task ApproveAsync(RaidRelationshipHistory entry)
+    {
+        _approvingLogin = entry.Login;
+        _operationFeedback = string.Empty;
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var outcome = await _service.ApproveChannelAsync(
+                    HostId,
+                    entry.Login,
+                    entry.DisplayName,
+                    CancellationToken.None
+                );
+                (_operationFeedback, _operationFailed) = outcome switch
+                {
+                    ApproveRaidChannelOutcome.Approved approved => (
+                        $"@{approved.Channel.Login} is now an approved channel.",
+                        false
+                    ),
+                    ApproveRaidChannelOutcome.AlreadyApproved => (
+                        $"@{entry.Login} was already approved.",
+                        false
+                    ),
+                    ApproveRaidChannelOutcome.LimitReached limit => (
+                        $"Approve no more than {limit.Limit} channels.",
+                        true
+                    ),
+                    _ => ("Raid & collaboration was turned off. Nothing changed.", true),
+                };
+                await LoadDashboardWithoutReplacingFeedbackAsync(HostId);
+            }
+        );
+        _approvingLogin = null;
     }
 
     private void PrepareRaid(string login)
@@ -233,6 +308,9 @@ public partial class RaidCollaborationPage
     private void RemoveApprovedChannel(ApprovedChannelDraft channel) =>
         _ = _draft.ApprovedChannels.Remove(channel);
 
+    private void ClearShoutoutError(AutomaticRaidShoutoutValidationField field) =>
+        _shoutoutErrors = _shoutoutErrors.Where(error => error.Field != field).ToArray();
+
     private void AddCategory()
     {
         var value = _categoryDraft.Trim();
@@ -258,16 +336,27 @@ public partial class RaidCollaborationPage
 
     private void RemoveCategory(int index) => _draft.Categories.RemoveAt(index);
 
-    private static string ShoutoutReadiness(ShoutoutDashboardState state) =>
-        state.GlobalEligibleAtUtc is { } eligibleAt
-            ? $"Next global shoutout: {eligibleAt.ToLocalTime():g}"
-            : "No global cooldown is recorded. Twitch checks again when you send.";
+    private static string CooldownText(ShoutoutDashboardState state, string target) =>
+        state switch
+        {
+            {
+                GlobalEligibleAtUtc: { } global,
+                TargetCooldown: ShoutoutTargetCooldownReadiness.EligibleAt targetCooldown
+            } =>
+                $"Next global shoutout: {global.ToLocalTime():g}. @{target} is eligible at {targetCooldown.Value.ToLocalTime():g}.",
+            { GlobalEligibleAtUtc: { } global } =>
+                $"You can send another shoutout after {global.ToLocalTime():g}. No separate time is available yet for the target you typed.",
+            { TargetCooldown: ShoutoutTargetCooldownReadiness.EligibleAt targetCooldown } =>
+                $"@{target} can be shouted out after {targetCooldown.Value.ToLocalTime():g}. The overall next-send time is not available yet.",
+            _ => "No cooldown time is available yet. Try sending when you are ready.",
+        };
 
     private sealed class ConfigurationDraft
     {
         public bool WelcomeEnabled { get; set; }
         public string WelcomeMessage { get; set; } = string.Empty;
-        public bool NativeShoutoutEnabled { get; set; }
+        public AutomaticRaidShoutoutConfiguration AutomaticShoutout { get; set; } =
+            AutomaticRaidShoutoutConfiguration.Defaults;
         public int DeduplicationWindowMinutes { get; set; }
         public string Language { get; set; } = string.Empty;
         public List<string> Categories { get; } = [];
@@ -280,7 +369,7 @@ public partial class RaidCollaborationPage
             {
                 WelcomeEnabled = value.WelcomeEnabled,
                 WelcomeMessage = value.WelcomeMessage,
-                NativeShoutoutEnabled = value.NativeShoutoutEnabled,
+                AutomaticShoutout = value.AutomaticShoutout,
                 DeduplicationWindowMinutes = value.DeduplicationWindowMinutes,
                 Language = value.Language,
                 RelationshipCooldownHours = value.RelationshipCooldownHours,
@@ -296,7 +385,7 @@ public partial class RaidCollaborationPage
             new(
                 WelcomeEnabled,
                 WelcomeMessage,
-                NativeShoutoutEnabled,
+                AutomaticShoutout,
                 DeduplicationWindowMinutes,
                 Language,
                 [.. Categories],

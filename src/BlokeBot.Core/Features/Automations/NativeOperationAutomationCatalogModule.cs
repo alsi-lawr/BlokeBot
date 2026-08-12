@@ -42,9 +42,9 @@ public static class NativeOperationAutomations
     private static readonly ImmutableDictionary<string, HostFeatureFlags> _backingFeatures =
         new Dictionary<string, HostFeatureFlags>(StringComparer.Ordinal)
         {
-            ["shoutout-sent"] = HostFeatureFlags.Shoutouts,
-            ["shoutout-received"] = HostFeatureFlags.Shoutouts,
-            ["send-shoutout"] = HostFeatureFlags.Shoutouts,
+            ["shoutout-sent"] = HostFeatureFlags.RaidCollaboration,
+            ["shoutout-received"] = HostFeatureFlags.RaidCollaboration,
+            ["send-shoutout"] = HostFeatureFlags.RaidCollaboration,
             ["poll-started"] = HostFeatureFlags.Polls,
             ["poll-progressed"] = HostFeatureFlags.Polls,
             ["poll-ended"] = HostFeatureFlags.Polls,

@@ -5,6 +5,7 @@ public sealed class AutomaticRaidShoutoutSettings
     public int Id { get; set; }
     public int HostId { get; set; }
     public bool Enabled { get; set; }
+    public bool OnlyApprovedChannels { get; set; }
     public int MinimumViewerCount { get; set; } = 1;
     public AutomaticRaidShoutoutMechanism Mechanism { get; set; } =
         AutomaticRaidShoutoutMechanism.Native;

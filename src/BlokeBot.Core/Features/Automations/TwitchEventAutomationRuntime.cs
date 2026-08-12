@@ -239,7 +239,7 @@ public sealed class TwitchEventAutomationRuntime(
                     ? configuration is ShoutoutSentSourceConfiguration
                     : configuration is ShoutoutReceivedSourceConfiguration,
             cancellation,
-            HostFeatureFlags.Automations | HostFeatureFlags.Shoutouts
+            HostFeatureFlags.Automations | HostFeatureFlags.RaidCollaboration
         );
     }
 

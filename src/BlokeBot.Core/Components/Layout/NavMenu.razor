@@ -66,12 +66,11 @@
                     var showPlayQueues = FeatureIsVisible(session, selection, HostFeatureFlags.PlayWithViewers);
                     var showMoments = FeatureIsVisible(session, selection, HostFeatureFlags.Moments);
                     var showAlerts = selection is not null && !session.IsBotAccount;
-                    var showShoutouts = FeatureIsVisible(session, selection, HostFeatureFlags.Shoutouts);
                     var showPolls = FeatureIsVisible(session, selection, HostFeatureFlags.Polls);
                     var showClipsMarkers = FeatureIsVisible(session, selection, HostFeatureFlags.ClipsAndMarkers);
                     var showRewardsRedemptions = FeatureIsVisible(session, selection, HostFeatureFlags.RewardsAndRedemptions);
                     var showPredictions = FeatureIsVisible(session, selection, HostFeatureFlags.Predictions);
-                    var nativeTwitchCount = new[] { showShoutouts, showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
+                    var nativeTwitchCount = new[] { showPolls, showClipsMarkers, showRewardsRedemptions, showPredictions }.Count(value => value);
                     var showNativeTwitch = nativeTwitchCount > 0;
                     var showChatTools =
                         showNativeTwitch || showGuessing || showPoints || showBounties || showCommunityProgression || showCooperativeGame || showViewerPassports || showBingo || showCompetitions || showRaidCollaboration || showCollectives || showCustomCommands || showOverlays || showRequestBoards || showPlayQueues || showMoments;
@@ -206,16 +205,6 @@
                              class="nav-menu__section-body grid gap-1 border-t border-slate-100"
                              hidden="@(!GroupIsOpen(NavigationGroup.NativeTwitch))">
                             <p class="nav-menu__flyout-title">Native Twitch</p>
-                            @if (showShoutouts)
-                            {
-                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
-                                     ActiveClass="nav-menu__item-active"
-                                     Match="NavLinkMatch.All"
-                                     href="twitch-operations/shoutouts"
-                                     aria-label="Shoutouts"
-                                     aria-current="@CurrentRoute("twitch-operations/shoutouts", exact: true)"
-                                     @onclick="NotifyNavigatedAsync">Shoutouts</NavLink>
-                            }
                             @if (showPolls)
                             {
                             <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"

@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Persistence.Models;
@@ -25,7 +24,7 @@ public sealed class ShoutoutServiceTests
                 Login = "host",
                 DisplayName = "Host",
                 TwitchUserId = "host-id",
-                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.Shoutouts,
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.RaidCollaboration,
             };
             _ = db.Hosts.Add(host);
             _ = await db.SaveChangesAsync();
@@ -78,7 +77,7 @@ public sealed class ShoutoutServiceTests
         {
             (await verifyDisabled.ShoutoutHistory.CountAsync()).ShouldBe(1);
             var host = await verifyDisabled.Hosts.SingleAsync();
-            host.EnabledFeatures |= HostFeatureFlags.Shoutouts;
+            host.EnabledFeatures |= HostFeatureFlags.RaidCollaboration;
             _ = await verifyDisabled.SaveChangesAsync();
         }
 
@@ -262,13 +261,12 @@ public sealed class ShoutoutServiceTests
     }
 
     [Test]
-    [Arguments(ShoutoutScenario.Self, HostFeatureFlags.Shoutouts)]
-    [Arguments(ShoutoutScenario.Offline, HostFeatureFlags.RaidCollaboration)]
-    [Arguments(ShoutoutScenario.NotModerator, HostFeatureFlags.Shoutouts)]
-    [Arguments(ShoutoutScenario.MissingScope, HostFeatureFlags.Shoutouts)]
+    [Arguments(ShoutoutScenario.Self)]
+    [Arguments(ShoutoutScenario.Offline)]
+    [Arguments(ShoutoutScenario.NotModerator)]
+    [Arguments(ShoutoutScenario.MissingScope)]
     public async Task RequiredSendOutcome_SendingFeatureOwnedShoutout_ReturnsTypedResult(
-        ShoutoutScenario scenario,
-        HostFeatureFlags owner
+        ShoutoutScenario scenario
     )
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -277,10 +275,7 @@ public sealed class ShoutoutServiceTests
             _ = db.Hosts.Add(
                 new BotHost
                 {
-                    EnabledFeatures =
-                        owner is HostFeatureFlags.RaidCollaboration
-                            ? HostFeatureFlags.RaidCollaboration
-                            : HostFeatureFlags.All,
+                    EnabledFeatures = HostFeatureFlags.RaidCollaboration,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -305,14 +300,7 @@ public sealed class ShoutoutServiceTests
             new NativeTwitchFeatureGate(dbFactory)
         );
 
-        var outcome =
-            owner is HostFeatureFlags.RaidCollaboration
-                ? await new RaidCollaborationShoutoutProvider(service).SendAsync(
-                    1,
-                    "target",
-                    CancellationToken.None
-                )
-                : await service.SendAsync(1, "target", CancellationToken.None);
+        var outcome = await service.SendAsync(1, "target", CancellationToken.None);
 
         switch (scenario)
         {

@@ -11,7 +11,6 @@ public partial class NativeTwitchToolSwitcher
     [Parameter]
     public int HostId { get; set; }
 
-    private bool _shoutouts;
     private bool _polls;
     private bool _clips;
     private bool _rewards;
@@ -31,9 +30,6 @@ public partial class NativeTwitchToolSwitcher
                 _ = option.Match(
                     enabled =>
                     {
-                        _shoutouts =
-                            (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.Shoutouts)
-                            == BlokeBot.Persistence.Models.HostFeatureFlags.Shoutouts;
                         _polls =
                             (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.Polls)
                             == BlokeBot.Persistence.Models.HostFeatureFlags.Polls;

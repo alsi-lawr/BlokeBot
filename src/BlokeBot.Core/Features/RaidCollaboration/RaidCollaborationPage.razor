@@ -1,6 +1,7 @@
 @page "/raid-collaboration"
 @using BlokeBot.Core.Components.Layout
 @using BlokeBot.Core.Components.Studio
+@using BlokeBot.Core.Features.TwitchOperations.Shared
 @using BlokeBot.Core.Features.TwitchOperations.Shoutouts
 @using BlokeBot.Eventing
 @using BlokeBot.Persistence.Models
@@ -20,7 +21,7 @@
     <Actions>
         @if (_dashboard is not null && _workspaceKey == _hubKey)
         {
-            <button class="btn-secondary" type="button" disabled="@_loading" @onclick="LoadAsync">Refresh live channels</button>
+            <button class="btn-secondary" type="button" disabled="@_loading" @onclick="RefreshAsync">Refresh live channels</button>
         }
     </Actions>
     <ChildContent>
@@ -43,7 +44,7 @@
         else if (_loadFailed)
         {
             <PageState Kind="PageStateKind.Failure" Title="Raid hub could not load" Description="Twitch live context is unavailable. Nothing was sent or changed.">
-                <Actions><button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button></Actions>
+                <Actions><button class="btn-primary" type="button" @onclick="RefreshAsync">Retry</button></Actions>
             </PageState>
         }
         else if (_dashboard is { } dashboard)
@@ -98,7 +99,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="flex flex-wrap gap-2">
-                                                        <button class="btn-secondary" type="button" @onclick="() => SendShoutoutAsync(candidate.Login)">Shoutout</button>
+                                                        <button class="btn-secondary" type="button" @onclick="() => SendShortlistShoutoutAsync(candidate.Login)">Shoutout</button>
                                                         <button class="btn-primary" type="button" @onclick="() => PrepareRaid(candidate.Login)">Prepare raid</button>
                                                     </div>
                                                 </div>
@@ -154,8 +155,16 @@
                                     <p class="text-sm text-muted-foreground">No incoming raid has been recorded yet.</p>
                                 }
                             </TaskPanel>
-                            <TaskPanel Title="Native shoutout" Description="Live and cooldown checks run again at send time through the existing Twitch shoutout boundary.">
-                                <p class="text-sm font-semibold">@ShoutoutReadiness(dashboard.ShoutoutContext)</p>
+                            <TaskPanel Title="Send a shoutout" Description="Enter the Twitch name of another channel that is live with viewers.">
+                                <div class="studio-grid" data-shoutout-send>
+                                    <div class="studio-span-8">
+                                        <Field Id="shoutout-target" Label="Target channel" @bind-Value="_shoutoutTarget" Placeholder="channel login" />
+                                    </div>
+                                    <div class="studio-span-4 content-end">
+                                        <button class="btn-primary w-full" type="button" @onclick="SendShoutoutAsync">Send shoutout</button>
+                                    </div>
+                                    <div class="studio-span-12"><p class="form-help">@CooldownText(dashboard.ShoutoutContext, _shoutoutTarget)</p></div>
+                                </div>
                             </TaskPanel>
                             @if (!dashboard.RaidManagementAuthorized)
                             {
@@ -181,7 +190,38 @@
                                         <strong class="raid-history__outcome">Welcome: @item.WelcomeOutcome</strong>
                                         <p class="raid-history__meta">Shoutout: @item.ShoutoutOutcome · @item.OccurredAt.ToLocalTime().ToString("MMM d, HH:mm")</p>
                                         <p class="raid-history__meta">Stream @(item.StreamId ?? "identity unavailable")</p>
+                                        @if (!IsApproved(item.Login))
+                                        {
+                                            <button class="btn-secondary raid-history__approve"
+                                                    type="button"
+                                                    disabled="@(_approvingLogin == item.Login)"
+                                                    @onclick="() => ApproveAsync(item)">Approve channel</button>
+                                        }
                                     </article>
+                                }
+                            </div>
+                        }
+                    </TaskPanel>
+
+                    <TaskPanel Title="Automatic shoutout outcomes" Description="What happened to the automatic shoutout for each recent incoming raid.">
+                        <AutomaticShoutoutOutcomeList Outcomes="dashboard.AutomaticShoutoutOutcomes" />
+                    </TaskPanel>
+
+                    <TaskPanel Title="Recent shoutouts" Description="Shoutouts this channel sent and received on Twitch.">
+                        @if (dashboard.ShoutoutContext.History.Count == 0)
+                        {
+                            <p class="text-sm text-muted-foreground">No shoutouts recorded yet.</p>
+                        }
+                        else
+                        {
+                            <div class="grid gap-2" data-shoutout-history>
+                                @foreach (var item in dashboard.ShoutoutContext.History)
+                                {
+                                    <NativeOperationRow @key="item"
+                                                        Title="@($"{item.Direction} · @{item.TargetLogin}")"
+                                                        When="@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")">
+                                        @item.ViewerCount viewers
+                                    </NativeOperationRow>
                                 }
                             </div>
                         }
@@ -214,20 +254,6 @@
                                                 aria-describedby="raid-welcome-enabled-hint"
                                                 @onclick="() => _draft.WelcomeEnabled = !_draft.WelcomeEnabled"></button>
                                     </div>
-                                    <div class="raid-toggle">
-                                        <div class="min-w-0">
-                                            <strong id="raid-native-shoutout-label" class="raid-toggle__title">Send a native shoutout</strong>
-                                            <span id="raid-native-shoutout-hint" class="raid-toggle__hint">Uses Twitch when the cooldown allows it.</span>
-                                        </div>
-                                        <button id="raid-native-shoutout"
-                                                class="studio-toggle"
-                                                type="button"
-                                                role="switch"
-                                                aria-checked="@(_draft.NativeShoutoutEnabled ? "true" : "false")"
-                                                aria-labelledby="raid-native-shoutout-label"
-                                                aria-describedby="raid-native-shoutout-hint"
-                                                @onclick="() => _draft.NativeShoutoutEnabled = !_draft.NativeShoutoutEnabled"></button>
-                                    </div>
                                 </div>
                                 <div class="raid-split">
                                     <div class="raid-field raid-field--wide">
@@ -258,6 +284,22 @@
                         <section class="card raid-section">
                             <header class="raid-section__header">
                                 <span class="raid-section__step" aria-hidden="true">2</span>
+                                <div class="min-w-0">
+                                    <h2 class="raid-section__heading">Automatic raid shoutouts</h2>
+                                    <p class="raid-section__description">Decide how a qualifying incoming raid is shouted out.</p>
+                                </div>
+                            </header>
+                            <div class="raid-section__body">
+                                <AutomaticShoutoutSection Value="_draft.AutomaticShoutout"
+                                                          ValueChanged="@(value => _draft.AutomaticShoutout = value)"
+                                                          Errors="_shoutoutErrors"
+                                                          ErrorCleared="ClearShoutoutError" />
+                            </div>
+                        </section>
+
+                        <section class="card raid-section">
+                            <header class="raid-section__header">
+                                <span class="raid-section__step" aria-hidden="true">3</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Shortlist rules</h2>
                                     <p class="raid-section__description">Keep the next-channel list focused.</p>
@@ -306,7 +348,7 @@
 
                         <section class="card raid-section">
                             <header class="raid-section__header">
-                                <span class="raid-section__step" aria-hidden="true">3</span>
+                                <span class="raid-section__step" aria-hidden="true">4</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Approved channels</h2>
                                     <p class="raid-section__description">Only approved channels can appear in your shortlist. Approval is an allowlist you control, and Twitch supplies no safety or reputation signal for it. An optional clip ID is shown only when Twitch confirms it belongs to that channel and is at most 30 days old.</p>

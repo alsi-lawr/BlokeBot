@@ -291,7 +291,7 @@ public sealed class NativeOperationAutomationTests
         );
         (await fixture.RunCountAsync()).ShouldBe(1);
 
-        await fixture.SetFeatureAsync(HostFeatureFlags.Shoutouts, enabled: false);
+        await fixture.SetFeatureAsync(HostFeatureFlags.RaidCollaboration, enabled: false);
         await fixture.Runtime.ShoutoutOccurredAsync(
             fixture.Shoutout("suppressed-3", EventSubShoutoutDirection.Sent),
             CancellationToken.None
@@ -334,7 +334,7 @@ public sealed class NativeOperationAutomationTests
 
         AutomationRequiredFeatures
             .ForDefinitions(["shoutout-sent", "send-shoutout"])
-            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.Shoutouts);
+            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.RaidCollaboration);
         AutomationRequiredFeatures
             .ForDefinitions(["poll-started", "start-poll", "end-poll"])
             .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.Polls);
@@ -679,7 +679,7 @@ public sealed class NativeOperationAutomationTests
             fixture.Poll("message-1", EventSubPollStage.Begin),
             _start
         );
-        await fixture.SetFeatureAsync(HostFeatureFlags.Shoutouts, enabled: false);
+        await fixture.SetFeatureAsync(HostFeatureFlags.RaidCollaboration, enabled: false);
 
         var outcome = await fixture.Executor.ExecuteAsync(
             new(fixture.HostId),
@@ -943,7 +943,7 @@ public sealed class NativeOperationAutomationTests
         internal const HostFeatureFlags AllFeatures =
             HostFeatureFlags.Automations
             | HostFeatureFlags.CustomCommands
-            | HostFeatureFlags.Shoutouts
+            | HostFeatureFlags.RaidCollaboration
             | HostFeatureFlags.Polls
             | HostFeatureFlags.ClipsAndMarkers
             | HostFeatureFlags.Predictions;

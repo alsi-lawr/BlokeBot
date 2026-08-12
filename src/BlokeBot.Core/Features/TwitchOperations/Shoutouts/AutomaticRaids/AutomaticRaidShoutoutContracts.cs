@@ -5,6 +5,7 @@ namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 
 public sealed record AutomaticRaidShoutoutConfiguration(
     bool Enabled,
+    bool OnlyApprovedChannels,
     int MinimumViewerCount,
     AutomaticRaidShoutoutMechanism Mechanism,
     AutomaticRaidChatPresentation ChatPresentation,
@@ -16,6 +17,7 @@ public sealed record AutomaticRaidShoutoutConfiguration(
     public static AutomaticRaidShoutoutConfiguration Defaults { get; } =
         new(
             false,
+            false,
             1,
             AutomaticRaidShoutoutMechanism.Native,
             AutomaticRaidChatPresentation.Regular,
@@ -23,19 +25,66 @@ public sealed record AutomaticRaidShoutoutConfiguration(
             null,
             PersistedAnnouncementColor.Primary
         );
-}
 
-public abstract record AutomaticRaidShoutoutSaveOutcome
-{
-    private AutomaticRaidShoutoutSaveOutcome() { }
+    public static AutomaticRaidShoutoutConfiguration From(AutomaticRaidShoutoutSettings settings) =>
+        new(
+            settings.Enabled,
+            settings.OnlyApprovedChannels,
+            settings.MinimumViewerCount,
+            settings.Mechanism,
+            settings.ChatPresentation,
+            settings.MessageTemplate,
+            settings.PinDurationSeconds,
+            settings.AnnouncementColor
+        );
 
-    public sealed record Saved(AutomaticRaidShoutoutConfiguration Configuration)
-        : AutomaticRaidShoutoutSaveOutcome;
+    public IReadOnlyList<AutomaticRaidShoutoutValidationError> Validate()
+    {
+        var errors = new List<AutomaticRaidShoutoutValidationError>();
+        if (MinimumViewerCount < 1)
+        {
+            Add(
+                AutomaticRaidShoutoutValidationField.MinimumViewerCount,
+                "Minimum viewers must be at least 1."
+            );
+        }
+        if (!Enum.IsDefined(Mechanism))
+        {
+            Add(AutomaticRaidShoutoutValidationField.Mechanism, "Choose Native or chat delivery.");
+        }
+        if (!Enum.IsDefined(ChatPresentation))
+        {
+            Add(
+                AutomaticRaidShoutoutValidationField.ChatPresentation,
+                "Choose a supported chat presentation."
+            );
+        }
+        if (!Enum.IsDefined(AnnouncementColor))
+        {
+            Add(
+                AutomaticRaidShoutoutValidationField.AnnouncementColor,
+                "Choose a supported Twitch announcement color."
+            );
+        }
+        if (PinDurationSeconds is { } duration && duration is < 30 or > 1800)
+        {
+            Add(
+                AutomaticRaidShoutoutValidationField.PinDuration,
+                "Pin duration must be 30 through 1800 seconds, or until stream end."
+            );
+        }
+        if (
+            AutomaticRaidShoutoutTemplate.Parse(MessageTemplate)
+            is AutomaticRaidTemplateParseOutcome.Invalid invalid
+        )
+        {
+            Add(AutomaticRaidShoutoutValidationField.MessageTemplate, invalid.Message);
+        }
+        return errors;
 
-    public sealed record Invalid(IReadOnlyList<AutomaticRaidShoutoutValidationError> Errors)
-        : AutomaticRaidShoutoutSaveOutcome;
-
-    public sealed record HostNotFound : AutomaticRaidShoutoutSaveOutcome;
+        void Add(AutomaticRaidShoutoutValidationField field, string message) =>
+            errors.Add(new AutomaticRaidShoutoutValidationError(field, message));
+    }
 }
 
 public sealed record AutomaticRaidShoutoutValidationError(
@@ -51,20 +100,6 @@ public enum AutomaticRaidShoutoutValidationField
     MessageTemplate,
     PinDuration,
     AnnouncementColor,
-}
-
-public abstract record AutomaticRaidShoutoutPreviewOutcome
-{
-    private AutomaticRaidShoutoutPreviewOutcome() { }
-
-    public sealed record Rendered(string Message) : AutomaticRaidShoutoutPreviewOutcome;
-
-    public sealed record InvalidTemplate(string Message) : AutomaticRaidShoutoutPreviewOutcome;
-
-    public sealed record TooLong(int ActualCharacters, int MaximumCharacters)
-        : AutomaticRaidShoutoutPreviewOutcome;
-
-    public sealed record HostNotFound : AutomaticRaidShoutoutPreviewOutcome;
 }
 
 public sealed record AutomaticRaidShoutoutOutcomeView(

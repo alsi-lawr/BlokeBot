@@ -55,7 +55,7 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
     private static HostFeatureFlags Map(NativeTwitchFeature feature) =>
         feature switch
         {
-            NativeTwitchFeature.Shoutouts => HostFeatureFlags.Shoutouts,
+            NativeTwitchFeature.Shoutouts => HostFeatureFlags.RaidCollaboration,
             NativeTwitchFeature.Polls => HostFeatureFlags.Polls,
             NativeTwitchFeature.RewardsAndRedemptions => HostFeatureFlags.RewardsAndRedemptions,
             NativeTwitchFeature.Predictions => HostFeatureFlags.Predictions,
@@ -68,8 +68,7 @@ public sealed class NativeTwitchFeatureGate(IDbContextFactory<BlokeBotDbContext>
         if (
             feature
             is not (
-                HostFeatureFlags.Shoutouts
-                or HostFeatureFlags.Polls
+                HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
                 or HostFeatureFlags.RewardsAndRedemptions
                 or HostFeatureFlags.Predictions

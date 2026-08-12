@@ -45,9 +45,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
     {
         var native = new AutomaticRaidNativeShoutoutSender(
             new ScriptedNativeOperation(
-                new ShoutoutOperationOutcome.NotReady(
-                    ShoutoutService.UnauthorizedAuthorityMessage
-                )
+                new ShoutoutOperationOutcome.NotReady(ShoutoutService.UnauthorizedAuthorityMessage)
             )
         );
 
@@ -364,7 +362,17 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
         AutomaticRaidShoutoutMechanism mechanism,
         AutomaticRaidChatPresentation presentation = AutomaticRaidChatPresentation.Regular,
         string template = "Welcome {display_name}"
-    ) => new(true, 1, mechanism, presentation, template, null, PersistedAnnouncementColor.Primary);
+    ) =>
+        new(
+            true,
+            false,
+            1,
+            mechanism,
+            presentation,
+            template,
+            null,
+            PersistedAnnouncementColor.Primary
+        );
 
     private static async Task SeedHostAsync(SqliteBlokeBotDbFactory database)
     {

@@ -55,6 +55,11 @@
     margin-top: 0.5rem;
 }
 
+.raid-history__approve {
+    justify-self: start;
+    margin-top: 0.6rem;
+}
+
 .raid-settings {
     display: grid;
     gap: 1rem;

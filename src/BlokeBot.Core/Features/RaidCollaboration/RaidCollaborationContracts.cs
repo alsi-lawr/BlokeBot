@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.RaidCollaboration;
@@ -6,7 +7,7 @@ namespace BlokeBot.Core.Features.RaidCollaboration;
 public sealed record RaidCollaborationConfiguration(
     bool WelcomeEnabled,
     string WelcomeMessage,
-    bool NativeShoutoutEnabled,
+    AutomaticRaidShoutoutConfiguration AutomaticShoutout,
     int DeduplicationWindowMinutes,
     string Language,
     IReadOnlyList<string> EligibleCategories,
@@ -15,7 +16,16 @@ public sealed record RaidCollaborationConfiguration(
 )
 {
     public static RaidCollaborationConfiguration Defaults { get; } =
-        new(true, RaidCollaborationDefaults.WelcomeMessage, true, 60, "en", [], 336, []);
+        new(
+            true,
+            RaidCollaborationDefaults.WelcomeMessage,
+            AutomaticRaidShoutoutConfiguration.Defaults,
+            60,
+            "en",
+            [],
+            336,
+            []
+        );
 }
 
 public sealed record ApprovedRaidChannelDraft(
@@ -31,6 +41,7 @@ public sealed record RaidCollaborationDashboard(
     IReadOnlyList<RaidRelationshipHistory> History,
     RaidArrivalSummary? LatestArrival,
     ShoutoutDashboardState ShoutoutContext,
+    IReadOnlyList<AutomaticRaidShoutoutOutcomeView> AutomaticShoutoutOutcomes,
     bool RaidManagementAuthorized
 );
 
@@ -100,11 +111,27 @@ public abstract record RaidCollaborationSaveOutcome
     public sealed record Saved(RaidCollaborationConfiguration Configuration)
         : RaidCollaborationSaveOutcome;
 
-    public sealed record Invalid(IReadOnlyList<string> Errors) : RaidCollaborationSaveOutcome;
+    public sealed record Invalid(
+        IReadOnlyList<string> Errors,
+        IReadOnlyList<AutomaticRaidShoutoutValidationError> ShoutoutErrors
+    ) : RaidCollaborationSaveOutcome;
 
     public sealed record FeatureDisabled : RaidCollaborationSaveOutcome;
 
     public sealed record HostNotFound : RaidCollaborationSaveOutcome;
+}
+
+public abstract record ApproveRaidChannelOutcome
+{
+    private ApproveRaidChannelOutcome() { }
+
+    public sealed record Approved(ApprovedRaidChannelDraft Channel) : ApproveRaidChannelOutcome;
+
+    public sealed record AlreadyApproved : ApproveRaidChannelOutcome;
+
+    public sealed record LimitReached(int Limit) : ApproveRaidChannelOutcome;
+
+    public sealed record FeatureDisabled : ApproveRaidChannelOutcome;
 }
 
 public abstract record ConfirmedRaidStartOutcome
@@ -176,21 +203,6 @@ public interface IRaidWelcomeSender
         string hostLogin,
         string providerMessageId,
         string message,
-        CancellationToken cancellationToken
-    );
-}
-
-public interface IRaidCollaborationShoutoutProvider
-{
-    Task<ShoutoutDashboardState> LoadAsync(
-        int hostId,
-        string? targetLogin,
-        CancellationToken cancellationToken
-    );
-
-    Task<ShoutoutOperationOutcome> SendAsync(
-        int hostId,
-        string targetLogin,
         CancellationToken cancellationToken
     );
 }

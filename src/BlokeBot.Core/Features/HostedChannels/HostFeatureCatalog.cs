@@ -7,7 +7,6 @@ public static class HostFeatureCatalog
     public static IReadOnlyList<HostFeatureFlags> Features { get; } =
     [
         HostFeatureFlags.Automations,
-        HostFeatureFlags.Shoutouts,
         HostFeatureFlags.Polls,
         HostFeatureFlags.ClipsAndMarkers,
         HostFeatureFlags.RewardsAndRedemptions,
@@ -31,12 +30,6 @@ public static class HostFeatureCatalog
 
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
         [
-            new(
-                HostFeatureFlags.Shoutouts,
-                "Shoutouts",
-                "Send manual and automatic raid shoutouts.",
-                enabledFeatures.Contains(HostFeatureFlags.Shoutouts)
-            ),
             new(
                 HostFeatureFlags.Polls,
                 "Polls",
@@ -136,7 +129,7 @@ public static class HostFeatureCatalog
             new(
                 HostFeatureFlags.RaidCollaboration,
                 "Raid & collaboration",
-                "Welcome incoming raids and choose approved live channels with explainable filters.",
+                "Welcome incoming raids, send manual and automatic shoutouts, and choose approved live channels with explainable filters.",
                 enabledFeatures.Contains(HostFeatureFlags.RaidCollaboration)
             ),
             new(

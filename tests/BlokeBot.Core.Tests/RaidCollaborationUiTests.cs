@@ -1,6 +1,8 @@
 using AngleSharp.Dom;
 using BlokeBot.Core.Features.RaidCollaboration;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Bunit.TestDoubles;
@@ -188,7 +190,6 @@ public sealed partial class RaidCollaborationUiTests
                     HostId = hostId,
                     WelcomeEnabled = true,
                     WelcomeMessage = "Welcome in, {display_name}!",
-                    NativeShoutoutEnabled = true,
                     DeduplicationWindowMinutes = 45,
                     Language = "en",
                     EligibleCategories = "Celeste",
@@ -223,6 +224,11 @@ public sealed partial class RaidCollaborationUiTests
                 new OfflineRaidProvider(),
                 new UnusedWelcomeSender(),
                 new IdleShoutouts(),
+                new AutomaticRaidShoutoutRunner(
+                    database,
+                    new UnusedAutomaticDelivery(),
+                    TimeProvider.System
+                ),
                 [],
                 TestEventBus.Create<AppEventKind>(),
                 TimeProvider.System
@@ -288,7 +294,7 @@ public sealed partial class RaidCollaborationUiTests
         ) => throw new NotSupportedException("The workspace tests never deliver a welcome.");
     }
 
-    private sealed class IdleShoutouts : IRaidCollaborationShoutoutProvider
+    private sealed class IdleShoutouts : IShoutoutDashboardOperations
     {
         public Task<ShoutoutDashboardState> LoadAsync(
             int hostId,
@@ -304,5 +310,16 @@ public sealed partial class RaidCollaborationUiTests
             string targetLogin,
             CancellationToken cancellationToken
         ) => throw new NotSupportedException("The workspace tests never send a shoutout.");
+    }
+
+    private sealed class UnusedAutomaticDelivery : IAutomaticRaidShoutoutDelivery
+    {
+        public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
+            AutomaticRaidShoutoutDeliveryRequest request,
+            CancellationToken cancellationToken
+        ) =>
+            throw new NotSupportedException(
+                "The workspace tests never deliver an automatic shoutout."
+            );
     }
 }

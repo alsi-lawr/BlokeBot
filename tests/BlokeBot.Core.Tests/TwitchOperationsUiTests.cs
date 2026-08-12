@@ -11,7 +11,6 @@ using BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
@@ -154,9 +153,6 @@ public sealed class TwitchOperationsUiTests
         );
         _ = context.Services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
-        );
-        _ = context.Services.AddSingleton(
-            new AutomaticRaidShoutoutConfigurationService(dbFactory, TimeProvider.System)
         );
         _ = context.Services.AddSingleton(
             new ClipMarkerService(

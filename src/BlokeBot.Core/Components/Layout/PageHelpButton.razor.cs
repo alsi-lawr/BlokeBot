@@ -127,7 +127,6 @@ public partial class PageHelpButton
                 "media" => new(_mediaLibraryHelp, "/overlays/media"),
                 _ => new(_overlaysHelp, "/overlays"),
             },
-            "/twitch-operations/shoutouts" => new(_shoutoutsHelp, "/twitch-operations/shoutouts"),
             "/twitch-operations/polls" => new(_pollsHelp, "/twitch-operations/polls"),
             "/twitch-operations/clips-markers" => new(
                 _clipsMarkersHelp,
@@ -369,6 +368,28 @@ public partial class PageHelpButton
                 []
             ),
             new(
+                "Recommend a live channel now",
+                "Use Send a shoutout with the Twitch name of another channel that is live with viewers. If Twitch asks you to wait, the panel shows when you can send again. Approve channel on a history entry adds that channel to your approved list straight away.",
+                []
+            ),
+            new(
+                "Welcome incoming raids",
+                "Turn on Automatic raid shoutouts and choose the smallest raid that should get one. Choose either a native Twitch shoutout or one chat message; a failed shoutout is not resent another way.",
+                [
+                    "Only shoutout approved channels limits automatic shoutouts to your approved list.",
+                    "Chat delivery uses one presentation: regular, pinned, or announcement.",
+                    "A pinned shoutout replaces the current pin, and the previous pin is not restored.",
+                ]
+            ),
+            new(
+                "Personalise the chat message",
+                "Use these details in the message. Add fallback text for the last game and stream title in case Twitch has no value.",
+                [
+                    "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
+                    "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
+                ]
+            ),
+            new(
                 "Change welcome and shortlist rules",
                 "Open Settings, make your changes, then save. Twitch gives a raid's total viewer count only, so no individual viewer is recorded.",
                 []
@@ -493,33 +514,6 @@ public partial class PageHelpButton
                 "Deleting a file",
                 "Media still used by a cue cannot be deleted. Edit the cue first, then delete the file.",
                 []
-            ),
-        ]
-    );
-
-    private static readonly HelpPage _shoutoutsHelp = new(
-        "Shoutouts",
-        [
-            new(
-                "Recommend a live channel",
-                "Enter the Twitch name of another channel that is live with viewers, then send the shoutout. If Twitch asks you to wait, the page shows when you can send again.",
-                []
-            ),
-            new(
-                "Welcome incoming raids",
-                "Turn on Automatic raid shoutouts and choose the smallest raid that should get one. Choose either a native Twitch shoutout or one chat message; a failed shoutout is not resent another way.",
-                [
-                    "Chat delivery uses one presentation: regular, pinned, or announcement.",
-                    "A pinned shoutout replaces the current pin, and the previous pin is not restored.",
-                ]
-            ),
-            new(
-                "Personalise the chat message",
-                "Use these details in the message. Add fallback text for the last game and stream title in case Twitch has no value.",
-                [
-                    "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
-                    "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
-                ]
             ),
         ]
     );

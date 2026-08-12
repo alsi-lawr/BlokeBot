@@ -43,11 +43,6 @@ internal static class SimulationServiceCollectionExtensions
             )
         );
         _ = services.Replace(
-            ServiceDescriptor.Singleton<INativeShoutoutOperations>(static provider =>
-                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
-            )
-        );
-        _ = services.Replace(
             ServiceDescriptor.Singleton<IPollDashboardOperations>(static provider =>
                 provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
             )

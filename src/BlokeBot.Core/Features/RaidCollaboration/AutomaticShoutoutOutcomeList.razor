@@ -1,0 +1,21 @@
+@using BlokeBot.Core.Features.TwitchOperations.Shared
+@using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids
+
+@if (Outcomes.Count == 0)
+{
+    <p class="text-sm text-muted-foreground" data-automatic-raid-outcomes>No automatic raid shoutouts recorded yet.</p>
+}
+else
+{
+    <div class="grid gap-2" data-automatic-raid-outcomes>
+        @foreach (var outcome in Outcomes)
+        {
+            <NativeOperationRow @key="outcome.Id"
+                                Title="@($"@{outcome.SourceLogin} · {outcome.ViewerCount} viewers")"
+                                When="@outcome.MessageTimestamp.ToLocalTime().ToString("MMM d, HH:mm")">
+                <span class="@OutcomePillClass(outcome)"><span class="status-pill__label">@OutcomeTitle(outcome)</span></span>
+                <span class="mt-1 block">@OutcomeDescription(outcome)</span>
+            </NativeOperationRow>
+        }
+    </div>
+}

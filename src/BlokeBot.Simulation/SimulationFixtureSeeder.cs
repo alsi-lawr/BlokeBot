@@ -2668,7 +2668,6 @@ internal sealed class SimulationFixtureSeeder(
                 HostId = hostId,
                 WelcomeEnabled = true,
                 WelcomeMessage = "Welcome {display_name} and community! 💜",
-                NativeShoutoutEnabled = true,
                 DeduplicationWindowMinutes = 60,
                 Language = "en",
                 EligibleCategories = "Celeste\nMakers & Crafting",

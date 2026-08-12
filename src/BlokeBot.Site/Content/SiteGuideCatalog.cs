@@ -63,7 +63,6 @@ internal static partial class SiteGuideCatalog
             "Native Twitch",
             [
                 GuideLink("Overview", "twitch-operations"),
-                GuideLink("Shoutouts", "twitch-operations/shoutouts"),
                 GuideLink("Polls", "twitch-operations/polls"),
                 GuideLink("Clips and markers", "twitch-operations/clips-markers"),
                 GuideLink("Rewards and redemptions", "twitch-operations/channel-points"),
@@ -1389,7 +1388,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Native Twitch",
             Title = "Use Twitch channel tools",
             Summary =
-                "Send shoutouts, run polls, save live moments, manage rewards and settle Predictions for the selected channel.",
+                "Run polls, save live moments, manage rewards and settle Predictions for the selected channel.",
             Sections =
             [
                 new SiteGuideSection
@@ -1399,7 +1398,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Choose the channel in the top bar and open Channel setup.",
                         "Open Chat tools and turn on Native Twitch. The feature card persists the change immediately.",
-                        "Open Native Twitch in the Chat tools navigation, then choose Shoutouts, Polls, Clips & markers, Rewards & redemptions or Predictions.",
+                        "Open Native Twitch in the Chat tools navigation, then choose Polls, Clips & markers, Rewards & redemptions or Predictions.",
                     ],
                     Paragraphs =
                     [
@@ -1411,7 +1410,6 @@ internal static partial class SiteGuideCatalog
                     Heading = "Follow the action on the page",
                     Bullets =
                     [
-                        "Shoutouts use the active bot account for Twitch's shoutout action. Automatic chat-message shoutouts use the public chat connection.",
                         "Polls, clips, markers, rewards, redemptions and Predictions use the selected channel's Twitch connection.",
                         "Rewards and Predictions require a Twitch Affiliate or Partner channel.",
                         "Use the ? button beside a page title for help without leaving the task you are doing.",
@@ -1428,70 +1426,6 @@ internal static partial class SiteGuideCatalog
                         "Reload the same page to check Twitch's current state and recent results.",
                         "Open Alerts if the page still needs attention.",
                         "Send the page name, selected channel, approximate time and alert text to the server owner. Never send Twitch tokens or secrets.",
-                    ],
-                },
-            ],
-            Next = [new SiteLink("Set up shoutouts", "twitch-operations/shoutouts")],
-        };
-
-        yield return new SiteGuidePage
-        {
-            Route = "/twitch-operations/shoutouts",
-            Eyebrow = "Native Twitch · Shoutouts",
-            Title = "Send shoutouts and welcome raids",
-            Summary =
-                "Recommend another live channel now, or prepare one automatic welcome for each qualifying incoming raid.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-native-shoutouts.png",
-                LightPhoneSource: "media/phone-light-native-shoutouts.png",
-                DarkLaptopSource: "media/laptop-dark-native-shoutouts.png",
-                LightLaptopSource: "media/laptop-light-native-shoutouts.png",
-                PhoneAlt: "BlokeBot Shoutouts page on a phone showing a Twitch channel name field and the Send shoutout action.",
-                LaptopAlt: "BlokeBot Shoutouts page showing the manual target and automatic raid shoutout settings.",
-                "Manual shoutouts, automatic incoming-raid settings and recent outcomes stay on one task page."
-            ),
-            Sections =
-            [
-                new SiteGuideSection
-                {
-                    Heading = "Send a shoutout now",
-                    Steps =
-                    [
-                        "Open Shoutouts, enter the other channel's Twitch name and select Send shoutout.",
-                        "Wait for the result before trying again. The target must be live with viewers.",
-                        "Use the displayed cooldown and Recent shoutouts to decide when another send is available.",
-                    ],
-                    Paragraphs =
-                    [
-                        "If BlokeBot asks for the bot account to be reconnected, restore that account's moderator role first, then reconnect it from Channel setup.",
-                    ],
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Welcome incoming raids automatically",
-                    Steps =
-                    [
-                        "Automatic raid shoutouts are off by default. Open the section and turn them on when you are ready.",
-                        "Set the minimum viewer count, then choose either a Native Twitch shoutout or a Chat message.",
-                        "For a chat message, choose Regular, Pinned or Announcement. A pinned message can use a duration from 30 to 1,800 seconds or stay pinned until stream end; an announcement colour is Default, Blue, Green, Orange or Purple.",
-                        "Write the message, check its preview and readiness note, then select Save automatic shoutouts.",
-                    ],
-                    Bullets =
-                    [
-                        "Message tokens include {twitch_handle}, {display_name}, {channel_url}, {viewer_count}, {last_game|fallback} and {stream_title|fallback}.",
-                        "Last game and stream title need an inline fallback because Twitch may not provide them.",
-                        "BlokeBot handles each eligible raid once. A failed native shoutout is not replaced with a chat message, and a failed announcement is not replaced with a regular message.",
-                    ],
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Check an automatic outcome",
-                    Bullets =
-                    [
-                        "Automatic shoutout outcomes shows the newest raid results and why a send was skipped or incomplete.",
-                        "Native shoutouts can be skipped while Twitch's cooldown is active.",
-                        "A pinned message can be sent even when Twitch cannot pin it afterwards; the outcome states both parts.",
-                        "Fix the connection or permission named by the outcome before the next raid. There is no retry or fallback action for an earlier raid.",
                     ],
                 },
             ],
@@ -2202,7 +2136,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Shoutout, poll and Prediction events",
                     Bullets =
                     [
-                        "Shoutout sent and Shoutout received follow the bot account's moderator approvals and appear only while Shoutouts is on.",
+                        "Shoutout sent and Shoutout received follow the bot account's moderator approvals and appear only while Raid & collaboration is on.",
                         "Poll started, Poll progressed and Poll ended need the channel's poll-reading permission and appear only while Polls is on.",
                         "Prediction started, Prediction progressed, Prediction locked and Prediction ended need the channel's Prediction-reading permission and appear only while Predictions is on.",
                         "These sources report polls and Predictions however they were started, including ones run outside BlokeBot.",

@@ -26,13 +26,9 @@ public static class TwitchOperationsServiceCollectionExtensions
         _ = services.AddSingleton<IShoutoutDashboardOperations>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
-        _ = services.AddSingleton<INativeShoutoutOperations>(static provider =>
-            provider.GetRequiredService<ShoutoutService>()
-        );
         _ = services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
-        _ = services.AddSingleton<AutomaticRaidShoutoutConfigurationService>();
         services.TryAddSingleton<
             IAutomaticRaidNativeShoutoutSender,
             AutomaticRaidNativeShoutoutSender
@@ -46,14 +42,10 @@ public static class TwitchOperationsServiceCollectionExtensions
             AutomaticRaidAnnouncementSender
         >();
         services.TryAddSingleton<IAutomaticRaidShoutoutDelivery, AutomaticRaidShoutoutDelivery>();
-        _ = services.AddSingleton<AutomaticRaidShoutoutObserver>();
+        _ = services.AddSingleton<AutomaticRaidShoutoutRunner>();
         _ = services.AddSingleton<RaidCollaborationService>();
         services.TryAddSingleton<IRaidCollaborationProvider, TwitchRaidCollaborationProvider>();
         services.TryAddSingleton<IRaidWelcomeSender, RaidWelcomeSender>();
-        services.TryAddSingleton<
-            IRaidCollaborationShoutoutProvider,
-            RaidCollaborationShoutoutProvider
-        >();
         _ = services.AddSingleton<PollService>();
         _ = services.AddSingleton<IPollDashboardOperations>(static provider =>
             provider.GetRequiredService<PollService>()
@@ -100,9 +92,6 @@ public static class TwitchOperationsServiceCollectionExtensions
         );
         _ = services.AddSingleton<IShoutoutEventObserver>(static provider =>
             provider.GetRequiredService<ShoutoutService>()
-        );
-        _ = services.AddSingleton<IIncomingRaidEventObserver>(static provider =>
-            provider.GetRequiredService<AutomaticRaidShoutoutObserver>()
         );
         _ = services.AddSingleton<IIncomingRaidEventObserver>(static provider =>
             provider.GetRequiredService<RaidCollaborationService>()

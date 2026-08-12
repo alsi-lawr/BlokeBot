@@ -206,17 +206,48 @@ internal static partial class SiteGuideCatalog
                         "The channel owner reconnects the Twitch integration with raid management access when Confirm and start raid reports missing authority.",
                     ],
                     Note =
-                        "Raid & collaboration owns its native shoutout step. The separate Shoutouts switch is not a prerequisite, although Twitch authority, live state, cooldown and provider checks are still enforced.",
+                        "Raid & collaboration owns every shoutout, manual and automatic. Twitch authority, live state, cooldown and provider checks are still enforced at send time.",
                 },
                 new SiteGuideSection
                 {
                     Heading = "Welcome an incoming raid",
                     Bullets =
                     [
-                        "Choose whether the welcome message and native shoutout steps run, write the bounded tokenised message and set the deduplication window.",
+                        "Choose whether the welcome message runs, write the bounded tokenised message and set the deduplication window.",
                         "Incoming Twitch EventSub supplies the source channel and one aggregate viewer count. BlokeBot does not infer, enumerate or store individual viewer attribution.",
                         "Duplicate deliveries converge into one history entry. Repeated raids inside the configured window do not repeat the welcome sequence.",
                         "The history records visible welcome and shoutout outcomes. A cooldown, offline state or provider rejection remains an explicit non-success rather than a fabricated send.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Shout out a raider automatically",
+                    Steps =
+                    [
+                        "Automatic raid shoutouts are off by default. Open Settings, turn them on when you are ready and set the minimum viewer count.",
+                        "Turn on Only shoutout approved channels when a raider should be shouted out only after you have approved that channel.",
+                        "Choose either a Native Twitch shoutout or a Chat message.",
+                        "For a chat message, choose Regular, Pinned or Announcement. A pinned message can use a duration from 30 to 1,800 seconds or stay pinned until stream end; an announcement colour is Default, Blue, Green, Orange or Purple.",
+                        "Write the message, check its preview and readiness note, then save the settings once.",
+                    ],
+                    Bullets =
+                    [
+                        "Message tokens include {twitch_handle}, {display_name}, {channel_url}, {viewer_count}, {last_game|fallback} and {stream_title|fallback}.",
+                        "Last game and stream title need an inline fallback because Twitch may not provide them.",
+                        "BlokeBot handles each eligible raid once. A failed native shoutout is not replaced with a chat message, and a failed announcement is not replaced with a regular message.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Send a shoutout now and check an automatic outcome",
+                    Bullets =
+                    [
+                        "Send a shoutout takes any Twitch name that is live with viewers. Wait for the result before trying again, and use the displayed cooldown to decide when another send is available.",
+                        "Approve channel on a relationship history entry adds that channel to Approved channels immediately, and the action disappears once it is approved.",
+                        "Automatic shoutout outcomes shows the newest raid results and why a send was skipped or incomplete. Native shoutouts can be skipped while Twitch's cooldown is active.",
+                        "A pinned message can be sent even when Twitch cannot pin it afterwards; the outcome states both parts.",
+                        "Fix the connection or permission named by the outcome before the next raid. There is no retry or fallback action for an earlier raid.",
+                        "If BlokeBot asks for the bot account to be reconnected, restore that account's moderator role first, then reconnect it from Channel setup.",
                     ],
                 },
                 new SiteGuideSection
@@ -235,7 +266,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Confirm host-owned actions",
                     Bullets =
                     [
-                        "Shoutout uses the shared native Twitch boundary and repeats authority, live-state, cooldown and deduplication checks at send time.",
+                        "Shoutout on a shortlist candidate uses the shared native Twitch boundary and repeats authority, live-state, cooldown and deduplication checks at send time.",
                         "Prepare raid opens an explicit confirmation for the selected approved live channel. It does not call Twitch.",
                         "Only Confirm and start raid performs the outgoing provider action, after rechecking the feature and Twitch authority. The hub never raids automatically from a recommendation, incoming relationship or retry.",
                         "If the target goes offline, becomes ineligible, authorization expires or the provider declines, refresh the hub and make a new host decision. Do not assume the previous preparation remains authority.",
@@ -256,7 +287,7 @@ internal static partial class SiteGuideCatalog
             Next =
             [
                 new SiteLink("Coordinate a multi-host raid relay", "community/collectives"),
-                new SiteLink("Configure native shoutouts", "twitch-operations/shoutouts"),
+                new SiteLink("Use the other Twitch channel tools", "twitch-operations"),
             ],
         };
 

@@ -1,5 +1,4 @@
 using BlokeBot.Core.Features.HostedChannels.Authorization;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -219,32 +218,4 @@ internal sealed class RaidWelcomeSender(
                 cancellationToken
             );
     }
-}
-
-internal sealed class RaidCollaborationShoutoutProvider(INativeShoutoutOperations shoutouts)
-    : IRaidCollaborationShoutoutProvider
-{
-    public Task<ShoutoutDashboardState> LoadAsync(
-        int hostId,
-        string? targetLogin,
-        CancellationToken cancellationToken
-    ) =>
-        shoutouts.LoadAsync(
-            hostId,
-            targetLogin,
-            NativeShoutoutOwner.RaidCollaboration,
-            cancellationToken
-        );
-
-    public Task<ShoutoutOperationOutcome> SendAsync(
-        int hostId,
-        string targetLogin,
-        CancellationToken cancellationToken
-    ) =>
-        shoutouts.SendAsync(
-            hostId,
-            targetLogin,
-            NativeShoutoutOwner.RaidCollaboration,
-            cancellationToken
-        );
 }

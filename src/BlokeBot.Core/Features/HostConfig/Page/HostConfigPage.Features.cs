@@ -44,8 +44,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
                 HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
                 HostFeatureFlags.CustomCommands => $"{_featureIconBase} text-violet-600",
-                HostFeatureFlags.Shoutouts
-                or HostFeatureFlags.Polls
+                HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
                 or HostFeatureFlags.RewardsAndRedemptions
                 or HostFeatureFlags.Predictions => $"{_featureIconBase} text-purple-700",
@@ -135,8 +134,7 @@ public partial class HostConfigPage
                     <path d="m16 14 3 3-3 3" />
                 </svg>
                 """,
-                HostFeatureFlags.Shoutouts
-                or HostFeatureFlags.Polls
+                HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
                 or HostFeatureFlags.RewardsAndRedemptions
                 or HostFeatureFlags.Predictions => """
@@ -265,7 +263,6 @@ public partial class HostConfigPage
             HostFeatureFlags.ViewerPassports => "Viewer passports",
             HostFeatureFlags.Bingo => "Bingo",
             HostFeatureFlags.CustomCommands => "Custom commands",
-            HostFeatureFlags.Shoutouts => "Shoutouts",
             HostFeatureFlags.Polls => "Polls",
             HostFeatureFlags.ClipsAndMarkers => "Clips & markers",
             HostFeatureFlags.RewardsAndRedemptions => "Rewards & redemptions",

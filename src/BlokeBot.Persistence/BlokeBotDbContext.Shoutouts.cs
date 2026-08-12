@@ -76,6 +76,7 @@ public sealed partial class BlokeBotDbContext
             );
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.Enabled).HasDefaultValue(false);
+            _ = b.Property(static x => x.OnlyApprovedChannels).HasDefaultValue(false);
             _ = b.Property(static x => x.MinimumViewerCount).HasDefaultValue(1);
             _ = b.Property(static x => x.Mechanism)
                 .HasConversion(

@@ -22,7 +22,6 @@ public sealed partial class BlokeBotDbContext
             _ = b.Property(static x => x.WelcomeMessage)
                 .HasMaxLength(500)
                 .HasDefaultValue(RaidCollaborationDefaults.WelcomeMessage);
-            _ = b.Property(static x => x.NativeShoutoutEnabled).HasDefaultValue(true);
             _ = b.Property(static x => x.DeduplicationWindowMinutes).HasDefaultValue(60);
             _ = b.Property(static x => x.Language).HasMaxLength(16).HasDefaultValue("en");
             _ = b.Property(static x => x.EligibleCategories).HasMaxLength(1000);

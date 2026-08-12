@@ -116,7 +116,7 @@ internal sealed partial class EfPublicChatOutbox
                 Title = "Automatic raid shoutout was not delivered",
                 Message =
                     $"The durable chat delivery ended with {resultCode}. Check the shoutout delivery settings and Twitch connection.",
-                LinkPath = "/twitch-operations/shoutouts",
+                LinkPath = "/raid-collaboration",
                 CreatedAtUtc = completedAt.UtcDateTime,
             }
         );

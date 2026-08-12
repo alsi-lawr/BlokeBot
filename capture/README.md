@@ -35,9 +35,8 @@ process inside the Lua definition, waits for `/simulation/ready`, follows the re
 `/simulation/login` alias, waits for route-specific visible ready-state content, captures the page
 without hiding sibling sections, and stops that process even when capture fails.
 
-The Shoutouts still capture opens the real **Automatic raid shoutouts** disclosure before
-snapshotting, and the Twitch events capture waits for all 21 automation event sources to report
-ready. Before every state-dependent capture, `v0.5-guides.lua` drives the deterministic
+The Twitch events capture waits for all 21 automation event sources to report ready. Before every
+state-dependent capture, `v0.5-guides.lua` drives the deterministic
 round, giveaway, feature and stream-liveness endpoints. It captures both all-disabled and
 representative enabled Chat Tools states and opens the real **Available viewer commands**
 disclosure. `community-guides.lua` captures the current moderator workspace on laptops and the
@@ -49,7 +48,7 @@ Source URL. The animated captures use PNG screencast frames, high-quality lossy 
 page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
 gesture.
 
-The final matrix is 108 generated assets: 100 PNG and 8 WebP. Generated files go directly to
+The final matrix is 104 generated assets: 96 PNG and 8 WebP. Generated files go directly to
 `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
 
 ## Editor support

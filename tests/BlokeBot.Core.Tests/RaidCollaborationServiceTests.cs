@@ -1,10 +1,13 @@
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.RaidCollaboration;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
+using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 
 namespace BlokeBot.Core.Tests;
 
@@ -17,6 +20,7 @@ public sealed class RaidCollaborationServiceTests
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(database, hostId, [], automaticShoutouts: true);
         var fixture = Fixture(database);
         fixture.Provider.SetLive("raider", "Raid Game", "en", 42);
         var first = Incoming("event-1", _now, "raider-id", "raider");
@@ -29,7 +33,8 @@ public sealed class RaidCollaborationServiceTests
         );
 
         _ = fixture.Welcome.Messages.ShouldHaveSingleItem();
-        fixture.Shoutouts.Targets.ShouldHaveSingleItem().ShouldBe("raider");
+        fixture.AutomaticShoutouts.Requests.ShouldHaveSingleItem().RaiderLogin.ShouldBe("raider");
+        fixture.Shoutouts.Targets.ShouldBeEmpty();
         fixture.Provider.LoadedLogins.Count(value => value == "raider").ShouldBe(2);
         await using var verify = await database.CreateDbContextAsync();
         var history = await verify
@@ -65,7 +70,7 @@ public sealed class RaidCollaborationServiceTests
             default
         );
         _ = (
-            await fixture.Service.LoadAsync(hostId, default)
+            await fixture.Service.LoadAsync(hostId, null, default)
         ).ShouldBeOfType<RaidCollaborationLoadOutcome.FeatureDisabled>();
         await using (var enable = await database.CreateDbContextAsync())
         {
@@ -92,9 +97,144 @@ public sealed class RaidCollaborationServiceTests
 
         fixture.Provider.LoadedLogins.ShouldBeEmpty();
         fixture.Welcome.Messages.ShouldBeEmpty();
-        fixture.Shoutouts.Targets.ShouldBeEmpty();
+        fixture.AutomaticShoutouts.Requests.ShouldBeEmpty();
         await using var verify = await database.CreateDbContextAsync();
         (await verify.RaidCollaborationHistory.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    public async Task ApprovedOnlyToggle_GovernsWhetherAnUnapprovedRaiderIsShoutedOut(
+        bool onlyApprovedChannels,
+        bool expectAttempt
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(
+            database,
+            hostId,
+            ["approved"],
+            automaticShoutouts: true,
+            onlyApprovedChannels: onlyApprovedChannels
+        );
+        var fixture = Fixture(database);
+        fixture.Provider.SetLive("stranger", "Raid Game", "en", 42);
+
+        await fixture.Service.IncomingRaidReceivedAsync(
+            Incoming("unapproved-raid", _now, "stranger-id", "stranger"),
+            default
+        );
+
+        fixture.AutomaticShoutouts.Requests.Count.ShouldBe(expectAttempt ? 1 : 0);
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(expectAttempt ? 1 : 0);
+        (await verify.RaidCollaborationHistory.SingleAsync()).ShoutoutOutcome.ShouldBe(
+            expectAttempt ? RaidShoutoutOutcome.Sent : RaidShoutoutOutcome.NotConfigured
+        );
+    }
+
+    [Test]
+    public async Task InvalidShoutoutConfiguration_RejectsTheWholeSaveWithoutPersistingEitherTable()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        var fixture = Fixture(database);
+        var invalid = RaidCollaborationConfiguration.Defaults with
+        {
+            AutomaticShoutout = new(
+                true,
+                false,
+                0,
+                (AutomaticRaidShoutoutMechanism)99,
+                AutomaticRaidChatPresentation.Pinned,
+                "{bad}",
+                29,
+                (PersistedAnnouncementColor)99
+            ),
+        };
+
+        var rejected = (
+            await fixture.Service.SaveAsync(hostId, invalid, default)
+        ).ShouldBeOfType<RaidCollaborationSaveOutcome.Invalid>();
+
+        rejected
+            .ShoutoutErrors.Select(static error => error.Field)
+            .ShouldBe(
+                [
+                    AutomaticRaidShoutoutValidationField.MinimumViewerCount,
+                    AutomaticRaidShoutoutValidationField.Mechanism,
+                    AutomaticRaidShoutoutValidationField.AnnouncementColor,
+                    AutomaticRaidShoutoutValidationField.PinDuration,
+                    AutomaticRaidShoutoutValidationField.MessageTemplate,
+                ],
+                ignoreOrder: true
+            );
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.AutomaticRaidShoutoutSettings.CountAsync()).ShouldBe(0);
+        (await verify.RaidCollaborationSettings.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task SavedShoutoutConfiguration_IsHostIsolatedAndRoundTrips()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var firstId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        var secondId = await SeedHostAsync(database, "beta", HostFeatureFlags.RaidCollaboration);
+        var fixture = Fixture(database);
+        var configured = RaidCollaborationConfiguration.Defaults with
+        {
+            AutomaticShoutout = new(
+                true,
+                true,
+                12,
+                AutomaticRaidShoutoutMechanism.Chat,
+                AutomaticRaidChatPresentation.Pinned,
+                "Raid from {display_name}: {last_game|something fun}",
+                null,
+                PersistedAnnouncementColor.Purple
+            ),
+        };
+
+        _ = (
+            await fixture.Service.SaveAsync(firstId, configured, default)
+        ).ShouldBeOfType<RaidCollaborationSaveOutcome.Saved>();
+
+        (await fixture.Service.LoadAsync(firstId, null, default))
+            .ShouldBeOfType<RaidCollaborationLoadOutcome.Loaded>()
+            .Dashboard.Configuration.AutomaticShoutout.ShouldBe(configured.AutomaticShoutout);
+        (await fixture.Service.LoadAsync(secondId, null, default))
+            .ShouldBeOfType<RaidCollaborationLoadOutcome.Loaded>()
+            .Dashboard.Configuration.AutomaticShoutout.ShouldBe(
+                AutomaticRaidShoutoutConfiguration.Defaults
+            );
+    }
+
+    [Test]
+    public async Task ApprovingFromHistory_PersistsOnceAndIsRejectedOnRepeat()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(database, hostId, []);
+        var fixture = Fixture(database);
+
+        var approved = (
+            await fixture.Service.ApproveChannelAsync(hostId, "MaplePixel", "MaplePixel", default)
+        ).ShouldBeOfType<ApproveRaidChannelOutcome.Approved>();
+        var repeated = await fixture.Service.ApproveChannelAsync(
+            hostId,
+            "maplepixel",
+            "MaplePixel",
+            default
+        );
+
+        approved.Channel.Login.ShouldBe("maplepixel");
+        _ = repeated.ShouldBeOfType<ApproveRaidChannelOutcome.AlreadyApproved>();
+        await using var verify = await database.CreateDbContextAsync();
+        var stored = await verify.ApprovedRaidChannels.SingleAsync();
+        stored.Login.ShouldBe("maplepixel");
+        stored.DisplayName.ShouldBe("MaplePixel");
     }
 
     [Test]
@@ -124,7 +264,7 @@ public sealed class RaidCollaborationServiceTests
         fixture.Provider.SetLive("wronglanguage", "Celeste", "fr", 80);
         fixture.Provider.SetLive("recent", "Celeste", "en", 90);
 
-        var loaded = (await fixture.Service.LoadAsync(hostId, default))
+        var loaded = (await fixture.Service.LoadAsync(hostId, null, default))
             .ShouldBeOfType<RaidCollaborationLoadOutcome.Loaded>()
             .Dashboard;
 
@@ -142,7 +282,7 @@ public sealed class RaidCollaborationServiceTests
             );
         fixture.Provider.LoadedLogins.ShouldNotContain("private-other");
         _ = (
-            await fixture.Service.SendShoutoutAsync(hostId, "eligible", default)
+            await fixture.Service.SendShortlistShoutoutAsync(hostId, "eligible", default)
         ).ShouldBeOfType<ShoutoutOperationOutcome.Sent>();
         fixture.Shoutouts.Targets.ShouldBe(["eligible"]);
     }
@@ -194,6 +334,7 @@ public sealed class RaidCollaborationServiceTests
         var provider = new RecordingProvider();
         var welcome = new RecordingWelcomeSender();
         var shoutouts = new RecordingShoutouts();
+        var automatic = new RecordingAutomaticDelivery();
         var domainEvents = new RecordingDomainEvents();
         return new(
             new RaidCollaborationService(
@@ -201,6 +342,7 @@ public sealed class RaidCollaborationServiceTests
                 provider,
                 welcome,
                 shoutouts,
+                new AutomaticRaidShoutoutRunner(database, automatic, new FixedTimeProvider(_now)),
                 [domainEvents],
                 TestEventBus.Create<AppEventKind>(),
                 new FixedTimeProvider(_now)
@@ -208,6 +350,7 @@ public sealed class RaidCollaborationServiceTests
             provider,
             welcome,
             shoutouts,
+            automatic,
             domainEvents
         );
     }
@@ -237,7 +380,9 @@ public sealed class RaidCollaborationServiceTests
         int hostId,
         IReadOnlyList<string> channels,
         string language = "",
-        IReadOnlyList<string>? categories = null
+        IReadOnlyList<string>? categories = null,
+        bool automaticShoutouts = false,
+        bool onlyApprovedChannels = false
     )
     {
         await using var db = await database.CreateDbContextAsync();
@@ -246,11 +391,20 @@ public sealed class RaidCollaborationServiceTests
             {
                 HostId = hostId,
                 WelcomeEnabled = true,
-                NativeShoutoutEnabled = true,
                 DeduplicationWindowMinutes = 60,
                 Language = language,
                 EligibleCategories = string.Join('\n', categories ?? []),
                 RelationshipCooldownHours = 336,
+                UpdatedAtUtc = _now.UtcDateTime,
+            }
+        );
+        _ = db.AutomaticRaidShoutoutSettings.Add(
+            new AutomaticRaidShoutoutSettings
+            {
+                HostId = hostId,
+                Enabled = automaticShoutouts,
+                OnlyApprovedChannels = onlyApprovedChannels,
+                MinimumViewerCount = 1,
                 UpdatedAtUtc = _now.UtcDateTime,
             }
         );
@@ -320,6 +474,7 @@ public sealed class RaidCollaborationServiceTests
         RecordingProvider Provider,
         RecordingWelcomeSender Welcome,
         RecordingShoutouts Shoutouts,
+        RecordingAutomaticDelivery AutomaticShoutouts,
         RecordingDomainEvents Events
     );
 
@@ -396,7 +551,7 @@ public sealed class RaidCollaborationServiceTests
         }
     }
 
-    private sealed class RecordingShoutouts : IRaidCollaborationShoutoutProvider
+    private sealed class RecordingShoutouts : IShoutoutDashboardOperations
     {
         internal List<string> Targets { get; } = [];
 
@@ -419,6 +574,22 @@ public sealed class RaidCollaborationServiceTests
             return Task.FromResult<ShoutoutOperationOutcome>(
                 new ShoutoutOperationOutcome.Sent(targetLogin)
             );
+        }
+    }
+
+    private sealed class RecordingAutomaticDelivery : IAutomaticRaidShoutoutDelivery
+    {
+        internal List<AutomaticRaidShoutoutDeliveryRequest> Requests { get; } = [];
+        internal AutomaticRaidShoutoutDeliveryResult Result { get; set; } =
+            new AutomaticRaidShoutoutDeliveryResult.Delivered();
+
+        public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
+            AutomaticRaidShoutoutDeliveryRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            Requests.Add(request);
+            return Task.FromResult(Result);
         }
     }
 

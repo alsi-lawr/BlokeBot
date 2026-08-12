@@ -485,7 +485,7 @@ internal sealed class AutomaticRaidShoutoutDelivery(
                 request.ProviderMessageId,
                 "Automatic raid shoutout was not delivered",
                 $"The automatic shoutout for @{request.RaiderLogin} ended with {code}. Check the shoutout delivery settings and Twitch connection.",
-                "/twitch-operations/shoutouts"
+                "/raid-collaboration"
             )
             .ExecuteAsync(cancellationToken);
     }

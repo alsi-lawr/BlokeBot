@@ -117,14 +117,14 @@ public sealed class HostFeatureTests
             [observer]
         );
 
-        await service.DisableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
-        await service.DisableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
-        await service.EnableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
+        await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
+        await service.DisableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
+        await service.EnableAsync(hostId, HostFeatureFlags.Polls, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         observer.Changes.ShouldBe([
-            (hostId, HostFeatureFlags.Shoutouts, NativeTwitchFeatureState.Disabled),
-            (hostId, HostFeatureFlags.Shoutouts, NativeTwitchFeatureState.Enabled),
+            (hostId, HostFeatureFlags.Polls, NativeTwitchFeatureState.Disabled),
+            (hostId, HostFeatureFlags.Polls, NativeTwitchFeatureState.Enabled),
         ]);
     }
 

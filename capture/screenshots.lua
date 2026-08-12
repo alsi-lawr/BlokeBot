@@ -46,7 +46,6 @@ view = [
   "guessing-leaderboard",
   "points-settings",
   "admin",
-  "native-shoutouts",
   "native-polls",
   "native-clips-markers",
   "native-channel-points",
@@ -114,10 +113,6 @@ local readiness = {
     path = "/admin",
     expression = [[document.body.innerText.includes("Channels using BlokeBot")]],
   },
-  ["native-shoutouts"] = {
-    path = "/twitch-operations/shoutouts",
-    expression = [[Boolean(document.querySelector("[data-native-route='shoutouts'] .task-panel button"))]],
-  },
   ["native-polls"] = {
     path = "/twitch-operations/polls",
     expression = [[Boolean(document.querySelector("[data-native-route='polls'] .task-panel button"))]],
@@ -152,25 +147,6 @@ local succeeded, failure = pcall(function()
       getComputedStyle(document.querySelector("main")).opacity === "1"
   ]=]):format(expected.path, expected.expression)
   viset.page.wait_for(viset.javascript(ready_expression), "20s")
-  if view == "native-shoutouts" then
-    viset.sleep("350ms")
-    viset.page.evaluate(viset.javascript([=[
-      (() => {
-        const trigger = [...document.querySelectorAll(".studio-stage__header")].find(
-          candidate => candidate.textContent.includes("Automatic raid shoutouts")
-        );
-        if (!trigger) throw new Error("Automatic raid shoutout stage was not found.");
-        trigger.click();
-        return true;
-      })()
-    ]=]))
-    viset.page.wait_for(
-      viset.javascript(
-        [[document.querySelector("[data-stage='automatic-raid']").classList.contains("studio-stage--open")]]
-      ),
-      "20s"
-    )
-  end
   viset.sleep("350ms")
   viset.snapshot()
 end)

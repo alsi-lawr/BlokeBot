@@ -38,7 +38,6 @@ internal static class SimulationViewCatalog
         ["automation-events"] = "/automations/events",
         ["overlays"] = "/overlays#sources",
         ["admin"] = "/admin",
-        ["native-shoutouts"] = "/twitch-operations/shoutouts",
         ["native-polls"] = "/twitch-operations/polls",
         ["native-clips-markers"] = "/twitch-operations/clips-markers",
         ["native-channel-points"] = "/twitch-operations/channel-points",

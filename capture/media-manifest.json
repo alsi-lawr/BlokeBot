@@ -342,19 +342,6 @@
       "semanticReadiness": "path /twitch-operations/predictions; Sample Channel; [data-native-route='predictions'] .task-panel button; main opacity 1"
     },
     {
-      "file": "laptop-dark-native-shoutouts.png",
-      "capture": "capture/screenshots.lua",
-      "route": "/twitch-operations/shoutouts",
-      "simulationAlias": "/simulation/login?view=native-shoutouts&theme=dark",
-      "scenario": "fresh-simulation-process:ready-fixture:native-shoutouts",
-      "theme": "dark",
-      "device": "laptop",
-      "format": "png",
-      "width": 1308,
-      "height": 840,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
-    },
-    {
       "file": "laptop-dark-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
       "route": "/overlays#cues",
@@ -652,19 +639,6 @@
       "width": 1308,
       "height": 840,
       "semanticReadiness": "path /twitch-operations/predictions; Sample Channel; [data-native-route='predictions'] .task-panel button; main opacity 1"
-    },
-    {
-      "file": "laptop-light-native-shoutouts.png",
-      "capture": "capture/screenshots.lua",
-      "route": "/twitch-operations/shoutouts",
-      "simulationAlias": "/simulation/login?view=native-shoutouts&theme=light",
-      "scenario": "fresh-simulation-process:ready-fixture:native-shoutouts",
-      "theme": "light",
-      "device": "laptop",
-      "format": "png",
-      "width": 1308,
-      "height": 840,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "laptop-light-overlay-cues.png",
@@ -966,19 +940,6 @@
       "semanticReadiness": "path /twitch-operations/predictions; Sample Channel; [data-native-route='predictions'] .task-panel button; main opacity 1"
     },
     {
-      "file": "phone-dark-native-shoutouts.png",
-      "capture": "capture/screenshots.lua",
-      "route": "/twitch-operations/shoutouts",
-      "simulationAlias": "/simulation/login?view=native-shoutouts&theme=dark",
-      "scenario": "fresh-simulation-process:ready-fixture:native-shoutouts",
-      "theme": "dark",
-      "device": "phone",
-      "format": "png",
-      "width": 462,
-      "height": 956,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
-    },
-    {
       "file": "phone-dark-overlay-cues.png",
       "capture": "capture/v0.6-overlay-guides.lua",
       "route": "/overlays#cues",
@@ -1276,19 +1237,6 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /twitch-operations/predictions; Sample Channel; [data-native-route='predictions'] .task-panel button; main opacity 1"
-    },
-    {
-      "file": "phone-light-native-shoutouts.png",
-      "capture": "capture/screenshots.lua",
-      "route": "/twitch-operations/shoutouts",
-      "simulationAlias": "/simulation/login?view=native-shoutouts&theme=light",
-      "scenario": "fresh-simulation-process:ready-fixture:native-shoutouts",
-      "theme": "light",
-      "device": "phone",
-      "format": "png",
-      "width": 462,
-      "height": 956,
-      "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts stage opens [data-stage='automatic-raid'].studio-stage--open; main opacity 1"
     },
     {
       "file": "phone-light-overlay-cues.png",

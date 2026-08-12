@@ -310,7 +310,7 @@ public sealed class AutomationActionExecutor(
         CancellationToken cancellationToken
     )
     {
-        if (!await IsEnabledAsync(hostId, HostFeatureFlags.Shoutouts, cancellationToken))
+        if (!await IsEnabledAsync(hostId, HostFeatureFlags.RaidCollaboration, cancellationToken))
         {
             return new AutomationActionOutcome.Failed("feature-disabled");
         }

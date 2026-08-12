@@ -9,7 +9,6 @@ namespace BlokeBot.Simulation;
 
 internal sealed class SimulationNativeTwitchDashboardOperations
     : IShoutoutDashboardOperations,
-        INativeShoutoutOperations,
         IPollDashboardOperations,
         IClipMarkerDashboardOperations,
         IChannelPointsDashboardOperations,
@@ -76,20 +75,6 @@ internal sealed class SimulationNativeTwitchDashboardOperations
             new ShoutoutOperationOutcome.Sent(normalized)
         );
     }
-
-    Task<ShoutoutDashboardState> INativeShoutoutOperations.LoadAsync(
-        int hostId,
-        string? targetLogin,
-        NativeShoutoutOwner owner,
-        CancellationToken cancellationToken
-    ) => LoadAsync(hostId, targetLogin, cancellationToken);
-
-    Task<ShoutoutOperationOutcome> INativeShoutoutOperations.SendAsync(
-        int hostId,
-        string targetLogin,
-        NativeShoutoutOwner owner,
-        CancellationToken cancellationToken
-    ) => SendAsync(hostId, targetLogin, cancellationToken);
 
     Task<PollDashboardState> IPollDashboardOperations.LoadAsync(
         int hostId,

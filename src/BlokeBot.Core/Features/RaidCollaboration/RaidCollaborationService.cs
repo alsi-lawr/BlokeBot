@@ -1,5 +1,7 @@
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -11,7 +13,8 @@ public sealed class RaidCollaborationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IRaidCollaborationProvider provider,
     IRaidWelcomeSender welcomeSender,
-    IRaidCollaborationShoutoutProvider shoutouts,
+    IShoutoutDashboardOperations shoutouts,
+    AutomaticRaidShoutoutRunner automaticShoutouts,
     IEnumerable<IRaidCollaborationDomainEventObserver> domainEventObservers,
     EventBus<AppEventKind> events,
     TimeProvider clock
@@ -19,6 +22,7 @@ public sealed class RaidCollaborationService(
 {
     private const int _historyLimit = 100;
     private const int _approvedChannelLimit = 50;
+    private const int _automaticShoutoutOutcomeLimit = 20;
     private readonly IRaidCollaborationDomainEventObserver[] _domainEventObservers =
     [
         .. domainEventObservers,
@@ -26,6 +30,7 @@ public sealed class RaidCollaborationService(
 
     public async Task<RaidCollaborationLoadOutcome> LoadAsync(
         int hostId,
+        string? shoutoutTargetLogin,
         CancellationToken cancellationToken
     )
     {
@@ -78,7 +83,16 @@ public sealed class RaidCollaborationService(
             return new RaidCollaborationLoadOutcome.FeatureDisabled();
         }
 
-        var shoutoutContext = await shoutouts.LoadAsync(hostId, null, cancellationToken);
+        var shoutoutContext = await shoutouts.LoadAsync(
+            hostId,
+            shoutoutTargetLogin,
+            cancellationToken
+        );
+        var automaticOutcomes = await LoadAutomaticShoutoutOutcomesAsync(
+            db,
+            hostId,
+            cancellationToken
+        );
         var latestArrival = history
             .Where(value => value.Direction == RaidDirection.Incoming)
             .Select(value => new RaidArrivalSummary(
@@ -99,10 +113,39 @@ public sealed class RaidCollaborationService(
                 history,
                 latestArrival,
                 shoutoutContext,
+                automaticOutcomes,
                 await provider.HasRaidManagementAuthorizationAsync(hostId, cancellationToken)
             )
         );
     }
+
+    private static async Task<
+        IReadOnlyList<AutomaticRaidShoutoutOutcomeView>
+    > LoadAutomaticShoutoutOutcomesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken cancellationToken
+    ) =>
+        await db
+            .AutomaticRaidShoutoutOutcomes.AsNoTracking()
+            .Where(value => value.HostId == hostId)
+            .OrderByDescending(value => value.MessageTimestampUtc)
+            .ThenByDescending(value => value.Id)
+            .Take(_automaticShoutoutOutcomeLimit)
+            .Select(value => new AutomaticRaidShoutoutOutcomeView(
+                value.Id,
+                value.ProviderMessageId,
+                value.SourceLogin,
+                value.SourceDisplayName,
+                value.ViewerCount,
+                value.Status,
+                value.ResultCode,
+                new DateTimeOffset(value.MessageTimestampUtc, TimeSpan.Zero),
+                value.CompletedAtUtc == null
+                    ? null
+                    : new DateTimeOffset(value.CompletedAtUtc.Value, TimeSpan.Zero)
+            ))
+            .ToArrayAsync(cancellationToken);
 
     public async Task<RaidCollaborationSaveOutcome> SaveAsync(
         int hostId,
@@ -111,9 +154,10 @@ public sealed class RaidCollaborationService(
     )
     {
         var errors = Validate(configuration);
-        if (errors.Count > 0)
+        var shoutoutErrors = configuration.AutomaticShoutout.Validate();
+        if (errors.Count > 0 || shoutoutErrors.Count > 0)
         {
-            return new RaidCollaborationSaveOutcome.Invalid(errors);
+            return new RaidCollaborationSaveOutcome.Invalid(errors, shoutoutErrors);
         }
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db.Hosts.SingleOrDefaultAsync(
@@ -140,12 +184,31 @@ public sealed class RaidCollaborationService(
         }
         settings.WelcomeEnabled = configuration.WelcomeEnabled;
         settings.WelcomeMessage = configuration.WelcomeMessage.Trim();
-        settings.NativeShoutoutEnabled = configuration.NativeShoutoutEnabled;
         settings.DeduplicationWindowMinutes = configuration.DeduplicationWindowMinutes;
         settings.Language = configuration.Language.Trim().ToLowerInvariant();
         settings.EligibleCategories = FormatCategories(configuration.EligibleCategories);
         settings.RelationshipCooldownHours = configuration.RelationshipCooldownHours;
         settings.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
+
+        var shoutoutSettings = await db.AutomaticRaidShoutoutSettings.SingleOrDefaultAsync(
+            value => value.HostId == hostId,
+            cancellationToken
+        );
+        if (shoutoutSettings is null)
+        {
+            shoutoutSettings = new AutomaticRaidShoutoutSettings { HostId = hostId };
+            _ = db.AutomaticRaidShoutoutSettings.Add(shoutoutSettings);
+        }
+        var shoutout = configuration.AutomaticShoutout;
+        shoutoutSettings.Enabled = shoutout.Enabled;
+        shoutoutSettings.OnlyApprovedChannels = shoutout.OnlyApprovedChannels;
+        shoutoutSettings.MinimumViewerCount = shoutout.MinimumViewerCount;
+        shoutoutSettings.Mechanism = shoutout.Mechanism;
+        shoutoutSettings.ChatPresentation = shoutout.ChatPresentation;
+        shoutoutSettings.MessageTemplate = shoutout.MessageTemplate;
+        shoutoutSettings.PinDurationSeconds = shoutout.PinDurationSeconds;
+        shoutoutSettings.AnnouncementColor = shoutout.AnnouncementColor;
+        shoutoutSettings.UpdatedAtUtc = settings.UpdatedAtUtc;
 
         var existing = await db
             .ApprovedRaidChannels.Where(value => value.HostId == hostId)
@@ -173,7 +236,7 @@ public sealed class RaidCollaborationService(
         );
     }
 
-    public async Task<ShoutoutOperationOutcome> SendShoutoutAsync(
+    public async Task<ShoutoutOperationOutcome> SendShortlistShoutoutAsync(
         int hostId,
         string targetLogin,
         CancellationToken cancellationToken
@@ -183,6 +246,60 @@ public sealed class RaidCollaborationService(
                 "Raid & collaboration is off or the channel is not approved."
             )
             : await shoutouts.SendAsync(hostId, targetLogin, cancellationToken);
+
+    public Task<ShoutoutOperationOutcome> SendShoutoutAsync(
+        int hostId,
+        string targetLogin,
+        CancellationToken cancellationToken
+    ) => shoutouts.SendAsync(hostId, targetLogin, cancellationToken);
+
+    public async Task<ApproveRaidChannelOutcome> ApproveChannelAsync(
+        int hostId,
+        string login,
+        string displayName,
+        CancellationToken cancellationToken
+    )
+    {
+        var normalized = Login.Normalize(login);
+        if (
+            string.IsNullOrWhiteSpace(normalized)
+            || !await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken)
+        )
+        {
+            return new ApproveRaidChannelOutcome.FeatureDisabled();
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var approved = await db
+            .ApprovedRaidChannels.AsNoTracking()
+            .Where(value => value.HostId == hostId)
+            .Select(value => value.Login)
+            .ToArrayAsync(cancellationToken);
+        if (approved.Contains(normalized, StringComparer.Ordinal))
+        {
+            return new ApproveRaidChannelOutcome.AlreadyApproved();
+        }
+        if (approved.Length >= _approvedChannelLimit)
+        {
+            return new ApproveRaidChannelOutcome.LimitReached(_approvedChannelLimit);
+        }
+
+        var now = clock.GetUtcNow().UtcDateTime;
+        var channel = new ApprovedRaidChannel
+        {
+            HostId = hostId,
+            Login = normalized,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? normalized : displayName.Trim(),
+            ApprovedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+        _ = db.ApprovedRaidChannels.Add(channel);
+        _ = await db.SaveChangesAsync(cancellationToken);
+        _ = await events.PublishAsync(AppEventKind.RaidCollaborationChanged, cancellationToken);
+        return new ApproveRaidChannelOutcome.Approved(
+            new(channel.Login, channel.DisplayName, channel.ApprovedClipId)
+        );
+    }
 
     public async Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
         int hostId,
@@ -389,7 +506,15 @@ public sealed class RaidCollaborationService(
     )
     {
         var configuration = await LoadConfigurationAsync(db, host.Id, cancellationToken);
-        if (!configuration.WelcomeEnabled && !configuration.NativeShoutoutEnabled)
+        var shoutoutRequested =
+            configuration.AutomaticShoutout.Enabled
+            && (
+                !configuration.AutomaticShoutout.OnlyApprovedChannels
+                || configuration.ApprovedChannels.Any(channel =>
+                    string.Equals(channel.Login, row.OtherLogin, StringComparison.Ordinal)
+                )
+            );
+        if (!configuration.WelcomeEnabled && !shoutoutRequested)
         {
             return;
         }
@@ -422,7 +547,7 @@ public sealed class RaidCollaborationService(
             row.WelcomeOutcome = configuration.WelcomeEnabled
                 ? RaidWelcomeOutcome.Deduplicated
                 : RaidWelcomeOutcome.NotConfigured;
-            row.ShoutoutOutcome = configuration.NativeShoutoutEnabled
+            row.ShoutoutOutcome = shoutoutRequested
                 ? RaidShoutoutOutcome.Deduplicated
                 : RaidShoutoutOutcome.NotConfigured;
             return;
@@ -450,7 +575,7 @@ public sealed class RaidCollaborationService(
                     : RaidWelcomeOutcome.Rejected;
             }
         }
-        if (!configuration.NativeShoutoutEnabled)
+        if (!shoutoutRequested)
         {
             return;
         }
@@ -460,7 +585,12 @@ public sealed class RaidCollaborationService(
             return;
         }
         row.ShoutoutOutcome = MapShoutoutOutcome(
-            await shoutouts.SendAsync(host.Id, row.OtherLogin, cancellationToken)
+            await automaticShoutouts.RunAsync(
+                host,
+                configuration.AutomaticShoutout,
+                incomingRaid,
+                cancellationToken
+            )
         );
     }
 
@@ -598,6 +728,12 @@ public sealed class RaidCollaborationService(
         var settings = await db
             .RaidCollaborationSettings.AsNoTracking()
             .SingleOrDefaultAsync(value => value.HostId == hostId, cancellationToken);
+        var shoutoutSettings = await db
+            .AutomaticRaidShoutoutSettings.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.HostId == hostId, cancellationToken);
+        var shoutout = shoutoutSettings is null
+            ? AutomaticRaidShoutoutConfiguration.Defaults
+            : AutomaticRaidShoutoutConfiguration.From(shoutoutSettings);
         var channels = await db
             .ApprovedRaidChannels.AsNoTracking()
             .Where(value => value.HostId == hostId)
@@ -611,12 +747,13 @@ public sealed class RaidCollaborationService(
         return settings is null
             ? RaidCollaborationConfiguration.Defaults with
             {
+                AutomaticShoutout = shoutout,
                 ApprovedChannels = channels,
             }
             : new(
                 settings.WelcomeEnabled,
                 settings.WelcomeMessage,
-                settings.NativeShoutoutEnabled,
+                shoutout,
                 settings.DeduplicationWindowMinutes,
                 settings.Language,
                 ParseCategories(settings.EligibleCategories),
@@ -756,13 +893,15 @@ public sealed class RaidCollaborationService(
                 StringComparison.Ordinal
             );
 
-    private static RaidShoutoutOutcome MapShoutoutOutcome(ShoutoutOperationOutcome outcome) =>
-        outcome switch
+    private static RaidShoutoutOutcome MapShoutoutOutcome(
+        AutomaticRaidShoutoutResultCode? resultCode
+    ) =>
+        resultCode switch
         {
-            ShoutoutOperationOutcome.Sent => RaidShoutoutOutcome.Sent,
-            ShoutoutOperationOutcome.CooldownActive or ShoutoutOperationOutcome.CooldownUnknown =>
-                RaidShoutoutOutcome.Cooldown,
-            ShoutoutOperationOutcome.TargetOffline => RaidShoutoutOutcome.TargetOffline,
+            null => RaidShoutoutOutcome.NotConfigured,
+            AutomaticRaidShoutoutResultCode.Delivered => RaidShoutoutOutcome.Sent,
+            AutomaticRaidShoutoutResultCode.Cooldown => RaidShoutoutOutcome.Cooldown,
+            AutomaticRaidShoutoutResultCode.Invalid => RaidShoutoutOutcome.TargetOffline,
             _ => RaidShoutoutOutcome.Rejected,
         };
 

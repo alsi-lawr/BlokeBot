@@ -8,7 +8,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class AutomaticRaidShoutoutObserverTests
+public sealed class AutomaticRaidShoutoutRunnerTests
 {
     private static readonly DateTimeOffset _now = new(2026, 7, 29, 10, 0, 0, TimeSpan.Zero);
 
@@ -16,21 +16,22 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task DisabledBelowThresholdStaleAndMissingIdentity_DoNotClaimOrDeliver()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(factory, enabled: false, threshold: 10);
+        var disabled = await SeedAsync(factory, enabled: false, threshold: 10);
+        var enabled = disabled with
+        {
+            Configuration = disabled.Configuration with { Enabled = true },
+        };
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-        var observer = Observer(factory, delivery);
 
-        await observer.IncomingRaidReceivedAsync(
-            Raid("disabled", _now, 20),
-            CancellationToken.None
+        await RunAsync(factory, delivery, disabled, Raid("disabled", _now, 20));
+        await RunAsync(factory, delivery, enabled, Raid("below", _now, 9));
+        await RunAsync(
+            factory,
+            delivery,
+            enabled,
+            Raid("stale", _now.AddMinutes(-2).AddTicks(-1), 20)
         );
-        await SetEnabledAsync(factory, hostId, enabled: true);
-        await observer.IncomingRaidReceivedAsync(Raid("below", _now, 9), CancellationToken.None);
-        await observer.IncomingRaidReceivedAsync(
-            Raid("stale", _now.AddMinutes(-2).AddTicks(-1), 20),
-            CancellationToken.None
-        );
-        await observer.IncomingRaidReceivedAsync(Raid("", _now, 20), CancellationToken.None);
+        await RunAsync(factory, delivery, enabled, Raid("", _now, 20));
 
         delivery.Requests.ShouldBeEmpty();
         await using var db = await factory.CreateDbContextAsync();
@@ -42,18 +43,14 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task ExactlyTwoMinutesOld_ClaimsBeforeOneTypedDeliveryAndPersistsMappedResult()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(
             new AutomaticRaidShoutoutDeliveryResult.NotDelivered(
                 AutomaticRaidShoutoutResultCode.Rejected
             )
         );
-        var observer = Observer(factory, delivery);
 
-        await observer.IncomingRaidReceivedAsync(
-            Raid("boundary", _now.AddMinutes(-2), 1),
-            CancellationToken.None
-        );
+        await RunAsync(factory, delivery, seeded, Raid("boundary", _now.AddMinutes(-2), 1));
 
         delivery.Requests.ShouldHaveSingleItem().ProviderMessageId.ShouldBe("boundary");
         await using var db = await factory.CreateDbContextAsync();
@@ -68,12 +65,13 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task DeliveryTerminalCallback_IsNotOverwrittenByQueueAdmissionResult()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
-        var observer = Observer(factory, new TerminalCallbackDelivery(factory));
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
 
-        await observer.IncomingRaidReceivedAsync(
-            Raid("terminal-callback", _now, 1),
-            CancellationToken.None
+        await RunAsync(
+            factory,
+            new TerminalCallbackDelivery(factory),
+            seeded,
+            Raid("terminal-callback", _now, 1)
         );
 
         await using var db = await factory.CreateDbContextAsync();
@@ -86,12 +84,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task SequentialAndRestartDuplicate_UsesDurableHostScopedClaimOnce()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var raid = Raid("duplicate", _now, 1);
 
-        await Observer(factory, delivery).IncomingRaidReceivedAsync(raid, CancellationToken.None);
-        await Observer(factory, delivery).IncomingRaidReceivedAsync(raid, CancellationToken.None);
+        await RunAsync(factory, delivery, seeded, raid);
+        await RunAsync(factory, delivery, seeded, raid);
 
         delivery.Requests.Count.ShouldBe(1);
         await using var db = await factory.CreateDbContextAsync();
@@ -107,12 +105,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
             deleteFailure,
             new DeferredSqliteTransactionInterceptor()
         );
-        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         await using var writer = await factory.CreateDbContextAsync();
         await using var transaction = await writer.Database.BeginTransactionAsync();
         _ = writer.AutomaticRaidShoutoutOutcomes.Add(
             Outcome(
-                hostId,
+                seeded.Host.Id,
                 "held-writer",
                 AutomaticRaidShoutoutOutcomeStatus.Processing,
                 null,
@@ -123,11 +121,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
 
         var observation = Task.Run(() =>
-            Observer(factory, delivery)
-                .IncomingRaidReceivedAsync(
-                    Raid("distinct-under-lock", _now, 1),
-                    CancellationToken.None
-                )
+            RunAsync(factory, delivery, seeded, Raid("distinct-under-lock", _now, 1))
         );
         try
         {
@@ -153,20 +147,16 @@ public sealed class AutomaticRaidShoutoutObserverTests
     {
         var contention = new PersistentProcessedEventDeleteContention();
         await using var factory = await InterceptedSqliteDbFactory.CreateAsync(contention);
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-        var observer = Observer(factory, delivery);
 
         var exception = await Should.ThrowAsync<SqliteException>(() =>
-            observer.IncomingRaidReceivedAsync(
-                Raid("contention-exhausted", _now, 1),
-                CancellationToken.None
-            )
+            RunAsync(factory, delivery, seeded, Raid("contention-exhausted", _now, 1))
         );
 
         exception.SqliteErrorCode.ShouldBe(SQLitePCL.raw.SQLITE_BUSY);
         contention.MatchedDispatches.ShouldBe(
-            AutomaticRaidShoutoutObserver.ClaimContentionMaximumAttempts
+            AutomaticRaidShoutoutRunner.ClaimContentionMaximumAttempts
         );
         delivery.Requests.ShouldBeEmpty();
         await using var verification = await factory.CreateDbContextAsync();
@@ -178,18 +168,17 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task CrashOrAmbiguousProcessing_IsVisibleAndNeverReplayed()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         var throwing = new ThrowingDelivery();
         var raid = Raid("crash", _now, 1);
         _ = await Should.ThrowAsync<InvalidOperationException>(() =>
-            Observer(factory, throwing).IncomingRaidReceivedAsync(raid, CancellationToken.None)
+            RunAsync(factory, throwing, seeded, raid)
         );
         var replacement = new RecordingDelivery(
             new AutomaticRaidShoutoutDeliveryResult.Delivered()
         );
 
-        await Observer(factory, replacement)
-            .IncomingRaidReceivedAsync(raid, CancellationToken.None);
+        await RunAsync(factory, replacement, seeded, raid);
 
         replacement.Requests.ShouldBeEmpty();
         await using var db = await factory.CreateDbContextAsync();
@@ -202,13 +191,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task AmbiguousResult_IsVisibleAndSameHostRedeliveryNeverReplays()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Ambiguous());
-        var observer = Observer(factory, delivery);
         var raid = Raid("ambiguous-replay", _now, 1);
 
-        await observer.IncomingRaidReceivedAsync(raid, CancellationToken.None);
-        await observer.IncomingRaidReceivedAsync(raid, CancellationToken.None);
+        await RunAsync(factory, delivery, seeded, raid);
+        await RunAsync(factory, delivery, seeded, raid);
 
         delivery.Requests.Count.ShouldBe(1);
         await using var verification = await factory.CreateDbContextAsync();
@@ -304,7 +292,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     )
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         AutomaticRaidShoutoutDeliveryResult result = shape switch
         {
             DeliveryResultShape.Delivered => new AutomaticRaidShoutoutDeliveryResult.Delivered(),
@@ -314,8 +302,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
             _ => throw new InvalidOperationException("Unsupported test delivery result."),
         };
 
-        await Observer(factory, new RecordingDelivery(result))
-            .IncomingRaidReceivedAsync(Raid("result-mapping", _now, 1), CancellationToken.None);
+        await RunAsync(
+            factory,
+            new RecordingDelivery(result),
+            seeded,
+            Raid("result-mapping", _now, 1)
+        );
 
         await using var verification = await factory.CreateDbContextAsync();
         var outcome = await verification.AutomaticRaidShoutoutOutcomes.SingleAsync();
@@ -327,52 +319,28 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task SameProviderIdentity_IsIndependentAcrossHosts()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        _ = await SeedAsync(factory, enabled: true, threshold: 1, login: "host");
-        _ = await SeedAsync(factory, enabled: true, threshold: 1, login: "other");
+        var first = await SeedAsync(factory, enabled: true, threshold: 1, login: "host");
+        var second = await SeedAsync(factory, enabled: true, threshold: 1, login: "other");
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Ambiguous());
 
-        await Observer(factory, delivery)
-            .IncomingRaidReceivedAsync(Raid("same", _now, 1, "host"), CancellationToken.None);
-        await Observer(factory, delivery)
-            .IncomingRaidReceivedAsync(Raid("same", _now, 1, "other"), CancellationToken.None);
+        await RunAsync(factory, delivery, first, Raid("same", _now, 1, "host"));
+        await RunAsync(factory, delivery, second, Raid("same", _now, 1, "other"));
 
         delivery.Requests.Count.ShouldBe(2);
         delivery.Requests.Select(static request => request.HostLogin).ShouldBe(["host", "other"]);
     }
 
     [Test]
-    public async Task NativeDisabled_LoadsSettingsButDoesNotClaimOrDeliver()
-    {
-        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
-        await using (var db = await factory.CreateDbContextAsync())
-        {
-            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
-            host.EnabledFeatures &= ~HostFeatureFlags.Shoutouts;
-            _ = await db.SaveChangesAsync();
-        }
-        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-
-        await Observer(factory, delivery)
-            .IncomingRaidReceivedAsync(Raid("disabled-native", _now, 1), CancellationToken.None);
-
-        delivery.Requests.ShouldBeEmpty();
-        await using var verification = await factory.CreateDbContextAsync();
-        (await verification.AutomaticRaidProcessedEvents.CountAsync()).ShouldBe(0);
-        (await verification.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(0);
-    }
-
-    [Test]
     public async Task ExpiredClaimsArePrunedOnlyOnFreshEligibleWorkAndOldReplayRemainsStale()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         await using (var db = await factory.CreateDbContextAsync())
         {
             _ = db.AutomaticRaidProcessedEvents.Add(
                 new AutomaticRaidProcessedEvent
                 {
-                    HostId = hostId,
+                    HostId = seeded.Host.Id,
                     ProviderMessageId = "expired",
                     ClaimedAtUtc = _now.AddMinutes(-4).UtcDateTime,
                     ExpiresAtUtc = _now.AddMinutes(-2).UtcDateTime,
@@ -381,12 +349,8 @@ public sealed class AutomaticRaidShoutoutObserverTests
             _ = await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-        var observer = Observer(factory, delivery);
 
-        await observer.IncomingRaidReceivedAsync(
-            Raid("stale-replay", _now.AddMinutes(-3), 1),
-            CancellationToken.None
-        );
+        await RunAsync(factory, delivery, seeded, Raid("stale-replay", _now.AddMinutes(-3), 1));
         await using (var beforeFresh = await factory.CreateDbContextAsync())
         {
             (
@@ -395,7 +359,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
                 )
             ).ShouldBeTrue();
         }
-        await observer.IncomingRaidReceivedAsync(Raid("fresh", _now, 1), CancellationToken.None);
+        await RunAsync(factory, delivery, seeded, Raid("fresh", _now, 1));
 
         delivery.Requests.Select(static request => request.ProviderMessageId).ShouldBe(["fresh"]);
         await using var verification = await factory.CreateDbContextAsync();
@@ -410,12 +374,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
     public async Task RetentionEvictsOldestTerminalButKeepsClaimAndNewest100InOrder()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
+        var seeded = await SeedAsync(factory, enabled: true, threshold: 1);
         await using (var db = await factory.CreateDbContextAsync())
         {
             _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 Outcome(
-                    hostId,
+                    seeded.Host.Id,
                     "processing",
                     AutomaticRaidShoutoutOutcomeStatus.Processing,
                     null,
@@ -424,7 +388,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
             );
             _ = db.AutomaticRaidShoutoutOutcomes.Add(
                 Outcome(
-                    hostId,
+                    seeded.Host.Id,
                     "ambiguous",
                     AutomaticRaidShoutoutOutcomeStatus.Ambiguous,
                     AutomaticRaidShoutoutResultCode.Ambiguous,
@@ -434,13 +398,9 @@ public sealed class AutomaticRaidShoutoutObserverTests
             _ = await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-        var observer = Observer(factory, delivery);
         for (var index = 0; index < 101; index++)
         {
-            await observer.IncomingRaidReceivedAsync(
-                Raid($"terminal-{index}", _now, 1),
-                CancellationToken.None
-            );
+            await RunAsync(factory, delivery, seeded, Raid($"terminal-{index}", _now, 1));
         }
 
         await using var verification = await factory.CreateDbContextAsync();
@@ -465,15 +425,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
         ).ShouldBe(2);
         (
             await verification.AutomaticRaidProcessedEvents.AnyAsync(value =>
-                value.HostId == hostId && value.ProviderMessageId == "terminal-0"
+                value.HostId == seeded.Host.Id && value.ProviderMessageId == "terminal-0"
             )
         ).ShouldBeTrue();
         delivery.Requests.Count.ShouldBe(101);
 
-        await observer.IncomingRaidReceivedAsync(
-            Raid("terminal-0", _now, 1),
-            CancellationToken.None
-        );
+        await RunAsync(factory, delivery, seeded, Raid("terminal-0", _now, 1));
 
         delivery.Requests.Count.ShouldBe(101);
         (
@@ -483,10 +440,22 @@ public sealed class AutomaticRaidShoutoutObserverTests
         ).ShouldBeFalse();
     }
 
-    private static AutomaticRaidShoutoutObserver Observer(
+    private static async Task RunAsync(
         IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
-        IAutomaticRaidShoutoutDelivery delivery
-    ) => new(factory, delivery, new FixedTimeProvider(_now));
+        IAutomaticRaidShoutoutDelivery delivery,
+        SeededHost seeded,
+        EventSubIncomingRaidEvent raid
+    ) =>
+        _ = await new AutomaticRaidShoutoutRunner(
+            factory,
+            delivery,
+            new FixedTimeProvider(_now)
+        ).RunAsync(seeded.Host, seeded.Configuration, raid, CancellationToken.None);
+
+    private sealed record SeededHost(
+        BotHost Host,
+        AutomaticRaidShoutoutConfiguration Configuration
+    );
 
     private static EventSubIncomingRaidEvent Raid(
         string messageId,
@@ -506,7 +475,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
             viewers
         );
 
-    private static async Task<int> SeedAsync(
+    private static async Task<SeededHost> SeedAsync(
         IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
         bool enabled,
         int threshold,
@@ -524,31 +493,16 @@ public sealed class AutomaticRaidShoutoutObserverTests
         };
         _ = db.Hosts.Add(host);
         _ = await db.SaveChangesAsync();
-        _ = db.AutomaticRaidShoutoutSettings.Add(
-            new AutomaticRaidShoutoutSettings
-            {
-                HostId = host.Id,
-                Enabled = enabled,
-                MinimumViewerCount = threshold,
-                UpdatedAtUtc = _now.UtcDateTime,
-            }
-        );
+        var settings = new AutomaticRaidShoutoutSettings
+        {
+            HostId = host.Id,
+            Enabled = enabled,
+            MinimumViewerCount = threshold,
+            UpdatedAtUtc = _now.UtcDateTime,
+        };
+        _ = db.AutomaticRaidShoutoutSettings.Add(settings);
         _ = await db.SaveChangesAsync();
-        return host.Id;
-    }
-
-    private static async Task SetEnabledAsync(
-        SqliteBlokeBotDbFactory factory,
-        int hostId,
-        bool enabled
-    )
-    {
-        await using var db = await factory.CreateDbContextAsync();
-        var settings = await db.AutomaticRaidShoutoutSettings.SingleAsync(value =>
-            value.HostId == hostId
-        );
-        settings.Enabled = enabled;
-        _ = await db.SaveChangesAsync();
+        return new(host, AutomaticRaidShoutoutConfiguration.From(settings));
     }
 
     private static AutomaticRaidShoutoutOutcome Outcome(

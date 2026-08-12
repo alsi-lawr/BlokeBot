@@ -6,7 +6,6 @@ public sealed class RaidCollaborationSettings
     public int HostId { get; set; }
     public bool WelcomeEnabled { get; set; } = true;
     public string WelcomeMessage { get; set; } = RaidCollaborationDefaults.WelcomeMessage;
-    public bool NativeShoutoutEnabled { get; set; } = true;
     public int DeduplicationWindowMinutes { get; set; } = 60;
     public string Language { get; set; } = "en";
     public string EligibleCategories { get; set; } = string.Empty;

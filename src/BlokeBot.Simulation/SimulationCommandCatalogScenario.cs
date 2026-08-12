@@ -186,7 +186,7 @@ internal sealed class SimulationCommandCatalogScenario(
             "available" => HostFeatureFlags.All,
             "all-enabled" => HostFeatureFlags.All,
             "all-disabled" => HostFeatureFlags.None,
-            "selective-native" => HostFeatureFlags.Shoutouts | HostFeatureFlags.Predictions,
+            "selective-native" => HostFeatureFlags.RaidCollaboration | HostFeatureFlags.Predictions,
             "mixed" => HostFeatureFlags.RequestBoards
                 | HostFeatureFlags.Moments
                 | HostFeatureFlags.Points

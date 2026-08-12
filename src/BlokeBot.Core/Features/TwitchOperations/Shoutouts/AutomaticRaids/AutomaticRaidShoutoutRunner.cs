@@ -1,4 +1,3 @@
-using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
@@ -6,11 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 
-public sealed class AutomaticRaidShoutoutObserver(
+public sealed class AutomaticRaidShoutoutRunner(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     IAutomaticRaidShoutoutDelivery delivery,
     TimeProvider clock
-) : IIncomingRaidEventObserver
+)
 {
     internal static readonly TimeSpan FreshnessWindow = TimeSpan.FromMinutes(2);
     internal static readonly TimeSpan ClaimContentionRetryDelay = TimeSpan.FromMilliseconds(25);
@@ -18,66 +17,29 @@ public sealed class AutomaticRaidShoutoutObserver(
     internal const int ClaimContentionMaximumAttempts = 3;
     internal const int TerminalOutcomeRetention = 100;
 
-    public async Task IncomingRaidReceivedAsync(
+    public async Task<AutomaticRaidShoutoutResultCode?> RunAsync(
+        BotHost host,
+        AutomaticRaidShoutoutConfiguration configuration,
         EventSubIncomingRaidEvent incomingRaid,
         CancellationToken cancellationToken
     )
     {
-        if (incomingRaid.SubscriptionDirection is not EventSubRaidSubscriptionDirection.Incoming)
-        {
-            return;
-        }
-
-        if (!HasUsableIdentity(incomingRaid))
-        {
-            return;
-        }
-
         var now = clock.GetUtcNow();
-        if (now - incomingRaid.MessageTimestamp > FreshnessWindow)
-        {
-            return;
-        }
-
-        await using var lookup = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var normalizedTargetLogin = Login.Normalize(incomingRaid.ToBroadcasterUserLogin);
-        var host = !string.IsNullOrWhiteSpace(incomingRaid.ToBroadcasterUserId)
-            ? await lookup
-                .Hosts.AsNoTracking()
-                .SingleOrDefaultAsync(
-                    value => value.TwitchUserId == incomingRaid.ToBroadcasterUserId,
-                    cancellationToken
-                )
-            : await lookup
-                .Hosts.AsNoTracking()
-                .SingleOrDefaultAsync(
-                    value => value.Login == normalizedTargetLogin,
-                    cancellationToken
-                );
-        if (host is null)
-        {
-            return;
-        }
-        var settings = await lookup
-            .AutomaticRaidShoutoutSettings.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.HostId == host.Id, cancellationToken);
-        var configuration = settings is null
-            ? AutomaticRaidShoutoutConfiguration.Defaults
-            : AutomaticRaidShoutoutConfigurationService.Map(settings);
         if (
-            !host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts)
-            || !configuration.Enabled
-            || AutomaticRaidShoutoutConfigurationService.Validate(configuration).Count > 0
+            !configuration.Enabled
+            || !HasUsableIdentity(incomingRaid)
+            || now - incomingRaid.MessageTimestamp > FreshnessWindow
+            || configuration.Validate().Count > 0
             || incomingRaid.ViewerCount < configuration.MinimumViewerCount
         )
         {
-            return;
+            return null;
         }
 
         var outcomeId = await TryClaimAsync(host.Id, incomingRaid, now, cancellationToken);
         if (outcomeId is null)
         {
-            return;
+            return null;
         }
 
         var result = await delivery.DeliverAsync(
@@ -94,7 +56,7 @@ public sealed class AutomaticRaidShoutoutObserver(
             ),
             cancellationToken
         );
-        await StoreResultAsync(host.Id, outcomeId.Value, result, cancellationToken);
+        return await StoreResultAsync(host.Id, outcomeId.Value, result, cancellationToken);
     }
 
     private async Task<long?> TryClaimAsync(
@@ -161,7 +123,7 @@ public sealed class AutomaticRaidShoutoutObserver(
         }
     }
 
-    private async Task StoreResultAsync(
+    private async Task<AutomaticRaidShoutoutResultCode?> StoreResultAsync(
         int hostId,
         long outcomeId,
         AutomaticRaidShoutoutDeliveryResult result,
@@ -175,7 +137,7 @@ public sealed class AutomaticRaidShoutoutObserver(
         );
         if (outcome.Status is not AutomaticRaidShoutoutOutcomeStatus.Processing)
         {
-            return;
+            return outcome.ResultCode;
         }
         var now = clock.GetUtcNow().UtcDateTime;
         switch (result)
@@ -216,6 +178,7 @@ public sealed class AutomaticRaidShoutoutObserver(
             .ThenByDescending(value => value.Id)
             .Skip(TerminalOutcomeRetention)
             .ExecuteDeleteAsync(cancellationToken);
+        return outcome.ResultCode;
     }
 
     private static bool HasUsableIdentity(EventSubIncomingRaidEvent incomingRaid) =>
@@ -229,10 +192,6 @@ public sealed class AutomaticRaidShoutoutObserver(
         && incomingRaid.FromBroadcasterUserName.Length <= 128
         && incomingRaid.ToBroadcasterUserId.Length <= 64
         && Login.Normalize(incomingRaid.ToBroadcasterUserLogin).Length <= 128
-        && (
-            !string.IsNullOrWhiteSpace(incomingRaid.ToBroadcasterUserId)
-            || !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.ToBroadcasterUserLogin))
-        )
         && incomingRaid.ViewerCount >= 0;
 
     private static bool IsPersistenceContention(Exception exception) =>

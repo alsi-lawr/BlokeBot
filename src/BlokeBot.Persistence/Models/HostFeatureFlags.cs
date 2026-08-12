@@ -7,7 +7,6 @@ public enum HostFeatureFlags : ulong
     Guessing = 1UL << 0,
     Points = 1UL << 1,
     CustomCommands = 1UL << 2,
-    Shoutouts = 1UL << 3,
     Overlays = 1UL << 4,
     RequestBoards = 1UL << 5,
     PlayWithViewers = 1UL << 6,
@@ -26,17 +25,11 @@ public enum HostFeatureFlags : ulong
     CooperativeGame = 1UL << 19,
     Collectives = 1UL << 20,
     NativeTwitchFeatures =
-        Shoutouts
-        | Polls
-        | ClipsAndMarkers
-        | RewardsAndRedemptions
-        | Predictions
-        | RaidCollaboration,
+        Polls | ClipsAndMarkers | RewardsAndRedemptions | Predictions | RaidCollaboration,
     All =
         Guessing
         | Points
         | CustomCommands
-        | Shoutouts
         | Overlays
         | RequestBoards
         | PlayWithViewers

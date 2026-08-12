@@ -387,8 +387,8 @@ public sealed class HostConfigFaultRoutingTests
         var page = RenderHostConfigPage(context);
         page.WaitForAssertion(() =>
         {
-            var shoutouts = FindFeatureButton(page, "Shoutouts");
-            shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
+            var polls = FindFeatureButton(page, "Polls");
+            polls.HasAttribute("aria-pressed").ShouldBeTrue();
             page.FindAll("#chat-tools button")
                 .ShouldNotContain(static button =>
                     button.TextContent.Contains("Automations", StringComparison.Ordinal)
@@ -398,11 +398,11 @@ public sealed class HostConfigFaultRoutingTests
         });
         page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
-        await page.InvokeAsync(() => FindFeatureButton(page, "Shoutouts").ClickAsync(new()));
+        await page.InvokeAsync(() => FindFeatureButton(page, "Polls").ClickAsync(new()));
 
         page.WaitForAssertion(() =>
         {
-            FindFeatureButton(page, "Shoutouts").HasAttribute("aria-pressed").ShouldBeFalse();
+            FindFeatureButton(page, "Polls").HasAttribute("aria-pressed").ShouldBeFalse();
             page.Find("#startup-chat-message")
                 .GetAttribute("value")
                 .ShouldBe("unsaved Native switch draft");
@@ -433,7 +433,7 @@ public sealed class HostConfigFaultRoutingTests
             .Hosts.Where(host => host.Id == hostId)
             .Select(host => host.EnabledFeatures)
             .SingleAsync();
-        enabled.Contains(HostFeatureFlags.Shoutouts).ShouldBeFalse();
+        enabled.Contains(HostFeatureFlags.Polls).ShouldBeFalse();
         enabled.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
         enabled.Contains(HostFeatureFlags.Automations).ShouldBeTrue();
     }
