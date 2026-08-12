@@ -127,10 +127,7 @@ public sealed class NativeEventDispatchTests
             CancellationToken.None
         );
 
-        disabledGate.Requests.ShouldBe([
-            ("target_login", NativeTwitchFeature.Shoutouts),
-            ("target_login", NativeTwitchFeature.RaidCollaboration),
-        ]);
+        disabledGate.Requests.ShouldBe([("target_login", NativeTwitchFeature.RaidCollaboration)]);
         disabledObserver.Events.ShouldBeEmpty();
 
         var wrongTargetGate = new MutableNativeTwitchFeatureStateProvider
@@ -147,7 +144,6 @@ public sealed class NativeEventDispatchTests
         );
 
         wrongTargetGate.Requests.ShouldBe([
-            ("target_login", NativeTwitchFeature.Shoutouts),
             ("target_login", NativeTwitchFeature.RaidCollaboration),
         ]);
         wrongTargetObserver.Events.ShouldBeEmpty();

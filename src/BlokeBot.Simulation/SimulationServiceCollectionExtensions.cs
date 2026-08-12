@@ -2,7 +2,6 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.RaidCollaboration;
 using BlokeBot.Core.Features.TwitchOperations;
-using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
