@@ -96,9 +96,6 @@ internal static class BlokeBotHost
                     statePaths.StateDirectory
                 )
         );
-        _ = builder.Services.Configure<HostOptions>(static host =>
-            host.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore
-        );
         _ = builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
         ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
