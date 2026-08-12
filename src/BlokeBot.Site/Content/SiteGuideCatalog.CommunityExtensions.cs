@@ -222,6 +222,13 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Shout out a raider automatically",
+                    Figure = new SiteFigure(
+                        "media/community/v010/shoutout-setup-light-laptop.png",
+                        1308,
+                        840,
+                        "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
+                        "Automatic shoutout setup keeps the message, its tokens and the preview viewers will see readable together before one save."
+                    ),
                     Steps =
                     [
                         "Automatic raid shoutouts are off by default. Open Settings, turn them on when you are ready and set the minimum viewer count.",
