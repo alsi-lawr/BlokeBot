@@ -29,7 +29,7 @@
         }
         @if (_view.CompletedRecap is { } recap)
         {
-            <section class="card public-raid-recap"><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span><div><h2>Latest recap · @recap.BossName</h2><p>@recap.Contributions.Count contributors recorded @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage. Completed @(recap.CompletedAtUtc?.ToString("d MMM yyyy, HH:mm") ?? "—") UTC.</p></div></section>
+            <section class="card public-raid-recap"><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span><div><h2>Latest recap · @recap.BossName</h2><p>@recap.Contributions.Count contributors recorded @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage. @(recap.CompletedAtUtc is { } completedAtUtc ? "Completed " + completedAtUtc.ToString("d MMM yyyy, HH:mm") + " UTC." : "Completion time was not recorded.")</p></div></section>
         }
     }
 </main>
