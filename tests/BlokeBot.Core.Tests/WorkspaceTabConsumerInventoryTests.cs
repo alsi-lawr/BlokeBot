@@ -32,11 +32,6 @@ public sealed partial class WorkspaceTabConsumerInventoryTests
     }
 
     [Test]
-    [Skip(
-        "Pending BLOKEBOT-202, -203, -206 and -209. Competitions still renders a workspace tab "
-            + "strip with no fragment, and the remaining local adoptions land with those tickets. "
-            + "The last of them removes this Skip."
-    )]
     public void EveryWorkspaceTabStrip_IsFragmentBacked()
     {
         var offenders = Directory

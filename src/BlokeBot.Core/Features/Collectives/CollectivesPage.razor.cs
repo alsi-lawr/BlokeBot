@@ -1,4 +1,5 @@
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 
@@ -6,6 +7,18 @@ namespace BlokeBot.Core.Features.Collectives;
 
 public partial class CollectivesPage
 {
+    private const string _workspaceTabsId = "collective-workspace";
+
+    private static readonly IReadOnlyList<SegmentedTabItem> _workflowTabs =
+    [
+        new("tournament", "Tournament"),
+        new("raid", "Raid relay"),
+        new("goal", "Shared goal"),
+    ];
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private CollectiveWorkspace? _workspace;
     private bool _featureEnabled;
     private bool _showCreate;
@@ -29,9 +42,6 @@ public partial class CollectivesPage
     private DateTime _goalDeadlineUtc = DateTime.UtcNow.AddDays(7);
     private Guid _goalSourceBountyPublicId;
 
-    [SupplyParameterFromQuery(Name = "workflow")]
-    public string? RequestedWorkflow { get; set; }
-
     [SupplyParameterFromQuery(Name = "collective")]
     public Guid? RequestedCollective { get; set; }
 
@@ -41,6 +51,10 @@ public partial class CollectivesPage
 
     private bool _localSettingsChanged =>
         _selected is not null && _notification != _selected.LocalSettings.Notification;
+
+    private bool _goalSourceChanged =>
+        _selected is not null
+        && _goalSourceBountyPublicId != (_selected.LocalGoalSourcePublicId ?? Guid.Empty);
 
     private string _workflowTitle =>
         _workflow switch
@@ -81,7 +95,7 @@ public partial class CollectivesPage
         _workflow switch
         {
             "raid" =>
-                "Shared state carries host, bounded aggregate count, hand-off status, and operation identity—never individual viewer data.",
+                "Shared state carries the host names, the total viewer count, the hand-off status, and a reference for the operation. Individual viewer details stay private to the host that owns them.",
             "goal" =>
                 "Public output shows the collective target and bounded host totals. Contributor identities and private goal configuration stay local.",
             _ =>
@@ -90,12 +104,22 @@ public partial class CollectivesPage
 
     protected override async Task OnInitializedAsync()
     {
-        _workflow = RequestedWorkflow is "raid" or "goal" ? RequestedWorkflow : "tournament";
-        await ObserveRouteLoadAsync(LoadAsync);
+        _workflow = SegmentedTabs.CanonicalKey(_navigation, _workflowTabs);
+        await ObserveRouteLoadAsync(() => LoadAsync());
     }
 
-    private async Task LoadAsync()
+    private void SelectWorkflow(string key) => _workflow = key;
+
+    // Each local settings control reaches its own service call, so a reload triggered by one of them
+    // keeps an edit that is still pending in the other.
+    private async Task LoadAsync(bool keepPendingLocalEdits = false)
     {
+        var pendingNotification =
+            keepPendingLocalEdits && _localSettingsChanged
+                ? _notification
+                : (CollectiveLocalNotification?)null;
+        var pendingGoalSource =
+            keepPendingLocalEdits && _goalSourceChanged ? _goalSourceBountyPublicId : (Guid?)null;
         _ = await LoadPageContextAsync();
         if (Host is null)
         {
@@ -119,7 +143,7 @@ public partial class CollectivesPage
         _workspace = outcome is CollectiveDashboardOutcome.Loaded loaded ? loaded.Workspace : null;
         if (_workspace is { SelectedCollective: { } selected } workspace)
         {
-            _notification = selected.LocalSettings.Notification;
+            _notification = pendingNotification ?? selected.LocalSettings.Notification;
             _knownHosts = workspace.KnownHosts;
             _ownedBounties = workspace.OwnedBounties;
             _tournamentOwnerHostId = selected.Tournament is { } tournament
@@ -143,7 +167,8 @@ public partial class CollectivesPage
             _goalUnitName = selected.Goal?.UnitName ?? string.Empty;
             _goalTarget = selected.Goal?.Target ?? 1;
             _goalDeadlineUtc = selected.Goal?.DeadlineUtc ?? DateTime.UtcNow.AddDays(7);
-            _goalSourceBountyPublicId = selected.LocalGoalSourcePublicId ?? Guid.Empty;
+            _goalSourceBountyPublicId =
+                pendingGoalSource ?? selected.LocalGoalSourcePublicId ?? Guid.Empty;
         }
     }
 
@@ -375,7 +400,7 @@ public partial class CollectivesPage
                             _showCreate = false;
                             _showInvite = false;
                             _showWorkflowEditor = false;
-                            await LoadAsync();
+                            await LoadAsync(keepPendingLocalEdits: true);
                         }
                     }
                 )
@@ -388,32 +413,6 @@ public partial class CollectivesPage
             : null;
         await LoadAsync();
     }
-
-    private RenderFragment WorkflowTab(string key, string label) =>
-        builder =>
-        {
-            builder.OpenElement(0, "button");
-            builder.AddAttribute(1, "type", "button");
-            builder.AddAttribute(2, "role", "tab");
-            builder.AddAttribute(
-                3,
-                "aria-selected",
-                (_workflow == key).ToString().ToLowerInvariant()
-            );
-            builder.AddAttribute(4, "aria-controls", "collective-workflow-panel");
-            builder.AddAttribute(
-                5,
-                "class",
-                _workflow == key ? "collective-tab collective-tab--active" : "collective-tab"
-            );
-            builder.AddAttribute(
-                6,
-                "onclick",
-                EventCallback.Factory.Create(this, () => _workflow = key)
-            );
-            builder.AddContent(7, label);
-            builder.CloseElement();
-        };
 
     private void SetFeedback(CollectiveMutationOutcome outcome) =>
         (_feedback, _failed) = outcome switch

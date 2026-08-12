@@ -84,44 +84,6 @@
         line-height: 1.35;
     }
 
-    .collective-tabs {
-        align-items: center;
-        background: var(--app-surface-muted);
-        border: 1px solid var(--app-border);
-        border-radius: 0.75rem;
-        display: flex;
-        gap: 0.2rem;
-        padding: 0.25rem;
-        width: max-content;
-    }
-
-    .collective-tab {
-        border: 1px solid transparent;
-        border-radius: 0.58rem;
-        color: var(--app-text-muted);
-        font-size: 0.78rem;
-        font-weight: 750;
-        min-height: 2.5rem;
-        padding: 0.55rem 0.75rem;
-    }
-
-    .collective-tab:hover,
-    .collective-tab:focus-visible {
-        color: var(--app-text-strong);
-        outline: none;
-    }
-
-    .collective-tab:focus-visible {
-        box-shadow: var(--app-focus-shadow);
-    }
-
-    .collective-tab--active {
-        background: var(--app-surface-solid);
-        border-color: var(--app-border);
-        box-shadow: var(--app-shadow-sm);
-        color: var(--app-text-strong);
-    }
-
     .collective-workspace {
         background: var(--app-surface-solid);
         border: 1px solid var(--app-border);
@@ -501,6 +463,16 @@
         padding-top: 0.7rem;
     }
 
+    .collective-local-settings {
+        display: grid;
+        gap: 0.45rem;
+        min-width: 0;
+    }
+
+    .collective-local-settings__head {
+        display: none;
+    }
+
     .collective-private {
         background: var(--app-surface-muted);
         border: 1px dashed var(--app-control-border);
@@ -660,15 +632,61 @@
             order: 1;
         }
 
-        .collective-members,
-        .collective-sidecar {
+        .collective-members {
             display: none;
+        }
+
+        .collective-sidecar {
+            border-top: 1px solid var(--app-border);
+            order: 2;
+        }
+
+        /*
+         * The two hidden sections are addressed through .collective-sidecar__body so they outrank
+         * the wider `.collective-sidecar__body > section` display rule above.
+         */
+        .collective-sidecar > header,
+        .collective-sidecar__authority > .collective-sidecar__label,
+        .collective-sidecar__authority > h3,
+        .collective-sidecar__authority > .collective-private,
+        .collective-sidecar__body > .collective-sidecar__shared,
+        .collective-sidecar__body > .collective-sidecar__audit {
+            display: none;
+        }
+
+        .collective-local-settings__head {
+            align-items: center;
+            display: grid;
+            gap: 0.6rem;
+            grid-template-columns: auto minmax(0, 1fr);
+            padding-bottom: 0.15rem;
+        }
+
+        .collective-local-settings__head p {
+            color: var(--app-text-muted);
+            font-size: 0.68rem;
+            line-height: 1.35;
+        }
+
+        .collective-local-settings__icon {
+            align-items: center;
+            background: var(--tone-blue-bg);
+            border-radius: 0.6rem;
+            color: var(--tone-blue-fg);
+            display: flex;
+            height: 2rem;
+            justify-content: center;
+            width: 2rem;
+        }
+
+        .collective-local-settings__source-action {
+            justify-self: start;
         }
 
         .collective-mobile-management {
             border-top: 1px solid var(--app-border);
             display: block;
-            order: 2;
+            order: 3;
         }
 
         .collective-mobile-management summary {
@@ -734,19 +752,8 @@
             font-size: 0.76rem;
         }
 
-        .collective-tabs {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            width: 100%;
-        }
-
         .collective-workflow-editor {
             grid-template-columns: 1fr;
-        }
-
-        .collective-tab {
-            font-size: 0.66rem;
-            padding-inline: 0.3rem;
         }
 
         .collective-stage > header {

@@ -68,11 +68,12 @@
                     <div><span>Shared activity</span><strong>@WorkflowCount(selected) workflows</strong><small>Shared summaries only</small></div>
                 </section>
 
-                <div class="collective-tabs" role="tablist" aria-label="Collective workflows">
-                    @WorkflowTab("tournament", "Tournament reference")
-                    @WorkflowTab("raid", "Raid relay")
-                    @WorkflowTab("goal", "Shared goal")
-                </div>
+                <SegmentedTabs Id="@_workspaceTabsId"
+                               OwnsFragment
+                               AriaLabel="Collective workflows"
+                               Items="_workflowTabs"
+                               ActiveKey="@_workflow"
+                               ActiveKeyChanged="SelectWorkflow" />
 
                 <section class="collective-workspace" data-collective-workspace>
                     <aside class="collective-members" aria-label="Participating hosts">
@@ -105,7 +106,7 @@
                         <p class="collective-members__note">Membership is an explicit server-owned allowlist. Twitch relationships never imply trust.</p>
                     </aside>
 
-                    <section id="collective-workflow-panel" class="collective-stage" role="tabpanel" aria-label="Selected collective workflow">
+                    <section id="@SegmentedTabs.PanelId(_workspaceTabsId, _workflow)" class="collective-stage" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId(_workspaceTabsId, _workflow)">
                         <header><div><h2>@_workflowTitle</h2><p>@_workflowSubtitle</p></div><div class="collective-stage__actions">@if (_workflow == "tournament" && selected.Tournament is not null){<a class="collective-quiet-link" href="/competitions">Open tournament ↗</a>}else if (_workflow == "raid"){<a class="collective-quiet-link" href="/raid-collaboration">Open raid hub ↗</a>}else if (_workflow == "goal"){<a class="collective-quiet-link" href="@PublicUrl(selected.Id)" target="_blank" rel="noopener">Open public summary ↗</a>}@if(selected.CanCoordinate){<button class="btn-secondary" type="button" @onclick="ShowWorkflowEditor">Edit</button>}</div></header>
                         <div class="collective-stage__body">
                             @if (_showWorkflowEditor)
@@ -163,17 +164,32 @@
                         </div>
                     </section>
 
-                    <aside class="collective-sidecar" aria-label="Workflow details and audit">
+                    <aside class="collective-sidecar" aria-label="Local settings and workflow details">
                         <header><div><h2>Details</h2><p>Context for @Host.DisplayName</p></div><span class="status-pill">Host-scoped</span></header>
                         <div class="collective-sidecar__body" data-sticky-save-scope>
-                            <section><span class="collective-sidecar__label">Authority</span><h3>Only @Host.DisplayName can change these settings</h3><div class="collective-private"><span aria-hidden="true">▣</span><div><strong>Private to this host</strong><p>@_privateDetail</p></div></div>@if(_workflow == "goal" && selected.Goal is not null){<label class="label" for="collective-goal-source">This host's goal source</label><select id="collective-goal-source" class="input" @bind="_goalSourceBountyPublicId"><option value="@Guid.Empty">Choose a public bounty</option>@foreach(var bounty in _ownedBounties){<option value="@bounty.PublicId">@bounty.Title</option>}</select><button class="btn-secondary" type="button" disabled="@(_goalSourceBountyPublicId == Guid.Empty)" @onclick="SetGoalSourceAsync">Use this source</button>}<label class="label" for="collective-notification">Local workflow setting</label><select id="collective-notification" class="input" @bind="_notification"><option value="@CollectiveLocalNotification.Moderators">Notify moderators only</option><option value="@CollectiveLocalNotification.ModeratorsAndOwner">Notify moderators and owner</option></select></section>
-                            <section><span class="collective-sidecar__label">Shared output</span><h3>@_sharedOutputTitle</h3><p>@_sharedOutputDetail</p></section>
-                            <section><span class="collective-sidecar__label">Recent audit</span><ul class="collective-audit">@foreach(var audit in selected.Audit.Take(4)){<li><strong>@AuditLabel(audit.Action)</strong><span>@audit.ActingHostLogin · @audit.OperationReference · @Relative(audit.OccurredAtUtc)</span></li>}</ul></section>
+                            <section class="collective-sidecar__authority">
+                                <span class="collective-sidecar__label">Authority</span>
+                                <h3>Only @Host.DisplayName can change these settings</h3>
+                                <div class="collective-private"><span aria-hidden="true">▣</span><div><strong>Private to this host</strong><p>@_privateDetail</p></div></div>
+                                <div class="collective-local-settings" data-collective-local-settings>
+                                    <div class="collective-local-settings__head"><span class="collective-local-settings__icon" aria-hidden="true">⚙</span><div><h3>Local settings</h3><p>Settings for @Host.DisplayName.</p></div></div>
+                                    @if (_workflow == "goal" && selected.Goal is not null)
+                                    {
+                                        <label class="label" for="collective-goal-source">This host's goal source</label>
+                                        <select id="collective-goal-source" class="input" @bind="_goalSourceBountyPublicId"><option value="@Guid.Empty">Choose a public bounty</option>@foreach(var bounty in _ownedBounties){<option value="@bounty.PublicId">@bounty.Title</option>}</select>
+                                        <button class="btn-secondary collective-local-settings__source-action" type="button" disabled="@(_goalSourceBountyPublicId == Guid.Empty)" @onclick="SetGoalSourceAsync">Use this source</button>
+                                    }
+                                    <label class="label" for="collective-notification">Notifications</label>
+                                    <select id="collective-notification" class="input" @bind="_notification"><option value="@CollectiveLocalNotification.Moderators">Notify moderators only</option><option value="@CollectiveLocalNotification.ModeratorsAndOwner">Notify moderators and owner</option></select>
+                                </div>
+                            </section>
+                            <section class="collective-sidecar__shared"><span class="collective-sidecar__label">Shared output</span><h3>@_sharedOutputTitle</h3><p>@_sharedOutputDetail</p></section>
+                            <section class="collective-sidecar__audit"><span class="collective-sidecar__label">Recent audit</span><ul class="collective-audit">@foreach(var audit in selected.Audit.Take(4)){<li><strong>@AuditLabel(audit.Action)</strong><span>@audit.ActingHostLogin · @audit.OperationReference · @Relative(audit.OccurredAtUtc)</span></li>}</ul></section>
                             <StickySaveRegion Scope="StickySaveScope.Editor" Active="@_localSettingsChanged"><button class="btn-primary" type="button" disabled="@(!_localSettingsChanged)" @onclick="SaveLocalSettingsAsync">Save local settings</button></StickySaveRegion>
                         </div>
                     </aside>
 
-                    <details class="collective-mobile-management"><summary>Membership &amp; @Host.DisplayName settings</summary><div>@foreach(var member in selected.Members){<p><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span></p>}</div></details>
+                    <details class="collective-mobile-management"><summary>Participating hosts</summary><div>@foreach(var member in selected.Members){<p><strong>@member.DisplayName</strong><span>@MembershipLabel(member)</span></p>}</div></details>
                 </section>
             }
 
