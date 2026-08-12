@@ -36,7 +36,7 @@ public sealed class BotRuntimeHostedServiceTests
             status,
             idleWait
         );
-        var eventSub = new EventSubRuntime(null!, null!, null!, null!, null!, null!);
+        var eventSub = new EventSubRuntime(null!, null!, null!, null!, null!, null!, null!);
         return new RuntimeHarness(
             new BotRuntimeHostedService(
                 BotSettings.FromOptions(new BotOptions { Runtime = runtime }),

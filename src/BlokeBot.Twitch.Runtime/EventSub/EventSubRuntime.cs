@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class EventSubRuntime(
@@ -6,7 +8,8 @@ internal sealed class EventSubRuntime(
     EventSubChannelSessionFactory channelSessions,
     EventSubChannelReconciliationTrigger reconciliation,
     IEventSubSubscriptionTransport subscriptions,
-    IRuntimeIdleWait idleWait
+    IRuntimeIdleWait idleWait,
+    ILogger<EventSubRuntime> log
 )
 {
     public async Task RunAsync(CancellationToken stoppingToken)
@@ -23,20 +26,46 @@ internal sealed class EventSubRuntime(
             while (!stoppingToken.IsCancellationRequested)
             {
                 await idleWait.WaitAsync(stoppingToken);
-                await session.RepairMissingSubscriptionsAndDrainAsync(
-                    await subscriptions.ListEnabledOwnedIdsAsync(
-                        settings.Identity.ClientId,
-                        stoppingToken
-                    ),
-                    BotChannelList.Normalize(await channels.GetChannelsAsync(stoppingToken)),
-                    stoppingToken
-                );
+                await ReconcileAsync(session, stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
             await session.DisposeAsync();
+        }
+    }
+
+    private async Task ReconcileAsync(
+        EventSubChannelSession session,
+        CancellationToken stoppingToken
+    )
+    {
+        try
+        {
+            await session.RepairMissingSubscriptionsAndDrainAsync(
+                await subscriptions.ListEnabledOwnedIdsAsync(
+                    settings.Identity.ClientId,
+                    stoppingToken
+                ),
+                BotChannelList.Normalize(await channels.GetChannelsAsync(stoppingToken)),
+                stoppingToken
+            );
+        }
+        catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
+        {
+            var details = EventSubChannelFailureClassifier.Classify(
+                exception,
+                EventSubChannelPhase.Reconciliation,
+                stoppingToken
+            );
+            log.LogError(
+                exception,
+                "EventSub reconciliation failed at {Phase}; classified {Classification} ({FailureType}). The runtime stays up and retries on the next idle cycle.",
+                details.Phase,
+                details.Classification,
+                details.FailureType
+            );
         }
     }
 }
