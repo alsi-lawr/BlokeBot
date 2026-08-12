@@ -14,17 +14,20 @@ public partial class ViewerPassportsPage
         new(
             ViewerPassportVisibility.Public,
             "Public",
-            "Anyone with the link can see your selected profile fields."
+            "Anyone with the link can see the profile fields you allow, even without signing in.",
+            "public"
         ),
         new(
             ViewerPassportVisibility.ChannelMembers,
             "Channel members",
-            "Only signed-in viewers who participate in this channel."
+            "Signed-in viewers who have a passport in this channel, and channel managers.",
+            "members"
         ),
         new(
             ViewerPassportVisibility.Private,
             "Private",
-            "Only you and channel managers can open this passport."
+            "Only you and channel managers can open this passport.",
+            "private"
         ),
     ];
     private ViewerPassportView? _passport;
@@ -154,10 +157,10 @@ public partial class ViewerPassportsPage
 
     private void ToggleAttendance() => _hideAttendance = !_hideAttendance;
 
-    private string VisibilityClass(ViewerPassportVisibility visibility) =>
-        visibility == _visibility
-            ? "passport-visibility-option passport-visibility-option--selected"
-            : "passport-visibility-option";
+    private string VisibilityClass(VisibilityOption option) =>
+        option.Value == _visibility
+            ? $"passport-visibility-option passport-visibility-option--{option.Tone} passport-visibility-option--selected"
+            : $"passport-visibility-option passport-visibility-option--{option.Tone}";
 
     private static long? ParseReward(string value) =>
         long.TryParse(value, out var parsed) ? parsed : null;
@@ -204,6 +207,7 @@ public partial class ViewerPassportsPage
     private sealed record VisibilityOption(
         ViewerPassportVisibility Value,
         string Label,
-        string Description
+        string Description,
+        string Tone
     );
 }

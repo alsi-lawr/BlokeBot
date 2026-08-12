@@ -101,22 +101,52 @@
                         </summary>
                         <div class="passport-editor__section-body">
                             <p class="mb-4 text-sm text-muted-foreground">Public presentation is opt-in. Saved activity stays private until you choose otherwise.</p>
-                            <div class="passport-visibility-options">
-                                @foreach (var option in _visibilityOptions)
-                                {
-                                    <label class="@VisibilityClass(option.Value)">
-                                        <input type="radio"
-                                               name="passport-visibility"
-                                               value="@option.Value"
-                                               @onchange="() => _visibility = option.Value"
-                                               checked="@(_visibility == option.Value)" />
-                                        <span>
-                                            <span class="passport-visibility-option__label">@option.Label</span>
-                                            <span class="passport-visibility-option__copy">@option.Description</span>
-                                        </span>
-                                    </label>
-                                }
-                            </div>
+                            <fieldset class="passport-visibility">
+                                <legend class="passport-visibility__legend">Who can open this passport</legend>
+                                <div class="passport-visibility-options">
+                                    @foreach (var option in _visibilityOptions)
+                                    {
+                                        <label class="@VisibilityClass(option)">
+                                            <input type="radio"
+                                                   name="passport-visibility"
+                                                   value="@option.Value"
+                                                   @onchange="() => _visibility = option.Value"
+                                                   checked="@(_visibility == option.Value)" />
+                                            <span class="passport-visibility-option__icon" aria-hidden="true">
+                                                @switch (option.Value)
+                                                {
+                                                    case ViewerPassportVisibility.Public:
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" focusable="false">
+                                                            <circle cx="12" cy="12" r="9" />
+                                                            <path d="M3 12h18" />
+                                                            <path d="M12 3c3 3.2 3 14.8 0 18" />
+                                                            <path d="M12 3c-3 3.2-3 14.8 0 18" />
+                                                        </svg>
+                                                        break;
+                                                    case ViewerPassportVisibility.ChannelMembers:
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" focusable="false">
+                                                            <circle cx="9" cy="8" r="3" />
+                                                            <circle cx="17" cy="10" r="2.5" />
+                                                            <path d="M3 20c.4-4 2.5-6 6-6s5.6 2 6 6" />
+                                                            <path d="M14 15c4-.7 6.3 1 7 5" />
+                                                        </svg>
+                                                        break;
+                                                    case ViewerPassportVisibility.Private:
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" focusable="false">
+                                                            <rect x="5" y="10" width="14" height="11" rx="2" />
+                                                            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                                                        </svg>
+                                                        break;
+                                                }
+                                            </span>
+                                            <span class="passport-visibility-option__text">
+                                                <span class="passport-visibility-option__label">@option.Label</span>
+                                                <span class="passport-visibility-option__copy">@option.Description</span>
+                                            </span>
+                                        </label>
+                                    }
+                                </div>
+                            </fieldset>
                             <div class="passport-attendance">
                                 <span>
                                     <span class="passport-attendance__label" id="passport-attendance-label">Show attendance streak</span>

@@ -91,26 +91,63 @@
         margin-top: 0.35rem;
     }
 
+    .passport-visibility {
+        border: 0;
+        margin: 0;
+        min-width: 0;
+        padding: 0;
+    }
+
+    .passport-visibility__legend {
+        color: var(--app-text-muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        margin-bottom: 0.5rem;
+        padding: 0;
+        text-transform: uppercase;
+    }
+
     .passport-visibility-options {
         display: grid;
         gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
     }
 
     .passport-visibility-option {
         align-items: start;
         background: var(--app-surface-solid);
         border: 1px solid var(--app-border);
-        border-radius: 0.65rem;
+        border-radius: 0.75rem;
         cursor: pointer;
         display: grid;
-        gap: 0.65rem;
-        grid-template-columns: 1rem minmax(0, 1fr);
+        gap: 0.6rem;
+        grid-template-columns: 1rem 2.25rem minmax(0, 1fr);
         min-height: 3.5rem;
-        padding: 0.65rem 0.8rem;
+        min-width: 0;
+        padding: 0.75rem 0.85rem;
         transition:
             background-color 140ms ease,
             border-color 140ms ease,
             box-shadow 140ms ease;
+    }
+
+    .passport-visibility-option--public {
+        --passport-tone-bg: var(--tone-blue-bg);
+        --passport-tone-fg: var(--tone-blue-fg);
+        --passport-tone-ring: var(--tone-blue-ring);
+    }
+
+    .passport-visibility-option--members {
+        --passport-tone-bg: var(--tone-violet-bg);
+        --passport-tone-fg: var(--tone-violet-fg);
+        --passport-tone-ring: var(--tone-violet-ring);
+    }
+
+    .passport-visibility-option--private {
+        --passport-tone-bg: var(--tone-amber-bg);
+        --passport-tone-fg: var(--tone-amber-fg);
+        --passport-tone-ring: var(--tone-amber-ring);
     }
 
     .passport-visibility-option:hover {
@@ -118,14 +155,11 @@
         border-color: var(--app-control-hover-border);
     }
 
-    .passport-visibility-option--selected {
-        background: var(--tone-blue-bg);
-        border-color: var(--tone-blue-ring);
-    }
-
+    .passport-visibility-option--selected,
     .passport-visibility-option--selected:hover {
-        background: var(--tone-blue-bg);
-        border-color: var(--tone-blue-solid);
+        background: var(--passport-tone-bg);
+        border-color: var(--passport-tone-fg);
+        box-shadow: inset 0 0 0 1px var(--passport-tone-fg);
     }
 
     .passport-visibility-option:has(input:focus-visible) {
@@ -133,12 +167,39 @@
         box-shadow: var(--app-focus-shadow);
     }
 
+    .passport-visibility-option:has(input:disabled) {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
     .passport-visibility-option input {
-        accent-color: var(--tone-blue-solid);
-        cursor: pointer;
+        accent-color: var(--passport-tone-fg);
+        cursor: inherit;
         height: 1rem;
-        margin: 0.16rem 0 0;
+        margin: 0.625rem 0 0;
         width: 1rem;
+    }
+
+    .passport-visibility-option__icon {
+        align-items: center;
+        background: var(--app-surface-solid);
+        border: 1px solid var(--passport-tone-ring);
+        border-radius: 0.6rem;
+        color: var(--passport-tone-fg);
+        display: flex;
+        height: 2.25rem;
+        justify-content: center;
+        width: 2.25rem;
+    }
+
+    .passport-visibility-option__icon svg {
+        height: 1.15rem;
+        width: 1.15rem;
+    }
+
+    .passport-visibility-option__text {
+        min-width: 0;
+        overflow-wrap: break-word;
     }
 
     .passport-visibility-option__label {
@@ -155,6 +216,10 @@
         font-size: 0.75rem;
         line-height: 1.4;
         margin-top: 0.1rem;
+    }
+
+    .passport-visibility-option--selected .passport-visibility-option__copy {
+        color: var(--app-text-medium);
     }
 
     .passport-attendance {
