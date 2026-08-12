@@ -32,6 +32,7 @@ figure = [
   "competition-result-light",
   "progression-overlay-setup-light",
   "achievement-feed-setup-dark",
+  "shoutout-setup-light",
 ]
 ]]
 
@@ -74,6 +75,13 @@ local succeeded, failure = pcall(function()
       theme = "light",
       selected = "Community milestone",
       ready = "document.querySelector('[data-overlay-editor]') !== null",
+    },
+    ["shoutout-setup-light"] = {
+      path = "/raid-collaboration",
+      fragment = "#settings",
+      theme = "light",
+      scroll = "[data-automatic-raid-shoutouts]",
+      ready = "document.querySelector('[data-automatic-raid-shoutouts]') !== null",
     },
     ["achievement-feed-setup-dark"] = {
       path = "/overlays",
@@ -138,6 +146,20 @@ local succeeded, failure = pcall(function()
     ]=]):format(target.ready)),
     "40s"
   )
+
+  if target.scroll ~= nil then
+    viset.page.evaluate(
+      viset.javascript([=[
+        ({ selector }) => {
+          const target = document.querySelector(selector);
+          if (target) target.scrollIntoView({ block: "center" });
+          return true;
+        }
+      ]=]),
+      { selector = target.scroll }
+    )
+  end
+
   viset.sleep("400ms")
   viset.snapshot()
 end)
