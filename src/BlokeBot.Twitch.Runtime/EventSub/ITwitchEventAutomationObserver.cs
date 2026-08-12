@@ -92,8 +92,8 @@ public enum AutomationEventSubRequirement
     Redemptions,
 
     /// <summary>
-    /// Subscription lifecycle owned by the Shoutouts feature; diagnostics metadata only, never
-    /// consulted for subscription creation.
+    /// Subscription lifecycle owned by the Raid &amp; collaboration feature; diagnostics metadata
+    /// only, never consulted for subscription creation.
     /// </summary>
     Shoutouts,
 

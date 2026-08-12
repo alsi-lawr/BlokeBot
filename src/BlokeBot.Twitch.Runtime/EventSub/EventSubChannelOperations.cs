@@ -236,7 +236,7 @@ internal sealed class EventSubChannelOperations(
         {
             EventSubOperationSubscriptionKind.Shoutouts => await nativeTwitch.IsEnabledAsync(
                 channel,
-                NativeTwitchFeature.Shoutouts,
+                NativeTwitchFeature.RaidCollaboration,
                 cancellationToken
             ),
             // One incoming channel.raid subscription serves collaboration and automations.

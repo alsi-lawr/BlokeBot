@@ -91,7 +91,7 @@ internal sealed class EventSubDeliveryHandler(
         if (
             !await nativeTwitch.IsEnabledAsync(
                 shoutout.BroadcasterUserLogin,
-                NativeTwitchFeature.Shoutouts,
+                NativeTwitchFeature.RaidCollaboration,
                 cancellationToken
             )
         )

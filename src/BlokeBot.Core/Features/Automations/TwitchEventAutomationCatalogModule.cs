@@ -102,9 +102,9 @@ public static class TwitchEventAutomationSources
             [RedemptionsReadScope, RedemptionsManageScope],
             "channel.channel_points_custom_reward_redemption.add"
         ),
-        // The shoutout EventSub subscription lifecycle is owned by the Shoutouts feature and uses
-        // the configured bot account's moderator scopes rather than the broadcaster grant, so no
-        // broadcaster scopes are listed here.
+        // The shoutout EventSub subscription lifecycle is owned by the Raid & collaboration feature
+        // and uses the configured bot account's moderator scopes rather than the broadcaster grant,
+        // so no broadcaster scopes are listed here.
         new(
             AutomationDefinitionIds.ShoutoutSentSource,
             AutomationEventSubRequirement.Shoutouts,

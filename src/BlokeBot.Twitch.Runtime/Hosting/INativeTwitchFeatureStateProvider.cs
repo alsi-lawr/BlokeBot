@@ -11,7 +11,6 @@ public interface INativeTwitchFeatureStateProvider
 
 public enum NativeTwitchFeature
 {
-    Shoutouts,
     Polls,
     RewardsAndRedemptions,
     Predictions,

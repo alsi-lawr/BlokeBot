@@ -445,11 +445,11 @@ public sealed class TwitchEventAutomationEventSubTests : EventSubChannelRecovery
     }
 
     [Test]
-    public async Task ShoutoutEvents_ReachAutomationObserversOnlyBehindTheShoutoutsGate()
+    public async Task ShoutoutEvents_ReachAutomationObserversOnlyBehindTheRaidCollaborationGate()
     {
         var observer = new RecordingAutomationObserver();
         var shoutoutObserver = new RecordingShoutoutObserver();
-        var gate = new SingleFeatureGate(NativeTwitchFeature.Shoutouts);
+        var gate = new SingleFeatureGate(NativeTwitchFeature.RaidCollaboration);
         var handler = new EventSubDeliveryHandler(
             null!,
             null!,
