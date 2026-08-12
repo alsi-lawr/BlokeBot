@@ -161,12 +161,6 @@
         padding: 0.85rem 1.1rem;
     }
 
-    .competition-inspector__actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
     .competition-tabs {
         border-bottom: 1px solid var(--app-border);
         container-type: inline-size;

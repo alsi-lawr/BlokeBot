@@ -201,11 +201,6 @@ html[data-theme="dark"] .app-shell {
 }
 
 html[data-theme="dark"] .app-shell__sidebar,
-html[data-theme="dark"] .app-shell__mobile-nav {
-    background: rgb(17 19 20 / 0.97);
-    border-color: var(--app-border);
-}
-
 html[data-theme="dark"] .app-shell__topbar {
     background: rgb(17 19 20 / 0.86);
     border-color: var(--app-border);

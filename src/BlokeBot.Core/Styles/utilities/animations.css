@@ -150,8 +150,7 @@
     .home-info-card__icon,
     .app-shell__drawer-overlay,
     .app-shell__mobile-drawer,
-    .motion-list__item,
-    .motion-status {
+    .motion-list__item {
         animation: none !important;
         transition-duration: 1ms !important;
     }

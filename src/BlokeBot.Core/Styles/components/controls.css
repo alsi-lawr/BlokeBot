@@ -131,12 +131,6 @@
         color: var(--app-placeholder);
     }
 
-    .form-grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    }
-
     .form-help {
         color: var(--app-text-muted);
         font-size: 0.8rem;

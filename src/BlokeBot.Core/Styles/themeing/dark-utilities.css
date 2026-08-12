@@ -44,19 +44,6 @@ html[data-theme="dark"] .bg-rose-50 {
     background-color: rgb(127 29 29 / 0.32);
 }
 
-html[data-theme="dark"] .from-white,
-html[data-theme="dark"] .from-white\/80 {
-    --tw-gradient-from: rgb(24 26 27 / 0.9);
-}
-
-html[data-theme="dark"] .to-slate-100 {
-    --tw-gradient-to: rgb(36 39 40 / 0.82);
-}
-
-html[data-theme="dark"] .to-teal-50\/70 {
-    --tw-gradient-to: rgb(19 78 74 / 0.42);
-}
-
 html[data-theme="dark"] .border-slate-100,
 html[data-theme="dark"] .border-slate-200,
 html[data-theme="dark"] .border-slate-200\/80,
@@ -92,8 +79,7 @@ html[data-theme="dark"] .ring-purple-200 {
     --tw-ring-color: rgb(168 85 247 / 0.34);
 }
 
-html[data-theme="dark"] .ring-red-200,
-html[data-theme="dark"] .ring-rose-200 {
+html[data-theme="dark"] .ring-red-200 {
     --tw-ring-color: rgb(248 113 113 / 0.34);
 }
 
@@ -101,7 +87,6 @@ html[data-theme="dark"] .ring-sky-200 {
     --tw-ring-color: rgb(56 189 248 / 0.34);
 }
 
-html[data-theme="dark"] .text-black,
 html[data-theme="dark"] .text-slate-950,
 html[data-theme="dark"] .text-slate-900,
 html[data-theme="dark"] .text-slate-800 {
@@ -144,7 +129,6 @@ html[data-theme="dark"] .text-purple-700 {
     color: rgb(216 180 254);
 }
 
-html[data-theme="dark"] .text-red-600,
 html[data-theme="dark"] .text-red-700,
 html[data-theme="dark"] .text-rose-700 {
     color: rgb(252 165 165);
