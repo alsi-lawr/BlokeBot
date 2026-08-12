@@ -150,26 +150,34 @@
                 </div>
                 <div class="surface-band grid gap-4 border-b p-5 lg:grid-cols-4">
                     <div>
-                        <label class="label" for="leaderboardFrom">From</label>
-                        <input id="leaderboardFrom" class="input mt-2" type="date" @bind="_leaderboardFromDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <div class="field">
+                            <label class="field__label" for="leaderboardFrom">From</label>
+                            <input id="leaderboardFrom" class="field__input mt-2" type="date" @bind="_leaderboardFromDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        </div>
                     </div>
                     <div>
-                        <label class="label" for="leaderboardTo">To</label>
-                        <input id="leaderboardTo" class="input mt-2" type="date" @bind="_leaderboardToDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <div class="field">
+                            <label class="field__label" for="leaderboardTo">To</label>
+                            <input id="leaderboardTo" class="field__input mt-2" type="date" @bind="_leaderboardToDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        </div>
                     </div>
                     <div>
-                        <label class="label" for="leaderboardProfile">Round type</label>
-                        <select id="leaderboardProfile" class="input mt-2" @bind="_leaderboardProfileId" @bind:after="ResetAndLoadLeaderboardAsync">
-                            <option value="0">All round types</option>
-                            @foreach (var profile in _state?.Profiles ?? [])
-                            {
-                                <option value="@profile.Id">@profile.Name</option>
-                            }
-                        </select>
+                        <div class="field">
+                            <label class="field__label" for="leaderboardProfile">Round type</label>
+                            <select id="leaderboardProfile" class="field__input mt-2" @bind="_leaderboardProfileId" @bind:after="ResetAndLoadLeaderboardAsync">
+                                <option value="0">All round types</option>
+                                @foreach (var profile in _state?.Profiles ?? [])
+                                {
+                                    <option value="@profile.Id">@profile.Name</option>
+                                }
+                            </select>
+                        </div>
                     </div>
                     <div>
-                        <label class="label" for="leaderboardUsername">Username</label>
-                        <input id="leaderboardUsername" class="input mt-2" placeholder="any player" @bind="_leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <div class="field">
+                            <label class="field__label" for="leaderboardUsername">Username</label>
+                            <input id="leaderboardUsername" class="field__input mt-2" placeholder="any player" @bind="_leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        </div>
                     </div>
                 </div>
 

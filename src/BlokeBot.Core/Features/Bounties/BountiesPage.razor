@@ -76,12 +76,14 @@
                             <div class="studio-span-4">
                                 <Field Id="bounty-reward" Label="Completion bonus" @bind-Value="_draft.CompletionReward" />
                             </div>
-                            <div class="studio-span-4 space-y-2">
-                                <label class="label" for="bounty-visibility">Visibility</label>
-                                <select id="bounty-visibility" class="input w-auto max-w-full" @bind="_draft.Visibility">
-                                    <option value="@BountyVisibility.Public">Public</option>
-                                    <option value="@BountyVisibility.Private">Private</option>
-                                </select>
+                            <div class="studio-span-4">
+                                <div class="field">
+                                    <label class="field__label" for="bounty-visibility">Visibility</label>
+                                    <select id="bounty-visibility" class="field__input w-auto max-w-full" @bind="_draft.Visibility">
+                                        <option value="@BountyVisibility.Public">Public</option>
+                                        <option value="@BountyVisibility.Private">Private</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 

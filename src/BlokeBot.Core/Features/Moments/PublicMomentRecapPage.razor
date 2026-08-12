@@ -44,8 +44,10 @@
                 else
                 {
                     <div class="mt-4 max-w-sm">
-                        <label class="label" for="moment-voter-login">Twitch login</label>
-                        <input id="moment-voter-login" class="input" maxlength="128" autocomplete="username" @bind="_login" />
+                        <div class="field">
+                            <label class="field__label" for="moment-voter-login">Twitch login</label>
+                            <input id="moment-voter-login" class="field__input" maxlength="128" autocomplete="username" @bind="_login" />
+                        </div>
                         <p class="mt-1 text-xs text-muted-foreground">Sign in for Twitch-ID voting, or use the normalized-login fallback.</p>
                     </div>
                 }

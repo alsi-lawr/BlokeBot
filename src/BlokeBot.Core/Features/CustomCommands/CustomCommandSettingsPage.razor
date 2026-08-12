@@ -313,19 +313,21 @@
                                         @foreach (var route in _replyRoutes)
                                         {
                                             <div class="studio-span-4 space-y-2" @key="route.Arguments">
-                                                <label class="label" for="@CommandReplyFieldId(command, route.Arguments)">@route.Label</label>
-                                                <select id="@CommandReplyFieldId(command, route.Arguments)"
-                                                        class="input"
-                                                        @attributes="ValidationAttributes(CommandReplyFieldId(command, route.Arguments), CommandTarget(command.Id, route.Field))"
-                                                        @ref="_controls[CommandReplyFieldId(command, route.Arguments)]"
-                                                        value="@route.Get(command.Action.ReplyRoutes)"
-                                                        @onchange="args => route.Set(command.Action.ReplyRoutes, ParseEntryId(args.Value))">
-                                                    <option value="">Ignore</option>
-                                                    @foreach (var entry in _config.MessageEntries)
-                                                    {
-                                                        <option value="@entry.Id">@entry.Name</option>
-                                                    }
-                                                </select>
+                                                <div class="field">
+                                                    <label class="field__label" for="@CommandReplyFieldId(command, route.Arguments)">@route.Label</label>
+                                                    <select id="@CommandReplyFieldId(command, route.Arguments)"
+                                                            class="field__input"
+                                                            @attributes="ValidationAttributes(CommandReplyFieldId(command, route.Arguments), CommandTarget(command.Id, route.Field))"
+                                                            @ref="_controls[CommandReplyFieldId(command, route.Arguments)]"
+                                                            value="@route.Get(command.Action.ReplyRoutes)"
+                                                            @onchange="args => route.Set(command.Action.ReplyRoutes, ParseEntryId(args.Value))">
+                                                        <option value="">Ignore</option>
+                                                        @foreach (var entry in _config.MessageEntries)
+                                                        {
+                                                            <option value="@entry.Id">@entry.Name</option>
+                                                        }
+                                                    </select>
+                                                </div>
                                                 @(ValidationMessageFor(CommandReplyFieldId(command, route.Arguments), CommandTarget(command.Id, route.Field)))
                                             </div>
                                         }
@@ -349,73 +351,81 @@
                                             </p>
                                         }
                                         <div class="studio-span-6 space-y-2" data-overlay-cue-command>
-                                            <label class="label" for="@CommandOverlayTargetFieldId(command)">Overlay player</label>
-                                            <select id="@CommandOverlayTargetFieldId(command)"
-                                                    class="input"
-                                                    disabled="@(!_overlaysEnabled)"
-                                                    @attributes="ValidationAttributes(CommandOverlayTargetFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayTarget))"
-                                                    @ref="_controls[CommandOverlayTargetFieldId(command)]"
-                                                    @bind="cueAction.TargetOverlayPublicId">
-                                                <option value="@Guid.Empty">Choose an overlay player</option>
-                                                @if (cueAction.TargetOverlayPublicId != Guid.Empty && !_cueCatalog.Targets.Any(target => target.Id == cueAction.TargetOverlayPublicId))
-                                                {
-                                                    <option value="@cueAction.TargetOverlayPublicId">Unavailable saved player</option>
-                                                }
-                                                @foreach (var target in _cueCatalog.Targets)
-                                                {
-                                                    <option value="@target.Id">@target.Name</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="@CommandOverlayTargetFieldId(command)">Overlay player</label>
+                                                <select id="@CommandOverlayTargetFieldId(command)"
+                                                        class="field__input"
+                                                        disabled="@(!_overlaysEnabled)"
+                                                        @attributes="ValidationAttributes(CommandOverlayTargetFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayTarget))"
+                                                        @ref="_controls[CommandOverlayTargetFieldId(command)]"
+                                                        @bind="cueAction.TargetOverlayPublicId">
+                                                    <option value="@Guid.Empty">Choose an overlay player</option>
+                                                    @if (cueAction.TargetOverlayPublicId != Guid.Empty && !_cueCatalog.Targets.Any(target => target.Id == cueAction.TargetOverlayPublicId))
+                                                    {
+                                                        <option value="@cueAction.TargetOverlayPublicId">Unavailable saved player</option>
+                                                    }
+                                                    @foreach (var target in _cueCatalog.Targets)
+                                                    {
+                                                        <option value="@target.Id">@target.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             @(ValidationMessageFor(CommandOverlayTargetFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayTarget)))
                                         </div>
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@CommandOverlayCueFieldId(command)">Cue</label>
-                                            <select id="@CommandOverlayCueFieldId(command)"
-                                                    class="input"
-                                                    disabled="@(!_overlaysEnabled)"
-                                                    @attributes="ValidationAttributes(CommandOverlayCueFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayCue))"
-                                                    @ref="_controls[CommandOverlayCueFieldId(command)]"
-                                                    @bind="cueAction.CuePublicId">
-                                                <option value="@Guid.Empty">Choose a cue</option>
-                                                @if (cueAction.CuePublicId != Guid.Empty && !_cueCatalog.Cues.Any(cue => cue.Id == cueAction.CuePublicId))
-                                                {
-                                                    <option value="@cueAction.CuePublicId">Unavailable saved cue</option>
-                                                }
-                                                @foreach (var cue in _cueCatalog.Cues)
-                                                {
-                                                    <option value="@cue.Id">@cue.Name</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="@CommandOverlayCueFieldId(command)">Cue</label>
+                                                <select id="@CommandOverlayCueFieldId(command)"
+                                                        class="field__input"
+                                                        disabled="@(!_overlaysEnabled)"
+                                                        @attributes="ValidationAttributes(CommandOverlayCueFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayCue))"
+                                                        @ref="_controls[CommandOverlayCueFieldId(command)]"
+                                                        @bind="cueAction.CuePublicId">
+                                                    <option value="@Guid.Empty">Choose a cue</option>
+                                                    @if (cueAction.CuePublicId != Guid.Empty && !_cueCatalog.Cues.Any(cue => cue.Id == cueAction.CuePublicId))
+                                                    {
+                                                        <option value="@cueAction.CuePublicId">Unavailable saved cue</option>
+                                                    }
+                                                    @foreach (var cue in _cueCatalog.Cues)
+                                                    {
+                                                        <option value="@cue.Id">@cue.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             @(ValidationMessageFor(CommandOverlayCueFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.OverlayCue)))
                                         </div>
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@CommandQueuePolicyFieldId(command)">When the player is busy</label>
-                                            <select id="@CommandQueuePolicyFieldId(command)"
-                                                    class="input"
-                                                    disabled="@(!_overlaysEnabled)"
-                                                    @attributes="ValidationAttributes(CommandQueuePolicyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.QueuePolicy))"
-                                                    @ref="_controls[CommandQueuePolicyFieldId(command)]"
-                                                    @bind="cueAction.QueuePolicy">
-                                                @foreach (var policy in _cueQueuePolicies)
-                                                {
-                                                    <option value="@policy">@CueQueuePolicyLabel(policy)</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="@CommandQueuePolicyFieldId(command)">When the player is busy</label>
+                                                <select id="@CommandQueuePolicyFieldId(command)"
+                                                        class="field__input"
+                                                        disabled="@(!_overlaysEnabled)"
+                                                        @attributes="ValidationAttributes(CommandQueuePolicyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.QueuePolicy))"
+                                                        @ref="_controls[CommandQueuePolicyFieldId(command)]"
+                                                        @bind="cueAction.QueuePolicy">
+                                                    @foreach (var policy in _cueQueuePolicies)
+                                                    {
+                                                        <option value="@policy">@CueQueuePolicyLabel(policy)</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             @(ValidationMessageFor(CommandQueuePolicyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.QueuePolicy)))
                                         </div>
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@CommandReplyOrderFieldId(command)">Optional reply timing</label>
-                                            <select id="@CommandReplyOrderFieldId(command)"
-                                                    class="input"
-                                                    disabled="@(!_overlaysEnabled)"
-                                                    @attributes="ValidationAttributes(CommandReplyOrderFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.ReplyOrder))"
-                                                    @ref="_controls[CommandReplyOrderFieldId(command)]"
-                                                    @bind="cueAction.ReplyOrder">
-                                                @foreach (var order in _cueReplyOrders)
-                                                {
-                                                    <option value="@order">@CueReplyOrderLabel(order)</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="@CommandReplyOrderFieldId(command)">Optional reply timing</label>
+                                                <select id="@CommandReplyOrderFieldId(command)"
+                                                        class="field__input"
+                                                        disabled="@(!_overlaysEnabled)"
+                                                        @attributes="ValidationAttributes(CommandReplyOrderFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.ReplyOrder))"
+                                                        @ref="_controls[CommandReplyOrderFieldId(command)]"
+                                                        @bind="cueAction.ReplyOrder">
+                                                    @foreach (var order in _cueReplyOrders)
+                                                    {
+                                                        <option value="@order">@CueReplyOrderLabel(order)</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             @(ValidationMessageFor(CommandReplyOrderFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.ReplyOrder)))
                                         </div>
                                         <div class="studio-span-12 flex flex-wrap items-center gap-3">
@@ -441,62 +451,70 @@
                                          OpenChanged="@(open => _openStages.Set(CustomCommandStage.FineTuning, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-4 space-y-2">
-                                        <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
-                                        <input id="@CommandCooldownFieldId(command)"
-                                               class="input"
-                                               type="number"
-                                               min="0"
-                                               @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
-                                               @ref="_controls[CommandCooldownFieldId(command)]"
-                                               @bind="command.CooldownSeconds" />
+                                        <div class="field">
+                                            <label class="field__label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
+                                            <input id="@CommandCooldownFieldId(command)"
+                                                   class="field__input"
+                                                   type="number"
+                                                   min="0"
+                                                   @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
+                                                   @ref="_controls[CommandCooldownFieldId(command)]"
+                                                   @bind="command.CooldownSeconds" />
+                                        </div>
                                         @(ValidationMessageFor(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown)))
                                     </div>
                                     <div class="studio-span-4 space-y-2">
-                                        <label class="label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
-                                        <select id="@CommandCooldownScopeFieldId(command)"
-                                                class="input"
-                                                @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
-                                                @ref="_controls[CommandCooldownScopeFieldId(command)]"
-                                                @bind="command.CooldownScope">
-                                            @foreach (var scope in _cooldownScopes)
-                                            {
-                                                <option value="@scope">@CooldownScopeLabel(scope)</option>
-                                            }
-                                        </select>
+                                        <div class="field">
+                                            <label class="field__label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
+                                            <select id="@CommandCooldownScopeFieldId(command)"
+                                                    class="field__input"
+                                                    @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
+                                                    @ref="_controls[CommandCooldownScopeFieldId(command)]"
+                                                    @bind="command.CooldownScope">
+                                                @foreach (var scope in _cooldownScopes)
+                                                {
+                                                    <option value="@scope">@CooldownScopeLabel(scope)</option>
+                                                }
+                                            </select>
+                                        </div>
                                         @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
                                     </div>
                                     <div class="studio-span-4 space-y-2">
-                                        <label class="label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
-                                        <select id="@CommandInvocationLimitFieldId(command)"
-                                                class="input"
-                                                @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
-                                                @ref="_controls[CommandInvocationLimitFieldId(command)]"
-                                                @bind="command.InvocationLimit">
-                                            @foreach (var limit in _invocationLimits)
-                                            {
-                                                <option value="@limit">@InvocationLimitLabel(limit)</option>
-                                            }
-                                        </select>
+                                        <div class="field">
+                                            <label class="field__label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
+                                            <select id="@CommandInvocationLimitFieldId(command)"
+                                                    class="field__input"
+                                                    @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
+                                                    @ref="_controls[CommandInvocationLimitFieldId(command)]"
+                                                    @bind="command.InvocationLimit">
+                                                @foreach (var limit in _invocationLimits)
+                                                {
+                                                    <option value="@limit">@InvocationLimitLabel(limit)</option>
+                                                }
+                                            </select>
+                                        </div>
                                         @(ValidationMessageFor(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
                                     </div>
                                     @if (command.Action is CounterCustomCommandActionEditor counterAction)
                                     {
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@CommandCounterFieldId(command)">Counter</label>
-                                            <select id="@CommandCounterFieldId(command)"
-                                                    class="input"
-                                                    @attributes="ValidationAttributes(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter))"
-                                                    @ref="_controls[CommandCounterFieldId(command)]"
-                                                    @bind="counterAction.CounterId">
-                                                @if (_config.Counters.Count == 0)
-                                                {
-                                                    <option value="0">Create a counter first</option>
-                                                }
-                                                @foreach (var counter in _config.Counters)
-                                                {
-                                                    <option value="@counter.Id">@counter.Name</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="@CommandCounterFieldId(command)">Counter</label>
+                                                <select id="@CommandCounterFieldId(command)"
+                                                        class="field__input"
+                                                        @attributes="ValidationAttributes(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter))"
+                                                        @ref="_controls[CommandCounterFieldId(command)]"
+                                                        @bind="counterAction.CounterId">
+                                                    @if (_config.Counters.Count == 0)
+                                                    {
+                                                        <option value="0">Create a counter first</option>
+                                                    }
+                                                    @foreach (var counter in _config.Counters)
+                                                    {
+                                                        <option value="@counter.Id">@counter.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             @(ValidationMessageFor(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter)))
                                         </div>
                                     }
@@ -551,9 +569,11 @@
                                        @bind-Value="counter.Name"
                                        Placeholder="deaths" />
                             </div>
-                            <div class="studio-span-4 space-y-2">
-                                <label class="label" for="@CounterValueFieldId(counter)">Current number</label>
-                                <input id="@CounterValueFieldId(counter)" class="input" type="number" @bind="counter.Value" />
+                            <div class="studio-span-4">
+                                <div class="field">
+                                    <label class="field__label" for="@CounterValueFieldId(counter)">Current number</label>
+                                    <input id="@CounterValueFieldId(counter)" class="field__input" type="number" @bind="counter.Value" />
+                                </div>
                             </div>
                             <div class="studio-span-12 flex justify-end">
                                 <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete counter</button>
@@ -577,47 +597,53 @@
                                        Placeholder="Hydrate reminder" />
                             </div>
                             <div class="studio-span-6 space-y-2">
-                                <label class="label" for="@AnnouncementReplyFieldId(announcement)">Reply to send</label>
-                                <select id="@AnnouncementReplyFieldId(announcement)"
-                                        class="input"
-                                        @attributes="ValidationAttributes(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply))"
-                                        @ref="_controls[AnnouncementReplyFieldId(announcement)]"
-                                        @bind="announcement.MessageLibraryEntryId">
-                                    @foreach (var entry in _config.MessageEntries)
-                                    {
-                                        <option value="@entry.Id">@entry.Name</option>
-                                    }
-                                </select>
+                                <div class="field">
+                                    <label class="field__label" for="@AnnouncementReplyFieldId(announcement)">Reply to send</label>
+                                    <select id="@AnnouncementReplyFieldId(announcement)"
+                                            class="field__input"
+                                            @attributes="ValidationAttributes(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply))"
+                                            @ref="_controls[AnnouncementReplyFieldId(announcement)]"
+                                            @bind="announcement.MessageLibraryEntryId">
+                                        @foreach (var entry in _config.MessageEntries)
+                                        {
+                                            <option value="@entry.Id">@entry.Name</option>
+                                        }
+                                    </select>
+                                </div>
                                 @(ValidationMessageFor(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply)))
                             </div>
                             <div class="studio-span-6 space-y-2">
-                                <label class="label" for="@AnnouncementDeliveryFieldId(announcement)">Delivery type</label>
-                                <select id="@AnnouncementDeliveryFieldId(announcement)"
-                                        class="input"
-                                        @attributes="ValidationAttributes(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery))"
-                                        @ref="_controls[AnnouncementDeliveryFieldId(announcement)]"
-                                        @bind="announcement.DeliveryType">
-                                    @foreach (var type in _announcementDeliveryTypes)
-                                    {
-                                        <option value="@type">@AnnouncementDeliveryTypeLabel(type)</option>
-                                    }
-                                </select>
+                                <div class="field">
+                                    <label class="field__label" for="@AnnouncementDeliveryFieldId(announcement)">Delivery type</label>
+                                    <select id="@AnnouncementDeliveryFieldId(announcement)"
+                                            class="field__input"
+                                            @attributes="ValidationAttributes(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery))"
+                                            @ref="_controls[AnnouncementDeliveryFieldId(announcement)]"
+                                            @bind="announcement.DeliveryType">
+                                        @foreach (var type in _announcementDeliveryTypes)
+                                        {
+                                            <option value="@type">@AnnouncementDeliveryTypeLabel(type)</option>
+                                        }
+                                    </select>
+                                </div>
                                 @(ValidationMessageFor(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery)))
                             </div>
                             @if (announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement)
                             {
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementColorFieldId(announcement)">Twitch announcement color</label>
-                                    <select id="@AnnouncementColorFieldId(announcement)"
-                                            class="input"
-                                            @attributes="ValidationAttributes(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color))"
-                                            @ref="_controls[AnnouncementColorFieldId(announcement)]"
-                                            @bind="announcement.AnnouncementColor">
-                                        @foreach (var color in _twitchAnnouncementColors)
-                                        {
-                                            <option value="@color">@TwitchAnnouncementColorLabel(color)</option>
-                                        }
-                                    </select>
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementColorFieldId(announcement)">Twitch announcement color</label>
+                                        <select id="@AnnouncementColorFieldId(announcement)"
+                                                class="field__input"
+                                                @attributes="ValidationAttributes(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color))"
+                                                @ref="_controls[AnnouncementColorFieldId(announcement)]"
+                                                @bind="announcement.AnnouncementColor">
+                                            @foreach (var color in _twitchAnnouncementColors)
+                                            {
+                                                <option value="@color">@TwitchAnnouncementColorLabel(color)</option>
+                                            }
+                                        </select>
+                                    </div>
                                     @(ValidationMessageFor(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color)))
                                 </div>
                                 <div class="studio-span-12 surface-row rounded-lg px-3 py-2 text-sm text-slate-700">
@@ -630,77 +656,89 @@
                                 </div>
                             }
                             <div class="studio-span-6 space-y-2">
-                                <label class="label" for="@AnnouncementScheduleFieldId(announcement)">When to send</label>
-                                <select id="@AnnouncementScheduleFieldId(announcement)"
-                                        class="input"
-                                        @attributes="ValidationAttributes(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule))"
-                                        @ref="_controls[AnnouncementScheduleFieldId(announcement)]"
-                                        @bind="announcement.ScheduleKind">
-                                    @foreach (var type in _announcementScheduleKinds)
-                                    {
-                                        <option value="@type">@AnnouncementScheduleLabel(type)</option>
-                                    }
-                                </select>
+                                <div class="field">
+                                    <label class="field__label" for="@AnnouncementScheduleFieldId(announcement)">When to send</label>
+                                    <select id="@AnnouncementScheduleFieldId(announcement)"
+                                            class="field__input"
+                                            @attributes="ValidationAttributes(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule))"
+                                            @ref="_controls[AnnouncementScheduleFieldId(announcement)]"
+                                            @bind="announcement.ScheduleKind">
+                                        @foreach (var type in _announcementScheduleKinds)
+                                        {
+                                            <option value="@type">@AnnouncementScheduleLabel(type)</option>
+                                        }
+                                    </select>
+                                </div>
                                 @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
                             </div>
                             @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                             {
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
-                                    <input id="@AnnouncementIntervalFieldId(announcement)"
-                                           class="input"
-                                           type="number"
-                                           min="1"
-                                           @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
-                                           @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
-                                           @bind="interval.IntervalMinutes" />
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
+                                        <input id="@AnnouncementIntervalFieldId(announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                               @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
+                                               @bind="interval.IntervalMinutes" />
+                                    </div>
                                     @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
                                 </div>
                             }
                             else if (announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
                             {
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
-                                    <input id="@AnnouncementIntervalFieldId(announcement)"
-                                           class="input"
-                                           type="number"
-                                           min="1"
-                                           @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
-                                           @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
-                                           @bind="intervalAfterChat.IntervalMinutes" />
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
+                                        <input id="@AnnouncementIntervalFieldId(announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                               @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
+                                               @bind="intervalAfterChat.IntervalMinutes" />
+                                    </div>
                                     @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
                                 </div>
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementChatMessagesFieldId(announcement)">Chat messages needed</label>
-                                    <input id="@AnnouncementChatMessagesFieldId(announcement)"
-                                           class="input"
-                                           type="number"
-                                           min="1"
-                                           @attributes="ValidationAttributes(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages))"
-                                           @ref="_controls[AnnouncementChatMessagesFieldId(announcement)]"
-                                           @bind="intervalAfterChat.RequiredChatMessages" />
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementChatMessagesFieldId(announcement)">Chat messages needed</label>
+                                        <input id="@AnnouncementChatMessagesFieldId(announcement)"
+                                               class="field__input"
+                                               type="number"
+                                               min="1"
+                                               @attributes="ValidationAttributes(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages))"
+                                               @ref="_controls[AnnouncementChatMessagesFieldId(announcement)]"
+                                               @bind="intervalAfterChat.RequiredChatMessages" />
+                                    </div>
                                     @(ValidationMessageFor(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages)))
                                 </div>
                             }
                             else if (announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
                             {
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementDayFieldId(announcement)">Day</label>
-                                    <select id="@AnnouncementDayFieldId(announcement)"
-                                            class="input"
-                                            @attributes="ValidationAttributes(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day))"
-                                            @ref="_controls[AnnouncementDayFieldId(announcement)]"
-                                            @bind="weekly.Day">
-                                        @foreach (var day in _daysOfWeek)
-                                        {
-                                            <option value="@day">@day</option>
-                                        }
-                                    </select>
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementDayFieldId(announcement)">Day</label>
+                                        <select id="@AnnouncementDayFieldId(announcement)"
+                                                class="field__input"
+                                                @attributes="ValidationAttributes(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day))"
+                                                @ref="_controls[AnnouncementDayFieldId(announcement)]"
+                                                @bind="weekly.Day">
+                                            @foreach (var day in _daysOfWeek)
+                                            {
+                                                <option value="@day">@day</option>
+                                            }
+                                        </select>
+                                    </div>
                                     @(ValidationMessageFor(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day)))
                                 </div>
-                                <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="@AnnouncementWeeklyTimeFieldId(announcement)">Time</label>
-                                    <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
+                                <div class="studio-span-6">
+                                    <div class="field">
+                                        <label class="field__label" for="@AnnouncementWeeklyTimeFieldId(announcement)">Time</label>
+                                        <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="field__input" type="time" @bind="weekly.Time" />
+                                    </div>
                                 </div>
                             }
                             <div class="studio-span-12" data-announcement-secondary="delivery-details">
@@ -711,27 +749,31 @@
                                                     OpenRequest="@AnnouncementAdvancedOpenRequest(announcement.Id)">
                                     <div class="studio-grid p-4">
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
-                                            <input id="@AnnouncementRetryDelayFieldId(announcement)"
-                                                   class="input"
-                                                   type="number"
-                                                   min="1"
-                                                   max="59"
-                                                   @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
-                                                   @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
-                                                   @bind="announcement.RetryDelaySeconds" />
+                                            <div class="field">
+                                                <label class="field__label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
+                                                <input id="@AnnouncementRetryDelayFieldId(announcement)"
+                                                       class="field__input"
+                                                       type="number"
+                                                       min="1"
+                                                       max="59"
+                                                       @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
+                                                       @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
+                                                       @bind="announcement.RetryDelaySeconds" />
+                                            </div>
                                             @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
                                         </div>
                                         <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
-                                            <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
-                                                   class="input"
-                                                   type="number"
-                                                   min="1"
-                                                   max="60"
-                                                   @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
-                                                   @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
-                                                   @bind="announcement.OccurrenceLifetimeSeconds" />
+                                            <div class="field">
+                                                <label class="field__label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
+                                                <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
+                                                       class="field__input"
+                                                       type="number"
+                                                       min="1"
+                                                       max="60"
+                                                       @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
+                                                       @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
+                                                       @bind="announcement.OccurrenceLifetimeSeconds" />
+                                            </div>
                                             @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
                                         </div>
                                     </div>
@@ -782,31 +824,35 @@
                                        Placeholder="welcome" />
                             </div>
                             <div class="studio-span-6 space-y-2">
-                                <label class="label" for="@MessageSelectionFieldId(entry)">How the bot chooses</label>
-                                <select id="@MessageSelectionFieldId(entry)"
-                                        class="input"
-                                        @attributes="ValidationAttributes(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode))"
-                                        @ref="_controls[MessageSelectionFieldId(entry)]"
-                                        @bind="entry.SelectionMode">
-                                    @foreach (var mode in _messageSelectionModes)
-                                    {
-                                        <option value="@mode">@MessageSelectionLabel(mode)</option>
-                                    }
-                                </select>
+                                <div class="field">
+                                    <label class="field__label" for="@MessageSelectionFieldId(entry)">How the bot chooses</label>
+                                    <select id="@MessageSelectionFieldId(entry)"
+                                            class="field__input"
+                                            @attributes="ValidationAttributes(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode))"
+                                            @ref="_controls[MessageSelectionFieldId(entry)]"
+                                            @bind="entry.SelectionMode">
+                                        @foreach (var mode in _messageSelectionModes)
+                                        {
+                                            <option value="@mode">@MessageSelectionLabel(mode)</option>
+                                        }
+                                    </select>
+                                </div>
                                 @(ValidationMessageFor(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode)))
                             </div>
-                            <div class="studio-span-6 space-y-2">
-                                <label class="label" for="@MessageCurrentVariantFieldId(entry)">Next message</label>
-                                <select id="@MessageCurrentVariantFieldId(entry)"
-                                        class="input"
-                                        disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
-                                        @bind="entry.CurrentVariantIndex">
-                                    @for (var i = 0; i < entry.Variants.Count; i++)
-                                    {
-                                        var index = i;
-                                        <option value="@index">Message @(index + 1)</option>
-                                    }
-                                </select>
+                            <div class="studio-span-6">
+                                <div class="field">
+                                    <label class="field__label" for="@MessageCurrentVariantFieldId(entry)">Next message</label>
+                                    <select id="@MessageCurrentVariantFieldId(entry)"
+                                            class="field__input"
+                                            disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
+                                            @bind="entry.CurrentVariantIndex">
+                                        @for (var i = 0; i < entry.Variants.Count; i++)
+                                        {
+                                            var index = i;
+                                            <option value="@index">Message @(index + 1)</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
                             <div class="studio-span-12 space-y-2">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -863,17 +909,19 @@
                             OpenRequest="@_timeZoneSectionOpenRequest">
             <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <div class="space-y-2">
-                    <label class="label" for="@_timeZoneControlId">Time zone</label>
-                    <select id="@_timeZoneControlId"
-                            class="input"
-                            @attributes="ValidationAttributes(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone))"
-                            @ref="_controls[_timeZoneControlId]"
-                            @bind="_config.TimeZoneId">
-                        @foreach (var timeZone in _timeZones)
-                        {
-                            <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
-                        }
-                    </select>
+                    <div class="field">
+                        <label class="field__label" for="@_timeZoneControlId">Time zone</label>
+                        <select id="@_timeZoneControlId"
+                                class="field__input"
+                                @attributes="ValidationAttributes(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone))"
+                                @ref="_controls[_timeZoneControlId]"
+                                @bind="_config.TimeZoneId">
+                            @foreach (var timeZone in _timeZones)
+                            {
+                                <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
+                            }
+                        </select>
+                    </div>
                     @(ValidationMessageFor(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone)))
                 </div>
                 <div class="surface-muted rounded-lg px-3 py-2.5">

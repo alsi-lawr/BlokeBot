@@ -231,22 +231,24 @@
                                 </div>
                                 <div class="raid-split">
                                     <div class="raid-field raid-field--wide">
-                                        <label class="label" for="raid-welcome-message">Welcome message</label>
-                                        <textarea id="raid-welcome-message"
-                                                  class="input min-h-24 resize-y"
-                                                  aria-describedby="raid-welcome-message-hint"
-                                                  @bind="_draft.WelcomeMessage"
-                                                  @bind:event="oninput"></textarea>
+                                        <div class="field">
+                                            <label class="field__label" for="raid-welcome-message">Welcome message</label>
+                                            <textarea id="raid-welcome-message"
+                                                      class="field__input min-h-24 resize-y"
+                                                      aria-describedby="raid-welcome-message-hint"
+                                                      @bind="_draft.WelcomeMessage"
+                                                      @bind:event="oninput"></textarea>
+                                        </div>
                                         <p id="raid-welcome-message-hint" class="form-help">Tokens: {display_name}, {twitch_handle}, {viewer_count}</p>
                                     </div>
                                     <div class="raid-stack">
-                                        <div class="raid-compact">
-                                            <label class="raid-compact__label" for="raid-dedupe">Repeat window (minutes)</label>
-                                            <input id="raid-dedupe" class="raid-compact__input" type="number" min="1" max="1440" @bind="_draft.DeduplicationWindowMinutes" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-dedupe">Repeat window (minutes)</label>
+                                            <input id="raid-dedupe" class="field__input" type="number" min="1" max="1440" @bind="_draft.DeduplicationWindowMinutes" />
                                         </div>
-                                        <div class="raid-compact">
-                                            <label class="raid-compact__label" for="raid-gap">Outgoing raid gap (hours)</label>
-                                            <input id="raid-gap" class="raid-compact__input" type="number" min="0" max="8760" @bind="_draft.RelationshipCooldownHours" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-gap">Outgoing raid gap (hours)</label>
+                                            <input id="raid-gap" class="field__input" type="number" min="0" max="8760" @bind="_draft.RelationshipCooldownHours" />
                                         </div>
                                     </div>
                                 </div>
@@ -264,12 +266,14 @@
                             <div class="raid-section__body">
                                 <div class="raid-split">
                                     <div class="raid-field raid-field--wide">
-                                        <label class="label" for="raid-language">Stream language</label>
-                                        <input id="raid-language"
-                                               class="input"
-                                               aria-describedby="raid-language-hint"
-                                               @bind="_draft.Language"
-                                               @bind:event="oninput" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-language">Stream language</label>
+                                            <input id="raid-language"
+                                                   class="field__input"
+                                                   aria-describedby="raid-language-hint"
+                                                   @bind="_draft.Language"
+                                                   @bind:event="oninput" />
+                                        </div>
                                         <p id="raid-language-hint" class="form-help">One language code. Leave blank for any language.</p>
                                     </div>
                                     <div class="raid-field">
@@ -323,25 +327,31 @@
                                             var position = index;
                                             <div class="raid-channel" @key="channel">
                                                 <div class="raid-field">
-                                                    <label class="label" for="@($"raid-channel-login-{position}")">Twitch login</label>
-                                                    <input id="@($"raid-channel-login-{position}")"
-                                                           class="input"
-                                                           @bind="channel.Login"
-                                                           @bind:event="oninput" />
+                                                    <div class="field">
+                                                        <label class="field__label" for="@($"raid-channel-login-{position}")">Twitch login</label>
+                                                        <input id="@($"raid-channel-login-{position}")"
+                                                               class="field__input"
+                                                               @bind="channel.Login"
+                                                               @bind:event="oninput" />
+                                                    </div>
                                                 </div>
                                                 <div class="raid-field">
-                                                    <label class="label" for="@($"raid-channel-name-{position}")">Display name</label>
-                                                    <input id="@($"raid-channel-name-{position}")"
-                                                           class="input"
-                                                           @bind="channel.DisplayName"
-                                                           @bind:event="oninput" />
+                                                    <div class="field">
+                                                        <label class="field__label" for="@($"raid-channel-name-{position}")">Display name</label>
+                                                        <input id="@($"raid-channel-name-{position}")"
+                                                               class="field__input"
+                                                               @bind="channel.DisplayName"
+                                                               @bind:event="oninput" />
+                                                    </div>
                                                 </div>
                                                 <div class="raid-field">
-                                                    <label class="label" for="@($"raid-channel-clip-{position}")">Approved clip ID (optional)</label>
-                                                    <input id="@($"raid-channel-clip-{position}")"
-                                                           class="input"
-                                                           @bind="channel.ApprovedClipId"
-                                                           @bind:event="oninput" />
+                                                    <div class="field">
+                                                        <label class="field__label" for="@($"raid-channel-clip-{position}")">Approved clip ID (optional)</label>
+                                                        <input id="@($"raid-channel-clip-{position}")"
+                                                               class="field__input"
+                                                               @bind="channel.ApprovedClipId"
+                                                               @bind:event="oninput" />
+                                                    </div>
                                                 </div>
                                                 <button class="btn-secondary raid-channel__remove" type="button" @onclick="() => RemoveApprovedChannel(channel)">Remove</button>
                                             </div>

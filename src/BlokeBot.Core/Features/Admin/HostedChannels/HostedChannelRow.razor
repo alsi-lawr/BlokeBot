@@ -57,13 +57,15 @@
                  aria-describedby="channel-removal-warning">
             <h2 id="channel-removal-title" class="text-lg font-bold text-slate-950">Permanently remove #@Host.Login?</h2>
             <p id="channel-removal-warning" class="mt-2 text-sm leading-6 text-slate-600">Removing this channel stops the bot and permanently deletes channel settings, moderator access, guessing history, points data, giveaways, and custom commands. This cannot be undone.</p>
-            <div class="mt-4 space-y-2">
-                <label class="label" for="@_removalConfirmationInputId">Type @Host.Login to confirm</label>
-                <input id="@_removalConfirmationInputId"
-                       class="input"
-                       aria-label="Type channel login to confirm removal"
-                       value="@_removalConfirmation"
-                       @oninput="UpdateRemovalConfirmation" />
+            <div class="mt-4">
+                <div class="field">
+                    <label class="field__label" for="@_removalConfirmationInputId">Type @Host.Login to confirm</label>
+                    <input id="@_removalConfirmationInputId"
+                           class="field__input"
+                           aria-label="Type channel login to confirm removal"
+                           value="@_removalConfirmation"
+                           @oninput="UpdateRemovalConfirmation" />
+                </div>
             </div>
             <div class="mt-5 flex flex-wrap justify-end gap-2">
                 <button class="btn-secondary" @onclick="CancelRemoval">Cancel</button>

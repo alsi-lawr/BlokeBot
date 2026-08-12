@@ -82,17 +82,53 @@
         outline-offset: 2px;
     }
 
+    /*
+     * The framed field owns its own border so the control inside it can be borderless.
+     * Nesting a bordered .input inside would draw two frames, so use .field__input there.
+     */
     .field {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.5rem;
+        display: grid;
         flex: 1 1 16rem;
+        gap: 0.1rem;
         max-width: 100%;
-        min-width: min(100%, 16rem);
+        min-width: 0;
+        padding: 0.5rem 0.7rem;
     }
 
-    .field-row {
-        align-items: flex-end;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
+    .field:focus-within {
+        border-color: var(--app-focus-border);
+        box-shadow: var(--app-focus-shadow);
+    }
+
+    .field--wide {
+        grid-column: 1 / -1;
+    }
+
+    .field__label {
+        color: var(--app-text-muted);
+        font-size: 0.66rem;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+    }
+
+    .field__input {
+        background: transparent;
+        border: 0;
+        color: var(--app-text-strong);
+        font-size: 0.95rem;
+        font-weight: 700;
+        min-width: 0;
+        outline: none;
+        padding: 0;
+        width: 100%;
+    }
+
+    .field__input::placeholder {
+        color: var(--app-placeholder);
     }
 
     .form-grid {
@@ -137,12 +173,7 @@
     @media (max-width: 30rem) {
         .field {
             flex-basis: 100%;
-            min-width: 100%;
             width: 100%;
-        }
-
-        .field-row {
-            align-items: stretch;
         }
     }
 

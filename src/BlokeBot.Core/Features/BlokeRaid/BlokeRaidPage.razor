@@ -122,17 +122,23 @@
                                         <Field Id="raid-boss-name" Label="Boss name" MaxLength="120" @bind-Value="_editor.BossName" />
                                     </div>
                                     <div class="raid-field">
-                                        <label class="label" for="raid-duration">Duration (hours)</label>
-                                        <input id="raid-duration" class="input" type="number" min="1" max="8760" aria-describedby="raid-duration-hint" @bind="_editor.CampaignDurationHours" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-duration">Duration (hours)</label>
+                                            <input id="raid-duration" class="field__input" type="number" min="1" max="8760" aria-describedby="raid-duration-hint" @bind="_editor.CampaignDurationHours" />
+                                        </div>
                                         <p id="raid-duration-hint" class="form-help">1 hour to 365 days.</p>
                                     </div>
                                     <div class="raid-field">
-                                        <label class="label" for="raid-health">Boss health</label>
-                                        <input id="raid-health" class="input" type="number" min="100" max="10000000" @bind="_editor.MaximumHealth" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-health">Boss health</label>
+                                            <input id="raid-health" class="field__input" type="number" min="100" max="10000000" @bind="_editor.MaximumHealth" />
+                                        </div>
                                     </div>
                                     <div class="raid-field">
-                                        <label class="label" for="raid-ward">Raid ward</label>
-                                        <input id="raid-ward" class="input" type="number" min="0" max="1000000" @bind="_editor.MaximumWard" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-ward">Raid ward</label>
+                                            <input id="raid-ward" class="field__input" type="number" min="0" max="1000000" @bind="_editor.MaximumWard" />
+                                        </div>
                                     </div>
                                     <div class="raid-field">
                                         <Field Id="raid-victory-reward" Label="Victory reward" @bind-Value="_editor.VictoryPointReward" />
@@ -159,22 +165,22 @@
                                             <span class="status-pill status-pill--slate"><span class="status-pill__label">@RuleRange(_editor.Attack)</span></span>
                                         </header>
                                         <p class="raid-rule-card__hint">Damage dealt by <code>!raid attack</code>.</p>
-                                        <div class="raid-compact-grid">
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-attack-minimum">Minimum</label>
-                                                <input id="raid-attack-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.Minimum" />
+                                        <div class="raid-field-grid">
+                                            <div class="field">
+                                                <label class="field__label" for="raid-attack-minimum">Minimum</label>
+                                                <input id="raid-attack-minimum" class="field__input" type="number" min="1" @bind="_editor.Attack.Minimum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-attack-maximum">Maximum</label>
-                                                <input id="raid-attack-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.Maximum" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-attack-maximum">Maximum</label>
+                                                <input id="raid-attack-maximum" class="field__input" type="number" min="1" @bind="_editor.Attack.Maximum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-attack-cooldown">Cooldown (sec)</label>
-                                                <input id="raid-attack-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Attack.CooldownSeconds" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-attack-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-attack-cooldown" class="field__input" type="number" min="0" @bind="_editor.Attack.CooldownSeconds" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-attack-limit">Per stream</label>
-                                                <input id="raid-attack-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.PerStreamLimit" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-attack-limit">Per stream</label>
+                                                <input id="raid-attack-limit" class="field__input" type="number" min="1" @bind="_editor.Attack.PerStreamLimit" />
                                             </div>
                                         </div>
                                     </article>
@@ -185,22 +191,22 @@
                                             <span class="status-pill status-pill--slate"><span class="status-pill__label">@RuleRange(_editor.Mend)</span></span>
                                         </header>
                                         <p class="raid-rule-card__hint">Raid ward restored by <code>!raid mend</code>.</p>
-                                        <div class="raid-compact-grid">
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-mend-minimum">Minimum</label>
-                                                <input id="raid-mend-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.Minimum" />
+                                        <div class="raid-field-grid">
+                                            <div class="field">
+                                                <label class="field__label" for="raid-mend-minimum">Minimum</label>
+                                                <input id="raid-mend-minimum" class="field__input" type="number" min="1" @bind="_editor.Mend.Minimum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-mend-maximum">Maximum</label>
-                                                <input id="raid-mend-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.Maximum" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-mend-maximum">Maximum</label>
+                                                <input id="raid-mend-maximum" class="field__input" type="number" min="1" @bind="_editor.Mend.Maximum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-mend-cooldown">Cooldown (sec)</label>
-                                                <input id="raid-mend-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Mend.CooldownSeconds" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-mend-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-mend-cooldown" class="field__input" type="number" min="0" @bind="_editor.Mend.CooldownSeconds" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-mend-limit">Per stream</label>
-                                                <input id="raid-mend-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.PerStreamLimit" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-mend-limit">Per stream</label>
+                                                <input id="raid-mend-limit" class="field__input" type="number" min="1" @bind="_editor.Mend.PerStreamLimit" />
                                             </div>
                                         </div>
                                     </article>
@@ -211,34 +217,36 @@
                                             <span class="status-pill status-pill--violet"><span class="status-pill__label">@RuleRange(_editor.Special)</span></span>
                                         </header>
                                         <p class="raid-rule-card__hint">Damage from <code>!raid nova</code>, paid in points.</p>
-                                        <div class="raid-compact-grid">
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-special-minimum">Minimum</label>
-                                                <input id="raid-special-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.Minimum" />
+                                        <div class="raid-field-grid">
+                                            <div class="field">
+                                                <label class="field__label" for="raid-special-minimum">Minimum</label>
+                                                <input id="raid-special-minimum" class="field__input" type="number" min="1" @bind="_editor.Special.Minimum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-special-maximum">Maximum</label>
-                                                <input id="raid-special-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.Maximum" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-special-maximum">Maximum</label>
+                                                <input id="raid-special-maximum" class="field__input" type="number" min="1" @bind="_editor.Special.Maximum" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-special-cooldown">Cooldown (sec)</label>
-                                                <input id="raid-special-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Special.CooldownSeconds" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-special-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-special-cooldown" class="field__input" type="number" min="0" @bind="_editor.Special.CooldownSeconds" />
                                             </div>
-                                            <div class="raid-compact">
-                                                <label class="raid-compact__label" for="raid-special-limit">Per stream</label>
-                                                <input id="raid-special-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.PerStreamLimit" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-special-limit">Per stream</label>
+                                                <input id="raid-special-limit" class="field__input" type="number" min="1" @bind="_editor.Special.PerStreamLimit" />
                                             </div>
-                                            <div class="raid-compact raid-compact--wide">
-                                                <label class="raid-compact__label" for="raid-special-cost">Point cost</label>
-                                                <input id="raid-special-cost" class="raid-compact__input" @bind="_editor.Special.PointCost" />
+                                            <div class="field field--wide">
+                                                <label class="field__label" for="raid-special-cost">Point cost</label>
+                                                <input id="raid-special-cost" class="field__input" @bind="_editor.Special.PointCost" />
                                             </div>
                                         </div>
                                     </article>
                                 </div>
                                 <div class="raid-split">
                                     <div class="raid-field">
-                                        <label class="label" for="raid-guess-damage">Damage per correct guess</label>
-                                        <input id="raid-guess-damage" class="input" type="number" min="1" aria-describedby="raid-guess-damage-hint" @bind="_editor.CorrectGuessDamage" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-guess-damage">Damage per correct guess</label>
+                                            <input id="raid-guess-damage" class="field__input" type="number" min="1" aria-describedby="raid-guess-damage-hint" @bind="_editor.CorrectGuessDamage" />
+                                        </div>
                                         <p id="raid-guess-damage-hint" class="form-help">Every viewer who guesses correctly in a guessing round strikes the boss for this much.</p>
                                     </div>
                                 </div>
@@ -270,9 +278,9 @@
                                             <h3>Phase 2</h3>
                                             <span class="status-pill status-pill--violet"><span class="status-pill__label">@PhaseTwoBand()</span></span>
                                         </header>
-                                        <div class="raid-compact">
-                                            <label class="raid-compact__label" for="raid-phase-two">Starts at health %</label>
-                                            <input id="raid-phase-two" class="raid-compact__input" type="number" min="2" max="99" @bind="_editor.PhaseTwoHealthPercent" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-phase-two">Starts at health %</label>
+                                            <input id="raid-phase-two" class="field__input" type="number" min="2" max="99" @bind="_editor.PhaseTwoHealthPercent" />
                                         </div>
                                         <TextAreaField Id="raid-phase-two-response" Label="Phase 2 response" @bind-Value="_editor.PhaseTwoResponse" />
                                     </article>
@@ -282,9 +290,9 @@
                                             <h3>Phase 3</h3>
                                             <span class="status-pill status-pill--amber"><span class="status-pill__label">@PhaseThreeBand()</span></span>
                                         </header>
-                                        <div class="raid-compact">
-                                            <label class="raid-compact__label" for="raid-phase-three">Starts at health %</label>
-                                            <input id="raid-phase-three" class="raid-compact__input" type="number" min="1" max="98" @bind="_editor.PhaseThreeHealthPercent" />
+                                        <div class="field">
+                                            <label class="field__label" for="raid-phase-three">Starts at health %</label>
+                                            <input id="raid-phase-three" class="field__input" type="number" min="1" max="98" @bind="_editor.PhaseThreeHealthPercent" />
                                         </div>
                                         <TextAreaField Id="raid-phase-three-response" Label="Phase 3 response" @bind-Value="_editor.PhaseThreeResponse" />
                                     </article>
@@ -343,12 +351,16 @@
                                 {
                                     <div class="raid-split">
                                         <div class="raid-field">
-                                            <label class="label" for="raid-reset-day">Weekly reset day</label>
-                                            <select id="raid-reset-day" class="input" @bind="_editor.WeeklyResetDay">@foreach (var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@day</option>}</select>
+                                            <div class="field">
+                                                <label class="field__label" for="raid-reset-day">Weekly reset day</label>
+                                                <select id="raid-reset-day" class="field__input" @bind="_editor.WeeklyResetDay">@foreach (var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@day</option>}</select>
+                                            </div>
                                         </div>
                                         <div class="raid-field">
-                                            <label class="label" for="raid-reset-hour">Reset hour (UTC)</label>
-                                            <input id="raid-reset-hour" class="input" type="number" min="0" max="23" @bind="_editor.WeeklyResetHourUtc" />
+                                            <div class="field">
+                                                <label class="field__label" for="raid-reset-hour">Reset hour (UTC)</label>
+                                                <input id="raid-reset-hour" class="field__input" type="number" min="0" max="23" @bind="_editor.WeeklyResetHourUtc" />
+                                            </div>
                                         </div>
                                     </div>
                                 }

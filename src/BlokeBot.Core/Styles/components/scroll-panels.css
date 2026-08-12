@@ -28,20 +28,12 @@
         background-clip: content-box;
     }
 
-    .scroll-panel--access-list {
-        max-height: 16rem;
-    }
-
     .scroll-panel--data-table {
         max-height: min(32rem, calc(100vh - 22rem));
     }
 
     .scroll-panel--hosted-channels {
         max-height: min(42rem, calc(100vh - 20rem));
-    }
-
-    .scroll-panel--settings {
-        max-height: min(36rem, calc(100vh - 18rem));
     }
 
     .scroll-panel--valid-guesses {

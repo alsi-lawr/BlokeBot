@@ -10,14 +10,16 @@
         <div class="studio-span-6">
             <button class="btn-secondary w-full" @onclick="InvokeStopGuessingAsync">Stop guessing</button>
         </div>
-        <div class="studio-span-12 space-y-2">
-            <label class="label" for="profile">Round type</label>
-            <select id="profile" class="input" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
-                @foreach (var profile in State.Profiles)
-                {
-                    <option value="@profile.Id">@profile.Name@(profile.IsDefault ? " (default)" : "")</option>
-                }
-            </select>
+        <div class="studio-span-12">
+            <div class="field">
+                <label class="field__label" for="profile">Round type</label>
+                <select id="profile" class="field__input" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
+                    @foreach (var profile in State.Profiles)
+                    {
+                        <option value="@profile.Id">@profile.Name@(profile.IsDefault ? " (default)" : "")</option>
+                    }
+                </select>
+            </div>
         </div>
         <div class="studio-span-12 space-y-2">
             <label class="label" for="winner">Winner</label>

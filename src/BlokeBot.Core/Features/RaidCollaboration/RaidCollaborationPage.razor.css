@@ -165,39 +165,6 @@
     line-height: 1.45;
 }
 
-.raid-compact {
-    background: var(--app-surface-solid);
-    border: 1px solid var(--app-border);
-    border-radius: 0.5rem;
-    display: grid;
-    gap: 0.1rem;
-    padding: 0.5rem 0.7rem;
-}
-
-.raid-compact__label {
-    color: var(--app-text-muted);
-    font-size: 0.66rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-}
-
-.raid-compact__input {
-    background: transparent;
-    border: 0;
-    color: var(--app-text-strong);
-    font-size: 0.95rem;
-    font-weight: 700;
-    outline: none;
-    padding: 0;
-    width: 100%;
-}
-
-.raid-compact:focus-within {
-    border-color: var(--app-focus-border);
-    box-shadow: var(--app-focus-shadow);
-}
-
 .raid-chips {
     align-items: center;
     display: flex;

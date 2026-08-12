@@ -4,22 +4,26 @@
 <div class="@ContainerClass">
     <div class="studio-grid">
         <div class="studio-span-4">
-            <label class="label" for="public-leaderboard-feature">Leaderboard</label>
-            <select class="input mt-2" id="public-leaderboard-feature" aria-label="Leaderboard feature" @bind="_feature">
-                <option value="guessing">Guessing</option>
-                <option value="points">Points</option>
-            </select>
+            <div class="field">
+                <label class="field__label" for="public-leaderboard-feature">Leaderboard</label>
+                <select class="field__input" id="public-leaderboard-feature" aria-label="Leaderboard feature" @bind="_feature">
+                    <option value="guessing">Guessing</option>
+                    <option value="points">Points</option>
+                </select>
+            </div>
         </div>
         <div class="studio-span-4">
-            <label class="label" for="public-leaderboard-channel">Twitch channel name</label>
-            <input class="input mt-2"
-                   id="public-leaderboard-channel"
-                   placeholder="samplechannel"
-                   value="@_channel"
-                   aria-describedby="public-leaderboard-channel-hint public-leaderboard-channel-error"
-                   aria-invalid="@(_channelError is null ? "false" : "true")"
-                   @ref="_channelInput"
-                   @oninput="UpdateChannel" />
+            <div class="field">
+                <label class="field__label" for="public-leaderboard-channel">Twitch channel name</label>
+                <input class="field__input"
+                       id="public-leaderboard-channel"
+                       placeholder="samplechannel"
+                       value="@_channel"
+                       aria-describedby="public-leaderboard-channel-hint public-leaderboard-channel-error"
+                       aria-invalid="@(_channelError is null ? "false" : "true")"
+                       @ref="_channelInput"
+                       @oninput="UpdateChannel" />
+            </div>
             <p id="public-leaderboard-channel-hint" class="mt-1 text-xs font-medium text-slate-500">You can enter samplechannel, @@samplechannel, or #samplechannel.</p>
             <p id="public-leaderboard-channel-error"
                class="mt-1 text-sm font-semibold text-red-700"

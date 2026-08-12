@@ -39,16 +39,18 @@
                 </div>
 
                 <div class="studio-span-4">
-                    <label class="label" for="automatic-raid-minimum-viewers">Minimum raid size</label>
-                    <input id="automatic-raid-minimum-viewers"
-                           class="input mt-2"
-                           type="number"
-                           min="1"
-                           value="@_draft.MinimumViewerCount"
-                           disabled="@(!_draft.Enabled)"
-                           aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
-                           aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
-                           @oninput="SetMinimumViewerCount" />
+                    <div class="field">
+                        <label class="field__label" for="automatic-raid-minimum-viewers">Minimum raid size</label>
+                        <input id="automatic-raid-minimum-viewers"
+                               class="field__input mt-2"
+                               type="number"
+                               min="1"
+                               value="@_draft.MinimumViewerCount"
+                               disabled="@(!_draft.Enabled)"
+                               aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
+                               aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MinimumViewerCount)"
+                               @oninput="SetMinimumViewerCount" />
+                    </div>
                     <p class="mt-1 text-xs text-muted-foreground">Raids below this many viewers are ignored.</p>
                     @if (ErrorFor(AutomaticRaidShoutoutValidationField.MinimumViewerCount) is { } thresholdError)
                     {
@@ -95,17 +97,19 @@
                     @if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Pinned)
                     {
                         <div class="studio-span-4">
-                            <label class="label" for="automatic-raid-pin-duration">Pin duration in seconds</label>
-                            <input id="automatic-raid-pin-duration"
-                                   class="input mt-2"
-                                   type="number"
-                                   min="30"
-                                   max="1800"
-                                   value="@_pinDurationValue"
-                                   disabled="@(!_draft.Enabled || _pinUntilStreamEnd)"
-                                   aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.PinDuration)"
-                                   aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.PinDuration)"
-                                   @oninput="SetPinDuration" />
+                            <div class="field">
+                                <label class="field__label" for="automatic-raid-pin-duration">Pin duration in seconds</label>
+                                <input id="automatic-raid-pin-duration"
+                                       class="field__input mt-2"
+                                       type="number"
+                                       min="30"
+                                       max="1800"
+                                       value="@_pinDurationValue"
+                                       disabled="@(!_draft.Enabled || _pinUntilStreamEnd)"
+                                       aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.PinDuration)"
+                                       aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.PinDuration)"
+                                       @oninput="SetPinDuration" />
+                            </div>
                             <p class="mt-1 text-xs text-muted-foreground">30–1800 seconds.</p>
                             @if (ErrorFor(AutomaticRaidShoutoutValidationField.PinDuration) is { } pinError)
                             {
@@ -130,19 +134,21 @@
                     else if (_draft.ChatPresentation == AutomaticRaidChatPresentation.Announcement)
                     {
                         <div class="studio-span-4">
-                            <label class="label" for="automatic-raid-announcement-color">Announcement color</label>
-                            <select id="automatic-raid-announcement-color"
-                                    class="input mt-2"
-                                    value="@_draft.AnnouncementColor"
-                                    disabled="@(!_draft.Enabled)"
-                                    aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
-                                    aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
-                                    @onchange="SetAnnouncementColor">
-                                @foreach (var color in _announcementColors)
-                                {
-                                    <option value="@color">@AnnouncementColorLabel(color)</option>
-                                }
-                            </select>
+                            <div class="field">
+                                <label class="field__label" for="automatic-raid-announcement-color">Announcement color</label>
+                                <select id="automatic-raid-announcement-color"
+                                        class="field__input mt-2"
+                                        value="@_draft.AnnouncementColor"
+                                        disabled="@(!_draft.Enabled)"
+                                        aria-describedby="@FieldDescription(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
+                                        aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.AnnouncementColor)"
+                                        @onchange="SetAnnouncementColor">
+                                    @foreach (var color in _announcementColors)
+                                    {
+                                        <option value="@color">@AnnouncementColorLabel(color)</option>
+                                    }
+                                </select>
+                            </div>
                             <p class="mt-1 text-xs text-muted-foreground">If the announcement fails, no regular message is sent instead.</p>
                             @if (ErrorFor(AutomaticRaidShoutoutValidationField.AnnouncementColor) is { } colorError)
                             {
@@ -152,14 +158,16 @@
                     }
 
                     <div class="studio-span-12">
-                        <label class="label" for="automatic-raid-message-template">Message</label>
-                        <textarea id="automatic-raid-message-template"
-                                  class="input mt-2 min-h-28 resize-y"
-                                  value="@_draft.MessageTemplate"
-                                  disabled="@(!_draft.Enabled)"
-                                  aria-describedby="automatic-raid-template-guidance automatic-raid-template-budget automatic-raid-message-template-error"
-                                  aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MessageTemplate)"
-                                  @oninput="SetMessageTemplate"></textarea>
+                        <div class="field">
+                            <label class="field__label" for="automatic-raid-message-template">Message</label>
+                            <textarea id="automatic-raid-message-template"
+                                      class="field__input mt-2 min-h-28 resize-y"
+                                      value="@_draft.MessageTemplate"
+                                      disabled="@(!_draft.Enabled)"
+                                      aria-describedby="automatic-raid-template-guidance automatic-raid-template-budget automatic-raid-message-template-error"
+                                      aria-invalid="@HasError(AutomaticRaidShoutoutValidationField.MessageTemplate)"
+                                      @oninput="SetMessageTemplate"></textarea>
+                        </div>
                         <div class="studio-chips flex flex-wrap items-center gap-[0.45rem] mt-2">
                             <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{twitch_handle}</span></span>
                             <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.78rem] font-semibold text-[var(--app-text-strong)]"><span>{display_name}</span></span>

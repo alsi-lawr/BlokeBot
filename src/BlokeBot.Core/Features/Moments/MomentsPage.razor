@@ -237,14 +237,16 @@
                                             OpenChanged="@(open => _openFolds.Set(MomentFold.Merge, open))">
                                     <div class="studio-grid">
                                         <div class="studio-span-8 space-y-2">
-                                            <label class="label" for="moment-merge">Merge target</label>
-                                            <select id="moment-merge" class="input" @bind="draft.MergeTarget">
-                                                <option value="">Choose a moment…</option>
-                                                @foreach (var target in MergeTargets(selected))
-                                                {
-                                                    <option @key="target.Public.PublicId" value="@target.Public.PublicId">@MergeTargetLabel(target)</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="moment-merge">Merge target</label>
+                                                <select id="moment-merge" class="field__input" @bind="draft.MergeTarget">
+                                                    <option value="">Choose a moment…</option>
+                                                    @foreach (var target in MergeTargets(selected))
+                                                    {
+                                                        <option @key="target.Public.PublicId" value="@target.Public.PublicId">@MergeTargetLabel(target)</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             <p class="text-xs text-muted-foreground">This moment’s contributors and votes move to the target.</p>
                                         </div>
                                         <div class="studio-span-4">

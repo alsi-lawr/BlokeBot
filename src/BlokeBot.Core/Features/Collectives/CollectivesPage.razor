@@ -175,12 +175,16 @@
                                     <div class="collective-local-settings__head"><span class="collective-local-settings__icon" aria-hidden="true">⚙</span><div><h3>Local settings</h3><p>Settings for @Host.DisplayName.</p></div></div>
                                     @if (_workflow == "goal" && selected.Goal is not null)
                                     {
-                                        <label class="label" for="collective-goal-source">This host's goal source</label>
-                                        <select id="collective-goal-source" class="input" @bind="_goalSourceBountyPublicId"><option value="@Guid.Empty">Choose a public bounty</option>@foreach(var bounty in _ownedBounties){<option value="@bounty.PublicId">@bounty.Title</option>}</select>
+                                        <div class="field">
+                                            <label class="field__label" for="collective-goal-source">This host's goal source</label>
+                                            <select id="collective-goal-source" class="field__input" @bind="_goalSourceBountyPublicId"><option value="@Guid.Empty">Choose a public bounty</option>@foreach(var bounty in _ownedBounties){<option value="@bounty.PublicId">@bounty.Title</option>}</select>
+                                        </div>
                                         <button class="btn-secondary collective-local-settings__source-action" type="button" disabled="@(_goalSourceBountyPublicId == Guid.Empty)" @onclick="SetGoalSourceAsync">Use this source</button>
                                     }
-                                    <label class="label" for="collective-notification">Notifications</label>
-                                    <select id="collective-notification" class="input" @bind="_notification"><option value="@CollectiveLocalNotification.Moderators">Notify moderators only</option><option value="@CollectiveLocalNotification.ModeratorsAndOwner">Notify moderators and owner</option></select>
+                                    <div class="field">
+                                        <label class="field__label" for="collective-notification">Notifications</label>
+                                        <select id="collective-notification" class="field__input" @bind="_notification"><option value="@CollectiveLocalNotification.Moderators">Notify moderators only</option><option value="@CollectiveLocalNotification.ModeratorsAndOwner">Notify moderators and owner</option></select>
+                                    </div>
                                 </div>
                             </section>
                             <section class="collective-sidecar__shared"><span class="collective-sidecar__label">Shared output</span><h3>@_sharedOutputTitle</h3><p>@_sharedOutputDetail</p></section>
@@ -204,16 +208,20 @@
             @if (_showCreate)
             {
                 <section class="card collective-flow-card" aria-label="Create collective">
-                    <label class="label" for="collective-name">Collective name</label>
-                    <input id="collective-name" class="input" maxlength="160" @bind="_newCollectiveName" />
+                    <div class="field">
+                        <label class="field__label" for="collective-name">Collective name</label>
+                        <input id="collective-name" class="field__input" maxlength="160" @bind="_newCollectiveName" />
+                    </div>
                     <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="CreateAsync">Create collective</button></div>
                 </section>
             }
             else if (_showInvite && _selected is not null)
             {
                 <section class="card collective-flow-card" aria-label="Invite host">
-                    <label class="label" for="collective-invite-host">Known host</label>
-                    <select id="collective-invite-host" class="input" @bind="_inviteHostId"><option value="0">Choose a host</option>@foreach (var host in _knownHosts){<option value="@host.HostId">@host.DisplayName</option>}</select>
+                    <div class="field">
+                        <label class="field__label" for="collective-invite-host">Known host</label>
+                        <select id="collective-invite-host" class="field__input" @bind="_inviteHostId"><option value="0">Choose a host</option>@foreach (var host in _knownHosts){<option value="@host.HostId">@host.DisplayName</option>}</select>
+                    </div>
                     <p class="text-xs text-muted-foreground">The selected host must accept for itself. Twitch raids, follows, moderators, and relationships never add trust.</p>
                     <div class="collective-flow-card__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="InviteAsync">Send invitation</button></div>
                 </section>

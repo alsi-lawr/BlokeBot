@@ -297,13 +297,15 @@
                     <span class="text-sm font-semibold text-[var(--app-text-strong)]">Send a message when the bot joins or reconnects</span>
                 </div>
                 <div class="studio-span-12">
-                    <label class="label" for="startup-chat-message">Message</label>
-                    <textarea id="startup-chat-message"
-                              class="input mt-2 min-h-24 w-full"
-                              maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
-                              disabled="@(!_startupMessageEnabled)"
-                              value="@_startupMessageText"
-                              @oninput="SetStartupMessageText"></textarea>
+                    <div class="field">
+                        <label class="field__label" for="startup-chat-message">Message</label>
+                        <textarea id="startup-chat-message"
+                                  class="field__input mt-2 min-h-24 w-full"
+                                  maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
+                                  disabled="@(!_startupMessageEnabled)"
+                                  value="@_startupMessageText"
+                                  @oninput="SetStartupMessageText"></textarea>
+                    </div>
                     <p class="mt-1 text-xs font-medium text-slate-500">
                         This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
                     </p>
@@ -324,13 +326,15 @@
                      OpenChanged="open => _openStages.Set(HostConfigStage.Commands, open)">
             <div class="studio-grid" data-simulation-command-settings>
                 <div class="studio-span-8">
-                    <label class="label" for="commands-aliases">Command words</label>
-                    <input id="commands-aliases"
-                           class="input mt-2 w-full"
-                           value="@_commandsAliases"
-                           @oninput="args => { _commandsAliases = args.Value?.ToString() ?? string.Empty; MarkCommandsDirty(); }"
-                           placeholder="commands"
-                           autocomplete="off" />
+                    <div class="field">
+                        <label class="field__label" for="commands-aliases">Command words</label>
+                        <input id="commands-aliases"
+                               class="field__input mt-2 w-full"
+                               value="@_commandsAliases"
+                               @oninput="args => { _commandsAliases = args.Value?.ToString() ?? string.Empty; MarkCommandsDirty(); }"
+                               placeholder="commands"
+                               autocomplete="off" />
+                    </div>
                     <p class="mt-1 text-xs font-medium text-slate-500">
                         Separate extra command words with commas. Leave this blank to disable the catalog.
                     </p>

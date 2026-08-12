@@ -61,13 +61,17 @@
                                 <div class="studio-grid">
                                     <div class="studio-span-4"><Field Id="cue-name" Label="Cue name" @bind-Value="_name" /></div>
                                     <div class="studio-span-4 space-y-2">
-                                        <label class="label" for="cue-duration">Total duration (milliseconds)</label>
-                                        <input id="cue-duration" class="input" type="number" min="100" max="300000" @bind="_duration" />
+                                        <div class="field">
+                                            <label class="field__label" for="cue-duration">Total duration (milliseconds)</label>
+                                            <input id="cue-duration" class="field__input" type="number" min="100" max="300000" @bind="_duration" />
+                                        </div>
                                         <p class="text-xs text-muted-foreground">100 ms – 300 000 ms.</p>
                                     </div>
-                                    <div class="studio-span-4 space-y-2">
-                                        <label class="label" for="cue-policy">When another cue is playing</label>
-                                        <select id="cue-policy" class="input" @bind="_policy">@foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>()) { <option value="@policy">@PolicyLabel(policy)</option> }</select>
+                                    <div class="studio-span-4">
+                                        <div class="field">
+                                            <label class="field__label" for="cue-policy">When another cue is playing</label>
+                                            <select id="cue-policy" class="field__input" @bind="_policy">@foreach (var policy in Enum.GetValues<OverlayCueQueuePolicy>()) { <option value="@policy">@PolicyLabel(policy)</option> }</select>
+                                        </div>
                                     </div>
                                 </div>
                             </StudioStage>
@@ -112,33 +116,33 @@
                                             {
                                                 <div id="@LayerBodyId(layerIndex)" class="border-t border-[var(--app-border)] p-4">
                                                     <div class="studio-grid">
-                                                        <div class="studio-span-4 space-y-2"><label class="label">Content type</label><select class="input" @bind="layer.Kind"><option value="@CueLayerKind.UploadedMedia">Uploaded media</option><option value="@CueLayerKind.OnlineMedia">Online media</option><option value="@CueLayerKind.WebPage">Web page</option></select></div>
+                                                        <div class="studio-span-4"><div class="field"><label class="field__label">Content type</label><select class="field__input" @bind="layer.Kind"><option value="@CueLayerKind.UploadedMedia">Uploaded media</option><option value="@CueLayerKind.OnlineMedia">Online media</option><option value="@CueLayerKind.WebPage">Web page</option></select></div></div>
                                                         @if (layer.Kind is CueLayerKind.UploadedMedia)
                                                         {
-                                                            <div class="studio-span-8 space-y-2"><label class="label">Media</label><select class="input" @bind="layer.AssetId"><option value="">Choose media</option>@foreach (var asset in _assets) { <option value="@asset.Id">@asset.Name (@OverlayMediaTypes.Label(asset.ContentType).ToLowerInvariant())</option> }</select></div>
+                                                            <div class="studio-span-8"><div class="field"><label class="field__label">Media</label><select class="field__input" @bind="layer.AssetId"><option value="">Choose media</option>@foreach (var asset in _assets) { <option value="@asset.Id">@asset.Name (@OverlayMediaTypes.Label(asset.ContentType).ToLowerInvariant())</option> }</select></div></div>
                                                         }
                                                         else
                                                         {
-                                                            <div class="studio-span-8 space-y-2"><label class="label">Secure address</label><input class="input" type="url" placeholder="https://example.com/media" @bind="layer.Address" /></div>
+                                                            <div class="studio-span-8"><div class="field"><label class="field__label">Secure address</label><input class="field__input" type="url" placeholder="https://example.com/media" @bind="layer.Address" /></div></div>
                                                         }
                                                         @if (layer.Kind is CueLayerKind.OnlineMedia)
                                                         {
-                                                            <div class="studio-span-4 space-y-2"><label class="label">Media type</label><select class="input" @bind="layer.MediaKind"><option value="@OverlayCueMediaKind.Video">Video</option><option value="@OverlayCueMediaKind.Audio">Audio</option></select></div>
+                                                            <div class="studio-span-4"><div class="field"><label class="field__label">Media type</label><select class="field__input" @bind="layer.MediaKind"><option value="@OverlayCueMediaKind.Video">Video</option><option value="@OverlayCueMediaKind.Audio">Audio</option></select></div></div>
                                                         }
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Starts after (ms)</label><input class="input" type="number" min="0" max="300000" @bind="layer.StartMilliseconds" /></div>
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Plays for (ms)</label><input class="input" type="number" min="100" max="300000" @bind="layer.DurationMilliseconds" /></div>
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Stacking order</label><input class="input" type="number" min="-100" max="100" @bind="layer.StackOrder" /></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Starts after (ms)</label><input class="field__input" type="number" min="0" max="300000" @bind="layer.StartMilliseconds" /></div></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Plays for (ms)</label><input class="field__input" type="number" min="100" max="300000" @bind="layer.DurationMilliseconds" /></div></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Stacking order</label><input class="field__input" type="number" min="-100" max="100" @bind="layer.StackOrder" /></div></div>
                                                         @if (layer.Kind is not CueLayerKind.WebPage)
                                                         {
-                                                            <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Volume (%)</label><input class="input" type="number" min="0" max="100" step="1" @bind="layer.VolumePercent" /></div>
+                                                            <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Volume (%)</label><input class="field__input" type="number" min="0" max="100" step="1" @bind="layer.VolumePercent" /></div></div>
                                                         }
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Left (%)</label><input class="input" type="number" min="0" max="100" step="0.1" @bind="layer.X" /></div>
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Top (%)</label><input class="input" type="number" min="0" max="100" step="0.1" @bind="layer.Y" /></div>
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Width (%)</label><input class="input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Width" /></div>
-                                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label">Height (%)</label><input class="input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Height" /></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Left (%)</label><input class="field__input" type="number" min="0" max="100" step="0.1" @bind="layer.X" /></div></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Top (%)</label><input class="field__input" type="number" min="0" max="100" step="0.1" @bind="layer.Y" /></div></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Width (%)</label><input class="field__input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Width" /></div></div>
+                                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label">Height (%)</label><input class="field__input" type="number" min="0.1" max="100" step="0.1" @bind="layer.Height" /></div></div>
                                                         @if (layer.Kind is not CueLayerKind.WebPage)
                                                         {
-                                                            <div class="studio-span-4 space-y-2"><label class="label">Fit</label><select class="input" @bind="layer.Fit"><option value="@OverlayCueFitMode.Contain">Show all</option><option value="@OverlayCueFitMode.Cover">Fill and crop</option><option value="@OverlayCueFitMode.Fill">Stretch to fill</option></select></div>
+                                                            <div class="studio-span-4"><div class="field"><label class="field__label">Fit</label><select class="field__input" @bind="layer.Fit"><option value="@OverlayCueFitMode.Contain">Show all</option><option value="@OverlayCueFitMode.Cover">Fill and crop</option><option value="@OverlayCueFitMode.Fill">Stretch to fill</option></select></div></div>
                                                         }
                                                     </div>
                                                 </div>
@@ -163,8 +167,10 @@
                                          OpenChanged="@(open => _openStages.Set(CueStage.Test, open))">
                                 <div class="studio-grid">
                                     <div class="studio-span-8 space-y-2">
-                                        <label class="label" for="cue-target">Cue player</label>
-                                        <select id="cue-target" class="input" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select>
+                                        <div class="field">
+                                            <label class="field__label" for="cue-target">Cue player</label>
+                                            <select id="cue-target" class="field__input" @bind="_target"><option value="">Choose a Cue player</option>@foreach (var target in _catalog.Targets) { <option value="@target.Id">@target.Name</option> }</select>
+                                        </div>
                                         <p class="text-xs text-muted-foreground">Only enabled Cue player Browser Sources appear here. <a class="font-semibold text-blue-700 underline" href="overlays#sources">Manage Browser Sources →</a></p>
                                     </div>
                                     <div class="studio-span-4 content-end">

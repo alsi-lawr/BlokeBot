@@ -110,36 +110,38 @@
                                            Placeholder="Main stream overlay" />
                                 </div>
                                 <div class="studio-span-6 space-y-2">
-                                    <label class="label" for="overlay-type">Overlay type</label>
-                                    <select id="overlay-type"
-                                            class="input"
-                                            disabled="@(!_isCreating)"
-                                            @bind="_draftType"
-                                            @bind:after="DraftTypeChanged">
-                                        <option value="@OverlayType.Empty">Empty</option>
-                                        <option value="@OverlayType.CuePlayer">Cue player</option>
-                                        <option value="@OverlayType.EventFeed">Event feed</option>
-                                        @if (_playWithViewersFeatureEnabled || _draftType is OverlayType.ViewerQueue)
-                                        {
-                                            <option value="@OverlayType.ViewerQueue">Viewer Queue</option>
-                                        }
-                                        @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
-                                        {
-                                            <option value="@OverlayType.Guessing">Guessing round</option>
-                                        }
-                                        @if (_pointsFeatureEnabled || _draftType is OverlayType.Giveaway)
-                                        {
-                                            <option value="@OverlayType.Giveaway">Points giveaway</option>
-                                        }
-                                        @if (_communityProgressionFeatureEnabled || _draftType is OverlayType.CommunityGoal)
-                                        {
-                                            <option value="@OverlayType.CommunityGoal">Community goal</option>
-                                        }
-                                        @if (_bountiesFeatureEnabled || _draftType is OverlayType.ViewerFundedBounty)
-                                        {
-                                            <option value="@OverlayType.ViewerFundedBounty">Viewer-funded bounty</option>
-                                        }
-                                    </select>
+                                    <div class="field">
+                                        <label class="field__label" for="overlay-type">Overlay type</label>
+                                        <select id="overlay-type"
+                                                class="field__input"
+                                                disabled="@(!_isCreating)"
+                                                @bind="_draftType"
+                                                @bind:after="DraftTypeChanged">
+                                            <option value="@OverlayType.Empty">Empty</option>
+                                            <option value="@OverlayType.CuePlayer">Cue player</option>
+                                            <option value="@OverlayType.EventFeed">Event feed</option>
+                                            @if (_playWithViewersFeatureEnabled || _draftType is OverlayType.ViewerQueue)
+                                            {
+                                                <option value="@OverlayType.ViewerQueue">Viewer Queue</option>
+                                            }
+                                            @if (_guessingFeatureEnabled || _draftType is OverlayType.Guessing)
+                                            {
+                                                <option value="@OverlayType.Guessing">Guessing round</option>
+                                            }
+                                            @if (_pointsFeatureEnabled || _draftType is OverlayType.Giveaway)
+                                            {
+                                                <option value="@OverlayType.Giveaway">Points giveaway</option>
+                                            }
+                                            @if (_communityProgressionFeatureEnabled || _draftType is OverlayType.CommunityGoal)
+                                            {
+                                                <option value="@OverlayType.CommunityGoal">Community goal</option>
+                                            }
+                                            @if (_bountiesFeatureEnabled || _draftType is OverlayType.ViewerFundedBounty)
+                                            {
+                                                <option value="@OverlayType.ViewerFundedBounty">Viewer-funded bounty</option>
+                                            }
+                                        </select>
+                                    </div>
                                     <p class="text-xs leading-5 text-muted-foreground">
                                         Type is fixed after creation. Feature-owned sources appear only while their inherited Channel Setup tool is on.
                                     </p>
@@ -273,10 +275,10 @@
                                 @if (previewOverlay.Type is not (OverlayType.Empty or OverlayType.CuePlayer))
                                 {
                                     <div class="studio-grid mt-4" data-appearance-fields>
-                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label" for="appearance-x">X</label><input id="appearance-x" class="input" type="number" min="0" max="1760" @bind="_appearanceX" @bind:event="oninput" /></div>
-                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label" for="appearance-y">Y</label><input id="appearance-y" class="input" type="number" min="0" max="990" @bind="_appearanceY" @bind:event="oninput" /></div>
-                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label" for="appearance-width">Width</label><input id="appearance-width" class="input" type="number" min="160" max="1920" @bind="_appearanceWidth" @bind:event="oninput" /></div>
-                                        <div class="col-span-3 min-w-0 space-y-2 max-md:col-span-6"><label class="label" for="appearance-height">Height</label><input id="appearance-height" class="input" type="number" min="90" max="1080" @bind="_appearanceHeight" @bind:event="oninput" /></div>
+                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label" for="appearance-x">X</label><input id="appearance-x" class="field__input" type="number" min="0" max="1760" @bind="_appearanceX" @bind:event="oninput" /></div></div>
+                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label" for="appearance-y">Y</label><input id="appearance-y" class="field__input" type="number" min="0" max="990" @bind="_appearanceY" @bind:event="oninput" /></div></div>
+                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label" for="appearance-width">Width</label><input id="appearance-width" class="field__input" type="number" min="160" max="1920" @bind="_appearanceWidth" @bind:event="oninput" /></div></div>
+                                        <div class="col-span-3 min-w-0 max-md:col-span-6"><div class="field"><label class="field__label" for="appearance-height">Height</label><input id="appearance-height" class="field__input" type="number" min="90" max="1080" @bind="_appearanceHeight" @bind:event="oninput" /></div></div>
                                         <div class="studio-span-12"><button class="btn-secondary" type="button" @onclick="ResetAppearance">Reset position and size</button></div>
                                     </div>
                                     <div class="mt-4">
@@ -334,14 +336,16 @@
                                                         @onclick="() => _draftShowGuessCount = !_draftShowGuessCount"></button>
                                             </span>
                                         </div>
-                                        <div class="studio-span-6 space-y-2">
-                                            <label class="label" for="overlay-result-duration">Result animation duration (seconds)</label>
-                                            <input id="overlay-result-duration"
-                                                   class="input"
-                                                   type="number"
-                                                   min="@OverlayConfiguration.GuessingV1.MinimumResultDurationSeconds"
-                                                   max="@OverlayConfiguration.GuessingV1.MaximumResultDurationSeconds"
-                                                   @bind="_draftResultDurationSeconds" />
+                                        <div class="studio-span-6">
+                                            <div class="field">
+                                                <label class="field__label" for="overlay-result-duration">Result animation duration (seconds)</label>
+                                                <input id="overlay-result-duration"
+                                                       class="field__input"
+                                                       type="number"
+                                                       min="@OverlayConfiguration.GuessingV1.MinimumResultDurationSeconds"
+                                                       max="@OverlayConfiguration.GuessingV1.MaximumResultDurationSeconds"
+                                                       @bind="_draftResultDurationSeconds" />
+                                            </div>
                                         </div>
                                     </div>
                                     <p class="mt-3 text-sm leading-6 text-muted-foreground">
@@ -425,36 +429,42 @@
                                 {
                                     <div class="studio-grid" data-progress-overlay-settings>
                                         <div class="studio-span-8 space-y-2">
-                                            <label class="label" for="progress-overlay-selection">Goal or bounty selection</label>
-                                            <select id="progress-overlay-selection" class="input" @bind="_progressSelectedItemId">
-                                                <option value="">Rotate current public @(_draftType is OverlayType.CommunityGoal ? "communal goals" : "bounties")</option>
-                                                @foreach (var option in sourceOptions)
-                                                {
-                                                    <option value="@option.Id">Only @option.Label</option>
-                                                }
-                                            </select>
+                                            <div class="field">
+                                                <label class="field__label" for="progress-overlay-selection">Goal or bounty selection</label>
+                                                <select id="progress-overlay-selection" class="field__input" @bind="_progressSelectedItemId">
+                                                    <option value="">Rotate current public @(_draftType is OverlayType.CommunityGoal ? "communal goals" : "bounties")</option>
+                                                    @foreach (var option in sourceOptions)
+                                                    {
+                                                        <option value="@option.Id">Only @option.Label</option>
+                                                    }
+                                                </select>
+                                            </div>
                                             <p class="text-xs leading-5 text-muted-foreground">A selected item stays fixed. Rotation uses up to 12 current public items and restarts from current state after reconnect.</p>
                                         </div>
-                                        <div class="studio-span-4 space-y-2">
-                                            <label class="label" for="progress-overlay-rotation">Rotate every (seconds)</label>
-                                            <input id="progress-overlay-rotation"
-                                                   class="input"
-                                                   type="number"
-                                                   min="@OverlayConfiguration.ProgressOverlayV1.MinimumRotationSeconds"
-                                                   max="@OverlayConfiguration.ProgressOverlayV1.MaximumRotationSeconds"
-                                                   disabled="@(_progressSelectedItemId is not null)"
-                                                   @bind="_progressRotationSeconds" />
+                                        <div class="studio-span-4">
+                                            <div class="field">
+                                                <label class="field__label" for="progress-overlay-rotation">Rotate every (seconds)</label>
+                                                <input id="progress-overlay-rotation"
+                                                       class="field__input"
+                                                       type="number"
+                                                       min="@OverlayConfiguration.ProgressOverlayV1.MinimumRotationSeconds"
+                                                       max="@OverlayConfiguration.ProgressOverlayV1.MaximumRotationSeconds"
+                                                       disabled="@(_progressSelectedItemId is not null)"
+                                                       @bind="_progressRotationSeconds" />
+                                            </div>
                                         </div>
                                         @if (_draftType is OverlayType.ViewerFundedBounty)
                                         {
-                                            <div class="studio-span-4 space-y-2">
-                                                <label class="label" for="progress-overlay-contributors">Recent contributor callouts</label>
-                                                <select id="progress-overlay-contributors" class="input" @bind="_progressRecentContributorCount">
-                                                    @for (var count = 0; count <= OverlayConfiguration.ProgressOverlayV1.MaximumRecentContributorCount; count++)
-                                                    {
-                                                        <option value="@count">@(count == 0 ? "Hidden" : $"Latest {count}")</option>
-                                                    }
-                                                </select>
+                                            <div class="studio-span-4">
+                                                <div class="field">
+                                                    <label class="field__label" for="progress-overlay-contributors">Recent contributor callouts</label>
+                                                    <select id="progress-overlay-contributors" class="field__input" @bind="_progressRecentContributorCount">
+                                                        @for (var count = 0; count <= OverlayConfiguration.ProgressOverlayV1.MaximumRecentContributorCount; count++)
+                                                        {
+                                                            <option value="@count">@(count == 0 ? "Hidden" : $"Latest {count}")</option>
+                                                        }
+                                                    </select>
+                                                </div>
                                             </div>
                                         }
                                     </div>
@@ -473,8 +483,8 @@
                             else if (_draftType is OverlayType.EventFeed)
                             {
                                 <div class="studio-grid">
-                                    <div class="studio-span-4 space-y-2"><label class="label" for="event-feed-capacity">Maximum waiting cards</label><input id="event-feed-capacity" class="input" type="number" min="1" max="25" @bind="_eventFeedCapacity" /></div>
-                                    <div class="studio-span-8 space-y-2"><label class="label" for="event-feed-overflow">When full</label><select id="event-feed-overflow" class="input" @bind="_eventFeedOverflow"><option value="@EventFeedOverflowPolicy.DropNewest">Keep current cards</option><option value="@EventFeedOverflowPolicy.ReplaceNewestSameKind">Replace the newest matching item</option></select></div>
+                                    <div class="studio-span-4"><div class="field"><label class="field__label" for="event-feed-capacity">Maximum waiting cards</label><input id="event-feed-capacity" class="field__input" type="number" min="1" max="25" @bind="_eventFeedCapacity" /></div></div>
+                                    <div class="studio-span-8"><div class="field"><label class="field__label" for="event-feed-overflow">When full</label><select id="event-feed-overflow" class="field__input" @bind="_eventFeedOverflow"><option value="@EventFeedOverflowPolicy.DropNewest">Keep current cards</option><option value="@EventFeedOverflowPolicy.ReplaceNewestSameKind">Replace the newest matching item</option></select></div></div>
                                 </div>
                                 <div class="mt-4 grid gap-3 xl:grid-cols-2" data-event-feed-kind-settings>
                                     <section class="@KindCardClass(_pointEventEnabled)">
@@ -488,14 +498,14 @@
                                         @if (_pointEventEnabled)
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
-                                                <div class="space-y-2"><label class="label" for="point-event-template">Template</label><input id="point-event-template" class="input" @bind="_pointEventTemplate" /></div>
+                                                <div><div class="field"><label class="field__label" for="point-event-template">Template</label><input id="point-event-template" class="field__input" @bind="_pointEventTemplate" /></div></div>
                                                 <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{recipient}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{amount}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                                                    <div class="space-y-2"><label class="label" for="point-event-duration">On screen for (seconds)</label><input id="point-event-duration" class="input" type="number" min="1" max="30" @bind="_pointEventDuration" /></div>
+                                                    <div><div class="field"><label class="field__label" for="point-event-duration">On screen for (seconds)</label><input id="point-event-duration" class="field__input" type="number" min="1" max="30" @bind="_pointEventDuration" /></div></div>
                                                     <StudioSegmentedPill TValue="OverlayEventFeedPriority"
                                                                          AriaLabel="Point award priority"
                                                                          Options="_priorityOptions"
@@ -534,14 +544,14 @@
                                         else if (_achievementEventEnabled)
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
-                                                <div class="space-y-2"><label class="label" for="achievement-event-template">Template</label><input id="achievement-event-template" class="input" @bind="_achievementEventTemplate" /></div>
+                                                <div><div class="field"><label class="field__label" for="achievement-event-template">Template</label><input id="achievement-event-template" class="field__input" @bind="_achievementEventTemplate" /></div></div>
                                                 <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{viewer}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{achievement}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{rewards}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                                                    <div class="space-y-2"><label class="label" for="achievement-event-duration">On screen for (seconds)</label><input id="achievement-event-duration" class="input" type="number" min="1" max="30" @bind="_achievementEventDuration" /></div>
+                                                    <div><div class="field"><label class="field__label" for="achievement-event-duration">On screen for (seconds)</label><input id="achievement-event-duration" class="field__input" type="number" min="1" max="30" @bind="_achievementEventDuration" /></div></div>
                                                     <StudioSegmentedPill TValue="OverlayEventFeedPriority"
                                                                          AriaLabel="Achievement completion priority"
                                                                          Options="_priorityOptions"
@@ -561,7 +571,7 @@
                                         @if (_guessEventEnabled)
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
-                                                <div class="space-y-2"><label class="label" for="guess-event-template">Template</label><input id="guess-event-template" class="input" @bind="_guessEventTemplate" /></div>
+                                                <div><div class="field"><label class="field__label" for="guess-event-template">Template</label><input id="guess-event-template" class="field__input" @bind="_guessEventTemplate" /></div></div>
                                                 <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{roundName}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winningAnswer}</span>
@@ -571,7 +581,7 @@
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                                                    <div class="space-y-2"><label class="label" for="guess-event-duration">On screen for (seconds)</label><input id="guess-event-duration" class="input" type="number" min="1" max="30" @bind="_guessEventDuration" /></div>
+                                                    <div><div class="field"><label class="field__label" for="guess-event-duration">On screen for (seconds)</label><input id="guess-event-duration" class="field__input" type="number" min="1" max="30" @bind="_guessEventDuration" /></div></div>
                                                     <StudioSegmentedPill TValue="OverlayEventFeedPriority"
                                                                          AriaLabel="Guessing winner priority"
                                                                          Options="_priorityOptions"
@@ -591,7 +601,7 @@
                                         @if (_giveawayEventEnabled)
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
-                                                <div class="space-y-2"><label class="label" for="giveaway-event-template">Template</label><input id="giveaway-event-template" class="input" @bind="_giveawayEventTemplate" /></div>
+                                                <div><div class="field"><label class="field__label" for="giveaway-event-template">Template</label><input id="giveaway-event-template" class="field__input" @bind="_giveawayEventTemplate" /></div></div>
                                                 <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winners}</span>
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{winnerCount}</span>
@@ -599,7 +609,7 @@
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{pointLabel}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                                                    <div class="space-y-2"><label class="label" for="giveaway-event-duration">On screen for (seconds)</label><input id="giveaway-event-duration" class="input" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div>
+                                                    <div><div class="field"><label class="field__label" for="giveaway-event-duration">On screen for (seconds)</label><input id="giveaway-event-duration" class="field__input" type="number" min="1" max="30" @bind="_giveawayEventDuration" /></div></div>
                                                     <StudioSegmentedPill TValue="OverlayEventFeedPriority"
                                                                          AriaLabel="Giveaway winner priority"
                                                                          Options="_priorityOptions"
@@ -619,12 +629,12 @@
                                         @if (_bingoEventEnabled)
                                         {
                                             <div class="mt-3 grid gap-3" data-event-feed-details>
-                                                <div class="space-y-2"><label class="label" for="bingo-event-template">Template</label><input id="bingo-event-template" class="input" @bind="_bingoEventTemplate" /></div>
+                                                <div><div class="field"><label class="field__label" for="bingo-event-template">Template</label><input id="bingo-event-template" class="field__input" @bind="_bingoEventTemplate" /></div></div>
                                                 <div class="studio-chips flex flex-wrap items-center gap-[0.45rem]">
                                                     <span class="studio-chip inline-flex items-center gap-[0.4rem] rounded-full border border-[var(--app-control-border)] bg-[var(--app-surface-solid)] px-3 py-[0.28rem] font-mono text-[0.82rem] font-semibold text-[var(--app-text-strong)]">{summary}</span>
                                                 </div>
                                                 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
-                                                    <div class="space-y-2"><label class="label" for="bingo-event-duration">On screen for (seconds)</label><input id="bingo-event-duration" class="input" type="number" min="1" max="30" @bind="_bingoEventDuration" /></div>
+                                                    <div><div class="field"><label class="field__label" for="bingo-event-duration">On screen for (seconds)</label><input id="bingo-event-duration" class="field__input" type="number" min="1" max="30" @bind="_bingoEventDuration" /></div></div>
                                                     <StudioSegmentedPill TValue="OverlayEventFeedPriority"
                                                                          AriaLabel="Bingo event priority"
                                                                          Options="_priorityOptions"
@@ -667,22 +677,28 @@
                                 else
                                 {
                                     <div class="studio-grid">
-                                        <div class="studio-span-4 space-y-2">
-                                            <label class="label" for="viewer-queue-source">Queue</label>
-                                            <select id="viewer-queue-source" class="input" @bind="_viewerQueueId">
-                                                @foreach (var queue in _queueOptions)
-                                                {
-                                                    <option value="@queue.Id">@queue.Name</option>
-                                                }
-                                            </select>
+                                        <div class="studio-span-4">
+                                            <div class="field">
+                                                <label class="field__label" for="viewer-queue-source">Queue</label>
+                                                <select id="viewer-queue-source" class="field__input" @bind="_viewerQueueId">
+                                                    @foreach (var queue in _queueOptions)
+                                                    {
+                                                        <option value="@queue.Id">@queue.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
                                         </div>
-                                        <div class="studio-span-4 space-y-2">
-                                            <label class="label" for="viewer-queue-current-rows">Current party rows</label>
-                                            <input id="viewer-queue-current-rows" class="input" type="number" min="0" max="12" @bind="_viewerQueueCurrentRows" />
+                                        <div class="studio-span-4">
+                                            <div class="field">
+                                                <label class="field__label" for="viewer-queue-current-rows">Current party rows</label>
+                                                <input id="viewer-queue-current-rows" class="field__input" type="number" min="0" max="12" @bind="_viewerQueueCurrentRows" />
+                                            </div>
                                         </div>
-                                        <div class="studio-span-4 space-y-2">
-                                            <label class="label" for="viewer-queue-next-rows">Next rows</label>
-                                            <input id="viewer-queue-next-rows" class="input" type="number" min="0" max="12" @bind="_viewerQueueNextRows" />
+                                        <div class="studio-span-4">
+                                            <div class="field">
+                                                <label class="field__label" for="viewer-queue-next-rows">Next rows</label>
+                                                <input id="viewer-queue-next-rows" class="field__input" type="number" min="0" max="12" @bind="_viewerQueueNextRows" />
+                                            </div>
                                         </div>
                                     </div>
                                     <p class="mt-3 text-sm leading-6 text-muted-foreground">

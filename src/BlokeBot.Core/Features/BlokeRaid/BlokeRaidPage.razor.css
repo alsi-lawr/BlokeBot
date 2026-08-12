@@ -439,7 +439,7 @@
 }
 
 .raid-card-grid,
-.raid-compact-grid {
+.raid-field-grid {
     gap: 0.75rem;
 }
 
@@ -489,48 +489,9 @@
     font-weight: 700;
 }
 
-.raid-compact-grid {
+.raid-field-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.raid-compact {
-    display: grid;
-    gap: 0.1rem;
-    min-width: 0;
-    border: 1px solid var(--app-border);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.7rem;
-    background: var(--app-surface-solid);
-}
-
-.raid-compact--wide {
-    grid-column: 1 / -1;
-}
-
-.raid-compact__label {
-    color: var(--app-text-muted);
-    font-size: 0.66rem;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-}
-
-.raid-compact__input {
-    width: 100%;
-    min-width: 0;
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--app-text-strong);
-    font-size: 0.95rem;
-    font-weight: 700;
-    outline: none;
-}
-
-.raid-compact:focus-within {
-    border-color: var(--app-focus-border);
-    box-shadow: var(--app-focus-shadow);
 }
 
 .raid-reset {

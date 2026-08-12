@@ -58,36 +58,42 @@
                             <p class="mb-4 text-sm text-muted-foreground">Your Twitch user ID keeps this passport together if your login changes.</p>
                             <div class="passport-editor__fields">
                                 <div class="passport-editor__field--wide" data-field>
-                                    <label class="label" for="passport-profile-line">Profile line</label>
-                                    <textarea id="passport-profile-line"
-                                              class="input passport-editor__profile-line mt-2"
-                                              maxlength="@ViewerPassportLimits.ProfileLineMaximumLength"
-                                              @bind="_profileLine"
-                                              @bind:event="oninput"></textarea>
+                                    <div class="field">
+                                        <label class="field__label" for="passport-profile-line">Profile line</label>
+                                        <textarea id="passport-profile-line"
+                                                  class="field__input passport-editor__profile-line mt-2"
+                                                  maxlength="@ViewerPassportLimits.ProfileLineMaximumLength"
+                                                  @bind="_profileLine"
+                                                  @bind:event="oninput"></textarea>
+                                    </div>
                                     <p class="passport-editor__hint">
                                         <span>Channel moderation rules apply. Displayed as plain text.</span>
                                         <span>@_profileLine.Length / @ViewerPassportLimits.ProfileLineMaximumLength</span>
                                     </p>
                                 </div>
                                 <div>
-                                    <label class="label" for="passport-title">Display title</label>
-                                    <select id="passport-title" class="input mt-2" @bind="_selectedTitle">
-                                        <option value="">No title</option>
-                                        @foreach (var reward in _passport.EarnedTitles)
-                                        {
-                                            <option value="@reward.Id">@reward.Name</option>
-                                        }
-                                    </select>
+                                    <div class="field">
+                                        <label class="field__label" for="passport-title">Display title</label>
+                                        <select id="passport-title" class="field__input mt-2" @bind="_selectedTitle">
+                                            <option value="">No title</option>
+                                            @foreach (var reward in _passport.EarnedTitles)
+                                            {
+                                                <option value="@reward.Id">@reward.Name</option>
+                                            }
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label class="label" for="passport-badge">Featured badge</label>
-                                    <select id="passport-badge" class="input mt-2" @bind="_selectedBadge">
-                                        <option value="">No badge</option>
-                                        @foreach (var reward in _passport.EarnedBadges)
-                                        {
-                                            <option value="@reward.Id">@reward.Name · @reward.PresentationToken</option>
-                                        }
-                                    </select>
+                                    <div class="field">
+                                        <label class="field__label" for="passport-badge">Featured badge</label>
+                                        <select id="passport-badge" class="field__input mt-2" @bind="_selectedBadge">
+                                            <option value="">No badge</option>
+                                            @foreach (var reward in _passport.EarnedBadges)
+                                            {
+                                                <option value="@reward.Id">@reward.Name · @reward.PresentationToken</option>
+                                            }
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -10,8 +10,10 @@
         <ConnectedChannelsSummary />
         <div class="studio-grid mt-3">
             <div class="studio-span-8">
-                <label class="label" for="newHostLogin">Add a channel</label>
-                <input id="newHostLogin" class="input mt-2 w-full" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
+                <div class="field">
+                    <label class="field__label" for="newHostLogin">Add a channel</label>
+                    <input id="newHostLogin" class="field__input mt-2 w-full" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
+                </div>
             </div>
             <div class="studio-span-4 content-end">
                 <button class="btn-primary w-full" @onclick="CreateHost">Add channel</button>
