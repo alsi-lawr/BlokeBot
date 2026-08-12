@@ -83,7 +83,7 @@ local succeeded, failure = pcall(function()
     ["play-with-viewers"] = {
       laptop = {
         path = "/queues",
-        ready = "Set up queue",
+        ready = "Set up",
       },
       phone = {
         path = "/queues/samplechannel/main",
