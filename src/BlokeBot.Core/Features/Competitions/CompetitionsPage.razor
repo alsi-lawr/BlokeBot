@@ -9,6 +9,7 @@
 @inject CompetitionService _service
 @inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
 @inject TimeProvider _clock
+@inject NavigationManager _navigation
 
 <PageTitle>BlokeBot | Tournaments &amp; leagues</PageTitle>
 
@@ -21,7 +22,14 @@
         @if (_featureEnabled && Host is not null)
         {
             <div class="competition-page-actions">
-                <button class="btn-primary" type="button" data-action="new-competition" disabled="@_isCreating" @onclick="NewCompetition">New competition</button>
+                @if (_isCreating && _competitions.Count > 0)
+                {
+                    <button class="btn-secondary" type="button" data-action="cancel-new-competition" @onclick="CancelNewCompetition">Cancel</button>
+                }
+                else
+                {
+                    <button class="btn-primary" type="button" data-action="new-competition" disabled="@_isCreating" @onclick="NewCompetition">New competition</button>
+                }
             </div>
         }
     </Actions>
@@ -40,7 +48,7 @@
         }
         else
         {
-            @if (!string.IsNullOrWhiteSpace(_feedback))
+            @if (!_isCreating && !string.IsNullOrWhiteSpace(_feedback))
             {
                 <p class="card p-3 text-sm font-semibold" role="@(_failed ? "alert" : "status")">@_feedback</p>
             }
@@ -100,48 +108,112 @@
                     @if (_isCreating)
                     {
                         <header class="competition-inspector__header">
-                            <div><h2 class="studio__title">New competition</h2><p class="studio__subtitle">Set format, eligibility, standings, reminders, and rewards.</p></div>
+                            <div><h2 class="studio__title">New competition</h2><p class="studio__subtitle">Start with the essentials. Add rewards and reminders when needed. Nothing is public until registration opens.</p></div>
+                            <span class="status-pill status-pill--blue"><span class="status-pill__label">Draft</span></span>
                         </header>
                         <div class="competition-inspector__body" data-competition-create>
-                            <StudioStage Key="competition-new" Number="1" Title="Competition setup" Summary="A deliberate draft; nothing is public until registration opens.">
-                                <div class="studio-grid">
-                                    <div class="studio-span-8"><Field Id="competition-name" Label="Name" @bind-Value="_draft.Name" /></div>
-                                    <div class="studio-span-4 space-y-2"><label class="label" for="competition-format">Format</label><select id="competition-format" class="input" @bind="_draft.Format"><option value="@CompetitionFormat.Tournament">Tournament bracket</option><option value="@CompetitionFormat.RoundRobin">Round robin</option><option value="@CompetitionFormat.PredictionLeague">Prediction league</option></select></div>
-                                    <div class="studio-span-12"><TextAreaField Id="competition-description" Label="Public description" @bind-Value="_draft.Description" /></div>
-                                    <div class="studio-span-4 space-y-2"><label class="label" for="competition-entry-kind">Entry</label><select id="competition-entry-kind" class="input" @bind="_draft.EntryKind"><option value="@CompetitionEntryKind.Individual">Individuals</option><option value="@CompetitionEntryKind.Team">Teams</option></select></div>
-                                    <div class="studio-span-4"><label class="label" for="competition-capacity">Entrant capacity</label><input id="competition-capacity" class="input" type="number" min="2" max="128" @bind="_draft.Capacity" /></div>
-                                    <div class="studio-span-4"><label class="label" for="competition-team-size">Members per team</label><input id="competition-team-size" class="input" type="number" min="1" max="32" @bind="_draft.TeamSize" /></div>
-                                    <div class="studio-span-4 space-y-2"><label class="label" for="competition-seeding">Schedule order</label><select id="competition-seeding" class="input" @bind="_draft.Seeding"><option value="@CompetitionSeeding.Random">Seeded random</option><option value="@CompetitionSeeding.Seeded">Moderator ranks</option></select></div>
-                                    <div class="studio-span-4"><Field Id="competition-seed" Label="Reproducible seed" @bind-Value="_draft.Seed" /></div>
-                                    <div class="studio-span-4"><Field Id="competition-minimum-points" Label="Minimum points eligibility" @bind-Value="_draft.MinimumPoints" /></div>
-                                    <div class="studio-span-4 space-y-2"><label class="label" for="competition-tiebreak">Tiebreak</label><select id="competition-tiebreak" class="input" @bind="_draft.Tiebreak"><option value="@CompetitionTiebreak.ScoreDifferenceThenScoreFor">Score difference, then score for</option><option value="@CompetitionTiebreak.ScoreForThenWins">Score for, then wins</option></select></div>
-                                    <div class="studio-span-8 grid grid-cols-3 gap-3"><div><label class="label" for="competition-win-points">Win</label><input id="competition-win-points" class="input" type="number" min="0" @bind="_draft.WinPoints" /></div><div><label class="label" for="competition-draw-points">Draw</label><input id="competition-draw-points" class="input" type="number" min="0" @bind="_draft.DrawPoints" /></div><div><label class="label" for="competition-loss-points">Loss</label><input id="competition-loss-points" class="input" type="number" min="0" @bind="_draft.LossPoints" /></div></div>
-                                    <div class="studio-span-4"><label class="label" for="competition-reminder">Reminder hours before</label><input id="competition-reminder" class="input" type="number" min="0" max="168" @bind="_draft.ReminderHoursBefore" /></div>
-                                    <div class="studio-span-8"><Field Id="competition-reminder-message" Label="Reminder message" @bind-Value="_draft.ReminderMessage" /><p class="mt-1 text-xs text-muted-foreground">Tokens: {competition}, {round}, {scheduled}, {public_url}</p></div>
-                                    <div class="studio-span-4"><Field Id="competition-winner-points" Label="Winner points" @bind-Value="_draft.WinnerPoints" /></div>
-                                    <div class="studio-span-4"><Field Id="competition-runner-points" Label="Runner-up points" @bind-Value="_draft.RunnerUpPoints" /></div>
-                                    <div class="studio-span-4"><Field Id="competition-winner-achievement" Label="Winner achievement key" @bind-Value="_draft.WinnerAchievement" /></div>
-                                    <div class="studio-span-4"><Field Id="competition-runner-achievement" Label="Runner-up achievement key" @bind-Value="_draft.RunnerUpAchievement" /></div>
-                                    <div class="studio-span-12 competition-milestone-editor">
-                                        <div class="flex items-center justify-between gap-3"><div><h3 class="font-semibold text-[var(--app-text-strong)]">Win milestones</h3><p class="text-xs text-muted-foreground">Up to 8 confirmed-win thresholds; final corrected standings decide recipients.</p></div><button class="btn-secondary" type="button" disabled="@(_draft.MilestoneRewards.Count >= 8)" @onclick="AddMilestoneReward">+ Add milestone</button></div>
-                                        @foreach (var rule in _draft.MilestoneRewards)
-                                        {
-                                            <div class="competition-milestone-rule" @key="rule"><div><label class="label">Confirmed wins</label><input class="input" type="number" min="1" @bind="rule.WinsRequired" /></div><div><label class="label">Points</label><input class="input" @bind="rule.Points" /></div><div><label class="label">Achievement key</label><input class="input" @bind="rule.AchievementKey" /></div><button class="btn-secondary" type="button" aria-label="Remove win milestone" @onclick="() => RemoveMilestoneReward(rule)">Remove</button></div>
-                                        }
+                            <div class="settings-disclosure-stack">
+                                <StudioStage Key="competition-format"
+                                             Number="1"
+                                             Title="Format and entry"
+                                             Summary="Name, format and team size."
+                                             Open="@_composer.IsOpen(ComposerSection.FormatAndEntry)"
+                                             OpenChanged="@(open => _composer.Set(ComposerSection.FormatAndEntry, open))">
+                                    @if (ComposerFailureIn(ComposerSection.FormatAndEntry) is { } formatFailure)
+                                    {
+                                        <p class="competition-composer__error" role="alert" data-composer-error="format-and-entry">@formatFailure</p>
+                                    }
+                                    <div class="studio-grid">
+                                        <div class="studio-span-8"><Field Id="competition-name" Label="Name" @bind-Value="_draft.Name" /></div>
+                                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-format">Format</label><select id="competition-format" class="input" @bind="_draft.Format"><option value="@CompetitionFormat.Tournament">Tournament bracket</option><option value="@CompetitionFormat.RoundRobin">Round robin</option><option value="@CompetitionFormat.PredictionLeague">Prediction league</option></select></div>
+                                        <div class="studio-span-12"><TextAreaField Id="competition-description" Label="Public description" @bind-Value="_draft.Description" /></div>
+                                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-entry-kind">Entry</label><select id="competition-entry-kind" class="input" @bind="_draft.EntryKind"><option value="@CompetitionEntryKind.Individual">Individuals</option><option value="@CompetitionEntryKind.Team">Teams</option></select></div>
+                                        <div class="studio-span-4"><label class="label" for="competition-capacity">Entrant capacity</label><input id="competition-capacity" class="input" type="number" min="2" max="128" @bind="_draft.Capacity" /></div>
+                                        <div class="studio-span-4"><label class="label" for="competition-team-size">Members per team</label><input id="competition-team-size" class="input" type="number" min="1" max="32" @bind="_draft.TeamSize" /></div>
+                                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-seeding">Schedule order</label><select id="competition-seeding" class="input" @bind="_draft.Seeding"><option value="@CompetitionSeeding.Random">Seeded random</option><option value="@CompetitionSeeding.Seeded">Moderator ranks</option></select></div>
+                                        <div class="studio-span-4"><Field Id="competition-seed" Label="Reproducible seed" @bind-Value="_draft.Seed" /></div>
+                                        <div class="studio-span-4"><Field Id="competition-minimum-points" Label="Minimum points eligibility" @bind-Value="_draft.MinimumPoints" /></div>
                                     </div>
-                                    <div class="studio-span-12"><TextAreaField Id="competition-lobby" Label="Private contact / lobby information" @bind-Value="_draft.PrivateLobbyInformation" /><p class="mt-1 text-xs text-muted-foreground">Moderator-only; never included in public views or lifecycle payloads.</p></div>
-                                    <div class="studio-span-12"><TextAreaField Id="competition-create-note" Label="Private moderator note" @bind-Value="_draft.PrivateReason" /></div>
-                                    <div class="studio-span-12"><button class="btn-primary" type="button" @onclick="CreateAsync">Create draft competition</button></div>
-                                </div>
-                            </StudioStage>
+                                </StudioStage>
+                                <StudioStage Key="competition-scoring"
+                                             Number="2"
+                                             Title="Scoring"
+                                             Summary="Set points and tiebreaks."
+                                             Open="@_composer.IsOpen(ComposerSection.Scoring)"
+                                             OpenChanged="@(open => _composer.Set(ComposerSection.Scoring, open))">
+                                    @if (ComposerFailureIn(ComposerSection.Scoring) is { } scoringFailure)
+                                    {
+                                        <p class="competition-composer__error" role="alert" data-composer-error="scoring">@scoringFailure</p>
+                                    }
+                                    <div class="studio-grid">
+                                        <div class="studio-span-4 space-y-2"><label class="label" for="competition-tiebreak">Tiebreak</label><select id="competition-tiebreak" class="input" @bind="_draft.Tiebreak"><option value="@CompetitionTiebreak.ScoreDifferenceThenScoreFor">Score difference, then score for</option><option value="@CompetitionTiebreak.ScoreForThenWins">Score for, then wins</option></select></div>
+                                        <div class="studio-span-8 grid grid-cols-3 gap-3"><div><label class="label" for="competition-win-points">Win</label><input id="competition-win-points" class="input" type="number" min="0" @bind="_draft.WinPoints" /></div><div><label class="label" for="competition-draw-points">Draw</label><input id="competition-draw-points" class="input" type="number" min="0" @bind="_draft.DrawPoints" /></div><div><label class="label" for="competition-loss-points">Loss</label><input id="competition-loss-points" class="input" type="number" min="0" @bind="_draft.LossPoints" /></div></div>
+                                    </div>
+                                </StudioStage>
+                                <StudioStage Key="competition-rewards"
+                                             Number="3"
+                                             Title="Rewards and reminders"
+                                             Summary="Optional points, achievements and chat reminders."
+                                             Open="@_composer.IsOpen(ComposerSection.RewardsAndReminders)"
+                                             OpenChanged="@(open => _composer.Set(ComposerSection.RewardsAndReminders, open))">
+                                    @if (ComposerFailureIn(ComposerSection.RewardsAndReminders) is { } rewardsFailure)
+                                    {
+                                        <p class="competition-composer__error" role="alert" data-composer-error="rewards-and-reminders">@rewardsFailure</p>
+                                    }
+                                    <div class="studio-grid">
+                                        <div class="studio-span-4"><label class="label" for="competition-reminder">Reminder hours before</label><input id="competition-reminder" class="input" type="number" min="0" max="168" @bind="_draft.ReminderHoursBefore" /></div>
+                                        <div class="studio-span-8"><Field Id="competition-reminder-message" Label="Reminder message" @bind-Value="_draft.ReminderMessage" /><p class="mt-1 text-xs text-muted-foreground">Tokens: {competition}, {round}, {scheduled}, {public_url}</p></div>
+                                        <div class="studio-span-4"><Field Id="competition-winner-points" Label="Winner points" @bind-Value="_draft.WinnerPoints" /></div>
+                                        <div class="studio-span-4"><Field Id="competition-runner-points" Label="Runner-up points" @bind-Value="_draft.RunnerUpPoints" /></div>
+                                        <div class="studio-span-4"><Field Id="competition-winner-achievement" Label="Winner achievement key" @bind-Value="_draft.WinnerAchievement" /></div>
+                                        <div class="studio-span-4"><Field Id="competition-runner-achievement" Label="Runner-up achievement key" @bind-Value="_draft.RunnerUpAchievement" /></div>
+                                        <div class="studio-span-12 competition-milestone-editor">
+                                            <div class="flex items-center justify-between gap-3"><div><h3 class="font-semibold text-[var(--app-text-strong)]">Win milestones</h3><p class="text-xs text-muted-foreground">Up to 8 confirmed-win thresholds; final corrected standings decide recipients.</p></div><button class="btn-secondary" type="button" disabled="@(_draft.MilestoneRewards.Count >= 8)" @onclick="AddMilestoneReward">+ Add milestone</button></div>
+                                            @foreach (var rule in _draft.MilestoneRewards)
+                                            {
+                                                <div class="competition-milestone-rule" @key="rule"><div><label class="label">Confirmed wins</label><input class="input" type="number" min="1" @bind="rule.WinsRequired" /></div><div><label class="label">Points</label><input class="input" @bind="rule.Points" /></div><div><label class="label">Achievement key</label><input class="input" @bind="rule.AchievementKey" /></div><button class="btn-secondary" type="button" aria-label="Remove win milestone" @onclick="() => RemoveMilestoneReward(rule)">Remove</button></div>
+                                            }
+                                        </div>
+                                    </div>
+                                </StudioStage>
+                                <StudioStage Key="competition-notes"
+                                             Number="4"
+                                             Title="Private notes"
+                                             Summary="Lobby details and moderator notes."
+                                             Open="@_composer.IsOpen(ComposerSection.PrivateNotes)"
+                                             OpenChanged="@(open => _composer.Set(ComposerSection.PrivateNotes, open))">
+                                    @if (ComposerFailureIn(ComposerSection.PrivateNotes) is { } notesFailure)
+                                    {
+                                        <p class="competition-composer__error" role="alert" data-composer-error="private-notes">@notesFailure</p>
+                                    }
+                                    <div class="studio-grid">
+                                        <div class="studio-span-12"><TextAreaField Id="competition-lobby" Label="Private contact / lobby information" @bind-Value="_draft.PrivateLobbyInformation" /><p class="mt-1 text-xs text-muted-foreground">Moderator-only; never included in public views or lifecycle payloads.</p></div>
+                                        <div class="studio-span-12"><TextAreaField Id="competition-create-note" Label="Private moderator note" @bind-Value="_draft.PrivateReason" /></div>
+                                    </div>
+                                </StudioStage>
+                            </div>
+                            @if (_unplacedComposerFailure is { } composerFailure)
+                            {
+                                <p class="competition-composer__error" role="alert" data-composer-error="composer">@composerFailure</p>
+                            }
+                            <div class="competition-composer__submit">
+                                <button class="btn-primary" type="button" data-action="create-competition" @onclick="CreateAsync">Create draft competition</button>
+                            </div>
                         </div>
                     }
                     else if (_selected is { } selected)
                     {
                         var competition = selected.Competition;
-                        <div class="competition-tabs"><SegmentedTabs Id="competition-tabs" AriaLabel="Competition workspace" Items="_tabs" ActiveKey="_activeTab" ActiveKeyChanged="@(key => _activeTab = key)" /></div>
-                        <div id="@SegmentedTabs.PanelId("competition-tabs", _activeTab)" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId("competition-tabs", _activeTab)" class="competition-inspector__body">
-                            @if (_activeTab == "standings")
+                        <div class="competition-tabs">
+                            <SegmentedTabs Id="@_tabsId"
+                                           OwnsFragment
+                                           AriaLabel="Competition workspace"
+                                           Items="_tabs"
+                                           ActiveKey="@_activeTab"
+                                           ActiveKeyChanged="@(key => _activeTab = key)" />
+                        </div>
+                        <div id="@SegmentedTabs.PanelId(_tabsId, _activeTab)" role="tabpanel" aria-labelledby="@SegmentedTabs.TabId(_tabsId, _activeTab)" class="competition-inspector__body">
+                            @if (_activeTab == _standingsKey)
                             {
                                 <div class="data-table-region" tabindex="0"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-muted-foreground"><th class="p-2">#</th><th class="p-2">Entrant</th><th class="p-2">Played</th><th class="p-2">W–D–L</th><th class="p-2">Score</th><th class="p-2">Points</th></tr></thead><tbody>@foreach (var row in competition.Standings){<tr class="border-t"><td class="p-2">@row.Rank</td><td class="p-2 font-semibold text-[var(--app-text-strong)]">@row.Name</td><td class="p-2">@row.Played</td><td class="p-2">@row.Wins–@row.Draws–@row.Losses</td><td class="p-2">@row.ScoreFor–@row.ScoreAgainst</td><td class="p-2 font-semibold">@row.Points</td></tr>}</tbody></table></div>
                                 @if (competition.Matches.LastOrDefault(x => x.Status == CompetitionMatchStatus.Confirmed) is { } latest)
@@ -153,7 +225,7 @@
                                     </div>
                                 }
                             }
-                            else if (_activeTab == "schedule")
+                            else if (_activeTab == _scheduleKey)
                             {
                                 <div class="competition-schedule">@foreach (var round in competition.Matches.GroupBy(x => x.Round).OrderBy(x => x.Key)){<section><h3>Round @round.Key</h3>@foreach (var match in round){<button class="competition-fixture @(match.Id == _selectedMatchId ? "competition-fixture--selected" : null)" type="button" disabled="@(match.EntrantAId is null || match.EntrantBId is null)" @onclick="() => SelectMatch(match.Id)"><span>@match.EntrantA <strong>@(match.ScoreA?.ToString() ?? "–")</strong></span><span>@match.EntrantB <strong>@(match.ScoreB?.ToString() ?? "–")</strong></span><small>@match.Status · @(match.ScheduledAtUtc?.ToString("u") ?? "Unscheduled")</small></button>}</section>}</div>
                                 @if (_selectedMatch is { Status: CompetitionMatchStatus.Confirmed } attachmentMatch)
@@ -163,7 +235,7 @@
                                                               Destination="@(new MomentAttachmentDestination.TournamentResult(attachmentMatch.Id))" />
                                 }
                             }
-                            else if (_activeTab == "entrants")
+                            else if (_activeTab == _entrantsKey)
                             {
                                 <div class="competition-entrant-list">@foreach (var entrant in competition.Entrants){<div class="competition-entrant"><div><strong>@entrant.Name</strong><span>@string.Join(", ", entrant.Members.Select(x => x.DisplayName))</span></div><span>@(entrant.SeedRank is { } rank ? $"Seed {rank}" : "Unseeded")</span></div>}</div>
                                 @if (competition.Status == CompetitionStatus.Registration)
@@ -188,7 +260,7 @@
                 @if (!_isCreating && _selected is { } resultOwner)
                 {
                     var competition = resultOwner.Competition;
-                    <aside class="competition-result-panel @(_activeTab == "schedule" ? "competition-result-panel--mobile-visible" : null)" aria-label="Contextual result entry">
+                    <aside class="competition-result-panel @(_activeTab == _scheduleKey ? "competition-result-panel--mobile-visible" : null)" aria-label="Contextual result entry">
                         <header><h2>Enter result</h2>@if (_selectedMatch is { } chosen) { <span class="status-pill status-pill--green"><span class="status-pill__label">Round @chosen.Round</span></span> }</header>
                         <div class="competition-result-panel__body">
                             @if (competition.Status == CompetitionStatus.Running && _selectedMatch is { } match)

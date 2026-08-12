@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components.Layout;
+using BlokeBot.Core.Components.Studio;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
@@ -8,14 +9,22 @@ namespace BlokeBot.Core.Features.Competitions;
 
 public partial class CompetitionsPage
 {
+    private const string _tabsId = "competition-tabs";
+    private const string _standingsKey = "standings";
+    private const string _scheduleKey = "schedule";
+    private const string _entrantsKey = "entrants";
+    private const string _settingsKey = "settings";
+
     private IReadOnlyList<CompetitionModeratorView> _competitions = [];
     private CompetitionDraftModel _draft = new();
     private RegistrationModel _registration = new();
     private readonly Dictionary<Guid, ResultModel> _results = [];
     private readonly Dictionary<Guid, string> _notes = [];
+    private readonly StudioOpenSet<ComposerSection> _composer = new(ComposerSection.FormatAndEntry);
     private CompetitionId? _selectedCompetitionId;
     private CompetitionMatchId? _selectedMatchId;
-    private string _activeTab = "standings";
+    private ComposerFailure? _composerFailure;
+    private string _activeTab = _standingsKey;
     private bool _isCreating;
     private bool _featureEnabled;
     private bool _failed;
@@ -32,15 +41,35 @@ public partial class CompetitionsPage
             : null;
     private static IReadOnlyList<SegmentedTabItem> _tabs { get; } =
     [
-        new("standings", "Standings"),
-        new("schedule", "Schedule"),
-        new("entrants", "Entrants"),
-        new("settings", "Settings & history"),
+        new(_standingsKey, "Standings"),
+        new(_scheduleKey, "Schedule"),
+        new(_entrantsKey, "Entrants"),
+        new(_settingsKey, "Settings & history"),
+    ];
+
+    /// <summary>
+    /// Places a create failure beside the fields it names. The phrases are the wording
+    /// <see cref="CompetitionService"/> returns for each draft rule; anything it does not name
+    /// stays with the Create action.
+    /// </summary>
+    private static readonly (string Phrase, ComposerSection Section)[] _failurePlacement =
+    [
+        ("competition name", ComposerSection.FormatAndEntry),
+        ("description", ComposerSection.FormatAndEntry),
+        ("capacity", ComposerSection.FormatAndEntry),
+        ("team size", ComposerSection.FormatAndEntry),
+        ("reproducible seed", ComposerSection.FormatAndEntry),
+        ("standing points", ComposerSection.Scoring),
+        ("reminder", ComposerSection.RewardsAndReminders),
+        ("milestone", ComposerSection.RewardsAndReminders),
+        ("achievements", ComposerSection.RewardsAndReminders),
+        ("private lobby", ComposerSection.PrivateNotes),
     ];
 
     protected override async Task OnInitializedAsync()
     {
         _draft = CompetitionDraftModel.New(_clock.GetUtcNow().UtcDateTime);
+        _activeTab = SegmentedTabs.CanonicalKey(_navigation, _tabs);
         _ = await LoadPageContextAsync();
         await LoadAsync();
     }
@@ -104,7 +133,7 @@ public partial class CompetitionsPage
             );
             if (outcome is CompetitionOutcome.Succeeded)
             {
-                _isCreating = false;
+                ShowWorkspace();
                 _selectedCompetitionId = null;
                 _draft = CompetitionDraftModel.New(_clock.GetUtcNow().UtcDateTime);
             }
@@ -213,14 +242,33 @@ public partial class CompetitionsPage
     {
         _isCreating = true;
         _feedback = string.Empty;
+        _composerFailure = null;
+        _composer.Reset(ComposerSection.FormatAndEntry);
+    }
+
+    private void CancelNewCompetition()
+    {
+        ShowWorkspace();
+        _composerFailure = null;
+        ReconcileSelection();
     }
 
     private void SelectCompetition(CompetitionId id)
     {
-        _isCreating = false;
+        ShowWorkspace();
         _selectedCompetitionId = id;
         _registration = new();
         ReconcileSelectedMatch();
+    }
+
+    /// <summary>
+    /// Leaves the composer for the workspace, taking the selected tab from the URL because the
+    /// fragment-owned strip remounts against whatever fragment the address bar carries.
+    /// </summary>
+    private void ShowWorkspace()
+    {
+        _isCreating = false;
+        _activeTab = SegmentedTabs.CanonicalKey(_navigation, _tabs);
     }
 
     private void SelectMobileCompetition(string? value)
@@ -238,7 +286,24 @@ public partial class CompetitionsPage
     private void SelectMatch(CompetitionMatchId id)
     {
         _selectedMatchId = id;
-        _activeTab = "schedule";
+        _activeTab = _scheduleKey;
+        PublishFragment(_scheduleKey);
+    }
+
+    /// <summary>
+    /// Moves the address bar with a workspace change the page made for itself. The shared strip
+    /// publishes only the fragments a person clicks, so without this the schedule would appear
+    /// behind whichever fragment was already shown.
+    /// </summary>
+    private void PublishFragment(string key)
+    {
+        var current = _navigation.ToAbsoluteUri(_navigation.Uri);
+        if (string.Equals(current.Fragment.TrimStart('#'), key, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _navigation.NavigateTo($"{current.GetLeftPart(UriPartial.Query)}#{key}");
     }
 
     private void ReconcileSelection()
@@ -331,6 +396,7 @@ public partial class CompetitionsPage
             case CompetitionOutcome.Succeeded:
                 _failed = false;
                 _feedback = success;
+                _composerFailure = null;
                 await LoadAsync();
                 break;
             case CompetitionOutcome.Invalid invalid:
@@ -352,7 +418,33 @@ public partial class CompetitionsPage
     {
         _failed = true;
         _feedback = message;
+        if (!_isCreating)
+        {
+            _composerFailure = null;
+            return;
+        }
+
+        var section = SectionFor(message);
+        _composerFailure = new(message, section);
+        if (section is { } target)
+        {
+            _composer.Open(target);
+        }
     }
+
+    private static ComposerSection? SectionFor(string message) =>
+        _failurePlacement
+            .Where(entry => message.Contains(entry.Phrase, StringComparison.OrdinalIgnoreCase))
+            .Select(entry => (ComposerSection?)entry.Section)
+            .FirstOrDefault();
+
+    private string? ComposerFailureIn(ComposerSection section) =>
+        _composerFailure is { Section: { } placed, Message: var message } && placed == section
+            ? message
+            : null;
+
+    private string? _unplacedComposerFailure =>
+        _composerFailure is { Section: null, Message: var message } ? message : null;
 
     private CompetitionActor Actor() => new(PageContext.Session.UserId, PageContext.Session.Login);
 
@@ -377,6 +469,16 @@ public partial class CompetitionsPage
         }
         return _registration.Members[index];
     }
+
+    private enum ComposerSection
+    {
+        FormatAndEntry,
+        Scoring,
+        RewardsAndReminders,
+        PrivateNotes,
+    }
+
+    private sealed record ComposerFailure(string Message, ComposerSection? Section);
 
     private sealed class CompetitionDraftModel
     {
