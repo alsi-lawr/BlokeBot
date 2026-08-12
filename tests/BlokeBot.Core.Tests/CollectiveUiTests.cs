@@ -343,6 +343,42 @@ public sealed partial class CollectiveUiTests
         (await StoredGoalSourceAsync(database)).ShouldBe(workspace.BountyPublicId);
     }
 
+    [Test]
+    public async Task PendingNotificationEdit_ReportsTheConflictWhenAnotherSessionSavedFirst()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var workspace = await SeedWorkspaceAsync(database);
+        using var context = CreateContext(database, workspace);
+        var page = RenderAt(context, "goal");
+
+        SetNotification(page, CollectiveLocalNotification.ModeratorsAndOwner);
+        _ = (
+            await workspace.Service.SaveLocalSettingsAsync(
+                new(
+                    Guid.NewGuid(),
+                    workspace.CollectiveId,
+                    0,
+                    CollectiveLocalNotification.Moderators,
+                    new(workspace.HostId, "streamer-id", "streamer", true)
+                ),
+                default
+            )
+        ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
+        page.Find("#collective-goal-source").Change(workspace.BountyPublicId.ToString());
+        SourceAction(page).Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("[role='status']").TextContent.ShouldContain("Collective saved.")
+        );
+        Save(page);
+
+        page.WaitForAssertion(() =>
+            page.Find("[role='alert']").TextContent.ShouldContain("Local settings changed")
+        );
+        (await StoredNotificationAsync(database)).ShouldBe(CollectiveLocalNotification.Moderators);
+        (await StoredNotificationRevisionAsync(database)).ShouldBe(1);
+    }
+
     private static IRenderedComponent<CollectivesPage> RenderAt(
         BunitContext context,
         string workflow
@@ -389,6 +425,14 @@ public sealed partial class CollectiveUiTests
     {
         await using var db = await database.CreateDbContextAsync();
         return (await db.CollectiveLocalSettings.SingleOrDefaultAsync())?.Notification;
+    }
+
+    private static async Task<long?> StoredNotificationRevisionAsync(
+        SqliteBlokeBotDbFactory database
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        return (await db.CollectiveLocalSettings.SingleOrDefaultAsync())?.Revision;
     }
 
     private static async Task<Guid?> StoredGoalSourceAsync(SqliteBlokeBotDbFactory database)
@@ -458,7 +502,7 @@ public sealed partial class CollectiveUiTests
                 )
             ).ShouldBeOfType<CollectiveMutationOutcome.Succeeded>();
         }
-        return new(hostId, service, bountyPublicId);
+        return new(hostId, created.CollectiveId, service, bountyPublicId);
     }
 
     private static async Task<int> SeedCollectiveHostAsync(
@@ -527,6 +571,7 @@ public sealed partial class CollectiveUiTests
 
     private sealed record SeededWorkspace(
         int HostId,
+        CollectiveId CollectiveId,
         CollectiveService Service,
         Guid BountyPublicId
     );

@@ -41,6 +41,7 @@ public partial class CollectivesPage
     private long _goalTarget = 1;
     private DateTime _goalDeadlineUtc = DateTime.UtcNow.AddDays(7);
     private Guid _goalSourceBountyPublicId;
+    private long _notificationRevision;
 
     [SupplyParameterFromQuery(Name = "collective")]
     public Guid? RequestedCollective { get; set; }
@@ -111,7 +112,8 @@ public partial class CollectivesPage
     private void SelectWorkflow(string key) => _workflow = key;
 
     // Each local settings control reaches its own service call, so a reload triggered by one of them
-    // keeps an edit that is still pending in the other.
+    // keeps an edit that is still pending in the other. A kept edit holds on to the revision it was
+    // read against, so a save that races a newer one reports the service's conflict.
     private async Task LoadAsync(bool keepPendingLocalEdits = false)
     {
         var pendingNotification =
@@ -143,7 +145,7 @@ public partial class CollectivesPage
         _workspace = outcome is CollectiveDashboardOutcome.Loaded loaded ? loaded.Workspace : null;
         if (_workspace is { SelectedCollective: { } selected } workspace)
         {
-            _notification = pendingNotification ?? selected.LocalSettings.Notification;
+            AdoptLocalSettings(selected, pendingNotification, pendingGoalSource);
             _knownHosts = workspace.KnownHosts;
             _ownedBounties = workspace.OwnedBounties;
             _tournamentOwnerHostId = selected.Tournament is { } tournament
@@ -167,9 +169,32 @@ public partial class CollectivesPage
             _goalUnitName = selected.Goal?.UnitName ?? string.Empty;
             _goalTarget = selected.Goal?.Target ?? 1;
             _goalDeadlineUtc = selected.Goal?.DeadlineUtc ?? DateTime.UtcNow.AddDays(7);
-            _goalSourceBountyPublicId =
-                pendingGoalSource ?? selected.LocalGoalSourcePublicId ?? Guid.Empty;
         }
+    }
+
+    private void AdoptLocalSettings(
+        CollectiveDashboard selected,
+        CollectiveLocalNotification? pendingNotification,
+        Guid? pendingGoalSource
+    )
+    {
+        if (
+            pendingNotification is { } notification
+            && notification != selected.LocalSettings.Notification
+        )
+        {
+            _notification = notification;
+        }
+        else
+        {
+            _notification = selected.LocalSettings.Notification;
+            _notificationRevision = selected.LocalSettings.Revision;
+        }
+        var storedGoalSource = selected.LocalGoalSourcePublicId ?? Guid.Empty;
+        _goalSourceBountyPublicId =
+            pendingGoalSource is { } source && source != storedGoalSource
+                ? source
+                : storedGoalSource;
     }
 
     private CollectiveAuthority ReadAuthority() =>
@@ -374,7 +399,7 @@ public partial class CollectivesPage
                     new(
                         Guid.NewGuid(),
                         _selected.Id,
-                        _selected.LocalSettings.Revision,
+                        _notificationRevision,
                         _notification,
                         authority
                     ),
