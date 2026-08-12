@@ -284,6 +284,39 @@ public sealed class PageHelpButtonTests
         HelpText("/collectives", "").ShouldContain("shared summary");
     }
 
+    [Test]
+    public void RaidCollaborationHelp_KeepsTheReviewedTwoSectionCompositionAndItsSafetyMeaning()
+    {
+        using var context = CreateContext(null);
+        var help = RenderAt(context, "/raid-collaboration");
+        help.Find("button[aria-label='Page help']").Click();
+
+        var sections = help.Find("#page-help-popover").QuerySelectorAll("h3");
+
+        sections
+            .Select(section => section.TextContent.Trim())
+            .ShouldBe(["Choose where to raid", "Change welcome and shortlist rules"]);
+        var text = help.Find("#page-help-popover").TextContent;
+        text.ShouldContain("Approval is an allowlist you control");
+        text.ShouldContain("Prepare raid always asks you to confirm");
+        text.ShouldContain("no individual viewer is recorded");
+    }
+
+    [Test]
+    public void HelpCopy_AssertsWithoutFirstNegatingSomethingElse()
+    {
+        string[] bannedConstructions = [", not a ", ", not an ", ", not the ", " but rather "];
+
+        foreach (var (path, fragment, _) in _routeMap)
+        {
+            var text = HelpText(path, fragment);
+            foreach (var construction in bannedConstructions)
+            {
+                text.ShouldNotContain(construction, Case.Sensitive, $"{path}#{fragment}");
+            }
+        }
+    }
+
     private static IReadOnlyList<string> HostSelectedRoutes()
     {
         const string RedirectOnlyRoute = "/twitch-operations";
@@ -292,9 +325,7 @@ public sealed class PageHelpButtonTests
         return routes;
     }
 
-    private static IReadOnlyList<string> DiscoverHostSelectedRoutes(string redirectOnlyRoute)
-    {
-        return
+    private static IReadOnlyList<string> DiscoverHostSelectedRoutes(string redirectOnlyRoute) =>
         [
             .. typeof(PageHelpButton)
                 .Assembly.GetTypes()
@@ -311,7 +342,6 @@ public sealed class PageHelpButtonTests
                 .Where(route => route != redirectOnlyRoute)
                 .Order(StringComparer.Ordinal),
         ];
-    }
 
     private static string HelpText(string path, string fragment)
     {

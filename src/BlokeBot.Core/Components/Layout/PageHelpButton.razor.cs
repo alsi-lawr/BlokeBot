@@ -365,17 +365,12 @@ public partial class PageHelpButton
         [
             new(
                 "Choose where to raid",
-                "The Hub shows approved channels that are live and match your filters.",
+                "The Hub shows approved channels that are live and match your filters. Approval is an allowlist you control, and Prepare raid always asks you to confirm.",
                 []
             ),
             new(
                 "Change welcome and shortlist rules",
-                "Open Settings, make your changes, then save.",
-                []
-            ),
-            new(
-                "What to expect",
-                "Approval is your allowlist, not a safety score, and Prepare raid always asks you to confirm. Twitch gives a raid's total viewer count only, so no individual viewer is recorded.",
+                "Open Settings, make your changes, then save. Twitch gives a raid's total viewer count only, so no individual viewer is recorded.",
                 []
             ),
         ]
@@ -708,7 +703,7 @@ public partial class PageHelpButton
                     "<code>{random_from|one|two}</code> picks one value.",
                     "<code>{random_between|1|10}</code> picks an inclusive whole number.",
                     "Each random token occurrence makes a fresh pick.",
-                    "<code>{random_viewer}</code> picks a connected Twitch chatter, not a verified viewer. The active bot account must be a moderator with connected-chatter access.",
+                    "<code>{random_viewer}</code> picks from Twitch chatters currently connected to chat. The active bot account must be a moderator with connected-chatter access.",
                     "If Twitch cannot return the complete chatter list, <code>{random_viewer}</code> becomes empty text.",
                 ]
             ),
