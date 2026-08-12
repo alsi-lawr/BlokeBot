@@ -20,10 +20,6 @@
 }
 
 #components-reconnect-modal {
-    background: var(--app-surface-solid);
-    border: 1px solid var(--app-border);
-    border-radius: 0.75rem;
-    box-shadow: var(--app-shadow-surface);
     color: var(--app-text-strong);
     margin: 20vh auto 0;
     max-width: calc(100% - 2rem);

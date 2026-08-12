@@ -101,7 +101,7 @@ public partial class ToastHost
 
     private string ToastClass(ToastNotification toast)
     {
-        var classes = $"toast-card toast-card--{ToneCssClass(toast.Tone)}";
+        var classes = $"surface-card toast-card toast-card--{ToneCssClass(toast.Tone)}";
         return _dismissingToastIds.Contains(toast.Id) ? $"{classes} toast-card--removing" : classes;
     }
 

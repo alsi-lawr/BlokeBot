@@ -26,7 +26,7 @@
 }
 
 .disclosure-trigger:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--app-focus-border) 24%, transparent);
+    outline: var(--app-focus-outline);
     outline-offset: -3px;
 }
 

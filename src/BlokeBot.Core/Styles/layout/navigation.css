@@ -32,7 +32,7 @@
 .nav-menu__link:focus-visible,
 .nav-menu__summary:focus-visible,
 .nav-menu__sub-link:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--app-focus-border) 38%, transparent);
+    outline: var(--app-focus-outline);
     outline-offset: 2px;
 }
 

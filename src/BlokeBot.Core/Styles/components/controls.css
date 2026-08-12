@@ -78,7 +78,7 @@
 
     .btn-primary:focus-visible,
     .btn-secondary:focus-visible {
-        outline: 3px solid color-mix(in srgb, var(--app-focus-border) 34%, transparent);
+        outline: var(--app-focus-outline);
         outline-offset: 2px;
     }
 

@@ -13,6 +13,14 @@
         box-shadow: var(--app-shadow-sm);
     }
 
+    /* Like .card but on the opaque surface, for anything that overlays page content. */
+    .surface-card {
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        box-shadow: var(--app-shadow-surface);
+    }
+
     .surface-muted {
         background: var(--app-surface-muted);
         border: 1px solid var(--app-border);

@@ -1,7 +1,10 @@
-.raid-workspace {
-    display: grid;
-    gap: 1rem;
-    min-width: 0;
+/* container-type must not sit above the fixed sticky Save surface, so it stops at the body. */
+.raid-section__body {
+    container-type: inline-size;
+}
+
+.raid-field {
+    align-content: start;
 }
 
 .raid-feedback {
@@ -371,58 +374,10 @@
     min-width: 0;
 }
 
-.raid-section {
-    min-width: 0;
-}
-
-.raid-section__header {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    border-bottom: 1px solid var(--app-border);
-    padding: 1rem 1.25rem;
-}
-
-.raid-section__step {
-    display: flex;
-    width: 1.75rem;
-    height: 1.75rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--tone-blue-ring);
-    border-radius: 999px;
-    background: var(--tone-blue-bg);
-    color: var(--tone-blue-fg);
-    font-size: 0.85rem;
-    font-weight: 800;
-}
-
-.raid-section__heading {
-    color: var(--app-text-strong);
-    font-size: 1rem;
-    font-weight: 750;
-}
-
-.raid-section__description {
-    margin-top: 0.15rem;
-    color: var(--app-text-muted);
-    font-size: 0.8rem;
-    line-height: 1.5;
-}
-
 /* Grouped fields answer to the width of the section they sit in. The 18rem navigation rail only
    takes space from 64rem up, so a viewport just under that leaves this body wider than a viewport
    just over it. The query context stops at the body so it stays clear of the sticky Save surface,
    whose fixed positioning would otherwise resolve against a container box. */
-.raid-section__body {
-    container-type: inline-size;
-    display: grid;
-    gap: 1rem;
-    padding: 1.25rem;
-}
-
 .raid-section__note {
     color: var(--app-text-muted);
     font-size: 0.78rem;
@@ -441,13 +396,6 @@
 .raid-card-grid,
 .raid-field-grid {
     gap: 0.75rem;
-}
-
-.raid-field {
-    display: grid;
-    align-content: start;
-    gap: 0.4rem;
-    min-width: 0;
 }
 
 .raid-field .input {

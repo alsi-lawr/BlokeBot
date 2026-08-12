@@ -1,0 +1,70 @@
+@layer components {
+    /*
+     * Shared by the BlokeRaid and Raid & collaboration workspaces. Both are scoped components, and
+     * Blazor rewrites scoped selectors with a per-component attribute, so neither could reuse the
+     * other's copy. Page-specific divergences stay in the scoped stylesheets, where the added
+     * attribute outranks these rules.
+     */
+    .raid-workspace {
+        display: grid;
+        gap: 1rem;
+        min-width: 0;
+    }
+
+    .raid-section {
+        min-width: 0;
+    }
+
+    .raid-section__header {
+        align-items: center;
+        border-bottom: 1px solid var(--app-border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .raid-section__step {
+        align-items: center;
+        background: var(--tone-blue-bg);
+        border: 1px solid var(--tone-blue-ring);
+        border-radius: 999px;
+        color: var(--tone-blue-fg);
+        display: flex;
+        flex: none;
+        font-size: 0.85rem;
+        font-weight: 800;
+        height: 1.75rem;
+        justify-content: center;
+        width: 1.75rem;
+    }
+
+    .raid-section__heading {
+        color: var(--app-text-strong);
+        font-size: 1rem;
+        font-weight: 750;
+    }
+
+    .raid-section__description {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+        margin-top: 0.15rem;
+    }
+
+    .raid-section__action {
+        margin-left: auto;
+    }
+
+    .raid-section__body {
+        display: grid;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .raid-field {
+        display: grid;
+        gap: 0.4rem;
+        min-width: 0;
+    }
+}
