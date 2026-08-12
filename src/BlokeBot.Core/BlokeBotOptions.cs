@@ -13,6 +13,13 @@ public sealed record BlokeBotOptions
     public BlokeBotOverlayOptions Overlays { get; init; } = new();
 
     public string DatabasePath { get; init; } = "blokebot.db";
+
+    /// <summary>
+    /// Optional base address of the deployment's BlokeBot.Site guide. Page help adds one guide
+    /// link when it resolves and omits the link otherwise; it is deliberately outside
+    /// <see cref="BlokeBotOptionsValidation"/> so a bad value never prevents startup.
+    /// </summary>
+    public string? HelpSiteBaseUrl { get; init; }
 }
 
 public sealed record BlokeBotCustomCommandOptions

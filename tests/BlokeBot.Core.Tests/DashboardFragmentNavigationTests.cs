@@ -7,8 +7,10 @@ using BlokeBot.Core.Features.Guessing.History;
 using BlokeBot.Core.Features.Guessing.Replies;
 using BlokeBot.Core.Features.Guessing.Rounds;
 using BlokeBot.Core.Features.Overlays;
+using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence.Models;
 using Bunit;
@@ -240,6 +242,210 @@ public sealed class DashboardFragmentNavigationTests
             page.Find(".studio").GetAttribute("data-active-fragment").ShouldBe("commands");
             page.FindAll("[data-selected-editor='reply']").ShouldBeEmpty();
         });
+    }
+
+    [Test]
+    public async Task PlayQueueBarePath_NormalizesToSetupAndSelectingRunPushesOneFragmentEntry()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var context = await CreatePlayQueueContextAsync(database);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/queues");
+
+        var page = context.Render<PlayQueuesPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            navigation.Uri.ShouldEndWith("/queues#setup");
+            navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeTrue();
+            page.Find("#queue-pane-setup-tab").GetAttribute("aria-selected").ShouldBe("true");
+        });
+
+        page.Find("#queue-pane-run-tab").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            navigation.Uri.ShouldEndWith("/queues#run");
+            navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
+            page.Find("#queue-pane-run-tab").GetAttribute("aria-selected").ShouldBe("true");
+            _ = page.Find("#queue-pane-run-panel");
+        });
+
+        navigation.NavigateTo("/queues#setup");
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("#queue-pane-setup-tab").GetAttribute("aria-selected").ShouldBe("true");
+            _ = page.Find("#queue-slug");
+        });
+    }
+
+    [Test]
+    public async Task PlayQueueDirectRunFragment_OpensTheRunPaneOnFirstRender()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var context = await CreatePlayQueueContextAsync(database);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/queues#run");
+
+        var page = context.Render<PlayQueuesPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("#queue-pane-run-tab").GetAttribute("aria-selected").ShouldBe("true");
+            page.Find("#queue-pane-run-panel")
+                .GetAttribute("aria-labelledby")
+                .ShouldBe("queue-pane-run-tab");
+        });
+    }
+
+    [Test]
+    public async Task RequestBoardFragments_LinkTheSetupAndReviewPanes()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var context = await CreateRequestBoardContextAsync(database);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/requests#review");
+
+        var page = context.Render<RequestBoardsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            navigation.Uri.ShouldEndWith("/requests#review");
+            page.Find("#request-board-pane-review-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            page.Find("#request-board-pane-review-panel").GetAttribute("role").ShouldBe("tabpanel");
+        });
+
+        page.Find("#request-board-pane-setup-tab").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            navigation.Uri.ShouldEndWith("/requests#setup");
+            navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
+            page.Find("#request-board-pane-setup-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+        });
+    }
+
+    [Test]
+    public async Task WorkspaceTabs_AreAnchorsAndValueControlsAreNot()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var context = await CreateRequestBoardContextAsync(database);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/requests");
+
+        var page = context.Render<RequestBoardsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.FindAll("[role='tab']")
+                .Select(tab => tab.GetAttribute("href"))
+                .ShouldBe(["#setup", "#review"]);
+            page.FindAll("[role='group'] button")
+                .ShouldAllBe(option => !option.HasAttribute("href"));
+            page.FindAll("[role='group'][aria-label='Board workspace']").ShouldBeEmpty();
+        });
+    }
+
+    private static async Task<BunitContext> CreatePlayQueueContextAsync(
+        SqliteBlokeBotDbFactory database
+    )
+    {
+        var hostId = await SeedFeatureHostAsync(database);
+        var queues = new PlayQueueService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        _ = await queues.ConfigureAsync(
+            hostId,
+            new ConfigurePlayQueueCommand(
+                "squad",
+                "Community squad",
+                "Example game",
+                4,
+                true,
+                PlayQueueSelectionMode.JoinOrder,
+                false,
+                120,
+                30,
+                15,
+                [],
+                []
+            ),
+            CancellationToken.None
+        );
+        var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(queues);
+        _ = context.Services.AddSingleton<IPrivateLobbyDelivery>(new UnusedPrivateLobbyDelivery());
+        return context;
+    }
+
+    private static async Task<BunitContext> CreateRequestBoardContextAsync(
+        SqliteBlokeBotDbFactory database
+    )
+    {
+        var hostId = await SeedFeatureHostAsync(database);
+        var boards = new RequestBoardService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        _ = await boards.ConfigureAsync(
+            hostId,
+            new ConfigureRequestBoardCommand(
+                "clips",
+                "Clip reviews",
+                "Share a clip.",
+                true,
+                "0",
+                RequestBoardRefundPolicy.Never,
+                3,
+                0,
+                5,
+                true,
+                [
+                    new RequestBoardFieldCommand(
+                        "clip",
+                        "Clip",
+                        RequestBoardFieldKind.Url,
+                        true,
+                        2048
+                    ),
+                ]
+            ),
+            CancellationToken.None
+        );
+        var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(boards);
+        return context;
+    }
+
+    private static async Task<int> SeedFeatureHostAsync(SqliteBlokeBotDbFactory database)
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            EnabledFeatures = HostFeatureFlags.All,
+            Login = "streamer",
+            DisplayName = "Streamer",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        _ = db.Hosts.Add(host);
+        _ = await db.SaveChangesAsync();
+        return host.Id;
+    }
+
+    private sealed class UnusedPrivateLobbyDelivery : IPrivateLobbyDelivery
+    {
+        public Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
+            string hostLogin,
+            string lobbyCode,
+            IReadOnlyList<PrivateLobbyRecipient> recipients,
+            CancellationToken ct
+        ) => throw new NotSupportedException("Fragment navigation never delivers a lobby message.");
     }
 
     private static BunitContext CreateOverlayContext(SqliteBlokeBotDbFactory database, int hostId)

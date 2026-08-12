@@ -52,8 +52,8 @@ public sealed class PlayQueueCommandAndUiTests
 
         var page = context.Render<PlayQueuesPage>();
 
-        page.WaitForAssertion(() => _ = FindButton(page, "Run the queue"));
-        FindButton(page, "Run the queue").Click();
+        page.WaitForAssertion(() => _ = page.Find("#queue-pane-run-tab"));
+        page.Find("#queue-pane-run-tab").Click();
         page.WaitForElement("#queue-lobby-code").Input("join-code");
         FindButton(page, "Whisper party").Click();
 

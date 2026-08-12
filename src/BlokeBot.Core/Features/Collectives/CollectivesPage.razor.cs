@@ -62,7 +62,7 @@ public partial class CollectivesPage
         _workflow switch
         {
             "raid" =>
-                "Welcome rules, cooldowns, approved channels, and provider access remain local.",
+                "Welcome rules, cooldowns, approved channels, and Twitch access remain local.",
             "goal" =>
                 "The local goal source, contributor records, rewards, and moderator notes are not shared.",
             _ =>

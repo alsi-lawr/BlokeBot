@@ -39,7 +39,7 @@
                     <div class="collective-disabled__actions"><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></div>
                     <div class="collective-disabled__retained">
                         <div><strong>Saved state stays intact</strong><span>Collectives, membership consent, workflow configuration, bounded history, and audits remain retained.</span></div>
-                        <div><strong>Nothing suppressed is replayed</strong><span>Re-enable resumes retained state from a new watermark. Missed invitations, events, timers, retries, relays, reconciliation, and provider actions are never replayed.</span></div>
+                        <div><strong>Nothing missed is repeated</strong><span>Re-enable resumes the retained state. Missed invitations, events, timers, retries, relays, and Twitch actions are never repeated.</span></div>
                     </div>
                 </div>
             </section>
@@ -65,7 +65,7 @@
                     <label><span>Collective</span><select class="collective-summary__select" value="@selected.Id.Value" @onchange="SelectCollectiveAsync">@foreach (var item in _workspace.Collectives){<option value="@item.Id.Value">@item.Name</option>}</select><small>This BlokeBot server · explicit hosts only</small></label>
                     <div><span>Membership</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) participating</strong><small>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Pending) invitation awaiting host</small></div>
                     <div><span>Your authority</span><strong>@Host.DisplayName</strong><small>Manage this host only</small></div>
-                    <div><span>Shared activity</span><strong>@WorkflowCount(selected) workflows</strong><small>Bounded projections only</small></div>
+                    <div><span>Shared activity</span><strong>@WorkflowCount(selected) workflows</strong><small>Shared summaries only</small></div>
                 </section>
 
                 <div class="collective-tabs" role="tablist" aria-label="Collective workflows">
@@ -129,16 +129,16 @@
                                         <label><span>Target</span><input class="input" type="number" min="1" @bind="_goalTarget" /></label>
                                         <label><span>Deadline (UTC)</span><input class="input" type="datetime-local" @bind="_goalDeadlineUtc" /></label>
                                     }
-                                    <p>Workflow definitions are collective-scoped. Private host source mappings and provider access are not edited here.</p>
+                                    <p>Workflow definitions are collective-scoped. Private host source mappings and Twitch access are not edited here.</p>
                                     <div class="collective-workflow-editor__actions"><button class="btn-secondary" type="button" @onclick="CancelFlow">Cancel</button><button class="btn-primary" type="button" @onclick="SaveWorkflowAsync">Save workflow</button></div>
                                 </section>
                             }
-                            <div class="collective-boundary"><span aria-hidden="true">◇</span><p><strong>Shared boundary.</strong> Participating hosts receive only this workflow’s bounded projection and events. Private lobby details, source mappings, provider access, moderator notes, rewards, and viewer data stay with their owning host.</p></div>
+                            <div class="collective-boundary"><span aria-hidden="true">◇</span><p><strong>Shared boundary.</strong> Participating hosts receive only this workflow’s shared summary and events. Private lobby details, source mappings, Twitch access, moderator notes, rewards, and viewer data stay with their owning host.</p></div>
                             @if (_workflow == "tournament")
                             {
                                 @if (selected.Tournament is { } tournament)
                                 {
-                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@tournament.Name</h3><p>Owned by @tournament.OwnerLogin · shared reference <code>@ShortId(tournament.CompetitionPublicId)</code></p></div><span class="status-pill"><span class="status-pill__dot"></span>@tournament.Status</span></div><div class="collective-metrics"><div><span>Format</span><strong>@tournament.Format.Label()</strong><small>@tournament.EntrantCount entrants</small></div><div><span>Round</span><strong>@tournament.Round</strong><small>@tournament.ConfirmedResultCount results confirmed</small></div><div><span>Participants</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) hosts</strong><small>Read-only projection</small></div></div><div class="collective-events"><div><span>✓</span><p><strong>Reference updated from authoritative tournament</strong><small>The reference changed; no host-owned competition state was copied.</small></p><time>@Relative(tournament.UpdatedAtUtc)</time></div></div></article>
+                                    <article class="collective-flow"><div class="collective-flow__title"><div><h3>@tournament.Name</h3><p>Owned by @tournament.OwnerLogin · shared reference <code>@ShortId(tournament.CompetitionPublicId)</code></p></div><span class="status-pill"><span class="status-pill__dot"></span>@tournament.Status</span></div><div class="collective-metrics"><div><span>Format</span><strong>@tournament.Format.Label()</strong><small>@tournament.EntrantCount entrants</small></div><div><span>Round</span><strong>@tournament.Round</strong><small>@tournament.ConfirmedResultCount results confirmed</small></div><div><span>Participants</span><strong>@selected.Members.Count(x => x.Status == CollectiveMembershipStatus.Active) hosts</strong><small>Read-only summary</small></div></div><div class="collective-events"><div><span>✓</span><p><strong>Reference updated from the current tournament</strong><small>The reference changed; no host-owned competition state was copied.</small></p><time>@Relative(tournament.UpdatedAtUtc)</time></div></div></article>
                                 }
                                 else { <p class="collective-empty">No tournament reference is configured.</p> }
                             }

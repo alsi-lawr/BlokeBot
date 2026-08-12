@@ -74,7 +74,7 @@ public sealed class CompetitionUiTests
         {
             cut.Find("[data-competitions-disabled-recovery]")
                 .TextContent.ShouldContain("Channel setup");
-            cut.Markup.ShouldContain("without replaying suppressed commands");
+            cut.Markup.ShouldContain("without repeating missed commands");
             cut.Markup.ShouldNotContain("RETAINED PRIVATE CUP");
         });
     }

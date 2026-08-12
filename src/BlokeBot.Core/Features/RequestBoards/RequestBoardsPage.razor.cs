@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
@@ -10,6 +11,13 @@ namespace BlokeBot.Core.Features.RequestBoards;
 
 public partial class RequestBoardsPage
 {
+    private const string _paneTabsId = "request-board-pane";
+    private const string _setupPaneKey = "setup";
+    private const string _reviewPaneKey = "review";
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private IReadOnlyList<RequestBoardSummary> _boardList = [];
     private RequestBoardModeratorPage? _moderatorPage;
     private readonly Dictionary<long, ModerationDraft> _moderationDrafts = [];
@@ -22,18 +30,12 @@ public partial class RequestBoardsPage
     private bool _isCreating = true;
     private bool _operationFailed;
     private bool _featureEnabled;
-    private RequestBoardPane _pane = RequestBoardPane.Setup;
+    private string _paneKey = _setupPaneKey;
     private readonly StudioOpenSet<RequestBoardStage> _openStages = new(RequestBoardStage.Basics);
     private readonly StudioOpenSet<long> _openModerationFolds = new();
 
     private const string _formPreviewBox =
         "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
-
-    private enum RequestBoardPane
-    {
-        Setup,
-        Review,
-    }
 
     private enum RequestBoardStage
     {
@@ -113,13 +115,10 @@ public partial class RequestBoardsPage
             ),
         ];
 
-    private IReadOnlyList<StudioSegmentedOption<RequestBoardPane>> _paneOptions =>
+    private IReadOnlyList<SegmentedTabItem> _paneTabs =>
         [
-            new(RequestBoardPane.Setup, "Set up board"),
-            new(
-                RequestBoardPane.Review,
-                _pendingCount > 0 ? $"Review requests · {_pendingCount}" : "Review requests"
-            ),
+            new(_setupPaneKey, "Set up"),
+            new(_reviewPaneKey, _pendingCount > 0 ? $"Review · {_pendingCount}" : "Review"),
         ];
 
     private int _pendingCount =>
@@ -292,6 +291,7 @@ public partial class RequestBoardsPage
 
     protected override async Task OnInitializedAsync()
     {
+        _paneKey = SegmentedTabs.CanonicalKey(_navigation, _paneTabs);
         _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
@@ -336,7 +336,6 @@ public partial class RequestBoardsPage
         _isCreating = false;
         _operationFailed = false;
         _feedback = string.Empty;
-        _pane = RequestBoardPane.Setup;
         _openModerationFolds.Reset();
         SelectFirstField();
         await LoadModeratorPageAsync();
@@ -377,7 +376,6 @@ public partial class RequestBoardsPage
         _moderatorPage = null;
         _moderationDrafts.Clear();
         _operationFailed = false;
-        _pane = RequestBoardPane.Setup;
         _openModerationFolds.Reset();
         SelectFirstField();
         SetCreateGuidance();

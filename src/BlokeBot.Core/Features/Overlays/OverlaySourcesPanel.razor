@@ -209,7 +209,7 @@
                                          data-achievement-preview-disabled-recovery>
                                         <p class="text-sm leading-6 text-slate-700">
                                             <span class="font-semibold text-slate-950">Achievement samples are paused.</span>
-                                            Community progression is off, so achievement preview produces no projection, mutation, reconnect state, or rendering. Other configured event kinds remain available to preview.
+                                            Community progression is off, so achievement preview and live display are unavailable. Other configured event kinds remain available to preview.
                                         </p>
                                     </div>
                                 }
@@ -316,7 +316,7 @@
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
                                             Guessing game is off. Its saved setup is retained, but preview, live delivery, tests, and changes remain blocked.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn Guessing game on in Channel setup</a>
-                                            to resume from the current round without replaying suppressed events or winner animations.
+                                            to resume from the current round without repeating missed events or winner animations.
                                         </p>
                                     </div>
                                 }
@@ -359,7 +359,7 @@
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
                                             Points is off. The saved setup and giveaway history are retained, but preview, live delivery, tests, changes, and winner animations remain blocked.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn Points on in Channel setup</a>
-                                            to resume from current giveaway state without replaying suppressed events or animations.
+                                            to resume from current giveaway state without repeating missed events or animations.
                                         </p>
                                     </div>
                                 }
@@ -415,9 +415,9 @@
                                          data-overlay-disabled-recovery>
                                         <p class="text-sm font-semibold text-slate-950">This @(TypeLabel(_draftType).ToLowerInvariant()) overlay is paused.</p>
                                         <p class="mt-1 text-sm leading-6 text-slate-700">
-                                            @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") is off. The saved source configuration and domain history stay in place, but projection, preview, live publication, tests, reconnect state, and animations remain blocked.
+                                            @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") is off. The saved source configuration and domain history stay in place, but preview and live display remain blocked.
                                             <a class="font-semibold text-blue-700 underline" href="host">Turn @(_draftType is OverlayType.CommunityGoal ? "Community progression" : "Bounties") on in Channel setup</a>
-                                            to show current authoritative state without replaying suppressed progress or completion animations.
+                                            to show current state without repeating missed progress or completion animations.
                                         </p>
                                     </div>
                                 }
@@ -525,9 +525,9 @@
                                             <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3"
                                                  data-achievement-event-disabled-recovery>
                                                 <p class="text-sm leading-6 text-slate-700">
-                                                    Community progression is off. Saved feed settings and history are retained, but achievement projection, preview, delivery, reconnect state, and rendering stay blocked.
+                                                    Community progression is off. Saved feed settings and history are retained, but achievement preview and live display stay blocked.
                                                     <a class="font-semibold text-blue-700 underline" href="host">Turn Community progression on in Channel setup</a>
-                                                    to accept only new completions without replaying suppressed achievements.
+                                                    to accept only new completions without repeating missed achievements.
                                                 </p>
                                             </div>
                                         }
@@ -636,7 +636,7 @@
                                     <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 xl:col-span-2"
                                          data-achievement-event-inheritance>
                                         <p class="text-sm font-semibold text-slate-950">Achievement events inherit Community progression and Overlays.</p>
-                                        <p class="mt-1 text-sm leading-6 text-slate-700">Turning either off retains saved feed settings and history while blocking preview and delivery. Re-enable accepts only new completions; suppressed achievements never replay.</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-700">Turning either off retains saved feed settings and history while blocking preview and delivery. Re-enable accepts only new completions; missed achievements never repeat.</p>
                                     </div>
                                     <p class="text-xs leading-5 text-muted-foreground xl:col-span-2">
                                         Achievement cards include only a public viewer name, achievement name, and presentation-safe reward names or points. Twitch user IDs, balances, moderator notes, internal keys, and reward tokens never enter the feed.

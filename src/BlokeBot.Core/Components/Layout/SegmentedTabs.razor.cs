@@ -23,6 +23,10 @@ public partial class SegmentedTabs : IDisposable
     [Parameter]
     public string? Id { get; set; }
 
+    /// <summary>
+    /// Makes this strip the owner of the page's URL fragment. Fragment-owned tabs render as
+    /// anchors so a workspace pane can be linked, refreshed, and reached with Back and Forward.
+    /// </summary>
     [Parameter]
     public bool OwnsFragment { get; set; }
 
@@ -174,6 +178,8 @@ public partial class SegmentedTabs : IDisposable
 
         return 0;
     }
+
+    private static string FragmentHref(SegmentedTabItem item) => "#" + item.Key;
 
     private string? TabIdFor(SegmentedTabItem item) => Id is null ? null : TabId(Id, item.Key);
 

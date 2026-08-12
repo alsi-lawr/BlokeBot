@@ -241,13 +241,13 @@ public partial class HostConfigPage
             HostFeatureFlags.Overlays =>
                 "Its dashboard and Browser Sources are unavailable until you enable it again.",
             HostFeatureFlags.RaidCollaboration when enabled =>
-                "Its hub and fresh EventSub processing are available again; suppressed work is not replayed.",
+                "Its hub and fresh Twitch event processing are available again; missed work is not repeated.",
             HostFeatureFlags.RaidCollaboration =>
-                "Its hub, raid processing, welcome actions, and provider calls are paused while saved history and settings remain.",
+                "Its hub, raid processing, welcome actions, and Twitch actions are paused while saved history and settings remain.",
             HostFeatureFlags.Collectives when enabled =>
-                "Retained collectives resume from a new watermark; suppressed work is not replayed.",
+                "Retained collectives resume where they left off; missed work is not repeated.",
             HostFeatureFlags.Collectives =>
-                "Membership, workflows, shared output, events, and provider effects pause while retained data remains.",
+                "Membership, workflows, shared output, events, and Twitch actions pause while retained data remains.",
             _ when enabled => "Its chat commands and pages are available again.",
             _ => "Its chat commands and pages are unavailable until you enable it again.",
         };

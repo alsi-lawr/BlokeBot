@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Components.Studio;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
@@ -10,6 +11,13 @@ namespace BlokeBot.Core.Features.PlayWithViewers;
 
 public partial class PlayQueuesPage
 {
+    private const string _paneTabsId = "queue-pane";
+    private const string _setupPaneKey = "setup";
+    private const string _runPaneKey = "run";
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private IReadOnlyList<PlayQueueSummary> _queueList = [];
     private ModeratorPlayQueuePage? _moderatorPage;
     private readonly Dictionary<long, EntryDraft> _entryDrafts = [];
@@ -24,18 +32,12 @@ public partial class PlayQueuesPage
     private bool _isCreating = true;
     private bool _operationFailed;
     private bool _featureEnabled;
-    private PlayQueuePane _pane = PlayQueuePane.Setup;
+    private string _paneKey = _setupPaneKey;
     private readonly StudioOpenSet<PlayQueueStage> _openStages = new(PlayQueueStage.Basics);
     private readonly StudioOpenSet<long> _openEntryFolds = new();
 
     private const string _formPreviewBox =
         "overflow-hidden rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.55rem] py-[0.32rem] text-[0.78rem] whitespace-nowrap text-ellipsis text-[var(--app-placeholder)]";
-
-    private enum PlayQueuePane
-    {
-        Setup,
-        Run,
-    }
 
     private enum PlayQueueStage
     {
@@ -100,14 +102,14 @@ public partial class PlayQueuesPage
             ),
         ];
 
-    private IReadOnlyList<StudioSegmentedOption<PlayQueuePane>> _paneOptions =>
+    private IReadOnlyList<SegmentedTabItem> _paneTabs =>
         [
-            new(PlayQueuePane.Setup, "Set up queue"),
+            new(_setupPaneKey, "Set up"),
             new(
-                PlayQueuePane.Run,
+                _runPaneKey,
                 _moderatorPage is { Waiting.Count: > 0 } moderation
-                    ? $"Run the queue · {moderation.Waiting.Count}"
-                    : "Run the queue"
+                    ? $"Run · {moderation.Waiting.Count}"
+                    : "Run"
             ),
         ];
 
@@ -306,6 +308,7 @@ public partial class PlayQueuesPage
 
     protected override async Task OnInitializedAsync()
     {
+        _paneKey = SegmentedTabs.CanonicalKey(_navigation, _paneTabs);
         _ = await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
@@ -349,7 +352,6 @@ public partial class PlayQueuesPage
         _isCreating = false;
         _operationFailed = false;
         _feedback = string.Empty;
-        _pane = PlayQueuePane.Setup;
         _openEntryFolds.Reset();
         SelectFirstField();
         await RefreshPageAsync();
@@ -382,7 +384,6 @@ public partial class PlayQueuesPage
         _moderatorPage = null;
         _entryDrafts.Clear();
         _operationFailed = false;
-        _pane = PlayQueuePane.Setup;
         _openEntryFolds.Reset();
         SelectFirstField();
         SetCreateGuidance();

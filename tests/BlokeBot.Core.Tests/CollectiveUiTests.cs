@@ -80,7 +80,7 @@ public sealed class CollectiveUiTests
         {
             cut.Find("[data-collectives-disabled-recovery]")
                 .TextContent.ShouldContain("Channel setup");
-            cut.Markup.ShouldContain("Nothing suppressed is replayed");
+            cut.Markup.ShouldContain("Nothing missed is repeated");
             cut.Markup.ShouldNotContain("RETAINED PRIVATE COLLECTIVE");
             cut.Markup.ShouldNotContain("PRIVATE ACTOR");
             cut.FindAll("input[type='checkbox']").ShouldBeEmpty();

@@ -100,6 +100,22 @@ public sealed class SegmentedTabsTests
     }
 
     [Test]
+    public void FragmentTabs_RenderEveryTabAsALinkableFragmentAnchor()
+    {
+        using var context = new BunitContext();
+        _ = context.Services.AddScoped<DashboardFragmentState>();
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/overlays#cues");
+
+        var tabs = RenderFragmentTabs(context);
+
+        tabs.FindAll("[role='tab']")
+            .Select(tab => tab.GetAttribute("href"))
+            .ShouldBe(["#sources", "#cues", "#media"]);
+        tabs.FindAll("button").ShouldBeEmpty();
+    }
+
+    [Test]
     [Arguments("/overlays")]
     [Arguments("/overlays#unknown-tab")]
     public void FragmentTabs_BareOrUnknownFragment_IsReplacedWithTheFirstCanonicalFragment(
@@ -129,7 +145,7 @@ public sealed class SegmentedTabsTests
 
         var tabs = RenderFragmentTabs(context, observed.Add);
 
-        tabs.FindAll("button").Single(button => button.TextContent.Trim() == "Cues").Click();
+        tabs.FindAll("a").Single(tab => tab.TextContent.Trim() == "Cues").Click();
 
         navigation.Uri.ShouldEndWith("/overlays#cues");
         navigation.History.First().Options.ReplaceHistoryEntry.ShouldBeFalse();
@@ -157,7 +173,7 @@ public sealed class SegmentedTabsTests
         var tabs = RenderFragmentTabs(context);
         var historyDepth = navigation.History.Count;
 
-        tabs.FindAll("button").Single(button => button.TextContent.Trim() == "Media").Click();
+        tabs.FindAll("a").Single(tab => tab.TextContent.Trim() == "Media").Click();
 
         navigation.History.Count.ShouldBe(historyDepth);
         navigation.Uri.ShouldEndWith("/overlays#media");

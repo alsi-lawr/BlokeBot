@@ -59,11 +59,12 @@
                     <span class="studio__spacer flex-1"></span>
                     @if (_moderatorPage is not null)
                     {
-                        <StudioSegmentedPill TValue="PlayQueuePane"
-                                             AriaLabel="Queue workspace"
-                                             Options="_paneOptions"
-                                             Value="_pane"
-                                             ValueChanged="@(pane => _pane = pane)" />
+                        <SegmentedTabs Id="@_paneTabsId"
+                                       OwnsFragment
+                                       AriaLabel="Queue workspace"
+                                       Items="_paneTabs"
+                                       ActiveKey="@_paneKey"
+                                       ActiveKeyChanged="@(key => _paneKey = key)" />
                     }
                     <span class="studio-toggle-label text-[0.82rem] font-semibold text-[var(--app-text-muted)]">Queue open</span>
                     <button type="button"
@@ -78,7 +79,11 @@
                     </StickySaveRegion>
                 </header>
 
-                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4">
+                <div class="studio__body grid min-w-0 gap-3 p-5 max-md:p-4"
+                     id="@(_moderatorPage is null ? null : SegmentedTabs.PanelId(_paneTabsId, _paneKey))"
+                     role="@(_moderatorPage is null ? null : "tabpanel")"
+                     aria-labelledby="@(_moderatorPage is null ? null : SegmentedTabs.TabId(_paneTabsId, _paneKey))"
+                     tabindex="@(_moderatorPage is null ? null : "0")">
                     @if (_isCreating)
                     {
                         <p id="queue-create-guidance" class="text-sm text-muted-foreground">
@@ -90,7 +95,7 @@
                         <p class="text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
                     }
 
-                    @if (_pane == PlayQueuePane.Run && _moderatorPage is { } moderation)
+                    @if (_paneKey == _runPaneKey && _moderatorPage is { } moderation)
                     {
                         <section class="application-card-collection" data-card-owner="play-queue-run-cards" aria-label="Run the queue">
                             <article class="card p-5" aria-labelledby="party-heading">

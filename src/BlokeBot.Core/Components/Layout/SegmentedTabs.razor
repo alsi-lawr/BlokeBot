@@ -9,7 +9,24 @@
     @foreach (var item in Items)
     {
         var active = IsActive(item);
-        if (item.Href is null)
+        if (OwnsFragment)
+        {
+            <a @key="item.Key"
+               id="@TabIdFor(item)"
+               class="@TabClass(active)"
+               href="@FragmentHref(item)"
+               role="tab"
+               aria-selected="@(active ? "true" : "false")"
+               aria-controls="@PanelIdFor(item)"
+               tabindex="@TabIndexFor(item)"
+               @ref="_tabElements[item.Key]"
+               @onclick="() => SelectAsync(item)"
+               @onclick:preventDefault="true"
+               @onkeydown="args => HandleKeyDownAsync(args, item)">
+                @item.Label
+            </a>
+        }
+        else if (item.Href is null)
         {
             <button @key="item.Key"
                     id="@TabIdFor(item)"
