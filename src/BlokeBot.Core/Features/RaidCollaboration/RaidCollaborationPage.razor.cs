@@ -1,13 +1,30 @@
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.RaidCollaboration;
 
 public partial class RaidCollaborationPage
 {
+    private const string _workspaceTabsId = "raid-workspace";
+    private const string _hubKey = "hub";
+    private const string _settingsKey = "settings";
+
+    private static readonly IReadOnlyList<SegmentedTabItem> _workspaceTabs =
+    [
+        new(_hubKey, "Hub"),
+        new(_settingsKey, "Settings"),
+    ];
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private RaidCollaborationDashboard? _dashboard;
     private ConfigurationDraft _draft = new();
+    private string _workspaceKey = _hubKey;
+    private string _categoryDraft = string.Empty;
     private string? _preparedRaidLogin;
     private string _operationFeedback = string.Empty;
     private bool _operationFailed;
@@ -17,8 +34,14 @@ public partial class RaidCollaborationPage
     private bool _saving;
     private PageSaveFeedback? _saveFeedback;
 
+    private static string DescriptionFor(string key) =>
+        key == _settingsKey
+            ? "Choose how raids are welcomed and shortlisted."
+            : "Welcome new communities and choose where to raid next.";
+
     protected override async Task OnInitializedAsync()
     {
+        _workspaceKey = SegmentedTabs.CanonicalKey(_navigation, _workspaceTabs);
         _ = await LoadPageContextAsync();
         _ = TrackSubscription(
             _events.SubscribeForComponentRefresh(
@@ -210,6 +233,31 @@ public partial class RaidCollaborationPage
     private void RemoveApprovedChannel(ApprovedChannelDraft channel) =>
         _ = _draft.ApprovedChannels.Remove(channel);
 
+    private void AddCategory()
+    {
+        var value = _categoryDraft.Trim();
+        _categoryDraft = string.Empty;
+        if (
+            value.Length == 0
+            || _draft.Categories.Contains(value, StringComparer.OrdinalIgnoreCase)
+        )
+        {
+            return;
+        }
+
+        _draft.Categories.Add(value);
+    }
+
+    private void AddCategoryOnEnter(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddCategory();
+        }
+    }
+
+    private void RemoveCategory(int index) => _draft.Categories.RemoveAt(index);
+
     private static string ShoutoutReadiness(ShoutoutDashboardState state) =>
         state.GlobalEligibleAtUtc is { } eligibleAt
             ? $"Next global shoutout: {eligibleAt.ToLocalTime():g}"
@@ -222,7 +270,7 @@ public partial class RaidCollaborationPage
         public bool NativeShoutoutEnabled { get; set; }
         public int DeduplicationWindowMinutes { get; set; }
         public string Language { get; set; } = string.Empty;
-        public string Categories { get; set; } = string.Empty;
+        public List<string> Categories { get; } = [];
         public int RelationshipCooldownHours { get; set; }
         public List<ApprovedChannelDraft> ApprovedChannels { get; } = [];
 
@@ -235,9 +283,9 @@ public partial class RaidCollaborationPage
                 NativeShoutoutEnabled = value.NativeShoutoutEnabled,
                 DeduplicationWindowMinutes = value.DeduplicationWindowMinutes,
                 Language = value.Language,
-                Categories = string.Join('\n', value.EligibleCategories),
                 RelationshipCooldownHours = value.RelationshipCooldownHours,
             };
+            draft.Categories.AddRange(value.EligibleCategories);
             draft.ApprovedChannels.AddRange(
                 value.ApprovedChannels.Select(ApprovedChannelDraft.From)
             );
@@ -251,10 +299,7 @@ public partial class RaidCollaborationPage
                 NativeShoutoutEnabled,
                 DeduplicationWindowMinutes,
                 Language,
-                Categories.Split(
-                    '\n',
-                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-                ),
+                [.. Categories],
                 RelationshipCooldownHours,
                 ApprovedChannels.Select(value => value.ToDraft()).ToArray()
             );

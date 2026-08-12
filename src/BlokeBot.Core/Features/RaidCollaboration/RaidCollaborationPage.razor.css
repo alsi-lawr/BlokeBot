@@ -1,0 +1,262 @@
+.raid-workspace {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.raid-hub {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.raid-hub__column {
+    align-content: start;
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.raid-history {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.raid-history__card {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.625rem;
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 0.85rem;
+}
+
+.raid-history__direction {
+    color: var(--tone-violet-fg);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.raid-history__channel {
+    color: var(--app-text-strong);
+    font-size: 0.95rem;
+    font-weight: 750;
+    margin-top: 0.2rem;
+}
+
+.raid-history__meta {
+    color: var(--app-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.raid-history__outcome {
+    color: var(--app-text-strong);
+    font-weight: 650;
+    margin-top: 0.5rem;
+}
+
+.raid-settings {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.raid-section {
+    min-width: 0;
+}
+
+.raid-section__header {
+    align-items: center;
+    border-bottom: 1px solid var(--app-border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+}
+
+.raid-section__step {
+    align-items: center;
+    background: var(--tone-blue-bg);
+    border: 1px solid var(--tone-blue-ring);
+    border-radius: 999px;
+    color: var(--tone-blue-fg);
+    display: flex;
+    flex: none;
+    font-size: 0.85rem;
+    font-weight: 800;
+    height: 1.75rem;
+    justify-content: center;
+    width: 1.75rem;
+}
+
+.raid-section__heading {
+    color: var(--app-text-strong);
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.raid-section__description {
+    color: var(--app-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin-top: 0.15rem;
+}
+
+.raid-section__action {
+    margin-left: auto;
+}
+
+.raid-section__body {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.raid-split {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.raid-stack {
+    align-content: start;
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.raid-field {
+    display: grid;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.raid-field--wide {
+    grid-column: 1 / -1;
+}
+
+.raid-toggle {
+    align-items: center;
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+    border-radius: 0.625rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 0.85rem 0.95rem;
+}
+
+.raid-toggle__title {
+    color: var(--app-text-strong);
+    display: block;
+    font-weight: 700;
+}
+
+.raid-toggle__hint {
+    color: var(--app-text-muted);
+    display: block;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.raid-compact {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.5rem 0.7rem;
+}
+
+.raid-compact__label {
+    color: var(--app-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.raid-compact__input {
+    background: transparent;
+    border: 0;
+    color: var(--app-text-strong);
+    font-size: 0.95rem;
+    font-weight: 700;
+    outline: none;
+    padding: 0;
+    width: 100%;
+}
+
+.raid-compact:focus-within {
+    border-color: var(--app-focus-border);
+    box-shadow: var(--app-focus-shadow);
+}
+
+.raid-chips {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.raid-channels {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.raid-channel {
+    align-items: end;
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+    border-radius: 0.625rem;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    padding: 0.85rem;
+}
+
+@media (max-width: 1450px) {
+    .raid-history {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1100px) {
+    .raid-channel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .raid-channel__remove {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+}
+
+@media (max-width: 900px) {
+    .raid-hub,
+    .raid-history,
+    .raid-split {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .raid-field--wide {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 30rem) {
+    .raid-channel {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .raid-section__action {
+        margin-left: 0;
+        width: 100%;
+    }
+}
