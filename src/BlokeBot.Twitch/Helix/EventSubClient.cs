@@ -17,6 +17,9 @@ public sealed class EventSubClient(
 {
     private const int _maxErrorBodyBytes = 16 * 1024;
     private const int _maxDiagnosticFieldLength = 256;
+    private const int _listAttemptLimit = 3;
+    private static readonly TimeSpan _listAttemptTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan _listRetryDelay = TimeSpan.FromSeconds(2);
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
@@ -349,24 +352,56 @@ public sealed class EventSubClient(
         CancellationToken cancellationToken
     )
     {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await SendListPageAsync(context, after, cancellationToken);
+            }
+            catch (Exception exception)
+                when (attempt < _listAttemptLimit
+                    && !cancellationToken.IsCancellationRequested
+                    && IsTransientListFailure(exception)
+                )
+            {
+                await Task.Delay(_listRetryDelay * attempt, cancellationToken);
+            }
+        }
+    }
+
+    private async Task<EventSubSubscriptionInventory> SendListPageAsync(
+        HelixRequestContext context,
+        string? after,
+        CancellationToken cancellationToken
+    )
+    {
         var uri = endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri;
         if (!string.IsNullOrWhiteSpace(after))
         {
             uri += $"?after={Uri.EscapeDataString(after)}";
         }
 
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        attempt.CancelAfter(_listAttemptTimeout);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
-        using var response = await _http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, attempt.Token);
         _ = response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<SubscriptionListResponse>(
             _jsonOptions,
-            cancellationToken
+            attempt.Token
         );
         return new EventSubSubscriptionInventory(
             result?.Data.Select(static item => item.ToSubscription()).ToArray() ?? [],
             result?.Pagination?.Cursor
         );
     }
+
+    private static bool IsTransientListFailure(Exception exception) =>
+        exception
+            is OperationCanceledException
+                or IOException
+                or TimeoutException
+                or HttpRequestException { StatusCode: null };
 
     private sealed record CreateSubscriptionRequest
     {
