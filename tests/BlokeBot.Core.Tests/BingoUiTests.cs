@@ -199,9 +199,7 @@ public sealed class BingoUiTests
         _ = context.Services.AddSingleton(service);
 
         var page = context.Render<BingoPage>();
-        page.WaitForAssertion(() =>
-            _ = page.Find("[data-bingo-revisions] .bingo-revisions__meta")
-        );
+        page.WaitForAssertion(() => _ = page.Find("[data-bingo-revisions] .bingo-revisions__meta"));
         page.Find(".bingo-revisions__load").Click();
 
         page.WaitForAssertion(() =>

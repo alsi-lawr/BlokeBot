@@ -636,9 +636,10 @@ public sealed class CustomCommandSettingsUiTests
         audit.AffectedClaimCount.ShouldBe(1);
     }
 
-    private static string[] ValidationMessages(IRenderedComponent<CustomCommandSettingsPage> page) =>
-        page
-            .Find("[data-validation-summary]")
+    private static string[] ValidationMessages(
+        IRenderedComponent<CustomCommandSettingsPage> page
+    ) =>
+        page.Find("[data-validation-summary]")
             .QuerySelectorAll("li")
             .Select(static item => item.TextContent.Trim())
             .ToArray();

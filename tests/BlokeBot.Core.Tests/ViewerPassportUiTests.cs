@@ -110,9 +110,7 @@ public sealed class ViewerPassportUiTests
 
         var cut = context.Render<ViewerPassportsPage>();
 
-        cut.WaitForAssertion(() =>
-            cut.FindAll(".passport-visibility-option").ShouldNotBeEmpty()
-        );
+        cut.WaitForAssertion(() => cut.FindAll(".passport-visibility-option").ShouldNotBeEmpty());
         var choices = cut.FindAll(".passport-visibility-option");
         choices
             .Select(choice => choice.QuerySelector("input")!.GetAttribute("name"))
