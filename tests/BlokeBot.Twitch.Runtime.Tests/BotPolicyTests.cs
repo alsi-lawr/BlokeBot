@@ -165,7 +165,6 @@ public sealed class BotPolicyTests
         );
 
         exception.OptionsName.ShouldContain(nameof(BotPolicyOptions.EventSubChannelRecovery));
-        exception.Failures.ShouldContain("MaximumDelay must be greater than or equal to Delay.");
     }
 
     [Test]

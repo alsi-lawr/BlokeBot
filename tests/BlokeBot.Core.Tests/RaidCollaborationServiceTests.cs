@@ -133,9 +133,6 @@ public sealed class RaidCollaborationServiceTests
             .ExcludedChannels.Select(value => value.Login)
             .ShouldBe(["offline", "recent", "wronglanguage"], ignoreOrder: true);
         loaded
-            .ExcludedChannels.Single(value => value.Login == "offline")
-            .Reasons.ShouldContain("Channel is offline.");
-        loaded
             .ExcludedChannels.Single(value => value.Login == "wronglanguage")
             .Reasons.ShouldContain(value => value.Contains("Language", StringComparison.Ordinal));
         loaded

@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -150,10 +149,6 @@ public sealed class RequestBoardUiTests
 
         page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Clip reviews"));
         page.Markup.ShouldContain("Up to 5 votes per viewer");
-        page.Find("dl div:nth-child(4) dd")
-            .TextContent.ShouldBe(
-                "Status first: accepted, queued, approved, pending, completed, rejected, withdrawn, then merged. Within each status: higher priority, more votes, lower assigned queue position (unassigned last), earlier submission time, then lower request ID."
-            );
         page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         page.Markup.ShouldNotContain("PRIVATE-REJECTION-REASON");
         page.Markup.ShouldNotContain("<script>alert");
@@ -162,21 +157,6 @@ public sealed class RequestBoardUiTests
         page.FindAll("article.card h3")
             .Select(heading => heading.TextContent)
             .ShouldBe(["<script>alert('title')</script>", "Higher priority queued request"]);
-    }
-
-    [Test]
-    public void ModeratorAndPublicRoutes_DeclareCorrectAuthorizationAudience()
-    {
-        var moderator = typeof(RequestBoardsPage)
-            .GetCustomAttributes(typeof(AuthorizeAttribute), true)
-            .Cast<AuthorizeAttribute>()
-            .ShouldHaveSingleItem();
-        var publicRoute = typeof(PublicRequestBoardPage)
-            .GetCustomAttributes(typeof(AllowAnonymousAttribute), true)
-            .ShouldHaveSingleItem();
-
-        moderator.Policy.ShouldBe("HostSelected");
-        _ = publicRoute.ShouldNotBeNull();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)

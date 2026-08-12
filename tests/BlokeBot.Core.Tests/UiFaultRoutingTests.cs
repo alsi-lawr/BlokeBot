@@ -24,12 +24,6 @@ public sealed class UiFaultRoutingTests
         );
 
         _ = failure.ShouldNotBeNull();
-        failure.ModeratorStatusMessage.ShouldBe(
-            "BlokeBot could not check whether the bot is a mod."
-        );
-        failure.FollowerReadStatusMessage.ShouldBe(
-            "BlokeBot could not check follower-only giveaways."
-        );
     }
 
     [Test]

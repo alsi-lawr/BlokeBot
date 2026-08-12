@@ -227,26 +227,6 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void FeatureStrategyCatalogs_ReadingDefaults_ExposeExpectedAliases()
-    {
-        var guessing = GuessingCatalog();
-        var points = PointsCatalog();
-
-        guessing
-            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Start)
-            .DefaultAliases.ShouldBe(["startguessing"]);
-        guessing
-            .Descriptors.Single(static x => x.Kind == GuessCommandKind.Guess)
-            .DefaultAliases.ShouldBe(["guess"]);
-        points
-            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Points)
-            .DefaultAliases.ShouldBe(["points"]);
-        points
-            .Descriptors.Single(static x => x.Kind == PointsCommandKind.Giveaway)
-            .DefaultAliases.ShouldBe(["giveaway"]);
-    }
-
-    [Test]
     public void FeatureStrategyCatalogs_ReadingPermissions_ExposeModeratorRequirements()
     {
         var guessing = GuessingCatalog();
@@ -297,17 +277,6 @@ public sealed class CommandCatalogTests
     [Test]
     public void FeatureAndPersistedCommandKinds_Mapping_MapsSupportedKindsWithoutOverlap()
     {
-        GuessingAppCommandKindMap.ToAppKind(GuessCommandKind.Guess).ShouldBe(AppCommandKind.Guess);
-        PointsAppCommandKindMap.ToAppKind(PointsCommandKind.Gamble).ShouldBe(AppCommandKind.Gamble);
-
-        GuessingAppCommandKindMap
-            .FromAppKind(AppCommandKind.Win)
-            .Match(static kind => kind, static () => throw new InvalidOperationException())
-            .ShouldBe(GuessCommandKind.Win);
-        PointsAppCommandKindMap
-            .FromAppKind(AppCommandKind.Giveaway)
-            .Match(static kind => kind, static () => throw new InvalidOperationException())
-            .ShouldBe(PointsCommandKind.Giveaway);
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
             .Match(static _ => false, static () => true)

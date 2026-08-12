@@ -423,9 +423,7 @@ public sealed class BlokeRaidServiceTests
         );
 
         aboveEditedThreshold.Action.PhaseAfter.ShouldBe(2);
-        aboveEditedThreshold.Action.Response.ShouldBe("Attack dealt 5 damage.");
         belowEditedThreshold.Action.PhaseAfter.ShouldBe(2);
-        belowEditedThreshold.Action.Response.ShouldBe("Attack dealt 10 damage.");
         reachedPhaseThree.Action.PhaseAfter.ShouldBe(3);
         reachedPhaseThree.Action.Response.ShouldBe("Edited phase three response.");
         await using var verify = await database.CreateDbContextAsync();

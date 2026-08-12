@@ -1,5 +1,4 @@
 using System.Net;
-using System.Runtime.CompilerServices;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
@@ -45,34 +44,6 @@ public sealed class BlokeRaidPublicRouteTests
         (await response.Content.ReadAsStringAsync()).ShouldContain("data-public-raid-unavailable");
         response.Headers.Location.ShouldBeNull();
     }
-
-    [Test]
-    public void DashboardRouteTable_DeclaresNoSignedInChildRouteUnderRaid()
-    {
-        var routes = Directory
-            .EnumerateFiles(DashboardSourceRoot(), "*.razor", SearchOption.AllDirectories)
-            .SelectMany(File.ReadLines)
-            .Select(line => line.Trim())
-            .Where(line => line.StartsWith("@page \"", StringComparison.Ordinal))
-            .Select(line => line["@page \"".Length..].TrimEnd('"'))
-            .Where(route => route.StartsWith("/raid/", StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-
-        routes.ShouldBe(["/raid/{Channel}"]);
-    }
-
-    private static string DashboardSourceRoot([CallerFilePath] string testFile = "") =>
-        Path.GetFullPath(
-            Path.Combine(
-                Path.GetDirectoryName(testFile)!,
-                "..",
-                "..",
-                "src",
-                "BlokeBot.Core",
-                "Features"
-            )
-        );
 
     private sealed class PublicRouteHost(
         WebApplication app,

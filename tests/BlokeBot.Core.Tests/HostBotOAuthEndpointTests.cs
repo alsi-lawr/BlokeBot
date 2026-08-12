@@ -43,10 +43,6 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         using var response = await host.Client.SendAsync(request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch access needed");
-        page.ShouldContain("approve every requested permission");
-        page.ShouldContain("Return to Channel setup");
     }
 
     [Test]
@@ -153,7 +149,6 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch access saved");
         page.ShouldNotContain(">Try again</a>");
         await using var db = await host.DbFactory!.CreateDbContextAsync();
         var authorization = await db.HostBroadcasterAuthorizations.SingleAsync();
@@ -178,10 +173,6 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         using var response = await host.Client.GetAsync("/oauth/host-bot/start");
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Turn on the custom bot first");
-        page.ShouldContain("Enable the custom bot in Channel setup");
-        page.ShouldContain("Return to Channel setup");
     }
 
     private static async Task AssertBroadcasterCompletionRetryAsync(

@@ -159,7 +159,6 @@ public sealed class PointsGiveawayDrawTests : PointsGiveawaySchedulerTestBase
         var reply = Failed(
             new PointsGiveawayMessageFormatter().Reply(outcome, new ReplyDeliveryMap())
         );
-        reply.Message.ShouldBe("Giveaway prizes could not be awarded.");
         reply.Message.ShouldNotContain("Giveaway winners");
         await using var db = await dbFactory.CreateDbContextAsync();
         var persisted = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);

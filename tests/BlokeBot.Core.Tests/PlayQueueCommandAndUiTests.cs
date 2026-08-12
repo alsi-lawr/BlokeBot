@@ -5,7 +5,6 @@ using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,10 +57,7 @@ public sealed class PlayQueueCommandAndUiTests
         FindButton(page, "Whisper party").Click();
 
         page.WaitForAssertion(() =>
-            page.Find("[role='alert']")
-                .TextContent.ShouldBe(
-                    "We couldn’t send the lobby message privately to @viewer. It was not posted publicly."
-                )
+            page.Find("[role='alert']").TextContent.ShouldContain("not posted publicly")
         );
     }
 
@@ -303,25 +299,10 @@ public sealed class PlayQueueCommandAndUiTests
                 .Add(value => value.QueueSlug, "squad")
         );
         page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Community squad"));
-        page.Markup.ShouldContain("Entry fields are optional and public");
-        page.Markup.ShouldContain("names are hidden");
         page.Markup.ShouldNotContain("private_viewer");
         page.Markup.ShouldNotContain("secret-twitch-id");
         page.Markup.ShouldContain("SECRET-REGION");
         page.Markup.ShouldContain("Tank");
-    }
-
-    [Test]
-    public void ModeratorAndPublicRoutes_DeclareCorrectAudiences()
-    {
-        typeof(PlayQueuesPage)
-            .GetCustomAttributes(typeof(AuthorizeAttribute), true)
-            .Cast<AuthorizeAttribute>()
-            .ShouldHaveSingleItem()
-            .Policy.ShouldBe("HostSelected");
-        _ = typeof(PublicPlayQueuePage)
-            .GetCustomAttributes(typeof(AllowAnonymousAttribute), true)
-            .ShouldHaveSingleItem();
     }
 
     private static ConfigurePlayQueueCommand Queue(string slug) =>

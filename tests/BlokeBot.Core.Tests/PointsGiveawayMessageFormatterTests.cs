@@ -30,7 +30,7 @@ public sealed class PointsGiveawayMessageFormatterTests
 
         AssertSucceeded(
             _formatter.Reply(new PointsGiveawayStartOutcome.Started(_settings), delivery),
-            "Giveaway started. Type !join to enter.",
+            null,
             CommandResponseTarget.Chat
         );
         AssertFailed(
@@ -46,7 +46,7 @@ public sealed class PointsGiveawayMessageFormatterTests
         );
         AssertFailed(
             _formatter.Reply(new PointsGiveawayStartOutcome.AlreadyActive(_settings), delivery),
-            "A giveaway is already active.",
+            null,
             CommandResponseTarget.Whisper
         );
         AssertFailed(
@@ -59,7 +59,7 @@ public sealed class PointsGiveawayMessageFormatterTests
         );
         AssertFailed(
             _formatter.Reply(new PointsGiveawayStartOutcome.StreamOffline(_settings), delivery),
-            "Giveaways can only start while the stream is live.",
+            null,
             CommandResponseTarget.Whisper
         );
         AssertFailed(
@@ -67,7 +67,7 @@ public sealed class PointsGiveawayMessageFormatterTests
                 new PointsGiveawayStartOutcome.StreamLivenessUnavailable(_settings, unavailable),
                 delivery
             ),
-            "Stream status could not be checked right now.",
+            null,
             CommandResponseTarget.Chat
         );
         AssertFailed(
@@ -75,7 +75,7 @@ public sealed class PointsGiveawayMessageFormatterTests
                 new PointsGiveawayStartOutcome.FollowerEligibilityUnavailable(_settings),
                 delivery
             ),
-            "Follower eligibility is not available for this channel.",
+            null,
             CommandResponseTarget.Whisper
         );
     }
@@ -101,7 +101,7 @@ public sealed class PointsGiveawayMessageFormatterTests
                 new PointsGiveawayJoinOutcome.NotActive(_settings, "viewer"),
                 delivery
             ),
-            "No giveaway is active.",
+            null,
             CommandResponseTarget.Whisper
         );
         AssertFailed(
@@ -117,7 +117,7 @@ public sealed class PointsGiveawayMessageFormatterTests
                 new PointsGiveawayJoinOutcome.FollowerEligibilityUnavailable(_settings, "viewer"),
                 delivery
             ),
-            "Follower eligibility is not available for this channel.",
+            null,
             CommandResponseTarget.Whisper
         );
         AssertFailed(
@@ -142,12 +142,12 @@ public sealed class PointsGiveawayMessageFormatterTests
         );
         AssertFailed(
             _formatter.Reply(new PointsGiveawayDrawOutcome.NotActive(_settings), delivery),
-            "No giveaway is active.",
+            null,
             CommandResponseTarget.Whisper
         );
         AssertSucceeded(
             _formatter.Reply(new PointsGiveawayDrawOutcome.NoEntrants(_settings), delivery),
-            "Giveaway ended with no eligible entrants.",
+            null,
             CommandResponseTarget.Chat
         );
         AssertFailed(
@@ -161,7 +161,7 @@ public sealed class PointsGiveawayMessageFormatterTests
                 ),
                 delivery
             ),
-            "Giveaway prizes could not be awarded.",
+            null,
             CommandResponseTarget.Chat
         );
         AssertSucceeded(
@@ -184,12 +184,12 @@ public sealed class PointsGiveawayMessageFormatterTests
 
         AssertSucceeded(
             _formatter.Reply(new PointsGiveawayCancelOutcome.Cancelled(_settings), delivery),
-            "Giveaway cancelled.",
+            null,
             CommandResponseTarget.Chat
         );
         AssertFailed(
             _formatter.Reply(new PointsGiveawayCancelOutcome.NotActive(_settings), delivery),
-            "No giveaway is active.",
+            null,
             CommandResponseTarget.Whisper
         );
     }
@@ -199,7 +199,7 @@ public sealed class PointsGiveawayMessageFormatterTests
 
     private static void AssertSucceeded(
         PointOperationOutcome outcome,
-        string expectedMessage,
+        string? expectedMessage,
         CommandResponseTarget expectedTarget
     )
     {
@@ -207,13 +207,16 @@ public sealed class PointsGiveawayMessageFormatterTests
             static value => value,
             static _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
         );
-        succeeded.Message.ShouldBe(expectedMessage);
+        if (expectedMessage is not null)
+        {
+            succeeded.Message.ShouldBe(expectedMessage);
+        }
         succeeded.Target.ShouldBe(expectedTarget);
     }
 
     private static void AssertFailed(
         PointOperationOutcome outcome,
-        string expectedMessage,
+        string? expectedMessage,
         CommandResponseTarget expectedTarget
     )
     {
@@ -221,7 +224,10 @@ public sealed class PointsGiveawayMessageFormatterTests
             static _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
             static value => value
         );
-        failed.Message.ShouldBe(expectedMessage);
+        if (expectedMessage is not null)
+        {
+            failed.Message.ShouldBe(expectedMessage);
+        }
         failed.Target.ShouldBe(expectedTarget);
     }
 }

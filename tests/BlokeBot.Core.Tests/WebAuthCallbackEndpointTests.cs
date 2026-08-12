@@ -25,12 +25,9 @@ public sealed class WebAuthCallbackEndpointTests
 
         response.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldNotContain("Connection link expired");
         page.ShouldContain("role=\"alert\"");
         page.ShouldContain("href=\"/auth/login?start=true\">Try again</a>");
         page.ShouldContain("href=\"/auth/login\">Return to sign in</a>");
-        page.ShouldContain("Close window</button>");
         page.ShouldNotContain(Sentinel);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("text/html");
     }

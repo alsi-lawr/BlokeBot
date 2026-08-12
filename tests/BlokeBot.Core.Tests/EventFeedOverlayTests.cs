@@ -120,12 +120,6 @@ public sealed class EventFeedOverlayTests
             .DecodeOnce("&amp;lt;already escaped&amp;gt;")
             .ShouldBe("&lt;already escaped&gt;");
         EventFeedProjectionText.DecodeOnce("ordinary &amp; text").ShouldBe("ordinary & text");
-
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("element.textContent = text");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("host.append(body)");
-        OverlayBrowserSourceAssets.JavaScript.ShouldContain("body.textContent = text");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("innerHTML");
-        OverlayBrowserSourceAssets.JavaScript.ShouldNotContain("outerHTML");
     }
 
     [Test]

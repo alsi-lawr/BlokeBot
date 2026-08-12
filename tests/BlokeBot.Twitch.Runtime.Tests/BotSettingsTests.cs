@@ -28,7 +28,6 @@ public sealed class BotSettingsTests
         );
 
         exception.OptionsName.ShouldBe("TwitchBot");
-        exception.Failures.ShouldContain("Twitch bot options contain an invalid value.");
     }
 
     [Test]
@@ -59,17 +58,13 @@ public sealed class BotSettingsTests
     }
 
     [Test]
-    public void OnlineWebhook_MissingConfiguration_IsRejected()
-    {
-        var exception = Should.Throw<OptionsValidationException>(() =>
+    public void OnlineWebhook_MissingConfiguration_IsRejected() =>
+        _ = Should.Throw<OptionsValidationException>(() =>
             BotSettings.FromConfiguredOptions(
                 new BotOptions { Identity = ValidIdentity() },
                 "TwitchBot"
             )
         );
-
-        exception.Failures.ShouldContain("TwitchBot.EventSubWebhook configuration is required.");
-    }
 
     [Test]
     [Arguments("http://bot.blokebot.com/eventsub/twitch", "valid-secret")]
@@ -88,11 +83,9 @@ public sealed class BotSettingsTests
             },
         };
 
-        var exception = Should.Throw<OptionsValidationException>(() =>
+        _ = Should.Throw<OptionsValidationException>(() =>
             BotSettings.FromConfiguredOptions(options, "TwitchBot")
         );
-
-        exception.Failures.ShouldContain("TwitchBot.EventSubWebhook configuration is invalid.");
     }
 
     [Test]

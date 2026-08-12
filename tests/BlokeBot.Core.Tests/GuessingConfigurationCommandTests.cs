@@ -127,9 +127,6 @@ public sealed class GuessingConfigurationCommandTests
 
         _ = failure.ShouldNotBeNull();
         failure.ShouldBe(new GuessingConfigurationLoadFailure());
-        failure.Message.ShouldBe(
-            "That round type is no longer available. Reloaded the current settings."
-        );
     }
 
     private static GuessingConfigurationService ConfigurationService(

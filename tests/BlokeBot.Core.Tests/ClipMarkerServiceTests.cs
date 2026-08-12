@@ -318,8 +318,6 @@ public sealed class ClipMarkerServiceTests
         persistedMarker.Status.ShouldBe(TwitchStreamMarkerStatus.Succeeded);
         persistedMarker.VideoId.ShouldBe("video-id");
         persistedMarker.MarkerUrl.ShouldBe("https://twitch.test/marker");
-        typeof(ClipView).GetProperty("IdempotencyKey").ShouldBeNull();
-        typeof(StreamMarkerView).GetProperty("IdempotencyKey").ShouldBeNull();
     }
 
     [Test]

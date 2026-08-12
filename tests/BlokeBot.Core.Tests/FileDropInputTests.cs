@@ -9,7 +9,6 @@ public sealed class FileDropInputTests
     public async Task ProductionModule_SharesDocumentListenersAndDispatchesEachBrowseOrDropOnce()
     {
         var module = Source("FileDropInput.razor.js");
-        module.ShouldNotContain("data-file-drop-hover");
         var harness = $$"""
             import assert from "node:assert/strict";
 

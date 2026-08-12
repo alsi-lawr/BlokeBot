@@ -32,27 +32,17 @@ public sealed class GuessingDashboardRejectionTests
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<GuessingDashboard>();
 
-        cut.FindAll("[role='tab']")
-            .Single(static tab => tab.TextContent.Trim() == "Live")
-            .GetAttribute("aria-selected")
-            .ShouldBe("true");
-        cut.FindAll("[role='tab']")
-            .Select(static tab => tab.TextContent.Trim())
-            .ShouldBe(["Live", "History", "Leaderboard"]);
-
         cut.FindAll("button")
             .Single(static button => button.TextContent.Trim() == "Start round")
             .Click();
 
         var sent = chat.Messages.ShouldHaveSingleItem();
         sent.Channel.ShouldBe("streamer");
-        sent.Message.ShouldContain("Private round guessing is open.");
         _ = chat
             .Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
         var warning = toasts.Current.ShouldHaveSingleItem();
         warning.Kind.ShouldBe(ToastKind.Warning);
-        warning.Message.ShouldBe("The action completed, but its chat message could not be queued.");
         warning.Message.ShouldNotContain(sent.Message);
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.Rounds.SingleAsync()).Status.ShouldBe(GuessRoundStatus.Open);

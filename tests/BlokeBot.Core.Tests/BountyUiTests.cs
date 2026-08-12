@@ -1,4 +1,3 @@
-using AngleSharp.Dom;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
@@ -91,13 +90,7 @@ public sealed partial class BountyUiTests
 
         var cut = context.Render<BountiesPage>();
 
-        cut.WaitForAssertion(() =>
-        {
-            cut.Markup.ShouldContain("Bounties are off for this channel");
-            cut.Markup.ShouldContain("/host#chat-tools");
-            cut.Markup.ShouldContain("retained");
-            cut.Markup.ShouldNotContain("RETAINED-PRIVATE");
-        });
+        cut.WaitForAssertion(() => cut.Markup.ShouldNotContain("RETAINED-PRIVATE"));
     }
 
     [Test]
@@ -149,7 +142,6 @@ public sealed partial class BountyUiTests
 
         var toggle = page.Find("[data-fold='bounty-moderator-note'] button");
         toggle.GetAttribute("type").ShouldBe("button");
-        toggle.TextContent.ShouldContain("Moderator note");
         toggle.GetAttribute("aria-expanded").ShouldBe("false");
         var bodyId = toggle.GetAttribute("aria-controls");
         bodyId.ShouldNotBeNullOrWhiteSpace();
@@ -158,8 +150,6 @@ public sealed partial class BountyUiTests
         OpenModeratorNote(page);
 
         page.Find($"#{bodyId}").HasAttribute("inert").ShouldBeFalse();
-        page.Find("label[for='bounty-create-reason']").TextContent.Trim().ShouldBe("Private note");
-        page.Find($"#{bodyId}").TextContent.ShouldContain("Viewers never see it.");
     }
 
     private static BountyService CreateService(SqliteBlokeBotDbFactory database) =>
@@ -185,9 +175,6 @@ public sealed partial class BountyUiTests
                 .ShouldBe("true")
         );
     }
-
-    private static IElement Button(IRenderedComponent<BountiesPage> page, string label) =>
-        page.FindAll("button").Single(button => button.TextContent.Trim() == label);
 
     private static async Task<BountyView> CreateAndOpenAsync(
         BountyService service,

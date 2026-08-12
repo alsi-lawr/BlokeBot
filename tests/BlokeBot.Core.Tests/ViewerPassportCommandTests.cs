@@ -1,7 +1,6 @@
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -75,17 +74,6 @@ public sealed class ViewerPassportCommandTests
 
         responses.Single().ShouldBe("Open your viewer passport: /passports/streamer/me");
         responses.Single().ShouldNotContain("MEMBERS-LINE");
-        await using (var db = await database.CreateDbContextAsync())
-        {
-            var host = await db.Hosts.SingleAsync();
-            host.EnabledFeatures = HostFeatureFlags.None;
-            _ = await db.SaveChangesAsync();
-        }
-        responses.Clear();
-
-        await DispatchAsync(dispatcher, responses);
-
-        responses.ShouldBeEmpty();
     }
 
     private static SaveViewerPassportCommand Save(

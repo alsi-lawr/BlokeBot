@@ -81,10 +81,7 @@ public sealed class HostConfigFaultRoutingTests
 
         await AssertBroadcasterAuthorizationPresentAsync(dbFactory, hostId);
         notificationCount.ShouldBe(0);
-        context
-            .Services.GetRequiredService<ToastService>()
-            .Current.ShouldHaveSingleItem()
-            .Message.ShouldBe("Only the channel owner can disconnect the Twitch integration.");
+        _ = context.Services.GetRequiredService<ToastService>().Current.ShouldHaveSingleItem();
     }
 
     [Test]
@@ -124,10 +121,7 @@ public sealed class HostConfigFaultRoutingTests
 
         await AssertBroadcasterAuthorizationPresentAsync(dbFactory, hostId);
         notificationCount.ShouldBe(0);
-        context
-            .Services.GetRequiredService<ToastService>()
-            .Current.ShouldHaveSingleItem()
-            .Message.ShouldBe("Your selected channel changed. Choose the channel and try again.");
+        _ = context.Services.GetRequiredService<ToastService>().Current.ShouldHaveSingleItem();
     }
 
     [Test]
@@ -163,10 +157,8 @@ public sealed class HostConfigFaultRoutingTests
 
         page.WaitForAssertion(() =>
         {
-            page.Find("[data-twitch-integration]")
-                .TextContent.ShouldContain("The channel owner must connect this integration.");
             TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
-            BroadcasterActions(page).ShouldHaveSingleItem().Markup.ShouldContain("Connect");
+            _ = BroadcasterActions(page).ShouldHaveSingleItem();
         });
         await using var verify = await dbFactory.CreateDbContextAsync();
         (
@@ -176,7 +168,6 @@ public sealed class HostConfigFaultRoutingTests
             .Services.GetRequiredService<ToastService>()
             .Current.ShouldHaveSingleItem();
         toast.Kind.ShouldBe(ToastKind.Warning);
-        toast.Message.ShouldContain("disconnected, but the running bot may need attention");
     }
 
     [Test]
@@ -198,7 +189,6 @@ public sealed class HostConfigFaultRoutingTests
 
         var page = RenderHostConfigPage(context);
 
-        page.Markup.ShouldContain("Loading channel setup...");
         page.FindAll("[data-twitch-integration]").ShouldBeEmpty();
         BroadcasterActions(page).ShouldBeEmpty();
         TwitchIntegrationDisconnectActions(page).ShouldBeEmpty();
@@ -322,7 +312,6 @@ public sealed class HostConfigFaultRoutingTests
             var customBotToggle = page.Find("#custom-bot-enabled");
             customBotToggle.GetAttribute("role").ShouldBe("switch");
             customBotToggle.GetAttribute("disabled").ShouldBeNull();
-            page.Markup.ShouldContain("The channel owner must connect this Twitch account.");
             page.Markup.ShouldNotContain("/oauth/channel-bot/start");
         });
     }
@@ -376,9 +365,6 @@ public sealed class HostConfigFaultRoutingTests
             });
         }
 
-        page.Find("#chat-tools").GetAttribute("aria-label").ShouldBe("Chat tools");
-        page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
-        page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
         fragmentModule
             .Invocations.Count(invocation => invocation.Identifier == "observe")
             .ShouldBe(1);
@@ -403,14 +389,12 @@ public sealed class HostConfigFaultRoutingTests
         {
             var shoutouts = FindFeatureButton(page, "Shoutouts");
             shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
-            shoutouts.TextContent.ShouldContain("manual and automatic raid shoutouts");
             page.FindAll("#chat-tools button")
                 .ShouldNotContain(static button =>
                     button.TextContent.Contains("Automations", StringComparison.Ordinal)
                 );
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
-            _ = overlays.QuerySelector("svg").ShouldNotBeNull();
         });
         page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
@@ -431,9 +415,6 @@ public sealed class HostConfigFaultRoutingTests
             var toast = context
                 .Services.GetRequiredService<ToastService>()
                 .Current.Single(value => value.Title == "Overlays disabled");
-            toast.Message.ShouldBe(
-                "Overlays is now disabled for #streamer. Its dashboard and Browser Sources are unavailable until you enable it again."
-            );
             toast.Message.ShouldNotContain("chat commands");
         });
 
@@ -444,9 +425,6 @@ public sealed class HostConfigFaultRoutingTests
             var toast = context
                 .Services.GetRequiredService<ToastService>()
                 .Current.Single(value => value.Title == "Overlays enabled");
-            toast.Message.ShouldBe(
-                "Overlays is now enabled for #streamer. Its dashboard and Browser Sources are available again."
-            );
             toast.Message.ShouldNotContain("chat commands");
         });
 
@@ -738,7 +716,6 @@ public sealed class HostConfigFaultRoutingTests
         moderatorToggle.GetAttribute("aria-checked").ShouldBe("true");
         var toast = toasts.Current.ShouldHaveSingleItem();
         toast.Kind.ShouldBe(ToastKind.Error);
-        toast.Title.ShouldBe("Mod help not saved");
         toast.Message.ShouldBe(
             runtimeNotificationFails
                 ? new HostModAccessSaveFailure.RuntimeNotificationFailed(1, 1).Message

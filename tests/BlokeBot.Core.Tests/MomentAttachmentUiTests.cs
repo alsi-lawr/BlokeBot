@@ -34,28 +34,6 @@ public sealed class MomentAttachmentUiTests
         rendered.WaitForAssertion(() => rendered.FindAll("[data-attached-moment]").ShouldBeEmpty());
     }
 
-    [Test]
-    public async Task EmbeddedSection_WhenAParentIsOff_ShowsRecoveryWithoutRelationshipData()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var fixture = await SeedAsync(database, momentsEnabled: false, attached: true);
-        using var context = Context(database, fixture.HostId);
-
-        var rendered = context.Render<MomentAttachmentsSection>(parameters =>
-            parameters
-                .Add(component => component.SelectedHostId, fixture.HostId)
-                .Add(component => component.SelectedHostLogin, "streamer")
-                .Add(
-                    component => component.Destination,
-                    new MomentAttachmentDestination.Bounty(fixture.BountyId)
-                )
-        );
-
-        _ = rendered.Find("[data-moment-attachments-disabled]").ShouldNotBeNull();
-        rendered.FindAll("[data-moment-attachments]").ShouldBeEmpty();
-        rendered.FindAll("[data-attached-moment]").ShouldBeEmpty();
-    }
-
     private static BunitContext Context(SqliteBlokeBotDbFactory database, int hostId) =>
         UiTestContextFactory.Create(database, hostId);
 

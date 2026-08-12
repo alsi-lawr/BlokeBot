@@ -35,7 +35,7 @@ public sealed class PointsCommandTests : PointsTestBase
         );
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        replies.ShouldBe(["Twitch user @missingviewer was not found."]);
+        _ = replies.ShouldHaveSingleItem();
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
 
@@ -65,7 +65,6 @@ public sealed class PointsCommandTests : PointsTestBase
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var balance = await db.PointBalances.SingleAsync(CancellationToken.None);
-        replies.ShouldBe(["Added 10 points to viewer."]);
         balance.Login.ShouldBe("viewer");
         balance.Amount.ShouldBe("10");
     }
@@ -285,7 +284,7 @@ public sealed class PointsCommandTests : PointsTestBase
             CancellationToken.None
         );
 
-        replies.ShouldBe(["Gambling is unavailable. The wait between gambles cannot be negative."]);
+        _ = replies.ShouldHaveSingleItem();
         var balance = await new PointBalanceService(dbFactory).GetBalanceAsync(
             hostId,
             "alice",

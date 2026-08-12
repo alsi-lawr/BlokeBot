@@ -43,10 +43,12 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
     [Test]
     public async Task NativeAdapter_MapsProductionUnauthorizedAuthorityOutcome()
     {
-        const string ProductionMessage = "Twitch rejected the configured bot's shoutout authority.";
-        ProductionMessage.ShouldBe(ShoutoutService.UnauthorizedAuthorityMessage);
         var native = new AutomaticRaidNativeShoutoutSender(
-            new ScriptedNativeOperation(new ShoutoutOperationOutcome.NotReady(ProductionMessage))
+            new ScriptedNativeOperation(
+                new ShoutoutOperationOutcome.NotReady(
+                    ShoutoutService.UnauthorizedAuthorityMessage
+                )
+            )
         );
 
         var result = await native.SendAsync(1, "raider", CancellationToken.None);

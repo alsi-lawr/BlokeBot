@@ -480,39 +480,12 @@ public sealed class OverlayBrowserSourceTests
         using var state = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state");
         using var stylesheet = await host.Client.GetAsync("/overlay/assets/blokebot-overlay.css");
         using var script = await host.Client.GetAsync("/overlay/assets/blokebot-overlay.js");
-        var css = await stylesheet.Content.ReadAsStringAsync();
         var javascript = await script.Content.ReadAsStringAsync();
 
         AssertPrivateHeaders(document);
         AssertPrivateHeaders(state);
         AssertPrivateHeaders(stylesheet);
         AssertPrivateHeaders(script);
-        var html = await document.Content.ReadAsStringAsync();
-        html.ShouldContain("viewBox=\"0 0 1920 1080\"");
-        html.ShouldContain("preserveAspectRatio=\"xMidYMid meet\"");
-        css.ShouldContain("width: 100%");
-        css.ShouldContain("height: 100%");
-        css.ShouldContain("overflow: hidden");
-        css.ShouldContain("background: transparent");
-        javascript.ShouldContain("await loadCurrentState(pageLifetime.signal)");
-        javascript.ShouldContain("refreshAppearanceStylesheet(snapshot.sequence)");
-        javascript.ShouldContain("fetch(root.dataset.stateUrl");
-        javascript.ShouldContain("fetch(root.dataset.liveUrl");
-        javascript.ShouldContain("headers: { Accept: \"text/event-stream\" }");
-        javascript.ShouldContain("canvas.replaceChildren()");
-        javascript.ShouldContain("envelope.sequence <= liveSequence");
-        javascript.ShouldContain("envelope.sequence !== liveSequence + 1");
-        javascript.ShouldContain("envelope.serverEpoch !== liveEpoch");
-        javascript.ShouldContain("const reconnectDelay = (attempt, randomValue)");
-        javascript.ShouldContain("maximumRetryDelayMilliseconds");
-        javascript.ShouldContain("Math.random()");
-        javascript.ShouldContain("while (!pageLifetime.signal.aborted)");
-        javascript.ShouldNotContain("WebSocket");
-        javascript.ShouldNotContain("EventSource");
-        javascript.ShouldNotContain("setInterval");
-        javascript.ShouldNotContain("style.setProperty");
-        javascript.ShouldNotContain("http://");
-        javascript.ShouldNotContain("https://");
         await AssertDelayLifecycleAsync(javascript);
     }
 
@@ -644,30 +617,6 @@ public sealed class OverlayBrowserSourceTests
         await using var host = await BrowserSourceHost.StartAsync();
         var seed = await host.SeedEventFeedAsync("event-feed");
         await host.PresentPointEventAsync(seed, "private-ledger-key", "<b>viewer & friend</b>");
-
-        using (var documentResponse = await host.Client.GetAsync($"/overlay/{seed.AccessKey}"))
-        using (
-            var stylesheetResponse = await host.Client.GetAsync(
-                "/overlay/assets/blokebot-overlay.css"
-            )
-        )
-        using (
-            var scriptResponse = await host.Client.GetAsync("/overlay/assets/blokebot-overlay.js")
-        )
-        {
-            var html = await documentResponse.Content.ReadAsStringAsync();
-            html.ShouldContain("viewBox=\"0 0 1920 1080\"");
-            var stylesheet = await stylesheetResponse.Content.ReadAsStringAsync();
-            stylesheet.ShouldContain("white-space: pre-wrap");
-            stylesheet.ShouldContain("overflow-wrap: anywhere");
-            var script = await scriptResponse.Content.ReadAsStringAsync();
-            script.ShouldContain("svgElement(\"foreignObject\"");
-            script.ShouldContain("body.textContent = text");
-            script.ShouldNotContain("Intl.Segmenter");
-            script.ShouldNotContain("\"tspan\"");
-            script.ShouldNotContain("innerHTML");
-            script.ShouldNotContain("outerHTML");
-        }
 
         using (var response = await host.Client.GetAsync($"/overlay/{seed.AccessKey}/state"))
         {

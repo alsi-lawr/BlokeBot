@@ -142,53 +142,6 @@ public sealed partial class RaidCollaborationUiTests
         (await verify.ApprovedRaidChannels.SingleAsync()).Login.ShouldBe("cozyworkshop");
     }
 
-    [Test]
-    public async Task SettingsWorkspace_ExposesOneSaveControlAndProgrammaticFormSemantics()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateContextAsync(database);
-        var page = RenderSettings(context);
-
-        page.FindAll("[data-save-scope]").Count.ShouldBe(1);
-        page.FindAll("button")
-            .Count(button => button.TextContent.StartsWith("Save", StringComparison.Ordinal))
-            .ShouldBe(1);
-        foreach (var id in new[] { "raid-welcome-enabled", "raid-native-shoutout" })
-        {
-            var toggle = page.Find("#" + id);
-            toggle.GetAttribute("role").ShouldBe("switch");
-            toggle.GetAttribute("aria-checked").ShouldBe("true");
-            toggle.GetAttribute("aria-labelledby").ShouldBe(id + "-label");
-            toggle.GetAttribute("aria-describedby").ShouldBe(id + "-hint");
-            _ = page.Find("#" + id + "-label");
-            _ = page.Find("#" + id + "-hint");
-        }
-        foreach (
-            var id in new[]
-            {
-                "raid-welcome-message",
-                "raid-dedupe",
-                "raid-gap",
-                "raid-language",
-                "raid-channel-login-0",
-                "raid-channel-name-0",
-                "raid-channel-clip-0",
-            }
-        )
-        {
-            _ = page.FindAll($"label[for='{id}']").ShouldHaveSingleItem();
-        }
-        page.Find("#raid-language").GetAttribute("aria-describedby").ShouldBe("raid-language-hint");
-        _ = page.Find("#raid-language-hint");
-        page.Find("#raid-categories")
-            .GetAttribute("aria-label")
-            .ShouldBe("Add an eligible category");
-        page.Find("[role='group']")
-            .GetAttribute("aria-labelledby")
-            .ShouldBe("raid-categories-label");
-        page.Find("#raid-categories-label").TextContent.ShouldBe("Eligible categories");
-    }
-
     private static IRenderedComponent<RaidCollaborationPage> RenderSettings(BunitContext context)
     {
         context

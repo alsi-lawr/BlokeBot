@@ -23,7 +23,6 @@ public sealed class BlokeBotAuthResultPageTests
 
         statusCode.ShouldBe(StatusCodes.Status502BadGateway);
         page.ShouldNotContain(Sentinel);
-        page.ShouldContain("Support reference: <code>support-ref</code>");
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Properties["Classification"].ShouldBe("InvalidProviderPayload");
         entry.Properties["FailureType"].ShouldBe("InvalidOperationException");

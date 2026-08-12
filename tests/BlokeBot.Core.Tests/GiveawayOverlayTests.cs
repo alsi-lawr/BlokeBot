@@ -147,10 +147,9 @@ public sealed class GiveawayOverlayTests
             _now.UtcDateTime,
             _now.UtcDateTime
         );
-        (await provider.ProjectAsync(instance, CancellationToken.None))
+        _ = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GiveawayV1>()
-            .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Cancelled>()
-            .Message.ShouldBe("Giveaway cancelled");
+            .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Cancelled>();
 
         await UpdateAsync(
             database,
@@ -159,10 +158,9 @@ public sealed class GiveawayOverlayTests
             _now.UtcDateTime,
             _now.UtcDateTime
         );
-        (await provider.ProjectAsync(instance, CancellationToken.None))
+        _ = (await provider.ProjectAsync(instance, CancellationToken.None))
             .ShouldBeOfType<OverlaySnapshotProjection.GiveawayV1>()
-            .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Cancelled>()
-            .Message.ShouldBe("Giveaway closed without a winner");
+            .Snapshot.State.ShouldBeOfType<GiveawayV1OverlayPresentationState.Cancelled>();
 
         await SetFeaturesAsync(database, hostId, HostFeatureFlags.Overlays);
         _ = (

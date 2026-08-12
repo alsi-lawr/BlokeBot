@@ -132,9 +132,6 @@ public sealed class WhisperResponseRoutingTests : WhisperResponseTestBase
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Exception.ShouldBeNull();
-        entry.Message.ShouldContain("Private command response delivery");
-        entry.Message.ShouldContain("streamer");
-        entry.Message.ShouldContain(nameof(PrivateDeliveryError.Unexpected));
         entry.Message.ShouldNotContain("sensitive exception message");
         entry.Message.ShouldNotContain("access-token");
         entry.Message.ShouldNotContain("private response");

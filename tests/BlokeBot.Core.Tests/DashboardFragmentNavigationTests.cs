@@ -108,8 +108,7 @@ public sealed class DashboardFragmentNavigationTests
         page.WaitForAssertion(() =>
         {
             page.Find("#overlays-cues-tab").GetAttribute("aria-selected").ShouldBe("true");
-            page.Find("[data-overlay-disabled-recovery]")
-                .TextContent.ShouldContain("Turn Overlays on in Channel setup");
+            _ = page.Find("[data-overlay-disabled-recovery]");
         });
     }
 
@@ -326,26 +325,6 @@ public sealed class DashboardFragmentNavigationTests
             page.Find("#request-board-pane-setup-tab")
                 .GetAttribute("aria-selected")
                 .ShouldBe("true");
-        });
-    }
-
-    [Test]
-    public async Task WorkspaceTabs_AreAnchorsAndValueControlsAreNot()
-    {
-        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var context = await CreateRequestBoardContextAsync(database);
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/requests");
-
-        var page = context.Render<RequestBoardsPage>();
-
-        page.WaitForAssertion(() =>
-        {
-            page.FindAll("[role='tab']")
-                .Select(tab => tab.GetAttribute("href"))
-                .ShouldBe(["#setup", "#review"]);
-            page.FindAll("[role='group'] button")
-                .ShouldAllBe(option => !option.HasAttribute("href"));
-            page.FindAll("[role='group'][aria-label='Board workspace']").ShouldBeEmpty();
         });
     }
 

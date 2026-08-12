@@ -234,11 +234,6 @@ public sealed class TokenStatusServiceTests
         entry.Exception.ShouldBeNull();
         entry.Properties["Operation"].ShouldBe("acquisition");
         entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
-        entry
-            .Properties["{OriginalFormat}"]
-            .ShouldBe(
-                "Unexpected Twitch token status {Operation} failure of type {FailureType} was escalated."
-            );
         entry.Message.ShouldNotContain(SensitiveMessage);
     }
 

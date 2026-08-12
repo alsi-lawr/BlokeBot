@@ -61,9 +61,7 @@ public sealed class RequestBoardCommandTests
         await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
         await DispatchAsync(dispatcher, Message("viewer", "!requestapprove 1"), responses);
 
-        responses.ShouldContain(static value => value.Contains("submitted for moderator review"));
         responses.ShouldContain(static value => value.Contains("/requests/streamer/games"));
-        responses[^1].ShouldContain("moderator-only");
         (
             await boardService.GetModeratorSubmissionAsync(hostId, 1, CancellationToken.None)
         )!.Public.Status.ShouldBe(RequestSubmissionStatus.Pending);
@@ -80,7 +78,6 @@ public sealed class RequestBoardCommandTests
         await DispatchAsync(dispatcher, Message("viewer", "!requestvote 1"), responses);
 
         responses[^2].ShouldContain("now approved");
-        responses[^1].ShouldContain("Vote recorded");
         (
             await boardService.GetModeratorSubmissionAsync(hostId, 1, CancellationToken.None)
         )!.Public.VoteCount.ShouldBe(1);

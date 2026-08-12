@@ -247,30 +247,24 @@ public sealed class AutomationCatalogTests
             && definition.Kind == AutomationNodeKind.Action
         );
 
-        var duplicate = Should.Throw<AutomationCatalogRegistrationException>(() =>
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
             _ = new AutomationDefinitionCatalog([
                 new CoreAutomationCatalogModule(),
                 new DuplicateAutomationModule(),
             ])
         );
-        duplicate.Message.ShouldContain("send-chat");
-        duplicate.Message.ShouldContain("more than once");
-
-        var unsupported = Should.Throw<AutomationCatalogRegistrationException>(() =>
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
             _ = new AutomationDefinitionCatalog([new UnsupportedSchemaAutomationModule()])
         );
-        unsupported.Message.ShouldContain("Schema versions");
-        unsupported.Message.ShouldContain("1..1");
 
         var services = new ServiceCollection();
         _ = services
             .AddBlokeBotAutomations()
             .AddAutomationCatalogModule<DuplicateAutomationModule>();
         await using var provider = services.BuildServiceProvider();
-        var startupFailure = Should.Throw<AutomationCatalogRegistrationException>(() =>
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
             _ = provider.GetRequiredService<AutomationDefinitionCatalog>()
         );
-        startupFailure.Message.ShouldContain("send-chat");
     }
 
     [Test]

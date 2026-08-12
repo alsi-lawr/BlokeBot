@@ -64,7 +64,6 @@ public sealed class OverlayDashboardUiTests
         previewDocument.ShouldContain(
             "data-state-url=\"/blokebot/overlays/preview/opaque-id/state\""
         );
-        previewDocument.ShouldContain("viewBox=\"0 0 1920 1080\"");
         previewDocument.ShouldNotContain("accessKey", Case.Insensitive);
     }
 

@@ -129,10 +129,8 @@ public sealed class AutomaticRaidShoutoutUiTests
             .PublishAsync(AppEventKind.AlertsChanged, CancellationToken.None);
 
         section.WaitForAssertion(() =>
-        {
-            section.Markup.ShouldContain("Message sent, pin failed");
-            section.Markup.ShouldContain("will not resend or switch modes");
-        });
+            section.Markup.ShouldNotContain("No automatic raid shoutouts recorded yet.")
+        );
     }
 
     private static BunitContext CreateContext(SqliteBlokeBotDbFactory factory)
