@@ -1,0 +1,148 @@
+--[[
+# viset
+version = 1
+output_root = "../src/BlokeBot.Site/wwwroot/media/community/v010"
+output = "{figure}-{device}.png"
+frame = "builtin:auto"
+browser_arguments = [
+  "--disable-background-networking",
+  "--disable-background-mode",
+  "--disable-component-update",
+  "--disable-default-apps",
+  "--disable-sync",
+  "--force-prefers-reduced-motion",
+  "--host-resolver-rules=MAP * 0.0.0.0, EXCLUDE 127.0.0.1",
+  "--hide-scrollbars",
+  "--metrics-recording-only",
+  "--password-store=basic",
+  "--use-mock-keychain",
+]
+
+[devices.laptop]
+mobile = false
+touch = false
+device_scale = 1.0
+
+[devices.laptop.viewport]
+width = 1180
+height = 720
+
+[matrix]
+figure = [
+  "competition-result-light",
+  "progression-overlay-setup-light",
+  "achievement-feed-setup-dark",
+]
+]]
+
+local repo_root = viset.script.directory .. "/.."
+local port = os.getenv("BLOKEBOT_V010_FIGURES_LAPTOP_PORT") or "5475"
+local base_url = "http://127.0.0.1:" .. port
+local server = viset.process.start({
+  file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
+  arguments = {
+    "run",
+    "--project",
+    repo_root .. "/src/BlokeBot.Simulation/BlokeBot.Simulation.csproj",
+    "--configuration",
+    "Release",
+    "--no-build",
+    "--no-launch-profile",
+    "--",
+    "--urls",
+    base_url,
+  },
+  working_directory = repo_root,
+  environment = {
+    DOTNET_CLI_TELEMETRY_OPTOUT = "1",
+    TZ = "UTC",
+  },
+})
+
+local succeeded, failure = pcall(function()
+  local figure = viset.context.axes.figure
+  local targets = {
+    ["competition-result-light"] = {
+      path = "/competitions",
+      fragment = "#standings",
+      theme = "light",
+      ready = "document.querySelectorAll('tbody tr').length > 0",
+    },
+    ["progression-overlay-setup-light"] = {
+      path = "/overlays",
+      fragment = "#sources",
+      theme = "light",
+      selected = "Community milestone",
+      ready = "document.querySelector('[data-overlay-editor]') !== null",
+    },
+    ["achievement-feed-setup-dark"] = {
+      path = "/overlays",
+      fragment = "#sources",
+      theme = "dark",
+      selected = "Channel event feed",
+      ready = "document.querySelector('[data-event-feed-kind-settings]') !== null",
+    },
+  }
+
+  local target = targets[figure]
+  if target == nil then
+    error("Unknown v0.10 guide figure: " .. figure)
+  end
+
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
+
+  viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. target.theme)
+  viset.page.wait_for(
+    viset.javascript([=[
+      location.pathname === "/"
+        && document.body.innerText.includes("Sample Channel")
+        && document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]),
+    "40s"
+  )
+
+  viset.page.navigate(
+    base_url .. target.path .. "?simulationTheme=" .. target.theme .. target.fragment
+  )
+  viset.page.wait_for(
+    viset.javascript(([=[
+      location.pathname === %q
+        && document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]):format(target.path)),
+    "40s"
+  )
+
+  if target.selected ~= nil then
+    viset.page.evaluate(
+      viset.javascript([=[
+        async ({ selected }) => {
+          const choice = [...document.querySelectorAll("[aria-label='Saved overlays'] button")]
+            .find(candidate => candidate.textContent.includes(selected));
+          if (!choice) throw new Error(`Saved Browser Source not found: ${selected}`);
+          choice.click();
+          await new Promise(resolve => setTimeout(resolve, 750));
+          return true;
+        }
+      ]=]),
+      { selected = target.selected }
+    )
+  end
+
+  viset.page.wait_for(
+    viset.javascript(([=[
+      document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+        && (%s)
+    ]=]):format(target.ready)),
+    "40s"
+  )
+  viset.sleep("400ms")
+  viset.snapshot()
+end)
+
+viset.process.stop(server)
+if not succeeded then
+  error(failure, 0)
+end
