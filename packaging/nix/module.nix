@@ -180,7 +180,8 @@ in
           User = "blokebot";
           Group = "blokebot";
           WorkingDirectory = stateDir;
-          Restart = "on-failure";
+          Restart = "always";
+          RestartSec = 5;
           UMask = "0077";
 
           NoNewPrivileges = true;
