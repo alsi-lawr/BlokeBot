@@ -158,11 +158,10 @@
                                 @onclick="() => toggledAnnouncement.Enabled = !toggledAnnouncement.Enabled"></button>
                     }
                     <StickySaveRegion Scope="StickySaveScope.Editor">
-                        <button class="@(_hasChanges ? "btn-primary custom-command-save--dirty" : "btn-secondary")"
-                                aria-label="Save custom commands"
-                                data-save-state="@(_hasChanges ? "dirty" : "clean")"
-                                disabled="@(!_hasChanges)"
-                                @onclick="SaveAsync">Save</button>
+                        <SaveChangesButton AccessibleName="Save custom commands"
+                                           Disabled="@(!_hasChanges)"
+                                           HasChanges="@_hasChanges"
+                                           OnSave="SaveAsync" />
                     </StickySaveRegion>
                 </header>
 

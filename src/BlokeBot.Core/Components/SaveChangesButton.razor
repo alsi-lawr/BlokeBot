@@ -1,0 +1,9 @@
+<button class="@_class"
+        type="button"
+        aria-label="@AccessibleName"
+        data-save-state="@_state"
+        disabled="@_disabled"
+        @onclick="OnSave"
+        @attributes="AdditionalAttributes">
+    @(Saving ? "Saving..." : "Save changes")
+</button>

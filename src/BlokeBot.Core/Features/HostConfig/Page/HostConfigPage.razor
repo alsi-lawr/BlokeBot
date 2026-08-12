@@ -280,7 +280,6 @@
         </div>
 
         <StudioStage Key="startup-message"
-                     data-sticky-save-scope
                      Number="2"
                      Title="Startup chat message"
                      Summary="@_startupMessageStageSummary"
@@ -310,20 +309,14 @@
                     </p>
                 </div>
                 <div class="studio-span-12">
-                    <StickySaveRegion Scope="StickySaveScope.Editor">
-                        <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                                type="button"
-                                disabled="@_startupMessageSaving"
-                                @onclick="() => SaveStartupMessageAsync(hostId)">
-                            @(_startupMessageSaving ? "Saving..." : "Save startup message")
-                        </button>
-                    </StickySaveRegion>
+                    <SaveChangesButton AccessibleName="Save startup message"
+                                       Saving="@_startupMessageSaving"
+                                       OnSave="() => SaveStartupMessageAsync(hostId)" />
                 </div>
             </div>
         </StudioStage>
 
         <StudioStage Key="commands"
-                     data-sticky-save-scope
                      Number="3"
                      Title="Commands"
                      Summary="@_commandsStageSummary"
@@ -343,14 +336,10 @@
                     </p>
                 </div>
                 <div class="studio-span-4 content-end">
-                    <StickySaveRegion Scope="StickySaveScope.Editor">
-                        <button class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
-                                type="button"
-                                disabled="@_commandsSaving"
-                                @onclick="() => SaveCommandsAsync(hostId)">
-                            @(_commandsSaving ? "Saving..." : "Save Commands")
-                        </button>
-                    </StickySaveRegion>
+                    <SaveChangesButton AccessibleName="Save commands"
+                                       Class="w-full"
+                                       Saving="@_commandsSaving"
+                                       OnSave="() => SaveCommandsAsync(hostId)" />
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_state.Commands.ConflictAlias))
                 {

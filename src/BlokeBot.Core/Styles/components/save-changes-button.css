@@ -1,0 +1,7 @@
+@layer components {
+    .save-changes-button[data-save-state="dirty"]:not(:disabled) {
+        box-shadow:
+            0 0 0 3px color-mix(in srgb, var(--app-focus-border) 22%, transparent),
+            var(--app-shadow-sm);
+    }
+}

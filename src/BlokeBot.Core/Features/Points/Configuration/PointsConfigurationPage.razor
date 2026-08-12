@@ -15,7 +15,7 @@
     <PageHeader Title="Points settings"
                 Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says." />
     <StickySaveRegion>
-        <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
+        <SaveChangesButton Disabled="@(!_featureEnabled || _config is null)" OnSave="SaveAsync" />
     </StickySaveRegion>
 
     @if (Host is null)

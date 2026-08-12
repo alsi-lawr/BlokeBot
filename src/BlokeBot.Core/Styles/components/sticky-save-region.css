@@ -52,8 +52,24 @@
         color: var(--app-warning-text);
     }
 
-    .sticky-save-region[data-save-active="true"] {
+    /*
+     * Only the elected owner leaves the flow, so only the owner needs its footprint reserved.
+     * Reserving it for every active region left dead space around each inline Save button.
+     */
+    .sticky-save-region[data-save-active="true"][data-save-visible="true"] {
         min-height: 4.25rem;
+    }
+
+    .sticky-save-region__surface {
+        transition:
+            opacity 0.25s ease,
+            transform 0.25s ease;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .sticky-save-region__surface {
+            transition: none;
+        }
     }
 
     .sticky-save-region[data-save-active="true"][data-save-visible="true"]
@@ -66,9 +82,19 @@
         box-shadow: var(--app-shadow-surface);
         max-width: calc(100vw - 2rem);
         padding: 0.5rem;
+        opacity: 1;
         position: fixed;
         right: 1rem;
+        transform: translateY(0);
         z-index: 35;
+    }
+
+    @starting-style {
+        .sticky-save-region[data-save-active="true"][data-save-visible="true"]
+            .sticky-save-region__surface {
+            opacity: 0;
+            transform: translateY(0.5rem);
+        }
     }
 
     .sticky-save-region[data-save-scope="modal"][data-save-visible="true"]
@@ -110,7 +136,7 @@
     }
 
     @media (max-width: 30rem) {
-        .sticky-save-region[data-save-active="true"] {
+        .sticky-save-region[data-save-active="true"][data-save-visible="true"] {
             min-height: 4.75rem;
         }
 

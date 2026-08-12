@@ -59,18 +59,20 @@ function compareOwners(left, right) {
     return proximityDifference !== 0 ? proximityDifference : documentOrder(left, right);
 }
 
-function updateBoundaryEnrollment() {
-    for (const [boundary, state] of boundaries) {
-        const active = [...state.registrations].some(
-            (registration) => isActive(registration) && isRendered(registration),
-        );
-        boundary.dataset.stickySaveBoundaryActive = String(active);
+function updateBoundaryEnrollment(owner) {
+    // Only a floating owner overlaps content, so only its boundary reserves room for the bar.
+    // A modal owner stays in flow, and every other boundary keeps its natural spacing.
+    const enrolled =
+        owner !== undefined && owner.region.dataset.saveScope !== "modal"
+            ? owner.boundary
+            : undefined;
+    for (const boundary of boundaries.keys()) {
+        boundary.dataset.stickySaveBoundaryActive = String(boundary === enrolled);
     }
 }
 
 function updateOwnership() {
     updateFrame = undefined;
-    updateBoundaryEnrollment();
 
     const candidates = [...registrations.values()].filter(isEligible);
     const modalCandidates = candidates.filter(
@@ -83,6 +85,8 @@ function updateOwnership() {
     for (const registration of registrations.values()) {
         registration.region.dataset.saveVisible = String(registration === owner);
     }
+
+    updateBoundaryEnrollment(owner);
 }
 
 function scheduleOwnershipUpdate() {
