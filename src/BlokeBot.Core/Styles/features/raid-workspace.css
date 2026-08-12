@@ -1,10 +1,4 @@
 @layer components {
-    /*
-     * Shared by the BlokeRaid and Raid & collaboration workspaces. Both are scoped components, and
-     * Blazor rewrites scoped selectors with a per-component attribute, so neither could reuse the
-     * other's copy. Page-specific divergences stay in the scoped stylesheets, where the added
-     * attribute outranks these rules.
-     */
     .raid-workspace {
         display: grid;
         gap: 1rem;

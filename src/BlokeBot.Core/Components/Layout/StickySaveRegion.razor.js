@@ -1,5 +1,6 @@
 const registrations = new Map();
 const boundaries = new Map();
+const sentinels = new Map();
 const boundaryInteractions = new WeakMap();
 
 let intersectionObserver;
@@ -22,6 +23,7 @@ function isEligible(registration) {
     return (
         isActive(registration) &&
         registration.boundaryState.intersects &&
+        !registration.sentinelVisible &&
         isRendered(registration)
     );
 }
@@ -60,8 +62,6 @@ function compareOwners(left, right) {
 }
 
 function updateBoundaryEnrollment(owner) {
-    // Only a floating owner overlaps content, so only its boundary reserves room for the bar.
-    // A modal owner stays in flow, and every other boundary keeps its natural spacing.
     const enrolled =
         owner !== undefined && owner.region.dataset.saveScope !== "modal"
             ? owner.boundary
@@ -126,6 +126,11 @@ function startCoordinator() {
                 if (state) {
                     state.intersects = entry.isIntersecting;
                 }
+
+                const anchored = sentinels.get(entry.target);
+                if (anchored) {
+                    anchored.sentinelVisible = entry.isIntersecting;
+                }
             }
             scheduleOwnershipUpdate();
         },
@@ -184,13 +189,20 @@ export function register(region) {
 
     const activeObserver = new MutationObserver(scheduleOwnershipUpdate);
     const visibilityObserver = new MutationObserver(updateOwnershipImmediately);
+    const sentinel = region.querySelector(".sticky-save-region__sentinel");
     const registration = {
         activeObserver,
         boundary,
         boundaryState,
         region,
+        sentinel,
+        sentinelVisible: sentinel ? initialIntersection(sentinel) : false,
         visibilityObserver,
     };
+    if (sentinel) {
+        sentinels.set(sentinel, registration);
+        intersectionObserver.observe(sentinel);
+    }
     registrations.set(region, registration);
     boundaryState.registrations.add(registration);
     activeObserver.observe(region, { attributes: true, attributeFilter: ["data-save-active"] });
@@ -211,6 +223,10 @@ export function register(region) {
         dispose() {
             activeObserver.disconnect();
             visibilityObserver.disconnect();
+            if (sentinel) {
+                intersectionObserver.unobserve(sentinel);
+                sentinels.delete(sentinel);
+            }
             registrations.delete(region);
             boundaryState.registrations.delete(registration);
             region.dataset.saveVisible = "false";

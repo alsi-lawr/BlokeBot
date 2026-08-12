@@ -12,7 +12,6 @@ html {
     --app-control-hover-border: #94a3b8;
     --app-focus-border: #64748b;
     --app-focus-shadow: 0 0 0 3px rgb(100 116 139 / 0.16);
-    /* Resolves against the themed --app-focus-border, so one definition serves both themes. */
     --app-focus-outline: 3px solid color-mix(in srgb, var(--app-focus-border) 38%, transparent);
     --app-placeholder: #94a3b8;
     --app-text-strong: #0f172a;

@@ -82,10 +82,6 @@
         outline-offset: 2px;
     }
 
-    /*
-     * The framed field owns its own border so the control inside it can be borderless.
-     * Nesting a bordered .input inside would draw two frames, so use .field__input there.
-     */
     .field {
         background: var(--app-surface-solid);
         border: 1px solid var(--app-border);

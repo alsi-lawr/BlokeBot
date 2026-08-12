@@ -1,8 +1,4 @@
 @layer components {
-    /*
-     * The card-table transform comes from .responsive-data-cards. Only the action cell differs:
-     * the leaderboard's trailing control fills its card row instead of sitting inline.
-     */
     @media (max-width: 30rem) {
         .points-dashboard__leaderboard td:last-child .control-surface {
             justify-content: center;

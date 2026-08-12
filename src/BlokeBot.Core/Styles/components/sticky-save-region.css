@@ -52,10 +52,6 @@
         color: var(--app-warning-text);
     }
 
-    /*
-     * Only the elected owner leaves the flow, so only the owner needs its footprint reserved.
-     * Reserving it for every active region left dead space around each inline Save button.
-     */
     .sticky-save-region[data-save-active="true"][data-save-visible="true"] {
         min-height: 4.25rem;
     }

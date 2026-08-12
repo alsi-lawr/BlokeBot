@@ -1,4 +1,3 @@
-/* container-type must not sit above the fixed sticky Save surface, so it stops at the body. */
 .raid-section__body {
     container-type: inline-size;
 }
