@@ -239,17 +239,12 @@ internal sealed class EventSubChannelOperations(
                 NativeTwitchFeature.Shoutouts,
                 cancellationToken
             ),
-            // One incoming channel.raid subscription serves shoutouts, collaboration, and automations.
+            // One incoming channel.raid subscription serves collaboration and automations.
             EventSubOperationSubscriptionKind.Raids => await nativeTwitch.IsEnabledAsync(
                 channel,
-                NativeTwitchFeature.Shoutouts,
+                NativeTwitchFeature.RaidCollaboration,
                 cancellationToken
             )
-                || await nativeTwitch.IsEnabledAsync(
-                    channel,
-                    NativeTwitchFeature.RaidCollaboration,
-                    cancellationToken
-                )
                 || await AutomationRequiresAsync(
                     channel,
                     AutomationEventSubRequirement.IncomingRaids,
