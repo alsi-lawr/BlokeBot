@@ -609,6 +609,115 @@ public sealed class CompetitionUiTests
         _ = page.Find(".competition-fixture--selected");
     }
 
+    [Test]
+    [Arguments("standings", "Standings")]
+    [Arguments("schedule", "Schedule")]
+    [Arguments("entrants", "Entrants")]
+    [Arguments("settings", "Settings & history")]
+    public async Task EveryWorkspacePanel_IsHeadedByItsOwnTabLabel(string fragment, string label)
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedCompetitionHostAsync(database);
+        var service = CreateService(database);
+        _ = await SeedRunningCompetitionAsync(service, hostId);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo($"/competitions#{fragment}");
+
+        var page = RenderWorkspace(context);
+
+        var head = page.Find("[role='tabpanel'] [data-competition-panel-head]");
+        head.QuerySelector("h2")!.TextContent.Trim().ShouldBe(label);
+        page.Find("[aria-selected='true']").TextContent.Trim().ShouldBe(label);
+        page.Find("[role='tabpanel']")
+            .GetAttribute("aria-labelledby")
+            .ShouldBe(page.Find("[aria-selected='true']").Id);
+        page.FindAll("[data-competition-panel-head]").Count.ShouldBe(1);
+        head.QuerySelector("p")!.TextContent.Trim().ShouldNotBeEmpty();
+    }
+
+    [Test]
+    public async Task RunningWorkspacePanels_DescribeWhatEachPanelActuallyShows()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedCompetitionHostAsync(database);
+        var service = CreateService(database);
+        var running = await SeedRunningCompetitionAsync(service, hostId);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/competitions#standings");
+        var page = RenderWorkspace(context);
+
+        Hint(page).ShouldBe("Ranked from confirmed results.");
+        page.FindAll("tbody tr").Count.ShouldBe(running.Standings.Count);
+
+        Tab(page, "Schedule").Click();
+
+        var rounds = page.FindAll(".competition-schedule section").Count;
+        rounds.ShouldBe(running.Matches.Select(match => match.Round).Distinct().Count());
+        Hint(page).ShouldBe($"Round 1 of {rounds} · select a match to record a result.");
+
+        Tab(page, "Entrants").Click();
+
+        Hint(page).ShouldBe($"{page.FindAll(".competition-entrant").Count} of 8 registered.");
+
+        Tab(page, "Settings & history").Click();
+
+        Hint(page)
+            .ShouldBe(
+                $"Saved setup, rewards and {page.FindAll(".competition-audit li").Count} audit entries."
+            );
+    }
+
+    [Test]
+    public async Task DraftWorkspacePanels_SayWhereTheMissingContentComesFrom()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedCompetitionHostAsync(database);
+        var service = CreateService(database);
+        await SeedDraftAsync(service, hostId, "Community Cup");
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/competitions#standings");
+        var page = RenderWorkspace(context);
+
+        Hint(page).ShouldBe("Standings appear once entrants are registered.");
+
+        Tab(page, "Schedule").Click();
+
+        Hint(page).ShouldBe("Fixtures appear when the competition starts.");
+        page.FindAll(".competition-fixture").ShouldBeEmpty();
+
+        Tab(page, "Entrants").Click();
+
+        Hint(page).ShouldBe("0 of 8 registered.");
+    }
+
+    [Test]
+    public async Task RegistrationEntrantsPanel_PointsAtTheRegistrationFormItRenders()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedCompetitionHostAsync(database);
+        var service = CreateService(database);
+        await SeedDraftAsync(service, hostId, "Community Cup");
+        var competition = (await service.GetModeratorAsync(hostId, default)).Single().Competition;
+        _ = (
+            await service.OpenRegistrationAsync(hostId, Transition(competition), default)
+        ).ShouldBeOfType<CompetitionOutcome.Succeeded>();
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+        var navigation = context.Services.GetRequiredService<BunitNavigationManager>();
+        navigation.NavigateTo("/competitions#entrants");
+
+        var page = RenderWorkspace(context);
+
+        Hint(page).ShouldBe("0 of 8 registered · register another below.");
+        _ = page.Find(".competition-registration");
+    }
+
     private static readonly string[] _composerStages =
     [
         "competition-format",
@@ -729,6 +838,9 @@ public sealed class CompetitionUiTests
         page.WaitForAssertion(() => _ = page.Find("[role='tablist']"));
         return page;
     }
+
+    private static string Hint(IRenderedComponent<CompetitionsPage> page) =>
+        page.Find("[role='tabpanel'] [data-competition-panel-head] p").TextContent.Trim();
 
     private static IElement Tab(IRenderedComponent<CompetitionsPage> page, string label) =>
         page.FindAll("[role='tab']").Single(tab => tab.TextContent.Trim() == label);

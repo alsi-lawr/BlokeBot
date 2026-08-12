@@ -347,6 +347,41 @@ public partial class CompetitionsPage
         _selectedMatchId = selected?.Id;
     }
 
+    /// <summary>
+    /// The panel heading reads from the tab list so it can never drift from the tab that names the
+    /// panel for assistive technology.
+    /// </summary>
+    private string _panelTitle =>
+        _tabs.Single(tab => string.Equals(tab.Key, _activeTab, StringComparison.Ordinal)).Label;
+
+    private string PanelHint(CompetitionModeratorView view) =>
+        _activeTab switch
+        {
+            _standingsKey => StandingsHint(view.Competition),
+            _scheduleKey => ScheduleHint(view.Competition),
+            _entrantsKey => EntrantsHint(view.Competition),
+            _ => SettingsHint(view),
+        };
+
+    private static string StandingsHint(CompetitionView competition) =>
+        competition.Standings.Count == 0
+            ? "Standings appear once entrants are registered."
+            : "Ranked from confirmed results.";
+
+    private static string ScheduleHint(CompetitionView competition) =>
+        competition.Matches.Count == 0 ? "Fixtures appear when the competition starts."
+        : competition.Status == CompetitionStatus.Running
+            ? $"Round {CurrentRound(competition)} of {TotalRounds(competition)} · select a match to record a result."
+        : "Fixtures from every round.";
+
+    private static string EntrantsHint(CompetitionView competition) =>
+        competition.Status == CompetitionStatus.Registration
+            ? $"{competition.Entrants.Count} of {competition.Capacity} registered · register another below."
+            : $"{competition.Entrants.Count} of {competition.Capacity} registered.";
+
+    private static string SettingsHint(CompetitionModeratorView view) =>
+        $"Saved setup, rewards and {view.Audit.Count} audit {(view.Audit.Count == 1 ? "entry" : "entries")}.";
+
     private static int CurrentRound(CompetitionView competition) =>
         competition
             .Matches.Where(x => x.Status == CompetitionMatchStatus.Pending)
