@@ -1,4 +1,45 @@
 @layer components {
+    .bounty-authoring {
+        display: grid;
+        gap: 1.1rem;
+    }
+
+    .bounty-authoring__group {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .bounty-authoring__group-label {
+        color: var(--app-text-muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .bounty-authoring__submit {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .bounty-row-actions {
+        align-items: flex-start;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    /* Row actions are secondary to the row itself: pin them to their label width so no future
+       grid, stretch or full-width breakpoint rule can grow one into its whole column, and stop
+       them shrinking below the shared control height. */
+    .bounty-row-actions > .btn-primary,
+    .bounty-row-actions > .btn-secondary {
+        flex: 0 0 auto;
+        justify-self: start;
+        max-width: 100%;
+        width: auto;
+    }
+
     /* The marker suppression and the chevron rotation both hang off the parent details' open
        state, which a utility on the chevron cannot address. */
     .bounty-disclosure > summary {

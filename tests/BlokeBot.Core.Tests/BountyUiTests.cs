@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
+using AngleSharp.Dom;
 using BlokeBot.Core.Features.Bounties;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
@@ -8,7 +11,7 @@ using Shouldly;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class BountyUiTests
+public sealed partial class BountyUiTests
 {
     private static readonly DateTimeOffset _now = new(2026, 8, 10, 10, 0, 0, TimeSpan.Zero);
 
@@ -98,6 +101,169 @@ public sealed class BountyUiTests
             cut.Markup.ShouldNotContain("RETAINED-PRIVATE");
         });
     }
+
+    [Test]
+    public async Task NewBounty_CreatesWithEveryGroupedChoiceAndThePrivateModeratorNote()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        var service = CreateService(database);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+
+        var page = RenderAuthoring(context);
+        page.Find("#bounty-title").Input("No-reset speedrun");
+        page.Find("#bounty-expiry").Input("2026-09-01 16:00");
+        page.Find("#bounty-description").Input("Fund a no-reset attempt tonight.");
+        page.Find("#bounty-target").Input("1500");
+        page.Find("#bounty-reward").Input("300");
+        page.Find("#bounty-visibility").Change(nameof(BountyVisibility.Private));
+        page.Find("[data-failure-policy='Spend']").Click();
+        page.Find("[data-reward-distribution='Equal']").Click();
+        OpenModeratorNote(page);
+        page.Find("#bounty-create-reason").Input("PRIVATE-CREATION-NOTE");
+        page.Find(".bounty-authoring__submit button").Click();
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("Created proposed bounty"));
+        var created = (
+            await service.GetModeratorBoardAsync(hostId, default)
+        ).ShouldHaveSingleItem();
+        created.Bounty.Title.ShouldBe("No-reset speedrun");
+        created.Bounty.Description.ShouldBe("Fund a no-reset attempt tonight.");
+        created.Bounty.FundingTarget.ShouldBe(new PointAmount(1500));
+        created.Bounty.CompletionReward.ShouldBe(new PointAmount(300));
+        created.Bounty.ExpiresAtUtc.ShouldBe(new DateTime(2026, 9, 1, 16, 0, 0, DateTimeKind.Utc));
+        created.Bounty.Visibility.ShouldBe(BountyVisibility.Private);
+        created.Bounty.FailurePledgePolicy.ShouldBe(BountyFailurePledgePolicy.Spend);
+        created.Bounty.RewardDistribution.ShouldBe(BountyRewardDistribution.Equal);
+        created.Audits.ShouldContain(audit => audit.Reason == "PRIVATE-CREATION-NOTE");
+    }
+
+    [Test]
+    public async Task InvalidFundingTarget_KeepsTheExistingValidationMessageAndPersistsNothing()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        var service = CreateService(database);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+
+        var page = RenderAuthoring(context);
+        page.Find("#bounty-title").Input("Unfunded challenge");
+        page.Find("#bounty-target").Input("0");
+        page.Find(".bounty-authoring__submit button").Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("[role='alert']")
+                .TextContent.ShouldContain("Funding target must be a positive whole number.")
+        );
+        (await service.GetModeratorBoardAsync(hostId, default)).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ModeratorNote_IsAKeyboardDisclosureThatStaysCollapsedByDefault()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(CreateService(database));
+
+        var page = RenderAuthoring(context);
+
+        var toggle = page.Find("[data-fold='bounty-moderator-note'] button");
+        toggle.GetAttribute("type").ShouldBe("button");
+        toggle.TextContent.ShouldContain("Moderator note");
+        toggle.GetAttribute("aria-expanded").ShouldBe("false");
+        var bodyId = toggle.GetAttribute("aria-controls");
+        bodyId.ShouldNotBeNullOrWhiteSpace();
+        page.Find($"#{bodyId}").HasAttribute("inert").ShouldBeTrue();
+
+        OpenModeratorNote(page);
+
+        page.Find($"#{bodyId}").HasAttribute("inert").ShouldBeFalse();
+        page.Find("label[for='bounty-create-reason']").TextContent.Trim().ShouldBe("Private note");
+        page.Find($"#{bodyId}").TextContent.ShouldContain("Viewers never see it.");
+    }
+
+    [Test]
+    public async Task CreateAndExtendStayNormalFlowActionsOutsideEverySaveRegion()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        var service = CreateService(database);
+        _ = await CreateAndOpenAsync(service, hostId, "Funded challenge", BountyVisibility.Public);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+
+        var page = RenderAuthoring(context);
+
+        page.Find(".bounty-authoring__submit button").Closest("[data-save-scope]").ShouldBeNull();
+        var extend = Button(page, "Extend");
+        extend.Closest("[data-save-scope]").ShouldBeNull();
+        extend.ParentElement!.ClassList.ShouldContain("bounty-row-actions");
+        extend.GetAttribute("aria-expanded").ShouldBe("false");
+        page.FindAll("[data-save-scope]").ShouldBeEmpty();
+
+        extend.Click();
+
+        page.WaitForAssertion(() => page.FindAll("[data-save-scope]").Count.ShouldBe(1));
+        Button(page, "Extend").Closest("[data-save-scope]").ShouldBeNull();
+        _ = Button(page, "Save new expiry").Closest("[data-save-scope]").ShouldNotBeNull();
+    }
+
+    [Test]
+    public void RowActionCss_PinsRowActionsToTheirIntrinsicWidth()
+    {
+        var css = Whitespace()
+            .Replace(File.ReadAllText(Path.Combine(BountyStyleSourceRoot(), "bounties.css")), " ");
+
+        css.ShouldContain(
+            ".bounty-row-actions > .btn-primary, .bounty-row-actions > .btn-secondary { flex: 0 0 auto; justify-self: start; max-width: 100%; width: auto; }"
+        );
+    }
+
+    private static BountyService CreateService(SqliteBlokeBotDbFactory database) =>
+        new(database, TestEventBus.Create<AppEventKind>(), new FixedTimeProvider(_now));
+
+    private static IRenderedComponent<BountiesPage> RenderAuthoring(BunitContext context)
+    {
+        var page = context.Render<BountiesPage>();
+        page.WaitForAssertion(() =>
+            _ = page.Find("[data-stage='bounty-new'] .studio-stage__header")
+        );
+        page.Find("[data-stage='bounty-new'] .studio-stage__header").Click();
+        page.WaitForAssertion(() => _ = page.Find(".bounty-authoring__submit button"));
+        return page;
+    }
+
+    private static void OpenModeratorNote(IRenderedComponent<BountiesPage> page)
+    {
+        page.Find("[data-fold='bounty-moderator-note'] button").Click();
+        page.WaitForAssertion(() =>
+            page.Find("[data-fold='bounty-moderator-note'] button")
+                .GetAttribute("aria-expanded")
+                .ShouldBe("true")
+        );
+    }
+
+    private static IElement Button(IRenderedComponent<BountiesPage> page, string label) =>
+        page.FindAll("button").Single(button => button.TextContent.Trim() == label);
+
+    private static string BountyStyleSourceRoot([CallerFilePath] string testFile = "") =>
+        Path.GetFullPath(
+            Path.Combine(
+                Path.GetDirectoryName(testFile)!,
+                "..",
+                "..",
+                "src",
+                "BlokeBot.Core",
+                "Styles",
+                "features"
+            )
+        );
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Whitespace();
 
     private static async Task<BountyView> CreateAndOpenAsync(
         BountyService service,

@@ -56,54 +56,85 @@
                 <StudioStage Key="bounty-new"
                              Number="1"
                              Title="New bounty"
-                             Summary="Title, description, funding target, expiry, failure policy, bonus distribution"
+                             Summary="Set the challenge, funding goal and outcome rules."
                              Open="_draftOpen"
                              OpenChanged="open => _draftOpen = open">
-                    <div class="studio-grid">
-                        <div class="studio-span-8">
-                            <Field Id="bounty-title" Label="Title" @bind-Value="_draft.Title" />
+                    <div class="bounty-authoring">
+                        <div class="studio-grid">
+                            <div class="studio-span-8">
+                                <Field Id="bounty-title" Label="Challenge" @bind-Value="_draft.Title" />
+                            </div>
+                            <div class="studio-span-4">
+                                <Field Id="bounty-expiry" Label="Funding ends (UTC)" @bind-Value="_draft.ExpiresAtUtc" />
+                            </div>
+                            <div class="studio-span-12">
+                                <TextAreaField Id="bounty-description" Label="What happens on stream?" @bind-Value="_draft.Description" />
+                            </div>
+                            <div class="studio-span-4">
+                                <Field Id="bounty-target" Label="Funding target" @bind-Value="_draft.FundingTarget" />
+                            </div>
+                            <div class="studio-span-4">
+                                <Field Id="bounty-reward" Label="Completion bonus" @bind-Value="_draft.CompletionReward" />
+                            </div>
+                            <div class="studio-span-4 space-y-2">
+                                <label class="label" for="bounty-visibility">Visibility</label>
+                                <select id="bounty-visibility" class="input w-auto max-w-full" @bind="_draft.Visibility">
+                                    <option value="@BountyVisibility.Public">Public</option>
+                                    <option value="@BountyVisibility.Private">Private</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="studio-span-4">
-                            <Field Id="bounty-expiry" Label="Expiry (UTC)" @bind-Value="_draft.ExpiresAtUtc" />
+
+                        <div class="bounty-authoring__group">
+                            <span class="bounty-authoring__group-label">If the bounty fails</span>
+                            <StudioChoiceCards id="bounty-failure"
+                                               AriaLabel="If the bounty fails"
+                                               Columns="StudioChoiceCardsColumns.Two">
+                                @foreach (var choice in _failureChoices)
+                                {
+                                    <StudioChoiceCard @key="choice.Policy"
+                                                      data-failure-policy="@choice.Policy"
+                                                      Title="@choice.Title"
+                                                      Description="@choice.Description"
+                                                      Pressed="@(_draft.FailurePolicy == choice.Policy)"
+                                                      Select="@(() => _draft.FailurePolicy = choice.Policy)" />
+                                }
+                            </StudioChoiceCards>
                         </div>
-                        <div class="studio-span-12">
-                            <TextAreaField Id="bounty-description" Label="Description" @bind-Value="_draft.Description" />
+
+                        <div class="bounty-authoring__group">
+                            <span class="bounty-authoring__group-label">Split the completion bonus</span>
+                            <StudioChoiceCards id="bounty-reward-distribution"
+                                               AriaLabel="Split the completion bonus"
+                                               Columns="StudioChoiceCardsColumns.Two">
+                                @foreach (var choice in _distributionChoices)
+                                {
+                                    <StudioChoiceCard @key="choice.Distribution"
+                                                      data-reward-distribution="@choice.Distribution"
+                                                      Title="@choice.Title"
+                                                      Description="@choice.Description"
+                                                      Pressed="@(_draft.RewardDistribution == choice.Distribution)"
+                                                      Select="@(() => _draft.RewardDistribution = choice.Distribution)" />
+                                }
+                            </StudioChoiceCards>
                         </div>
-                        <div class="studio-span-4">
-                            <Field Id="bounty-target" Label="Funding target" @bind-Value="_draft.FundingTarget" />
-                        </div>
-                        <div class="studio-span-4">
-                            <Field Id="bounty-reward" Label="Completion bonus pool" @bind-Value="_draft.CompletionReward" />
-                        </div>
-                        <div class="studio-span-4 space-y-2">
-                            <label class="label" for="bounty-visibility">Visibility</label>
-                            <select id="bounty-visibility" class="input w-auto max-w-full" @bind="_draft.Visibility">
-                                <option value="@BountyVisibility.Public">Public</option>
-                                <option value="@BountyVisibility.Private">Private</option>
-                            </select>
-                        </div>
-                        <div class="studio-span-6 space-y-2">
-                            <label class="label" for="bounty-failure">If the bounty fails</label>
-                            <select id="bounty-failure" class="input w-auto max-w-full" @bind="_draft.FailurePolicy">
-                                <option value="@BountyFailurePledgePolicy.Refund">Refund pledges</option>
-                                <option value="@BountyFailurePledgePolicy.Spend">Spend pledges</option>
-                            </select>
-                        </div>
-                        <div class="studio-span-6 space-y-2">
-                            <label class="label" for="bounty-reward-distribution">Completion bonus distribution</label>
-                            <select id="bounty-reward-distribution" class="input w-auto max-w-full" @bind="_draft.RewardDistribution">
-                                <option value="@BountyRewardDistribution.Equal">Equal</option>
-                                <option value="@BountyRewardDistribution.Proportional">Proportional</option>
-                            </select>
-                        </div>
-                        <div class="studio-span-12">
-                            <TextAreaField Id="bounty-create-reason" Label="Private moderator note" @bind-Value="_draft.Reason" />
-                        </div>
-                        <div class="studio-span-12">
-                            <button class="btn-primary" type="button" @onclick="CreateAsync">Create proposed bounty</button>
-                        </div>
+
+                        <StudioFold Bare
+                                    Key="bounty-moderator-note"
+                                    Label="Moderator note"
+                                    Open="_moderatorNoteOpen"
+                                    OpenChanged="open => _moderatorNoteOpen = open">
+                            <TextAreaField Id="bounty-create-reason" Label="Private note" @bind-Value="_draft.Reason" />
+                            <p class="mt-1 text-xs text-muted-foreground">Kept with the private moderation record for this bounty. Viewers never see it.</p>
+                        </StudioFold>
                     </div>
                 </StudioStage>
+                @if (_draftOpen)
+                {
+                    <div class="bounty-authoring__submit">
+                        <button class="btn-primary" type="button" @onclick="CreateAsync">Create proposed bounty</button>
+                    </div>
+                }
             </div>
 
             <StudioSegmentedPill TValue="BountyBoardFilter"
@@ -231,7 +262,7 @@
                                     </div>
                                     <div class="studio-span-6">
                                         <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
-                                        <div class="mt-2 flex flex-wrap gap-2 max-md:mt-0">
+                                        <div class="bounty-row-actions mt-2 max-md:mt-0">
                                             @if (BountyLifecycle.CanExtend(bounty.Status))
                                             {
                                                 <button class="btn-secondary"

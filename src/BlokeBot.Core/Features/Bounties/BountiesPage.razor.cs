@@ -16,6 +16,7 @@ public partial class BountiesPage
     private BountyDraft _draft = new();
     private BountyBoardFilter _boardFilter = BountyBoardFilter.Active;
     private bool _draftOpen;
+    private bool _moderatorNoteOpen;
     private bool _bountiesConfigured;
     private bool _pointsEnabled;
     private bool _featureEnabled;
@@ -33,6 +34,46 @@ public partial class BountiesPage
                 == (_boardFilter == BountyBoardFilter.History)
             ),
         ];
+
+    private sealed record FailureChoice(
+        BountyFailurePledgePolicy Policy,
+        string Title,
+        string Description
+    );
+
+    private static readonly IReadOnlyList<FailureChoice> _failureChoices =
+    [
+        new(
+            BountyFailurePledgePolicy.Refund,
+            "Refund pledges",
+            "Return every held point to its contributor."
+        ),
+        new(
+            BountyFailurePledgePolicy.Spend,
+            "Spend pledges",
+            "Keep the pledged points spent by their contributors."
+        ),
+    ];
+
+    private sealed record DistributionChoice(
+        BountyRewardDistribution Distribution,
+        string Title,
+        string Description
+    );
+
+    private static readonly IReadOnlyList<DistributionChoice> _distributionChoices =
+    [
+        new(
+            BountyRewardDistribution.Equal,
+            "Equal split",
+            "Every contributor gets the same share."
+        ),
+        new(
+            BountyRewardDistribution.Proportional,
+            "By contribution",
+            "Larger pledges receive a larger share."
+        ),
+    ];
 
     private IReadOnlyList<StudioSegmentedOption<BountyBoardFilter>> _boardFilters =>
         [
@@ -114,6 +155,7 @@ public partial class BountiesPage
                 if (!_operationFailed)
                 {
                     _draft = BountyDraft.New(_nowUtc);
+                    _moderatorNoteOpen = false;
                     _boardFilter = BountyBoardFilter.Active;
                     await LoadAsync();
                 }
