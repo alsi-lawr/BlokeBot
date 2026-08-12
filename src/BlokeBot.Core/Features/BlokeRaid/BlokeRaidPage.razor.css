@@ -1,3 +1,9 @@
+.raid-workspace {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+}
+
 .raid-feedback {
     border: 1px solid var(--app-border);
     border-radius: 0.75rem;
@@ -33,7 +39,6 @@
 .raid-ward,
 .raid-table-card > header,
 .raid-history-card > header,
-.raid-config > summary,
 .raid-recaps > summary,
 .raid-empty-campaign,
 .raid-empty-campaign > div,
@@ -46,7 +51,6 @@
 .raid-meter__label,
 .raid-table-card > header,
 .raid-history-card > header,
-.raid-config > summary,
 .raid-recaps > summary,
 .raid-empty-campaign {
     justify-content: space-between;
@@ -75,7 +79,6 @@
 .raid-control h2,
 .raid-table-card h2,
 .raid-history-card h2,
-.raid-config h2,
 .raid-recaps h2,
 .raid-empty-campaign h2 {
     margin: 0;
@@ -172,7 +175,6 @@
 
 .raid-phase-response p,
 .raid-control > p,
-.raid-config summary p,
 .raid-recaps summary p,
 .raid-empty-campaign p,
 .raid-recaps__body p {
@@ -255,23 +257,14 @@
     margin-top: 0.7rem;
 }
 
-.raid-activity-layout,
-.raid-config,
-.raid-recaps,
-.raid-empty-campaign {
-    margin-top: 1rem;
-}
-
 .raid-table-card,
 .raid-history-card,
-.raid-config,
 .raid-recaps {
     overflow: hidden;
 }
 
 .raid-table-card > header,
 .raid-history-card > header,
-.raid-config > summary,
 .raid-recaps > summary {
     border-bottom: 1px solid var(--app-border);
     padding: 0.9rem 1rem;
@@ -359,60 +352,279 @@
     padding: 1.25rem;
 }
 
-.raid-config > summary,
 .raid-recaps > summary {
     cursor: pointer;
     list-style: none;
 }
 
-.raid-config > summary::-webkit-details-marker,
 .raid-recaps > summary::-webkit-details-marker {
     display: none;
 }
 
-.raid-config[open] > summary > span,
 .raid-recaps[open] > summary > span {
     transform: rotate(90deg);
 }
 
-.raid-config__body {
+.raid-configuration {
     display: grid;
-    gap: 1.1rem;
-    padding: 1rem;
-}
-
-.raid-rule-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-}
-
-.raid-rule-editor {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.45rem 0.6rem;
+    gap: 1rem;
     min-width: 0;
-    border: 1px solid var(--app-border);
-    border-radius: 0.75rem;
-    padding: 0.8rem;
-    background: var(--app-surface-muted);
 }
 
-.raid-rule-editor legend {
-    grid-column: 1 / -1;
-    padding: 0 0.25rem;
+.raid-section {
+    min-width: 0;
+}
+
+.raid-section__header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--app-border);
+    padding: 1rem 1.25rem;
+}
+
+.raid-section__step {
+    display: flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tone-blue-ring);
+    border-radius: 999px;
+    background: var(--tone-blue-bg);
+    color: var(--tone-blue-fg);
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.raid-section__heading {
     color: var(--app-text-strong);
-    font-size: 0.78rem;
+    font-size: 1rem;
     font-weight: 750;
 }
 
-.raid-rule-editor .label {
-    align-self: end;
-    font-size: 0.62rem;
+.raid-section__description {
+    margin-top: 0.15rem;
+    color: var(--app-text-muted);
+    font-size: 0.8rem;
+    line-height: 1.5;
 }
 
-.raid-rule-editor .input {
+/* Grouped fields answer to the width of the section they sit in. The 18rem navigation rail only
+   takes space from 64rem up, so a viewport just under that leaves this body wider than a viewport
+   just over it. The query context stops at the body so it stays clear of the sticky Save surface,
+   whose fixed positioning would otherwise resolve against a container box. */
+.raid-section__body {
+    container-type: inline-size;
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.raid-section__note {
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.raid-field-grid,
+.raid-card-grid,
+.raid-split,
+.raid-option-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.raid-card-grid,
+.raid-compact-grid {
+    gap: 0.75rem;
+}
+
+.raid-field {
+    display: grid;
+    align-content: start;
+    gap: 0.4rem;
     min-width: 0;
+}
+
+.raid-field .input {
+    min-width: 0;
+}
+
+.raid-rule-card {
+    display: grid;
+    align-content: start;
+    gap: 0.7rem;
+    min-width: 0;
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+    background: var(--app-surface-muted);
+}
+
+.raid-rule-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.raid-rule-card__head h3 {
+    color: var(--app-text-strong);
+    font-size: 0.95rem;
+    font-weight: 750;
+}
+
+.raid-rule-card__hint {
+    color: var(--app-text-muted);
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.raid-rule-card__hint code {
+    color: var(--tone-violet-fg);
+    font-weight: 700;
+}
+
+.raid-compact-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.raid-compact {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--app-surface-solid);
+}
+
+.raid-compact--wide {
+    grid-column: 1 / -1;
+}
+
+.raid-compact__label {
+    color: var(--app-text-muted);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.raid-compact__input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--app-text-strong);
+    font-size: 0.95rem;
+    font-weight: 700;
+    outline: none;
+}
+
+.raid-compact:focus-within {
+    border-color: var(--app-focus-border);
+    box-shadow: var(--app-focus-shadow);
+}
+
+.raid-reset {
+    display: grid;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.raid-option {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.75rem;
+    padding: 0.9rem;
+    background: var(--app-control-bg);
+    cursor: pointer;
+}
+
+.raid-option:hover {
+    border-color: var(--app-control-hover-border);
+    background: var(--app-control-hover);
+}
+
+.raid-option--selected,
+.raid-option--selected:hover {
+    border-color: var(--app-focus-border);
+    background: var(--app-surface-solid);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.raid-option:focus-within {
+    border-color: var(--app-focus-border);
+    box-shadow: var(--app-focus-shadow);
+}
+
+.raid-option input {
+    accent-color: var(--tone-blue-fg);
+}
+
+.raid-option__icon {
+    display: grid;
+    width: 1.9rem;
+    height: 1.9rem;
+    place-items: center;
+    border: 1px solid var(--tone-blue-ring);
+    border-radius: 0.6rem;
+    background: var(--tone-blue-bg);
+    color: var(--tone-blue-fg);
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.raid-option__text {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.raid-option__title {
+    color: var(--app-text-strong);
+    font-weight: 700;
+}
+
+.raid-option__copy {
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+@container (min-width: 30rem) {
+    .raid-field-grid,
+    .raid-card-grid,
+    .raid-split,
+    .raid-option-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .raid-field--wide {
+        grid-column: 1 / -1;
+    }
+}
+
+@container (min-width: 46rem) {
+    .raid-field-grid,
+    .raid-card-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .raid-field--wide {
+        grid-column: span 2;
+    }
 }
 
 .raid-recaps__body {
@@ -441,9 +653,7 @@
     }
 
     .raid-control,
-    .raid-history-card,
-    .raid-config,
-    .raid-recaps {
+    .raid-history-card {
         margin-top: 0.8rem;
     }
 
@@ -493,7 +703,6 @@
         display: none;
     }
 
-    .raid-rule-grid,
     .raid-recaps__body {
         grid-template-columns: 1fr;
     }

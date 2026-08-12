@@ -1,13 +1,46 @@
 using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Core.Features.BlokeRaid;
 
 public partial class BlokeRaidPage
 {
+    private const string _workspaceTabsId = "raid-workspace";
+    private const string _campaignKey = "campaign";
+    private const string _configurationKey = "configuration";
+
+    private static readonly IReadOnlyList<SegmentedTabItem> _workspaceTabs =
+    [
+        new(_campaignKey, "Campaign"),
+        new(_configurationKey, "Configuration"),
+    ];
+
+    private static readonly IReadOnlyList<ResetPolicyOption> _resetPolicies =
+    [
+        new(
+            BlokeRaidResetPolicy.Manual,
+            "raid-reset-manual",
+            "↻",
+            "Manual",
+            "A fresh campaign starts only when a moderator resets it here."
+        ),
+        new(
+            BlokeRaidResetPolicy.Weekly,
+            "raid-reset-weekly",
+            "7",
+            "Weekly",
+            "At the chosen day and hour the active campaign ends and a fresh one starts."
+        ),
+    ];
+
+    [Inject]
+    private NavigationManager _navigation { get; set; } = null!;
+
     private BlokeRaidModeratorView? _view;
     private ConfigurationEditor _editor = new();
+    private string _workspaceKey = _campaignKey;
     private bool _enabled;
     private bool _loaded;
     private bool _operationFailed;
@@ -19,9 +52,33 @@ public partial class BlokeRaidPage
 
     protected override async Task OnInitializedAsync()
     {
+        _workspaceKey = SegmentedTabs.CanonicalKey(_navigation, _workspaceTabs);
         _ = await LoadPageContextAsync();
         await LoadAsync(adoptConfiguration: true);
     }
+
+    private static string DescriptionFor(string key) =>
+        key == _configurationKey
+            ? "Set the rules for the current and next campaign."
+            : "Lead chat through one persistent channel boss campaign.";
+
+    private void SelectWorkspace(string key) => _workspaceKey = key;
+
+    private void SelectResetPolicy(BlokeRaidResetPolicy policy) => _editor.ResetPolicy = policy;
+
+    private string ResetOptionClass(BlokeRaidResetPolicy policy) =>
+        _editor.ResetPolicy == policy ? "raid-option raid-option--selected" : "raid-option";
+
+    private static string RuleRange(ActionRuleEditor rule) =>
+        $"{rule.Minimum:N0}–{rule.Maximum:N0}";
+
+    private string PhaseOneBand() =>
+        $"100–{Math.Clamp(_editor.PhaseTwoHealthPercent + 1, 0, 100)}%";
+
+    private string PhaseTwoBand() =>
+        $"{_editor.PhaseTwoHealthPercent}–{Math.Clamp(_editor.PhaseThreeHealthPercent + 1, 0, 100)}%";
+
+    private string PhaseThreeBand() => $"{_editor.PhaseThreeHealthPercent}% and below";
 
     private async Task LoadAsync(bool adoptConfiguration = false)
     {
@@ -247,6 +304,14 @@ public partial class BlokeRaidPage
         amount = parsed;
         return valid;
     }
+
+    private sealed record ResetPolicyOption(
+        BlokeRaidResetPolicy Policy,
+        string Id,
+        string Icon,
+        string Title,
+        string Description
+    );
 
     private sealed class ConfigurationEditor
     {

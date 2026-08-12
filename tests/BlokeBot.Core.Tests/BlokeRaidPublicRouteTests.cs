@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
@@ -29,6 +30,49 @@ public sealed class BlokeRaidPublicRouteTests
         page.ShouldContain("data-public-raid-unavailable");
         response.Headers.Location.ShouldBeNull();
     }
+
+    [Test]
+    [Arguments("/raid/alpha")]
+    [Arguments("/raid/campaign")]
+    [Arguments("/raid/configuration")]
+    public async Task ChannelSegment_StillResolvesToThePublicPageForEveryWorkspaceName(string path)
+    {
+        await using var host = await PublicRouteHost.StartAsync();
+
+        using var response = await host.Client.GetAsync(path);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("data-public-raid-unavailable");
+        response.Headers.Location.ShouldBeNull();
+    }
+
+    [Test]
+    public void DashboardRouteTable_DeclaresNoSignedInChildRouteUnderRaid()
+    {
+        var routes = Directory
+            .EnumerateFiles(DashboardSourceRoot(), "*.razor", SearchOption.AllDirectories)
+            .SelectMany(File.ReadLines)
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("@page \"", StringComparison.Ordinal))
+            .Select(line => line["@page \"".Length..].TrimEnd('"'))
+            .Where(route => route.StartsWith("/raid/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        routes.ShouldBe(["/raid/{Channel}"]);
+    }
+
+    private static string DashboardSourceRoot([CallerFilePath] string testFile = "") =>
+        Path.GetFullPath(
+            Path.Combine(
+                Path.GetDirectoryName(testFile)!,
+                "..",
+                "..",
+                "src",
+                "BlokeBot.Core",
+                "Features"
+            )
+        );
 
     private sealed class PublicRouteHost(
         WebApplication app,

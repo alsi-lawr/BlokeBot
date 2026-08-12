@@ -1,4 +1,5 @@
 @page "/raid"
+@using BlokeBot.Core.Components.Layout
 @using BlokeBot.Core.Features.Points.Balances
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
@@ -12,10 +13,10 @@
 
 <DashboardPage Kicker="Cooperative game"
                Title="BlokeRaid"
-               Description="Lead chat through one persistent channel boss campaign."
+               Description="@DescriptionFor(_workspaceKey)"
                Width="DashboardPageWidth.Wide">
     <Actions>
-        @if (_enabled && Host is not null)
+        @if (_enabled && Host is not null && _workspaceKey == _campaignKey)
         {
             <a class="btn-secondary" href="@_publicUrl" target="_blank" rel="noopener">Open public standings</a>
         }
@@ -43,89 +44,324 @@
         }
         else
         {
-            @if (!string.IsNullOrWhiteSpace(_feedback))
-            {
-                <p class="raid-feedback" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
-            }
+            <SegmentedTabs Id="@_workspaceTabsId"
+                           OwnsFragment
+                           AriaLabel="BlokeRaid workspace"
+                           Items="_workspaceTabs"
+                           ActiveKey="@_workspaceKey"
+                           ActiveKeyChanged="SelectWorkspace" />
 
-            @if (_view.ActiveCampaign is { } campaign)
-            {
-                <section class="raid-layout" data-raid-campaign="@campaign.Id">
-                    <article class="card raid-boss">
-                        <header class="raid-boss__header">
-                            <div class="raid-boss__identity"><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>@campaign.BossName</h2><p>Phase @campaign.CurrentPhase of 3 · @PhaseLabel(campaign.CurrentPhase)</p></div></div>
-                            <span class="raid-boss__age">Active @Age(campaign.StartedAtUtc)</span>
-                        </header>
-                        <div class="raid-meter__label"><span>Boss health</span><strong>@campaign.CurrentHealth.ToString("N0") / @campaign.MaximumHealth.ToString("N0")</strong></div>
-                        <div class="raid-meter raid-meter--health" role="progressbar" aria-label="Boss health" aria-valuemin="0" aria-valuemax="@campaign.MaximumHealth" aria-valuenow="@campaign.CurrentHealth"><span style="width:@Percent(campaign.CurrentHealth, campaign.MaximumHealth)%"></span></div>
-                        <div class="raid-ward"><div class="raid-meter__label"><span>Raid ward</span><strong>@campaign.CurrentWard.ToString("N0") / @campaign.MaximumWard.ToString("N0")</strong></div><div class="raid-meter raid-meter--ward" role="progressbar" aria-label="Raid ward" aria-valuemin="0" aria-valuemax="@campaign.MaximumWard" aria-valuenow="@campaign.CurrentWard"><span style="width:@Percent(campaign.CurrentWard, campaign.MaximumWard)%"></span></div></div>
-                        <div class="raid-phase-response"><span aria-hidden="true">✦</span><div><strong>Phase response</strong><p>@PhaseResponse(campaign.CurrentPhase)</p></div></div>
-                        <div class="raid-action-rules">
-                            <div><strong>⚔ Attack <span>@Range(_view.Configuration.Attack)</span></strong><p>Damage · @Cooldown(_view.Configuration.Attack) · @_view.Configuration.Attack.PerStreamLimit per stream</p><code>!raid attack</code></div>
-                            <div><strong>✚ Mend <span>@Range(_view.Configuration.Mend)</span></strong><p>Restore ward · @Cooldown(_view.Configuration.Mend) · @_view.Configuration.Mend.PerStreamLimit per stream</p><code>!raid mend</code></div>
-                            <div><strong>✦ Nova <span>@Range(_view.Configuration.Special)</span></strong><p>@_view.Configuration.Special.PointCost.ToDisplayString() points · @Cooldown(_view.Configuration.Special) · @_view.Configuration.Special.PerStreamLimit per stream</p><code>!raid nova</code></div>
-                        </div>
-                    </article>
+            <div class="raid-workspace"
+                 id="@SegmentedTabs.PanelId(_workspaceTabsId, _workspaceKey)"
+                 role="tabpanel"
+                 aria-labelledby="@SegmentedTabs.TabId(_workspaceTabsId, _workspaceKey)"
+                 tabindex="0">
+                @if (_workspaceKey == _campaignKey)
+                {
+                    @if (!string.IsNullOrWhiteSpace(_feedback))
+                    {
+                        <p class="raid-feedback" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+                    }
 
-                    <aside class="card raid-control">
-                        <h2>Campaign control</h2>
-                        <dl><div><dt>Status</dt><dd><span class="status-pill status-pill--emerald"><span class="status-pill__dot"></span><span class="status-pill__label">Active</span></span></dd></div><div><dt>Ends</dt><dd>@campaign.EndsAtUtc.ToString("ddd d MMM · HH:mm") UTC</dd></div><div><dt>Reset policy</dt><dd>@ResetSummary()</dd></div><div><dt>Victory reward</dt><dd>@campaign.VictoryPointReward.ToDisplayString() points each</dd></div></dl>
-                        <div class="raid-control__actions"><button class="btn-danger" type="button" @onclick="EndAsync">End campaign</button><button class="btn-secondary" type="button" @onclick="ResetAsync">Reset now</button></div>
-                        <p>Lifecycle controls act immediately and are never sticky. Reset starts a fresh recorded campaign without deleting history.</p>
-                    </aside>
-                </section>
+                    @if (_view.ActiveCampaign is { } campaign)
+                    {
+                        <section class="raid-layout" data-raid-campaign="@campaign.Id">
+                            <article class="card raid-boss">
+                                <header class="raid-boss__header">
+                                    <div class="raid-boss__identity"><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>@campaign.BossName</h2><p>Phase @campaign.CurrentPhase of 3 · @PhaseLabel(campaign.CurrentPhase)</p></div></div>
+                                    <span class="raid-boss__age">Active @Age(campaign.StartedAtUtc)</span>
+                                </header>
+                                <div class="raid-meter__label"><span>Boss health</span><strong>@campaign.CurrentHealth.ToString("N0") / @campaign.MaximumHealth.ToString("N0")</strong></div>
+                                <div class="raid-meter raid-meter--health" role="progressbar" aria-label="Boss health" aria-valuemin="0" aria-valuemax="@campaign.MaximumHealth" aria-valuenow="@campaign.CurrentHealth"><span style="width:@Percent(campaign.CurrentHealth, campaign.MaximumHealth)%"></span></div>
+                                <div class="raid-ward"><div class="raid-meter__label"><span>Raid ward</span><strong>@campaign.CurrentWard.ToString("N0") / @campaign.MaximumWard.ToString("N0")</strong></div><div class="raid-meter raid-meter--ward" role="progressbar" aria-label="Raid ward" aria-valuemin="0" aria-valuemax="@campaign.MaximumWard" aria-valuenow="@campaign.CurrentWard"><span style="width:@Percent(campaign.CurrentWard, campaign.MaximumWard)%"></span></div></div>
+                                <div class="raid-phase-response"><span aria-hidden="true">✦</span><div><strong>Phase response</strong><p>@PhaseResponse(campaign.CurrentPhase)</p></div></div>
+                                <div class="raid-action-rules">
+                                    <div><strong>⚔ Attack <span>@Range(_view.Configuration.Attack)</span></strong><p>Damage · @Cooldown(_view.Configuration.Attack) · @_view.Configuration.Attack.PerStreamLimit per stream</p><code>!raid attack</code></div>
+                                    <div><strong>✚ Mend <span>@Range(_view.Configuration.Mend)</span></strong><p>Restore ward · @Cooldown(_view.Configuration.Mend) · @_view.Configuration.Mend.PerStreamLimit per stream</p><code>!raid mend</code></div>
+                                    <div><strong>✦ Nova <span>@Range(_view.Configuration.Special)</span></strong><p>@_view.Configuration.Special.PointCost.ToDisplayString() points · @Cooldown(_view.Configuration.Special) · @_view.Configuration.Special.PerStreamLimit per stream</p><code>!raid nova</code></div>
+                                </div>
+                            </article>
 
-                <section class="raid-activity-layout">
-                    <article class="card raid-table-card"><header><h2>Raid contribution standings</h2><span>@campaign.Contributions.Count raiders · current campaign</span></header><div class="data-table-region" tabindex="0"><table><thead><tr><th>#</th><th>Raider</th><th>Total</th><th>Damage</th><th>Ward</th><th>Nova</th><th>Guesses</th></tr></thead><tbody>@foreach (var row in campaign.Contributions.Select((value, index) => new { value, index })){<tr><td class="raid-rank">@(row.index + 1)</td><td><strong>@($"@{row.value.Viewer.Login}")</strong></td><td><strong>@row.value.Total.ToString("N0")</strong></td><td>@row.value.Damage.ToString("N0")</td><td>@row.value.WardRestored.ToString("N0")</td><td>@row.value.SpecialCount</td><td>@row.value.CorrectGuessCount</td></tr>}</tbody></table></div></article>
-                    <article class="card raid-history-card"><header><h2>Recorded outcomes</h2><span>Persistent history</span></header><div>@if (campaign.RecentActions.Count == 0){<p class="raid-empty">No actions yet. Chat can use !raid attack, !raid mend, or !raid nova.</p>}@foreach (var action in campaign.RecentActions.Take(8)){<div class="raid-outcome"><span class="raid-outcome__icon" aria-hidden="true">@ActionIcon(action.Kind)</span><div><strong>@ActionHeading(action)</strong><p>@ActionDetail(action)</p></div><time>@Age(action.OccurredAtUtc)</time></div>}</div></article>
-                </section>
-            }
-            else
-            {
-                <section class="card raid-empty-campaign"><div><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>No active boss</h2><p>Start one host-scoped BlokeRaid campaign from the saved configuration.</p></div></div><button class="btn-primary" type="button" @onclick="StartAsync">Start campaign</button></section>
-            }
+                            <aside class="card raid-control">
+                                <h2>Campaign control</h2>
+                                <dl><div><dt>Status</dt><dd><span class="status-pill status-pill--emerald"><span class="status-pill__dot"></span><span class="status-pill__label">Active</span></span></dd></div><div><dt>Ends</dt><dd>@campaign.EndsAtUtc.ToString("ddd d MMM · HH:mm") UTC</dd></div><div><dt>Reset policy</dt><dd>@ResetSummary()</dd></div><div><dt>Victory reward</dt><dd>@campaign.VictoryPointReward.ToDisplayString() points each</dd></div></dl>
+                                <div class="raid-control__actions"><button class="btn-danger" type="button" @onclick="EndAsync">End campaign</button><button class="btn-secondary" type="button" @onclick="ResetAsync">Reset now</button></div>
+                                <p>Lifecycle controls act immediately and are never sticky. Reset starts a fresh recorded campaign without deleting history.</p>
+                            </aside>
+                        </section>
 
-            <details class="card raid-config" open>
-                <summary><div><h2>Campaign configuration</h2><p>Rules apply to the next action. Recorded outcomes and completed recaps never change.</p></div><span aria-hidden="true">›</span></summary>
-                <div class="raid-config__body" data-sticky-save-scope>
-                    <div class="studio-grid">
-                        <div class="studio-span-6"><Field Id="raid-boss-name" Label="Boss name" @bind-Value="_editor.BossName" /></div>
-                        <div class="studio-span-2"><label class="label" for="raid-health">Maximum health</label><input id="raid-health" class="input mt-2" type="number" min="100" max="10000000" @bind="_editor.MaximumHealth" /></div>
-                        <div class="studio-span-2"><label class="label" for="raid-ward">Maximum ward</label><input id="raid-ward" class="input mt-2" type="number" min="0" max="1000000" @bind="_editor.MaximumWard" /></div>
-                        <div class="studio-span-2"><label class="label" for="raid-duration">Duration hours</label><input id="raid-duration" class="input mt-2" type="number" min="1" max="8760" @bind="_editor.CampaignDurationHours" /></div>
+                        <section class="raid-activity-layout">
+                            <article class="card raid-table-card"><header><h2>Raid contribution standings</h2><span>@campaign.Contributions.Count raiders · current campaign</span></header><div class="data-table-region" tabindex="0"><table><thead><tr><th>#</th><th>Raider</th><th>Total</th><th>Damage</th><th>Ward</th><th>Nova</th><th>Guesses</th></tr></thead><tbody>@foreach (var row in campaign.Contributions.Select((value, index) => new { value, index })){<tr><td class="raid-rank">@(row.index + 1)</td><td><strong>@($"@{row.value.Viewer.Login}")</strong></td><td><strong>@row.value.Total.ToString("N0")</strong></td><td>@row.value.Damage.ToString("N0")</td><td>@row.value.WardRestored.ToString("N0")</td><td>@row.value.SpecialCount</td><td>@row.value.CorrectGuessCount</td></tr>}</tbody></table></div></article>
+                            <article class="card raid-history-card"><header><h2>Recorded outcomes</h2><span>Persistent history</span></header><div>@if (campaign.RecentActions.Count == 0){<p class="raid-empty">No actions yet. Chat can use !raid attack, !raid mend, or !raid nova.</p>}@foreach (var action in campaign.RecentActions.Take(8)){<div class="raid-outcome"><span class="raid-outcome__icon" aria-hidden="true">@ActionIcon(action.Kind)</span><div><strong>@ActionHeading(action)</strong><p>@ActionDetail(action)</p></div><time>@Age(action.OccurredAtUtc)</time></div>}</div></article>
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="card raid-empty-campaign"><div><span class="raid-boss__icon" aria-hidden="true">♜</span><div><h2>No active boss</h2><p>Start one host-scoped BlokeRaid campaign from the saved configuration.</p></div></div><button class="btn-primary" type="button" @onclick="StartAsync">Start campaign</button></section>
+                    }
+
+                    @if (_view.History.Count > 0)
+                    {
+                        <details class="card raid-recaps" open><summary><div><h2>Completed campaign recap</h2><p>Victory, expiry, ended and reset campaigns stay reviewable after restart.</p></div><span aria-hidden="true">›</span></summary><div class="raid-recaps__body">@foreach (var recap in _view.History.Take(8)){<article><div><strong>@recap.BossName</strong><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span></div><p>@recap.Contributions.Count contributors · @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage · @recap.StartedAtUtc.ToString("d MMM")–@(recap.CompletedAtUtc?.ToString("d MMM yyyy") ?? "current")</p></article>}</div></details>
+                    }
+                }
+                else
+                {
+                    <div class="raid-configuration" data-sticky-save-scope data-raid-configuration>
+                        <section class="card raid-section">
+                            <header class="raid-section__header">
+                                <span class="raid-section__step" aria-hidden="true">1</span>
+                                <div class="min-w-0">
+                                    <h2 class="raid-section__heading">Campaign basics</h2>
+                                    <p class="raid-section__description">Name the boss and set the campaign limits.</p>
+                                </div>
+                            </header>
+                            <div class="raid-section__body">
+                                <div class="raid-field-grid">
+                                    <div class="raid-field--wide">
+                                        <Field Id="raid-boss-name" Label="Boss name" MaxLength="120" @bind-Value="_editor.BossName" />
+                                    </div>
+                                    <div class="raid-field">
+                                        <label class="label" for="raid-duration">Duration (hours)</label>
+                                        <input id="raid-duration" class="input" type="number" min="1" max="8760" aria-describedby="raid-duration-hint" @bind="_editor.CampaignDurationHours" />
+                                        <p id="raid-duration-hint" class="form-help">1 hour to 365 days.</p>
+                                    </div>
+                                    <div class="raid-field">
+                                        <label class="label" for="raid-health">Boss health</label>
+                                        <input id="raid-health" class="input" type="number" min="100" max="10000000" @bind="_editor.MaximumHealth" />
+                                    </div>
+                                    <div class="raid-field">
+                                        <label class="label" for="raid-ward">Raid ward</label>
+                                        <input id="raid-ward" class="input" type="number" min="0" max="1000000" @bind="_editor.MaximumWard" />
+                                    </div>
+                                    <div class="raid-field">
+                                        <Field Id="raid-victory-reward" Label="Victory reward" @bind-Value="_editor.VictoryPointReward" />
+                                        <p class="form-help">Points granted to every contributor when the boss falls.</p>
+                                    </div>
+                                </div>
+                                <p class="raid-section__note">A campaign copies the boss name, health, ward, duration and victory reward when it starts, so these edits reach the next campaign.</p>
+                            </div>
+                        </section>
+
+                        <section class="card raid-section">
+                            <header class="raid-section__header">
+                                <span class="raid-section__step" aria-hidden="true">2</span>
+                                <div class="min-w-0">
+                                    <h2 class="raid-section__heading">Viewer actions</h2>
+                                    <p class="raid-section__description">Damage, cooldown and per-stream limits.</p>
+                                </div>
+                            </header>
+                            <div class="raid-section__body">
+                                <div class="raid-card-grid">
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3><span aria-hidden="true">⚔</span> Attack</h3>
+                                            <span class="status-pill status-pill--slate"><span class="status-pill__label">@RuleRange(_editor.Attack)</span></span>
+                                        </header>
+                                        <p class="raid-rule-card__hint">Damage dealt by <code>!raid attack</code>.</p>
+                                        <div class="raid-compact-grid">
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-attack-minimum">Minimum</label>
+                                                <input id="raid-attack-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.Minimum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-attack-maximum">Maximum</label>
+                                                <input id="raid-attack-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.Maximum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-attack-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-attack-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Attack.CooldownSeconds" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-attack-limit">Per stream</label>
+                                                <input id="raid-attack-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Attack.PerStreamLimit" />
+                                            </div>
+                                        </div>
+                                    </article>
+
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3><span aria-hidden="true">✚</span> Mend</h3>
+                                            <span class="status-pill status-pill--slate"><span class="status-pill__label">@RuleRange(_editor.Mend)</span></span>
+                                        </header>
+                                        <p class="raid-rule-card__hint">Raid ward restored by <code>!raid mend</code>.</p>
+                                        <div class="raid-compact-grid">
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-mend-minimum">Minimum</label>
+                                                <input id="raid-mend-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.Minimum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-mend-maximum">Maximum</label>
+                                                <input id="raid-mend-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.Maximum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-mend-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-mend-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Mend.CooldownSeconds" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-mend-limit">Per stream</label>
+                                                <input id="raid-mend-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Mend.PerStreamLimit" />
+                                            </div>
+                                        </div>
+                                    </article>
+
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3><span aria-hidden="true">✦</span> Nova</h3>
+                                            <span class="status-pill status-pill--violet"><span class="status-pill__label">@RuleRange(_editor.Special)</span></span>
+                                        </header>
+                                        <p class="raid-rule-card__hint">Damage from <code>!raid nova</code>, paid in points.</p>
+                                        <div class="raid-compact-grid">
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-special-minimum">Minimum</label>
+                                                <input id="raid-special-minimum" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.Minimum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-special-maximum">Maximum</label>
+                                                <input id="raid-special-maximum" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.Maximum" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-special-cooldown">Cooldown (sec)</label>
+                                                <input id="raid-special-cooldown" class="raid-compact__input" type="number" min="0" @bind="_editor.Special.CooldownSeconds" />
+                                            </div>
+                                            <div class="raid-compact">
+                                                <label class="raid-compact__label" for="raid-special-limit">Per stream</label>
+                                                <input id="raid-special-limit" class="raid-compact__input" type="number" min="1" @bind="_editor.Special.PerStreamLimit" />
+                                            </div>
+                                            <div class="raid-compact raid-compact--wide">
+                                                <label class="raid-compact__label" for="raid-special-cost">Point cost</label>
+                                                <input id="raid-special-cost" class="raid-compact__input" @bind="_editor.Special.PointCost" />
+                                            </div>
+                                        </div>
+                                    </article>
+                                </div>
+                                <div class="raid-split">
+                                    <div class="raid-field">
+                                        <label class="label" for="raid-guess-damage">Damage per correct guess</label>
+                                        <input id="raid-guess-damage" class="input" type="number" min="1" aria-describedby="raid-guess-damage-hint" @bind="_editor.CorrectGuessDamage" />
+                                        <p id="raid-guess-damage-hint" class="form-help">Every viewer who guesses correctly in a guessing round strikes the boss for this much.</p>
+                                    </div>
+                                </div>
+                                <p class="raid-section__note">Saved action rules apply from the next chat action. Recorded outcomes keep the values they were resolved with.</p>
+                            </div>
+                        </section>
+
+                        <section class="card raid-section">
+                            <header class="raid-section__header">
+                                <span class="raid-section__step" aria-hidden="true">3</span>
+                                <div class="min-w-0">
+                                    <h2 class="raid-section__heading">Phases and messages</h2>
+                                    <p class="raid-section__description">Pair each threshold with the message chat sees.</p>
+                                </div>
+                            </header>
+                            <div class="raid-section__body">
+                                <div class="raid-card-grid">
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3>Phase 1</h3>
+                                            <span class="status-pill status-pill--green"><span class="status-pill__label">@PhaseOneBand()</span></span>
+                                        </header>
+                                        <p class="raid-rule-card__hint">A campaign opens in phase 1 at full boss health.</p>
+                                        <TextAreaField Id="raid-phase-one-response" Label="Phase 1 response" @bind-Value="_editor.PhaseOneResponse" />
+                                    </article>
+
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3>Phase 2</h3>
+                                            <span class="status-pill status-pill--violet"><span class="status-pill__label">@PhaseTwoBand()</span></span>
+                                        </header>
+                                        <div class="raid-compact">
+                                            <label class="raid-compact__label" for="raid-phase-two">Starts at health %</label>
+                                            <input id="raid-phase-two" class="raid-compact__input" type="number" min="2" max="99" @bind="_editor.PhaseTwoHealthPercent" />
+                                        </div>
+                                        <TextAreaField Id="raid-phase-two-response" Label="Phase 2 response" @bind-Value="_editor.PhaseTwoResponse" />
+                                    </article>
+
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3>Phase 3</h3>
+                                            <span class="status-pill status-pill--amber"><span class="status-pill__label">@PhaseThreeBand()</span></span>
+                                        </header>
+                                        <div class="raid-compact">
+                                            <label class="raid-compact__label" for="raid-phase-three">Starts at health %</label>
+                                            <input id="raid-phase-three" class="raid-compact__input" type="number" min="1" max="98" @bind="_editor.PhaseThreeHealthPercent" />
+                                        </div>
+                                        <TextAreaField Id="raid-phase-three-response" Label="Phase 3 response" @bind-Value="_editor.PhaseThreeResponse" />
+                                    </article>
+                                </div>
+                                <div class="raid-split">
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3>Victory</h3>
+                                        </header>
+                                        <p class="raid-rule-card__hint">Sent once the boss reaches zero health and every contributor is paid the victory reward.</p>
+                                        <TextAreaField Id="raid-victory-response" Label="Victory response" @bind-Value="_editor.VictoryResponse" />
+                                    </article>
+                                    <article class="raid-rule-card">
+                                        <header class="raid-rule-card__head">
+                                            <h3>Expiry</h3>
+                                        </header>
+                                        <p class="raid-rule-card__hint">Sent when the campaign reaches its end time with the boss still standing.</p>
+                                        <TextAreaField Id="raid-expiry-response" Label="Expiry response" @bind-Value="_editor.ExpiryResponse" />
+                                    </article>
+                                </div>
+                                <p class="raid-section__note">Phase thresholds read from the saved configuration on every action, and a campaign only ever moves forward through the phases.</p>
+                            </div>
+                        </section>
+
+                        <section class="card raid-section">
+                            <header class="raid-section__header">
+                                <span class="raid-section__step" aria-hidden="true">4</span>
+                                <div class="min-w-0">
+                                    <h2 class="raid-section__heading">Reset schedule</h2>
+                                    <p class="raid-section__description">Choose when a fresh campaign can begin.</p>
+                                </div>
+                            </header>
+                            <div class="raid-section__body">
+                                <fieldset class="raid-reset">
+                                    <legend class="label">Reset policy</legend>
+                                    <div class="raid-option-grid">
+                                        @foreach (var option in _resetPolicies)
+                                        {
+                                            <label class="@ResetOptionClass(option.Policy)" @key="option.Policy">
+                                                <input id="@option.Id"
+                                                       type="radio"
+                                                       name="raid-reset-policy"
+                                                       value="@option.Policy"
+                                                       checked="@(_editor.ResetPolicy == option.Policy)"
+                                                       @onchange="() => SelectResetPolicy(option.Policy)" />
+                                                <span class="raid-option__icon" aria-hidden="true">@option.Icon</span>
+                                                <span class="raid-option__text">
+                                                    <span class="raid-option__title">@option.Title</span>
+                                                    <span class="raid-option__copy">@option.Description</span>
+                                                </span>
+                                            </label>
+                                        }
+                                    </div>
+                                </fieldset>
+                                @if (_editor.ResetPolicy == BlokeRaidResetPolicy.Weekly)
+                                {
+                                    <div class="raid-split">
+                                        <div class="raid-field">
+                                            <label class="label" for="raid-reset-day">Weekly reset day</label>
+                                            <select id="raid-reset-day" class="input" @bind="_editor.WeeklyResetDay">@foreach (var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@day</option>}</select>
+                                        </div>
+                                        <div class="raid-field">
+                                            <label class="label" for="raid-reset-hour">Reset hour (UTC)</label>
+                                            <input id="raid-reset-hour" class="input" type="number" min="0" max="23" @bind="_editor.WeeklyResetHourUtc" />
+                                        </div>
+                                    </div>
+                                }
+                                <p class="raid-section__note">Every completed campaign stays in the recap with its contributions and recorded outcomes.</p>
+                            </div>
+                        </section>
+
+                        <StickySaveRegion Scope="StickySaveScope.Editor" Feedback="_saveFeedback">
+                            <button class="btn-primary" type="button" disabled="@_saving" @onclick="SaveConfigurationAsync">@(_saving ? "Saving…" : "Save configuration")</button>
+                        </StickySaveRegion>
                     </div>
-                    <div class="raid-rule-grid">
-                        <fieldset class="raid-rule-editor"><legend>Attack</legend><label class="label" for="raid-attack-minimum">Minimum outcome</label><label class="label" for="raid-attack-maximum">Maximum outcome</label><input id="raid-attack-minimum" class="input" type="number" min="1" @bind="_editor.Attack.Minimum" /><input id="raid-attack-maximum" class="input" type="number" min="1" @bind="_editor.Attack.Maximum" /><label class="label" for="raid-attack-cooldown">Cooldown seconds</label><label class="label" for="raid-attack-limit">Per-stream limit</label><input id="raid-attack-cooldown" class="input" type="number" min="0" @bind="_editor.Attack.CooldownSeconds" /><input id="raid-attack-limit" class="input" type="number" min="1" @bind="_editor.Attack.PerStreamLimit" /></fieldset>
-                        <fieldset class="raid-rule-editor"><legend>Mend / defend</legend><label class="label" for="raid-mend-minimum">Minimum outcome</label><label class="label" for="raid-mend-maximum">Maximum outcome</label><input id="raid-mend-minimum" class="input" type="number" min="1" @bind="_editor.Mend.Minimum" /><input id="raid-mend-maximum" class="input" type="number" min="1" @bind="_editor.Mend.Maximum" /><label class="label" for="raid-mend-cooldown">Cooldown seconds</label><label class="label" for="raid-mend-limit">Per-stream limit</label><input id="raid-mend-cooldown" class="input" type="number" min="0" @bind="_editor.Mend.CooldownSeconds" /><input id="raid-mend-limit" class="input" type="number" min="1" @bind="_editor.Mend.PerStreamLimit" /></fieldset>
-                        <fieldset class="raid-rule-editor"><legend>Nova special</legend><label class="label" for="raid-special-minimum">Minimum outcome</label><label class="label" for="raid-special-maximum">Maximum outcome</label><input id="raid-special-minimum" class="input" type="number" min="1" @bind="_editor.Special.Minimum" /><input id="raid-special-maximum" class="input" type="number" min="1" @bind="_editor.Special.Maximum" /><label class="label" for="raid-special-cooldown">Cooldown seconds</label><label class="label" for="raid-special-limit">Per-stream limit</label><input id="raid-special-cooldown" class="input" type="number" min="0" @bind="_editor.Special.CooldownSeconds" /><input id="raid-special-limit" class="input" type="number" min="1" @bind="_editor.Special.PerStreamLimit" /><label class="label" for="raid-special-cost">Point cost</label><input id="raid-special-cost" class="input" @bind="_editor.Special.PointCost" /></fieldset>
-                    </div>
-                    <div class="studio-grid">
-                        <div class="studio-span-3"><label class="label" for="raid-guess-damage">Damage per correct guess</label><input id="raid-guess-damage" class="input mt-2" type="number" min="1" @bind="_editor.CorrectGuessDamage" /></div>
-                        <div class="studio-span-3"><Field Id="raid-victory-reward" Label="Victory points per contributor" @bind-Value="_editor.VictoryPointReward" /></div>
-                        <div class="studio-span-3"><label class="label" for="raid-phase-two">Phase 2 at health %</label><input id="raid-phase-two" class="input mt-2" type="number" min="2" max="99" @bind="_editor.PhaseTwoHealthPercent" /></div>
-                        <div class="studio-span-3"><label class="label" for="raid-phase-three">Phase 3 at health %</label><input id="raid-phase-three" class="input mt-2" type="number" min="1" max="98" @bind="_editor.PhaseThreeHealthPercent" /></div>
-                        <div class="studio-span-4"><TextAreaField Id="raid-phase-one-response" Label="Phase 1 response" @bind-Value="_editor.PhaseOneResponse" /></div>
-                        <div class="studio-span-4"><TextAreaField Id="raid-phase-two-response" Label="Phase 2 response" @bind-Value="_editor.PhaseTwoResponse" /></div>
-                        <div class="studio-span-4"><TextAreaField Id="raid-phase-three-response" Label="Phase 3 response" @bind-Value="_editor.PhaseThreeResponse" /></div>
-                        <div class="studio-span-6"><TextAreaField Id="raid-victory-response" Label="Victory response" @bind-Value="_editor.VictoryResponse" /></div>
-                        <div class="studio-span-6"><TextAreaField Id="raid-expiry-response" Label="Expiry response" @bind-Value="_editor.ExpiryResponse" /></div>
-                        <div class="studio-span-4 space-y-2"><label class="label" for="raid-reset-policy">Reset policy</label><select id="raid-reset-policy" class="input" @bind="_editor.ResetPolicy"><option value="@BlokeRaidResetPolicy.Manual">Manual</option><option value="@BlokeRaidResetPolicy.Weekly">Weekly</option></select></div>
-                        @if (_editor.ResetPolicy == BlokeRaidResetPolicy.Weekly)
-                        {
-                            <div class="studio-span-4 space-y-2"><label class="label" for="raid-reset-day">Weekly reset day</label><select id="raid-reset-day" class="input" @bind="_editor.WeeklyResetDay">@foreach (var day in Enum.GetValues<DayOfWeek>()){<option value="@day">@day</option>}</select></div>
-                            <div class="studio-span-4"><label class="label" for="raid-reset-hour">Reset hour (UTC)</label><input id="raid-reset-hour" class="input mt-2" type="number" min="0" max="23" @bind="_editor.WeeklyResetHourUtc" /></div>
-                        }
-                    </div>
-                    <StickySaveRegion Scope="StickySaveScope.Editor" Feedback="_saveFeedback">
-                        <button class="btn-primary" type="button" disabled="@_saving" @onclick="SaveConfigurationAsync">@(_saving ? "Saving…" : "Save configuration")</button>
-                    </StickySaveRegion>
-                </div>
-            </details>
-
-            @if (_view.History.Count > 0)
-            {
-                <details class="card raid-recaps" open><summary><div><h2>Completed campaign recap</h2><p>Victory, expiry, ended and reset campaigns stay reviewable after restart.</p></div><span aria-hidden="true">›</span></summary><div class="raid-recaps__body">@foreach (var recap in _view.History.Take(8)){<article><div><strong>@recap.BossName</strong><span class="status-pill status-pill--slate"><span class="status-pill__label">@recap.Status</span></span></div><p>@recap.Contributions.Count contributors · @recap.Contributions.Sum(value => value.Damage).ToString("N0") damage · @recap.StartedAtUtc.ToString("d MMM")–@(recap.CompletedAtUtc?.ToString("d MMM yyyy") ?? "current")</p></article>}</div></details>
-            }
+                }
+            </div>
         }
     </ChildContent>
 </DashboardPage>
