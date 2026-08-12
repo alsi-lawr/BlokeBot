@@ -11,7 +11,7 @@ namespace BlokeBot.Core.Features.Automations;
 /// <c>status</c> (<c>unfulfilled</c>, <c>fulfilled</c>, <c>canceled</c>, or <c>unknown</c>), and
 /// <c>redeemed_at</c>.</item>
 /// <item>Sensitive <c>user_input</c>: viewer-authored untrusted text, bounded at 500 characters
-/// (Twitch's own message maximum, not a BlokeBot capability limit).</item>
+/// (Twitch's own message maximum).</item>
 /// <item>The redeeming viewer as the sensitive actor.</item>
 /// </list>
 /// </summary>

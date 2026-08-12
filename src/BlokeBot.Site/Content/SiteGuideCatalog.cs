@@ -1756,7 +1756,7 @@ internal static partial class SiteGuideCatalog
                         "{random_from|one|two} picks one value.",
                         "{random_between|1|10} picks an inclusive whole number.",
                         "Each random token occurrence makes a fresh pick.",
-                        "{random_viewer} picks a connected Twitch chatter, not a verified viewer. The active bot account must be a moderator with connected-chatter access.",
+                        "{random_viewer} picks from Twitch chatters currently connected to chat. The active bot account must be a moderator with connected-chatter access.",
                         "If Twitch cannot return the complete chatter list, {random_viewer} becomes empty text.",
                     ],
                 },
@@ -2487,7 +2487,7 @@ internal static partial class SiteGuideCatalog
                         ),
                     ],
                     Note =
-                        "Register the public HTTPS callbacks with Twitch, not the proxy's private HTTP address.",
+                        "Register the public HTTPS callbacks with Twitch. The proxy's private HTTP address is unreachable from Twitch.",
                 },
                 new SiteGuideSection
                 {

@@ -39,7 +39,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Enter a profile line of at most 160 characters. BlokeBot presents it as plain text; the channel's moderation policy still applies.",
                         "Choose only a title or badge already earned in this channel. An unearned or stale reward selection is rejected rather than substituted.",
-                        "The preview combines permitted points and rank, Guessing results, achievements, games and giveaways won, supported bounties and approved Moments. Source features remain authoritative; the passport is a projection, not a second activity ledger.",
+                        "The preview combines permitted points and rank, Guessing results, achievements, games and giveaways won, supported bounties and approved Moments. Source features remain the record of truth; the passport only summarises what they already hold.",
                         "Attendance counts consecutive UTC days with a chat message. It does not measure watch time, and Show attendance streak can be changed independently of profile visibility.",
                     ],
                 },
@@ -224,7 +224,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Build an approved shortlist",
                     Steps =
                     [
-                        "Add Twitch channels deliberately to Approved channels. Approval is a host-owned allowlist, not a Twitch relationship, safety score or reputation claim.",
+                        "Add Twitch channels deliberately to Approved channels. Approval reflects only this channel's own decision to allow another; Twitch supplies no relationship, safety score or reputation signal for it.",
                         "Optionally restrict language and categories and set the recent outgoing-relationship gap. Save settings.",
                         "Review live candidates and the reason each other approved channel is excluded. The hub rechecks live state, language, category and recent history rather than using a stale recommendation.",
                         "An optional approved clip appears only when Twitch confirms that it belongs to that channel and is no more than 30 days old.",
@@ -381,7 +381,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "Here, a collaborator is an active member host, not a viewer-level account role. It can read the bounded shared workflow and act only for itself. A moderator's selected-host permission remains host-scoped; membership does not let a coordinator or collaborator edit another channel's Twitch connection, provider access, source mapping, lobby details, rewards or moderator notes.",
+                        "Here, a collaborator is an active member host, a channel that has joined this collective. It can read the bounded shared workflow and act only for itself. A moderator's selected-host permission remains host-scoped; membership does not let a coordinator or collaborator edit another channel's Twitch connection, provider access, source mapping, lobby details, rewards or moderator notes.",
                     ],
                 },
                 new SiteGuideSection
