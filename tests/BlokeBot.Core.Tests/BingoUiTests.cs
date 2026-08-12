@@ -1,5 +1,7 @@
+using AngleSharp.Dom;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.CommunityProgression;
+using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
@@ -169,6 +171,334 @@ public sealed class BingoUiTests
             cut.Markup.ShouldNotContain("RETAINED-BINGO-TEMPLATE");
             cut.FindAll("[data-bingo-game], [data-bingo-square-editors]").ShouldBeEmpty();
         });
+    }
+
+    [Test]
+    public async Task LoadingASavedRevision_RestoresEveryRewardFieldAndSavesTheNextRevision()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        await SeedExternalAchievementAsync(database, hostId, "line-caller");
+        await SeedExternalAchievementAsync(database, hostId, "night-of-moments");
+        var service = Service(database);
+        _ = Success(
+            await service.SaveTemplateAsync(
+                hostId,
+                new(
+                    Guid.NewGuid(),
+                    null,
+                    "Stream moments",
+                    new(4),
+                    ManualSquares(16),
+                    true,
+                    new(new PointAmount(50), new("line-caller")),
+                    new(new PointAmount(250), new("night-of-moments")),
+                    new("streamer-id", "streamer")
+                ),
+                default
+            )
+        );
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+
+        var page = context.Render<BingoPage>();
+        page.WaitForAssertion(() =>
+            page.Find("[data-bingo-revisions] .bingo-revisions__meta")
+                .TextContent.Trim()
+                .ShouldBe("rev 1 · 4×4")
+        );
+        page.Find(".bingo-revisions__load").Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("#bingo-template-name").GetAttribute("value").ShouldBe("Stream moments")
+        );
+        page.Find("#bingo-dimension").GetAttribute("value").ShouldBe("4");
+        page.Find("#bingo-line-points").GetAttribute("value").ShouldBe("50");
+        page.Find("#bingo-line-achievement").GetAttribute("value").ShouldBe("line-caller");
+        page.Find("#bingo-full-points").GetAttribute("value").ShouldBe("250");
+        page.Find("#bingo-full-achievement").GetAttribute("value").ShouldBe("night-of-moments");
+        page.Find("#bingo-full-card").GetAttribute("aria-checked").ShouldBe("true");
+        page.Find("#bingo-full-achievement").HasAttribute("disabled").ShouldBeFalse();
+        page.Find("[data-bingo-revisions] .status-pill__label").TextContent.ShouldBe("Loaded");
+        page.FindAll("[data-bingo-revisions] .bingo-revisions__load").ShouldBeEmpty();
+        _ = page.Find(".bingo-revisions__new");
+        page.Find("[data-bingo-revision-note]")
+            .TextContent.ShouldBe(
+                "Saving creates revision 2. Issued cards keep the revision, grid and seed they were dealt from."
+            );
+
+        page.Find("#bingo-line-points").Input("75");
+        SaveRevision(page).Click();
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("Template revision saved."));
+        var saved = (await service.GetTemplatesAsync(hostId, default)).ShouldHaveSingleItem();
+        saved.Revision.ShouldBe(2);
+        saved.Dimension.Value.ShouldBe(4);
+        saved.FullCardWinEnabled.ShouldBeTrue();
+        saved.LineReward.Points.ShouldBe(new PointAmount(75));
+        saved.LineReward.AchievementKey!.Value.Value.ShouldBe("line-caller");
+        saved.FullCardReward.Points.ShouldBe(new PointAmount(250));
+        saved.FullCardReward.AchievementKey!.Value.Value.ShouldBe("night-of-moments");
+        saved.Squares.Count.ShouldBe(16);
+    }
+
+    [Test]
+    public async Task TurningOffFullCardWins_ClosesTheFullCardAchievementAndPersistsLineRewards()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        await SeedExternalAchievementAsync(database, hostId, "line-caller");
+        var service = Service(database);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(service);
+
+        var page = RenderAuthoring(context);
+        page.Find("#bingo-template-name").Input("Line only");
+        page.Find("#bingo-dimension").Change("3");
+        page.Find("#bingo-line-points").Input("40");
+        page.Find("#bingo-line-achievement").Change("line-caller");
+        page.Find("#bingo-full-card").Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("#bingo-full-achievement").HasAttribute("disabled").ShouldBeTrue()
+        );
+        page.Find("#bingo-full-card").GetAttribute("aria-checked").ShouldBe("false");
+        SaveRevision(page).Click();
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("Template revision saved."));
+        var saved = (await service.GetTemplatesAsync(hostId, default)).ShouldHaveSingleItem();
+        saved.Name.ShouldBe("Line only");
+        saved.Dimension.Value.ShouldBe(3);
+        saved.FullCardWinEnabled.ShouldBeFalse();
+        saved.LineReward.Points.ShouldBe(new PointAmount(40));
+        saved.LineReward.AchievementKey!.Value.Value.ShouldBe("line-caller");
+        saved.FullCardReward.ShouldBe(BingoWinReward.None);
+    }
+
+    [Test]
+    [Arguments(BingoSquareKind.Manual, "")]
+    [Arguments(BingoSquareKind.IncomingRaid, "bingo-square-threshold")]
+    [Arguments(BingoSquareKind.BountyCompleted, "")]
+    [Arguments(BingoSquareKind.GuessingResult, "bingo-square-answer")]
+    [Arguments(BingoSquareKind.GiveawayStarted, "")]
+    [Arguments(BingoSquareKind.StreamCategoryChanged, "bingo-square-category")]
+    [Arguments(BingoSquareKind.CounterReached, "bingo-square-threshold bingo-square-counter")]
+    public async Task EveryTypedSource_ExposesOnlyItsOwnConditionalFields(
+        BingoSquareKind kind,
+        string expectedConditionalIds
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        await SeedCounterAsync(database, hostId, "Hype count");
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(Service(database));
+
+        var page = RenderAuthoring(context);
+        page.Find("#bingo-square-kind").Change(kind.ToString());
+
+        var expected = expectedConditionalIds.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+        page.WaitForAssertion(() =>
+            page.FindAll(".bingo-editor__pane [id^='bingo-square-']")
+                .Select(element => element.Id)
+                .Where(id => _conditionalSquareFieldIds.Contains(id))
+                .ShouldBe(expected, ignoreOrder: true)
+        );
+        _ = page.Find("#bingo-square-title");
+        _ = page.Find("#bingo-square-key");
+        _ = page.Find("#bingo-square-note");
+        _ = Button(page, "Reset square");
+    }
+
+    [Test]
+    public async Task ResetSquare_RestoresTheSelectedSquareWithoutTouchingItsNeighbours()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(Service(database));
+
+        var page = RenderAuthoring(context);
+        page.FindAll("[data-bingo-square-editors] button")[2].Click();
+        page.Find("#bingo-square-title").Input("Third moment");
+        page.Find("#bingo-square-key").Input("third-moment");
+        page.Find("#bingo-square-kind").Change(nameof(BingoSquareKind.GuessingResult));
+        page.WaitForAssertion(() => _ = page.Find("#bingo-square-answer"));
+        page.Find("#bingo-square-answer").Input("blue");
+        page.Find("#bingo-square-note").Input("PRIVATE-SQUARE-NOTE");
+
+        Button(page, "Reset square").Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("#bingo-square-title").GetAttribute("value").ShouldBe("Moment 3")
+        );
+        page.Find("#bingo-square-key").GetAttribute("value").ShouldBe("square-3");
+        page.Find("#bingo-square-kind")
+            .GetAttribute("value")
+            .ShouldBe(nameof(BingoSquareKind.Manual));
+        page.Find("#bingo-square-note").GetAttribute("value").ShouldBe(string.Empty);
+        page.FindAll("#bingo-square-answer").ShouldBeEmpty();
+        page.Markup.ShouldNotContain("PRIVATE-SQUARE-NOTE");
+        page.FindAll("[data-bingo-square-editors] button")[1].TextContent.ShouldContain("Moment 2");
+    }
+
+    [Test]
+    public async Task SaveRevision_IsTheOnlyControlInTheOnlyStickySaveRegion()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(Service(database));
+
+        var page = RenderAuthoring(context);
+
+        var region = page.FindAll(".sticky-save-region").ShouldHaveSingleItem();
+        region.GetAttribute("data-save-scope").ShouldBe("editor");
+        var save = region.QuerySelectorAll("button").ShouldHaveSingleItem();
+        save.TextContent.Trim().ShouldBe("Save revision");
+        region
+            .QuerySelector(".sticky-save-region__surface")!
+            .TextContent.Trim()
+            .ShouldBe("Save revision");
+        _ = save.Closest("[data-bingo-authoring]").ShouldNotBeNull();
+        _ = page.Find("[data-bingo-authoring]")
+            .GetAttribute("data-sticky-save-scope")
+            .ShouldNotBeNull();
+        page.FindAll("[data-bingo-authoring] [data-stage] .sticky-save-region").ShouldBeEmpty();
+        Button(page, "Reset square").Closest("[data-save-scope]").ShouldBeNull();
+    }
+
+    [Test]
+    public async Task TemplateStage_PairsSettingsWithASavedRevisionColumnThatIsNeverEmpty()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, HostFeatureFlags.All);
+        using var context = UiTestContextFactory.Create(database, hostId);
+        _ = context.Services.AddSingleton(Service(database));
+
+        var page = RenderAuthoring(context);
+
+        var composition = page.Find("[data-bingo-template]");
+        composition.Children.Length.ShouldBe(2);
+        composition.Children[0].ClassList.ShouldContain("bingo-template__settings");
+        composition.Children[1].ClassList.ShouldContain("bingo-revisions");
+        _ = composition.Closest(".bingo-pane").ShouldNotBeNull();
+        page.Find(".bingo-revisions__label").TextContent.ShouldBe("Saved revisions");
+        page.Find(".bingo-revisions__empty").TextContent.ShouldBe("No saved revisions yet.");
+        page.Find("[data-bingo-revision-note]")
+            .TextContent.ShouldStartWith("Saving creates revision 1.");
+        page.FindAll(".bingo-revisions__list").ShouldBeEmpty();
+
+        var editor = page.Find("[data-bingo-editor]");
+        editor.GetAttribute("style").ShouldBe("--bingo-dimension: 5");
+        editor.Children.Length.ShouldBe(2);
+        editor.Children[0].ClassList.ShouldContain("bingo-board");
+        editor.Children[1].ClassList.ShouldContain("bingo-editor__pane");
+        _ = editor.Closest(".bingo-pane").ShouldNotBeNull();
+    }
+
+    private static readonly string[] _conditionalSquareFieldIds =
+    [
+        "bingo-square-threshold",
+        "bingo-square-counter",
+        "bingo-square-answer",
+        "bingo-square-category",
+    ];
+
+    private static IRenderedComponent<BingoPage> RenderAuthoring(BunitContext context)
+    {
+        var page = context.Render<BingoPage>();
+        page.WaitForAssertion(() => _ = page.Find("[data-bingo-square-editors]"));
+        return page;
+    }
+
+    private static IElement SaveRevision(IRenderedComponent<BingoPage> page) =>
+        page.Find(".sticky-save-region button");
+
+    private static IElement Button(IRenderedComponent<BingoPage> page, string label) =>
+        page.FindAll("button").Single(element => element.TextContent.Trim() == label);
+
+    private static IReadOnlyList<BingoSquareDefinition> ManualSquares(int count) =>
+        Enumerable
+            .Range(1, count)
+            .Select(value =>
+                (BingoSquareDefinition)
+                    new BingoSquareDefinition.Manual(new($"square-{value}"), $"Moment {value}")
+            )
+            .ToArray();
+
+    private static async Task SeedCounterAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        string name
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        _ = db.CustomCounters.Add(
+            new CustomCounter
+            {
+                HostId = hostId,
+                Name = name,
+                Value = 0,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        _ = await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedExternalAchievementAsync(
+        SqliteBlokeBotDbFactory database,
+        int hostId,
+        string key
+    )
+    {
+        var now = DateTime.UtcNow;
+        await using var db = await database.CreateDbContextAsync();
+        var season = await db.CommunitySeasons.FirstOrDefaultAsync(value => value.HostId == hostId);
+        if (season is null)
+        {
+            season = new CommunitySeason
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                CreationOperationId = Guid.NewGuid(),
+                Name = "Bingo rewards",
+                Status = CommunitySeasonStatus.Open,
+                Visibility = CommunityVisibility.Public,
+                StartsAtUtc = now.AddDays(-1),
+                EndsAtUtc = now.AddDays(30),
+                Revision = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            };
+            _ = db.CommunitySeasons.Add(season);
+        }
+        _ = db.CommunityDefinitions.Add(
+            new CommunityDefinition
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                Season = season,
+                Key = key,
+                Name = key,
+                Kind = CommunityDefinitionKind.Achievement,
+                Scope = CommunityProgressScope.Viewer,
+                CompletionMode = CommunityCompletionMode.OneTime,
+                EventRule = CommunityEventRuleKind.ExternalGrant,
+                Increment = CommunityProgressIncrement.Occurrence,
+                Target = 1,
+                PointsReward = "0",
+                ResetCadence = CommunityResetCadence.None,
+                ResetLocalTime = "00:00",
+                ScheduleRevision = 1,
+                CreatedAtUtc = now,
+            }
+        );
+        _ = await db.SaveChangesAsync();
     }
 
     private static BingoService Service(SqliteBlokeBotDbFactory database) =>

@@ -43,48 +43,48 @@
                 <p class="card p-3 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
             }
 
-            <div class="settings-disclosure-stack">
+            <div class="settings-disclosure-stack" data-sticky-save-scope data-bingo-authoring>
                 <StudioStage Key="bingo-template"
-                             data-sticky-save-scope
                              Number="1"
                              Title="Template"
                              Summary="@TemplateSummary()"
                              Open="@IsOpen(_templateStageKey)"
                              OpenChanged="value => SetOpen(_templateStageKey, value)">
-                    <div class="grid gap-4">
-                        <p class="text-sm text-muted-foreground">
-                            Name, grid size, points, and achievement rewards. Saved templates appear here as revisions; issued cards always keep the revision, dimension, and seed they were dealt from.
-                        </p>
-                        @if (_templates.Count > 0)
-                        {
-                            <div class="space-y-2">
-                                <p class="label">Saved templates</p>
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach (var template in _templates)
-                                    {
-                                        <button class="btn-secondary h-8 px-3 text-xs" type="button" @key="template.Id.Value" @onclick="() => EditTemplate(template)">@template.Name · rev @template.Revision · @template.Dimension.GridLabel()</button>
-                                    }
-                                    @if (_template.Id is not null)
-                                    {
-                                        <button class="btn-secondary h-8 px-3 text-xs" type="button" @onclick="StartNewTemplate">Start a new template</button>
-                                    }
+                    <div class="bingo-pane">
+                        <div class="bingo-template" data-bingo-template>
+                            <div class="bingo-template__settings">
+                                <div class="studio-grid">
+                                    <div class="studio-span-8"><Field Id="bingo-template-name" Label="Template name" @bind-Value="_template.Name" /></div>
+                                    <div class="studio-span-4 space-y-2">
+                                        <label class="label" for="bingo-dimension">Grid</label>
+                                        <select id="bingo-dimension" class="input" value="@_template.Dimension" @onchange="ChangeDimension">
+                                            <option value="3">3 × 3</option>
+                                            <option value="4">4 × 4</option>
+                                            <option value="5">5 × 5</option>
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4"><Field Id="bingo-line-points" Label="Points per line" @bind-Value="_template.LinePoints" /></div>
+                                    <div class="studio-span-8 space-y-2">
+                                        <label class="label" for="bingo-line-achievement">Achievement per line</label>
+                                        <select id="bingo-line-achievement" class="input" @bind="_template.LineAchievement">
+                                            <option value="">No achievement</option>
+                                            @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
+                                        </select>
+                                    </div>
+                                    <div class="studio-span-4"><Field Id="bingo-full-points" Label="Full-card points" @bind-Value="_template.FullPoints" /></div>
+                                    <div class="studio-span-8 space-y-2">
+                                        <label class="label" for="bingo-full-achievement">Full-card achievement</label>
+                                        <select id="bingo-full-achievement" class="input" @bind="_template.FullAchievement" disabled="@(!_template.FullCard)">
+                                            <option value="">No achievement</option>
+                                            @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                        }
-                        <div class="studio-grid">
-                            <div class="studio-span-4"><Field Id="bingo-template-name" Label="Template name" @bind-Value="_template.Name" /></div>
-                            <div class="studio-span-4 space-y-2">
-                                <label class="label" for="bingo-dimension">Grid</label>
-                                <select id="bingo-dimension" class="input w-auto max-w-full" value="@_template.Dimension" @onchange="ChangeDimension">
-                                    <option value="3">3 × 3</option>
-                                    <option value="4">4 × 4</option>
-                                    <option value="5">5 × 5</option>
-                                </select>
-                            </div>
-                            <div class="studio-span-4">
-                                <span class="label max-md:hidden" aria-hidden="true">&nbsp;</span>
-                                <span class="studio-switch-row mt-2 flex items-center justify-between gap-[0.8rem] rounded-lg border border-[var(--app-control-border)] bg-[var(--app-control-bg)] px-[0.9rem] py-[0.6rem] text-[0.9rem] font-semibold text-[var(--app-text-strong)] max-md:mt-0">
-                                    <span id="bingo-full-card-label">Award full-card wins</span>
+                                <div class="bingo-award-row">
+                                    <div class="bingo-award-row__text">
+                                        <strong id="bingo-full-card-label">Award full-card wins</strong>
+                                        <small>Count a full card as a win and grant its reward.</small>
+                                    </div>
                                     <button id="bingo-full-card"
                                             type="button"
                                             class="studio-toggle"
@@ -92,23 +92,44 @@
                                             aria-checked="@(_template.FullCard ? "true" : "false")"
                                             aria-labelledby="bingo-full-card-label"
                                             @onclick="ToggleFullCard"></button>
-                                </span>
+                                </div>
                             </div>
-                            <div class="studio-span-4"><Field Id="bingo-line-points" Label="Points per row/line" @bind-Value="_template.LinePoints" /></div>
-                            <div class="studio-span-8 space-y-2">
-                                <label class="label" for="bingo-line-achievement">Achievement/title per row/line</label>
-                                <select id="bingo-line-achievement" class="input w-auto max-w-full" @bind="_template.LineAchievement">
-                                    <option value="">No achievement</option>
-                                    @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
-                                </select>
-                            </div>
-                            <div class="studio-span-4"><Field Id="bingo-full-points" Label="Points for full card" @bind-Value="_template.FullPoints" /></div>
-                            <div class="studio-span-8 space-y-2">
-                                <label class="label" for="bingo-full-achievement">Achievement/title for full card</label>
-                                <select id="bingo-full-achievement" class="input w-auto max-w-full" @bind="_template.FullAchievement" disabled="@(!_template.FullCard)">
-                                    <option value="">No achievement</option>
-                                    @foreach (var key in _achievementKeys) { <option value="@key">@key</option> }
-                                </select>
+                            <div class="bingo-revisions" data-bingo-revisions>
+                                <span class="bingo-revisions__label" id="bingo-revisions-label">Saved revisions</span>
+                                @if (_templates.Count > 0)
+                                {
+                                    <ul class="bingo-revisions__list" aria-labelledby="bingo-revisions-label">
+                                        @foreach (var template in _templates)
+                                        {
+                                            <li class="bingo-revisions__item" @key="template.Id.Value">
+                                                <span class="bingo-revisions__identity">
+                                                    <strong class="bingo-revisions__name">@template.Name</strong>
+                                                    <small class="bingo-revisions__meta">rev @template.Revision · @template.Dimension.GridLabel()</small>
+                                                </span>
+                                                @if (template.Id.Value == _template.Id)
+                                                {
+                                                    <span class="status-pill status-pill--green"><span class="status-pill__label">Loaded</span></span>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn-secondary bingo-revisions__load"
+                                                            type="button"
+                                                            aria-label="@($"Load {template.Name}")"
+                                                            @onclick="() => LoadTemplate(template)">Load</button>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                    @if (_template.Id is not null)
+                                    {
+                                        <button class="btn-secondary bingo-revisions__new" type="button" @onclick="StartNewTemplate">Start a new template</button>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="bingo-revisions__empty">No saved revisions yet.</p>
+                                }
+                                <p class="bingo-revisions__note" data-bingo-revision-note>@RevisionNote()</p>
                             </div>
                         </div>
                     </div>
@@ -120,20 +141,20 @@
                              Summary="@SquaresSummary()"
                              Open="@IsOpen(_squaresStageKey)"
                              OpenChanged="value => SetOpen(_squaresStageKey, value)">
-                    <div class="grid gap-4">
-                        <div class="bingo-editor">
+                    <div class="bingo-pane">
+                        <div class="bingo-editor" style="@GridVariable()" data-bingo-editor>
                             <div class="bingo-board">
                                 <div class="bingo-board__scroll" tabindex="0" aria-label="Scrollable @_template.Dimension by @_template.Dimension Bingo square editor">
                                     @if (_letters.Count > 0)
                                     {
-                                        <div class="bingo-board__letters" style="@GridVariable()" aria-hidden="true">
+                                        <div class="bingo-board__letters" aria-hidden="true">
                                             @foreach (var letter in _letters)
                                             {
                                                 <span class="bingo-board__letter">@letter</span>
                                             }
                                         </div>
                                     }
-                                    <div class="bingo-board__grid" style="@GridVariable()" data-bingo-square-editors>
+                                    <div class="bingo-board__grid" data-bingo-square-editors>
                                         @for (var index = 0; index < _template.Squares.Count; index++)
                                         {
                                             var position = index;
@@ -156,7 +177,7 @@
                                         }
                                     </div>
                                 </div>
-                                <p class="text-xs text-muted-foreground">Click a square to edit it. The grid you edit is the card viewers get.</p>
+                                <p class="bingo-board__hint">Select a square to edit it. Issued cards deal these squares into a seeded order.</p>
                             </div>
                             @{
                                 var selected = _template.Squares[_selectedSquare];
@@ -170,7 +191,7 @@
                                 <Field Id="bingo-square-key" Label="Stable square key" @bind-Value="selected.Key" />
                                 <div class="space-y-2">
                                     <label class="label" for="bingo-square-kind">Typed source</label>
-                                    <select id="bingo-square-kind" class="input w-auto max-w-full" @bind="selected.Kind">
+                                    <select id="bingo-square-kind" class="input" @bind="selected.Kind">
                                         <option value="@BingoSquareKind.Manual">Moderator confirmation</option>
                                         <option value="@BingoSquareKind.IncomingRaid">Incoming raid</option>
                                         <option value="@BingoSquareKind.BountyCompleted">Bounty completed</option>
@@ -182,19 +203,21 @@
                                 </div>
                                 @if (selected.Kind is BingoSquareKind.IncomingRaid or BingoSquareKind.CounterReached)
                                 {
-                                    <div class="space-y-2">
-                                        <label class="label" for="bingo-square-threshold">Minimum / target</label>
-                                        <input id="bingo-square-threshold" class="input" type="number" min="1" @bind="selected.Threshold" />
-                                    </div>
-                                }
-                                @if (selected.Kind == BingoSquareKind.CounterReached)
-                                {
-                                    <div class="space-y-2">
-                                        <label class="label" for="bingo-square-counter">Saved counter</label>
-                                        <select id="bingo-square-counter" class="input w-auto max-w-full" @bind="selected.CounterId">
-                                            <option value="0">Choose counter</option>
-                                            @foreach (var counter in _counters) { <option value="@counter.Id">@counter.Name</option> }
-                                        </select>
+                                    <div class="bingo-editor__conditional">
+                                        <div class="space-y-2">
+                                            <label class="label" for="bingo-square-threshold">Minimum / target</label>
+                                            <input id="bingo-square-threshold" class="input" type="number" min="1" @bind="selected.Threshold" />
+                                        </div>
+                                        @if (selected.Kind == BingoSquareKind.CounterReached)
+                                        {
+                                            <div class="space-y-2">
+                                                <label class="label" for="bingo-square-counter">Saved counter</label>
+                                                <select id="bingo-square-counter" class="input" @bind="selected.CounterId">
+                                                    <option value="0">Choose counter</option>
+                                                    @foreach (var counter in _counters) { <option value="@counter.Id">@counter.Name</option> }
+                                                </select>
+                                            </div>
+                                        }
                                     </div>
                                 }
                                 @if (selected.Kind == BingoSquareKind.GuessingResult)
@@ -206,17 +229,17 @@
                                     <Field Id="bingo-square-category" Label="Twitch category ID (blank means any)" @bind-Value="selected.Filter" />
                                 }
                                 <TextAreaField Id="bingo-square-note" Label="Private moderator note" @bind-Value="selected.PrivateNote" />
-                                <div class="flex flex-wrap gap-2">
-                                    <button class="btn-secondary h-8 px-3 text-xs" type="button" @onclick="ResetSelectedSquare">Reset square</button>
+                                <div class="bingo-editor__pane-actions">
+                                    <button class="btn-secondary" type="button" @onclick="ResetSelectedSquare">Reset square</button>
                                 </div>
                             </div>
                         </div>
-                        <StickySaveRegion Scope="StickySaveScope.Editor">
-                            <button class="btn-primary" type="button" @onclick="SaveTemplateAsync">Save revision</button>
-                            <span class="text-sm text-muted-foreground">@RevisionNote()</span>
-                        </StickySaveRegion>
                     </div>
                 </StudioStage>
+
+                <StickySaveRegion Scope="StickySaveScope.Editor">
+                    <button class="btn-primary" type="button" @onclick="SaveTemplateAsync">Save revision</button>
+                </StickySaveRegion>
             </div>
 
             @if (_templates.Count > 0)

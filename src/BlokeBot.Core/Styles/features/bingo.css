@@ -3,8 +3,26 @@
        clips on both axes once overflow-x is auto, so the widest ring is reserved as real space
        inside the scrolled grid rather than left to spill. */
     .bingo-board,
-    .bingo-card__pair {
+    .bingo-card__pair,
+    .bingo-editor {
         --bingo-ring-space: 4px;
+    }
+
+    /* The width a board needs before its own scroll container takes over, resolved against the
+       dimension in scope so the editor column and the grid inside it agree on one number. */
+    .bingo-board,
+    .bingo-editor {
+        --bingo-board-width: calc(
+            (var(--bingo-dimension) * 5.05rem) + (var(--bingo-ring-space) * 2)
+        );
+    }
+
+    /* Both authoring stages pair two panels, and the split is asked of the stage body rather than
+       the viewport: the 18rem navigation rail only takes space from 64rem up, so a viewport just
+       under that leaves these panels wider than a viewport just over it. */
+    .bingo-pane {
+        container-type: inline-size;
+        container-name: bingo-pane;
     }
 
     /* The card grid is driven by --bingo-dimension so a 3x3, 4x4 and 5x5 board share one rule.
@@ -25,7 +43,7 @@
         display: grid;
         gap: 0.45rem;
         grid-template-columns: repeat(var(--bingo-dimension), minmax(4.6rem, 1fr));
-        min-width: calc((var(--bingo-dimension) * 5.05rem) + (var(--bingo-ring-space) * 2));
+        min-width: var(--bingo-board-width);
         padding-inline: var(--bingo-ring-space);
     }
 
@@ -279,11 +297,139 @@
         font-weight: 650;
     }
 
+    .bingo-template,
     .bingo-editor {
         align-items: start;
         display: grid;
         gap: 1.25rem;
-        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .bingo-template__settings {
+        display: grid;
+        gap: 1rem;
+        min-width: 0;
+    }
+
+    .bingo-award-row {
+        align-items: center;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.5rem;
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        padding: 0.7rem 0.9rem;
+    }
+
+    .bingo-award-row__text {
+        display: grid;
+        gap: 0.15rem;
+        min-width: 0;
+    }
+
+    .bingo-award-row__text strong {
+        color: var(--app-text-strong);
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .bingo-award-row__text small {
+        color: var(--app-text-muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+    }
+
+    .bingo-revisions {
+        align-content: start;
+        display: grid;
+        gap: 0.6rem;
+        min-width: 0;
+    }
+
+    .bingo-revisions__label {
+        color: var(--app-text-muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .bingo-revisions__list {
+        display: grid;
+        gap: 0.5rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .bingo-revisions__item {
+        align-items: center;
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.6rem;
+        display: flex;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 0.6rem 0.7rem;
+    }
+
+    .bingo-revisions__identity {
+        display: grid;
+        gap: 0.1rem;
+        min-width: 0;
+    }
+
+    .bingo-revisions__name {
+        color: var(--app-text-strong);
+        font-size: 0.9rem;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+    }
+
+    .bingo-revisions__meta {
+        color: var(--app-text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .bingo-revisions__load,
+    .bingo-revisions__new {
+        flex: none;
+        justify-self: start;
+        width: auto;
+    }
+
+    .bingo-revisions__empty,
+    .bingo-revisions__note {
+        color: var(--app-text-muted);
+        font-size: 0.78rem;
+        line-height: 1.45;
+        margin: 0;
+    }
+
+    .bingo-board__hint {
+        color: var(--app-text-muted);
+        font-size: 0.75rem;
+        line-height: 1.45;
+        margin: 0;
+    }
+
+    .bingo-editor__conditional {
+        display: grid;
+        gap: 0.8rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+    }
+
+    .bingo-editor__pane-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .bingo-editor__pane-actions > .btn-secondary {
+        flex: 0 0 auto;
+        width: auto;
     }
 
     .bingo-editor__pane {
@@ -340,9 +486,17 @@
         font-weight: 500;
     }
 
-    @media (max-width: 56rem) {
+    @container bingo-pane (min-width: 44rem) {
+        .bingo-template {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    /* The board keeps its natural width so the paired editor takes what is left, which is what
+       stops the grid falling back to its own horizontal scroll at the intermediate breakpoint. */
+    @container bingo-pane (min-width: 46rem) {
         .bingo-editor {
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: minmax(var(--bingo-board-width), 1fr) minmax(0, 1fr);
         }
     }
 

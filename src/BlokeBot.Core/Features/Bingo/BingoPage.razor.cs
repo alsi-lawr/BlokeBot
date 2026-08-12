@@ -150,7 +150,7 @@ public partial class BingoPage
 
     private void ToggleFullCard() => _template.FullCard = !_template.FullCard;
 
-    private void EditTemplate(BingoTemplateView template)
+    private void LoadTemplate(BingoTemplateView template)
     {
         _template = new TemplateDraft
         {
@@ -220,7 +220,7 @@ public partial class BingoPage
     {
         var saved = _templates.FirstOrDefault(value => value.Id.Value == _template.Id);
         var next = saved is null ? 1 : saved.Revision + 1;
-        return $"Saving creates revision {next}. Cards already issued stay on their recorded revision.";
+        return $"Saving creates revision {next}. Issued cards keep the revision, grid and seed they were dealt from.";
     }
 
     private static string GameDescription(BingoGameView game) =>
