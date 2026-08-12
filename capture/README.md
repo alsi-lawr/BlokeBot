@@ -1,9 +1,7 @@
 # Dashboard help media
 
 The capture definitions render the deterministic `BlokeBot.Simulation` fixture used by the help
-site. `media-manifest.json` is the source of truth for every generated PNG and WebP: it records the
-real route, fresh-process scenario, theme, device, expected framed dimensions and semantic
-readiness.
+site. Each definition records its own routes, themes, devices and readiness conditions.
 
 ## Regenerate
 
@@ -15,8 +13,8 @@ dotnet build ../src/BlokeBot.Simulation/BlokeBot.Simulation.csproj \
   --configuration Release --property:TreatWarningsAsErrors=true --nologo
 ```
 
-From this directory, point `VISET_CHECKOUT` at the local Viset checkout, then run all six
-manifest-owned definitions on their own unused loopback ports. Port `5084` is reserved for human
+From this directory, point `VISET_CHECKOUT` at the local Viset checkout, then run each
+definition on its own unused loopback port. Port `5084` is reserved for human
 visual signoff and must not be used or stopped by capture work.
 
 ```sh
@@ -27,6 +25,8 @@ BLOKEBOT_GUESSING_CAPTURE_PORT=43219 nix run "$VISET_CHECKOUT" -- capture guessi
 BLOKEBOT_V05_GUIDES_PORT=5334 nix run "$VISET_CHECKOUT" -- capture v0.5-guides.lua --force
 BLOKEBOT_COMMUNITY_GUIDES_PORT=5460 nix run "$VISET_CHECKOUT" -- capture community-guides.lua --force
 BLOKEBOT_V06_OVERLAY_GUIDES_PORT=5461 nix run "$VISET_CHECKOUT" -- capture v0.6-overlay-guides.lua --force
+BLOKEBOT_V010_FIGURES_PHONE_PORT=5473 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-phone.lua --force
+BLOKEBOT_V010_FIGURES_LAPTOP_PORT=5475 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-laptop.lua --force
 ```
 
 The definitions have disjoint output names and ports, so they may run in parallel. Viset evaluates
@@ -48,8 +48,11 @@ Source URL. The animated captures use PNG screencast frames, high-quality lossy 
 page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
 gesture.
 
-The final matrix is 104 generated assets: 96 PNG and 8 WebP. Generated files go directly to
-`../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
+The two `v010-guide-figures-*` definitions produce the guide figures under
+`media/community/v010`. They are split by device because each figure pins one theme and one device
+rather than a full matrix.
+
+Generated files go directly to `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
 
 ## Editor support
 
