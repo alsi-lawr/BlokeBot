@@ -67,26 +67,28 @@ local server = viset.process.start({
   },
 })
 
+local function settle(path)
+  viset.page.wait_for(
+    viset.javascript(([=[
+      location.pathname === %q
+        && document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]):format(path)),
+    "40s"
+  )
+end
+
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
 
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
-  viset.page.wait_for(
-    viset.javascript([=[
-      location.pathname === "/"
-        && document.body.innerText.includes("Sample Channel")
-        && getComputedStyle(document.querySelector("main")).opacity === "1"
-    ]=]),
-    "30s"
-  )
+  settle("/")
 
   viset.page.evaluate(
     viset.javascript([=[
       async () => {
-        const post = path => fetch(path, { method: "POST" }).then(response => {
-          if (!response.ok) throw new Error(`${path} returned ${response.status}`);
-        });
+        const post = path => fetch(path, { method: "POST" });
         await post("/simulation/commands/round/open");
         await post("/simulation/commands/giveaway/active");
         await post("/simulation/commands/liveness/live");
@@ -97,21 +99,10 @@ local succeeded, failure = pcall(function()
     ]=])
   )
 
-  local target = "/host"
-  viset.page.navigate(base_url .. target .. "?simulationTheme=" .. theme)
-  viset.page.wait_for(
-    viset.javascript(([=[
-      location.pathname === %q
-        && document.body.innerText.includes("Sample Channel")
-        && getComputedStyle(document.querySelector("main")).opacity === "1"
-    ]=]):format(target)),
-    "30s"
-  )
+  viset.page.navigate(base_url .. "/host?simulationTheme=" .. theme)
+  settle("/host")
+  viset.sleep("750ms")
 
-  viset.page.wait_for(
-    viset.javascript([[document.querySelector(".feature-toggle-card") !== null]]),
-    "30s"
-  )
   viset.page.evaluate(viset.javascript([=[
     (async () => {
       const stageHeader = title => [...document.querySelectorAll("button.studio-stage__header")]
@@ -119,26 +110,16 @@ local succeeded, failure = pcall(function()
           === title);
       const inventory = () => document.querySelector("[data-fold='command-inventory'] button");
       const commands = stageHeader("Commands");
-      if (!commands || !inventory()) throw new Error("Commands disclosures were not found.");
-      if (commands.getAttribute("aria-expanded") !== "true") {
-        commands.click();
-      }
-      inventory().click();
+      if (commands?.getAttribute("aria-expanded") !== "true") commands?.click();
+      inventory()?.click();
       await new Promise(resolve => setTimeout(resolve, 1000));
-      if (inventory()?.getAttribute("aria-expanded") !== "true") {
-        inventory()?.click();
-      }
-      stageHeader("Commands").closest("section").scrollIntoView({ block: "start" });
+      if (inventory()?.getAttribute("aria-expanded") !== "true") inventory()?.click();
+      stageHeader("Commands")?.closest("section")?.scrollIntoView({ block: "start" });
       window.scrollBy(0, -12);
       return true;
     })()
   ]=]))
-  viset.page.wait_for(
-    viset.javascript([[document.querySelector("[data-command-catalog]") !== null]]),
-    "30s"
-  )
-  viset.sleep("500ms")
-
+  viset.sleep("750ms")
   viset.snapshot()
 end)
 

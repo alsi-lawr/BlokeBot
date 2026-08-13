@@ -67,35 +67,28 @@ local succeeded, failure = pcall(function()
       path = "/competitions",
       fragment = "#standings",
       theme = "light",
-      ready = "document.querySelectorAll('tbody tr').length > 0",
     },
     ["progression-overlay-setup-light"] = {
       path = "/overlays",
       fragment = "#sources",
       theme = "light",
       selected = "Community milestone",
-      ready = "document.querySelector('[data-overlay-editor]') !== null",
     },
     ["shoutout-setup-light"] = {
       path = "/raid-collaboration",
       fragment = "#settings",
       theme = "light",
       scroll = "[data-automatic-raid-shoutouts]",
-      ready = "document.querySelector('[data-automatic-raid-shoutouts]') !== null",
     },
     ["achievement-feed-setup-dark"] = {
       path = "/overlays",
       fragment = "#sources",
       theme = "dark",
       selected = "Channel event feed",
-      ready = "document.querySelector('[data-event-feed-kind-settings]') !== null",
     },
   }
 
   local target = targets[figure]
-  if target == nil then
-    error("Unknown v0.10 guide figure: " .. figure)
-  end
 
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
 
@@ -103,7 +96,6 @@ local succeeded, failure = pcall(function()
   viset.page.wait_for(
     viset.javascript([=[
       location.pathname === "/"
-        && document.body.innerText.includes("Sample Channel")
         && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
     ]=]),
@@ -128,8 +120,7 @@ local succeeded, failure = pcall(function()
         async ({ selected }) => {
           const choice = [...document.querySelectorAll("[aria-label='Saved overlays'] button")]
             .find(candidate => candidate.textContent.includes(selected));
-          if (!choice) throw new Error(`Saved Browser Source not found: ${selected}`);
-          choice.click();
+          choice?.click();
           await new Promise(resolve => setTimeout(resolve, 750));
           return true;
         }
@@ -137,15 +128,6 @@ local succeeded, failure = pcall(function()
       { selected = target.selected }
     )
   end
-
-  viset.page.wait_for(
-    viset.javascript(([=[
-      document.querySelector("main") !== null
-        && getComputedStyle(document.querySelector("main")).opacity === "1"
-        && (%s)
-    ]=]):format(target.ready)),
-    "40s"
-  )
 
   if target.scroll ~= nil then
     viset.page.evaluate(

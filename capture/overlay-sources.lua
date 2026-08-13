@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../src/BlokeBot.Site/wwwroot/media"
-output = "{device}-{theme}-{view}.png"
+output = "{device}-{theme}-overlay-{view}.png"
 frame = "builtin:auto"
 browser_arguments = [
   "--disable-background-networking",
@@ -39,13 +39,14 @@ height = 844
 [matrix]
 theme = ["light", "dark"]
 view = [
-  "chat-tools-all-disabled",
-  "chat-tools-enabled",
+  "sources",
+  "cues",
+  "media",
 ]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_CHAT_TOOLS_PORT") or "5335"
+local port = os.getenv("BLOKEBOT_OVERLAY_SOURCES_PORT") or "5461"
 local base_url = "http://127.0.0.1:" .. port
 local server = viset.process.start({
   file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
@@ -79,47 +80,83 @@ local function settle(path)
   )
 end
 
-local states = {
-  ["chat-tools-all-disabled"] = { features = "all-disabled", liveness = "offline" },
-  ["chat-tools-enabled"] = { features = "mixed", liveness = "live" },
+local views = {
+  ["sources"] = {
+    fragment = "#sources",
+    selected = "Channel event feed",
+    scroll = "[data-overlay-tabs]",
+  },
+  ["cues"] = {
+    fragment = "#cues",
+    scroll = "[data-cue-editor]",
+  },
+  ["media"] = {
+    fragment = "#media",
+    scroll = "main",
+  },
 }
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
-  local state = states[view]
+  local expected = views[view]
 
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
-  viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
-  settle("/")
-
-  viset.page.evaluate(
-    viset.javascript([=[
-      async ({ features, liveness }) => {
-        const post = path => fetch(path, { method: "POST" });
-        await post("/simulation/commands/round/none");
-        await post("/simulation/commands/giveaway/inactive");
-        await post(`/simulation/commands/liveness/${liveness}`);
-        await post(`/simulation/commands/features/${features}`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return true;
-      }
-    ]=]),
-    { features = state.features, liveness = state.liveness }
-  )
-
-  viset.page.navigate(base_url .. "/host?simulationTheme=" .. theme)
-  settle("/host")
+  viset.page.navigate(base_url .. "/simulation/login?view=overlays&theme=" .. theme)
+  settle("/overlays")
   viset.sleep("750ms")
 
   viset.page.evaluate(
     viset.javascript([=[
-      () => {
-        document.querySelector("#chat-tools")?.scrollIntoView({ block: "start" });
-        window.scrollBy(0, -12);
+      async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/round/open");
+        await post("/simulation/commands/giveaway/active");
+        await post("/simulation/commands/liveness/live");
+        await new Promise(resolve => setTimeout(resolve, 350));
         return true;
       }
     ]=])
+  )
+
+  if expected.fragment ~= "#sources" then
+    viset.page.evaluate(
+      viset.javascript([=[
+        ({ tabId }) => {
+          document.getElementById(tabId)?.click();
+          return true;
+        }
+      ]=]),
+      { tabId = "overlays-" .. expected.fragment:sub(2) .. "-tab" }
+    )
+    viset.sleep("750ms")
+  end
+
+  if expected.selected ~= nil then
+    viset.page.evaluate(
+      viset.javascript([=[
+        async ({ selected }) => {
+          [...document.querySelectorAll("[aria-label='Saved overlays'] button")]
+            .find(candidate => candidate.textContent.includes(selected))
+            ?.click();
+          await new Promise(resolve => setTimeout(resolve, 750));
+          return true;
+        }
+      ]=]),
+      { selected = expected.selected }
+    )
+  end
+
+  viset.page.evaluate(
+    viset.javascript([=[
+      ({ selector }) => {
+        document.querySelector(selector)?.scrollIntoView({ block: "start" });
+        window.scrollBy(0, -12);
+        return true;
+      }
+    ]=]),
+    { selector = expected.scroll }
   )
   viset.sleep("750ms")
   viset.snapshot()

@@ -67,34 +67,28 @@ local server = viset.process.start({
   },
 })
 
-local readiness = {
-  ["automation-events"] = {
-    path = "/automations/events",
-    expression = [[(() => {
-      const cards = [...document.querySelectorAll("[data-automation-event-source]")];
-      return cards.length === 21
-        && cards.every(card => card.getAttribute("data-source-state") === "ready");
-    })()]],
-  },
+local function settle(path)
+  viset.page.wait_for(
+    viset.javascript(([=[
+      location.pathname === %q
+        && document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]):format(path)),
+    "40s"
+  )
+end
+
+local paths = {
+  ["automation-events"] = "/automations/events",
 }
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
-  local expected = readiness[view]
-  if expected == nil then
-    error("No capture readiness is registered for " .. view)
-  end
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
-  local ready_expression = ([=[
-    window.location.pathname === %q &&
-      document.body.innerText.includes("Sample Channel") &&
-      (%s) &&
-      getComputedStyle(document.querySelector("main")).opacity === "1"
-  ]=]):format(expected.path, expected.expression)
-  viset.page.wait_for(viset.javascript(ready_expression), "20s")
-  viset.sleep("350ms")
+  settle(paths[view])
+  viset.sleep("600ms")
   viset.snapshot()
 end)
 

@@ -80,7 +80,6 @@ local succeeded, failure = pcall(function()
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
-      document.body.innerText.includes("Sample Channel") &&
         Boolean(document.querySelector("article"))
     ]=]),
     "20s"

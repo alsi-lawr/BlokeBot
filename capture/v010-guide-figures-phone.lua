@@ -68,39 +68,31 @@ local succeeded, failure = pcall(function()
       path = "/raid-collaboration",
       theme = "light",
       features = "all-enabled",
-      ready = "document.querySelector('[data-raid-history]') !== null",
       scroll = "[data-raid-shortlist] article",
     },
     ["blokeraid-completion-dark"] = {
       path = "/raid/samplechannel",
       theme = "dark",
       features = "all-enabled",
-      ready = "document.querySelector('.public-raid-recap') !== null",
     },
     ["collectives-recovery-dark"] = {
       path = "/collectives",
       theme = "dark",
       features = "selective-native",
-      ready = "document.querySelector('[data-collectives-disabled-recovery]') !== null",
     },
     ["viewer-passport-participant-dark"] = {
       path = "/passport/samplechannel/nightowl",
       theme = "dark",
       features = "all-enabled",
-      ready = "!document.body.innerText.includes('Loading viewer passport')",
     },
     ["moment-attachment-light"] = {
       path = "/bounties/samplechannel",
       theme = "light",
       features = "all-enabled",
-      ready = "document.querySelector('[data-public-moment-attachments]') !== null",
     },
   }
 
   local target = targets[figure]
-  if target == nil then
-    error("Unknown v0.10 guide figure: " .. figure)
-  end
 
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
 
@@ -108,7 +100,7 @@ local succeeded, failure = pcall(function()
   viset.page.wait_for(
     viset.javascript([=[
       location.pathname === "/"
-        && document.body.innerText.includes("Sample Channel")
+        && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
     ]=]),
     "40s"
@@ -116,10 +108,7 @@ local succeeded, failure = pcall(function()
 
   viset.page.evaluate(
     viset.javascript([=[
-      ({ endpoint }) => fetch(endpoint, { method: "POST" }).then(response => {
-        if (!response.ok) throw new Error(`${endpoint} returned ${response.status}`);
-        return true;
-      })
+      ({ endpoint }) => fetch(endpoint, { method: "POST" }).then(() => true)
     ]=]),
     { endpoint = base_url .. "/simulation/commands/features/" .. target.features }
   )
@@ -130,8 +119,7 @@ local succeeded, failure = pcall(function()
       location.pathname === %q
         && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
-        && (%s)
-    ]=]):format(target.path, target.ready)),
+    ]=]):format(target.path)),
     "40s"
   )
   if target.scroll ~= nil then

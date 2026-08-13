@@ -29,35 +29,41 @@ BLOKEBOT_NATIVE_TWITCH_PORT=43223 nix run "$VISET_CHECKOUT" -- capture native-tw
 BLOKEBOT_VIEWER_COMMAND_CATALOG_PORT=5334 nix run "$VISET_CHECKOUT" -- capture viewer-command-catalog.lua --force
 BLOKEBOT_CHAT_TOOLS_PORT=5335 nix run "$VISET_CHECKOUT" -- capture chat-tools-switches.lua --force
 BLOKEBOT_COMMUNITY_GUIDES_PORT=5460 nix run "$VISET_CHECKOUT" -- capture community-guides.lua --force
-BLOKEBOT_V06_OVERLAY_GUIDES_PORT=5461 nix run "$VISET_CHECKOUT" -- capture v0.6-overlay-guides.lua --force
+BLOKEBOT_OVERLAY_SOURCES_PORT=5461 nix run "$VISET_CHECKOUT" -- capture overlay-sources.lua --force
+BLOKEBOT_OVERLAY_PREVIEWS_PORT=5462 nix run "$VISET_CHECKOUT" -- capture overlay-previews.lua --force
 BLOKEBOT_V010_FIGURES_PHONE_PORT=5473 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-phone.lua --force
 BLOKEBOT_V010_FIGURES_LAPTOP_PORT=5475 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-laptop.lua --force
+BLOKEBOT_PROGRESSION_LAPTOP_PORT=5476 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-laptop.lua --force
+BLOKEBOT_PROGRESSION_PHONE_PORT=5477 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-phone.lua --force
 ```
 
 The definitions have disjoint output names and ports, so they may run in parallel. Viset evaluates
 every theme/device/view matrix item independently. Each item starts a fresh Release Simulation
 process inside the Lua definition, waits for `/simulation/ready`, follows the real
-`/simulation/login` alias, waits for route-specific visible ready-state content, captures the page
-without hiding sibling sections, and stops that process even when capture fails.
+`/simulation/login` alias, waits only for the route to load and its `main` element to finish fading
+in, captures the page without hiding sibling sections, and stops that process even when capture
+fails. The definitions assert nothing about product state; they set up a deterministic fixture and
+take the picture.
 
 Each definition covers one guide area so a single area can be recaptured without rerunning the
-others. `automation-events.lua` waits for all 21 automation event sources to report ready.
-`chat-tools-switches.lua` and `viewer-command-catalog.lua` drive the deterministic round, giveaway,
-feature and stream-liveness endpoints first: the former captures the all-disabled and
-representative enabled Chat Tools states, the latter opens the real **Available viewer commands**
-disclosure. Neither asserts a fixed feature-card count, so adding or retiring a feature does not
-break them. `community-guides.lua` captures the current moderator workspace on laptops and the
+others. `chat-tools-switches.lua` and `viewer-command-catalog.lua` drive the deterministic round,
+giveaway, feature and stream-liveness endpoints first: the former captures the all-disabled and
+representative enabled Chat Tools states, the latter opens the **Available viewer commands**
+disclosure. `community-guides.lua` captures the current moderator workspace on laptops and the
 matching participant view on phones for request boards, play-with-viewers queues and moments. The
 Simulation fixture provides the approved, voted moment shown in both moments captures.
-`v0.6-overlay-guides.lua` captures Browser Sources, Guessing, active Giveaway, Event feed, Viewer
-Queue, Cues and Media in light and dark laptop and phone frames without exposing a private Browser
-Source URL. The animated captures use PNG screencast frames, high-quality lossy WebP output, real
+`overlay-sources.lua` and `overlay-previews.lua` capture Browser Sources, Cues, Media, Guessing,
+active Giveaway, Event feed and Viewer Queue in light and dark laptop and phone frames without
+exposing a private Browser Source URL. The animated captures use PNG screencast frames, high-quality lossy WebP output, real
 page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
 gesture.
 
 The two `v010-guide-figures-*` definitions produce the guide figures under
 `media/community/v010`. They are split by device because each figure pins one theme and one device
-rather than a full matrix.
+rather than a full matrix. The two `community-progression-figures-*` definitions produce the Bingo,
+bounty and season figures under `media/community/progression`: the laptop set covers the moderator
+setup, moderation and archive areas, and the phone set covers the disabled-feature recovery states
+and the public card, board and season pages.
 
 Generated files go directly to `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
 

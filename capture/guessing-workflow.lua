@@ -79,26 +79,16 @@ local succeeded, failure = pcall(function()
   viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
-      document.body.innerText.includes("Sample Channel") &&
-        document.body.innerText.includes("Run a round")
+      document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
     ]=]),
-    "20s"
-  )
-  viset.page.wait_for(
-    viset.javascript([=[
-      document.documentElement.scrollWidth <= window.innerWidth &&
-        document.body.scrollWidth <= window.innerWidth
-    ]=]),
-    "10s"
+    "40s"
   )
   viset.sleep("350ms")
 
   local click = viset.javascript([=[
-    ({ label }) => {
-      const button = [...document.querySelectorAll("button")]
-        .find(candidate => candidate.textContent.trim() === label);
-      if (!button) throw new Error(`Button not found: ${label}.`);
-      button.click();
+    ({ tabId }) => {
+      document.getElementById(tabId)?.click();
       return true;
     }
   ]=])
@@ -107,14 +97,14 @@ local succeeded, failure = pcall(function()
   recording:start()
   recording:during("600ms")
   recording:during("233ms", function()
-    viset.page.evaluate(click, { label = "History" })
+    viset.page.evaluate(click, { tabId = "guessing-history-tab" })
   end)
-  viset.page.wait_for("Boolean(document.querySelector('#guessing-history-panel'))", "10s")
+  viset.sleep("400ms")
   recording:during("333ms")
   recording:during("233ms", function()
-    viset.page.evaluate(click, { label = "Leaderboard" })
+    viset.page.evaluate(click, { tabId = "guessing-leaderboard-tab" })
   end)
-  viset.page.wait_for("Boolean(document.querySelector('#guessing-leaderboard-panel'))", "10s")
+  viset.sleep("400ms")
   recording:during("267ms")
   recording:during("600ms", function()
     viset.page.evaluate(viset.javascript([=[
@@ -152,9 +142,9 @@ local succeeded, failure = pcall(function()
   )
   recording:during("467ms")
   recording:during("233ms", function()
-    viset.page.evaluate(click, { label = "Live" })
+    viset.page.evaluate(click, { tabId = "guessing-live-tab" })
   end)
-  viset.page.wait_for("document.body.innerText.includes('Run a round')", "10s")
+  viset.sleep("350ms")
   viset.page.evaluate("window.scrollTo(0, 0); true")
   recording:during("600ms")
   recording:stop()

@@ -73,49 +73,36 @@ local succeeded, failure = pcall(function()
     ["request-boards"] = {
       laptop = {
         path = "/requests",
-        ready = "Game night requests",
       },
       phone = {
         path = "/requests/samplechannel/requests",
-        ready = "Submit a request",
       },
     },
     ["play-with-viewers"] = {
       laptop = {
         path = "/queues",
-        ready = "Set up",
       },
       phone = {
         path = "/queues/samplechannel/main",
-        ready = "Join the queue",
       },
     },
     ["moments"] = {
       laptop = {
         path = "/moments",
-        ready = "Community clutch save",
       },
       phone = {
         path = "/moments/samplechannel/streams/stream-0001",
-        ready = "Community clutch save",
       },
     },
   }
-  local view_targets = targets[view]
-  if view_targets == nil then
-    error("Unknown community view: " .. view)
-  end
-  local target = view_targets[device]
-  if target == nil then
-    error("Unknown community device: " .. device)
-  end
+  local target = targets[view][device]
 
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
       location.pathname === "/"
-        && document.body.innerText.includes("Sample Channel")
+        && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
     ]=]),
     "30s"
@@ -125,10 +112,9 @@ local succeeded, failure = pcall(function()
   viset.page.wait_for(
     viset.javascript(([=[
       location.pathname === %q
-        && document.body.innerText.includes("Sample Channel")
-        && document.body.innerText.includes(%q)
+        && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
-    ]=]):format(target.path, target.ready)),
+    ]=]):format(target.path)),
     "30s"
   )
 

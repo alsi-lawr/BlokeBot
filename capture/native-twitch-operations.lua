@@ -70,42 +70,31 @@ local server = viset.process.start({
   },
 })
 
-local readiness = {
-  ["native-polls"] = {
-    path = "/twitch-operations/polls",
-    expression = [[Boolean(document.querySelector("[data-native-route='polls'] .task-panel button"))]],
-  },
-  ["native-clips-markers"] = {
-    path = "/twitch-operations/clips-markers",
-    expression = [[Boolean(document.querySelector("[data-native-route='clips-markers'] .task-panel button"))]],
-  },
-  ["native-channel-points"] = {
-    path = "/twitch-operations/channel-points",
-    expression = [[Boolean(document.querySelector("[data-native-route='channel-points'] [data-active-redemptions] [data-waiting-age-band]"))]],
-  },
-  ["native-predictions"] = {
-    path = "/twitch-operations/predictions",
-    expression = [[Boolean(document.querySelector("[data-native-route='predictions'] .task-panel button"))]],
-  },
+local function settle(path)
+  viset.page.wait_for(
+    viset.javascript(([=[
+      location.pathname === %q
+        && document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]):format(path)),
+    "40s"
+  )
+end
+
+local paths = {
+  ["native-polls"] = "/twitch-operations/polls",
+  ["native-clips-markers"] = "/twitch-operations/clips-markers",
+  ["native-channel-points"] = "/twitch-operations/channel-points",
+  ["native-predictions"] = "/twitch-operations/predictions",
 }
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
-  local expected = readiness[view]
-  if expected == nil then
-    error("No capture readiness is registered for " .. view)
-  end
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
-  local ready_expression = ([=[
-    window.location.pathname === %q &&
-      document.body.innerText.includes("Sample Channel") &&
-      (%s) &&
-      getComputedStyle(document.querySelector("main")).opacity === "1"
-  ]=]):format(expected.path, expected.expression)
-  viset.page.wait_for(viset.javascript(ready_expression), "20s")
-  viset.sleep("350ms")
+  settle(paths[view])
+  viset.sleep("600ms")
   viset.snapshot()
 end)
 
