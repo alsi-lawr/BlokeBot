@@ -126,7 +126,7 @@ local succeeded, failure = pcall(function()
 
   viset.page.evaluate(
     viset.javascript([=[
-      async () => {
+      (async () => {
         const post = path => fetch(path, { method: "POST" });
         await post("/simulation/commands/features/all-enabled");
         await post("/simulation/commands/round/open");
@@ -134,9 +134,11 @@ local succeeded, failure = pcall(function()
         await post("/simulation/commands/liveness/live");
         await new Promise(resolve => setTimeout(resolve, 350));
         return true;
-      }
+      })()
     ]=])
   )
+  viset.page.navigate(base_url .. "/overlays" .. "?simulationTheme=" .. theme)
+  settle("/overlays")
 
   if expected.fragment ~= "#sources" then
     viset.page.evaluate(
@@ -144,7 +146,7 @@ local succeeded, failure = pcall(function()
         ({ tabId }) => {
           document.getElementById(tabId)?.click();
           return true;
-        }
+        })()
       ]=]),
       { tabId = "overlays-" .. expected.fragment:sub(2) .. "-tab" }
     )
@@ -160,7 +162,7 @@ local succeeded, failure = pcall(function()
             ?.click();
           await new Promise(resolve => setTimeout(resolve, 750));
           return true;
-        }
+        })()
       ]=]),
       { selected = expected.selected }
     )
@@ -172,7 +174,7 @@ local succeeded, failure = pcall(function()
         document.querySelector(selector)?.scrollIntoView({ block: "start" });
         window.scrollBy(0, -12);
         return true;
-      }
+      })()
     ]=]),
     { selector = expected.scroll }
   )

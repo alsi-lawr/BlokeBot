@@ -97,7 +97,7 @@ local succeeded, failure = pcall(function()
 
   viset.page.evaluate(
     viset.javascript([=[
-      async () => {
+      (async () => {
         const post = path => fetch(path, { method: "POST" });
         await post("/simulation/commands/round/open");
         await post("/simulation/commands/giveaway/active");
@@ -105,7 +105,7 @@ local succeeded, failure = pcall(function()
         await post("/simulation/commands/features/all-enabled");
         await new Promise(resolve => setTimeout(resolve, 500));
         return true;
-      }
+      })()
     ]=])
   )
 

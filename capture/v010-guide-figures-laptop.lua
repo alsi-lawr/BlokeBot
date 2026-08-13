@@ -112,6 +112,18 @@ local succeeded, failure = pcall(function()
     "40s"
   )
 
+  viset.page.evaluate(
+    viset.javascript([=[
+      (async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/liveness/production");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return true;
+      })()
+    ]=])
+  )
+
   viset.page.navigate(
     base_url .. target.path .. "?simulationTheme=" .. target.theme .. target.fragment
   )
@@ -133,7 +145,7 @@ local succeeded, failure = pcall(function()
           choice?.click();
           await new Promise(resolve => setTimeout(resolve, 750));
           return true;
-        }
+        })()
       ]=]),
       { selected = target.selected }
     )
@@ -146,7 +158,7 @@ local succeeded, failure = pcall(function()
           const target = document.querySelector(selector);
           if (target) target.scrollIntoView({ block: "center" });
           return true;
-        }
+        })()
       ]=]),
       { selector = target.scroll }
     )

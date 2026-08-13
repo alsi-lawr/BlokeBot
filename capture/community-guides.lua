@@ -118,6 +118,18 @@ local succeeded, failure = pcall(function()
     "30s"
   )
 
+  viset.page.evaluate(
+    viset.javascript([=[
+      (async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/liveness/production");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return true;
+      })()
+    ]=])
+  )
+
   viset.page.navigate(base_url .. target.path .. "?simulationTheme=" .. theme)
   viset.page.wait_for(
     viset.javascript(([=[

@@ -102,6 +102,20 @@ local succeeded, failure = pcall(function()
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
   settle(paths[view])
+
+  viset.page.evaluate(
+    viset.javascript([=[
+      (async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/liveness/production");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return true;
+      })()
+    ]=])
+  )
+  viset.page.navigate(base_url .. paths[view] .. "?simulationTheme=" .. theme)
+  settle(paths[view])
   viset.sleep("600ms")
   viset.snapshot()
 end)

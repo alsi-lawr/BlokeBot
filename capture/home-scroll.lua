@@ -94,6 +94,26 @@ local succeeded, failure = pcall(function()
     ]=]),
     "20s"
   )
+
+  viset.page.evaluate(
+    viset.javascript([=[
+      (async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/liveness/production");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return true;
+      })()
+    ]=])
+  )
+  viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
+  viset.page.wait_for(
+    viset.javascript([=[
+      document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]),
+    "40s"
+  )
   viset.sleep("350ms")
 
   viset.page.evaluate(
@@ -119,7 +139,7 @@ local succeeded, failure = pcall(function()
         ].join(";");
         document.body.append(indicator);
         return true;
-      }
+      })()
     ]=]),
     { touch = device.touch }
   )
@@ -142,7 +162,7 @@ local succeeded, failure = pcall(function()
           ) + "px";
           indicator.style.opacity = "1";
         }
-      }
+      })()
     ]=])
       :format(start_ratio, end_ratio - start_ratio)
 

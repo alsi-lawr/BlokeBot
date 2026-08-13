@@ -94,13 +94,33 @@ local succeeded, failure = pcall(function()
     ]=]),
     "40s"
   )
+
+  viset.page.evaluate(
+    viset.javascript([=[
+      (async () => {
+        const post = path => fetch(path, { method: "POST" });
+        await post("/simulation/commands/features/all-enabled");
+        await post("/simulation/commands/liveness/production");
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return true;
+      })()
+    ]=])
+  )
+  viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
+  viset.page.wait_for(
+    viset.javascript([=[
+      document.querySelector("main") !== null
+        && getComputedStyle(document.querySelector("main")).opacity === "1"
+    ]=]),
+    "40s"
+  )
   viset.sleep("350ms")
 
   local click = viset.javascript([=[
     ({ tabId }) => {
       document.getElementById(tabId)?.click();
       return true;
-    }
+    })()
   ]=])
 
   local recording = viset.record()
@@ -134,7 +154,7 @@ local succeeded, failure = pcall(function()
         frame => {
           const range = window.blokeBotCaptureScroll;
           window.scrollTo(0, Math.round(range.start + (range.end - range.start) * frame.progress));
-        }
+        })()
       ]=]),
     })
   end)
@@ -146,7 +166,7 @@ local succeeded, failure = pcall(function()
         setter.call(input, value);
         input.dispatchEvent(new Event("input", { bubbles: true }));
         return true;
-      }
+      })()
     ]=]),
     { value = "nightowl" }
   )
