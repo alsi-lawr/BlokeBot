@@ -330,6 +330,15 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Start with every tool off",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-chat-tools-all-disabled.png",
+                        LightPhoneSource: "media/phone-light-chat-tools-all-disabled.png",
+                        DarkLaptopSource: "media/laptop-dark-chat-tools-all-disabled.png",
+                        LightLaptopSource: "media/laptop-light-chat-tools-all-disabled.png",
+                        PhoneAlt: "BlokeBot Channel setup on a phone with every Chat tools feature card showing off.",
+                        LaptopAlt: "BlokeBot Channel setup with every Chat tools feature card showing off.",
+                        "A new channel starts with every Chat Tools feature off; each card carries its own switch."
+                    ),
                     Paragraphs =
                     [
                         "A new channel starts with every available Chat Tools feature disabled. This includes Native Twitch operations, community interaction and progression, games, Points, Custom commands and Overlays.",
@@ -347,6 +356,15 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Turn on only what the channel needs",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-chat-tools-enabled.png",
+                        LightPhoneSource: "media/phone-light-chat-tools-enabled.png",
+                        DarkLaptopSource: "media/laptop-dark-chat-tools-enabled.png",
+                        LightLaptopSource: "media/laptop-light-chat-tools-enabled.png",
+                        PhoneAlt: "BlokeBot Channel setup on a phone with Request boards, Moments, Points and Custom commands on and the remaining features off.",
+                        LaptopAlt: "BlokeBot Channel setup with Request boards, Moments, Points and Custom commands on and the remaining features off.",
+                        "Each feature is independently opt-in, so a channel can run four tools and leave the rest off."
+                    ),
                     Steps =
                     [
                         "Choose the correct channel and open Channel setup.",
@@ -1663,6 +1681,15 @@ internal static partial class SiteGuideCatalog
             Title = "Create commands and scheduled messages",
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-custom-commands.png",
+                LightPhoneSource: "media/phone-light-custom-commands.png",
+                DarkLaptopSource: "media/laptop-dark-custom-commands.png",
+                LightLaptopSource: "media/laptop-light-custom-commands.png",
+                PhoneAlt: "BlokeBot Custom commands on a phone with the saved command list and the selected command's Basics step.",
+                LaptopAlt: "BlokeBot Custom commands with the saved command list beside the selected command's name, command words and chat preview.",
+                "The saved command list sits beside the selected command, so its words and the reply viewers will see stay visible together."
+            ),
             Sections =
             [
                 new SiteGuideSection
