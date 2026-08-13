@@ -11,11 +11,13 @@ internal static partial class SiteGuideCatalog
             Title = "Choose your viewer passport",
             Summary =
                 "Opt in to a host-scoped profile, choose exactly who can see it and keep control of the activity BlokeBot presents.",
-            Figure = new SiteFigure(
-                "media/community/figures/viewer-passport-participant-dark-phone.png",
-                462,
-                956,
-                "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/figures/phone-dark-viewer-passport-participant.png",
+                LightPhoneSource: "media/community/figures/phone-light-viewer-passport-participant.png",
+                DarkLaptopSource: "media/community/figures/laptop-dark-viewer-passport-participant.png",
+                LightLaptopSource: "media/community/figures/laptop-light-viewer-passport-participant.png",
+                PhoneAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
+                LaptopAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
                 "A viewer owns the editor and visibility choice; the public route contains only the resulting permitted projection."
             ),
             Sections =
@@ -91,11 +93,13 @@ internal static partial class SiteGuideCatalog
             Title = "Run tournaments and leagues",
             Summary =
                 "Register viewers or teams, generate a reproducible schedule, confirm and correct results, then publish bounded standings and archives.",
-            Figure = new SiteFigure(
-                "media/community/figures/competition-result-light-laptop.png",
-                1308,
-                840,
-                "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/figures/phone-dark-competition-result.png",
+                LightPhoneSource: "media/community/figures/phone-light-competition-result.png",
+                DarkLaptopSource: "media/community/figures/laptop-dark-competition-result.png",
+                LightLaptopSource: "media/community/figures/laptop-light-competition-result.png",
+                PhoneAlt: "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
+                LaptopAlt: "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
                 "Staff manage authoritative lifecycle and results; viewers receive the current public bracket, schedule or standings."
             ),
             Sections =
@@ -187,11 +191,13 @@ internal static partial class SiteGuideCatalog
             Title = "Use the raid and collaboration hub",
             Summary =
                 "Welcome incoming communities once, shortlist only explicitly approved live channels and keep every outgoing Twitch raid under host confirmation.",
-            Figure = new SiteFigure(
-                "media/community/figures/raid-collaboration-light-phone.png",
-                462,
-                956,
-                "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/figures/phone-dark-raid-collaboration.png",
+                LightPhoneSource: "media/community/figures/phone-light-raid-collaboration.png",
+                DarkLaptopSource: "media/community/figures/laptop-dark-raid-collaboration.png",
+                LightLaptopSource: "media/community/figures/laptop-light-raid-collaboration.png",
+                PhoneAlt: "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
+                LaptopAlt: "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
                 "The narrow active hub keeps approved candidates, explainable filters and host-confirmed Twitch actions readable together."
             ),
             Sections =
@@ -222,11 +228,13 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Shout out a raider automatically",
-                    Figure = new SiteFigure(
-                        "media/community/figures/shoutout-setup-light-laptop.png",
-                        1308,
-                        840,
-                        "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/figures/phone-dark-shoutout-setup.png",
+                        LightPhoneSource: "media/community/figures/phone-light-shoutout-setup.png",
+                        DarkLaptopSource: "media/community/figures/laptop-dark-shoutout-setup.png",
+                        LightLaptopSource: "media/community/figures/laptop-light-shoutout-setup.png",
+                        PhoneAlt: "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
+                        LaptopAlt: "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
                         "Automatic shoutout setup keeps the message, its tokens and the preview viewers will see readable together before one save."
                     ),
                     Steps =
@@ -305,11 +313,13 @@ internal static partial class SiteGuideCatalog
             Title = "Run a persistent BlokeRaid campaign",
             Summary =
                 "Carry one host-scoped channel boss across streams while preserving resolved actions, shared ward progress, phases, standings and completion recaps.",
-            Figure = new SiteFigure(
-                "media/community/figures/blokeraid-completion-dark-phone.png",
-                462,
-                956,
-                "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/figures/phone-dark-blokeraid-completion.png",
+                LightPhoneSource: "media/community/figures/phone-light-blokeraid-completion.png",
+                DarkLaptopSource: "media/community/figures/laptop-dark-blokeraid-completion.png",
+                LightLaptopSource: "media/community/figures/laptop-light-blokeraid-completion.png",
+                PhoneAlt: "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
+                LaptopAlt: "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
                 "The active campaign persists across streams; the public route keeps current standings and the latest completed recap readable."
             ),
             Sections =
@@ -399,11 +409,13 @@ internal static partial class SiteGuideCatalog
             Title = "Coordinate a multi-host Collective",
             Summary =
                 "Invite explicit hosts on one BlokeBot installation, preserve each host's authority and share only bounded tournament, raid-relay or goal projections.",
-            Figure = new SiteFigure(
-                "media/community/figures/collectives-recovery-dark-phone.png",
-                462,
-                956,
-                "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/figures/phone-dark-collectives-recovery.png",
+                LightPhoneSource: "media/community/figures/phone-light-collectives-recovery.png",
+                DarkLaptopSource: "media/community/figures/laptop-dark-collectives-recovery.png",
+                LightLaptopSource: "media/community/figures/laptop-light-collectives-recovery.png",
+                PhoneAlt: "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",
+                LaptopAlt: "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",
                 "The disabled route preserves consent and workflows and explains recovery without replay."
             ),
             Sections =

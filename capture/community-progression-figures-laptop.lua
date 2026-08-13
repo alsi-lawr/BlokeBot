@@ -24,8 +24,8 @@ touch = false
 device_scale = 1.0
 
 [devices.laptop.viewport]
-width = 1180
-height = 720
+width = 1920
+height = 1080
 
 [matrix]
 theme = ["light", "dark"]

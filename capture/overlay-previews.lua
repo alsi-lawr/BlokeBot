@@ -24,8 +24,8 @@ touch = false
 device_scale = 1.0
 
 [devices.laptop.viewport]
-width = 1180
-height = 720
+width = 1920
+height = 1080
 
 [devices.phone]
 mobile = true
@@ -33,8 +33,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 390
-height = 844
+width = 720
+height = 1280
 
 [matrix]
 theme = ["light", "dark"]
@@ -146,7 +146,7 @@ local succeeded, failure = pcall(function()
         ({ tabId }) => {
           document.getElementById(tabId)?.click();
           return true;
-        })()
+        }
       ]=]),
       { tabId = "overlays-" .. expected.fragment:sub(2) .. "-tab" }
     )
@@ -162,7 +162,7 @@ local succeeded, failure = pcall(function()
             ?.click();
           await new Promise(resolve => setTimeout(resolve, 750));
           return true;
-        })()
+        }
       ]=]),
       { selected = expected.selected }
     )
@@ -174,7 +174,7 @@ local succeeded, failure = pcall(function()
         document.querySelector(selector)?.scrollIntoView({ block: "start" });
         window.scrollBy(0, -12);
         return true;
-      })()
+      }
     ]=]),
     { selector = expected.scroll }
   )

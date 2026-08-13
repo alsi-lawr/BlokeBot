@@ -33,8 +33,8 @@ touch = false
 device_scale = 1.0
 
 [devices.laptop.viewport]
-width = 1180
-height = 720
+width = 1920
+height = 1080
 
 [devices.phone]
 mobile = true
@@ -42,8 +42,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 390
-height = 844
+width = 720
+height = 1280
 
 [matrix]
 theme = ["light", "dark"]
@@ -139,7 +139,7 @@ local succeeded, failure = pcall(function()
         ].join(";");
         document.body.append(indicator);
         return true;
-      })()
+      }
     ]=]),
     { touch = device.touch }
   )
@@ -162,7 +162,7 @@ local succeeded, failure = pcall(function()
           ) + "px";
           indicator.style.opacity = "1";
         }
-      })()
+      }
     ]=])
       :format(start_ratio, end_ratio - start_ratio)
 

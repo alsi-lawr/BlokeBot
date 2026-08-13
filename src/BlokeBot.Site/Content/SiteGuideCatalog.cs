@@ -509,11 +509,13 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Show community goals and bounties",
-                    Figure = new SiteFigure(
-                        "media/community/figures/progression-overlay-setup-light-laptop.png",
-                        1308,
-                        840,
-                        "The Sample Channel Community milestone Browser Source editor showing source selection, rotation and representative progress states.",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/figures/phone-dark-progression-overlay-setup.png",
+                        LightPhoneSource: "media/community/figures/phone-light-progression-overlay-setup.png",
+                        DarkLaptopSource: "media/community/figures/laptop-dark-progression-overlay-setup.png",
+                        LightLaptopSource: "media/community/figures/laptop-light-progression-overlay-setup.png",
+                        PhoneAlt: "The Sample Channel Community milestone Browser Source editor showing source selection, rotation and representative progress states.",
+                        LaptopAlt: "The Sample Channel Community milestone Browser Source editor showing source selection, rotation and representative progress states.",
                         "The signed-in editor selects bounded authoritative data; the private Browser Source renders current public progress without exposing its URL."
                     ),
                     Steps =
@@ -558,11 +560,13 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Present achievements in the Event feed",
-                    Figure = new SiteFigure(
-                        "media/community/figures/achievement-feed-setup-dark-laptop.png",
-                        1308,
-                        840,
-                        "The Sample Channel Event feed Browser Source editor showing independently configurable event kinds including Achievement completion.",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/figures/phone-dark-achievement-feed-setup.png",
+                        LightPhoneSource: "media/community/figures/phone-light-achievement-feed-setup.png",
+                        DarkLaptopSource: "media/community/figures/laptop-dark-achievement-feed-setup.png",
+                        LightLaptopSource: "media/community/figures/laptop-light-achievement-feed-setup.png",
+                        PhoneAlt: "The Sample Channel Event feed Browser Source editor showing independently configurable event kinds including Achievement completion.",
+                        LaptopAlt: "The Sample Channel Event feed Browser Source editor showing independently configurable event kinds including Achievement completion.",
                         "Achievement completion is one bounded Event feed kind with its own message, priority, duration and representative preview."
                     ),
                     Bullets =
@@ -998,11 +1002,13 @@ internal static partial class SiteGuideCatalog
                 new SiteGuideSection
                 {
                     Heading = "Attach approved Moments to progression",
-                    Figure = new SiteFigure(
-                        "media/community/figures/moment-attachment-light-phone.png",
-                        462,
-                        956,
-                        "The Sample Channel public bounty on a narrow screen showing its attached approved Moment with public-safe title and Twitch media link.",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/community/figures/phone-dark-moment-attachment.png",
+                        LightPhoneSource: "media/community/figures/phone-light-moment-attachment.png",
+                        DarkLaptopSource: "media/community/figures/laptop-dark-moment-attachment.png",
+                        LightLaptopSource: "media/community/figures/laptop-light-moment-attachment.png",
+                        PhoneAlt: "The Sample Channel public bounty on a narrow screen showing its attached approved Moment with public-safe title and Twitch media link.",
+                        LaptopAlt: "The Sample Channel public bounty on a narrow screen showing its attached approved Moment with public-safe title and Twitch media link.",
                         "Authorised staff attach by reference in the destination; viewers receive only the Moment's current approved public-safe fields."
                     ),
                     Steps =

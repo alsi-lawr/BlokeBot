@@ -33,8 +33,8 @@ touch = false
 device_scale = 1.0
 
 [devices.laptop.viewport]
-width = 1180
-height = 720
+width = 1920
+height = 1080
 
 [devices.phone]
 mobile = true
@@ -42,8 +42,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 390
-height = 844
+width = 720
+height = 1280
 
 [matrix]
 theme = ["light", "dark"]
@@ -120,7 +120,7 @@ local succeeded, failure = pcall(function()
     ({ tabId }) => {
       document.getElementById(tabId)?.click();
       return true;
-    })()
+    }
   ]=])
 
   local recording = viset.record()
@@ -154,7 +154,7 @@ local succeeded, failure = pcall(function()
         frame => {
           const range = window.blokeBotCaptureScroll;
           window.scrollTo(0, Math.round(range.start + (range.end - range.start) * frame.progress));
-        })()
+        }
       ]=]),
     })
   end)
@@ -166,7 +166,7 @@ local succeeded, failure = pcall(function()
         setter.call(input, value);
         input.dispatchEvent(new Event("input", { bubbles: true }));
         return true;
-      })()
+      }
     ]=]),
     { value = "nightowl" }
   )
