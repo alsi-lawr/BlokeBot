@@ -1,7 +1,7 @@
 --[[
 # viset
 version = 1
-output_root = "../src/BlokeBot.Site/wwwroot/media"
+output_root = "../src/BlokeBot.Site/wwwroot/media/chat-tools"
 output = "{device}-{theme}-{view}.png"
 frame = "builtin:auto"
 browser_arguments = [
@@ -71,7 +71,7 @@ local function startServer()
 end
 
 local reachable = pcall(function()
-  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "3s" })
+  viset.http.wait({ url = base_url .. "/simulation/started", timeout = "3s" })
 end)
 local server = nil
 if not reachable then
@@ -99,7 +99,7 @@ local succeeded, failure = pcall(function()
   local view = viset.context.axes.view
   local state = states[view]
 
-  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
+  viset.http.wait({ url = base_url .. "/simulation/started", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   settle("/")
 

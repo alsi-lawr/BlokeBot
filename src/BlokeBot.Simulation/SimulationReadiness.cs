@@ -10,6 +10,7 @@ internal sealed class SimulationReadiness(
 )
 {
     private int _persistenceReady;
+    private int _everReady;
 
     public void MarkPersistenceReady() => Interlocked.Exchange(ref _persistenceReady, 1);
 
@@ -44,13 +45,19 @@ internal sealed class SimulationReadiness(
             && eventSubReady
             && initialEventsReady;
 
+        if (ready)
+        {
+            Interlocked.Exchange(ref _everReady, 1);
+        }
+
         return new SimulationReadinessProjection(
             authority.Definition.Name,
             Volatile.Read(ref _persistenceReady) == 1,
             providerReady,
             eventSubReady,
             initialEventsReady,
-            ready
+            ready,
+            Volatile.Read(ref _everReady) == 1
         );
     }
 }
@@ -61,5 +68,6 @@ internal sealed record SimulationReadinessProjection(
     bool OAuthAndProvider,
     bool EventSub,
     bool InitialEvents,
-    bool Ready
+    bool Ready,
+    bool Started
 );

@@ -159,10 +159,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "The navigation follows the selected channel, groups its tools by task and shows only the features that channel has turned on.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-home.png",
-                LightPhoneSource: "media/phone-light-home.png",
-                DarkLaptopSource: "media/laptop-dark-home.png",
-                LightLaptopSource: "media/laptop-light-home.png",
+                DarkPhoneSource: "media/dashboard/phone-dark-home.png",
+                LightPhoneSource: "media/dashboard/phone-light-home.png",
+                DarkLaptopSource: "media/dashboard/laptop-dark-home.png",
+                LightLaptopSource: "media/dashboard/laptop-light-home.png",
                 PhoneAlt: "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
                 LaptopAlt: "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
@@ -210,10 +210,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Each Twitch channel keeps its own connection, tools, games, points and people who can help.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-channel-setup.png",
-                LightPhoneSource: "media/phone-light-channel-setup.png",
-                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
-                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                DarkPhoneSource: "media/dashboard/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/dashboard/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/dashboard/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/dashboard/laptop-light-channel-setup.png",
                 PhoneAlt: "Channel setup for Sample Channel showing separate Chat access and Twitch integration readiness.",
                 LaptopAlt: "Channel setup for Sample Channel showing separate Chat access and Twitch integration readiness.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
@@ -254,10 +254,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "BlokeBot explains which Twitch account or permission is needed and keeps the bot stopped until the channel is ready.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-channel-setup.png",
-                LightPhoneSource: "media/phone-light-channel-setup.png",
-                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
-                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                DarkPhoneSource: "media/dashboard/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/dashboard/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/dashboard/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/dashboard/laptop-light-channel-setup.png",
                 PhoneAlt: "Channel setup showing separate actions for Chat access and the Twitch integration.",
                 LaptopAlt: "Channel setup showing separate actions for Chat access and the Twitch integration.",
                 "Chat access and Twitch integration show their own connection actions and readiness."
@@ -331,10 +331,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Start with every tool off",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-chat-tools-all-disabled.png",
-                        LightPhoneSource: "media/phone-light-chat-tools-all-disabled.png",
-                        DarkLaptopSource: "media/laptop-dark-chat-tools-all-disabled.png",
-                        LightLaptopSource: "media/laptop-light-chat-tools-all-disabled.png",
+                        DarkPhoneSource: "media/chat-tools/phone-dark-chat-tools-all-disabled.png",
+                        LightPhoneSource: "media/chat-tools/phone-light-chat-tools-all-disabled.png",
+                        DarkLaptopSource: "media/chat-tools/laptop-dark-chat-tools-all-disabled.png",
+                        LightLaptopSource: "media/chat-tools/laptop-light-chat-tools-all-disabled.png",
                         PhoneAlt: "BlokeBot Channel setup on a phone with every Chat tools feature card showing off.",
                         LaptopAlt: "BlokeBot Channel setup with every Chat tools feature card showing off.",
                         "A new channel starts with every Chat Tools feature off; each card carries its own switch."
@@ -357,10 +357,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Turn on only what the channel needs",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-chat-tools-enabled.png",
-                        LightPhoneSource: "media/phone-light-chat-tools-enabled.png",
-                        DarkLaptopSource: "media/laptop-dark-chat-tools-enabled.png",
-                        LightLaptopSource: "media/laptop-light-chat-tools-enabled.png",
+                        DarkPhoneSource: "media/chat-tools/phone-dark-chat-tools-enabled.png",
+                        LightPhoneSource: "media/chat-tools/phone-light-chat-tools-enabled.png",
+                        DarkLaptopSource: "media/chat-tools/laptop-dark-chat-tools-enabled.png",
+                        LightLaptopSource: "media/chat-tools/laptop-light-chat-tools-enabled.png",
                         PhoneAlt: "BlokeBot Channel setup on a phone with Request boards, Moments, Points and Custom commands on and the remaining features off.",
                         LaptopAlt: "BlokeBot Channel setup with Request boards, Moments, Points and Custom commands on and the remaining features off.",
                         "Each feature is independently opt-in, so a channel can run four tools and leave the rest off."
@@ -406,10 +406,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Create private Browser Sources, preview and position their content, then keep each saved source working in OBS.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlay-sources.png",
-                LightPhoneSource: "media/phone-light-overlay-sources.png",
-                DarkLaptopSource: "media/laptop-dark-overlay-sources.png",
-                LightLaptopSource: "media/laptop-light-overlay-sources.png",
+                DarkPhoneSource: "media/overlays/phone-dark-overlay-sources.png",
+                LightPhoneSource: "media/overlays/phone-light-overlay-sources.png",
+                DarkLaptopSource: "media/overlays/laptop-dark-overlay-sources.png",
+                LightLaptopSource: "media/overlays/laptop-light-overlay-sources.png",
                 PhoneAlt: "BlokeBot Browser Sources on a phone with a saved source, Preview and appearance controls.",
                 LaptopAlt: "BlokeBot Browser Sources with saved sources beside a Preview-first appearance editor.",
                 "Browser Sources keeps the saved-source list beside the selected source's Preview and settings."
@@ -470,10 +470,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Guessing rounds",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-guessing.png",
-                        LightPhoneSource: "media/phone-light-overlay-guessing.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-guessing.png",
-                        LightLaptopSource: "media/laptop-light-overlay-guessing.png",
+                        DarkPhoneSource: "media/overlays/phone-dark-overlay-guessing.png",
+                        LightPhoneSource: "media/overlays/phone-light-overlay-guessing.png",
+                        DarkLaptopSource: "media/overlays/laptop-dark-overlay-guessing.png",
+                        LightLaptopSource: "media/overlays/laptop-light-overlay-guessing.png",
                         PhoneAlt: "Guessing Browser Source on a phone showing a representative open round in Preview.",
                         LaptopAlt: "Guessing Browser Source showing representative round choices, draggable Preview and settings.",
                         "Representative states let you place the Guessing Browser Source before a real round begins."
@@ -490,10 +490,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Active Giveaways",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-giveaway.png",
-                        LightPhoneSource: "media/phone-light-overlay-giveaway.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-giveaway.png",
-                        LightLaptopSource: "media/laptop-light-overlay-giveaway.png",
+                        DarkPhoneSource: "media/overlays/phone-dark-overlay-giveaway.png",
+                        LightPhoneSource: "media/overlays/phone-light-overlay-giveaway.png",
+                        DarkLaptopSource: "media/overlays/laptop-dark-overlay-giveaway.png",
+                        LightLaptopSource: "media/overlays/laptop-light-overlay-giveaway.png",
                         PhoneAlt: "Giveaway Browser Source on a phone showing an active giveaway in Preview.",
                         LaptopAlt: "Giveaway Browser Source showing an active giveaway, compact display controls and appearance editing.",
                         "The active Giveaway Preview shows useful live content; without an active giveaway the Browser Source renders nothing."
@@ -539,10 +539,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Event feed",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-event-feed.png",
-                        LightPhoneSource: "media/phone-light-overlay-event-feed.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-event-feed.png",
-                        LightLaptopSource: "media/laptop-light-overlay-event-feed.png",
+                        DarkPhoneSource: "media/overlays/phone-dark-overlay-event-feed.png",
+                        LightPhoneSource: "media/overlays/phone-light-overlay-event-feed.png",
+                        DarkLaptopSource: "media/overlays/laptop-dark-overlay-event-feed.png",
+                        LightLaptopSource: "media/overlays/laptop-light-overlay-event-feed.png",
                         PhoneAlt: "Event feed Browser Source on a phone showing a representative channel event and compact source controls.",
                         LaptopAlt: "Event feed Browser Source showing its Preview, waiting-card limit and enabled event sources.",
                         "One Event feed can present point awards, Guessing winners, Giveaway winners, Bingo events and achievement completions."
@@ -582,10 +582,10 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Viewer Queue",
                     Media = new SiteMedia(
-                        DarkPhoneSource: "media/phone-dark-overlay-viewer-queue.png",
-                        LightPhoneSource: "media/phone-light-overlay-viewer-queue.png",
-                        DarkLaptopSource: "media/laptop-dark-overlay-viewer-queue.png",
-                        LightLaptopSource: "media/laptop-light-overlay-viewer-queue.png",
+                        DarkPhoneSource: "media/overlays/phone-dark-overlay-viewer-queue.png",
+                        LightPhoneSource: "media/overlays/phone-light-overlay-viewer-queue.png",
+                        DarkLaptopSource: "media/overlays/laptop-dark-overlay-viewer-queue.png",
+                        LightLaptopSource: "media/overlays/laptop-light-overlay-viewer-queue.png",
                         PhoneAlt: "Viewer Queue Browser Source on a phone showing a safe representative public queue summary.",
                         LaptopAlt: "Viewer Queue Browser Source showing a representative party and safe public queue summary in Preview.",
                         "Viewer Queue presents current, next and waiting viewers without exposing private party information."
@@ -626,10 +626,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Combine uploaded media, online media and web pages, then play the saved Cue through a Cue player Browser Source.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlay-cues.png",
-                LightPhoneSource: "media/phone-light-overlay-cues.png",
-                DarkLaptopSource: "media/laptop-dark-overlay-cues.png",
-                LightLaptopSource: "media/laptop-light-overlay-cues.png",
+                DarkPhoneSource: "media/overlays/phone-dark-overlay-cues.png",
+                LightPhoneSource: "media/overlays/phone-light-overlay-cues.png",
+                DarkLaptopSource: "media/overlays/laptop-dark-overlay-cues.png",
+                LightLaptopSource: "media/overlays/laptop-light-overlay-cues.png",
                 PhoneAlt: "Cues page on a phone showing the saved Cue list and task-facing content editor.",
                 LaptopAlt: "Cues page showing attached saved Cues and editor columns with a reusable web layer.",
                 "Saved Cues and their editor stay together; test playback targets a Cue player Browser Source."
@@ -713,10 +713,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Upload private channel media, preview saved files and repair the assets used by reusable Cues.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-overlay-media.png",
-                LightPhoneSource: "media/phone-light-overlay-media.png",
-                DarkLaptopSource: "media/laptop-dark-overlay-media.png",
-                LightLaptopSource: "media/laptop-light-overlay-media.png",
+                DarkPhoneSource: "media/overlays/phone-dark-overlay-media.png",
+                LightPhoneSource: "media/overlays/phone-light-overlay-media.png",
+                DarkLaptopSource: "media/overlays/laptop-dark-overlay-media.png",
+                LightLaptopSource: "media/overlays/laptop-light-overlay-media.png",
                 PhoneAlt: "Media library on a phone showing private upload controls and the saved-media area.",
                 LaptopAlt: "Media library showing channel storage use, drag-and-drop upload and saved media management.",
                 "Media stays in the selected channel's private storage and is available to its Cues."
@@ -1458,10 +1458,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Save reusable poll questions, start one when you need it and watch the live vote totals.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-native-polls.png",
-                LightPhoneSource: "media/phone-light-native-polls.png",
-                DarkLaptopSource: "media/laptop-dark-native-polls.png",
-                LightLaptopSource: "media/laptop-light-native-polls.png",
+                DarkPhoneSource: "media/native-twitch/phone-dark-native-polls.png",
+                LightPhoneSource: "media/native-twitch/phone-light-native-polls.png",
+                DarkLaptopSource: "media/native-twitch/laptop-dark-native-polls.png",
+                LightLaptopSource: "media/native-twitch/laptop-light-native-polls.png",
                 PhoneAlt: "BlokeBot Polls page showing a saved question, current voting and poll controls.",
                 LaptopAlt: "BlokeBot Polls page showing a saved question, current voting and poll controls.",
                 "Saved questions, the active poll and recent results stay together."
@@ -1514,10 +1514,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Create a shareable clip now or leave a private marker to find in the stream recording later.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-native-clips-markers.png",
-                LightPhoneSource: "media/phone-light-native-clips-markers.png",
-                DarkLaptopSource: "media/laptop-dark-native-clips-markers.png",
-                LightLaptopSource: "media/laptop-light-native-clips-markers.png",
+                DarkPhoneSource: "media/native-twitch/phone-dark-native-clips-markers.png",
+                LightPhoneSource: "media/native-twitch/phone-light-native-clips-markers.png",
+                DarkLaptopSource: "media/native-twitch/laptop-dark-native-clips-markers.png",
+                LightLaptopSource: "media/native-twitch/laptop-light-native-clips-markers.png",
                 PhoneAlt: "BlokeBot Clips and markers page showing clip creation, stream marker and recent outcome controls.",
                 LaptopAlt: "BlokeBot Clips and markers page showing clip creation, stream marker and recent outcome controls.",
                 "Create a clip immediately or add a marker for the selected live channel."
@@ -1570,10 +1570,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Respond to waiting redemptions, manage BlokeBot rewards and create the next reward for your viewers.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-native-channel-points.png",
-                LightPhoneSource: "media/phone-light-native-channel-points.png",
-                DarkLaptopSource: "media/laptop-dark-native-channel-points.png",
-                LightLaptopSource: "media/laptop-light-native-channel-points.png",
+                DarkPhoneSource: "media/native-twitch/phone-dark-native-channel-points.png",
+                LightPhoneSource: "media/native-twitch/phone-light-native-channel-points.png",
+                DarkLaptopSource: "media/native-twitch/laptop-dark-native-channel-points.png",
+                LightLaptopSource: "media/native-twitch/laptop-light-native-channel-points.png",
                 PhoneAlt: "BlokeBot Rewards and redemptions page showing waiting requests, reward controls and age indicators.",
                 LaptopAlt: "BlokeBot Rewards and redemptions page showing waiting requests, reward controls and age indicators.",
                 "Waiting requests appear first, with visible age cues for requests that are becoming stale."
@@ -1627,10 +1627,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Save reusable Prediction questions, open Channel Points entries, then choose the winner or refund everyone.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-native-predictions.png",
-                LightPhoneSource: "media/phone-light-native-predictions.png",
-                DarkLaptopSource: "media/laptop-dark-native-predictions.png",
-                LightLaptopSource: "media/laptop-light-native-predictions.png",
+                DarkPhoneSource: "media/native-twitch/phone-dark-native-predictions.png",
+                LightPhoneSource: "media/native-twitch/phone-light-native-predictions.png",
+                DarkLaptopSource: "media/native-twitch/laptop-dark-native-predictions.png",
+                LightLaptopSource: "media/native-twitch/laptop-light-native-predictions.png",
                 PhoneAlt: "BlokeBot Predictions page showing a saved question, outcomes and controls for the active Prediction.",
                 LaptopAlt: "BlokeBot Predictions page showing a saved question, outcomes and controls for the active Prediction.",
                 "The active Prediction stays above reusable templates and recent settled results."
@@ -1682,10 +1682,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-custom-commands.png",
-                LightPhoneSource: "media/phone-light-custom-commands.png",
-                DarkLaptopSource: "media/laptop-dark-custom-commands.png",
-                LightLaptopSource: "media/laptop-light-custom-commands.png",
+                DarkPhoneSource: "media/commands/phone-dark-custom-commands.png",
+                LightPhoneSource: "media/commands/phone-light-custom-commands.png",
+                DarkLaptopSource: "media/commands/laptop-dark-custom-commands.png",
+                LightLaptopSource: "media/commands/laptop-light-custom-commands.png",
                 PhoneAlt: "BlokeBot Custom commands on a phone with the saved command list and the selected command's Basics step.",
                 LaptopAlt: "BlokeBot Custom commands with the saved command list beside the selected command's name, command words and chat preview.",
                 "The saved command list sits beside the selected command, so its words and the reply viewers will see stay visible together."
@@ -1748,10 +1748,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Choose one global Commands trigger and let viewers discover a viewer-safe list of main command names that follows the selected channel's current state.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-viewer-command-catalog.png",
-                LightPhoneSource: "media/phone-light-viewer-command-catalog.png",
-                DarkLaptopSource: "media/laptop-dark-viewer-command-catalog.png",
-                LightLaptopSource: "media/laptop-light-viewer-command-catalog.png",
+                DarkPhoneSource: "media/commands/phone-dark-viewer-command-catalog.png",
+                LightPhoneSource: "media/commands/phone-light-viewer-command-catalog.png",
+                DarkLaptopSource: "media/commands/laptop-dark-viewer-command-catalog.png",
+                LightLaptopSource: "media/commands/laptop-light-viewer-command-catalog.png",
                 PhoneAlt: "Channel setup on a phone showing the global Commands trigger and expanded Available viewer commands list.",
                 LaptopAlt: "Channel setup showing the global Commands trigger, expanded Available viewer commands list and a command-name conflict.",
                 "Channel setup shows the same viewer-safe list of main command names that the global chat trigger publishes."
@@ -1856,10 +1856,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-guessing-workflow.webp",
-                LightPhoneSource: "media/phone-light-guessing-workflow.webp",
-                DarkLaptopSource: "media/laptop-dark-guessing-workflow.webp",
-                LightLaptopSource: "media/laptop-light-guessing-workflow.webp",
+                DarkPhoneSource: "media/points-and-guessing/phone-dark-guessing-workflow.webp",
+                LightPhoneSource: "media/points-and-guessing/phone-light-guessing-workflow.webp",
+                DarkLaptopSource: "media/points-and-guessing/laptop-dark-guessing-workflow.webp",
+                LightLaptopSource: "media/points-and-guessing/laptop-light-guessing-workflow.webp",
                 PhoneAlt: "Animated BlokeBot guessing dashboard moving through a live round workflow.",
                 LaptopAlt: "Animated BlokeBot guessing dashboard moving through a live round workflow.",
                 "The live dashboard keeps round status, votes, answers and winner controls together."
@@ -1902,10 +1902,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Give each viewer a channel balance that can be checked, transferred, adjusted, gambled or awarded as a prize.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-points-settings.png",
-                LightPhoneSource: "media/phone-light-points-settings.png",
-                DarkLaptopSource: "media/laptop-dark-points-settings.png",
-                LightLaptopSource: "media/laptop-light-points-settings.png",
+                DarkPhoneSource: "media/points-and-guessing/phone-dark-points-settings.png",
+                LightPhoneSource: "media/points-and-guessing/phone-light-points-settings.png",
+                DarkLaptopSource: "media/points-and-guessing/laptop-dark-points-settings.png",
+                LightLaptopSource: "media/points-and-guessing/laptop-light-points-settings.png",
                 PhoneAlt: "Points settings showing the point label, gambling chance, cooldown and chat command words.",
                 LaptopAlt: "Points settings showing the point label, gambling chance, cooldown and chat command words.",
                 "Points settings define the channel's terminology, gambling rules and command words."
@@ -1944,10 +1944,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Open timed entry while the channel is live, choose eligibility and winner count, then award random point prizes.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-points-settings.png",
-                LightPhoneSource: "media/phone-light-points-settings.png",
-                DarkLaptopSource: "media/laptop-dark-points-settings.png",
-                LightLaptopSource: "media/laptop-light-points-settings.png",
+                DarkPhoneSource: "media/points-and-guessing/phone-dark-points-settings.png",
+                LightPhoneSource: "media/points-and-guessing/phone-light-points-settings.png",
+                DarkLaptopSource: "media/points-and-guessing/laptop-dark-points-settings.png",
+                LightLaptopSource: "media/points-and-guessing/laptop-light-points-settings.png",
                 PhoneAlt: "Points settings page where channel point commands and giveaway rules are configured.",
                 LaptopAlt: "Points settings page where channel point commands and giveaway rules are configured.",
                 "Giveaway rules live on the Points settings page alongside the channel's points configuration."
@@ -1990,10 +1990,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Viewers can open read-only guessing or points rankings without permission to manage the channel.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-guessing-leaderboard.png",
-                LightPhoneSource: "media/phone-light-guessing-leaderboard.png",
-                DarkLaptopSource: "media/laptop-dark-guessing-leaderboard.png",
-                LightLaptopSource: "media/laptop-light-guessing-leaderboard.png",
+                DarkPhoneSource: "media/points-and-guessing/phone-dark-guessing-leaderboard.png",
+                LightPhoneSource: "media/points-and-guessing/phone-light-guessing-leaderboard.png",
+                DarkLaptopSource: "media/points-and-guessing/laptop-dark-guessing-leaderboard.png",
+                LightLaptopSource: "media/points-and-guessing/laptop-light-guessing-leaderboard.png",
                 PhoneAlt: "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
                 LaptopAlt: "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
                 "Public leaderboards turn completed channel activity into a shareable read-only ranking."
@@ -2108,10 +2108,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "The Twitch events page lists every automation event source for the selected channel, the Twitch approval each one needs and whether an enabled flow uses it today.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-automation-events.png",
-                LightPhoneSource: "media/phone-light-automation-events.png",
-                DarkLaptopSource: "media/laptop-dark-automation-events.png",
-                LightLaptopSource: "media/laptop-light-automation-events.png",
+                DarkPhoneSource: "media/automations/phone-dark-automation-events.png",
+                LightPhoneSource: "media/automations/phone-light-automation-events.png",
+                DarkLaptopSource: "media/automations/laptop-dark-automation-events.png",
+                LightLaptopSource: "media/automations/laptop-light-automation-events.png",
                 PhoneAlt: "BlokeBot Twitch events page on a phone listing ready automation event sources with their Twitch subscriptions.",
                 LaptopAlt: "BlokeBot Twitch events page listing ready automation event sources, their Twitch subscriptions and required approvals.",
                 "Each event source states its Twitch subscription, the approval it needs and whether an enabled flow uses it."
@@ -2339,10 +2339,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Channel owners decide whether current Twitch moderators can use BlokeBot and whether access is open to all moderators or limited by lists.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-channel-setup.png",
-                LightPhoneSource: "media/phone-light-channel-setup.png",
-                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
-                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                DarkPhoneSource: "media/dashboard/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/dashboard/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/dashboard/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/dashboard/laptop-light-channel-setup.png",
                 PhoneAlt: "Channel setup containing readiness and access controls for the selected channel.",
                 LaptopAlt: "Channel setup containing readiness and access controls for the selected channel.",
                 "Moderator access is managed from Channel setup for the channel currently selected."
@@ -2384,10 +2384,10 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Install the service, connect one Twitch application, provide trusted HTTPS and keep its private state backed up.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/phone-dark-admin.png",
-                LightPhoneSource: "media/phone-light-admin.png",
-                DarkLaptopSource: "media/laptop-dark-admin.png",
-                LightLaptopSource: "media/laptop-light-admin.png",
+                DarkPhoneSource: "media/dashboard/phone-dark-admin.png",
+                LightPhoneSource: "media/dashboard/phone-light-admin.png",
+                DarkLaptopSource: "media/dashboard/laptop-dark-admin.png",
+                LightLaptopSource: "media/dashboard/laptop-light-admin.png",
                 PhoneAlt: "The BlokeBot admin page, showing you which controls are available to server owners.",
                 LaptopAlt: "The BlokeBot admin page, showing you which controls are available to server owners.",
                 "The admin page allows you to configure the server to suit your needs, including allow lists for channels and manual channel setup."

@@ -26,6 +26,20 @@ internal static class SimulationEndpoints
                 }
             )
             .AllowAnonymous();
+        _ = app.MapGet(
+                "/simulation/started",
+                static (SimulationReadiness readiness) =>
+                {
+                    var projection = readiness.Project();
+                    return Results.Json(
+                        projection,
+                        statusCode: projection.Started
+                            ? StatusCodes.Status200OK
+                            : StatusCodes.Status503ServiceUnavailable
+                    );
+                }
+            )
+            .AllowAnonymous();
 
         _ = app.MapGet(
                 "/simulation/login",

@@ -15,15 +15,23 @@ dotnet build ../src/BlokeBot.Simulation/BlokeBot.Simulation.csproj \
 
 Use `./capture-all.sh` to regenerate everything. It starts one Simulation per definition and
 leaves it up for that definition's whole matrix, rather than paying a fresh Simulation start for
-every theme, device and view. Pass a single definition name to run just that one:
+every theme, device and view, and runs definitions concurrently. Pass a single definition name to
+run just that one:
 
 ```sh
 ./capture-all.sh                       # every definition
 ./capture-all.sh chat-tools-switches.lua
+CAPTURE_JOBS=6 ./capture-all.sh        # override the concurrency
 ```
 
-Each definition reuses a Simulation already listening on its port and only starts its own when
-none is running, so the individual commands below still work unchanged.
+Concurrency defaults to a quarter of the available cores, capped at six, because every definition
+runs its own Simulation and its own browser. Each definition reuses a Simulation already listening
+on its port and only starts its own when none is running, so the individual commands below still
+work unchanged.
+
+Definitions wait on `/simulation/started` rather than `/simulation/ready`. `ready` reports live
+EventSub wiring, which a capture tears down as soon as it disables a feature; `started` latches once
+the fixture has fully wired and stays true, so one Simulation serves a whole matrix.
 
 From this directory, point `VISET_CHECKOUT` at the local Viset checkout, then run each
 definition on its own unused loopback port. Port `5084` is reserved for human
@@ -77,7 +85,9 @@ bounty and season figures under `media/community/progression`: the laptop set co
 setup, moderation and archive areas, and the phone set covers the disabled-feature recovery states
 and the public card, board and season pages.
 
-Generated files go directly to `../src/BlokeBot.Site/wwwroot/media`; do not hand-edit them.
+Generated files go to an area subdirectory of `../src/BlokeBot.Site/wwwroot/media`: `dashboard`,
+`chat-tools`, `commands`, `automations`, `points-and-guessing`, `native-twitch`, `overlays`,
+`community`, `community/figures` and `community/progression`. Do not hand-edit them.
 
 ## Editor support
 
