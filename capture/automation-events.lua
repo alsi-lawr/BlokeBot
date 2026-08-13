@@ -46,26 +46,36 @@ view = [
 local repo_root = viset.script.directory .. "/.."
 local port = os.getenv("BLOKEBOT_AUTOMATION_EVENTS_PORT") or "43221"
 local base_url = "http://127.0.0.1:" .. port
-local server = viset.process.start({
-  file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
-  arguments = {
-    "run",
-    "--project",
-    repo_root .. "/src/BlokeBot.Simulation/BlokeBot.Simulation.csproj",
-    "--configuration",
-    "Release",
-    "--no-build",
-    "--no-launch-profile",
-    "--",
-    "--urls",
-    base_url,
-  },
-  working_directory = repo_root,
-  environment = {
-    DOTNET_CLI_TELEMETRY_OPTOUT = "1",
-    TZ = "UTC",
-  },
-})
+local function startServer()
+  return viset.process.start({
+    file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
+    arguments = {
+      "run",
+      "--project",
+      repo_root .. "/src/BlokeBot.Simulation/BlokeBot.Simulation.csproj",
+      "--configuration",
+      "Release",
+      "--no-build",
+      "--no-launch-profile",
+      "--",
+      "--urls",
+      base_url,
+    },
+    working_directory = repo_root,
+    environment = {
+      DOTNET_CLI_TELEMETRY_OPTOUT = "1",
+      TZ = "UTC",
+    },
+  })
+end
+
+local reachable = pcall(function()
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "3s" })
+end)
+local server = nil
+if not reachable then
+  server = startServer()
+end
 
 local function settle(path)
   viset.page.wait_for(
@@ -92,7 +102,9 @@ local succeeded, failure = pcall(function()
   viset.snapshot()
 end)
 
-viset.process.stop(server)
+if server ~= nil then
+  viset.process.stop(server)
+end
 if not succeeded then
   error(failure, 0)
 end

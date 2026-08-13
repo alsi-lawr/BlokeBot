@@ -13,6 +13,18 @@ dotnet build ../src/BlokeBot.Simulation/BlokeBot.Simulation.csproj \
   --configuration Release --property:TreatWarningsAsErrors=true --nologo
 ```
 
+Use `./capture-all.sh` to regenerate everything. It starts one Simulation per definition and
+leaves it up for that definition's whole matrix, rather than paying a fresh Simulation start for
+every theme, device and view. Pass a single definition name to run just that one:
+
+```sh
+./capture-all.sh                       # every definition
+./capture-all.sh chat-tools-switches.lua
+```
+
+Each definition reuses a Simulation already listening on its port and only starts its own when
+none is running, so the individual commands below still work unchanged.
+
 From this directory, point `VISET_CHECKOUT` at the local Viset checkout, then run each
 definition on its own unused loopback port. Port `5084` is reserved for human
 visual signoff and must not be used or stopped by capture work.

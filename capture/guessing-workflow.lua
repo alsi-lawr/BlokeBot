@@ -4,7 +4,7 @@ version = 1
 output_root = "../src/BlokeBot.Site/wwwroot/media"
 output = "{device}-{theme}-guessing-workflow.webp"
 frame = "builtin:auto"
-frames_per_second = 50
+frames_per_second = 30
 browser_arguments = [
   "--disable-background-networking",
   "--disable-background-mode",
@@ -21,7 +21,7 @@ browser_arguments = [
 
 [webp]
 source = "png_screencast"
-encoder = "libwebp_full"
+encoder = "libwebp_anim"
 pipeline = "live"
 mode = "lossy"
 quality = 100
@@ -52,26 +52,36 @@ theme = ["light", "dark"]
 local repo_root = viset.script.directory .. "/.."
 local port = os.getenv("BLOKEBOT_GUESSING_CAPTURE_PORT") or "43219"
 local base_url = "http://127.0.0.1:" .. port
-local server = viset.process.start({
-  file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
-  arguments = {
-    "run",
-    "--project",
-    repo_root .. "/src/BlokeBot.Simulation/BlokeBot.Simulation.csproj",
-    "--configuration",
-    "Release",
-    "--no-build",
-    "--no-launch-profile",
-    "--",
-    "--urls",
-    base_url,
-  },
-  working_directory = repo_root,
-  environment = {
-    DOTNET_CLI_TELEMETRY_OPTOUT = "1",
-    TZ = "UTC",
-  },
-})
+local function startServer()
+  return viset.process.start({
+    file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
+    arguments = {
+      "run",
+      "--project",
+      repo_root .. "/src/BlokeBot.Simulation/BlokeBot.Simulation.csproj",
+      "--configuration",
+      "Release",
+      "--no-build",
+      "--no-launch-profile",
+      "--",
+      "--urls",
+      base_url,
+    },
+    working_directory = repo_root,
+    environment = {
+      DOTNET_CLI_TELEMETRY_OPTOUT = "1",
+      TZ = "UTC",
+    },
+  })
+end
+
+local reachable = pcall(function()
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "3s" })
+end)
+local server = nil
+if not reachable then
+  server = startServer()
+end
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
@@ -150,7 +160,9 @@ local succeeded, failure = pcall(function()
   recording:stop()
 end)
 
-viset.process.stop(server)
+if server ~= nil then
+  viset.process.stop(server)
+end
 if not succeeded then
   error(failure, 0)
 end
