@@ -25,8 +25,8 @@ DEFINITIONS=(
   "community-guides.lua:5460"
   "overlay-sources.lua:5461"
   "overlay-previews.lua:5462"
-  "v010-guide-figures-phone.lua:5473"
-  "v010-guide-figures-laptop.lua:5475"
+  "community-guide-figures-phone.lua:5473"
+  "community-guide-figures-laptop.lua:5475"
   "community-progression-figures-laptop.lua:5476"
   "community-progression-figures-phone.lua:5477"
 )

@@ -44,7 +44,7 @@ view = [
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_CUSTOM_COMMANDS_PORT") or "43220"
+local port = os.getenv("BLOKEBOT_CAPTURE_PORT") or "43217"
 local base_url = "http://127.0.0.1:" .. port
 local function startServer()
   return viset.process.start({

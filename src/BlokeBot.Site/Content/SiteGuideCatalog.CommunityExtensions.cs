@@ -12,7 +12,7 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Opt in to a host-scoped profile, choose exactly who can see it and keep control of the activity BlokeBot presents.",
             Figure = new SiteFigure(
-                "media/community/v010/viewer-passport-participant-dark-phone.png",
+                "media/community/figures/viewer-passport-participant-dark-phone.png",
                 462,
                 956,
                 "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
@@ -92,7 +92,7 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Register viewers or teams, generate a reproducible schedule, confirm and correct results, then publish bounded standings and archives.",
             Figure = new SiteFigure(
-                "media/community/v010/competition-result-light-laptop.png",
+                "media/community/figures/competition-result-light-laptop.png",
                 1308,
                 840,
                 "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
@@ -188,7 +188,7 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Welcome incoming communities once, shortlist only explicitly approved live channels and keep every outgoing Twitch raid under host confirmation.",
             Figure = new SiteFigure(
-                "media/community/v010/raid-collaboration-light-phone.png",
+                "media/community/figures/raid-collaboration-light-phone.png",
                 462,
                 956,
                 "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
@@ -223,7 +223,7 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Shout out a raider automatically",
                     Figure = new SiteFigure(
-                        "media/community/v010/shoutout-setup-light-laptop.png",
+                        "media/community/figures/shoutout-setup-light-laptop.png",
                         1308,
                         840,
                         "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
@@ -306,7 +306,7 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Carry one host-scoped channel boss across streams while preserving resolved actions, shared ward progress, phases, standings and completion recaps.",
             Figure = new SiteFigure(
-                "media/community/v010/blokeraid-completion-dark-phone.png",
+                "media/community/figures/blokeraid-completion-dark-phone.png",
                 462,
                 956,
                 "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
@@ -400,7 +400,7 @@ internal static partial class SiteGuideCatalog
             Summary =
                 "Invite explicit hosts on one BlokeBot installation, preserve each host's authority and share only bounded tournament, raid-relay or goal projections.",
             Figure = new SiteFigure(
-                "media/community/v010/collectives-recovery-dark-phone.png",
+                "media/community/figures/collectives-recovery-dark-phone.png",
                 462,
                 956,
                 "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",

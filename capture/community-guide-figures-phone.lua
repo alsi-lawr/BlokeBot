@@ -1,7 +1,7 @@
 --[[
 # viset
 version = 1
-output_root = "../src/BlokeBot.Site/wwwroot/media/community/v010"
+output_root = "../src/BlokeBot.Site/wwwroot/media/community/figures"
 output = "{figure}-{device}.png"
 frame = "builtin:auto"
 browser_arguments = [
@@ -18,26 +18,27 @@ browser_arguments = [
   "--use-mock-keychain",
 ]
 
-[devices.laptop]
-mobile = false
-touch = false
+[devices.phone]
+mobile = true
+touch = true
 device_scale = 1.0
 
-[devices.laptop.viewport]
-width = 1180
-height = 720
+[devices.phone.viewport]
+width = 390
+height = 844
 
 [matrix]
 figure = [
-  "competition-result-light",
-  "progression-overlay-setup-light",
-  "achievement-feed-setup-dark",
-  "shoutout-setup-light",
+  "raid-collaboration-light",
+  "blokeraid-completion-dark",
+  "collectives-recovery-dark",
+  "viewer-passport-participant-dark",
+  "moment-attachment-light",
 ]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_V010_FIGURES_LAPTOP_PORT") or "5475"
+local port = os.getenv("BLOKEBOT_COMMUNITY_FIGURES_PHONE_PORT") or "5473"
 local base_url = "http://127.0.0.1:" .. port
 local function startServer()
   return viset.process.start({
@@ -73,28 +74,31 @@ end
 local succeeded, failure = pcall(function()
   local figure = viset.context.axes.figure
   local targets = {
-    ["competition-result-light"] = {
-      path = "/competitions",
-      fragment = "#standings",
-      theme = "light",
-    },
-    ["progression-overlay-setup-light"] = {
-      path = "/overlays",
-      fragment = "#sources",
-      theme = "light",
-      selected = "Community milestone",
-    },
-    ["shoutout-setup-light"] = {
+    ["raid-collaboration-light"] = {
       path = "/raid-collaboration",
-      fragment = "#settings",
       theme = "light",
-      scroll = "[data-automatic-raid-shoutouts]",
+      features = "all-enabled",
+      scroll = "[data-raid-shortlist] article",
     },
-    ["achievement-feed-setup-dark"] = {
-      path = "/overlays",
-      fragment = "#sources",
+    ["blokeraid-completion-dark"] = {
+      path = "/raid/samplechannel",
       theme = "dark",
-      selected = "Channel event feed",
+      features = "all-enabled",
+    },
+    ["collectives-recovery-dark"] = {
+      path = "/collectives",
+      theme = "dark",
+      features = "selective-native",
+    },
+    ["viewer-passport-participant-dark"] = {
+      path = "/passport/samplechannel/nightowl",
+      theme = "dark",
+      features = "all-enabled",
+    },
+    ["moment-attachment-light"] = {
+      path = "/bounties/samplechannel",
+      theme = "light",
+      features = "all-enabled",
     },
   }
 
@@ -114,19 +118,12 @@ local succeeded, failure = pcall(function()
 
   viset.page.evaluate(
     viset.javascript([=[
-      (async () => {
-        const post = path => fetch(path, { method: "POST" });
-        await post("/simulation/commands/features/all-enabled");
-        await post("/simulation/commands/liveness/production");
-        await new Promise(resolve => setTimeout(resolve, 400));
-        return true;
-      })()
-    ]=])
+      ({ endpoint }) => fetch(endpoint, { method: "POST" }).then(() => true)
+    ]=]),
+    { endpoint = base_url .. "/simulation/commands/features/" .. target.features }
   )
 
-  viset.page.navigate(
-    base_url .. target.path .. "?simulationTheme=" .. target.theme .. target.fragment
-  )
+  viset.page.navigate(base_url .. target.path .. "?simulationTheme=" .. target.theme)
   viset.page.wait_for(
     viset.javascript(([=[
       location.pathname === %q
@@ -135,22 +132,6 @@ local succeeded, failure = pcall(function()
     ]=]):format(target.path)),
     "40s"
   )
-
-  if target.selected ~= nil then
-    viset.page.evaluate(
-      viset.javascript([=[
-        async ({ selected }) => {
-          const choice = [...document.querySelectorAll("[aria-label='Saved overlays'] button")]
-            .find(candidate => candidate.textContent.includes(selected));
-          choice?.click();
-          await new Promise(resolve => setTimeout(resolve, 750));
-          return true;
-        })()
-      ]=]),
-      { selected = target.selected }
-    )
-  end
-
   if target.scroll ~= nil then
     viset.page.evaluate(
       viset.javascript([=[
@@ -158,13 +139,13 @@ local succeeded, failure = pcall(function()
           const target = document.querySelector(selector);
           if (target) target.scrollIntoView({ block: "center" });
           return true;
-        })()
+        }
       ]=]),
       { selector = target.scroll }
     )
   end
 
-  viset.sleep("400ms")
+  viset.sleep("350ms")
   viset.snapshot()
 end)
 

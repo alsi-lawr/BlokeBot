@@ -43,8 +43,8 @@ BLOKEBOT_CHAT_TOOLS_PORT=5335 nix run "$VISET_CHECKOUT" -- capture chat-tools-sw
 BLOKEBOT_COMMUNITY_GUIDES_PORT=5460 nix run "$VISET_CHECKOUT" -- capture community-guides.lua --force
 BLOKEBOT_OVERLAY_SOURCES_PORT=5461 nix run "$VISET_CHECKOUT" -- capture overlay-sources.lua --force
 BLOKEBOT_OVERLAY_PREVIEWS_PORT=5462 nix run "$VISET_CHECKOUT" -- capture overlay-previews.lua --force
-BLOKEBOT_V010_FIGURES_PHONE_PORT=5473 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-phone.lua --force
-BLOKEBOT_V010_FIGURES_LAPTOP_PORT=5475 nix run "$VISET_CHECKOUT" -- capture v010-guide-figures-laptop.lua --force
+BLOKEBOT_COMMUNITY_FIGURES_PHONE_PORT=5473 nix run "$VISET_CHECKOUT" -- capture community-guide-figures-phone.lua --force
+BLOKEBOT_COMMUNITY_FIGURES_LAPTOP_PORT=5475 nix run "$VISET_CHECKOUT" -- capture community-guide-figures-laptop.lua --force
 BLOKEBOT_PROGRESSION_LAPTOP_PORT=5476 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-laptop.lua --force
 BLOKEBOT_PROGRESSION_PHONE_PORT=5477 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-phone.lua --force
 ```
@@ -70,8 +70,8 @@ exposing a private Browser Source URL. The animated captures use PNG screencast 
 page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
 gesture.
 
-The two `v010-guide-figures-*` definitions produce the guide figures under
-`media/community/v010`. They are split by device because each figure pins one theme and one device
+The two `community-guide-figures-*` definitions produce the guide figures under
+`media/community/figures`. They are split by device because each figure pins one theme and one device
 rather than a full matrix. The two `community-progression-figures-*` definitions produce the Bingo,
 bounty and season figures under `media/community/progression`: the laptop set covers the moderator
 setup, moderation and archive areas, and the phone set covers the disabled-feature recovery states

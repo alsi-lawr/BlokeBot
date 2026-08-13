@@ -510,7 +510,7 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Show community goals and bounties",
                     Figure = new SiteFigure(
-                        "media/community/v010/progression-overlay-setup-light-laptop.png",
+                        "media/community/figures/progression-overlay-setup-light-laptop.png",
                         1308,
                         840,
                         "The Sample Channel Community milestone Browser Source editor showing source selection, rotation and representative progress states.",
@@ -559,7 +559,7 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Present achievements in the Event feed",
                     Figure = new SiteFigure(
-                        "media/community/v010/achievement-feed-setup-dark-laptop.png",
+                        "media/community/figures/achievement-feed-setup-dark-laptop.png",
                         1308,
                         840,
                         "The Sample Channel Event feed Browser Source editor showing independently configurable event kinds including Achievement completion.",
@@ -999,7 +999,7 @@ internal static partial class SiteGuideCatalog
                 {
                     Heading = "Attach approved Moments to progression",
                     Figure = new SiteFigure(
-                        "media/community/v010/moment-attachment-light-phone.png",
+                        "media/community/figures/moment-attachment-light-phone.png",
                         462,
                         956,
                         "The Sample Channel public bounty on a narrow screen showing its attached approved Moment with public-safe title and Twitch media link.",
