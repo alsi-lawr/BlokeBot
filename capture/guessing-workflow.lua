@@ -43,7 +43,7 @@ device_scale = 1.0
 
 [devices.phone.viewport]
 width = 720
-height = 1280
+height = 1600
 
 [matrix]
 theme = ["light", "dark"]
@@ -76,7 +76,7 @@ local function startServer()
 end
 
 local reachable = pcall(function()
-  viset.http.wait({ url = base_url .. "/simulation/started", timeout = "3s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "3s" })
 end)
 local server = nil
 if not reachable then
@@ -85,35 +85,17 @@ end
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
-  viset.http.wait({ url = base_url .. "/simulation/started", timeout = "90s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
       document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
+        && document.querySelector("#components-reconnect-modal")?.open !== true
     ]=]),
     "40s"
   )
 
-  viset.page.evaluate(
-    viset.javascript([=[
-      (async () => {
-        const post = path => fetch(path, { method: "POST" });
-        await post("/simulation/commands/features/all-enabled");
-        await post("/simulation/commands/liveness/production");
-        await new Promise(resolve => setTimeout(resolve, 400));
-        return true;
-      })()
-    ]=])
-  )
-  viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
-  viset.page.wait_for(
-    viset.javascript([=[
-      document.querySelector("main") !== null
-        && getComputedStyle(document.querySelector("main")).opacity === "1"
-    ]=]),
-    "40s"
-  )
   viset.sleep("350ms")
 
   local click = viset.javascript([=[

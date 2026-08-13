@@ -34,7 +34,7 @@ device_scale = 1.0
 
 [devices.phone.viewport]
 width = 720
-height = 1280
+height = 1600
 
 [matrix]
 theme = ["light", "dark"]
@@ -86,6 +86,7 @@ local function settle(path)
       location.pathname === %q
         && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
+        && document.querySelector("#components-reconnect-modal")?.open !== true
     ]=]):format(path)),
     "40s"
   )
@@ -137,6 +138,7 @@ local succeeded, failure = pcall(function()
       })()
     ]=])
   )
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/overlays" .. "?simulationTheme=" .. theme)
   settle("/overlays")
 

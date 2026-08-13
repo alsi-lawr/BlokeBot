@@ -2113,15 +2113,6 @@ internal static partial class SiteGuideCatalog
             Title = "Start automations from Twitch activity",
             Summary =
                 "The Twitch events page lists every automation event source for the selected channel, the Twitch approval each one needs and whether an enabled flow uses it today.",
-            Media = new SiteMedia(
-                DarkPhoneSource: "media/automations/phone-dark-automation-events.png",
-                LightPhoneSource: "media/automations/phone-light-automation-events.png",
-                DarkLaptopSource: "media/automations/laptop-dark-automation-events.png",
-                LightLaptopSource: "media/automations/laptop-light-automation-events.png",
-                PhoneAlt: "BlokeBot Twitch events page on a phone listing ready automation event sources with their Twitch subscriptions.",
-                LaptopAlt: "BlokeBot Twitch events page listing ready automation event sources, their Twitch subscriptions and required approvals.",
-                "Each event source states its Twitch subscription, the approval it needs and whether an enabled flow uses it."
-            ),
             Sections =
             [
                 new SiteGuideSection

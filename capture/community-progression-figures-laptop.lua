@@ -80,6 +80,7 @@ local function settle(path)
       location.pathname === %q
         && document.querySelector("main") !== null
         && getComputedStyle(document.querySelector("main")).opacity === "1"
+        && document.querySelector("#components-reconnect-modal")?.open !== true
     ]=]):format(path)),
     "40s"
   )
@@ -139,6 +140,11 @@ local succeeded, failure = pcall(function()
     ]=]),
     { features = target.features }
   )
+  if target.features ~= "all-disabled" then
+    viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
+  else
+    viset.sleep("2s")
+  end
 
   viset.page.navigate(base_url .. target.path .. "?simulationTheme=" .. theme)
   settle(target.path)

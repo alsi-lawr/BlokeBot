@@ -43,7 +43,6 @@ BLOKEBOT_DASHBOARD_PORT=43217 nix run "$VISET_CHECKOUT" -- capture dashboard-and
 BLOKEBOT_HOME_SCROLL_PORT=43218 nix run "$VISET_CHECKOUT" -- capture home-scroll.lua --force
 BLOKEBOT_GUESSING_CAPTURE_PORT=43219 nix run "$VISET_CHECKOUT" -- capture guessing-workflow.lua --force
 BLOKEBOT_CUSTOM_COMMANDS_PORT=43220 nix run "$VISET_CHECKOUT" -- capture custom-commands.lua --force
-BLOKEBOT_AUTOMATION_EVENTS_PORT=43221 nix run "$VISET_CHECKOUT" -- capture automation-events.lua --force
 BLOKEBOT_POINTS_GUESSING_PORT=43222 nix run "$VISET_CHECKOUT" -- capture points-and-guessing.lua --force
 BLOKEBOT_NATIVE_TWITCH_PORT=43223 nix run "$VISET_CHECKOUT" -- capture native-twitch-operations.lua --force
 BLOKEBOT_VIEWER_COMMAND_CATALOG_PORT=5334 nix run "$VISET_CHECKOUT" -- capture viewer-command-catalog.lua --force
