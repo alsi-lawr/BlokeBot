@@ -901,7 +901,7 @@ public sealed class RaidCollaborationService(
             null => RaidShoutoutOutcome.NotConfigured,
             AutomaticRaidShoutoutResultCode.Delivered => RaidShoutoutOutcome.Sent,
             AutomaticRaidShoutoutResultCode.Cooldown => RaidShoutoutOutcome.Cooldown,
-            AutomaticRaidShoutoutResultCode.Invalid => RaidShoutoutOutcome.TargetOffline,
+            AutomaticRaidShoutoutResultCode.Invalid => RaidShoutoutOutcome.NotEligible,
             _ => RaidShoutoutOutcome.Rejected,
         };
 

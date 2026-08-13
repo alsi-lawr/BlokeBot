@@ -84,8 +84,8 @@ public enum RaidShoutoutOutcome
     [PersistedToken("Cooldown")]
     Cooldown,
 
-    [PersistedToken("TargetOffline")]
-    TargetOffline,
+    [PersistedToken("NotEligible")]
+    NotEligible,
 
     [PersistedToken("Rejected")]
     Rejected,
