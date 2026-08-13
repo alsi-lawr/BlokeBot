@@ -39,22 +39,12 @@ height = 844
 [matrix]
 theme = ["light", "dark"]
 view = [
-  "home",
-  "channel-setup",
-  "custom-commands",
   "automation-events",
-  "guessing-leaderboard",
-  "points-settings",
-  "admin",
-  "native-polls",
-  "native-clips-markers",
-  "native-channel-points",
-  "native-predictions",
 ]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_SCREENSHOT_PORT") or "43217"
+local port = os.getenv("BLOKEBOT_AUTOMATION_EVENTS_PORT") or "43221"
 local base_url = "http://127.0.0.1:" .. port
 local server = viset.process.start({
   file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
@@ -78,21 +68,6 @@ local server = viset.process.start({
 })
 
 local readiness = {
-  ["home"] = {
-    path = "/",
-    expression = [[document.body.innerText.includes("Choose your chat tools")]],
-  },
-  ["channel-setup"] = {
-    path = "/host",
-    expression = [[document.body.innerText.includes("Chat tools")]],
-  },
-  ["custom-commands"] = {
-    path = "/custom-commands/settings",
-    expression = [[Boolean(
-      document.querySelector(".studio-rail__item[aria-current='true']") &&
-      document.querySelector("[data-chat-preview] [data-chat-line='bot']")
-    )]],
-  },
   ["automation-events"] = {
     path = "/automations/events",
     expression = [[(() => {
@@ -100,34 +75,6 @@ local readiness = {
       return cards.length === 21
         && cards.every(card => card.getAttribute("data-source-state") === "ready");
     })()]],
-  },
-  ["guessing-leaderboard"] = {
-    path = "/guessing/leaderboard/samplechannel",
-    expression = [[document.body.innerText.includes("Guessing leaderboard")]],
-  },
-  ["points-settings"] = {
-    path = "/points/settings",
-    expression = [[document.body.innerText.includes("Points settings")]],
-  },
-  ["admin"] = {
-    path = "/admin",
-    expression = [[document.body.innerText.includes("Channels using BlokeBot")]],
-  },
-  ["native-polls"] = {
-    path = "/twitch-operations/polls",
-    expression = [[Boolean(document.querySelector("[data-native-route='polls'] .task-panel button"))]],
-  },
-  ["native-clips-markers"] = {
-    path = "/twitch-operations/clips-markers",
-    expression = [[Boolean(document.querySelector("[data-native-route='clips-markers'] .task-panel button"))]],
-  },
-  ["native-channel-points"] = {
-    path = "/twitch-operations/channel-points",
-    expression = [[Boolean(document.querySelector("[data-native-route='channel-points'] [data-active-redemptions] [data-waiting-age-band]"))]],
-  },
-  ["native-predictions"] = {
-    path = "/twitch-operations/predictions",
-    expression = [[Boolean(document.querySelector("[data-native-route='predictions'] .task-panel button"))]],
   },
 }
 

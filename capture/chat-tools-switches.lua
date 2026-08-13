@@ -39,14 +39,13 @@ height = 844
 [matrix]
 theme = ["light", "dark"]
 view = [
-  "viewer-command-catalog",
   "chat-tools-all-disabled",
   "chat-tools-enabled",
 ]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_V05_GUIDES_PORT") or "5334"
+local port = os.getenv("BLOKEBOT_CHAT_TOOLS_PORT") or "5335"
 local base_url = "http://127.0.0.1:" .. port
 local server = viset.process.start({
   file = os.getenv("BLOKEBOT_DOTNET") or "dotnet",
@@ -73,7 +72,6 @@ local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
   local feature_state = ({
-    ["viewer-command-catalog"] = "all-enabled",
     ["chat-tools-all-disabled"] = "all-disabled",
     ["chat-tools-enabled"] = "mixed",
   })[view]
@@ -94,17 +92,13 @@ local succeeded, failure = pcall(function()
 
   viset.page.evaluate(
     viset.javascript([=[
-      async ({ featureState, catalog }) => {
+      async ({ featureState }) => {
         const post = path => fetch(path, { method: "POST" }).then(response => {
           if (!response.ok) throw new Error(`${path} returned ${response.status}`);
         });
-        await post(catalog
-          ? "/simulation/commands/round/open"
-          : "/simulation/commands/round/none");
-        await post(catalog
-          ? "/simulation/commands/giveaway/active"
-          : "/simulation/commands/giveaway/inactive");
-        await post(catalog || featureState === "mixed"
+        await post("/simulation/commands/round/none");
+        await post("/simulation/commands/giveaway/inactive");
+        await post(featureState === "mixed"
           ? "/simulation/commands/liveness/live"
           : "/simulation/commands/liveness/offline");
         await post(`/simulation/commands/features/${featureState}`);
@@ -112,10 +106,7 @@ local succeeded, failure = pcall(function()
         return true;
       }
     ]=]),
-    {
-      featureState = feature_state,
-      catalog = view == "viewer-command-catalog",
-    }
+    { featureState = feature_state }
   )
 
   local target = "/host"
@@ -129,64 +120,23 @@ local succeeded, failure = pcall(function()
     "30s"
   )
 
-  if view == "viewer-command-catalog" then
-    viset.page.wait_for(
-      viset.javascript([[document.querySelector(".feature-toggle-card") !== null]]),
-      "30s"
-    )
-    viset.page.evaluate(viset.javascript([=[
-      (async () => {
-        const stageHeader = title => [...document.querySelectorAll("button.studio-stage__header")]
-          .find(candidate => candidate.querySelector(".studio-stage__title")?.textContent.trim()
-            === title);
-        const inventory = () => document.querySelector("[data-fold='command-inventory'] button");
-        const commands = stageHeader("Commands");
-        if (!commands || !inventory()) throw new Error("Commands disclosures were not found.");
-        if (commands.getAttribute("aria-expanded") !== "true") {
-          commands.click();
-        }
-        inventory().click();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        if (inventory()?.getAttribute("aria-expanded") !== "true") {
-          inventory()?.click();
-        }
-        stageHeader("Commands").closest("section").scrollIntoView({ block: "start" });
-        window.scrollBy(0, -12);
-        return true;
-      })()
-    ]=]))
-    viset.page.wait_for(
-      viset.javascript([[document.querySelector("[data-command-catalog]") !== null]]),
-      "30s"
-    )
-    viset.sleep("500ms")
-  else
-    viset.page.wait_for(
-      viset.javascript(([=[
-        (() => {
-          const expectedEnabled = new Set(%s === "mixed"
-            ? ["Request boards", "Moments", "Points", "Custom commands"]
-            : []);
-          const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          return cards.length === 13
-            && cards.every(card => {
-              const name = card.querySelector(".truncate")?.textContent.trim();
-              return name
-                && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
-            });
-        })()
-      ]=]):format(string.format("%q", feature_state))),
-      "30s"
-    )
-    viset.page.evaluate(
-      viset.javascript([=[
+  viset.page.wait_for(
+    viset.javascript([[
+      document.querySelector("#chat-tools") !== null
+        && document.querySelectorAll(".feature-toggle-card").length > 0
+    ]]),
+    "30s"
+  )
+
+  viset.page.evaluate(
+    viset.javascript([=[
       (async ({ featureState }) => {
         const expectedEnabled = new Set(featureState === "mixed"
           ? ["Request boards", "Moments", "Points", "Custom commands"]
           : []);
         const hasRequestedState = () => {
           const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          return cards.length === 13
+          return cards.length > 0
             && cards.every(card => {
               const name = card.querySelector(".truncate")?.textContent.trim();
               return name
@@ -216,30 +166,29 @@ local succeeded, failure = pcall(function()
         throw new Error(`Chat tools did not remain stable for ${featureState}.`);
       })
     ]=]),
-      { featureState = feature_state }
-    )
-    viset.page.wait_for(
-      viset.javascript(([=[
-        (() => {
-          const expectedEnabled = new Set(%s === "mixed"
-            ? ["Request boards", "Moments", "Points", "Custom commands"]
-            : []);
-          const target = document.querySelector("#chat-tools");
-          const cards = [...document.querySelectorAll(".feature-toggle-card")];
-          if (!target || cards.length !== 13) return false;
-          const bounds = target.getBoundingClientRect();
-          return bounds.top >= 0 && bounds.top < window.innerHeight
-            && bounds.bottom > 0
-            && cards.every(card => {
-              const name = card.querySelector(".truncate")?.textContent.trim();
-              return name
-                && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
-            });
-        })()
-      ]=]):format(string.format("%q", feature_state))),
-      "30s"
-    )
-  end
+    { featureState = feature_state }
+  )
+  viset.page.wait_for(
+    viset.javascript(([=[
+      (() => {
+        const expectedEnabled = new Set(%s === "mixed"
+          ? ["Request boards", "Moments", "Points", "Custom commands"]
+          : []);
+        const target = document.querySelector("#chat-tools");
+        const cards = [...document.querySelectorAll(".feature-toggle-card")];
+        if (!target || cards.length === 0) return false;
+        const bounds = target.getBoundingClientRect();
+        return bounds.top >= 0 && bounds.top < window.innerHeight
+          && bounds.bottom > 0
+          && cards.every(card => {
+            const name = card.querySelector(".truncate")?.textContent.trim();
+            return name
+              && card.hasAttribute("aria-pressed") === expectedEnabled.has(name);
+          });
+      })()
+    ]=]):format(string.format("%q", feature_state))),
+    "30s"
+  )
 
   viset.snapshot()
 end)
