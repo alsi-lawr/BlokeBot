@@ -70,8 +70,10 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<ViewerPassportLogin> ViewerPassportLogins => Set<ViewerPassportLogin>();
     public DbSet<ViewerPassportAmbiguousLogin> ViewerPassportAmbiguousLogins =>
         Set<ViewerPassportAmbiguousLogin>();
-    public DbSet<ViewerPassportAttendanceDay> ViewerPassportAttendanceDays =>
-        Set<ViewerPassportAttendanceDay>();
+    public DbSet<ViewerPassportStreamSession> ViewerPassportStreamSessions =>
+        Set<ViewerPassportStreamSession>();
+    public DbSet<ViewerPassportStreamAttendance> ViewerPassportStreamAttendances =>
+        Set<ViewerPassportStreamAttendance>();
     public DbSet<BingoTemplate> BingoTemplates => Set<BingoTemplate>();
     public DbSet<BingoTemplateRevision> BingoTemplateRevisions => Set<BingoTemplateRevision>();
     public DbSet<BingoSquare> BingoSquares => Set<BingoSquare>();

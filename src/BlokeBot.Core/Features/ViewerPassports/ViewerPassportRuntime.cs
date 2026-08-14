@@ -21,7 +21,7 @@ internal sealed class ViewerPassportRuntime(
 
         try
         {
-            _ = await passports.RecordChatPresenceAsync(
+            _ = await passports.RecordStreamAttendanceAsync(
                 message.Channel,
                 new(
                     twitchUserId,
@@ -39,7 +39,7 @@ internal sealed class ViewerPassportRuntime(
         catch (Exception exception)
         {
             log.LogError(
-                "Viewer passport chat-presence processing failed with {FailureType}.",
+                "Viewer passport stream attendance failed with {FailureType}.",
                 exception.GetType().Name
             );
         }

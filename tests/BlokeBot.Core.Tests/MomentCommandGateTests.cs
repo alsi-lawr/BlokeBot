@@ -87,7 +87,7 @@ public sealed class MomentCommandGateTests
             return IO<HostStreamLivenessOutcome, Never>.Create(static _ =>
                 ValueTask.FromResult(
                     Result<HostStreamLivenessOutcome, Never>.Success(
-                        new HostStreamLivenessOutcome.Live("stream-id")
+                        new HostStreamLivenessOutcome.Live("stream-id", DateTimeOffset.UnixEpoch)
                     )
                 )
             );

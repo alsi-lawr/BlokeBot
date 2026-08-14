@@ -36,7 +36,7 @@ public sealed record ViewerPassportStatistics(
     int? PointsRank,
     int GuessRounds,
     int CorrectGuesses,
-    int AttendanceStreakDays,
+    int AttendanceStreakSessions,
     int GamesWon,
     int GiveawaysWon,
     int BountiesSupported,
@@ -123,7 +123,7 @@ public sealed record ViewerPassportOverlayData(
     string ProfileLine,
     string Points,
     int? PointsRank,
-    int? AttendanceStreakDays,
+    int? AttendanceStreakSessions,
     int Achievements
 );
 
@@ -135,7 +135,7 @@ public sealed record ViewerPassportAutomationPayload(
     string? Badge,
     string Points,
     int? PointsRank,
-    int? AttendanceStreakDays,
+    int? AttendanceStreakSessions,
     int GamesWon,
     int GiveawaysWon,
     int BountiesSupported,

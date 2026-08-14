@@ -48,6 +48,8 @@ public sealed class BotHost
 
     public DateTime? CollectivesAcceptWorkAfterUtc { get; set; }
 
+    public int ViewerPassportContinuityGeneration { get; set; }
+
     public int AutomationGeneration { get; set; }
 
     public string TimeZoneId { get; set; } = "UTC";

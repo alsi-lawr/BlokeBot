@@ -29,7 +29,7 @@
         {
             <ApplicationCardCollection Owner="viewer-passport-cards">
                 <div class="card p-8 text-sm text-muted-foreground">
-                    Viewer passports is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved profiles, visibility choices, and chat-presence days are retained; re-enabling does not repeat missed activity.
+                    Viewer passports is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. BlokeBot keeps saved profiles and attendance. It does not record or replay activity while the feature is off.
                 </div>
             </ApplicationCardCollection>
         }
@@ -156,7 +156,7 @@
                             <div class="passport-attendance">
                                 <span>
                                     <span class="passport-attendance__label" id="passport-attendance-label">Show attendance streak</span>
-                                    <span class="passport-attendance__copy">Counts consecutive days you chatted.</span>
+                                    <span class="passport-attendance__copy">Counts consecutive recorded streams in which you chatted.</span>
                                 </span>
                                 <button type="button"
                                         class="studio-toggle"
@@ -175,7 +175,7 @@
                             <span class="passport-editor__chevron" aria-hidden="true">›</span>
                         </summary>
                         <div class="passport-editor__section-body">
-                            <p class="mb-4 text-sm text-muted-foreground">Export your channel data or remove this passport and its chat-presence days.</p>
+                            <p class="mb-4 text-sm text-muted-foreground">Export your channel data or remove this passport and its stream attendance.</p>
                             <div class="passport-data-actions">
                                 <a class="btn-secondary" href="@ExportUrl()">Export my channel data</a>
                                 @if (!_confirmReset)
@@ -185,7 +185,7 @@
                                 else
                                 {
                                     <span class="passport-reset-confirmation">
-                                        Remove this profile and its chat-presence days?
+                                        Remove this profile and its stream attendance?
                                         <button class="btn-secondary passport-data-actions__reset" type="button" @onclick="ResetAsync">Confirm reset</button>
                                         <button class="btn-secondary" type="button" @onclick="() => _confirmReset = false">Cancel</button>
                                     </span>
@@ -231,7 +231,7 @@
                         @Stat($"{_passport.Statistics.GuessAccuracyPercent}%", $"guess accuracy · {_passport.Statistics.GuessRounds} rounds")
                         @if (!_hideAttendance)
                         {
-                            @Stat($"{_passport.Statistics.AttendanceStreakDays} days", "chat-presence streak")
+                            @Stat($"{_passport.Statistics.AttendanceStreakSessions} streams", "attendance streak")
                         }
                         @Stat(_passport.Statistics.Achievements.ToString(), "achievements")
                         @Stat($"{_passport.Statistics.GamesWon} / {_passport.Statistics.GiveawaysWon}", "games / giveaways won")

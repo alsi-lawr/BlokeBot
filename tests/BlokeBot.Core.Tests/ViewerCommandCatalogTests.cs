@@ -451,7 +451,9 @@ public sealed class ViewerCommandCatalogTests
         var fixture = await SeedCatalogFixtureAsync(dbFactory);
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
-            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
+            new StaticLivenessProvider(
+                new HostStreamLivenessOutcome.Live("stream", DateTimeOffset.UnixEpoch)
+            ),
             new RecordingCueAdmissions(),
             new UnavailableCustomCommandAutomationRuntime()
         );
@@ -845,7 +847,9 @@ public sealed class ViewerCommandCatalogTests
 
         var catalog = new ViewerCommandCatalogService(
             dbFactory,
-            new StaticLivenessProvider(new HostStreamLivenessOutcome.Live("stream")),
+            new StaticLivenessProvider(
+                new HostStreamLivenessOutcome.Live("stream", DateTimeOffset.UnixEpoch)
+            ),
             new RecordingCueAdmissions(),
             new UnavailableCustomCommandAutomationRuntime()
         );

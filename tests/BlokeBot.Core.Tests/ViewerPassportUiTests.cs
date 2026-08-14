@@ -1,7 +1,9 @@
 using AngleSharp.Dom;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
@@ -25,6 +27,7 @@ public sealed class ViewerPassportUiTests
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
         var cut = context.Render<ViewerPassportsPage>();
@@ -50,6 +53,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
         _ = context.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.AddAuthorization().SetNotAuthorized();
@@ -79,6 +83,7 @@ public sealed class ViewerPassportUiTests
         _ = context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
         _ = context.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
         _ = context.Services.AddSingleton(new BlokeBotPageContextAccessor());
         _ = context.AddAuthorization().SetNotAuthorized();
@@ -106,6 +111,7 @@ public sealed class ViewerPassportUiTests
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
         var cut = context.Render<ViewerPassportsPage>();
@@ -132,6 +138,7 @@ public sealed class ViewerPassportUiTests
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
         var cut = context.Render<ViewerPassportsPage>();
@@ -161,6 +168,7 @@ public sealed class ViewerPassportUiTests
         );
         await using var context = UiTestContextFactory.Create(database, hostId);
         _ = context.Services.AddSingleton(new PointBalanceService(database));
+        _ = context.Services.AddSingleton<IHostStreamLivenessProvider>(new OfflineStreams());
         _ = context.Services.AddSingleton<ViewerPassportService>();
 
         var cut = context.Render<ViewerPassportsPage>();
@@ -196,6 +204,18 @@ public sealed class ViewerPassportUiTests
         IRenderedComponent<ViewerPassportsPage> cut,
         ViewerPassportVisibility visibility
     ) => cut.Find($"input[name='passport-visibility'][value='{visibility}']");
+
+    private sealed class OfflineStreams : IHostStreamLivenessProvider
+    {
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<HostStreamLivenessOutcome, Never>.Success(
+                        new HostStreamLivenessOutcome.Offline()
+                    )
+                )
+            );
+    }
 
     private static async Task<int> SeedAsync(
         SqliteBlokeBotDbFactory database,

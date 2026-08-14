@@ -746,16 +746,25 @@ public static class ViewerPrivacyService
                 })
         );
         await AddAsync(
-            "viewer-passports.attendance-days",
-            db.ViewerPassportAttendanceDays.Where(x =>
-                    passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId)
-                )
-                .Select(x => new
+            "viewer-passports.stream-attendance",
+            from attendance in db.ViewerPassportStreamAttendances
+            join session in db.ViewerPassportStreamSessions
+                on new { attendance.HostId, Id = attendance.StreamSessionId } equals new
                 {
-                    x.HostId,
-                    x.DateUtc,
-                    x.FirstSeenAtUtc,
-                })
+                    session.HostId,
+                    session.Id,
+                }
+            where
+                passportIds.Contains(attendance.PassportId)
+                && (hostId == null || attendance.HostId == hostId)
+            select new
+            {
+                attendance.HostId,
+                session.TwitchStreamId,
+                session.StartedAtUtc,
+                session.ContinuityGeneration,
+                attendance.FirstSeenAtUtc,
+            }
         );
         await AddAsync(
             "play-queues.entries",
@@ -2294,8 +2303,8 @@ public static class ViewerPrivacyService
             )
         );
         Record(
-            "viewer-passports.attendance-days",
-            await db.ViewerPassportAttendanceDays.CountAsync(
+            "viewer-passports.stream-attendance",
+            await db.ViewerPassportStreamAttendances.CountAsync(
                 x => passportIds.Contains(x.PassportId) && (hostId == null || x.HostId == hostId),
                 ct
             )

@@ -188,7 +188,7 @@ public sealed class HostBotStatusService(
         {
             var token = await appTokens.GetAccessTokenAsync(ct);
             return await helix.GetStreamAsync(HelixContext(token), channelLogin, ct) is { } stream
-                ? new HostStreamLivenessOutcome.Live(stream.Id)
+                ? new HostStreamLivenessOutcome.Live(stream.Id, stream.StartedAt)
                 : new HostStreamLivenessOutcome.Offline();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

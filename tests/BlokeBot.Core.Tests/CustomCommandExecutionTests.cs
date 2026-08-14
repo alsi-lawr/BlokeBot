@@ -1799,7 +1799,10 @@ public sealed class CustomCommandExecutionTests
                 ),
                 false => StreamId switch
                 {
-                    { } current => new HostStreamLivenessOutcome.Live(current),
+                    { } current => new HostStreamLivenessOutcome.Live(
+                        current,
+                        DateTimeOffset.UnixEpoch
+                    ),
                     _ => new HostStreamLivenessOutcome.Offline(),
                 },
             };

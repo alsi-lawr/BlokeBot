@@ -247,6 +247,13 @@ public sealed class HostFeatureService(
             host.CollectivesAcceptWorkAfterUtc = now;
             host.CollectivesPausedAtUtc = null;
         }
+        if (
+            host.EnabledFeatures.Contains(HostFeatureFlags.ViewerPassports)
+            && !updated.Contains(HostFeatureFlags.ViewerPassports)
+        )
+        {
+            host.ViewerPassportContinuityGeneration++;
+        }
         host.EnabledFeatures = updated;
         _ = await db.SaveChangesAsync(ct);
         foreach (var observer in featureObservers)

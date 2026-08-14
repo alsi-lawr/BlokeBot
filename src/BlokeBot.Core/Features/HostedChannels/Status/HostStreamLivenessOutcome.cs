@@ -19,7 +19,8 @@ public abstract record HostStreamLivenessOutcome
 {
     private HostStreamLivenessOutcome() { }
 
-    public sealed record Live(string StreamId) : HostStreamLivenessOutcome;
+    public sealed record Live(string StreamId, DateTimeOffset StartedAtUtc)
+        : HostStreamLivenessOutcome;
 
     public sealed record Offline : HostStreamLivenessOutcome;
 

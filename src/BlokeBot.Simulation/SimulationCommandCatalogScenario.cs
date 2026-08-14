@@ -36,7 +36,10 @@ internal sealed class SimulationCommandCatalogScenario(
                 channelLogin
             ),
             SimulationStreamLiveness.Live => Outcome(
-                new HostStreamLivenessOutcome.Live("simulation-stream")
+                new HostStreamLivenessOutcome.Live(
+                    "simulation-stream",
+                    new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+                )
             ),
             SimulationStreamLiveness.Offline => Outcome(new HostStreamLivenessOutcome.Offline()),
             SimulationStreamLiveness.Unavailable => Outcome(

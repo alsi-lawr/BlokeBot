@@ -47,11 +47,24 @@ public sealed class ViewerPassportAmbiguousLogin
     public DateTime DetectedAtUtc { get; set; }
 }
 
-public sealed class ViewerPassportAttendanceDay
+public sealed class ViewerPassportStreamSession
+{
+    public long Id { get; set; }
+    public int HostId { get; set; }
+    public string TwitchStreamId { get; set; } = string.Empty;
+    public DateTime StartedAtUtc { get; set; }
+    public int ContinuityGeneration { get; set; }
+    public DateTime RecordedAtUtc { get; set; }
+}
+
+public sealed class ViewerPassportStreamAttendance
 {
     public long Id { get; set; }
     public int HostId { get; set; }
     public long PassportId { get; set; }
-    public DateOnly DateUtc { get; set; }
+    public ViewerPassport? Passport { get; set; }
+    public long StreamSessionId { get; set; }
+    public ViewerPassportStreamSession? StreamSession { get; set; }
+    public int ContinuityGeneration { get; set; }
     public DateTime FirstSeenAtUtc { get; set; }
 }

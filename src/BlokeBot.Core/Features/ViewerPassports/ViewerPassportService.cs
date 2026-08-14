@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Identity;
 using BlokeBot.Persistence;
@@ -11,6 +13,7 @@ namespace BlokeBot.Core.Features.ViewerPassports;
 public sealed class ViewerPassportService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
+    IHostStreamLivenessProvider streamLiveness,
     TimeProvider clock
 )
 {
@@ -19,6 +22,10 @@ public sealed class ViewerPassportService(
         .Select(static _ => new SemaphoreSlim(1, 1))
         .ToArray();
     private readonly SemaphoreSlim[] _loginClaimGates = Enumerable
+        .Range(0, 64)
+        .Select(static _ => new SemaphoreSlim(1, 1))
+        .ToArray();
+    private readonly SemaphoreSlim[] _streamClaimGates = Enumerable
         .Range(0, 64)
         .Select(static _ => new SemaphoreSlim(1, 1))
         .ToArray();
@@ -304,7 +311,7 @@ public sealed class ViewerPassportService(
         }
     }
 
-    public async Task<bool> RecordChatPresenceAsync(
+    public async Task<bool> RecordStreamAttendanceAsync(
         string channelLogin,
         ViewerPassportIdentity viewer,
         DateTimeOffset occurredAtUtc,
@@ -316,12 +323,61 @@ public sealed class ViewerPassportService(
         {
             return false;
         }
+        var channel = NormalizeLogin(channelLogin);
+        var livenessResult = await streamLiveness
+            .GetStreamLiveness(channel)
+            .ExecuteAsync(cancellationToken);
+        var liveness = livenessResult.Match(
+            static value => value,
+            static _ => throw new UnreachableException()
+        );
+        if (liveness is not HostStreamLivenessOutcome.Live live)
+        {
+            return false;
+        }
+        var twitchStreamId = live.StreamId.Trim();
+        if (
+            twitchStreamId.Length is 0 or > 128
+            || live.StartedAtUtc == default
+            || live.StartedAtUtc.Offset != TimeSpan.Zero
+        )
+        {
+            return false;
+        }
+
+        var streamGate = StreamClaimGate(channel, twitchStreamId);
+        await streamGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await RecordConfirmedStreamAttendanceAsync(
+                channel,
+                identity,
+                twitchStreamId,
+                live.StartedAtUtc.UtcDateTime,
+                occurredAtUtc,
+                cancellationToken
+            );
+        }
+        finally
+        {
+            _ = streamGate.Release();
+        }
+    }
+
+    private async Task<bool> RecordConfirmedStreamAttendanceAsync(
+        string channel,
+        ViewerPassportIdentity identity,
+        string twitchStreamId,
+        DateTime startedAtUtc,
+        DateTimeOffset occurredAtUtc,
+        CancellationToken cancellationToken
+    )
+    {
         var gate = Gate(identity.TwitchUserId);
         await gate.WaitAsync(cancellationToken);
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var channel = NormalizeLogin(channelLogin);
             var host = await db.Hosts.SingleOrDefaultAsync(
                 value =>
                     value.Login == channel
@@ -342,6 +398,19 @@ public sealed class ViewerPassportService(
                     cancellationToken
                 );
                 var now = clock.GetUtcNow().UtcDateTime;
+                _ = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT OR IGNORE INTO viewer_passport_stream_sessions
+                        ("HostId", "TwitchStreamId", "StartedAtUtc", "ContinuityGeneration", "RecordedAtUtc")
+                    VALUES
+                        ({host.Id}, {twitchStreamId}, {startedAtUtc}, {host.ViewerPassportContinuityGeneration}, {now})
+                    """,
+                    cancellationToken
+                );
+                var streamSession = await db.ViewerPassportStreamSessions.SingleAsync(
+                    value => value.HostId == host.Id && value.TwitchStreamId == twitchStreamId,
+                    cancellationToken
+                );
                 var passport = await db.ViewerPassports.SingleOrDefaultAsync(
                     value => value.HostId == host.Id && value.TwitchUserId == identity.TwitchUserId,
                     cancellationToken
@@ -384,31 +453,17 @@ public sealed class ViewerPassportService(
                 await RememberLoginAsync(db, passport, identity.Login, now, cancellationToken);
                 _ = await db.SaveChangesAsync(cancellationToken);
 
-                var date = DateOnly.FromDateTime(occurredAtUtc.UtcDateTime);
-                var recorded = await db.ViewerPassportAttendanceDays.AnyAsync(
-                    value =>
-                        value.HostId == host.Id
-                        && value.PassportId == passport.Id
-                        && value.DateUtc == date,
+                var inserted = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT OR IGNORE INTO viewer_passport_stream_attendance
+                        ("HostId", "PassportId", "StreamSessionId", "ContinuityGeneration", "FirstSeenAtUtc")
+                    VALUES
+                        ({host.Id}, {passport.Id}, {streamSession.Id}, {host.ViewerPassportContinuityGeneration}, {occurredAtUtc.UtcDateTime})
+                    """,
                     cancellationToken
                 );
-                if (recorded)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                    return false;
-                }
-                _ = db.ViewerPassportAttendanceDays.Add(
-                    new()
-                    {
-                        HostId = host.Id,
-                        PassportId = passport.Id,
-                        DateUtc = date,
-                        FirstSeenAtUtc = occurredAtUtc.UtcDateTime,
-                    }
-                );
-                _ = await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return true;
+                return inserted == 1;
             }
             finally
             {
@@ -683,18 +738,34 @@ public sealed class ViewerPassportService(
                 && definition.Kind == CommunityDefinitionKind.Achievement
             select completion.Id
         ).CountAsync(cancellationToken);
-        var attendance = await db
-            .ViewerPassportAttendanceDays.AsNoTracking()
-            .Where(value => value.PassportId == passport.Id)
-            .Select(value => value.DateUtc)
-            .OrderByDescending(value => value)
+        var continuityGeneration = await db
+            .Hosts.AsNoTracking()
+            .Where(value => value.Id == passport.HostId)
+            .Select(value => value.ViewerPassportContinuityGeneration)
+            .SingleAsync(cancellationToken);
+        var recordedSessions = await db
+            .ViewerPassportStreamSessions.AsNoTracking()
+            .Where(value =>
+                value.HostId == passport.HostId
+                && value.ContinuityGeneration == continuityGeneration
+            )
+            .OrderByDescending(value => value.StartedAtUtc)
+            .ThenByDescending(value => value.TwitchStreamId)
+            .Select(value =>
+                db.ViewerPassportStreamAttendances.Any(attendance =>
+                    attendance.HostId == passport.HostId
+                    && attendance.PassportId == passport.Id
+                    && attendance.StreamSessionId == value.Id
+                    && attendance.ContinuityGeneration == continuityGeneration
+                )
+            )
             .ToArrayAsync(cancellationToken);
         return new ViewerPassportStatistics(
             pointBalance.ToDisplayString(),
             rank,
             guessRounds,
             correctGuesses,
-            AttendanceStreak(attendance),
+            StreamAttendanceStreak(recordedSessions),
             gamesWon,
             giveawayWins,
             bounties,
@@ -703,16 +774,12 @@ public sealed class ViewerPassportService(
         );
     }
 
-    private static int AttendanceStreak(IReadOnlyList<DateOnly> dates)
+    private static int StreamAttendanceStreak(IReadOnlyList<bool> recordedSessions)
     {
-        if (dates.Count == 0)
+        var streak = 0;
+        foreach (var attended in recordedSessions)
         {
-            return 0;
-        }
-        var streak = 1;
-        for (var index = 1; index < dates.Count; index++)
-        {
-            if (dates[index] != dates[index - 1].AddDays(-1))
+            if (!attended)
             {
                 break;
             }
@@ -925,6 +992,16 @@ public sealed class ViewerPassportService(
         _loginClaimGates[
             (HashCode.Combine(hostId, login.GetHashCode(StringComparison.Ordinal)) & int.MaxValue)
                 % _loginClaimGates.Length
+        ];
+
+    private SemaphoreSlim StreamClaimGate(string channelLogin, string twitchStreamId) =>
+        _streamClaimGates[
+            (
+                HashCode.Combine(
+                    channelLogin.GetHashCode(StringComparison.Ordinal),
+                    twitchStreamId.GetHashCode(StringComparison.Ordinal)
+                ) & int.MaxValue
+            ) % _streamClaimGates.Length
         ];
 
     private static async Task<bool> HostExistsAsync(

@@ -47,7 +47,7 @@ internal sealed class ViewerPassportCommandModule(ViewerPassportService passport
 
         var attendance = passport.HideAttendance
             ? string.Empty
-            : $", {passport.Statistics.AttendanceStreakDays}-day chat-presence streak";
+            : $", {passport.Statistics.AttendanceStreakSessions}-stream attendance streak";
         await context.ReplyAsync(
             $"{passport.DisplayName}: {passport.Statistics.Points} points"
                 + (passport.Statistics.PointsRank is { } rank ? $" (#{rank})" : string.Empty)

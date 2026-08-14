@@ -406,19 +406,31 @@ internal sealed class SimulationFixtureSeeder(
         );
         for (var offset = 0; offset < 6; offset++)
         {
-            db.ViewerPassportAttendanceDays.AddRange(
-                new ViewerPassportAttendanceDay
+            var startedAtUtc = now.AddDays(-offset).AddHours(-4);
+            var session = new ViewerPassportStreamSession
+            {
+                HostId = hostId,
+                TwitchStreamId = $"simulation-stream-{6 - offset}",
+                StartedAtUtc = startedAtUtc,
+                ContinuityGeneration = 0,
+                RecordedAtUtc = startedAtUtc.AddHours(1),
+            };
+            _ = db.ViewerPassportStreamSessions.Add(session);
+            db.ViewerPassportStreamAttendances.AddRange(
+                new ViewerPassportStreamAttendance
                 {
                     HostId = hostId,
                     PassportId = streamer.Id,
-                    DateUtc = DateOnly.FromDateTime(now.AddDays(-offset)),
+                    StreamSession = session,
+                    ContinuityGeneration = 0,
                     FirstSeenAtUtc = now.AddDays(-offset).AddHours(-2),
                 },
-                new ViewerPassportAttendanceDay
+                new ViewerPassportStreamAttendance
                 {
                     HostId = hostId,
                     PassportId = nightOwl.Id,
-                    DateUtc = DateOnly.FromDateTime(now.AddDays(-offset)),
+                    StreamSession = session,
+                    ContinuityGeneration = 0,
                     FirstSeenAtUtc = now.AddDays(-offset).AddHours(-3),
                 }
             );

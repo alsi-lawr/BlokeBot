@@ -1,13 +1,12 @@
 using BlokeBot.Core.Features.Guessing.History;
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Persistence.Privacy;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
 namespace BlokeBot.Core.Tests;
@@ -217,6 +216,12 @@ public sealed class ViewerPassportServiceTests
             )
         );
         _ = Success(await service.SaveAsync(Save(hostId, "member-id", "member"), default));
+        _ = await service.RecordStreamAttendanceAsync(
+            "channel",
+            new("subject-id", "subject", "Subject"),
+            _now,
+            default
+        );
         await using (var seed = await database.CreateDbContextAsync())
         {
             seed.PointBalances.AddRange(
@@ -290,10 +295,10 @@ public sealed class ViewerPassportServiceTests
         );
         var overlay = await projections.GetOverlayDataAsync("channel", "subject", default);
         overlay.ShouldNotBeNull().ProfileLine.ShouldBe("PUBLIC-LINE");
-        overlay.AttendanceStreakDays.ShouldBeNull();
+        overlay.AttendanceStreakSessions.ShouldBeNull();
         (await projections.GetAutomationPayloadAsync("channel", "subject", default))
             .ShouldNotBeNull()
-            .AttendanceStreakDays.ShouldBeNull();
+            .AttendanceStreakSessions.ShouldBeNull();
         var visible = await new ViewerPassportPublicIdentityPolicy(database).ExclusionsAsync(
             hostId,
             default
@@ -311,87 +316,69 @@ public sealed class ViewerPassportServiceTests
     }
 
     [Test]
-    public async Task ChatPresence_IsIdempotentAndDisabledStatePreservesWithoutReplay()
+    public async Task RepeatedChatInOneStream_RecordsAttendanceOnce()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
-        var service = CreateService(database);
+        _ = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var streams = new MutableStreamLivenessProvider("stream-1", _now.AddHours(-1));
+        var service = CreateService(database, streams);
         var viewer = new ViewerPassportIdentity("viewer-id", "viewer", "Viewer");
 
-        (await service.RecordChatPresenceAsync("channel", viewer, _now, default)).ShouldBeTrue();
         (
-            await service.RecordChatPresenceAsync("channel", viewer, _now.AddHours(2), default)
-        ).ShouldBeFalse();
-        await SetFeaturesAsync(database, hostId, HostFeatureFlags.None);
-
+            await service.RecordStreamAttendanceAsync("channel", viewer, _now, default)
+        ).ShouldBeTrue();
         (
-            await service.RecordChatPresenceAsync("channel", viewer, _now.AddDays(1), default)
+            await service.RecordStreamAttendanceAsync("channel", viewer, _now.AddHours(2), default)
         ).ShouldBeFalse();
-        _ = (
-            await service.SaveAsync(Save(hostId, "viewer-id", "viewer"), default)
-        ).ShouldBeOfType<ViewerPassportMutationOutcome.FeatureDisabled>();
-        _ = (
-            await service.GetVisibleAsync(
-                "channel",
-                "viewer",
-                ViewerPassportAudience.Anonymous,
-                default
-            )
-        ).ShouldBeOfType<ViewerPassportQueryOutcome.FeatureDisabled>();
-        _ = (
-            await service.ExportAsync(hostId, viewer, default)
-        ).ShouldBeOfType<ViewerPassportExportOutcome.FeatureDisabled>();
-        _ = (
-            await service.ResetAsync(hostId, "viewer-id", default)
-        ).ShouldBeOfType<ViewerPassportResetOutcome.FeatureDisabled>();
 
-        await SetFeaturesAsync(database, hostId, HostFeatureFlags.ViewerPassports);
-        var restored = (await service.GetSelfAsync(hostId, viewer, default))
-            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
-            .Passport;
-        restored.Statistics.AttendanceStreakDays.ShouldBe(1);
         await using var verify = await database.CreateDbContextAsync();
-        (await verify.ViewerPassportAttendanceDays.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportStreamSessions.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportStreamAttendances.CountAsync()).ShouldBe(1);
     }
 
     [Test]
-    public async Task ChatObserver_IsGatedBeforeCreatingAProfileAndUsesTheRuntimeClock()
+    public async Task AdjacentRecordedStreams_IncrementAttendanceStreak()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.None);
-        var service = CreateService(database);
-        var observer = new ViewerPassportRuntime(
-            service,
-            new FixedTimeProvider(_now),
-            NullLogger<ViewerPassportRuntime>.Instance
-        );
-        var message = new ChatMessage(
-            "viewer",
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var streams = new MutableStreamLivenessProvider("stream-1", _now.AddHours(-2));
+        var service = CreateService(database, streams);
+        var viewer = new ViewerPassportIdentity("viewer-id", "viewer", "Viewer");
+        _ = await service.RecordStreamAttendanceAsync("channel", viewer, _now, default);
+        streams.Set("stream-2", _now.AddHours(-1));
+
+        _ = await service.RecordStreamAttendanceAsync("channel", viewer, _now, default);
+
+        var passport = (await service.GetSelfAsync(hostId, viewer, default))
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        passport.Statistics.AttendanceStreakSessions.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task RecordedInterveningStream_ResetsNextAttendanceStreak()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var streams = new MutableStreamLivenessProvider("stream-1", _now.AddHours(-3));
+        var service = CreateService(database, streams);
+        var viewer = new ViewerPassportIdentity("viewer-id", "viewer", "Viewer");
+        _ = await service.RecordStreamAttendanceAsync("channel", viewer, _now, default);
+        streams.Set("stream-2", _now.AddHours(-2));
+        _ = await service.RecordStreamAttendanceAsync(
             "channel",
-            "hello",
-            "raw",
-            new Dictionary<string, string>
-            {
-                ["user-id"] = "viewer-id",
-                ["display-name"] = "Viewer",
-            }
+            new("other-id", "other", "Other"),
+            _now,
+            default
         );
+        streams.Set("stream-3", _now.AddHours(-1));
 
-        await observer.MessageReceivedAsync(message, default);
-        await using (var disabled = await database.CreateDbContextAsync())
-        {
-            (await disabled.ViewerPassports.CountAsync()).ShouldBe(0);
-            (await disabled.ViewerPassportAttendanceDays.CountAsync()).ShouldBe(0);
-        }
+        _ = await service.RecordStreamAttendanceAsync("channel", viewer, _now, default);
 
-        await SetFeaturesAsync(database, hostId, HostFeatureFlags.ViewerPassports);
-        await observer.MessageReceivedAsync(message, default);
-
-        await using var enabled = await database.CreateDbContextAsync();
-        (await enabled.ViewerPassports.SingleAsync()).DisplayName.ShouldBe("Viewer");
-        var attendance = await enabled.ViewerPassportAttendanceDays.SingleAsync();
-        attendance.DateUtc.ShouldBe(DateOnly.FromDateTime(_now.UtcDateTime));
-        attendance.FirstSeenAtUtc.ShouldBe(_now.UtcDateTime);
+        var passport = (await service.GetSelfAsync(hostId, viewer, default))
+            .ShouldBeOfType<ViewerPassportQueryOutcome.Available>()
+            .Passport;
+        passport.Statistics.AttendanceStreakSessions.ShouldBe(1);
     }
 
     [Test]
@@ -400,9 +387,16 @@ public sealed class ViewerPassportServiceTests
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
         var viewer = new ViewerPassportIdentity("viewer-id", "viewer", "Viewer");
-        var service = CreateService(database);
+        var streams = new MutableStreamLivenessProvider("stream-1", _now.AddHours(-1));
+        var service = CreateService(database, streams);
         _ = Success(await service.SaveAsync(Save(hostId, "viewer-id", "viewer"), default));
-        _ = await service.RecordChatPresenceAsync("channel", viewer, _now, default);
+        _ = await service.RecordStreamAttendanceAsync("channel", viewer, _now, default);
+        _ = await service.RecordStreamAttendanceAsync(
+            "channel",
+            new("other-id", "other", "Other"),
+            _now,
+            default
+        );
         await using (var seed = await database.CreateDbContextAsync())
         {
             _ = seed.PointBalances.Add(
@@ -422,15 +416,22 @@ public sealed class ViewerPassportServiceTests
         ).ShouldBeOfType<ViewerPassportExportOutcome.Succeeded>();
         export.Sections.Keys.ShouldContain("viewer-passports.profiles");
         export.Sections.Keys.ShouldContain("viewer-passports.logins");
-        export.Sections.Keys.ShouldContain("viewer-passports.attendance-days");
+        export.Sections["viewer-passports.stream-attendance"].Count.ShouldBe(1);
         _ = (
             await service.ResetAsync(hostId, "viewer-id", default)
         ).ShouldBeOfType<ViewerPassportResetOutcome.Succeeded>();
 
         await using var verify = await database.CreateDbContextAsync();
-        (await verify.ViewerPassports.CountAsync()).ShouldBe(0);
-        (await verify.ViewerPassportLogins.CountAsync()).ShouldBe(0);
-        (await verify.ViewerPassportAttendanceDays.CountAsync()).ShouldBe(0);
+        (
+            await verify.ViewerPassports.CountAsync(value => value.TwitchUserId == "viewer-id")
+        ).ShouldBe(0);
+        (
+            await verify.ViewerPassportLogins.CountAsync(value =>
+                value.Passport!.TwitchUserId == "viewer-id"
+            )
+        ).ShouldBe(0);
+        (await verify.ViewerPassportStreamAttendances.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportStreamSessions.CountAsync()).ShouldBe(1);
         (await verify.PointBalances.SingleAsync()).Amount.ShouldBe("42");
     }
 
@@ -443,6 +444,7 @@ public sealed class ViewerPassportServiceTests
         var firstIdentity = new ViewerPassportIdentity("first-id", "shared", "First");
         var secondIdentity = new ViewerPassportIdentity("second-id", "shared", "Second");
         _ = Success(await service.SaveAsync(Save(hostId, "first-id", "shared"), default));
+        _ = await service.RecordStreamAttendanceAsync("channel", firstIdentity, _now, default);
         await SeedLegacyActivityAsync(database, hostId, "shared", "75");
         _ = Success(
             await service.SaveAsync(
@@ -453,6 +455,7 @@ public sealed class ViewerPassportServiceTests
                 default
             )
         );
+        _ = await service.RecordStreamAttendanceAsync("channel", secondIdentity, _now, default);
 
         var first = (
             await service.GetVisibleByIdentityAsync(
@@ -529,6 +532,7 @@ public sealed class ViewerPassportServiceTests
                 .Cast<ViewerPassport>()
                 .Single()
                 .TwitchUserId.ShouldBe(identity.TwitchUserId);
+            export.Sections["viewer-passports.stream-attendance"].Count.ShouldBe(1);
         }
         await using (var loginOnly = await database.CreateDbContextAsync())
         {
@@ -568,6 +572,7 @@ public sealed class ViewerPassportServiceTests
                 default
             );
             report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows["viewer-passports.stream-attendance"].ShouldBe(1);
             report.ChangedRows.ShouldNotContainKey("points.balances");
             report.ChangedRows.ShouldNotContainKey("guessing.votes");
             report.ChangedRows.ShouldNotContainKey("points.giveaway-wins");
@@ -594,6 +599,8 @@ public sealed class ViewerPassportServiceTests
         }
         await using var verify = await database.CreateDbContextAsync();
         (await verify.ViewerPassports.CountAsync()).ShouldBe(0);
+        (await verify.ViewerPassportStreamAttendances.CountAsync()).ShouldBe(0);
+        (await verify.ViewerPassportStreamSessions.CountAsync()).ShouldBe(1);
         (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
         (await verify.PointBalances.CountAsync(value => value.Login == "shared")).ShouldBe(1);
         (await verify.Votes.CountAsync(value => value.Login == "shared")).ShouldBe(1);
@@ -617,6 +624,12 @@ public sealed class ViewerPassportServiceTests
         var uniqueHost = await SeedHostAsync(database, "unique", HostFeatureFlags.ViewerPassports);
         var service = CreateService(database);
         _ = Success(await service.SaveAsync(Save(ambiguousHost, "first-id", "old_name"), default));
+        _ = await service.RecordStreamAttendanceAsync(
+            "ambiguous",
+            new("first-id", "old_name", "First"),
+            _now,
+            default
+        );
         _ = Success(await service.SaveAsync(Save(ambiguousHost, "second-id", "old_name"), default));
         _ = Success(await service.SaveAsync(Save(uniqueHost, "owner-id", "old_name"), default));
         await SeedLegacyActivityAsync(database, uniqueHost, "old_name", "90");
@@ -628,6 +641,12 @@ public sealed class ViewerPassportServiceTests
                 },
                 default
             )
+        );
+        _ = await service.RecordStreamAttendanceAsync(
+            "unique",
+            new("owner-id", "new_name", "Owner"),
+            _now,
+            default
         );
 
         renamed.Statistics.Points.ShouldBe("90");
@@ -656,6 +675,7 @@ public sealed class ViewerPassportServiceTests
         stableExport.Sections.ShouldContainKey("points.balances");
         stableExport.Sections.ShouldContainKey("guessing.votes");
         stableExport.Sections.ShouldContainKey("points.giveaway-wins");
+        stableExport.Sections["viewer-passports.stream-attendance"].Count.ShouldBe(1);
         await using (var loginOnly = await database.CreateDbContextAsync())
         {
             var export = await ViewerPrivacyService.ExportAsync(
@@ -681,6 +701,7 @@ public sealed class ViewerPassportServiceTests
                 default
             );
             report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows["viewer-passports.stream-attendance"].ShouldBe(1);
             report.ChangedRows["points.balances"].ShouldBe(1);
             report.ChangedRows["guessing.votes"].ShouldBe(1);
             report.ChangedRows["points.giveaway-entries"].ShouldBe(1);
@@ -699,6 +720,8 @@ public sealed class ViewerPassportServiceTests
             new { HostId = uniqueHost, Login = "old_name" },
         ]);
         (await verify.PointBalances.CountAsync(value => value.HostId == uniqueHost)).ShouldBe(0);
+        (await verify.ViewerPassportStreamAttendances.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportStreamSessions.CountAsync()).ShouldBe(2);
         (await verify.Votes.CountAsync(value => value.GuessRound!.HostId == uniqueHost)).ShouldBe(
             0
         );
@@ -715,29 +738,35 @@ public sealed class ViewerPassportServiceTests
     }
 
     [Test]
-    public async Task ConcurrentChatClaims_MarkReuseAndRememberBothOwners()
+    public async Task ConcurrentFirstMessages_RecordOneSessionAndBothAttendanceRows()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
-        var service = CreateService(database);
-
-        var results = await Task.WhenAll(
-            service.RecordChatPresenceAsync(
-                "channel",
-                new("first-id", "shared", "First"),
-                _now,
-                default
-            ),
-            service.RecordChatPresenceAsync(
-                "channel",
-                new("second-id", "shared", "Second"),
-                _now,
-                default
-            )
+        _ = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
+        var streams = new GatedStreamLivenessProvider(
+            new HostStreamLivenessOutcome.Live("stream-1", _now.AddHours(-1))
         );
+        var service = CreateService(database, streams);
+
+        var first = service.RecordStreamAttendanceAsync(
+            "channel",
+            new("first-id", "shared", "First"),
+            _now,
+            default
+        );
+        var second = service.RecordStreamAttendanceAsync(
+            "channel",
+            new("second-id", "shared", "Second"),
+            _now,
+            default
+        );
+        await streams.BothCallsArrived;
+        streams.Release();
+        var results = await Task.WhenAll(first, second);
 
         results.ShouldAllBe(value => value);
         await using var verify = await database.CreateDbContextAsync();
+        (await verify.ViewerPassportStreamSessions.CountAsync()).ShouldBe(1);
+        (await verify.ViewerPassportStreamAttendances.CountAsync()).ShouldBe(2);
         (await verify.ViewerPassportAmbiguousLogins.CountAsync()).ShouldBe(1);
         (await verify.ViewerPassportLogins.CountAsync(value => value.Login == "shared")).ShouldBe(
             2
@@ -752,13 +781,9 @@ public sealed class ViewerPassportServiceTests
     }
 
     [Test]
-    public async Task ResetBeforeReuse_TombstonesAliasesAcrossMigrationDownUpAndKeepsHostsIsolated()
+    public async Task ResetBeforeReuse_TombstonesAliasesAndKeepsHostsIsolated()
     {
-        await using var database = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
-        await using (var migrate = await database.CreateDbContextAsync())
-        {
-            await migrate.Database.MigrateAsync();
-        }
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var firstHost = await SeedHostAsync(database, "first", HostFeatureFlags.ViewerPassports);
         var secondHost = await SeedHostAsync(database, "second", HostFeatureFlags.ViewerPassports);
         var service = CreateService(database);
@@ -769,18 +794,14 @@ public sealed class ViewerPassportServiceTests
         _ = (
             await service.ResetAsync(firstHost, "owner-id", default)
         ).ShouldBeOfType<ViewerPassportResetOutcome.Succeeded>();
-        await using (var rollback = await database.CreateDbContextAsync())
+        await using (var inspect = await database.CreateDbContextAsync())
         {
-            await rollback
-                .GetService<IMigrator>()
-                .MigrateAsync("20260811051820_v0.10.0_ViewerPassportLoginHistory");
             (
-                await rollback
+                await inspect
                     .ViewerPassportAmbiguousLogins.OrderBy(value => value.Login)
                     .Select(value => value.Login)
                     .ToArrayAsync()
             ).ShouldBe(["new_name", "old_name"]);
-            await rollback.Database.MigrateAsync();
         }
 
         var recreated = Success(
@@ -872,6 +893,12 @@ public sealed class ViewerPassportServiceTests
         var hostId = await SeedHostAsync(database, "channel", HostFeatureFlags.ViewerPassports);
         var service = CreateService(database);
         _ = Success(await service.SaveAsync(Save(hostId, "owner-id", "reused_name"), default));
+        _ = await service.RecordStreamAttendanceAsync(
+            "channel",
+            new("owner-id", "reused_name", "Owner"),
+            _now,
+            default
+        );
         await using (var seed = await database.CreateDbContextAsync())
         {
             _ = seed.PointBalances.Add(
@@ -895,6 +922,7 @@ public sealed class ViewerPassportServiceTests
             );
             report.ChangedRows["points.balances"].ShouldBe(1);
             report.ChangedRows["viewer-passports.profiles"].ShouldBe(1);
+            report.ChangedRows["viewer-passports.stream-attendance"].ShouldBe(1);
         }
         await using (var laterHistory = await database.CreateDbContextAsync())
         {
@@ -935,8 +963,16 @@ public sealed class ViewerPassportServiceTests
         ).ShouldBeEmpty();
     }
 
-    private static ViewerPassportService CreateService(SqliteBlokeBotDbFactory database) =>
-        new(database, new PointBalanceService(database), new FixedTimeProvider(_now));
+    private static ViewerPassportService CreateService(
+        SqliteBlokeBotDbFactory database,
+        IHostStreamLivenessProvider? streams = null
+    ) =>
+        new(
+            database,
+            new PointBalanceService(database),
+            streams ?? new MutableStreamLivenessProvider("stream-1", _now.AddHours(-1)),
+            new FixedTimeProvider(_now)
+        );
 
     private static SaveViewerPassportCommand Save(int hostId, string userId, string login) =>
         new(
@@ -1236,5 +1272,55 @@ public sealed class ViewerPassportServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class MutableStreamLivenessProvider(
+        string twitchStreamId,
+        DateTimeOffset startedAtUtc
+    ) : IHostStreamLivenessProvider
+    {
+        private HostStreamLivenessOutcome _outcome = new HostStreamLivenessOutcome.Live(
+            twitchStreamId,
+            startedAtUtc
+        );
+
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(_outcome))
+            );
+
+        public void Set(string streamId, DateTimeOffset streamStartedAtUtc) =>
+            _outcome = new HostStreamLivenessOutcome.Live(streamId, streamStartedAtUtc);
+    }
+
+    private sealed class GatedStreamLivenessProvider(HostStreamLivenessOutcome outcome)
+        : IHostStreamLivenessProvider
+    {
+        private readonly TaskCompletionSource _bothCallsArrived = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _release = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private int _callCount;
+
+        public Task BothCallsArrived => _bothCallsArrived.Task;
+
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(WaitAsync);
+
+        public void Release() => _release.SetResult();
+
+        private async ValueTask<Result<HostStreamLivenessOutcome, Never>> WaitAsync(
+            CancellationToken cancellationToken
+        )
+        {
+            if (Interlocked.Increment(ref _callCount) == 2)
+            {
+                _bothCallsArrived.SetResult();
+            }
+            await _release.Task.WaitAsync(cancellationToken);
+            return Result<HostStreamLivenessOutcome, Never>.Success(outcome);
+        }
     }
 }

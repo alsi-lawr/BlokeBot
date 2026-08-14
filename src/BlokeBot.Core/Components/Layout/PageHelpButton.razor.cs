@@ -446,7 +446,7 @@ public partial class PageHelpButton
             new(
                 "Export and reset",
                 "Export downloads the data that BlokeBot associates with your Twitch identity in this channel.",
-                ["Reset permanently removes the passport and its chat-presence days."]
+                ["Reset permanently removes the passport and its stream attendance."]
             ),
         ]
     );

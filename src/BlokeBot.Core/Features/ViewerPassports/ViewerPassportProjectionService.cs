@@ -24,7 +24,7 @@ public sealed class ViewerPassportProjectionService(ViewerPassportService passpo
                 passport.ProfileLine,
                 passport.Statistics.Points,
                 passport.Statistics.PointsRank,
-                passport.HideAttendance ? null : passport.Statistics.AttendanceStreakDays,
+                passport.HideAttendance ? null : passport.Statistics.AttendanceStreakSessions,
                 passport.Statistics.Achievements
             )
             : null;
@@ -52,7 +52,7 @@ public sealed class ViewerPassportProjectionService(ViewerPassportService passpo
                 passport.SelectedBadge?.PresentationToken,
                 passport.Statistics.Points,
                 passport.Statistics.PointsRank,
-                passport.HideAttendance ? null : passport.Statistics.AttendanceStreakDays,
+                passport.HideAttendance ? null : passport.Statistics.AttendanceStreakSessions,
                 passport.Statistics.GamesWon,
                 passport.Statistics.GiveawaysWon,
                 passport.Statistics.BountiesSupported,

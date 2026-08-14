@@ -1,5 +1,7 @@
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.ViewerPassports;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -30,6 +32,7 @@ public sealed class ViewerPassportCommandTests
         var service = new ViewerPassportService(
             database,
             new PointBalanceService(database),
+            new LiveStreamProvider(),
             TimeProvider.System
         );
         _ = Success(
@@ -84,6 +87,21 @@ public sealed class ViewerPassportCommandTests
 
     private static ViewerPassportView Success(ViewerPassportMutationOutcome outcome) =>
         outcome.ShouldBeOfType<ViewerPassportMutationOutcome.Succeeded>().Passport;
+
+    private sealed class LiveStreamProvider : IHostStreamLivenessProvider
+    {
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin) =>
+            IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<HostStreamLivenessOutcome, Never>.Success(
+                        new HostStreamLivenessOutcome.Live(
+                            "command-test-stream",
+                            DateTimeOffset.UnixEpoch
+                        )
+                    )
+                )
+            );
+    }
 
     private static async Task DispatchAsync(
         ChatCommandDispatcher dispatcher,

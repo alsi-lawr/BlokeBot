@@ -11,6 +11,7 @@ public sealed partial class BlokeBotDbContext
         {
             _ = entity.ToTable("viewer_passports");
             _ = entity.HasKey(value => value.Id);
+            _ = entity.HasAlternateKey(value => new { value.HostId, value.Id });
             _ = entity.HasIndex(value => new { value.HostId, value.TwitchUserId }).IsUnique();
             _ = entity
                 .HasIndex(value => new { value.HostId, value.Login })
@@ -77,27 +78,50 @@ public sealed partial class BlokeBotDbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        _ = modelBuilder.Entity<ViewerPassportAttendanceDay>(entity =>
+        _ = modelBuilder.Entity<ViewerPassportStreamSession>(entity =>
         {
-            _ = entity.ToTable("viewer_passport_attendance_days");
+            _ = entity.ToTable("viewer_passport_stream_sessions");
+            _ = entity.HasKey(value => value.Id);
+            _ = entity.HasAlternateKey(value => new { value.HostId, value.Id });
+            _ = entity.HasIndex(value => new { value.HostId, value.TwitchStreamId }).IsUnique();
+            _ = entity.HasIndex(value => new
+            {
+                value.HostId,
+                value.ContinuityGeneration,
+                value.StartedAtUtc,
+                value.TwitchStreamId,
+            });
+            _ = entity.Property(value => value.TwitchStreamId).HasMaxLength(128);
+            _ = entity
+                .HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(value => value.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        _ = modelBuilder.Entity<ViewerPassportStreamAttendance>(entity =>
+        {
+            _ = entity.ToTable("viewer_passport_stream_attendance");
             _ = entity.HasKey(value => value.Id);
             _ = entity
                 .HasIndex(value => new
                 {
                     value.HostId,
                     value.PassportId,
-                    value.DateUtc,
+                    value.StreamSessionId,
                 })
                 .IsUnique();
             _ = entity
-                .HasOne<ViewerPassport>()
+                .HasOne(value => value.Passport)
                 .WithMany()
-                .HasForeignKey(value => value.PassportId)
+                .HasForeignKey(value => new { value.HostId, value.PassportId })
+                .HasPrincipalKey(value => new { value.HostId, value.Id })
                 .OnDelete(DeleteBehavior.Cascade);
             _ = entity
-                .HasOne<BotHost>()
+                .HasOne(value => value.StreamSession)
                 .WithMany()
-                .HasForeignKey(value => value.HostId)
+                .HasForeignKey(value => new { value.HostId, value.StreamSessionId })
+                .HasPrincipalKey(value => new { value.HostId, value.Id })
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
