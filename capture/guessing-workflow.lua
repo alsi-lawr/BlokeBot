@@ -42,8 +42,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 720
-height = 1600
+width = 495
+height = 1100
 
 [matrix]
 theme = ["light", "dark"]

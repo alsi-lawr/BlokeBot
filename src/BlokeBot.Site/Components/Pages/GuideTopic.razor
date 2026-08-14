@@ -75,8 +75,6 @@
         @foreach (var section in _page.Sections)
         {
             <section id="@section.Anchor">
-                <h2>@section.Heading</h2>
-
                 @if (section.Media is not null)
                 {
                     <div style="display: contents">
@@ -90,6 +88,8 @@
                             Caption="@section.Media.Caption" />
                     </div>
                 }
+
+                <h2>@section.Heading</h2>
 
                 @foreach (var paragraph in section.Paragraphs)
                 {

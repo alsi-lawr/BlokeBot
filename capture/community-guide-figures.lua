@@ -33,8 +33,8 @@ touch = true
 device_scale = 1.0
 
 [devices.phone.viewport]
-width = 720
-height = 1600
+width = 495
+height = 1100
 
 [matrix]
 theme = ["light", "dark"]
@@ -52,7 +52,7 @@ figure = [
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_COMMUNITY_FIGURES_PORT") or "5473"
+local port = os.getenv("BLOKEBOT_CAPTURE_PORT") or "5473"
 local base_url = "http://127.0.0.1:" .. port
 
 local function startServer()

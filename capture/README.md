@@ -1,91 +1,59 @@
 # Dashboard help media
 
-The capture definitions render the deterministic `BlokeBot.Simulation` fixture used by the help
-site. Each definition records its own routes, themes, devices and readiness conditions.
+Viset capture definitions that photograph the deterministic `BlokeBot.Simulation` fixture for the
+help site. They set up a fixture state and take the picture; they assert nothing about product
+behaviour, so a definition passing does not mean the product is correct.
 
 ## Regenerate
 
-Build Simulation once, then use the local Viset checkout. Viset is screen capture tooling only;
-these runs do not verify product behaviour.
+Build Simulation once:
 
 ```sh
 dotnet build ../src/BlokeBot.Simulation/BlokeBot.Simulation.csproj \
   --configuration Release --property:TreatWarningsAsErrors=true --nologo
 ```
 
-Use `./capture-all.sh` to regenerate everything. It starts one Simulation per definition and
-leaves it up for that definition's whole matrix, rather than paying a fresh Simulation start for
-every theme, device and view, and runs definitions concurrently. Pass a single definition name to
-run just that one:
+Then run the definitions. `capture-all.sh` owns the definition-to-port mapping and starts one
+Simulation per definition, holding it up for that definition's whole matrix:
 
 ```sh
-./capture-all.sh                       # every definition
-./capture-all.sh chat-tools-switches.lua
-CAPTURE_JOBS=6 ./capture-all.sh        # override the concurrency
+./capture-all.sh                          # every definition
+./capture-all.sh chat-tools-switches.lua  # just one
+CAPTURE_JOBS=2 ./capture-all.sh           # override concurrency
 ```
 
-Concurrency defaults to a quarter of the available cores, capped at six, because every definition
-runs its own Simulation and its own browser. Each definition reuses a Simulation already listening
-on its port and only starts its own when none is running, so the individual commands below still
-work unchanged.
+Concurrency defaults to a quarter of the cores, capped at six, since each definition runs its own
+Simulation and browser. Lower it if browsers are killed mid-navigate.
 
-Definitions wait on `/simulation/started` rather than `/simulation/ready`. `ready` reports live
-EventSub wiring, which a capture tears down as soon as it disables a feature; `started` latches once
-the fixture has fully wired and stays true, so one Simulation serves a whole matrix.
-
-From this directory, point `VISET_CHECKOUT` at the local Viset checkout, then run each
-definition on its own unused loopback port. Port `5084` is reserved for human
-visual signoff and must not be used or stopped by capture work.
+A definition reuses a Simulation already listening on its port and starts its own only when none
+is, so running one directly still works:
 
 ```sh
-VISET_CHECKOUT="${VISET_CHECKOUT:-../../Viset}"
-BLOKEBOT_DASHBOARD_PORT=43217 nix run "$VISET_CHECKOUT" -- capture dashboard-and-admin.lua --force
-BLOKEBOT_HOME_SCROLL_PORT=43218 nix run "$VISET_CHECKOUT" -- capture home-scroll.lua --force
-BLOKEBOT_GUESSING_CAPTURE_PORT=43219 nix run "$VISET_CHECKOUT" -- capture guessing-workflow.lua --force
-BLOKEBOT_CUSTOM_COMMANDS_PORT=43220 nix run "$VISET_CHECKOUT" -- capture custom-commands.lua --force
-BLOKEBOT_POINTS_GUESSING_PORT=43222 nix run "$VISET_CHECKOUT" -- capture points-and-guessing.lua --force
-BLOKEBOT_NATIVE_TWITCH_PORT=43223 nix run "$VISET_CHECKOUT" -- capture native-twitch-operations.lua --force
-BLOKEBOT_VIEWER_COMMAND_CATALOG_PORT=5334 nix run "$VISET_CHECKOUT" -- capture viewer-command-catalog.lua --force
-BLOKEBOT_CHAT_TOOLS_PORT=5335 nix run "$VISET_CHECKOUT" -- capture chat-tools-switches.lua --force
-BLOKEBOT_COMMUNITY_GUIDES_PORT=5460 nix run "$VISET_CHECKOUT" -- capture community-guides.lua --force
-BLOKEBOT_OVERLAY_SOURCES_PORT=5461 nix run "$VISET_CHECKOUT" -- capture overlay-sources.lua --force
-BLOKEBOT_OVERLAY_PREVIEWS_PORT=5462 nix run "$VISET_CHECKOUT" -- capture overlay-previews.lua --force
-BLOKEBOT_COMMUNITY_FIGURES_PORT=5473 nix run "$VISET_CHECKOUT" -- capture community-guide-figures.lua --force
-BLOKEBOT_PROGRESSION_LAPTOP_PORT=5476 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-laptop.lua --force
-BLOKEBOT_PROGRESSION_PHONE_PORT=5477 nix run "$VISET_CHECKOUT" -- capture community-progression-figures-phone.lua --force
+BLOKEBOT_CAPTURE_PORT=5335 nix run ../../Viset -- capture chat-tools-switches.lua --force
 ```
 
-The definitions have disjoint output names and ports, so they may run in parallel. Viset evaluates
-every theme/device/view matrix item independently. Each item starts a fresh Release Simulation
-process inside the Lua definition, waits for `/simulation/ready`, follows the real
-`/simulation/login` alias, waits only for the route to load and its `main` element to finish fading
-in, captures the page without hiding sibling sections, and stops that process even when capture
-fails. The definitions assert nothing about product state; they set up a deterministic fixture and
-take the picture.
+Port `5084` is reserved for human visual signoff and must not be used or stopped by capture work.
 
-Each definition covers one guide area so a single area can be recaptured without rerunning the
-others. `chat-tools-switches.lua` and `viewer-command-catalog.lua` drive the deterministic round,
-giveaway, feature and stream-liveness endpoints first: the former captures the all-disabled and
-representative enabled Chat Tools states, the latter opens the **Available viewer commands**
-disclosure. `community-guides.lua` captures the current moderator workspace on laptops and the
-matching participant view on phones for request boards, play-with-viewers queues and moments. The
-Simulation fixture provides the approved, voted moment shown in both moments captures.
-`overlay-sources.lua` and `overlay-previews.lua` capture Browser Sources, Cues, Media, Guessing,
-active Giveaway, Event feed and Viewer Queue in light and dark laptop and phone frames without
-exposing a private Browser Source URL. The animated captures use PNG screencast frames, high-quality lossy WebP output, real
-page controls and scrolling. Phone home-scroll captures show a touch-contact circle during each
-gesture.
+## How a capture behaves
 
-`community-guide-figures.lua` produces the guide figures under `media/community/figures` as a full
-theme and device matrix, so every figure has the dark, light, phone and laptop variants the site's
-`SiteMedia` entries expect. The two `community-progression-figures-*` definitions produce the Bingo,
-bounty and season figures under `media/community/progression`: the laptop set covers the moderator
-setup, moderation and archive areas, and the phone set covers the disabled-feature recovery states
-and the public card, board and season pages.
+Each matrix item waits for `/simulation/started`, follows the real `/simulation/login` alias, sets
+the fixture state it needs, waits for the route and its `main` element to settle with no Blazor
+reconnect showing, then snapshots without hiding sibling sections.
 
-Generated files go to an area subdirectory of `../src/BlokeBot.Site/wwwroot/media`: `dashboard`,
-`chat-tools`, `commands`, `automations`, `points-and-guessing`, `native-twitch`, `overlays`,
-`community`, `community/figures` and `community/progression`. Do not hand-edit them.
+`/simulation/started` latches once the fixture has fully wired and stays true. `/simulation/ready`
+reports *live* EventSub wiring, which any capture that disables a feature tears down, so it cannot
+gate a whole matrix.
+
+Definitions that change fixture state wait for `/simulation/ready` again afterwards, so the app has
+finished reconnecting before the picture is taken.
+
+## Output
+
+Files go to an area subdirectory of `../src/BlokeBot.Site/wwwroot/media`: `dashboard`,
+`chat-tools`, `commands`, `points-and-guessing`, `native-twitch`, `overlays`, `community`,
+`community/figures` and `community/progression`. Do not hand-edit them.
+
+Laptop frames are 1920x1080 and phone frames 495x1100, both before Viset's device chrome.
 
 ## Editor support
 

@@ -325,8 +325,8 @@ main {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(20rem, 0.78fr) minmax(34rem, 1.22fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   gap: clamp(2rem, 4vw, 4rem);
   min-height: min(52rem, calc(100vh - 5.25rem));
   padding-block: clamp(3.5rem, 7vw, 7rem);
@@ -335,11 +335,28 @@ main {
 .hero-copy {
   position: relative;
   z-index: 2;
+  width: 100%;
+  max-width: 64rem;
   min-width: 0;
+  text-align: center;
+}
+
+.hero-copy .device-showcase {
+  margin-top: clamp(2rem, 4vw, 3.25rem);
 }
 
 .hero-copy .lede {
   max-width: 38rem;
+  margin-inline: auto;
+}
+
+.hero-copy h1 {
+  max-width: none;
+}
+
+.hero-copy .action-row,
+.hero-copy .hero-facts {
+  justify-content: center;
 }
 
 .hero-badge {
@@ -458,7 +475,7 @@ main {
 
 .device-showcase__stage {
   position: relative;
-  min-height: clamp(28rem, 43vw, 39rem);
+  aspect-ratio: 8 / 5;
   isolation: isolate;
 }
 
@@ -495,7 +512,7 @@ main {
 
 .device-showcase__phone {
   z-index: 2;
-  right: -2%;
+  right: 0;
   bottom: -4%;
   width: 29%;
   filter: drop-shadow(0 1.5rem 1.5rem rgb(16 8 33 / 0.36));
@@ -508,7 +525,7 @@ main {
 .device-showcase figcaption {
   position: relative;
   z-index: 3;
-  margin-top: 0.85rem;
+  margin-top: calc(0.85rem + 2.5%);
   color: var(--muted);
   font-size: 0.88rem;
   text-align: center;
@@ -1098,8 +1115,8 @@ main {
 
 .guide-layout {
   display: grid;
-  width: min(100% - 2rem, 78rem);
-  margin-inline: auto;
+  width: 100%;
+  padding-inline: clamp(1rem, 2.5vw, 3rem);
   padding-block: clamp(2rem, 3.5vw, 2.5rem) clamp(3.5rem, 8vw, 7rem);
   grid-template-columns: minmax(11.5rem, 13.5rem) minmax(0, 1fr);
   gap: clamp(2rem, 5vw, 4.5rem);
@@ -1111,6 +1128,11 @@ main {
   max-width: none;
   margin: 0;
   padding: 0;
+}
+
+.guide-layout .article-shell h1,
+.guide-layout .lede {
+  max-width: none;
 }
 
 .guide-sidebar {
@@ -1299,9 +1321,13 @@ main {
   font-size: clamp(1.7rem, 4vw, 2.5rem);
 }
 
+.guide-article > section h2:not(:first-child) {
+  margin-top: clamp(1.25rem, 2vw, 2rem);
+}
+
 .guide-article > section p,
 .guide-article > section li {
-  max-width: 48rem;
+  max-width: 80ch;
 }
 
 .guide-article ol {
@@ -1876,10 +1902,6 @@ main {
     order: -1;
   }
 
-  .device-showcase__stage {
-    min-height: clamp(21rem, 76vw, 31rem);
-  }
-
   .device-showcase__laptop {
     left: 0;
     width: 94%;
@@ -1963,7 +1985,7 @@ main {
   }
 
   .device-showcase__stage {
-    min-height: 19rem;
+    aspect-ratio: 3 / 2;
   }
 
   .device-showcase__phone {

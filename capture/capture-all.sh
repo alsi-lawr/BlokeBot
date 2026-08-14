@@ -21,6 +21,7 @@ JOBS="${CAPTURE_JOBS:-$default_jobs}"
 DEFINITIONS=(
   "dashboard-and-admin.lua:43217"
   "home-scroll.lua:43218"
+  "channel-setup-scroll.lua:43224"
   "guessing-workflow.lua:43219"
   "custom-commands.lua:43220"
   "points-and-guessing.lua:43222"
@@ -62,7 +63,7 @@ run_definition() {
 
   local outcome=0
   if [[ "$ready" -eq 1 ]]; then
-    if ! nix run "$VISET_CHECKOUT" -- capture "$definition" --force >"$log" 2>&1; then
+    if ! BLOKEBOT_CAPTURE_PORT="$port" nix run "$VISET_CHECKOUT" -- capture "$definition" --force >"$log" 2>&1; then
       outcome=1
     fi
   else

@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../src/BlokeBot.Site/wwwroot/media/dashboard"
-output = "{device}-{theme}-home-scroll.webp"
+output = "{device}-{theme}-channel-setup-scroll.webp"
 frame = "builtin:auto"
 frames_per_second = 30
 browser_arguments = [
@@ -27,15 +27,14 @@ mode = "lossy"
 quality = 100
 method = 4
 
-[devices.laptop]
-mobile = false
-touch = false
+[devices.phone]
+mobile = true
+touch = true
 device_scale = 1.0
 
-[devices.laptop.viewport]
-width = 1920
-height = 1080
-
+[devices.phone.viewport]
+width = 495
+height = 1100
 
 [matrix]
 theme = ["light", "dark"]
@@ -79,10 +78,10 @@ local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local device = viset.context.device
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
-  viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
+  viset.page.navigate(base_url .. "/simulation/login?view=channel-setup&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
-        Boolean(document.querySelector("article"))
+        Boolean(document.querySelector("#chat-tools"))
           && document.querySelector("#components-reconnect-modal")?.open !== true
     ]=]),
     "20s"
