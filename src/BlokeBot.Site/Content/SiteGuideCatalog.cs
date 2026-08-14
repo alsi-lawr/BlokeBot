@@ -140,7 +140,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Select My channel for the Twitch channel you own.",
                         "Use Other channels when you help manage another available channel.",
-                        "Select Find channels again if a newly available channel is missing.",
+                        "If a newly available channel does not appear, select Find channels again.",
                     ],
                     Paragraphs =
                     [
@@ -175,7 +175,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Bot status shows whether the selected channel is ready or needs attention.",
-                        "My channel and Other channels change which channel you are working on.",
+                        "My channel and Other channels change the active channel.",
                         "Alerts opens current problems. The account menu shows your role and Sign out.",
                     ],
                 },
@@ -361,8 +361,8 @@ internal static partial class SiteGuideCatalog
                         LightPhoneSource: "media/chat-tools/phone-light-chat-tools-enabled.png",
                         DarkLaptopSource: "media/chat-tools/laptop-dark-chat-tools-enabled.png",
                         LightLaptopSource: "media/chat-tools/laptop-light-chat-tools-enabled.png",
-                        PhoneAlt: "BlokeBot Channel setup on a phone with Request boards, Moments, Points and Custom commands on and the remaining features off.",
-                        LaptopAlt: "BlokeBot Channel setup with Request boards, Moments, Points and Custom commands on and the remaining features off.",
+                        PhoneAlt: "BlokeBot Channel setup on a phone with Request boards, Moments, Points and Custom commands on and all other features off.",
+                        LaptopAlt: "BlokeBot Channel setup with Request boards, Moments, Points and Custom commands on and all other features off.",
                         "Each feature is independently opt-in, so a channel can run four tools and leave the rest off."
                     ),
                     Steps =
@@ -422,8 +422,8 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Choose the channel you intend to show on stream. The owner or a permitted moderator can manage its Browser Sources.",
-                        "Open Channel setup and turn on Overlays. The feature card persists the change immediately. Guessing, Points and Play with viewers must also be on before their matching Browser Sources can preview or display.",
-                        "Use broadcasting software with web Browser Sources, such as OBS Studio.",
+                        "Open Channel setup and turn on Overlays. The feature card persists the change immediately. Guessing, Points and Play with viewers must also be on before Browser Sources for these features can preview or display.",
+                        "Use software that supports web Browser Sources, such as OBS Studio.",
                         "Open Overlays under Chat tools. Sources, Cues and Media are fragment-addressed tabs of one page at /overlays#sources, /overlays#cues and /overlays#media in BlokeBot.",
                     ],
                 },
@@ -495,14 +495,14 @@ internal static partial class SiteGuideCatalog
                         DarkLaptopSource: "media/overlays/laptop-dark-overlay-giveaway.png",
                         LightLaptopSource: "media/overlays/laptop-light-overlay-giveaway.png",
                         PhoneAlt: "Giveaway Browser Source on a phone that shows an active giveaway in Preview.",
-                        LaptopAlt: "Giveaway Browser Source that shows an active giveaway, compact display controls and appearance editing.",
+                        LaptopAlt: "Giveaway Browser Source that shows an active giveaway, compact display controls and appearance options.",
                         "The active Giveaway Preview shows useful live content. Without an active giveaway the Browser Source renders nothing."
                     ),
                     Bullets =
                     [
                         "Turn on Points and choose a Giveaway title. Set the entrant count, close-time countdown and current join command.",
-                        "Use Representative to inspect Open, Closing, Completed or Cancelled presentation, then save before running the giveaway from Points.",
-                        "When there is no active giveaway, the Browser Source renders nothing. There is no viewer-facing idle card.",
+                        "Use Representative to inspect Open, Closing, Completed or Cancelled presentation. Save before you run the giveaway from Points.",
+                        "When there is no active giveaway, the Browser Source renders nothing. There is no idle card for viewers.",
                         "If it stays blank during an active giveaway, check Overlays and Points. Check the source, private URL and giveaway state.",
                     ],
                 },
@@ -554,7 +554,7 @@ internal static partial class SiteGuideCatalog
                         "Choose the maximum waiting cards and what happens when the feed is full.",
                         "Turn point awards, Guessing winners, Giveaway winners, Bingo events and achievement completions on or off independently. Settings for an off source collapse and keep their saved values.",
                         "For each enabled source, edit its message, priority and display time, then choose a Representative event to check the result.",
-                        "If an expected card is missing, confirm its feature and event source are on. Re-enable the source for future events. Events missed while it was off are not replayed.",
+                        "If an expected card is absent, confirm its feature and event source are on. Re-enable the source for future events. Events missed while it was off are not replayed.",
                     ],
                 },
                 new SiteGuideSection
@@ -634,7 +634,7 @@ internal static partial class SiteGuideCatalog
                 LightPhoneSource: "media/overlays/phone-light-overlay-cues.png",
                 DarkLaptopSource: "media/overlays/laptop-dark-overlay-cues.png",
                 LightLaptopSource: "media/overlays/laptop-light-overlay-cues.png",
-                PhoneAlt: "Cues page on a phone that shows the saved Cue list and task-facing content editor.",
+                PhoneAlt: "Cues page on a phone that shows the saved Cue list and task-focused content editor.",
                 LaptopAlt: "Cues page that shows attached saved Cues and editor columns with a reusable web layer.",
                 "Saved Cues and their editor stay together. Test playback targets a Cue player Browser Source."
             ),
@@ -695,9 +695,9 @@ internal static partial class SiteGuideCatalog
                     Heading = "Recover embedded content",
                     Bullets =
                     [
-                        "Use complete secure addresses beginning with https:// for online media and web pages. A blocked, invalid or unreachable address must be corrected at its source.",
+                        "Use complete secure addresses that begin with https:// for online media and web pages. A blocked, invalid or unreachable address must be corrected at its source.",
                         "Some sites prevent embedded use. Use an embeddable page or media address instead. Do not weaken Browser Source safety settings.",
-                        "If uploaded media is missing or replaced, open Media and repair that asset. Return to the Cue and confirm the saved selection.",
+                        "If uploaded media is unavailable or replaced, open Media and repair that asset. Return to the Cue and confirm the saved selection.",
                         "If the layer layout is wrong, correct its timing, order or percentage geometry, save, and run one new test.",
                     ],
                 },
@@ -794,7 +794,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "A channel owner or permitted moderator chooses the channel. That person opens Request boards at /requests to manage boards.",
-                        "Open public board copies the viewer route /requests/{channel}/{board-name}. Anyone can read an existing board. A viewer signs in with Twitch to submit, vote or withdraw.",
+                        "Open public board copies the viewer route /requests/{channel}/{board-name}. Anyone can read a saved board. A viewer signs in with Twitch to submit, vote or withdraw.",
                         "Chat participants can discover boards with !requests. Website and chat actions use the same board, limits, votes and request states.",
                     ],
                     Note =
@@ -826,7 +826,7 @@ internal static partial class SiteGuideCatalog
                         "A submitter can Withdraw an active request from the public page. Private moderator text is never shown there.",
                     ],
                     Note =
-                        "BlokeBot recognizes a repeated delivery of the same chat submission. It reports the existing request and does not create or charge another.",
+                        "BlokeBot recognizes a repeated delivery of the same chat submission. It reports the original request and does not create or charge another.",
                 },
                 new SiteGuideSection
                 {
@@ -835,7 +835,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Review the submitted values and any possible-duplicate warning. Set public category, tags, priority and Public note when they help participants.",
                         "Move Awaiting review to Approved or Rejected. Approved requests can move to In queue or Accepted. In queue or Accepted requests can move to Completed. Submitters can select Withdraw. BlokeBot gives merged duplicates the Merged into another request state.",
-                        "Use Merge with the target request number when two entries are the same request. The public board keeps the Merged into another request outcome and the surviving request's combined support.",
+                        "Use Merge with the target request number when two entries are the same request. The public board keeps the Merged into another request outcome and the target request's combined support.",
                         "When the dashboard is not convenient, use !requestapprove, !requestreject, !requestqueue, !requestaccept or !requestcomplete followed by one request number.",
                         "To merge in chat, use !requestmerge <source-number> <target-number>.",
                     ],
@@ -883,7 +883,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "A channel owner or permitted moderator chooses the channel and opens Play with viewers at /queues.",
-                        "Open viewer page uses /queues/{channel}/{queue-name}. Joining requires Twitch sign-in. There is no unsigned typed-login fallback.",
+                        "Open viewer page uses /queues/{channel}/{queue-name}. A viewer must sign in with Twitch to join. There is no unsigned typed-login fallback.",
                         "Moderator controls, priorities, moderator notes and lobby messages are never shown on the public page. Configured entry fields and their answers are public.",
                     ],
                     Note =
@@ -895,7 +895,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Select New, set the Command and URL name, Queue name, Game or activity and Party size.",
-                        "Choose First to join or Viewers who played least recently. The viewer page states the resulting fair-selection rule before anyone joins.",
+                        "Choose First to join or Viewers who played least recently. The viewer page states the applicable fair-selection rule before anyone joins.",
                         "Set Ready expiry, History retention and Skip/no-show exclusion. Add optional public entry fields and any required roles in role=count form.",
                         "Choose whether the public page can show participant names. Turn Queue open on and save. Inspect Open viewer page at two widths.",
                     ],
@@ -911,7 +911,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "On the viewer page, fill the requested fields and select Join. Check position reports the current place. Leave removes the entry. I'm ready answers an active ready check.",
                         "In chat use !queue [queue], !join [queue] key=value, !leave [queue], !position [queue] and !ready [queue]. The queue name is optional when the channel has only one queue.",
-                        "A second join request keeps one entry. The signed-in Twitch identity is authoritative and prevents a second typed identity from creating a duplicate entry.",
+                        "A second join request keeps one entry. The signed-in Twitch identity is authoritative and blocks a duplicate entry from a second typed identity.",
                     ],
                 },
                 new SiteGuideSection
@@ -1046,7 +1046,7 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Read Twitch states before retrying",
+                    Heading = "Read Twitch states before you retry",
                     Bullets =
                     [
                         "Creating clip means that Twitch continues to prepare the clip. Reload the same candidate later. Do not capture again just to force an answer.",
@@ -1112,7 +1112,7 @@ internal static partial class SiteGuideCatalog
                         "The public board is /bounties/{channel}. Replace the value in braces with the channel login. Public bounties show the title, description, state, funding total, target, deadline, bonus, terminal history and recorded contributors.",
                         "A signed-in participant enters Pledge points on the board, or uses chat. BlokeBot reserves the accepted amount from that channel's available point balance.",
                         "BlokeBot caps a pledge request above the required amount to the target remainder. It does not overfund the bounty. A repeated delivery records the pledge only once.",
-                        "Owners and moderators can select Accept while the state is Funding. They can do this before or after contributions reach the target. Reaching the target does not accept the challenge automatically.",
+                        "Owners and moderators can select Accept while the state is Funding. They can do this before or after contributions reach the target. When contributions reach the target, BlokeBot does not accept the challenge automatically.",
                     ],
                     Code = "!bounties\n!bounty <bounty-id>\n!bountypledge <bounty-id> <points>",
                     Note =
@@ -1148,7 +1148,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "A Public bounty exposes each recorded normalized Twitch login and its total pledge amount. A Private bounty publishes no bounty data.",
-                        "Point debits, refunds, contributor grouping and bonuses use that host-scoped recorded login. A later Twitch rename does not move the balance or combine historical logins.",
+                        "BlokeBot groups contributors by that host-scoped recorded login. Point debits, refunds and bonuses also use it. A later Twitch rename does not move the balance or combine historical logins.",
                         "The public board and chat summary never contain private moderator notes, audit reasons, raw provider data or internal identifiers.",
                     ],
                 },
@@ -1238,7 +1238,7 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Daily and weekly repeatable definitions use the channel timezone, the configured local time and, for weekly resets, the configured weekday. The page shows the next UTC reset.",
-                        "A local time in a daylight-saving gap moves forward to the first valid instant. An overlapping local time uses its first occurrence and does not reset again at the second.",
+                        "A local time in a daylight-saving gap moves forward to the first valid instant. A local time in an overlap uses its first occurrence and does not reset again at the second.",
                         "After downtime, BlokeBot rolls at most once into the current period. It does not replay every missed daily or weekly period.",
                         "If you save a schedule change during an active period, BlokeBot closes that period. It resets active repeatable progress. Select Reset active progress now before Save schedule and roll over immediately. The confirmed change applies once across retries and multiple instances.",
                     ],
@@ -1328,11 +1328,11 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Open joining and freeze the roster",
+                    Heading = "Open entry and freeze the roster",
                     Bullets =
                     [
                         "Choose Shared board, Unique per viewer or Teams, enter a recorded seed and optionally set a host participant cap. Team games can also set a host team cap and team names.",
-                        "There is no product-wide participant cap. With no host cap, every joined viewer receives the applicable card and supported events update all cards synchronously. There is no hidden batching queue or rate-limit machinery.",
+                        "There is no product-wide participant cap. With no host cap, every joined viewer receives the applicable card and supported events update all cards synchronously. There is no hidden batch queue or rate-limit machinery.",
                         "Viewers use !bingojoin and can add a team name for team games. They use !bingoleave while entry is open. Owners and moderators can move or remove participants and keep private roster notes.",
                         "Select Issue and freeze cards only after you check the roster and teams. The issue action closes entry and permanently freezes participant, team and card assignments for that game.",
                     ],
@@ -1352,7 +1352,7 @@ internal static partial class SiteGuideCatalog
                     ),
                     Bullets =
                     [
-                        "Automatic squares mark once from a matching host-scoped event. Retries, restarts and provider replay do not mark the same source event twice.",
+                        "Automatic squares mark once from a host-scoped event that matches. Retries, restarts and provider replay do not mark the same source event twice.",
                         "Manual squares change only when an owner or moderator selects Confirm. Use Reverse to correct a mistaken manual mark. Both confirmation and reversal remain visible as public normalized evidence.",
                         "A card completes rows, columns, diagonals and the configured full-card rule from its persisted grid. Points and Community achievement or title rewards grant once per completed win rule.",
                         "If a reversed mark completed a rewarded win, BlokeBot corrects the live square. The completed win and reward remain immutable. A second mark cannot grant it again. Points and persistent unlocks are not clawed back.",
@@ -1390,7 +1390,7 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Recover after turning Bingo off",
+                    Heading = "Recover after you turn Bingo off",
                     Bullets =
                     [
                         "If Bingo is off, BlokeBot hides navigation and public data. It stops commands, joins, marks, rewards, overlay events and channel.update reconciliation.",
@@ -1468,8 +1468,8 @@ internal static partial class SiteGuideCatalog
                 LightPhoneSource: "media/native-twitch/phone-light-native-polls.png",
                 DarkLaptopSource: "media/native-twitch/laptop-dark-native-polls.png",
                 LightLaptopSource: "media/native-twitch/laptop-light-native-polls.png",
-                PhoneAlt: "BlokeBot Polls page that shows a saved question, current voting and poll controls.",
-                LaptopAlt: "BlokeBot Polls page that shows a saved question, current voting and poll controls.",
+                PhoneAlt: "BlokeBot Polls page that shows a saved question, current vote totals and poll controls.",
+                LaptopAlt: "BlokeBot Polls page that shows a saved question, current vote totals and poll controls.",
                 "Saved questions, the active poll and recent results stay together."
             ),
             Sections =
@@ -1582,7 +1582,7 @@ internal static partial class SiteGuideCatalog
                 LightLaptopSource: "media/native-twitch/laptop-light-native-channel-points.png",
                 PhoneAlt: "BlokeBot Rewards and redemptions page that shows waiting requests, reward controls and age indicators.",
                 LaptopAlt: "BlokeBot Rewards and redemptions page that shows waiting requests, reward controls and age indicators.",
-                "Waiting requests appear first, with visible age cues for requests that are becoming stale."
+                "Waiting requests appear first. Visible age cues identify requests near the stale threshold."
             ),
             Sections =
             [
@@ -1776,7 +1776,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save. BlokeBot does not silently replace the existing command.",
+                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save. BlokeBot does not silently replace the current command.",
                     ],
                 },
                 new SiteGuideSection
@@ -1840,9 +1840,9 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "The chat trigger does nothing: confirm that at least one Commands word is saved. Resolve each conflict in Channel setup.",
-                        "A Custom Command alias is missing: only its first saved word is advertised.",
-                        "A moderator command is missing: the public catalog deliberately shows viewer-safe commands only.",
-                        "A game or Moment command is missing: check the feature and active round or giveaway. Check the named live-stream state.",
+                        "A Custom Command alias is absent: only its first saved word is advertised.",
+                        "A moderator command is absent: the public catalog deliberately shows viewer-safe commands only.",
+                        "A game or Moment command is absent: check the feature and active round or giveaway. Check the named live-stream state.",
                         "The list is empty: enable or configure a viewer feature, board, queue or Custom Command. Reopen the disclosure.",
                     ],
                 },
@@ -1860,7 +1860,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Guessing games",
             Title = "Set up and run a guessing game",
             Summary =
-                "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
+                "Create reusable round types and answers, collect one guess per viewer, then record the correct answer.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/points-and-guessing/phone-dark-guessing-workflow.webp",
                 LightPhoneSource: "media/points-and-guessing/phone-light-guessing-workflow.webp",
@@ -1888,8 +1888,8 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Open the Guessing game Dashboard and choose the round type.",
-                        "Start the round, let viewers guess, then stop guessing.",
-                        "Enter the winning answer or one of its aliases and declare the winner.",
+                        "Start the round, let viewers submit guesses, then close the round to new guesses.",
+                        "Enter the correct answer or one of its aliases and declare the winner.",
                     ],
                     Paragraphs =
                     [
@@ -1981,7 +1981,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "If Start is unavailable, check stream status, an existing giveaway and the cooldown shown by the dashboard.",
+                        "If Start is unavailable, check stream status, an active giveaway and the cooldown shown by the dashboard.",
                     ],
                 },
             ],
@@ -2122,7 +2122,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Open Automations, then Twitch events. Each source shows its Twitch subscription, the required approval and whether an enabled flow uses it today.",
                         "Ready means the source can start flows now. Reconnect needed and Twitch connection needed mean that the source stays inactive. BlokeBot creates no Twitch subscription and starts no flow.",
-                        "Use Reconnect to Twitch on this page and complete Twitch as the selected channel owner to approve the missing permissions.",
+                        "Use Reconnect to Twitch on this page and complete Twitch as the selected channel owner to approve the required permissions.",
                         "A source's Twitch subscription follows the bot runtime and exists only while an enabled flow uses that source.",
                     ],
                 },
@@ -2220,7 +2220,7 @@ internal static partial class SiteGuideCatalog
                     Heading = "Complete Channel Points redemptions",
                     Bullets =
                     [
-                        "Fulfil redemption marks the triggering Channel Points redemption as fulfilled. Cancel redemption cancels it so Twitch refunds the viewer's points.",
+                        "Fulfil redemption marks the source Channel Points redemption as fulfilled. Cancel redemption cancels it so Twitch refunds the viewer's points.",
                         "Both actions apply only to the redemption that started the flow. The redemption must have the Unfulfilled state and use a reward that BlokeBot manages.",
                         "Prefer the redemption source's completion policy for whole-flow outcomes. Use these actions when a flow must settle the redemption at a specific step.",
                     ],
@@ -2234,11 +2234,11 @@ internal static partial class SiteGuideCatalog
                     ],
                     Bullets =
                     [
-                        "Send shoutout targets the broadcaster who triggered the flow, such as an incoming raider. The triggering event must carry a viewer or broadcaster.",
-                        "Start poll accepts a question of up to 60 characters. Add 2–5 choices of up to 25 characters. Set a 15-second to 30-minute duration and an optional Channel Points cost per extra vote. It fails while another poll is running.",
+                        "Send shoutout targets the broadcaster who triggered the flow, such as a broadcaster from a raid. The source event must carry a viewer or broadcaster.",
+                        "Start poll accepts a question of up to 60 characters. Add 2–5 choices of up to 25 characters. Set a 15-second to 30-minute duration and an optional Channel Points cost per extra vote. If another poll is active, it fails.",
                         "End poll finishes the channel's active poll immediately. A poll started outside BlokeBot is never ended by an automation.",
                         "Create clip captures the live stream immediately or after Twitch's broadcast delay. Create stream marker adds a marker with a description of up to 140 characters.",
-                        "Start prediction accepts a question of up to 45 characters. Add 2–10 outcomes of up to 25 characters. Set a 30-second to 30-minute window. It fails while another Prediction is running.",
+                        "Start prediction accepts a question of up to 45 characters. Add 2–10 outcomes of up to 25 characters. Set a 30-second to 30-minute window. If another Prediction is active, it fails.",
                         "Lock prediction stops entries. Cancel prediction refunds all viewer Channel Points. Resolve prediction uses an outcome identifier from a variable or expression.",
                     ],
                     Note =
@@ -2271,7 +2271,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Help and recovery",
             Title = "Understand a warning or offline bot",
             Summary =
-                "Start with the message on the page. BlokeBot normally identifies the missing channel, permission, connection or tool.",
+                "Start with the message on the page. BlokeBot normally identifies the absent channel, permission, connection or tool.",
             Sections =
             [
                 new SiteGuideSection
@@ -2294,7 +2294,7 @@ internal static partial class SiteGuideCatalog
                         "Moderator-only action unavailable: confirm the bot is still a moderator, then reconnect if its grant predates the required scope.",
                         "Follower-only rejection: make the bot a moderator or manually follow the channel while signed in as the bot account.",
                         "Announcement rejected: confirm that the bot is still a moderator. Reconnect the bot account with the action in Channel setup.",
-                        "Dashboard script or stylesheet missing: ask the server owner to verify the reverse proxy path and static assets. Do not reconnect Twitch repeatedly.",
+                        "Dashboard script or stylesheet is absent: ask the server owner to verify the reverse proxy path and static assets. Do not reconnect Twitch repeatedly.",
                     ],
                 },
                 new SiteGuideSection
@@ -2314,7 +2314,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Bullets =
                     [
-                        "This help site's preference-saving control is on the privacy notice itself.",
+                        "The control for this help site's preferences is on the privacy notice itself.",
                         "The dashboard's control is in its account menu: Stop saving view preferences. Each origin's control governs only that origin's storage.",
                         "Send private data requests to the privacy contact in the notice. Do not send them to chat or a public board.",
                     ],
@@ -2467,7 +2467,7 @@ internal static partial class SiteGuideCatalog
                     Paragraphs =
                     [
                         "Custom-bot encryption needs no operator configuration. ASP.NET Core manages Data Protection keys automatically in private persistent application state. Windows protects those keys with DPAPI LocalMachine.",
-                        "A copied SQLite database or SQL backup does not expose reusable custom-bot tokens. Theft or compromise of the full state directory or the running host is outside that boundary.",
+                        "A copied SQLite database or SQL backup does not expose reusable custom-bot tokens. Theft or compromise of the full state directory or active host is outside that boundary.",
                         "If an upgrade finds old plaintext custom-bot credentials, it deletes them and disables that custom bot. It alerts the channel owner.",
                     ],
                     Links =
