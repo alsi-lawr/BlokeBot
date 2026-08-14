@@ -99,6 +99,8 @@ public partial class PageHelpButton
         path switch
         {
             "/" => new(_homeHelp, "/dashboard"),
+            "/admin" => new(_adminHelp, "/channels"),
+            "/alerts" => new(_alertsHelp, "/troubleshooting"),
             "/guessing" => new(_guessingDashboardHelp, "/guessing"),
             "/guessing/settings" => new(_guessingSettingsHelp, "/guessing"),
             "/points" => new(_pointsDashboardHelp, "/points"),
@@ -160,14 +162,14 @@ public partial class PageHelpButton
 
     private static readonly string[] _templateVariableItems =
     [
-        "<strong>Start reply</strong>: <code>{round}</code>, <code>{options}</code>",
-        "<strong>Guess option reply</strong>: <code>{name}</code>, <code>{login}</code>",
-        "<strong>Invalid guess reply</strong>: <code>{name}</code>, <code>{login}</code>",
-        "<strong>How to guess reply</strong>: <code>{command}</code>",
-        "<strong>Available guesses reply</strong>: <code>{round}</code>, <code>{options}</code>",
-        "<strong>How to choose a winner reply</strong>: <code>{command}</code>",
-        "<strong>Winner and no-winners replies</strong>: <code>{name}</code>, <code>{winners}</code>, <code>{count}</code>",
-        "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong>: no live details",
+        "<strong>Start reply</strong> uses <code>{round}</code> and <code>{options}</code>.",
+        "<strong>Guess option reply</strong> uses <code>{name}</code> and <code>{login}</code>.",
+        "<strong>Invalid guess reply</strong> uses <code>{name}</code> and <code>{login}</code>.",
+        "<strong>How to guess reply</strong> uses <code>{command}</code>.",
+        "<strong>Available guesses reply</strong> uses <code>{round}</code> and <code>{options}</code>.",
+        "<strong>How to choose a winner reply</strong> uses <code>{command}</code>.",
+        "<strong>Winner and no-winners replies</strong> use <code>{name}</code>, <code>{winners}</code>, and <code>{count}</code>.",
+        "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong> use no live details.",
     ];
 
     private static readonly HelpPage _homeHelp = new(
@@ -180,9 +182,61 @@ public partial class PageHelpButton
             ),
             new(
                 "Where to go next",
-                "Use the menu to set up your channel, start chat games, manage points, or change bot settings.",
+                "",
+                [
+                    "Use the menu to set up your channel.",
+                    "Use the menu to start chat games.",
+                    "Use the menu to manage points.",
+                    "Use the menu to change bot settings.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _adminHelp = new(
+        "Admin",
+        [
+            new(
+                "Bot account",
+                "",
+                [
+                    "Authorize the bot account.",
+                    "Select Refresh to get the bot account status.",
+                    "Select Disconnect to disconnect the bot account.",
+                ]
+            ),
+            new(
+                "Who can create channels",
+                "The approved list or the blocked list controls who can create channels.",
                 []
             ),
+            new(
+                "BlokeBot channels",
+                "",
+                [
+                    "Select Add channel to add a channel.",
+                    "Select Start bot to start its bot.",
+                    "Select Stop bot to stop its bot.",
+                    "Select Manage channel to manage the channel.",
+                    "Select Remove to remove the channel.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _alertsHelp = new(
+        "Alerts",
+        [
+            new(
+                "Active alerts",
+                "Active alerts show problems that need attention.",
+                [
+                    "Select Open for a linked alert.",
+                    "Select Mark as handled after you deal with the alert.",
+                ]
+            ),
+            new("History", "Handled alerts show who dealt with them and when.", []),
+            new("Refresh the page", "", ["Select Refresh to get the current alerts."]),
         ]
     );
 
@@ -191,23 +245,42 @@ public partial class PageHelpButton
         [
             new(
                 "Connect your channel",
-                "Give the bot chat access, connect Twitch, choose the bot account, then start or stop it here.",
-                []
+                "",
+                [
+                    "Give the bot chat access.",
+                    "Connect Twitch.",
+                    "Choose the bot account.",
+                    "Start the bot here.",
+                    "Stop the bot here.",
+                ]
             ),
             new(
                 "Choose your Chat tools",
-                "Each tool has its own switch and starts off. Turning one off keeps its setup and history and stops its commands, public output, automation, and Twitch actions.",
-                []
+                "Each tool has its own switch and starts off.",
+                [
+                    "A switched-off tool keeps its setup and history.",
+                    "A switched-off tool stops its commands.",
+                    "A switched-off tool stops its public output.",
+                    "A switched-off tool stops its automation.",
+                    "A switched-off tool stops its Twitch actions.",
+                ]
             ),
             new(
                 "Decide who can help",
-                "Let all of your Twitch mods in by default, limit access to named mods, or block specific mods from changing this channel.",
-                []
+                "",
+                [
+                    "Let all of your Twitch mods access this channel by default.",
+                    "Limit access to named mods.",
+                    "Block specific mods from changes to this channel.",
+                ]
             ),
             new(
                 "Publish the command list",
-                "Choose the chat words that show viewers the command list. Only viewer-safe commands are listed, never moderator-only ones.",
-                []
+                "Only viewer-safe commands appear in the command list.",
+                [
+                    "Moderator-only commands never appear in the command list.",
+                    "Choose the chat words that show viewers the command list.",
+                ]
             ),
         ]
     );
@@ -217,18 +290,26 @@ public partial class PageHelpButton
         [
             new(
                 "Create or edit a board",
-                "Choose a saved board to edit it, or select New board to start a draft. The public link appears once the board is saved.",
-                []
+                "The public link appears after you save the board.",
+                ["Choose a saved board to edit it.", "Select New board to start a draft."]
             ),
             new(
                 "Moderate requests",
-                "Open a board to approve, queue, accept, complete, reject, or merge viewer submissions.",
-                []
+                "",
+                [
+                    "Open a board.",
+                    "Approve viewer submissions.",
+                    "Queue viewer submissions.",
+                    "Accept viewer submissions.",
+                    "Complete viewer submissions.",
+                    "Reject viewer submissions.",
+                    "Merge viewer submissions.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Public notes appear on the board. Private moderator notes and rejection reasons stay private.",
-                []
+                "Public notes appear on the board.",
+                ["Private moderator notes stay private.", "Rejection reasons stay private."]
             ),
         ]
     );
@@ -238,18 +319,23 @@ public partial class PageHelpButton
         [
             new(
                 "Fund and settle a challenge",
-                "Create a draft, open funding, then accept and resolve it. Bounties need Points to be on.",
-                []
+                "Bounties need Points to be on.",
+                ["Create a draft.", "Open funding.", "Accept the bounty.", "Resolve the bounty."]
             ),
             new(
                 "Where the points go",
-                "Pledges are held from each viewer's balance. Cancelling or letting a bounty expire refunds them; completing spends them, and each bounty chooses whether failure refunds or spends.",
-                []
+                "Pledges hold points from each viewer's balance.",
+                [
+                    "A canceled bounty refunds the pledges.",
+                    "An expired bounty refunds the pledges.",
+                    "A completed bounty spends the pledges.",
+                    "Each bounty defines whether failure refunds or spends the pledges.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Public bounties show contributor logins and pledge amounts. Private bounties show nothing publicly, and moderator reasons stay private.",
-                []
+                "Public bounties show contributor logins and pledge amounts.",
+                ["Private bounties show nothing publicly.", "Moderator reasons stay private."]
             ),
         ]
     );
@@ -258,19 +344,38 @@ public partial class PageHelpButton
         "Community progression",
         [
             new(
-                "Run a season",
-                "Create a draft season, add quests, achievements, and rewards, then open it. Viewers equip what they unlock with !equiptitle, !equipbadge, and !equipaccent.",
-                []
+                "Set up a season",
+                "",
+                [
+                    "Create a draft season.",
+                    "Add quests.",
+                    "Add achievements.",
+                    "Add rewards.",
+                    "Open the season.",
+                ]
             ),
             new(
-                "Repeating quests",
-                "Daily and weekly quests reset on the channel time zone boundary shown beside each one. Saving a schedule change closes the current period and resets active repeatable progress, so you are asked to confirm first.",
-                []
+                "Use unlocked rewards",
+                "Viewers equip unlocked rewards with chat commands.",
+                [
+                    "Use !equiptitle to equip a title.",
+                    "Use !equipbadge to equip a badge.",
+                    "Use !equipaccent to equip an accent.",
+                ]
+            ),
+            new(
+                "Quest resets",
+                "Daily and weekly quests reset at the channel time zone boundary shown beside each quest.",
+                [
+                    "A saved schedule change closes the current period.",
+                    "A saved schedule change resets active repeatable progress.",
+                    "BlokeBot asks you to confirm the schedule change first.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Public mode shows names, progress, standings, and unlocks. Hidden mode publishes nothing, and moderator notes never appear publicly.",
-                []
+                "Public mode shows names, progress, standings, and unlocks.",
+                ["Hidden mode publishes nothing.", "Moderator notes never appear publicly."]
             ),
         ]
     );
@@ -280,18 +385,18 @@ public partial class PageHelpButton
         [
             new(
                 "Run one channel boss",
-                "Start a campaign, then let viewers attack, mend the ward, or spend points on Nova across several streams.",
-                []
+                "Viewers can attack, mend the ward, or spend points on Nova across several streams.",
+                ["Start a campaign."]
             ),
             new(
                 "Tune the fight",
-                "Each action has its own outcome range, cooldown, and per-stream limit. Health thresholds trigger the phase response you saved.",
-                []
+                "Each action has its own outcome range, cooldown, and per-stream limit.",
+                ["Health thresholds trigger your saved phase response."]
             ),
             new(
                 "Resets",
-                "Manual reset ends the current campaign and starts a fresh boss. Weekly reset runs at the UTC day and hour you choose.",
-                []
+                "Manual reset ends the current campaign and starts a fresh boss.",
+                ["Weekly reset runs at your selected UTC day and hour."]
             ),
         ]
     );
@@ -300,19 +405,25 @@ public partial class PageHelpButton
         "Viewer passports",
         [
             new(
-                "Opt in and choose what is public",
-                "A passport starts private. Choose Public or Channel members only to show selected profile fields and activity.",
-                []
+                "Choose what is public",
+                "A passport starts private.",
+                [
+                    "Opt in to create a passport.",
+                    "Choose Public or Channel members only to show selected profile fields and activity.",
+                ]
             ),
             new(
                 "What is on show",
-                "Profile lines are plain text, limited to 160 characters, and still follow the channel's moderation policy. Only titles and badges earned in this channel can be selected.",
-                []
+                "Profile lines use plain text and have a limit of 160 characters.",
+                [
+                    "Profile lines follow the channel's moderation policy.",
+                    "Viewers can select only titles and badges earned in this channel.",
+                ]
             ),
             new(
                 "Export and reset",
-                "Export downloads the data this BlokeBot associates with your Twitch identity in this channel. Reset permanently removes the passport and its chat-presence days.",
-                []
+                "Export downloads the data that BlokeBot associates with your Twitch identity in this channel.",
+                ["Reset permanently removes the passport and its chat-presence days."]
             ),
         ]
     );
@@ -322,18 +433,31 @@ public partial class PageHelpButton
         [
             new(
                 "Build a template",
-                "Make reusable 3x3, 4x4, or 5x5 templates from automatic squares and moderator-confirmed moments. Automatic squares only use connected Twitch and BlokeBot sources.",
-                []
+                "Automatic squares use only connected Twitch and BlokeBot sources.",
+                [
+                    "Make reusable 3x3, 4x4, or 5x5 templates.",
+                    "Add automatic squares.",
+                    "Add moderator-confirmed moments.",
+                ]
             ),
             new(
                 "Join and issue cards",
-                "Viewers join before you issue cards. You can move or remove them until issuing freezes the roster.",
-                []
+                "Viewers join before you issue cards.",
+                [
+                    "Move viewers before you issue cards.",
+                    "Remove viewers before you issue cards.",
+                    "Issue cards to freeze the roster.",
+                ]
             ),
             new(
                 "Marks and rewards",
-                "Reversing a manual mark corrects the live card. A win that already paid out stays permanent and cannot pay again. Moderator notes and internal identifiers are never public.",
-                []
+                "A reversed manual mark corrects the live card.",
+                [
+                    "A paid win stays permanent.",
+                    "A paid win cannot pay again.",
+                    "Moderator notes never become public.",
+                    "Internal identifiers never become public.",
+                ]
             ),
         ]
     );
@@ -343,18 +467,30 @@ public partial class PageHelpButton
         [
             new(
                 "Run a competition",
-                "Create a draft as a tournament, round robin, or prediction league, open registration, then generate the schedule.",
-                []
+                "",
+                [
+                    "Create a tournament, round robin, or prediction league draft.",
+                    "Open registration.",
+                    "Generate the schedule.",
+                ]
             ),
             new(
                 "Results and corrections",
-                "Correcting a confirmed result keeps the previous scores in private history and clears later outcomes that no longer apply. Milestone and placement rewards are paid only once.",
-                []
+                "A corrected confirmed result keeps the previous scores in private history.",
+                [
+                    "The correction clears later outcomes that no longer apply.",
+                    "Milestone rewards pay only once.",
+                    "Placement rewards pay only once.",
+                ]
             ),
             new(
                 "What entrants can see",
-                "Public pages show entrant names, schedules, standings, confirmed scores, and archives. Contact details, lobby information, and moderator notes are never published.",
-                []
+                "Public pages show entrant names, schedules, standings, confirmed scores, and archives.",
+                [
+                    "Contact details never appear publicly.",
+                    "Lobby information never appears publicly.",
+                    "Moderator notes never appear publicly.",
+                ]
             ),
         ]
     );
@@ -364,35 +500,51 @@ public partial class PageHelpButton
         [
             new(
                 "Choose where to raid",
-                "The Hub shows approved channels that are live and match your filters. Approval is an allowlist you control, and Prepare raid always asks you to confirm.",
-                []
+                "The Hub shows approved live channels that match your filters.",
+                ["You control the approval allowlist.", "Prepare raid always asks you to confirm."]
             ),
             new(
                 "Recommend a live channel now",
-                "Use Send a shoutout with the Twitch name of another channel that is live with viewers. If Twitch asks you to wait, the panel shows when you can send again. Approve channel on a history entry adds that channel to your approved list straight away.",
-                []
-            ),
-            new(
-                "Welcome incoming raids",
-                "Turn on Automatic raid shoutouts and choose the smallest raid that should get one. Choose either a native Twitch shoutout or one chat message; a failed shoutout is not resent another way.",
+                "",
                 [
-                    "Only shoutout approved channels limits automatic shoutouts to your approved list.",
-                    "Chat delivery uses one presentation: regular, pinned, or announcement.",
-                    "A pinned shoutout replaces the current pin, and the previous pin is not restored.",
+                    "Use Send a shoutout with the Twitch name of a live channel with viewers.",
+                    "If Twitch asks you to wait, read the next available time in the panel.",
+                    "Use Approve channel on a history entry to add that channel to your approved list immediately.",
                 ]
             ),
             new(
-                "Personalise the chat message",
-                "Use these details in the message. Add fallback text for the last game and stream title in case Twitch has no value.",
+                "Welcome incoming raids",
+                "A failed shoutout does not use the other delivery method.",
                 [
-                    "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
-                    "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
+                    "Turn on Automatic raid shoutouts.",
+                    "Choose the smallest raid that receives a shoutout.",
+                    "Choose a native Twitch shoutout.",
+                    "Alternatively, choose one chat message.",
+                    "Only shoutout approved channels limits automatic shoutouts to your approved list.",
+                    "Chat delivery uses regular, pinned, or announcement presentation.",
+                    "A pinned shoutout replaces the current pin.",
+                    "BlokeBot does not restore the previous pin.",
+                ]
+            ),
+            new(
+                "Customize the chat message",
+                "Fallback text appears when Twitch has no value for the last game or stream title.",
+                [
+                    "Use <code>{twitch_handle}</code>, <code>{display_name}</code>, and <code>{channel_url}</code> in the message.",
+                    "Use <code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, and <code>{viewer_count}</code> in the message.",
+                    "Add fallback text for the last game.",
+                    "Add fallback text for the stream title.",
                 ]
             ),
             new(
                 "Change welcome and shortlist rules",
-                "Open Settings, make your changes, then save. Twitch gives a raid's total viewer count only, so no individual viewer is recorded.",
-                []
+                "Twitch gives only the total viewer count for a raid.",
+                [
+                    "Open Settings.",
+                    "Make your changes.",
+                    "Save the changes.",
+                    "BlokeBot records no individual viewer from the raid.",
+                ]
             ),
         ]
     );
@@ -402,18 +554,34 @@ public partial class PageHelpButton
         [
             new(
                 "Invite hosts you know",
-                "A collective is an allowlist you build here. Twitch raids, follows, and shared moderators never create membership.",
-                []
+                "A collective is an allowlist that you build here.",
+                [
+                    "Twitch raids never create membership.",
+                    "Twitch follows never create membership.",
+                    "Shared moderators never create membership.",
+                ]
             ),
             new(
-                "Coordinate without taking over",
-                "A coordinator can invite hosts, withdraw invitations, edit shared workflows, and end participation. Hosts accept, decline, and leave only for themselves, and one active coordinator is always kept.",
-                []
+                "Coordinate without control of hosts",
+                "A coordinator can invite hosts, withdraw invitations, edit shared workflows, and end participation.",
+                [
+                    "Hosts accept only for themselves.",
+                    "Hosts decline only for themselves.",
+                    "Hosts leave only for themselves.",
+                    "The collective always keeps one active coordinator.",
+                ]
             ),
             new(
                 "What is shared",
-                "Members see a shared summary: tournament references, relay totals, and goal progress. Contact details, lobby information, source mappings, moderator notes, rewards, and viewer identities stay with the owning host.",
-                []
+                "Members see tournament references, relay totals, and goal progress in a shared summary.",
+                [
+                    "Contact details stay with the owning host.",
+                    "Lobby information stays with the owning host.",
+                    "Source mappings stay with the owning host.",
+                    "Moderator notes stay with the owning host.",
+                    "Rewards stay with the owning host.",
+                    "Viewer identities stay with the owning host.",
+                ]
             ),
         ]
     );
@@ -423,18 +591,22 @@ public partial class PageHelpButton
         [
             new(
                 "Create or edit a queue",
-                "Choose a saved queue to edit it, or select New queue to start a draft. The viewer-page link appears once the queue is saved.",
-                []
+                "The viewer-page link appears after you save the queue.",
+                ["Choose a saved queue to edit it.", "Select New queue to start a draft."]
             ),
             new(
                 "Run the queue",
-                "Use fair selection and ready checks to form a party, then send lobby details privately to the viewers you picked.",
-                []
+                "",
+                [
+                    "Use fair selection to form a party.",
+                    "Use ready checks to form a party.",
+                    "Send lobby details privately to your selected viewers.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Entry answers appear on the viewer page and the Viewer Queue overlay. Lobby messages and moderator notes stay private.",
-                []
+                "Entry answers appear on the viewer page and the Viewer Queue overlay.",
+                ["Lobby messages stay private.", "Moderator notes stay private."]
             ),
         ]
     );
@@ -444,18 +616,26 @@ public partial class PageHelpButton
         [
             new(
                 "Capture and moderate",
-                "Capture now saves the current live moment for moderation. Choose how nearby captures merge, whether a stream marker is a fallback, and how point rewards work.",
-                []
+                "Capture now saves the current live moment for moderation.",
+                [
+                    "Choose how nearby captures merge.",
+                    "Choose whether a stream marker is a fallback.",
+                    "Choose how point rewards work.",
+                ]
             ),
             new(
                 "Publish the weekly recap",
-                "Open weekly recap shows the public recap in a new tab, so this workspace and any unsaved inputs stay put. Finalize previous week records the winning moment.",
-                []
+                "Open weekly recap opens the public recap in a new tab.",
+                [
+                    "The new tab keeps this workspace in place.",
+                    "The new tab keeps unsaved inputs in place.",
+                    "Finalize previous week records the winning moment.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Public titles and categories appear in the recap. Private moderator text never does.",
-                []
+                "Public titles and categories appear in the recap.",
+                ["Private moderator text never appears in the recap."]
             ),
         ]
     );
@@ -465,23 +645,36 @@ public partial class PageHelpButton
         [
             new(
                 "Set up a Browser Source",
-                "Create an overlay, copy its private Browser Source URL, then add it to OBS at 1920 by 1080. The URL is shown only when the overlay is created or the URL is rotated.",
-                []
+                "The private Browser Source URL appears only after overlay creation or URL rotation.",
+                [
+                    "Create an overlay.",
+                    "Copy its private Browser Source URL.",
+                    "Add it to OBS at 1920 by 1080.",
+                ]
             ),
             new(
-                "Rotating a URL",
-                "Rotating stops every OBS source that still uses the previous URL, so paste the new one into OBS straight away.",
-                []
+                "Rotate a URL",
+                "URL rotation stops each OBS source that uses the previous URL.",
+                ["Paste the new URL into OBS immediately."]
             ),
             new(
                 "Preview and test",
-                "Live preview shows how a Browser Source will look without revealing its URL. Sample buttons and Send test pulse only affect the selected overlay; they never change a round, giveaway, goal, or bounty.",
-                []
+                "Live preview shows the Browser Source appearance without its URL.",
+                [
+                    "Sample buttons affect only the selected overlay.",
+                    "Send test pulse affects only the selected overlay.",
+                    "These tests never change a round, giveaway, goal, or bounty.",
+                ]
             ),
             new(
                 "What viewers can see",
-                "Overlays show public presentation data only: names, counts, progress, and reward names. Twitch user IDs, balances, moderator notes, and private eligibility details never reach a Browser Source.",
-                []
+                "Overlays show only public names, counts, progress, and reward names.",
+                [
+                    "Twitch user IDs never reach a Browser Source.",
+                    "Balances never reach a Browser Source.",
+                    "Moderator notes never reach a Browser Source.",
+                    "Private eligibility details never reach a Browser Source.",
+                ]
             ),
         ]
     );
@@ -491,13 +684,21 @@ public partial class PageHelpButton
         [
             new(
                 "Compose a cue",
-                "Build reusable layers, choose a Cue player Browser Source, and try the cue exactly as it will appear in OBS. Use Media library to upload or replace cue media.",
-                []
+                "",
+                [
+                    "Build reusable layers.",
+                    "Choose a Cue player Browser Source.",
+                    "Try the cue exactly as it will appear in OBS.",
+                    "Use Media library to upload or replace cue media.",
+                ]
             ),
             new(
-                "If a layer will not show",
-                "A web page may refuse framing. BlokeBot keeps the Browser Source sandbox in place and moves on after a short wait.",
-                []
+                "If a layer does not show",
+                "A web page can refuse display in a frame.",
+                [
+                    "BlokeBot keeps the Browser Source sandbox in place.",
+                    "BlokeBot continues after a short wait.",
+                ]
             ),
         ]
     );
@@ -507,13 +708,19 @@ public partial class PageHelpButton
         [
             new(
                 "Manage cue media",
-                "Upload, preview, replace, and delete the media used by cues. Files stay in private channel storage and cannot be used by another channel.",
-                []
+                "Files stay in private channel storage.",
+                [
+                    "Another channel cannot use the files.",
+                    "Upload cue media.",
+                    "Preview cue media.",
+                    "Replace cue media.",
+                    "Delete cue media.",
+                ]
             ),
             new(
-                "Deleting a file",
-                "Media still used by a cue cannot be deleted. Edit the cue first, then delete the file.",
-                []
+                "Delete a file",
+                "You cannot delete media that a cue still uses.",
+                ["Edit the cue first.", "Delete the file."]
             ),
         ]
     );
@@ -523,13 +730,20 @@ public partial class PageHelpButton
         [
             new(
                 "Run a poll",
-                "Save a question and its choices, then start it whenever you want viewers to vote. End it here when voting should stop, and find finished polls under Recent results.",
-                []
+                "Finished polls appear under Recent results.",
+                [
+                    "Save a question and its choices.",
+                    "Start the poll when you want viewers to vote.",
+                    "End the poll here when you want the vote to stop.",
+                ]
             ),
             new(
                 "If you cannot run a poll",
-                "Use Reconnect to Twitch when the page asks you to connect this channel again, or Retry if the page itself could not load.",
-                []
+                "",
+                [
+                    "Use Reconnect to Twitch when the page asks you to connect this channel again.",
+                    "Use Retry if the page cannot load.",
+                ]
             ),
         ]
     );
@@ -539,13 +753,23 @@ public partial class PageHelpButton
         [
             new(
                 "Capture a live moment",
-                "Create a shareable clip of the current stream, or add a private marker to find the moment in the recording later. Go live and turn on recordings and clips first.",
-                []
+                "A shareable clip captures the current stream.",
+                [
+                    "Create a shareable clip of the current stream.",
+                    "Add a private marker to find the moment in the later recording.",
+                    "Go live first.",
+                    "Turn on recordings first.",
+                    "Turn on clips first.",
+                ]
             ),
             new(
                 "If the result is not clear",
-                "A clip can stay pending while Twitch prepares it. Use Check status or Check outcome on the existing attempt rather than creating it again.",
-                []
+                "A clip can stay pending while Twitch prepares it.",
+                [
+                    "Use Check status on the existing attempt.",
+                    "Use Check outcome on the existing attempt.",
+                    "Do not create the clip again.",
+                ]
             ),
         ]
     );
@@ -555,18 +779,28 @@ public partial class PageHelpButton
         [
             new(
                 "Manage rewards",
-                "Create a Channel Points reward, set its cost and instructions, then enable or pause it. Rewards created somewhere else stay visible but cannot be changed here.",
-                []
+                "Rewards created elsewhere stay visible.",
+                [
+                    "You cannot change those rewards here.",
+                    "Create a Channel Points reward.",
+                    "Set its cost.",
+                    "Set its instructions.",
+                    "Enable it.",
+                    "Pause it.",
+                ]
             ),
             new(
                 "Complete viewer requests",
-                "Fulfil a request when it is done, or cancel it to return the viewer's Channel Points. Recent outcomes appear in Redemption history.",
-                []
+                "Recent outcomes appear in Redemption history.",
+                [
+                    "Fulfill a completed request.",
+                    "Cancel a request to return the viewer's Channel Points.",
+                ]
             ),
             new(
                 "If rewards are unavailable",
-                "Channel Points rewards need a Twitch Affiliate or Partner channel. Use Reconnect to Twitch when the page asks you to connect this channel again.",
-                []
+                "Channel Points rewards need a Twitch Affiliate or Partner channel.",
+                ["Use Reconnect to Twitch when the page asks you to connect this channel again."]
             ),
         ]
     );
@@ -576,18 +810,26 @@ public partial class PageHelpButton
         [
             new(
                 "Run a Prediction",
-                "Save a question and possible outcomes, then start it when viewers should back an answer with Channel Points.",
-                []
+                "Viewers back an answer with Channel Points.",
+                [
+                    "Save a question.",
+                    "Save the possible outcomes.",
+                    "Start the Prediction when viewers must back an answer.",
+                ]
             ),
             new(
                 "Finish a Prediction",
-                "Lock it to stop new entries, then resolve it by choosing the winning outcome or cancel it to refund viewers. BlokeBot asks before each of these.",
-                []
+                "BlokeBot asks before a lock, resolution, or cancellation.",
+                [
+                    "Lock the Prediction to stop new entries.",
+                    "Choose the winning outcome to resolve the Prediction.",
+                    "Cancel the Prediction to refund viewers.",
+                ]
             ),
             new(
                 "If Predictions are unavailable",
-                "Predictions need a Twitch Affiliate or Partner channel. Use Reconnect to Twitch when the page asks you to connect this channel again.",
-                []
+                "Predictions need a Twitch Affiliate or Partner channel.",
+                ["Use Reconnect to Twitch when the page asks you to connect this channel again."]
             ),
         ]
     );
@@ -597,18 +839,21 @@ public partial class PageHelpButton
         [
             new(
                 "Live rounds",
-                "Start a round, close it when guesses are done, then pick the winning answer. Each viewer keeps their first valid guess for that round.",
+                "Each viewer keeps their first valid guess for the round.",
                 [
+                    "Start a round.",
+                    "Close the round after all guesses.",
+                    "Pick the winning answer.",
                     "<code>!guess &lt;name&gt;</code> records a player guess.",
-                    "<code>!guesses</code> lists the answers viewers can choose from.",
+                    "<code>!guesses</code> lists the available answers.",
                     "<code>!win &lt;name&gt;</code> closes the round and announces winners.",
-                    "You can change the chat command words in Settings.",
+                    "Change the chat command words in Settings.",
                 ]
             ),
             new(
                 "History",
-                "Use History to look back at past rounds by date, round type, or viewer name.",
-                []
+                "",
+                ["Use History to find past rounds by date, round type, or viewer name."]
             ),
         ]
     );
@@ -618,19 +863,22 @@ public partial class PageHelpButton
         [
             new(
                 "Round types",
-                "Create one or more kinds of guessing game. Each one can have its own answer list and chat replies.",
+                "Each guessing game type can use its own answer list and chat replies.",
                 [
-                    "Enter the main answer first, then any accepted alternatives, separated by commas.",
+                    "Create one or more guessing game types.",
+                    "Enter the main answer first.",
+                    "Enter accepted alternatives after the main answer.",
+                    "Separate accepted alternatives with commas.",
                 ]
             ),
             new(
                 "Commands",
-                "Command names are what viewers and mods type in chat. Start, stop, and win are mod-only commands.",
-                []
+                "Command names are the words that viewers and mods type in chat.",
+                ["Start, stop, and win are mod-only commands."]
             ),
             new(
                 "Add live details to replies",
-                "Words in braces are replaced with details from the current round or viewer.",
+                "Words in braces use details from the current round or viewer.",
                 _templateVariableItems
             ),
         ]
@@ -641,18 +889,24 @@ public partial class PageHelpButton
         [
             new(
                 "Balances",
-                "Use the leaderboard and search controls to check point balances for this channel.",
+                "Give and remove accept whole numbers, percentages such as <code>50%</code>, or <code>all</code>.",
                 [
-                    "Give and remove accept whole numbers, percentages such as <code>50%</code>, or <code>all</code>.",
-                    "Add gives points to an existing Twitch user and accepts whole numbers only.",
+                    "Use the leaderboard to check point balances for this channel.",
+                    "Use the search controls to check point balances for this channel.",
+                    "Add gives points to an existing Twitch user.",
+                    "Add accepts whole numbers only.",
                 ]
             ),
             new(
                 "Giveaways",
-                "Start, end, or cancel a giveaway. Giveaways only start while the channel is live.",
+                "Giveaways start only while the channel is live.",
                 [
+                    "Start a giveaway.",
+                    "End a giveaway.",
+                    "Cancel a giveaway.",
                     "Each viewer can join once.",
-                    "Winners are picked from eligible viewers and receive a random points prize.",
+                    "BlokeBot picks winners from eligible viewers.",
+                    "Each winner receives a random points prize.",
                 ]
             ),
         ]
@@ -663,26 +917,29 @@ public partial class PageHelpButton
         [
             new(
                 "Commands",
-                "Command names are the words viewers and mods type in chat. Each name must be unique for this channel.",
+                "Command names are the words that viewers and mods type in chat.",
                 [
-                    "<code>points</code> shows the caller's balance. With a login, it is moderator-only.",
+                    "Each command name must be unique for this channel.",
+                    "<code>points</code> shows the caller's balance.",
+                    "With a login, <code>points</code> is moderator-only.",
                     "<code>givepoints</code>, <code>gamble</code>, and <code>removepoints</code> accept whole numbers, percentages, or <code>all</code>.",
-                    "<code>addpoints</code> gives points to an existing Twitch user and accepts whole numbers only.",
+                    "<code>addpoints</code> gives points to an existing Twitch user.",
+                    "<code>addpoints</code> accepts whole numbers only.",
                 ]
             ),
             new(
                 "Add live details to replies",
-                "Words in braces are replaced with details from the current viewer, balance, or giveaway.",
+                "Words in braces use details from the current viewer, balance, or giveaway.",
                 [
-                    "Balance and gambling replies: <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, <code>{label}</code>.",
-                    "Transfer replies: <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, <code>{label}</code>.",
-                    "Giveaway replies: <code>{user}</code>, <code>{winners}</code>, <code>{time_left}</code>, <code>{label}</code>.",
+                    "Balance and gamble replies use <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, and <code>{label}</code>.",
+                    "Transfer replies use <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, and <code>{label}</code>.",
+                    "Giveaway replies use <code>{user}</code>, <code>{winners}</code>, <code>{time_left}</code>, and <code>{label}</code>.",
                 ]
             ),
             new(
                 "Follower-only giveaways",
-                "Follower-only giveaways need the bot account to be allowed to check followers, and the bot must be a moderator in the channel.",
-                []
+                "Follower-only giveaways need permission for the bot account to check followers.",
+                ["The bot must be a moderator in the channel."]
             ),
         ]
     );
@@ -692,31 +949,45 @@ public partial class PageHelpButton
         [
             new(
                 "Replies",
-                "A reply is a saved message. Add more than one message when you want the bot to rotate through them or pick one at random.",
+                "A reply is a saved message.",
                 [
-                    "<code>{random_from|one|two}</code> picks one value.",
-                    "<code>{random_between|1|10}</code> picks an inclusive whole number.",
-                    "Each random token occurrence makes a fresh pick.",
-                    "<code>{random_viewer}</code> picks from Twitch chatters currently connected to chat. The active bot account must be a moderator with connected-chatter access.",
+                    "Add multiple messages to rotate through them or select one at random.",
+                    "<code>{random_from|one|two}</code> selects one value.",
+                    "<code>{random_between|1|10}</code> selects an inclusive whole number.",
+                    "Each random token occurrence makes a new selection.",
+                    "<code>{random_viewer}</code> selects a Twitch chatter who is currently connected to chat.",
+                    "The active bot account must be a moderator with connected-chatter access.",
                     "If Twitch cannot return the complete chatter list, <code>{random_viewer}</code> becomes empty text.",
                 ]
             ),
             new(
                 "Chat commands",
-                "Command words are what viewers type after the exclamation mark. Separate extra command words with commas.",
+                "Command words are the words that viewers type after the exclamation mark.",
                 [
-                    "Use <code>{user}</code> for the viewer's name and <code>{channel}</code> for the channel name.",
-                    "Use <code>{args}</code> for everything typed after the command, or <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
-                    "Counter commands can use <code>{count}</code> for the new number.",
-                    "Everyone makes a command public. Restricted commands can independently allow moderators and selected Twitch accounts; with neither selected, only the streamer can use the command.",
-                    "Selected people are matched by their Twitch account, so a later Twitch name change does not remove access.",
-                    "Test cue checks the selected cue and Browser Source without sending chat, starting a cooldown, or consuming a one-time viewer use.",
+                    "Separate extra command words with commas.",
+                    "Use <code>{user}</code> for the viewer's name.",
+                    "Use <code>{channel}</code> for the channel name.",
+                    "Use <code>{args}</code> for all text after the command.",
+                    "Use <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
+                    "Use <code>{count}</code> for the new number in counter commands.",
+                    "Everyone makes a command public.",
+                    "Restricted commands can allow moderators independently.",
+                    "Restricted commands can allow selected Twitch accounts independently.",
+                    "With neither option selected, only the streamer can use the command.",
+                    "Selected people match by their Twitch account.",
+                    "A later Twitch name change does not remove access.",
+                    "Test cue checks the selected cue and Browser Source without a chat message.",
+                    "Test cue does not start a cooldown.",
+                    "Test cue does not consume a one-time viewer use.",
                 ]
             ),
             new(
                 "Scheduled messages",
-                "Choose a saved reply, then decide whether it should be sent on a timer, after enough chat activity, or once a week.",
-                []
+                "",
+                [
+                    "Choose a saved reply.",
+                    "Send it on a timer, after sufficient chat activity, or once a week.",
+                ]
             ),
         ]
     );
