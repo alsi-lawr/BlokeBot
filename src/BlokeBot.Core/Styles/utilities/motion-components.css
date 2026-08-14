@@ -21,6 +21,12 @@
     }
 
     .motion-list__item,
+    .motion-status {
+        animation: app-list-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        transform-origin: center top;
+        will-change: opacity, transform;
+    }
+
     .motion-list__item--removing {
         animation: app-list-exit 150ms ease-in both;
         pointer-events: none;

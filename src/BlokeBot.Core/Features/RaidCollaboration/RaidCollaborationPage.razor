@@ -78,7 +78,14 @@
                             <TaskPanel Title="Eligible channels" Description="Approved channels that match your current filters.">
                                 @if (dashboard.EligibleChannels.Count == 0)
                                 {
-                                    <p class="text-sm text-muted-foreground">No approved channel currently passes every live filter. Review the explicit exclusions below or save another approved channel.</p>
+                                    @if (dashboard.Configuration.ApprovedChannels.Count == 0)
+                                    {
+                                        <p class="text-sm text-muted-foreground">No channel is approved yet. Add an approved channel in Settings to build your shortlist.</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-sm text-muted-foreground">No approved channel currently passes every live filter. Review why each channel is hidden below.</p>
+                                    }
                                 }
                                 else
                                 {
