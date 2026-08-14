@@ -8,7 +8,7 @@
             <p class="eyebrow">How it works</p>
             <h1>Channel tools with a clear boundary.</h1>
         </div>
-        <p class="lede">The server owner operates BlokeBot. Channel owners decide what their channel uses. Moderators help within the authority Twitch currently gives them.</p>
+        <p class="lede">The server owner operates BlokeBot. Channel owners select the tools for their channels. Moderators act within their current Twitch authority.</p>
     </header>
 
     <ol class="process-list process-list--timeline">
@@ -16,50 +16,52 @@
             <span class="step-number" aria-hidden="true">1</span>
             <div>
                 <p class="eyebrow">Identify</p>
-                <h2>Sign in with your normal Twitch account</h2>
-                <p>BlokeBot discovers the channel you own and the channels you currently moderate. You choose one before viewing or changing its tools.</p>
-                <a class="text-link" href="guide/getting-started">Sign in and choose a channel</a>
+                <h2>Sign in to your normal Twitch account</h2>
+                <p>BlokeBot finds your channel and the channels that you currently moderate. You select one before you view or change its tools.</p>
+                <a class="text-link" href="guide/getting-started">Sign in and select a channel</a>
             </div>
         </li>
         <li>
             <span class="step-number" aria-hidden="true">2</span>
             <div>
-                <p class="eyebrow">Authorise</p>
+                <p class="eyebrow">Authorize</p>
                 <h2>Connect the channel and bot accounts separately</h2>
-                <p>The channel grants channel-level access. The bot account grants chat and announcement access. The dashboard shows which account must complete each step.</p>
-                <a class="text-link" href="connect">Understand Twitch connections</a>
+                <p>The channel account grants channel-level access. The bot account grants chat and announcement access. The dashboard identifies the account for each step.</p>
+                <a class="text-link" href="connect">Review Twitch connections</a>
             </div>
         </li>
         <li>
             <span class="step-number" aria-hidden="true">3</span>
             <div>
                 <p class="eyebrow">Configure</p>
-                <h2>Turn on only the tools that fit</h2>
-                <p>Every Chat Tools feature has its own switch and settings, including community progression and games. Channel data stays isolated from every other channel.</p>
-                <a class="text-link" href="tools">Choose channel tools</a>
+                <h2>Enable only the applicable tools</h2>
+                <p>Each Chat Tools feature has a separate switch and settings. Community progression and games are separate features. BlokeBot isolates the data for each channel.</p>
+                <a class="text-link" href="tools">Select channel tools</a>
             </div>
         </li>
         <li>
             <span class="step-number" aria-hidden="true">4</span>
             <div>
                 <p class="eyebrow">Operate</p>
-                <h2>Use live controls and follow visible failures</h2>
-                <p>Start the bot, run rounds and giveaways, and watch Alerts for delivery or readiness problems. Moderator authority is rechecked rather than trusted for an entire login session.</p>
-                <a class="text-link" href="troubleshooting">Read alerts and recover</a>
+                <h2>Use live controls and respond to visible failures</h2>
+                <p>Start the bot. Run rounds and giveaways. Review Alerts for delivery or readiness problems.</p>
+                <p>BlokeBot verifies moderator authority again during a login session.</p>
+                <a class="text-link" href="troubleshooting">Review alerts and recover</a>
             </div>
         </li>
     </ol>
 
     <section class="explain-grid" aria-labelledby="ownership-heading">
         <div>
-            <p class="eyebrow">What lives where</p>
+            <p class="eyebrow">Data locations</p>
             <h2 id="ownership-heading">The dashboard is public-facing. The state is not.</h2>
-            <p>BlokeBot stores its database and OAuth tokens on the server running it. Public feature pages expose only their documented participant-facing views; configuration still requires an authorised Twitch identity.</p>
+            <p>BlokeBot stores its database and OAuth tokens on its server. Public feature pages show only their documented views for participants.</p>
+            <p>Configuration requires an authorized Twitch identity.</p>
             <ul class="check-list">
-                <li>Channel data stays in the server's configured data directory.</li>
-                <li>Twitch client secrets belong in environment files or a secret manager.</li>
-                <li>HTTPS terminates at BlokeBot or a reverse proxy before OAuth reaches the app.</li>
-                <li>Backups keep the complete private application state together.</li>
+                <li>Channel data remains in the configured data directory of the server.</li>
+                <li>Environment files or a secret manager hold Twitch client secrets.</li>
+                <li>BlokeBot or a reverse proxy terminates HTTPS before OAuth reaches the app.</li>
+                <li>Each backup contains the complete private application state.</li>
             </ul>
         </div>
         <DeviceShowcase
@@ -67,9 +69,9 @@
             DarkLaptopSource="media/dashboard/laptop-dark-channel-setup.png"
             LightPhoneSource="media/dashboard/phone-light-channel-setup.png"
             DarkPhoneSource="media/dashboard/phone-dark-channel-setup.png"
-            PhoneAlt="Example BlokeBot channel setup showing Twitch readiness, account-specific connection actions and bot controls on mobile."
-            LaptopAlt="Example BlokeBot channel setup showing Twitch readiness, account-specific connection actions and bot controls on a laptop."
-            Caption="Channel setup keeps authority, connection and the next action in one place." />
+            PhoneAlt="Example BlokeBot channel setup with Twitch readiness, account-specific connection actions, and bot controls on mobile."
+            LaptopAlt="Example BlokeBot channel setup with Twitch readiness, account-specific connection actions, and bot controls on a laptop."
+            Caption="Channel setup shows authority, connection status, and the next action in one place." />
     </section>
 
     <aside class="next-panel next-panel--strong" aria-labelledby="how-next-heading">
