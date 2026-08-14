@@ -86,7 +86,9 @@ public sealed class OverlayDashboardUiTests
 
         _ = page.WaitForElement("iframe");
 
-        FindButton(page, "Guessing overlay sample state", "Result").Click();
+        await page.InvokeAsync(() =>
+            FindButton(page, "Guessing overlay sample state", "Result").Click()
+        );
 
         page.WaitForAssertion(() =>
             page.Find("iframe")
@@ -94,7 +96,7 @@ public sealed class OverlayDashboardUiTests
                 .ShouldEndWith("?mode=representative&sample=completed")
         );
 
-        FindButton(page, "Preview state", "Live").Click();
+        await page.InvokeAsync(() => FindButton(page, "Preview state", "Live").Click());
 
         page.WaitForAssertion(() =>
             (page.Find("iframe").GetAttribute("src") ?? string.Empty).ShouldNotContain(
@@ -172,7 +174,9 @@ public sealed class OverlayDashboardUiTests
             page.Find("[data-appearance-css]").GetAttribute("value").ShouldBe(string.Empty)
         );
 
-        FindButton(page, "Guessing overlay sample state", "Result").Click();
+        await page.InvokeAsync(() =>
+            FindButton(page, "Guessing overlay sample state", "Result").Click()
+        );
         page.WaitForAssertion(() =>
         {
             page.Find("[data-appearance-preview]")
