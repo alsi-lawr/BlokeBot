@@ -1,31 +1,31 @@
 @page "/guide"
 
-<PageTitle>BlokeBot user guide</PageTitle>
+<PageTitle>BlokeBot help guides</PageTitle>
 
 <div class="guide-layout">
     <GuideSidebar />
     <article class="article-shell article-shell--wide guide-home">
         <header class="article-header article-header--split">
             <div>
-                <p class="eyebrow">User guide</p>
+                <p class="eyebrow">Help guides</p>
                 <h1>Do the next useful thing.</h1>
             </div>
-            <p class="lede">These guides follow BlokeBot's navigation and use the words shown in the dashboard. Start with your current task rather than reading from the beginning.</p>
+            <p class="lede">Use the BlokeBot navigation label and dashboard text to select a guide for your current task.</p>
         </header>
 
         <section class="guide-launch" aria-labelledby="guide-start-heading">
             <div>
-                <p class="eyebrow">New channel</p>
-                <h2 id="guide-start-heading">From Twitch sign-in to a ready bot</h2>
-                <p>Choose the correct account, select a channel, complete the connection actions shown by Channel setup and start the bot only when the page says it is ready.</p>
+                <p class="eyebrow">Set up a new channel</p>
+                <h2 id="guide-start-heading">Prepare a bot after Twitch sign-in</h2>
+                <p>Choose the correct Twitch account. Select a channel. Complete the actions on Channel setup. If Channel setup shows Ready, start the bot.</p>
             </div>
-            <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Start here</a>
+            <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Open the setup guide</a>
         </section>
 
         <section aria-labelledby="guide-topics-heading">
             <div class="section-intro">
-                <p class="eyebrow">Task index</p>
-                <h2 id="guide-topics-heading">Find the screen you are using</h2>
+                <p class="eyebrow">Guides by task</p>
+                <h2 id="guide-topics-heading">Select the guide for your screen</h2>
             </div>
             <div class="guide-grid guide-grid--numbered">
                 @foreach (var topic in SiteGuideCatalog.All.Skip(1).Select((topic, index) => (Topic: topic, Index: index + 1)))
@@ -35,7 +35,7 @@
                         <p class="eyebrow">@topic.Topic.Eyebrow</p>
                         <h3><a href="@topic.Topic.Href">@topic.Topic.Title</a></h3>
                         <p>@topic.Topic.Summary</p>
-                        <a class="guide-card__arrow" href="@topic.Topic.Href" aria-label="Open @topic.Topic.Title"><SiteIcon Name="arrow" /></a>
+                        <a class="guide-card__arrow" href="@topic.Topic.Href" aria-label="Open guide: @topic.Topic.Title"><SiteIcon Name="arrow" /></a>
                     </article>
                 }
             </div>
@@ -43,16 +43,16 @@
 
         <section class="help-grid" aria-labelledby="help-heading">
             <div>
-                <p class="eyebrow">When something is wrong</p>
-                <h2 id="help-heading">Start with the visible state</h2>
-                <p>Check the selected channel, Alerts and Bot status before reconnecting accounts. The troubleshooting guide explains what information is safe and useful to send to the server owner.</p>
-                <a class="text-link" href="troubleshooting">Troubleshoot BlokeBot</a>
+                <p class="eyebrow">Resolve a problem</p>
+                <h2 id="help-heading">Check the visible state first</h2>
+                <p>First, check the selected channel. Then check Alerts and Bot status. Use the troubleshooting guide to select safe information for the server owner.</p>
+                <a class="text-link" href="troubleshooting">Open the troubleshooting guide</a>
             </div>
             <div>
-                <p class="eyebrow">Technical operations</p>
-                <h2>Installing or hosting?</h2>
-                <p>Server setup has its own path for Twitch developer credentials, callback URLs, HTTPS, process state and backups.</p>
-                <a class="text-link" href="server-owners">Open server setup</a>
+                <p class="eyebrow">Server operations</p>
+                <h2>Install or host BlokeBot</h2>
+                <p>Use the server setup guide for Twitch developer credentials and callback URLs. Use it for HTTPS and process state. Use it for backups.</p>
+                <a class="text-link" href="server-owners">Open the server setup guide</a>
             </div>
         </section>
     </article>

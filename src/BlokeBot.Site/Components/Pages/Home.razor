@@ -8,15 +8,15 @@
         <p class="hero-badge">Self-hosted Twitch channel tools</p>
         <h1 id="home-title">Your channel. Your bot. Your rules.</h1>
         <p class="lede">BlokeBot puts community progression, live games, commands, points and moderation-ready controls in one dashboard, without handing your community data to another service.</p>
-        <div class="action-row" aria-label="Get started">
-            <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Set up a channel</a>
-            <a class="button button-secondary" href="install"><SiteIcon Name="server" />Run your own copy</a>
+        <div class="action-row" aria-label="Setup actions">
+            <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Open the channel setup guide</a>
+            <a class="button button-secondary" href="install"><SiteIcon Name="server" />Run BlokeBot on your server</a>
             @if (SiteOptions.Value.LiveAppUri is not null)
             {
-                <a class="text-link" href="@SiteOptions.Value.LiveAppUri">Open the live dashboard</a>
+                <a class="text-link" href="@SiteOptions.Value.LiveAppUri">Open the live BlokeBot dashboard</a>
             }
         </div>
-        <ul class="hero-facts" aria-label="BlokeBot at a glance">
+        <ul class="hero-facts" aria-label="BlokeBot facts">
             <li>Free and open source</li>
             <li>Desktop and mobile</li>
             <li>State stays on your server</li>
@@ -26,8 +26,8 @@
             DarkPhoneSource="media/dashboard/phone-dark-channel-setup-scroll.webp"
             LightLaptopSource="media/dashboard/laptop-light-home-scroll.webp"
             DarkLaptopSource="media/dashboard/laptop-dark-home-scroll.webp"
-            PhoneAlt="BlokeBot scrolling Channel setup on mobile"
-            LaptopAlt="BlokeBot scrolling the channel dashboard on a laptop"
+            PhoneAlt="A phone shows the BlokeBot Channel setup page at a scrolled position"
+            LaptopAlt="A laptop shows the BlokeBot channel dashboard at a scrolled position"
             Caption="One channel dashboard, shaped for the screen in front of you."
             />
     </div>
@@ -35,9 +35,9 @@
 
 <section class="role-strip section-shell" aria-labelledby="choose-path-heading">
     <div class="section-intro">
-        <p class="eyebrow">Start with your job</p>
-        <h2 id="choose-path-heading">The right instructions, without the infrastructure detour</h2>
-        <p>Most people using BlokeBot do not need to install anything. Pick the path that matches what you are doing today.</p>
+        <p class="eyebrow">Choose your role</p>
+        <h2 id="choose-path-heading">Use the instructions for your role</h2>
+        <p>Most BlokeBot users do not install the application. Each path gives instructions for one role.</p>
     </div>
     <div class="path-grid">
         <a class="path-card path-card--owner" href="guide/getting-started">
@@ -47,14 +47,14 @@
             </span>
             <span>
                 <strong>Channel owner</strong>
-                <small>Sign in, connect Twitch and choose the tools your channel needs.</small>
+                <small>If you manage the channel and its tools, use this path.</small>
             </span>
             <ul class="check-list path-card__list">
-                <li>Connect chat and the Twitch integration</li>
-                <li>Turn on only the tools the channel needs</li>
-                <li>Give moderators a dashboard they can help from</li>
+                <li>Complete the connections for chat and the Twitch integration</li>
+                <li>Activate only the required tools</li>
+                <li>Give moderators access to the dashboard</li>
             </ul>
-            <span class="path-card__cta">Start here <SiteIcon Name="arrow" /></span>
+            <span class="path-card__cta">Open the channel owner guide <SiteIcon Name="arrow" /></span>
         </a>
         <a class="path-card path-card--moderator" href="moderators">
             <span class="path-card__head">
@@ -63,14 +63,14 @@
             </span>
             <span>
                 <strong>Moderator</strong>
-                <small>Learn what you can operate and why access can change while you are signed in.</small>
+                <small>If you operate tools for a channel owner, use this path.</small>
             </span>
             <ul class="check-list path-card__list">
-                <li>See which tools you can operate today</li>
-                <li>Understand why access appears and disappears</li>
-                <li>Act on readiness warnings during a stream</li>
+                <li>Review your current tool access</li>
+                <li>Learn why your access can change</li>
+                <li>Respond to readiness warnings during a stream</li>
             </ul>
-            <span class="path-card__cta">See your access <SiteIcon Name="arrow" /></span>
+            <span class="path-card__cta">Open the moderator guide <SiteIcon Name="arrow" /></span>
         </a>
         <a class="path-card path-card--server" href="server-owners">
             <span class="path-card__head">
@@ -79,14 +79,14 @@
             </span>
             <span>
                 <strong>Server owner</strong>
-                <small>Install, configure Twitch OAuth, provide HTTPS and protect state.</small>
+                <small>If you install and maintain BlokeBot, use this path.</small>
             </span>
             <ul class="check-list path-card__list">
-                <li>Install from Docker or a package</li>
-                <li>Configure Twitch OAuth and HTTPS</li>
-                <li>Back up durable state on your schedule</li>
+                <li>Install BlokeBot with Docker or a package</li>
+                <li>Configure HTTPS and Twitch OAuth</li>
+                <li>Create backups of durable state on your schedule</li>
             </ul>
-            <span class="path-card__cta">Set up a server <SiteIcon Name="arrow" /></span>
+            <span class="path-card__cta">Open the server owner guide <SiteIcon Name="arrow" /></span>
         </a>
     </div>
 </section>
@@ -101,11 +101,11 @@
         <div class="feature-spotlight">
             <div>
                 <span class="feature-icon"><SiteIcon Name="alert" /></span>
-                <h3>Readiness you can act on</h3>
-                <p>Connection state, moderator authority, follower-only chat and delivery failures point to a next action instead of leaving the bot silently offline.</p>
-                <a href="connect">Connect Twitch correctly</a>
+                <h3>Use readiness information</h3>
+                <p>The readiness panel shows problems that stop the bot. Each problem includes a next action.</p>
+                <a href="connect">Open the Twitch connection guide</a>
             </div>
-            <div class="status-demo" role="img" aria-label="Example of the channel readiness panel">
+            <div class="status-demo" role="img" aria-label="Example channel readiness panel">
                 <p class="status-demo__title">Channel readiness</p>
                 <ul>
                     <li>Chat connected <span>Ready</span></li>
@@ -117,33 +117,33 @@
         <div class="tool-grid">
             <article class="tool-card">
                 <span class="feature-icon"><SiteIcon Name="command" /></span>
-                <h3>Commands &amp; messages</h3>
-                <p>Reusable replies, aliases, counters, cooldowns, scheduled chat and native Twitch announcements.</p>
-                <a href="commands">Build a command</a>
+                <h3>Commands and messages</h3>
+                <p>Commands provide reusable replies and aliases. They can use counters and cooldowns. BlokeBot can schedule chat messages and send native Twitch announcements.</p>
+                <a href="commands">Create a command</a>
             </article>
             <article class="tool-card">
                 <span class="feature-icon"><SiteIcon Name="trophy" /></span>
-                <h3>Guessing games</h3>
-                <p>Reusable round types, live votes, history and public rankings.</p>
-                <a href="guessing">Run a round</a>
+                <h3>Prediction games</h3>
+                <p>Create reusable round types. View live votes and round history. Share public rankings.</p>
+                <a href="guessing">Start a round</a>
             </article>
             <article class="tool-card">
                 <span class="feature-icon"><SiteIcon Name="coins" /></span>
-                <h3>Points &amp; giveaways</h3>
-                <p>Balances, transfers, gambling, prizes and controlled giveaway entry.</p>
-                <a href="points">Manage points</a>
+                <h3>Points and giveaways</h3>
+                <p>Manage balances and transfers. Configure games of chance and prizes. Control entry to giveaways.</p>
+                <a href="points">Open the points guide</a>
             </article>
             <article class="tool-card">
                 <span class="feature-icon"><SiteIcon Name="trophy" /></span>
                 <h3>Community progression</h3>
-                <p>Bounties, passports, tournaments, BlokeRaid, Collectives, seasons, achievements and Stream-event Bingo.</p>
-                <a href="community/progression">Build community progress</a>
+                <p>Use bounties and passports. Run tournaments and BlokeRaid. Coordinate Collectives and seasons. Track achievements and Stream-event Bingo.</p>
+                <a href="community/progression">Configure community progress</a>
             </article>
             <article class="tool-card tool-card--accent">
                 <span class="feature-icon"><SiteIcon Name="arrow" /></span>
                 <h3>Public leaderboards</h3>
-                <p>Share read-only results without giving viewers dashboard access.</p>
-                <a href="leaderboards">Share a ranking</a>
+                <p>Public leaderboards show read-only results. Viewers do not get access to the dashboard.</p>
+                <a href="leaderboards">Open the leaderboard guide</a>
             </article>
         </div>
     </div>
@@ -151,9 +151,9 @@
 
 <section class="directory section-shell" aria-labelledby="docs-heading">
     <div class="section-intro">
-        <p class="eyebrow">Documentation that follows the product</p>
-        <h2 id="docs-heading">Find the page that explains your screen</h2>
-        <p>The user guide is organised the way the dashboard is. Start from the feature in front of you.</p>
+        <p class="eyebrow">Help for each product page</p>
+        <h2 id="docs-heading">Find help for the current page</h2>
+        <p>The user guide follows the dashboard structure. Each guide explains one feature.</p>
     </div>
     <div class="directory-grid">
         @foreach (var group in SiteGuideCatalog.NavigationGroups)
@@ -170,7 +170,7 @@
         }
     </div>
     <div class="directory-actions action-row">
-        <a class="button button-primary" href="guide"><SiteIcon Name="book" />Browse the user guide</a>
-        <a class="text-link" href="troubleshooting">Something is not working</a>
+        <a class="button button-primary" href="guide"><SiteIcon Name="book" />Open the user guide</a>
+        <a class="text-link" href="troubleshooting">Open the troubleshooting guide</a>
     </div>
 </section>
