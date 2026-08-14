@@ -8,80 +8,91 @@ internal static partial class SiteGuideCatalog
         {
             Route = "/community/passports",
             Eyebrow = "Community interaction · Viewer identity",
-            Title = "Choose your viewer passport",
+            Title = "Choose a viewer passport",
             Summary =
-                "Opt in to a host-scoped profile, choose exactly who can see it and keep control of the activity BlokeBot presents.",
+                "Create a host-scoped profile. Choose its audience and the activity that BlokeBot presents.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-viewer-passport-participant.png",
                 LightPhoneSource: "media/community/figures/phone-light-viewer-passport-participant.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-viewer-passport-participant.png",
                 LightLaptopSource: "media/community/figures/laptop-light-viewer-passport-participant.png",
-                PhoneAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
-                LaptopAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen, showing selected public identity and channel activity.",
-                "A viewer owns the editor and visibility choice; the public route contains only the resulting permitted projection."
+                PhoneAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen that shows selected public identity and channel activity.",
+                LaptopAlt: "The Sample Channel public NightOwl viewer passport on a narrow screen that shows selected public identity and channel activity.",
+                "A viewer controls the editor and visibility. The public route contains only the permitted projection."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Enable the opt-in feature",
+                    Heading = "Enable Viewer passports",
                     Steps =
                     [
-                        "A channel owner or permitted moderator chooses the channel, opens Channel setup and turns on Viewer passports under Chat tools. The feature card persists the change immediately; the switch is off for every channel until selected.",
-                        "The viewer signs in with Twitch and opens /passports/{channel}/me. BlokeBot keys the passport to that Twitch user ID, so a later login or display-name change updates the same profile instead of creating another one.",
-                        "A new passport starts Private with attendance hidden. Saving a different visibility is the viewer's explicit opt-in to broader presentation.",
+                        "As the channel owner or permitted moderator, choose the channel. Open Channel setup. Turn on Viewer passports under Chat tools.",
+                        "Expect the feature card to save the change immediately. Expect each channel to start with this switch off.",
+                        "As the viewer, sign in with Twitch. Open /passports/{channel}/me. Expect BlokeBot to link the passport to that Twitch user ID.",
+                        "Expect a later login or display-name change to update the same profile. Expect a new passport to start Private and hide attendance.",
+                        "Save a different visibility to approve a broader audience.",
                     ],
                     Note =
-                        "Replace {channel} with the channel login. The host, moderators and other viewers cannot choose a viewer's profile line, rewards, visibility or attendance setting for them.",
+                        "Replace {channel} with the channel login. Only the viewer can choose the profile line, rewards, visibility, and attendance choice.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Build a bounded profile",
+                    Heading = "Create a bounded profile",
                     Bullets =
                     [
-                        "Enter a profile line of at most 160 characters. BlokeBot presents it as plain text; the channel's moderation policy still applies.",
-                        "Choose only a title or badge already earned in this channel. An unearned or stale reward selection is rejected rather than substituted.",
-                        "The preview combines permitted points and rank, Guessing results, achievements, games and giveaways won, supported bounties and approved Moments. Source features remain the record of truth; the passport only summarises what they already hold.",
-                        "Attendance counts consecutive UTC days with a chat message. It does not measure watch time, and Show attendance streak can be changed independently of profile visibility.",
+                        "Enter a profile line of 160 characters or fewer.",
+                        "BlokeBot presents the profile line as plain text. The channel moderation policy still applies.",
+                        "Choose only a title or badge that the viewer earned in this channel.",
+                        "BlokeBot rejects an unearned or stale reward selection.",
+                        "The preview combines permitted points, rank, Guessing results, achievements, game and giveaway wins, supported bounties, and approved Moments. Each source feature remains authoritative. The passport summarizes its current records.",
+                        "Attendance counts consecutive UTC days with a chat message. It does not measure watch time.",
+                        "Change Show attendance streak independently of profile visibility.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Choose who can see it",
+                    Heading = "Choose the audience",
                     Bullets =
                     [
-                        "Public allows anyone with /passport/{channel}/{viewer} to see the selected public-safe profile fields and allows the chat summary and public overlay or automation projection.",
-                        "Channel members allows the viewer, channel managers and signed-in people who have their own passport in this channel. Anonymous visitors and unrelated signed-in accounts receive an unavailable result.",
-                        "Private allows only the viewer and that channel's owner or permitted managers. Private and Channel members profiles do not leak through public chat summaries, overlays, automations, leaderboards or other public identity projections.",
-                        "The public route never exposes Twitch user IDs, private source history, hidden attendance or unselected rewards.",
+                        "Public lets anyone with /passport/{channel}/{viewer} see the selected public-safe fields. It also permits chat, overlay, and automation projections.",
+                        "Channel members permits the viewer, channel managers, and signed-in people with a passport in this channel. Other accounts receive an unavailable result.",
+                        "Private permits only the viewer, channel owner, and permitted managers. Private and Channel members profiles stay out of all public identity projections.",
+                        "The public route excludes Twitch user IDs, private source history, hidden attendance, and unselected rewards.",
                     ],
                     Code = "!passport",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Save export or reset",
+                    Heading = "Save, export, or reset the passport",
                     Bullets =
                     [
-                        "Select Save passport after changing the profile line, title, badge, visibility or attendance choice. This is the page's sticky Save action.",
-                        "Export my channel data downloads the data this self-hosted BlokeBot associates with the viewer's Twitch identity in this channel.",
-                        "Reset passport requires confirmation and removes the passport and its chat-presence days. It does not rewrite the original points, Guessing, achievement, giveaway, bounty or Moment records owned by those features.",
+                        "Select Save passport after a profile change.",
+                        "This control is the sticky Save action for the page.",
+                        "Export my channel data downloads data that this BlokeBot installation associates with the viewer's Twitch identity in this channel.",
+                        "Confirm Reset passport to remove the passport and its chat-presence days.",
+                        "The reset does not change original points, Guessing, achievement, giveaway, bounty, or Moment records.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Recover privacy and availability",
+                    Heading = "Restore privacy and availability",
                     Bullets =
                     [
-                        "If a public link is unavailable, confirm the channel and viewer login, the viewer's current visibility, the audience's sign-in or channel membership and whether the passport has been reset.",
-                        "If activity is stale, use the current Twitch identity and wait for a supported source event. Suppressed or historical activity is not reconstructed on demand.",
-                        "Turning Viewer passports off removes normal discovery and public output and blocks edits, chat updates, commands, exports, resets, overlay data and automation payloads before effects. The signed-in direct route links back to Channel setup.",
-                        "Saved passports, visibility and chat-presence days remain. Re-enable resumes from retained current state; chat messages, events, timers, queued work and provider actions suppressed while off are not replayed.",
+                        "If a public link is unavailable, verify the channel, viewer login, visibility, audience access, and passport state.",
+                        "If activity is stale, use the current Twitch identity and wait for a supported source event.",
+                        "BlokeBot does not reconstruct suppressed or historical activity on demand.",
+                        "Turn off Viewer passports to remove discovery and public output.",
+                        "BlokeBot then blocks edits, chat updates, commands, exports, resets, overlay data, and automation payloads before effects.",
+                        "The signed-in direct route links to Channel setup. BlokeBot retains passports, visibility, and chat-presence days.",
+                        "Re-enable the feature to resume the retained current state.",
+                        "BlokeBot does not replay suppressed chat messages, events, timers, queued work, or provider actions.",
                     ],
                 },
             ],
             Next =
             [
-                new SiteLink("Build seasons and earned rewards", "community/progression"),
+                new SiteLink("Create seasons and earned rewards", "community/progression"),
                 new SiteLink("Review privacy boundaries", "privacy"),
             ],
         };
@@ -92,53 +103,57 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Community progression · Competitions",
             Title = "Run tournaments and leagues",
             Summary =
-                "Register viewers or teams, generate a reproducible schedule, confirm and correct results, then publish bounded standings and archives.",
+                "Register viewers or teams. Create a reproducible schedule. Confirm results and publish bounded standings and archives.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-competition-result.png",
                 LightPhoneSource: "media/community/figures/phone-light-competition-result.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-competition-result.png",
                 LightLaptopSource: "media/community/figures/laptop-light-competition-result.png",
-                PhoneAlt: "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
-                LaptopAlt: "The Sample Channel Tournaments and leagues workspace showing the running Summer Community Circuit, lifecycle actions and standings.",
-                "Staff manage authoritative lifecycle and results; viewers receive the current public bracket, schedule or standings."
+                PhoneAlt: "The Sample Channel Tournaments and leagues workspace that shows the active Summer Community Circuit, lifecycle actions, and standings.",
+                LaptopAlt: "The Sample Channel Tournaments and leagues workspace that shows the active Summer Community Circuit, lifecycle actions, and standings.",
+                "Staff control the authoritative lifecycle and results. Viewers receive the current public bracket, schedule, or standings."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Enable and assign authority",
+                    Heading = "Enable the feature and assign authority",
                     Steps =
                     [
-                        "The channel owner or a permitted moderator opens Channel setup and turns on Tournaments & leagues under Chat tools. The feature card persists the change immediately; this distinct switch starts off for every channel.",
-                        "Owners and permitted moderators create competitions, register or remove entrants, move the lifecycle, enter or correct results, send permitted reminders and archive records. A moderator can act only for the selected channel.",
-                        "Viewers use !competitions for the current public competition and !competitionjoin during individual registration. Team registration and private contact details are handled by authorised staff in the dashboard.",
+                        "As the channel owner or permitted moderator, choose the channel. Open Channel setup. Turn on Tournaments & leagues under Chat tools.",
+                        "Expect the feature card to save the change immediately. Expect each channel to start with this switch off.",
+                        "As an owner or permitted moderator, control competitions, entrants, lifecycle, results, permitted reminders, and archives.",
+                        "As a moderator, act only for the selected channel.",
+                        "As a viewer, use !competitions for the current public competition. Use !competitionjoin for individual registration.",
+                        "As authorized staff, manage teams and private contact details in the dashboard.",
                     ],
                     Code = "!competitions\n!competitionjoin",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Create the competition contract",
+                    Heading = "Create a competition contract",
                     Steps =
                     [
-                        "Create a Draft and choose Tournament bracket, Round robin or Prediction league plus Individuals or Teams.",
-                        "Set capacity, team size, optional minimum-points eligibility, schedule order, standing points, tiebreak rules and reminder lead time before opening registration.",
-                        "Configure confirmed-win milestone and final-placement points or predeclared Community progression achievement keys only when those rewards are intended.",
-                        "Open registration after reviewing the public name and rules. A format cannot be silently changed after results exist.",
+                        "Create a Draft. Choose Tournament bracket, Round robin, or Prediction league. Choose Individuals or Teams.",
+                        "Before you open registration, set capacity, team size, optional minimum-points eligibility, schedule order, points, tiebreak rules, and reminder lead time.",
+                        "Configure the confirmed-win milestone, final-placement points, or declared Community progression achievement keys only for intended rewards.",
+                        "Review the public name and rules. Then open registration. Do not change the format after results exist.",
                     ],
                     Bullets =
                     [
-                        "Prediction leagues treat each fixture's entered scores as correct-prediction totals, then apply the configured standing points and tiebreaks.",
-                        "Random schedule generation records its seed and BlokeBot algorithm version. Moderator-ranked seeding records the supplied ranks. Both preserve a reproducible entrant order.",
+                        "Prediction leagues treat entered fixture scores as correct-prediction totals. They apply the configured points and tiebreaks.",
+                        "A random schedule records its seed and BlokeBot algorithm version. A moderator-ranked schedule records the supplied ranks. Both preserve entrant order.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Register and start",
+                    Heading = "Register entrants and start",
                     Bullets =
                     [
-                        "Registration accepts only the configured entry kind, capacity, team size and eligibility. A viewer chat join requires an authenticated Twitch user ID and joins the first open individual competition.",
-                        "Private contact, lobby information, Twitch user IDs and moderator registration notes stay in the dashboard. The configured public entrant name is the deliberate public identity boundary.",
-                        "Generate & start closes registration and persists the bracket or round schedule. If registration is closed, full, ineligible or the competition changed, fix or reload that visible state instead of retrying with invented data.",
+                        "Registration enforces entry kind, capacity, team size, and eligibility. A chat join requires an authenticated Twitch user ID and selects the first open individual competition.",
+                        "Private contact, lobby information, Twitch user IDs, and moderator notes stay in the dashboard. Only the configured entrant name becomes public.",
+                        "Select Generate & start to close registration and save the bracket or round schedule.",
+                        "If registration closes or reaches capacity, correct or reload the visible state. Do the same if eligibility blocks entry or the competition changed.",
                     ],
                 },
                 new SiteGuideSection
@@ -146,31 +161,37 @@ internal static partial class SiteGuideCatalog
                     Heading = "Confirm and correct results",
                     Bullets =
                     [
-                        "Choose a scheduled match, enter both scores and confirm. Tournament advancement and league standings recompute from confirmed results.",
-                        "Correcting a confirmed result retains its previous scores and private audit reason. A tournament correction safely clears downstream outcomes that no longer follow from the corrected winner.",
-                        "Confirmed-win and final-placement rewards are idempotent across corrections, recomputation and retries; an already granted milestone is not paid again.",
-                        "A stale revision or changed status returns a conflict. Reload the competition, verify the selected match and current downstream effects, then apply a fresh intentional correction.",
+                        "Choose a scheduled match. Enter both scores and confirm them.",
+                        "BlokeBot recalculates advancement and standings from confirmed results.",
+                        "A result correction retains the previous scores and private audit reason. A tournament correction clears outcomes that no longer follow from the corrected winner.",
+                        "Corrections, recalculation, and retries do not duplicate confirmed-win or final-placement rewards. BlokeBot does not grant the same milestone twice.",
+                        "A stale revision or status returns a conflict.",
+                        "Reload the competition. Verify the match and its current downstream effects. Then apply the intended correction.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Complete archive and publish",
+                    Heading = "Complete, archive, and publish",
                     Bullets =
                     [
-                        "Complete competition evaluates final placements and rewards from the authoritative confirmed state. Archive then keeps the format, schedule, standings, results and audit history as completed history.",
-                        "The public route /competitions/{channel} shows entrant identities, schedule or bracket, standings, confirmed scores and archives. Lifecycle events sent to overlays or automations use the same bounded public state.",
-                        "Private contact, lobby information, moderator notes, audit reasons, internal IDs and provider details never appear on the public page or lifecycle payloads.",
-                        "Match reminders use private delivery only where permitted; an unavailable provider does not make the match public or fabricate successful delivery.",
+                        "Select Complete competition to evaluate final placements and rewards from the authoritative confirmed state.",
+                        "Select Archive to retain the format, schedule, standings, results, and audit history as completed history.",
+                        "The public route /competitions/{channel} shows entrants, schedule or bracket, standings, confirmed scores, and archives. Lifecycle events use the same bounded public state.",
+                        "The public page and lifecycle payloads exclude private contact, lobby information, moderator notes, audit reasons, internal IDs, and provider details.",
+                        "Match reminders use permitted private delivery. An unavailable provider does not expose the match or report a successful delivery.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Pause and recover",
+                    Heading = "Pause and restore the feature",
                     Bullets =
                     [
-                        "Turning Tournaments & leagues off removes normal discovery and public data and blocks registration, starts, results, advancement, reminders, rewards, events, commands and provider work before mutation. The retained signed-in direct route links to Channel setup.",
-                        "Formats, entrants, schedules, results, audit history and archives remain saved. Re-enable resumes that current lifecycle without replaying suppressed commands, reminders, rewards, events, subscriptions or provider work.",
-                        "If a public page or command is unavailable, confirm the selected channel, switch, current lifecycle and entry kind. If a result action is stale, reload before retrying; do not repeatedly submit an old revision.",
+                        "Turn off Tournaments & leagues to remove discovery and public data.",
+                        "BlokeBot then blocks registration, starts, results, advancement, reminders, rewards, events, commands, and provider work before changes.",
+                        "The signed-in direct route links to Channel setup. BlokeBot retains formats, entrants, schedules, results, audit history, and archives.",
+                        "Re-enable the feature to resume the current lifecycle.",
+                        "BlokeBot does not replay suppressed commands, reminders, rewards, events, subscriptions, or provider work.",
+                        "If a page or command is unavailable, verify the channel, switch, lifecycle, and entry kind. If an action is stale, reload before another attempt.",
                     ],
                 },
             ],
@@ -190,112 +211,120 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Community interaction · Raids",
             Title = "Use the raid and collaboration hub",
             Summary =
-                "Welcome incoming communities once, shortlist only explicitly approved live channels and keep every outgoing Twitch raid under host confirmation.",
+                "Welcome each raid community once. List only approved live channels. Require host confirmation for every Twitch raid from the channel.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-raid-collaboration.png",
                 LightPhoneSource: "media/community/figures/phone-light-raid-collaboration.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-raid-collaboration.png",
                 LightLaptopSource: "media/community/figures/laptop-light-raid-collaboration.png",
-                PhoneAlt: "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
-                LaptopAlt: "The Sample Channel raid hub on a narrow screen showing approved live channels and host-controlled Shoutout and Prepare raid actions.",
-                "The narrow active hub keeps approved candidates, explainable filters and host-confirmed Twitch actions readable together."
+                PhoneAlt: "The Sample Channel raid hub on a narrow screen that shows approved live channels and host-controlled Shoutout and Prepare raid actions.",
+                LaptopAlt: "The Sample Channel raid hub on a narrow screen that shows approved live channels and host-controlled Shoutout and Prepare raid actions.",
+                "The active hub shows approved candidates, filter reasons, and host-confirmed Twitch actions together."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Connect and opt in",
+                    Heading = "Connect Twitch and enable the feature",
                     Steps =
                     [
-                        "Connect the selected Twitch channel, then have its owner or permitted moderator turn on Raid & collaboration in Channel setup. The feature card persists the change immediately; this distinct switch starts off for every channel.",
-                        "The owner or a moderator permitted for the selected channel configures welcome and shortlist settings and operates the hub. Viewers do not approve channels or start provider actions.",
-                        "The channel owner reconnects the Twitch integration with raid management access when Confirm and start raid reports missing authority.",
+                        "Connect the selected Twitch channel. Ask its owner or permitted moderator to turn on Raid & collaboration in Channel setup.",
+                        "Expect the feature card to save the change immediately. Expect each channel to start with this switch off.",
+                        "As the owner or a permitted moderator, configure the welcome settings and shortlist. Operate the hub.",
+                        "As a viewer, do not approve channels or start provider actions.",
+                        "If Confirm and start raid reports no authority, ask the channel owner to reconnect Twitch with raid management access.",
                     ],
                     Note =
-                        "Raid & collaboration owns every shoutout, manual and automatic. Twitch authority, live state, cooldown and provider checks are still enforced at send time.",
+                        "Raid & collaboration controls all manual and automatic shoutouts. BlokeBot checks Twitch authority, live state, cooldown, and the provider before each send.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Welcome an incoming raid",
+                    Heading = "Welcome a raid",
                     Bullets =
                     [
-                        "Choose whether the welcome message runs, write the bounded tokenised message and set the deduplication window.",
-                        "Incoming Twitch EventSub supplies the source channel and one aggregate viewer count. BlokeBot does not infer, enumerate or store individual viewer attribution.",
-                        "Duplicate deliveries converge into one history entry. Repeated raids inside the configured window do not repeat the welcome sequence.",
-                        "The history records visible welcome and shoutout outcomes. A cooldown, offline state or provider rejection remains an explicit non-success rather than a fabricated send.",
+                        "Choose whether the welcome message runs. Write the bounded tokenized message. Set the duplicate-prevention window.",
+                        "Twitch EventSub supplies the source channel and one total viewer count. BlokeBot does not infer or store individual viewer attribution.",
+                        "Duplicate deliveries create one history entry. Repeated raids within the configured window do not repeat the welcome sequence.",
+                        "The history records welcome and shoutout outcomes. A cooldown, offline state, or provider rejection records an explicit non-success.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Shout out a raider automatically",
+                    Heading = "Configure automatic raid shoutouts",
                     Media = new SiteMedia(
                         DarkPhoneSource: "media/community/figures/phone-dark-shoutout-setup.png",
                         LightPhoneSource: "media/community/figures/phone-light-shoutout-setup.png",
                         DarkLaptopSource: "media/community/figures/laptop-dark-shoutout-setup.png",
                         LightLaptopSource: "media/community/figures/laptop-light-shoutout-setup.png",
-                        PhoneAlt: "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
-                        LaptopAlt: "The Sample Channel automatic raid shoutout settings showing the pinned chat message, its available tokens and the rendered viewer preview.",
-                        "Automatic shoutout setup keeps the message, its tokens and the preview viewers will see readable together before one save."
+                        PhoneAlt: "The Sample Channel automatic raid shoutout settings that show the pinned chat message, available tokens, and viewer preview.",
+                        LaptopAlt: "The Sample Channel automatic raid shoutout settings that show the pinned chat message, available tokens, and viewer preview.",
+                        "The automatic shoutout setup shows the message, its tokens, and the viewer preview before one save."
                     ),
                     Steps =
                     [
-                        "Automatic raid shoutouts are off by default. Open Settings, turn them on when you are ready and set the minimum viewer count.",
-                        "Turn on Only shoutout approved channels when a raider should be shouted out only after you have approved that channel.",
+                        "Expect automatic raid shoutouts to start off. Open Settings. Turn them on and set the minimum viewer count.",
+                        "Turn on Only shoutout approved channels to restrict shoutouts to channels that you approved.",
                         "Choose either a Native Twitch shoutout or a Chat message.",
-                        "For a chat message, choose Regular, Pinned or Announcement. A pinned message can use a duration from 30 to 1,800 seconds or stay pinned until stream end; an announcement colour is Default, Blue, Green, Orange or Purple.",
-                        "Write the message, check its preview and readiness note, then save the settings once.",
+                        "For a chat message, choose Regular, Pinned, or Announcement. Set a Pinned duration from 30 to 1,800 seconds, or until stream end. For Announcement, choose Default, Blue, Green, Orange, or Purple.",
+                        "Write the message. Check its preview and readiness note. Then save the settings once.",
                     ],
                     Bullets =
                     [
-                        "Message tokens include {twitch_handle}, {display_name}, {channel_url}, {viewer_count}, {last_game|fallback} and {stream_title|fallback}.",
-                        "Last game and stream title need an inline fallback because Twitch may not provide them.",
-                        "BlokeBot handles each eligible raid once. A failed native shoutout is not replaced with a chat message, and a failed announcement is not replaced with a regular message.",
+                        "Message tokens include {twitch_handle}, {display_name}, {channel_url}, {viewer_count}, {last_game|fallback}, and {stream_title|fallback}.",
+                        "Last game and stream title require an inline fallback because Twitch can omit them.",
+                        "BlokeBot processes each eligible raid once. It does not replace a failed native shoutout with a chat message.",
+                        "BlokeBot does not replace a failed announcement with a regular message.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Send a shoutout now and check an automatic outcome",
+                    Heading = "Send a shoutout and check its outcome",
                     Bullets =
                     [
-                        "Send a shoutout takes any Twitch name that is live with viewers. Wait for the result before trying again, and use the displayed cooldown to decide when another send is available.",
-                        "Approve channel on a relationship history entry adds that channel to Approved channels immediately, and the action disappears once it is approved.",
-                        "Automatic shoutout outcomes shows the newest raid results and why a send was skipped or incomplete. Native shoutouts can be skipped while Twitch's cooldown is active.",
-                        "A pinned message can be sent even when Twitch cannot pin it afterwards; the outcome states both parts.",
-                        "Fix the connection or permission named by the outcome before the next raid. There is no retry or fallback action for an earlier raid.",
-                        "If BlokeBot asks for the bot account to be reconnected, restore that account's moderator role first, then reconnect it from Channel setup.",
+                        "Enter a live Twitch name with viewers in Send a shoutout. Wait for the result. Use the displayed cooldown before another send.",
+                        "Select Approve channel on a history entry to add that channel to Approved channels. Expect the action to disappear after approval.",
+                        "Automatic shoutout outcomes shows the newest raid results and reasons for a skipped or incomplete send. Twitch can skip native shoutouts during its cooldown.",
+                        "Twitch can send a Pinned message but fail to pin it. The outcome reports both parts.",
+                        "Before the next raid, correct the connection or permission in the outcome. Do not retry or use a fallback for an earlier raid.",
+                        "If BlokeBot requests a bot account reconnection, restore its moderator role. Then reconnect it from Channel setup.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Build an approved shortlist",
+                    Heading = "Create an approved shortlist",
                     Steps =
                     [
-                        "Add Twitch channels deliberately to Approved channels. Approval reflects only this channel's own decision to allow another; Twitch supplies no relationship, safety score or reputation signal for it.",
-                        "Optionally restrict language and categories and set the recent outgoing-relationship gap. Save settings.",
-                        "Review live candidates and the reason each other approved channel is excluded. The hub rechecks live state, language, category and recent history rather than using a stale recommendation.",
-                        "An optional approved clip appears only when Twitch confirms that it belongs to that channel and is no more than 30 days old.",
+                        "Add Twitch channels to Approved channels only after this channel makes a deliberate approval decision.",
+                        "Do not use a Twitch relationship, safety score, or reputation signal because Twitch supplies none of these signals for approval.",
+                        "If required, restrict the language and categories. Set the recent outgoing-relationship gap. Save the settings.",
+                        "Review the live candidates and each exclusion reason. Expect the hub to check current live state, language, category, and recent history.",
+                        "Use an approved clip only if Twitch confirms its channel and an age of 30 days or fewer.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Confirm host-owned actions",
+                    Heading = "Confirm host-controlled actions",
                     Bullets =
                     [
-                        "Shoutout on a shortlist candidate uses the shared native Twitch boundary and repeats authority, live-state, cooldown and deduplication checks at send time.",
-                        "Prepare raid opens an explicit confirmation for the selected approved live channel. It does not call Twitch.",
-                        "Only Confirm and start raid performs the outgoing provider action, after rechecking the feature and Twitch authority. The hub never raids automatically from a recommendation, incoming relationship or retry.",
-                        "If the target goes offline, becomes ineligible, authorization expires or the provider declines, refresh the hub and make a new host decision. Do not assume the previous preparation remains authority.",
+                        "Shoutout uses the shared native Twitch boundary. BlokeBot repeats authority, live-state, cooldown, and duplicate checks before the send.",
+                        "Select Prepare raid to open confirmation for the approved live channel. Do not expect this action to call Twitch.",
+                        "Only Confirm and start raid calls the outgoing provider after new feature and Twitch authority checks. The hub never starts a raid automatically.",
+                        "If the target goes offline or becomes ineligible, refresh the hub and make a new host decision.",
+                        "If authorization expires or the provider declines, use the same recovery. Do not treat the previous preparation as authority.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Pause retain and recover",
+                    Heading = "Pause, retain, and restore",
                     Bullets =
                     [
-                        "Turning Raid & collaboration off removes discovery and blocks the hub, EventSub subscription and reconciliation, welcome sequence, history mutations, shortlist checks, shoutout handoff and outgoing provider calls before effects.",
-                        "Settings, approved channels and history remain private and retained. The signed-in direct route points to Channel setup.",
-                        "Re-enable establishes current subscriptions and accepts new work. Incoming events, welcome steps, shoutouts, timers, queued work and outgoing actions suppressed while off are never replayed.",
-                        "If incoming raids are absent after re-enable, confirm the selected channel ID and Twitch connection rather than relying on login fallback. If native actions fail, reconnect the owning channel account with the requested permission.",
+                        "Turn off Raid & collaboration to remove discovery.",
+                        "BlokeBot then blocks the hub, EventSub subscription, reconciliation, welcome sequence, history changes, shortlist checks, shoutout handoff, and provider calls before effects.",
+                        "BlokeBot retains private settings, approved channels, and history. The signed-in direct route points to Channel setup.",
+                        "Re-enable the feature to establish current subscriptions and accept new work.",
+                        "BlokeBot does not replay suppressed events, welcome steps, shoutouts, timers, queued work, or raid actions from the host.",
+                        "If raids remain absent, verify the selected channel ID and Twitch connection. Do not rely on a login fallback.",
+                        "If native actions fail, reconnect the account for the owning channel with the requested permission.",
                     ],
                 },
             ],
@@ -312,86 +341,94 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Community progression · Cooperative game",
             Title = "Run a persistent BlokeRaid campaign",
             Summary =
-                "Carry one host-scoped channel boss across streams while preserving resolved actions, shared ward progress, phases, standings and completion recaps.",
+                "Keep one host-scoped channel boss across streams. Preserve resolved actions, shared ward progress, phases, standings, and completion recaps.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-blokeraid-completion.png",
                 LightPhoneSource: "media/community/figures/phone-light-blokeraid-completion.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-blokeraid-completion.png",
                 LightLaptopSource: "media/community/figures/laptop-light-blokeraid-completion.png",
-                PhoneAlt: "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
-                LaptopAlt: "The Sample Channel public BlokeRaid page on a narrow screen showing current contributors and the completed Static Colossus recap.",
-                "The active campaign persists across streams; the public route keeps current standings and the latest completed recap readable."
+                PhoneAlt: "The Sample Channel public BlokeRaid page on a narrow screen that shows current contributors and the completed Static Colossus recap.",
+                LaptopAlt: "The Sample Channel public BlokeRaid page on a narrow screen that shows current contributors and the completed Static Colossus recap.",
+                "The active campaign persists across streams. The public route shows current standings and the latest completed recap."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Enable and configure the game",
+                    Heading = "Enable and configure Cooperative game",
                     Steps =
                     [
-                        "A channel owner or permitted moderator opens Channel setup and turns on Cooperative game under Chat tools. The feature card persists the change immediately; the switch is off for every channel until selected.",
-                        "Open BlokeRaid at /raid and configure the boss name, health, shared ward, duration, deterministic phase thresholds and public responses.",
-                        "Set outcome range, cooldown and per-stream limit for Attack, Mend and Nova; set Nova's point cost, damage per correct Guessing result and the per-contributor victory point reward.",
-                        "Choose Manual or Weekly reset. Weekly reset uses the configured UTC weekday and hour. Select Save configuration, then start one campaign.",
+                        "As the channel owner or permitted moderator, choose the channel. Open Channel setup. Turn on Cooperative game under Chat tools.",
+                        "Expect the feature card to save the change immediately. Expect each channel to start with this switch off.",
+                        "Open BlokeRaid at /raid. Configure the boss name, health, shared ward, duration, deterministic phase thresholds, and public responses.",
+                        "Set the outcome range, cooldown, and stream limit for Attack, Mend, and Nova.",
+                        "Set the Nova point cost and damage for each correct Guessing result. Set the point reward for each victory contributor.",
+                        "Choose Manual or Weekly reset. For Weekly reset, configure the UTC weekday and hour. Select Save configuration. Then start one campaign.",
                     ],
                     Paragraphs =
                     [
-                        "Configuration changes affect the next action, but recorded outcomes and completed recaps do not reroll. An active campaign's phase can move only forward even if thresholds are edited.",
+                        "Configuration changes affect the next action. They do not recalculate recorded outcomes or completed recaps. An active campaign phase can only move forward.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Assign host moderator and viewer actions",
+                    Heading = "Assign host, moderator, and viewer actions",
                     Bullets =
                     [
-                        "The owner and permitted moderators use the dashboard or moderator-only !raid start, !raid end and !raid reset commands. They control lifecycle, not individual viewer outcomes.",
-                        "While Twitch reports the channel live, a viewer uses attack to damage the boss, mend to restore the shared ward or nova to spend the configured BlokeBot points for a special attack.",
-                        "Each authenticated chat action records its resolved outcome, stream identity, before-and-after health and ward and resulting phase. Retrying the same message does not reroll or double-spend it.",
-                        "Status and standings are available in chat and at /raid/{channel}. Public standings show recorded participant logins, contribution totals and the latest completion recap.",
+                        "The owner and permitted moderators use the dashboard or moderator-only commands. They control the lifecycle, not individual viewer outcomes.",
+                        "When Twitch reports the channel live, use attack to damage the boss. Use mend to restore the shared ward.",
+                        "Use nova to spend the configured BlokeBot points for a special attack.",
+                        "Each authenticated chat action records its outcome, stream identity, health and ward before and after the action, and its phase.",
+                        "A duplicate message does not recalculate the outcome or spend the cost twice.",
+                        "Chat and /raid/{channel} show status and standings. Public standings include participant logins, contribution totals, and the latest completion recap.",
                     ],
                     Code =
                         "!raid status\n!raid attack\n!raid mend\n!raid nova\n!raid standings\n\nModerators: !raid start | end | reset",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Integrate correct guesses",
+                    Heading = "Apply correct guesses",
                     Bullets =
                     [
-                        "A completed Guessing round contributes the configured damage once for each distinct recorded correct login and once for that round ID.",
-                        "Guessing history remains the source of the result. BlokeRaid records the resulting cooperative action without changing the Guessing round.",
-                        "If Guessing or Cooperative game is unavailable when a result occurs, that effect is suppressed. Re-enabling either feature does not replay the missed result.",
+                        "A completed Guessing round applies configured damage once per distinct recorded correct login and once per round ID.",
+                        "Guessing history remains authoritative. BlokeRaid records the cooperative action but does not change the Guessing round.",
+                        "If Guessing or Cooperative game is unavailable, BlokeBot suppresses the effect. A later re-enable does not replay the missed result.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Reach phases and completion",
+                    Heading = "Reach a phase and complete the campaign",
                     Bullets =
                     [
-                        "Health and ward remain within their configured bounds. Crossing a saved health threshold moves to the next deterministic phase and emits its public response once.",
-                        "Victory freezes the campaign, records a recap and grants the configured host-scoped point reward once to every recorded contributor. Titles, achievements and automation-configured rewards are not part of this BlokeRaid version.",
-                        "If a reward cannot fit a contributor's point balance, a moderator must review Points; repeated action retries do not create a second victory reward.",
-                        "End records a non-victory completion. Reset completes the current campaign and starts a fresh recorded boss from the saved configuration.",
+                        "Health and ward stay within configured limits. A saved health threshold moves the campaign to the next deterministic phase and emits one public response.",
+                        "Victory freezes the campaign, records a recap, and grants each recorded contributor one configured host-scoped point reward.",
+                        "This BlokeRaid version excludes titles, achievements, and rewards from automation configuration.",
+                        "If a reward cannot fit a contributor balance, a moderator must review Points. Repeated action retries do not create a second victory reward.",
+                        "End records a non-victory completion. Reset completes the current campaign and starts a new recorded boss from the saved configuration.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Handle cooldowns limits and stale actions",
+                    Heading = "Handle cooldowns, limits, and stale actions",
                     Bullets =
                     [
-                        "Actions require a confirmed live stream. Offline and temporarily unknown liveness return different recovery messages; wait or retry after Twitch state is available.",
-                        "A cooldown reports the remaining time. A per-stream limit remains until a new stream identity. Mend is unavailable when the ward is full, and Nova reports its cost and current balance when points are insufficient.",
-                        "A changed configuration revision is not overwritten by an old save. Reload current settings, reapply the intended edit and save a fresh revision.",
+                        "Use actions only during a confirmed live stream. Expect different messages for offline and temporarily unknown states. Wait until Twitch state becomes available.",
+                        "A cooldown reports the time left. A per-stream limit remains until a new stream identity. Mend remains unavailable when the ward is full.",
+                        "If points are insufficient, Nova reports its cost and the current balance.",
+                        "An old save cannot overwrite a changed configuration revision. Reload current settings. Reapply the intended edit. Save a new revision.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Pause persistence and schedules",
+                    Heading = "Pause the feature and retain its schedule",
                     Bullets =
                     [
-                        "Turning Cooperative game off removes navigation and public standings and blocks chat actions, moderator controls, Guessing effects, point spending and rewards, resets, schedules and emitted events before mutation.",
-                        "Configuration, active campaign, contributions, resolved outcomes, phases and recaps remain. The signed-in direct route links to Channel setup.",
-                        "Re-enable resumes the same active campaign and moves its expiry past the disabled interval. Suppressed commands, Guessing results, resets, rewards, schedules and events are not replayed.",
-                        "A weekly reset missed while disabled does not catch up. Review the retained campaign after re-enable and use an explicit moderator reset only when a fresh boss is intended.",
+                        "Turn off Cooperative game to remove navigation and public standings.",
+                        "BlokeBot then blocks chat actions, moderator controls, Guessing effects, point spending, rewards, resets, schedules, and emitted events before changes.",
+                        "BlokeBot retains configuration, the active campaign, contributions, outcomes, phases, and recaps. The signed-in direct route links to Channel setup.",
+                        "Re-enable the feature to resume the active campaign. Expect BlokeBot to extend its expiry by the disabled interval.",
+                        "BlokeBot does not replay suppressed commands, Guessing results, resets, rewards, schedules, or events.",
+                        "BlokeBot does not run a missed Weekly reset. After re-enable, review the campaign. As a moderator, use Reset only for a new boss.",
                     ],
                 },
             ],
@@ -408,62 +445,73 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Community progression · Multi-host",
             Title = "Coordinate a multi-host Collective",
             Summary =
-                "Invite explicit hosts on one BlokeBot installation, preserve each host's authority and share only bounded tournament, raid-relay or goal projections.",
+                "Invite explicit hosts from one BlokeBot installation. Preserve each host's authority. Share only bounded tournament, raid-relay, or goal projections.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-collectives-recovery.png",
                 LightPhoneSource: "media/community/figures/phone-light-collectives-recovery.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-collectives-recovery.png",
                 LightLaptopSource: "media/community/figures/laptop-light-collectives-recovery.png",
-                PhoneAlt: "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",
-                LaptopAlt: "The Sample Channel Collectives direct route on a narrow screen showing retained consent and workflow recovery while the feature is off.",
-                "The disabled route preserves consent and workflows and explains recovery without replay."
+                PhoneAlt: "The Sample Channel Collectives direct route on a narrow screen that shows retained consent and recovery while the feature is off.",
+                LaptopAlt: "The Sample Channel Collectives direct route on a narrow screen that shows retained consent and recovery while the feature is off.",
+                "The disabled route preserves consent and workflows. It explains recovery without replay."
             ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Enable explicit host consent",
+                    Heading = "Enable explicit consent for each host",
                     Steps =
                     [
-                        "Every participating channel owner or permitted moderator turns on that channel's single Collectives switch in Channel setup. It starts off for every channel and has no second switch in the workspace.",
-                        "One host creates a Collective and becomes its first Coordinator. A coordinator invites only known hosts on the same self-hosted BlokeBot installation.",
-                        "The invited host accepts or declines only for itself. Twitch raids, follows, shared moderators and channel relationships never create membership, consent or trust.",
+                        "Ask each channel owner or permitted moderator to turn on Collectives in Channel setup. Expect each channel to start with this switch off.",
+                        "Do not look for a second switch in the workspace because it has none.",
+                        "Create a Collective from one host. Use that host as the first Coordinator. Invite only known hosts from the same BlokeBot installation.",
+                        "Let only the invited host accept or decline for itself.",
+                        "Do not treat Twitch raids, follows, shared moderators, or channel relationships as membership, consent, or trust.",
                     ],
                     Paragraphs =
                     [
-                        "Here, a collaborator is an active member host, a channel that has joined this collective. It can read the bounded shared workflow and act only for itself. A moderator's selected-host permission remains host-scoped; membership does not let a coordinator or collaborator edit another channel's Twitch connection, provider access, source mapping, lobby details, rewards or moderator notes.",
+                        "A collaborator is an active member host in this Collective. It can read the bounded workflow and act only for itself.",
+                        "A moderator permission remains host-scoped. Membership grants no authority over another host's Twitch connection, provider access, source mapping, lobby details, rewards, or moderator notes.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Manage coordinator and member roles",
+                    Heading = "Manage Coordinator and member roles",
                     Bullets =
                     [
-                        "A Coordinator can invite known hosts, withdraw a pending invitation, edit shared workflow definitions, transfer coordination and remove bounded participation.",
+                        "A Coordinator can invite known hosts, withdraw a pending invitation, edit shared workflow definitions, transfer coordination, and remove bounded participation.",
                         "An active member can leave only for its own host. A pending member can accept or decline only for itself.",
-                        "At least one active coordinator must remain. Transfer coordination before the last coordinator leaves or is removed; the rejected action leaves membership unchanged.",
-                        "Membership and authority changes are audited with the acting host and operation reference. Retrying the same accepted operation is idempotent.",
+                        "At least one active Coordinator must remain.",
+                        "Transfer coordination before the last Coordinator leaves or another user removes that Coordinator.",
+                        "BlokeBot rejects the action without a membership change.",
+                        "The audit records each membership or authority change, the actor host, and the operation reference. A repeated accepted operation makes no additional change.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Reference a host-owned tournament",
+                    Heading = "Reference a tournament from one host",
                     Bullets =
                     [
-                        "Choose an active member as Owning host and reference that host's public competition ID. The owner must have Tournaments & leagues on and the competition must exist for that host.",
-                        "The Collective copies no competition record. It shares a read-only name, format, status, round, entrant count, confirmed-result count and revision while the owning host remains authoritative.",
-                        "Private entrant contact, lobby details, moderator notes, rewards and result audit stay with the owning host. Open tournament returns to that host-owned workflow.",
+                        "Choose an active member as Owning host. Enter that host's public competition ID.",
+                        "Before the choice, verify that the host enabled Tournaments & leagues and owns the competition.",
+                        "The Collective does not copy the competition. It shares the read-only name, format, status, round, entrant count, confirmed-result count, and revision.",
+                        "The Owning host remains authoritative.",
+                        "Private entrant contact, lobby details, moderator notes, rewards, and result audit stay with the Owning host. Open tournament returns to that workflow.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Confirm each raid-relay handoff",
+                    Heading = "Confirm each raid relay handoff",
                     Bullets =
                     [
-                        "Configure only active consenting members as current and next hosts. Each involved host needs Collectives and Raid & collaboration on.",
-                        "The current host alone confirms its outgoing Twitch raid. Shared state carries current and next host, status, audited handoffs and aggregate viewer count, never viewer identities.",
-                        "BlokeBot rechecks membership, selected-host authority, relay identity and revision, both feature gates and pause watermarks after provider work. A stale reconfiguration, revoke, leave, disable or disable-and-re-enable returns typed non-success and cannot overwrite newer state.",
-                        "A provider rejection is retained once with a new revision and audit entry. Refresh the relay before a deliberate retry; it is never silently converted into success or replayed later.",
+                        "Choose only active members with consent as current and next hosts. Each host must enable Collectives and Raid & collaboration.",
+                        "Only the current host confirms its outgoing Twitch raid. Shared state contains current and next host, status, audited handoffs, and total viewer count.",
+                        "Shared state excludes viewer identities.",
+                        "After provider work, BlokeBot checks membership, selected-host authority, relay identity, revision, both feature gates, and pause watermarks.",
+                        "A stale reconfiguration, revoke, leave, disable, or disable-and-re-enable sequence returns a typed non-success. It cannot overwrite newer state.",
+                        "BlokeBot records one provider rejection with a new revision and audit entry.",
+                        "Before a deliberate retry, refresh the relay.",
+                        "BlokeBot never reports the rejection as success or replays it later.",
                     ],
                 },
                 new SiteGuideSection
@@ -471,35 +519,42 @@ internal static partial class SiteGuideCatalog
                     Heading = "Combine bounded public goals",
                     Steps =
                     [
-                        "The coordinator creates the goal name, unit, positive target and future UTC deadline.",
-                        "Each active host chooses only its own public viewer-funded bounty as its source. That host needs Bounties and Points on; another host cannot set or expose the private source mapping for it.",
-                        "The shared view publishes the target, current total, per-host totals, deadline and status. Contributor identities, rewards, balances, notes and internal source mappings remain local.",
+                        "As the Coordinator, create the goal name, unit, positive target, and future UTC deadline.",
+                        "Ask each active host to choose only its own public viewer-funded bounty.",
+                        "As that host, enable Bounties and Points before the choice.",
+                        "Do not let another host set or expose the private source mapping.",
                     ],
                     Paragraphs =
                     [
-                        "The public route and !collective summary include only active, enabled, explicitly participating hosts and the current allowlisted projection.",
+                        "The shared view publishes the target, current total, per-host totals, deadline, and status. Contributor identities, rewards, balances, notes, and source mappings remain local.",
+                        "The public route and !collective summary include only active hosts with explicit participation, enabled features, and the current allowlisted projection.",
                     ],
                     Code = "!collective",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Save only host-local settings",
+                    Heading = "Save only settings for one host",
                     Bullets =
                     [
-                        "The workflow editor changes Collective-scoped definitions only when the selected host can coordinate.",
-                        "The Details sidecar identifies settings private to the selected host, including that host's goal source and notification audience. Save local settings is the only sticky Save in this workspace and appears only for a genuine local change.",
-                        "A stale local-settings revision returns a conflict. Reload the current Collective, compare the selected host and workflow and then reapply the intended host-local choice.",
+                        "The workflow editor changes Collective definitions only if the selected host can coordinate.",
+                        "The Details sidecar identifies private settings for the selected host. These settings include its goal source and notification audience.",
+                        "Save local settings is the only sticky Save in this workspace. It appears only after a genuine local change.",
+                        "A stale revision returns a conflict.",
+                        "Reload the Collective. Compare the selected host and workflow. Then reapply the intended local choice.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Disable recover and bound public output",
+                    Heading = "Disable the feature and restore public output",
                     Bullets =
                     [
-                        "Turning Collectives off for a host removes its normal navigation and public output and blocks its membership, workflow, runtime, shared-event, command, automation, retry, reconciliation and provider boundaries before work begins.",
-                        "Collectives, consent, local settings, bounded history and audits remain saved. The signed-in direct route explains recovery and links to Channel setup.",
-                        "Re-enable resumes retained current state from a new watermark. Invitations, events, timers, retries, relays, reconciliation and provider actions suppressed while off are never replayed.",
-                        "If a host or workflow disappears from a public projection, check current membership and that host's switch and required owning feature. Restore consent or feature availability explicitly; private state is not projected as a fallback.",
+                        "Turn off Collectives for a host to remove its navigation and public output.",
+                        "BlokeBot then blocks membership, workflow, runtime, shared-event, command, automation, retry, reconciliation, and provider work before it starts.",
+                        "BlokeBot retains Collectives, consent, local settings, bounded history, and audits. The signed-in direct route explains recovery and links to Channel setup.",
+                        "Re-enable the feature to resume retained state from a new watermark.",
+                        "BlokeBot does not replay suppressed invitations, events, timers, retries, relays, reconciliation, or provider actions.",
+                        "If public output disappears, verify membership, the host switch, and its required feature. Restore consent or feature availability.",
+                        "BlokeBot never uses private state as a fallback projection.",
                     ],
                 },
             ],
