@@ -19,12 +19,12 @@ public sealed record BlokeBotSiteOptions
 internal static class BlokeBotSiteOptionsValidation
 {
     internal const string LiveAppUrlFailure =
-        "BlokeBotSite:LiveAppUrl must be an absolute HTTP or HTTPS URL when configured.";
+        "If you configure BlokeBotSite:LiveAppUrl, use an absolute HTTP or HTTPS URL.";
 
     internal const string PrivacyConfigurationFailure =
-        "Online deployments require BlokeBotSite:ControllerName, a monitored "
+        "For an online deployment, configure BlokeBotSite:ControllerName, a monitored "
         + "BlokeBotSite:PrivacyContact email address, and an absolute HTTPS "
-        + "BlokeBotSite:PrivacyNoticeUrl. Supply the deployment's own values; there is no default.";
+        + "BlokeBotSite:PrivacyNoticeUrl. Use values for the deployment because no default values exist.";
 
     internal static bool HasValidLiveAppUrl(BlokeBotSiteOptions options) =>
         string.IsNullOrWhiteSpace(options.LiveAppUrl) || options.LiveAppUri is not null;

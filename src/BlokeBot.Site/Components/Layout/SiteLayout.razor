@@ -13,13 +13,13 @@
         <div class="header-actions">
             <nav aria-label="Main navigation">
                 <a href="how-it-works">Overview</a>
-                <a href="guide">Use BlokeBot</a>
-                <a href="install">Install</a>
-                <a href="server-owners">Run a server</a>
+                <a href="guide">Help guides</a>
+                <a href="install">Install BlokeBot</a>
+                <a href="server-owners">Operate a server</a>
             </nav>
             @if (SiteOptions.Value.LiveAppUri is not null)
             {
-                <a class="button button-primary button-compact header-cta" href="@SiteOptions.Value.LiveAppUri">Open dashboard</a>
+                <a class="button button-primary button-compact header-cta" href="@SiteOptions.Value.LiveAppUri">Open the BlokeBot dashboard</a>
             }
             <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
                 <SiteIcon Name="sun" Class="theme-toggle__sun" />
@@ -42,18 +42,18 @@
             </div>
         </div>
         <nav aria-label="Footer navigation">
-            <a href="guide"><SiteIcon Name="book" />User guide</a>
-            <a href="troubleshooting"><SiteIcon Name="wrench" />Troubleshooting</a>
-            <a href="install"><SiteIcon Name="server" />Install</a>
-            <a href="privacy"><SiteIcon Name="shield" />Privacy</a>
-            <a href="https://github.com/alsi-lawr/BlokeBot"><SiteIcon Name="github" />Source</a>
+            <a href="guide"><SiteIcon Name="book" />Help guides</a>
+            <a href="troubleshooting"><SiteIcon Name="wrench" />Troubleshooting guide</a>
+            <a href="install"><SiteIcon Name="server" />Installation</a>
+            <a href="privacy"><SiteIcon Name="shield" />Privacy notice</a>
+            <a href="https://github.com/alsi-lawr/BlokeBot"><SiteIcon Name="github" />Source code</a>
         </nav>
     </div>
 </footer>
 <nav class="site-dock" aria-label="Quick navigation">
     <img class="site-dock__mark" src="media/blokedroid.svg" alt="" />
     <a aria-current="@DockCurrent("overview")" href="how-it-works">Overview</a>
-    <a aria-current="@DockCurrent("guide")" href="guide">Guide</a>
-    <a aria-current="@DockCurrent("install")" href="install">Install</a>
-    <a aria-current="@DockCurrent("server")" href="server-owners">Server</a>
+    <a aria-current="@DockCurrent("guide")" href="guide">Guides</a>
+    <a aria-current="@DockCurrent("install")" href="install">Installation</a>
+    <a aria-current="@DockCurrent("server")" href="server-owners">Server setup</a>
 </nav>
