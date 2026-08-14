@@ -168,8 +168,14 @@ public partial class PageHelpButton
         "<strong>How to guess reply</strong> uses <code>{command}</code>.",
         "<strong>Available guesses reply</strong> uses <code>{round}</code> and <code>{options}</code>.",
         "<strong>How to choose a winner reply</strong> uses <code>{command}</code>.",
-        "<strong>Winner and no-winners replies</strong> use <code>{name}</code>, <code>{winners}</code>, and <code>{count}</code>.",
-        "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong> use no live details.",
+        "<strong>Winner and no-winners replies</strong> use <code>{name}</code>.",
+        "<strong>Winner and no-winners replies</strong> use <code>{winners}</code>.",
+        "<strong>Winner and no-winners replies</strong> use <code>{count}</code>.",
+        "<strong>Stop reply</strong> uses no live details.",
+        "<strong>Closed reply</strong> uses no live details.",
+        "<strong>No-round reply</strong> uses no live details.",
+        "<strong>Already-running reply</strong> uses no live details.",
+        "<strong>Moderator-only reply</strong> uses no live details.",
     ];
 
     private static readonly HelpPage _homeHelp = new(
@@ -358,9 +364,9 @@ public partial class PageHelpButton
                 "Use unlocked rewards",
                 "Viewers equip unlocked rewards with chat commands.",
                 [
-                    "Use !equiptitle to equip a title.",
-                    "Use !equipbadge to equip a badge.",
-                    "Use !equipaccent to equip an accent.",
+                    "!equiptitle equips an unlocked title.",
+                    "!equipbadge equips an unlocked badge.",
+                    "!equipaccent equips an unlocked accent.",
                 ]
             ),
             new(
@@ -374,8 +380,15 @@ public partial class PageHelpButton
             ),
             new(
                 "What viewers can see",
-                "Public mode shows names, progress, standings, and unlocks.",
-                ["Hidden mode publishes nothing.", "Moderator notes never appear publicly."]
+                "",
+                [
+                    "Public mode shows names.",
+                    "Public mode shows progress.",
+                    "Public mode shows standings.",
+                    "Public mode shows unlocks.",
+                    "Hidden mode publishes nothing.",
+                    "Moderator notes never appear publicly.",
+                ]
             ),
         ]
     );
@@ -385,13 +398,23 @@ public partial class PageHelpButton
         [
             new(
                 "Run one channel boss",
-                "Viewers can attack, mend the ward, or spend points on Nova across several streams.",
-                ["Start a campaign."]
+                "",
+                [
+                    "Start a campaign.",
+                    "Viewers can attack across several streams.",
+                    "Viewers can mend the ward across several streams.",
+                    "Viewers can spend points on Nova across several streams.",
+                ]
             ),
             new(
                 "Tune the fight",
-                "Each action has its own outcome range, cooldown, and per-stream limit.",
-                ["Health thresholds trigger your saved phase response."]
+                "",
+                [
+                    "Each action has its own outcome range.",
+                    "Each action has its own cooldown.",
+                    "Each action has its own per-stream limit.",
+                    "Health thresholds trigger your saved phase response.",
+                ]
             ),
             new(
                 "Resets",
@@ -435,7 +458,9 @@ public partial class PageHelpButton
                 "Build a template",
                 "Automatic squares use only connected Twitch and BlokeBot sources.",
                 [
-                    "Make reusable 3x3, 4x4, or 5x5 templates.",
+                    "A reusable template can use a 3x3 size.",
+                    "A reusable template can use a 4x4 size.",
+                    "A reusable template can use a 5x5 size.",
                     "Add automatic squares.",
                     "Add moderator-confirmed moments.",
                 ]
@@ -469,7 +494,9 @@ public partial class PageHelpButton
                 "Run a competition",
                 "",
                 [
-                    "Create a tournament, round robin, or prediction league draft.",
+                    "A competition draft can use the tournament type.",
+                    "A competition draft can use the round robin type.",
+                    "A competition draft can use the prediction league type.",
                     "Open registration.",
                     "Generate the schedule.",
                 ]
@@ -485,8 +512,13 @@ public partial class PageHelpButton
             ),
             new(
                 "What entrants can see",
-                "Public pages show entrant names, schedules, standings, confirmed scores, and archives.",
+                "",
                 [
+                    "Public pages show entrant names.",
+                    "Public pages show schedules.",
+                    "Public pages show standings.",
+                    "Public pages show confirmed scores.",
+                    "Public pages show archives.",
                     "Contact details never appear publicly.",
                     "Lobby information never appears publicly.",
                     "Moderator notes never appear publicly.",
@@ -521,7 +553,9 @@ public partial class PageHelpButton
                     "Choose a native Twitch shoutout.",
                     "Alternatively, choose one chat message.",
                     "Only shoutout approved channels limits automatic shoutouts to your approved list.",
-                    "Chat delivery uses regular, pinned, or announcement presentation.",
+                    "Chat delivery can use regular presentation.",
+                    "Chat delivery can use pinned presentation.",
+                    "Chat delivery can use announcement presentation.",
                     "A pinned shoutout replaces the current pin.",
                     "BlokeBot does not restore the previous pin.",
                 ]
@@ -530,8 +564,12 @@ public partial class PageHelpButton
                 "Customize the chat message",
                 "Fallback text appears when Twitch has no value for the last game or stream title.",
                 [
-                    "Use <code>{twitch_handle}</code>, <code>{display_name}</code>, and <code>{channel_url}</code> in the message.",
-                    "Use <code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, and <code>{viewer_count}</code> in the message.",
+                    "The message can use <code>{twitch_handle}</code>.",
+                    "The message can use <code>{display_name}</code>.",
+                    "The message can use <code>{channel_url}</code>.",
+                    "The message can use <code>{last_game|fallback}</code>.",
+                    "The message can use <code>{stream_title|fallback}</code>.",
+                    "The message can use <code>{viewer_count}</code>.",
                     "Add fallback text for the last game.",
                     "Add fallback text for the stream title.",
                 ]
@@ -563,8 +601,12 @@ public partial class PageHelpButton
             ),
             new(
                 "Coordinate without control of hosts",
-                "A coordinator can invite hosts, withdraw invitations, edit shared workflows, and end participation.",
+                "",
                 [
+                    "A coordinator can invite hosts.",
+                    "A coordinator can withdraw invitations.",
+                    "A coordinator can edit shared workflows.",
+                    "A coordinator can end participation.",
                     "Hosts accept only for themselves.",
                     "Hosts decline only for themselves.",
                     "Hosts leave only for themselves.",
@@ -573,14 +615,17 @@ public partial class PageHelpButton
             ),
             new(
                 "What is shared",
-                "Members see tournament references, relay totals, and goal progress in a shared summary.",
+                "",
                 [
-                    "Contact details stay with the owning host.",
-                    "Lobby information stays with the owning host.",
-                    "Source mappings stay with the owning host.",
-                    "Moderator notes stay with the owning host.",
-                    "Rewards stay with the owning host.",
-                    "Viewer identities stay with the owning host.",
+                    "Members see tournament references in a shared summary.",
+                    "Members see relay totals in a shared summary.",
+                    "Members see goal progress in a shared summary.",
+                    "Each host keeps its own contact details.",
+                    "Each host keeps its own lobby information.",
+                    "Each host keeps its own source mappings.",
+                    "Each host keeps its own moderator notes.",
+                    "Each host keeps its own rewards.",
+                    "Each host keeps its own viewer identities.",
                 ]
             ),
         ]
@@ -646,11 +691,7 @@ public partial class PageHelpButton
             new(
                 "Set up a Browser Source",
                 "The private Browser Source URL appears only after overlay creation or URL rotation.",
-                [
-                    "Create an overlay.",
-                    "Copy its private Browser Source URL.",
-                    "Add it to OBS at 1920 by 1080.",
-                ]
+                ["Copy its private Browser Source URL.", "Add it to OBS at 1920 by 1080."]
             ),
             new(
                 "Rotate a URL",
@@ -663,13 +704,20 @@ public partial class PageHelpButton
                 [
                     "Sample buttons affect only the selected overlay.",
                     "Send test pulse affects only the selected overlay.",
-                    "These tests never change a round, giveaway, goal, or bounty.",
+                    "These tests never change a round.",
+                    "These tests never change a giveaway.",
+                    "These tests never change a goal.",
+                    "These tests never change a bounty.",
                 ]
             ),
             new(
                 "What viewers can see",
-                "Overlays show only public names, counts, progress, and reward names.",
+                "",
                 [
+                    "Overlays show only public names.",
+                    "Overlays show only public counts.",
+                    "Overlays show only public progress.",
+                    "Overlays show only public reward names.",
                     "Twitch user IDs never reach a Browser Source.",
                     "Balances never reach a Browser Source.",
                     "Moderator notes never reach a Browser Source.",
@@ -793,7 +841,7 @@ public partial class PageHelpButton
                 "Complete viewer requests",
                 "Recent outcomes appear in Redemption history.",
                 [
-                    "Fulfill a completed request.",
+                    "Fulfil a completed request.",
                     "Cancel a request to return the viewer's Channel Points.",
                 ]
             ),
@@ -819,8 +867,11 @@ public partial class PageHelpButton
             ),
             new(
                 "Finish a Prediction",
-                "BlokeBot asks before a lock, resolution, or cancellation.",
+                "",
                 [
+                    "BlokeBot asks before a lock.",
+                    "BlokeBot asks before a resolution.",
+                    "BlokeBot asks before a cancellation.",
                     "Lock the Prediction to stop new entries.",
                     "Choose the winning outcome to resolve the Prediction.",
                     "Cancel the Prediction to refund viewers.",
@@ -853,7 +904,11 @@ public partial class PageHelpButton
             new(
                 "History",
                 "",
-                ["Use History to find past rounds by date, round type, or viewer name."]
+                [
+                    "Use History to find past rounds by date.",
+                    "Use History to find past rounds by round type.",
+                    "Use History to find past rounds by viewer name.",
+                ]
             ),
         ]
     );
@@ -874,7 +929,11 @@ public partial class PageHelpButton
             new(
                 "Commands",
                 "Command names are the words that viewers and mods type in chat.",
-                ["Start, stop, and win are mod-only commands."]
+                [
+                    "Start is a mod-only command.",
+                    "Stop is a mod-only command.",
+                    "Win is a mod-only command.",
+                ]
             ),
             new(
                 "Add live details to replies",
@@ -889,8 +948,11 @@ public partial class PageHelpButton
         [
             new(
                 "Balances",
-                "Give and remove accept whole numbers, percentages such as <code>50%</code>, or <code>all</code>.",
+                "",
                 [
+                    "Give and remove accept whole numbers.",
+                    "Give and remove accept percentages such as <code>50%</code>.",
+                    "Give and remove accept <code>all</code>.",
                     "Use the leaderboard to check point balances for this channel.",
                     "Use the search controls to check point balances for this channel.",
                     "Add gives points to an existing Twitch user.",
@@ -922,18 +984,38 @@ public partial class PageHelpButton
                     "Each command name must be unique for this channel.",
                     "<code>points</code> shows the caller's balance.",
                     "With a login, <code>points</code> is moderator-only.",
-                    "<code>givepoints</code>, <code>gamble</code>, and <code>removepoints</code> accept whole numbers, percentages, or <code>all</code>.",
+                    "<code>givepoints</code> accepts whole numbers.",
+                    "<code>givepoints</code> accepts percentages.",
+                    "<code>givepoints</code> accepts <code>all</code>.",
+                    "<code>gamble</code> accepts whole numbers.",
+                    "<code>gamble</code> accepts percentages.",
+                    "<code>gamble</code> accepts <code>all</code>.",
+                    "<code>removepoints</code> accepts whole numbers.",
+                    "<code>removepoints</code> accepts percentages.",
+                    "<code>removepoints</code> accepts <code>all</code>.",
                     "<code>addpoints</code> gives points to an existing Twitch user.",
                     "<code>addpoints</code> accepts whole numbers only.",
                 ]
             ),
             new(
                 "Add live details to replies",
-                "Words in braces use details from the current viewer, balance, or giveaway.",
+                "",
                 [
-                    "Balance and gamble replies use <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, and <code>{label}</code>.",
-                    "Transfer replies use <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, and <code>{label}</code>.",
-                    "Giveaway replies use <code>{user}</code>, <code>{winners}</code>, <code>{time_left}</code>, and <code>{label}</code>.",
+                    "Words in braces can use details from the current viewer.",
+                    "Words in braces can use details from the current balance.",
+                    "Words in braces can use details from the current giveaway.",
+                    "Balance and gamble replies use <code>{user}</code>.",
+                    "Balance and gamble replies use <code>{balance}</code>.",
+                    "Balance and gamble replies use <code>{amount}</code>.",
+                    "Balance and gamble replies use <code>{label}</code>.",
+                    "Transfer replies use <code>{from}</code>.",
+                    "Transfer replies use <code>{to}</code>.",
+                    "Transfer replies use <code>{amount}</code>.",
+                    "Transfer replies use <code>{label}</code>.",
+                    "Giveaway replies use <code>{user}</code>.",
+                    "Giveaway replies use <code>{winners}</code>.",
+                    "Giveaway replies use <code>{time_left}</code>.",
+                    "Giveaway replies use <code>{label}</code>.",
                 ]
             ),
             new(
@@ -986,7 +1068,9 @@ public partial class PageHelpButton
                 "",
                 [
                     "Choose a saved reply.",
-                    "Send it on a timer, after sufficient chat activity, or once a week.",
+                    "A scheduled reply can use a timer.",
+                    "A scheduled reply can run after enough chat activity.",
+                    "A scheduled reply can run once a week.",
                 ]
             ),
         ]
