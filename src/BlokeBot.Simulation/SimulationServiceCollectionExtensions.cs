@@ -147,6 +147,37 @@ internal static class SimulationServiceCollectionExtensions
                 }
             );
 
+        public Task<RaidChannelSnapshotOutcome> LoadLiveChannelByIdAsync(
+            int hostId,
+            string twitchUserId,
+            string? approvedClipId,
+            CancellationToken cancellationToken
+        ) =>
+            LoadLiveChannelAsync(
+                hostId,
+                twitchUserId switch
+                {
+                    "maple-id" => "maplepixel",
+                    "cozy-id" => "cozyworkshop",
+                    _ => twitchUserId,
+                },
+                approvedClipId,
+                cancellationToken
+            );
+
+        public Task<FollowedLiveChannelsOutcome> LoadFollowedLiveChannelsAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<FollowedLiveChannelsOutcome>(
+                new FollowedLiveChannelsOutcome.Unavailable()
+            );
+
+        public Task<bool> HasFollowedLiveAuthorizationAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(false);
+
         public Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
             int hostId,
             string targetTwitchUserId,

@@ -211,15 +211,15 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Community interaction · Raids",
             Title = "Use the raid and collaboration hub",
             Summary =
-                "Welcome each raid community once. List only approved live channels. Require host confirmation for every Twitch raid from the channel.",
+                "Welcome each raid community once. Build a live shortlist from approved channels and optional followed channels. Confirm every outgoing Twitch raid.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/community/figures/phone-dark-raid-collaboration.png",
                 LightPhoneSource: "media/community/figures/phone-light-raid-collaboration.png",
                 DarkLaptopSource: "media/community/figures/laptop-dark-raid-collaboration.png",
                 LightLaptopSource: "media/community/figures/laptop-light-raid-collaboration.png",
-                PhoneAlt: "The Sample Channel raid hub on a narrow screen that shows approved live channels and host-controlled Shoutout and Prepare raid actions.",
-                LaptopAlt: "The Sample Channel raid hub on a narrow screen that shows approved live channels and host-controlled Shoutout and Prepare raid actions.",
-                "The active hub shows approved candidates, filter reasons, and host-confirmed Twitch actions together."
+                PhoneAlt: "The Sample Channel raid hub on a narrow screen with live shortlist channels and host-controlled actions.",
+                LaptopAlt: "The Sample Channel raid hub with live shortlist channels and host-controlled Shoutout and Prepare raid actions.",
+                "The hub shows live candidates, filter reasons, source evidence, and host-confirmed Twitch actions."
             ),
             Sections =
             [
@@ -291,11 +291,13 @@ internal static partial class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Create an approved shortlist",
+                    Heading = "Create a live shortlist",
                     Steps =
                     [
                         "Add Twitch channels to Approved channels only after this channel makes a deliberate approval decision.",
-                        "Do not use a Twitch relationship, safety score, or reputation signal because Twitch supplies none of these signals for approval.",
+                        "To add another source, turn on Include followed live channels.",
+                        "Reconnect the channel owner when BlokeBot requests permission to read followed channels.",
+                        "Treat a Twitch follow only as discovery evidence. It is not approval, safety, or reputation evidence.",
                         "If required, restrict the language and categories. Set the recent outgoing-relationship gap. Save the settings.",
                         "Review the live candidates and each exclusion reason. Expect the hub to check current live state, language, category, and recent history.",
                         "Use an approved clip only if Twitch confirms its channel and an age of 30 days or fewer.",
@@ -307,8 +309,9 @@ internal static partial class SiteGuideCatalog
                     Bullets =
                     [
                         "Shoutout uses the shared native Twitch boundary. BlokeBot repeats authority, live-state, cooldown, and duplicate checks before the send.",
-                        "Select Prepare raid to open confirmation for the approved live channel. Do not expect this action to call Twitch.",
+                        "Select Prepare raid to open confirmation for the live shortlist channel. This action does not call Twitch.",
                         "Only Confirm and start raid calls the outgoing provider after new feature and Twitch authority checks. The hub never starts a raid automatically.",
+                        "Before each shortlist action, BlokeBot checks the stable channel ID, source, live state, filters, and relationship gap again.",
                         "If the target goes offline or becomes ineligible, refresh the hub and make a new host decision.",
                         "If authorization expires or the provider declines, use the same recovery. Do not treat the previous preparation as authority.",
                     ],

@@ -270,6 +270,29 @@ public sealed partial class RaidCollaborationUiTests
                 new RaidChannelSnapshotOutcome.Offline(login)
             );
 
+        public Task<RaidChannelSnapshotOutcome> LoadLiveChannelByIdAsync(
+            int hostId,
+            string twitchUserId,
+            string? approvedClipId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<RaidChannelSnapshotOutcome>(
+                new RaidChannelSnapshotOutcome.Offline(twitchUserId)
+            );
+
+        public Task<FollowedLiveChannelsOutcome> LoadFollowedLiveChannelsAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult<FollowedLiveChannelsOutcome>(
+                new FollowedLiveChannelsOutcome.Unavailable()
+            );
+
+        public Task<bool> HasFollowedLiveAuthorizationAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(false);
+
         public Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
             int hostId,
             string targetTwitchUserId,

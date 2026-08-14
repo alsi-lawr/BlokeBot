@@ -56,6 +56,7 @@ public sealed class RaidCollaborationService(
             .Take(_historyLimit)
             .Select(value => new RaidRelationshipHistory(
                 value.Direction,
+                value.OtherTwitchUserId,
                 value.OtherLogin,
                 value.OtherDisplayName,
                 value.ViewerCount,
@@ -114,7 +115,8 @@ public sealed class RaidCollaborationService(
                 latestArrival,
                 shoutoutContext,
                 automaticOutcomes,
-                await provider.HasRaidManagementAuthorizationAsync(hostId, cancellationToken)
+                await provider.HasRaidManagementAuthorizationAsync(hostId, cancellationToken),
+                shortlist.Value.FollowedLiveSource
             )
         );
     }
@@ -173,6 +175,20 @@ public sealed class RaidCollaborationService(
             return new RaidCollaborationSaveOutcome.FeatureDisabled();
         }
 
+        var currentSettings = await db
+            .RaidCollaborationSettings.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.HostId == hostId, cancellationToken);
+        if (
+            configuration.IncludeFollowedLiveChannels
+            && currentSettings?.IncludeFollowedLiveChannels != true
+            && !await provider.HasFollowedLiveAuthorizationAsync(hostId, cancellationToken)
+        )
+        {
+            return new RaidCollaborationSaveOutcome.FollowedLiveAuthorizationRequired(
+                await LoadConfigurationAsync(db, hostId, cancellationToken)
+            );
+        }
+
         var settings = await db.RaidCollaborationSettings.SingleOrDefaultAsync(
             value => value.HostId == hostId,
             cancellationToken
@@ -188,6 +204,7 @@ public sealed class RaidCollaborationService(
         settings.Language = configuration.Language.Trim().ToLowerInvariant();
         settings.EligibleCategories = FormatCategories(configuration.EligibleCategories);
         settings.RelationshipCooldownHours = configuration.RelationshipCooldownHours;
+        settings.IncludeFollowedLiveChannels = configuration.IncludeFollowedLiveChannels;
         settings.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
 
         var shoutoutSettings = await db.AutomaticRaidShoutoutSettings.SingleOrDefaultAsync(
@@ -213,6 +230,9 @@ public sealed class RaidCollaborationService(
         var existing = await db
             .ApprovedRaidChannels.Where(value => value.HostId == hostId)
             .ToArrayAsync(cancellationToken);
+        var twitchUserIds = existing
+            .Where(static channel => !string.IsNullOrWhiteSpace(channel.TwitchUserId))
+            .ToDictionary(static channel => channel.Login, static channel => channel.TwitchUserId);
         db.ApprovedRaidChannels.RemoveRange(existing);
         var now = clock.GetUtcNow().UtcDateTime;
         foreach (var channel in configuration.ApprovedChannels)
@@ -221,6 +241,9 @@ public sealed class RaidCollaborationService(
                 new ApprovedRaidChannel
                 {
                     HostId = hostId,
+                    TwitchUserId =
+                        channel.TwitchUserId
+                        ?? twitchUserIds.GetValueOrDefault(Login.Normalize(channel.Login)),
                     Login = Login.Normalize(channel.Login),
                     DisplayName = DisplayName(channel),
                     ApprovedClipId = NormalizeOptional(channel.ApprovedClipId),
@@ -238,14 +261,24 @@ public sealed class RaidCollaborationService(
 
     public async Task<ShoutoutOperationOutcome> SendShortlistShoutoutAsync(
         int hostId,
+        string targetTwitchUserId,
         string targetLogin,
         CancellationToken cancellationToken
-    ) =>
-        !await IsApprovedAndEnabledAsync(hostId, targetLogin, cancellationToken)
-            ? new ShoutoutOperationOutcome.NotReady(
-                "Raid & collaboration is off or the channel is not approved."
-            )
-            : await shoutouts.SendAsync(hostId, targetLogin, cancellationToken);
+    )
+    {
+        var candidate = await RevalidateCandidateAsync(
+            hostId,
+            targetTwitchUserId,
+            cancellationToken
+        );
+        return candidate is CandidateRevalidation.Eligible eligible
+            ? await shoutouts.SendAsync(hostId, eligible.Snapshot.Login, cancellationToken)
+            : new ShoutoutOperationOutcome.NotReady(
+                candidate is CandidateRevalidation.AuthorizationRequired
+                    ? "Reconnect Twitch with followed-channel permission. No shoutout was sent."
+                    : $"@{targetLogin} is no longer an eligible shortlist channel. No shoutout was sent."
+            );
+    }
 
     public Task<ShoutoutOperationOutcome> SendShoutoutAsync(
         int hostId,
@@ -255,6 +288,7 @@ public sealed class RaidCollaborationService(
 
     public async Task<ApproveRaidChannelOutcome> ApproveChannelAsync(
         int hostId,
+        string twitchUserId,
         string login,
         string displayName,
         CancellationToken cancellationToken
@@ -288,6 +322,7 @@ public sealed class RaidCollaborationService(
         var channel = new ApprovedRaidChannel
         {
             HostId = hostId,
+            TwitchUserId = string.IsNullOrWhiteSpace(twitchUserId) ? null : twitchUserId,
             Login = normalized,
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? normalized : displayName.Trim(),
             ApprovedAtUtc = now,
@@ -298,66 +333,40 @@ public sealed class RaidCollaborationService(
         _ = await events.PublishAsync(AppEventKind.RaidCollaborationChanged, cancellationToken);
         return new ApproveRaidChannelOutcome.Approved(
             new(channel.Login, channel.DisplayName, channel.ApprovedClipId)
+            {
+                TwitchUserId = channel.TwitchUserId,
+            }
         );
     }
 
     public async Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
         int hostId,
+        string targetTwitchUserId,
         string targetLogin,
         CancellationToken cancellationToken
     )
     {
-        var normalized = Login.Normalize(targetLogin);
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        if (!await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken))
-        {
-            return new ConfirmedRaidStartOutcome.FeatureDisabled();
-        }
-        var approved = await (
-            from host in db.Hosts.AsNoTracking()
-            join channel in db.ApprovedRaidChannels.AsNoTracking() on host.Id equals channel.HostId
-            where
-                host.Id == hostId
-                && (host.EnabledFeatures & HostFeatureFlags.RaidCollaboration)
-                    == HostFeatureFlags.RaidCollaboration
-                && channel.Login == normalized
-            select channel
-        ).SingleOrDefaultAsync(cancellationToken);
-        if (approved is null)
-        {
-            return new ConfirmedRaidStartOutcome.TargetNotApproved();
-        }
-        var configuration = await LoadConfigurationAsync(db, hostId, cancellationToken);
-        var live = await provider.LoadLiveChannelAsync(
+        var candidate = await RevalidateCandidateAsync(
             hostId,
-            approved.Login,
-            approved.ApprovedClipId,
+            targetTwitchUserId,
             cancellationToken
         );
-        if (live is not RaidChannelSnapshotOutcome.Available available)
+        return candidate switch
         {
-            return new ConfirmedRaidStartOutcome.TargetIneligible([ExclusionReason(live)]);
-        }
-        var recent = await db
-            .RaidCollaborationHistory.AsNoTracking()
-            .Where(value =>
-                value.HostId == hostId
-                && value.Direction == RaidDirection.Outgoing
-                && value.OtherLogin == normalized
-            )
-            .OrderByDescending(value => value.OccurredAtUtc)
-            .Select(value => (DateTime?)value.OccurredAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-        var reasons = FilterReasons(configuration, available.Snapshot, recent);
-        return reasons.Count > 0 ? new ConfirmedRaidStartOutcome.TargetIneligible(reasons)
-            : !await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken)
-                ? new ConfirmedRaidStartOutcome.FeatureDisabled()
-            : await provider.StartConfirmedRaidAsync(
+            CandidateRevalidation.FeatureDisabled =>
+                new ConfirmedRaidStartOutcome.FeatureDisabled(),
+            CandidateRevalidation.AuthorizationRequired =>
+                new ConfirmedRaidStartOutcome.AuthorizationRequired(),
+            CandidateRevalidation.Ineligible ineligible =>
+                new ConfirmedRaidStartOutcome.TargetIneligible(ineligible.Reasons),
+            CandidateRevalidation.Eligible eligible => await provider.StartConfirmedRaidAsync(
                 hostId,
-                available.Snapshot.TwitchUserId,
-                available.Snapshot.Login,
+                eligible.Snapshot.TwitchUserId,
+                eligible.Snapshot.Login,
                 cancellationToken
-            );
+            ),
+            _ => new ConfirmedRaidStartOutcome.TargetNotApproved(),
+        };
     }
 
     public async Task IncomingRaidReceivedAsync(
@@ -596,7 +605,8 @@ public sealed class RaidCollaborationService(
 
     private async Task<(
         IReadOnlyList<RaidShortlistEntry> Eligible,
-        IReadOnlyList<RaidShortlistExclusion> Excluded
+        IReadOnlyList<RaidShortlistExclusion> Excluded,
+        FollowedLiveSourceState FollowedLiveSource
     )?> BuildShortlistAsync(
         int hostId,
         RaidCollaborationConfiguration configuration,
@@ -604,7 +614,7 @@ public sealed class RaidCollaborationService(
         CancellationToken cancellationToken
     )
     {
-        var eligible = new List<RaidShortlistEntry>();
+        var candidates = new Dictionary<string, CandidateSource>(StringComparer.Ordinal);
         var excluded = new List<RaidShortlistExclusion>();
         foreach (var approved in configuration.ApprovedChannels)
         {
@@ -612,12 +622,19 @@ public sealed class RaidCollaborationService(
             {
                 return null;
             }
-            var outcome = await provider.LoadLiveChannelAsync(
-                hostId,
-                approved.Login,
-                approved.ApprovedClipId,
-                cancellationToken
-            );
+            var outcome = string.IsNullOrWhiteSpace(approved.TwitchUserId)
+                ? await provider.LoadLiveChannelAsync(
+                    hostId,
+                    approved.Login,
+                    approved.ApprovedClipId,
+                    cancellationToken
+                )
+                : await provider.LoadLiveChannelByIdAsync(
+                    hostId,
+                    approved.TwitchUserId,
+                    approved.ApprovedClipId,
+                    cancellationToken
+                );
             if (outcome is RaidChannelSnapshotOutcome.Unavailable)
             {
                 return null;
@@ -627,40 +644,84 @@ public sealed class RaidCollaborationService(
                 excluded.Add(new(approved.Login, [ExclusionReason(outcome)]));
                 continue;
             }
+            await PersistApprovalIdentityAsync(
+                hostId,
+                approved.Login,
+                available.Snapshot.TwitchUserId,
+                cancellationToken
+            );
+            candidates[available.Snapshot.TwitchUserId] = new(
+                available.Snapshot,
+                RaidCandidateProvenance.Approved
+            );
+        }
+
+        var followedState = FollowedLiveSourceState.Disabled;
+        if (configuration.IncludeFollowedLiveChannels)
+        {
+            var followed = await provider.LoadFollowedLiveChannelsAsync(hostId, cancellationToken);
+            followedState = followed switch
+            {
+                FollowedLiveChannelsOutcome.Available => FollowedLiveSourceState.Ready,
+                FollowedLiveChannelsOutcome.AuthorizationRequired =>
+                    FollowedLiveSourceState.AuthorizationRequired,
+                _ => FollowedLiveSourceState.Unavailable,
+            };
+            if (followed is FollowedLiveChannelsOutcome.Available available)
+            {
+                foreach (var snapshot in available.Channels)
+                {
+                    _ = candidates.TryAdd(
+                        snapshot.TwitchUserId,
+                        new(snapshot with { ApprovedClip = null }, RaidCandidateProvenance.Followed)
+                    );
+                }
+            }
+        }
+
+        var eligible = new List<RaidShortlistEntry>();
+        foreach (var candidate in candidates.Values)
+        {
             var recent = history
                 .Where(value =>
                     value.Direction == RaidDirection.Outgoing
                     && string.Equals(
-                        value.Login,
-                        approved.Login,
-                        StringComparison.OrdinalIgnoreCase
+                        value.TwitchUserId,
+                        candidate.Snapshot.TwitchUserId,
+                        StringComparison.Ordinal
                     )
                 )
                 .Select(value => (DateTime?)value.OccurredAt.UtcDateTime)
                 .FirstOrDefault();
-            var reasons = FilterReasons(configuration, available.Snapshot, recent);
+            var reasons = FilterReasons(configuration, candidate.Snapshot, recent);
             if (reasons.Count > 0)
             {
-                excluded.Add(new(approved.Login, reasons));
+                excluded.Add(new(candidate.Snapshot.Login, reasons));
                 continue;
             }
-            eligible.Add(
-                new(
-                    available.Snapshot.TwitchUserId,
-                    available.Snapshot.Login,
-                    available.Snapshot.DisplayName,
-                    available.Snapshot.StreamId,
-                    available.Snapshot.Category,
-                    available.Snapshot.Language,
-                    available.Snapshot.Title,
-                    available.Snapshot.ViewerCount,
-                    EligibilityReasons(configuration, recent),
-                    available.Snapshot.ApprovedClip
-                )
-            );
+            eligible.Add(ToShortlistEntry(configuration, candidate, recent));
         }
-        return (eligible.OrderBy(value => value.ViewerCount).ToArray(), excluded);
+        return (eligible.OrderBy(value => value.ViewerCount).ToArray(), excluded, followedState);
     }
+
+    private static RaidShortlistEntry ToShortlistEntry(
+        RaidCollaborationConfiguration configuration,
+        CandidateSource candidate,
+        DateTime? recent
+    ) =>
+        new(
+            candidate.Snapshot.TwitchUserId,
+            candidate.Snapshot.Login,
+            candidate.Snapshot.DisplayName,
+            candidate.Snapshot.StreamId,
+            candidate.Snapshot.Category,
+            candidate.Snapshot.Language,
+            candidate.Snapshot.Title,
+            candidate.Snapshot.ViewerCount,
+            EligibilityReasons(configuration, recent, candidate.Provenance),
+            candidate.Snapshot.ApprovedClip,
+            candidate.Provenance
+        );
 
     private IReadOnlyList<string> FilterReasons(
         RaidCollaborationConfiguration configuration,
@@ -703,12 +764,15 @@ public sealed class RaidCollaborationService(
         return reasons;
     }
 
-    private IReadOnlyList<string> EligibilityReasons(
+    private static IReadOnlyList<string> EligibilityReasons(
         RaidCollaborationConfiguration configuration,
-        DateTime? lastOutgoingRaidUtc
+        DateTime? lastOutgoingRaidUtc,
+        RaidCandidateProvenance provenance
     ) =>
         [
-            "Approved by this channel",
+            provenance == RaidCandidateProvenance.Approved
+                ? "Approved by this channel"
+                : "Followed by this channel",
             "Live now",
             string.IsNullOrWhiteSpace(configuration.Language)
                 ? "Any language allowed"
@@ -742,7 +806,10 @@ public sealed class RaidCollaborationService(
                 value.Login,
                 value.DisplayName,
                 value.ApprovedClipId
-            ))
+            )
+            {
+                TwitchUserId = value.TwitchUserId,
+            })
             .ToArrayAsync(cancellationToken);
         return settings is null
             ? RaidCollaborationConfiguration.Defaults with
@@ -758,28 +825,112 @@ public sealed class RaidCollaborationService(
                 settings.Language,
                 ParseCategories(settings.EligibleCategories),
                 settings.RelationshipCooldownHours,
-                channels
+                channels,
+                settings.IncludeFollowedLiveChannels
             );
     }
 
-    private async Task<bool> IsApprovedAndEnabledAsync(
+    private async Task PersistApprovalIdentityAsync(
         int hostId,
-        string targetLogin,
+        string approvedLogin,
+        string twitchUserId,
         CancellationToken cancellationToken
     )
     {
-        var normalized = Login.Normalize(targetLogin);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await (
-            from host in db.Hosts.AsNoTracking()
-            join channel in db.ApprovedRaidChannels.AsNoTracking() on host.Id equals channel.HostId
-            where
-                host.Id == hostId
-                && (host.EnabledFeatures & HostFeatureFlags.RaidCollaboration)
-                    == HostFeatureFlags.RaidCollaboration
-                && channel.Login == normalized
-            select channel.Id
-        ).AnyAsync(cancellationToken);
+        var approved = await db.ApprovedRaidChannels.SingleOrDefaultAsync(
+            channel => channel.HostId == hostId && channel.Login == approvedLogin,
+            cancellationToken
+        );
+        if (approved is null || approved.TwitchUserId == twitchUserId)
+        {
+            return;
+        }
+        approved.TwitchUserId = twitchUserId;
+        approved.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
+        _ = await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<CandidateRevalidation> RevalidateCandidateAsync(
+        int hostId,
+        string targetTwitchUserId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken))
+        {
+            return new CandidateRevalidation.FeatureDisabled();
+        }
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var configuration = await LoadConfigurationAsync(db, hostId, cancellationToken);
+        RaidChannelSnapshot? snapshot = null;
+        foreach (var approved in configuration.ApprovedChannels)
+        {
+            var outcome = string.IsNullOrWhiteSpace(approved.TwitchUserId)
+                ? await provider.LoadLiveChannelAsync(
+                    hostId,
+                    approved.Login,
+                    approved.ApprovedClipId,
+                    cancellationToken
+                )
+                : await provider.LoadLiveChannelByIdAsync(
+                    hostId,
+                    approved.TwitchUserId,
+                    approved.ApprovedClipId,
+                    cancellationToken
+                );
+            if (
+                outcome is RaidChannelSnapshotOutcome.Available available
+                && string.Equals(
+                    available.Snapshot.TwitchUserId,
+                    targetTwitchUserId,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                snapshot = available.Snapshot;
+                break;
+            }
+        }
+
+        if (snapshot is null && configuration.IncludeFollowedLiveChannels)
+        {
+            var followed = await provider.LoadFollowedLiveChannelsAsync(hostId, cancellationToken);
+            if (followed is FollowedLiveChannelsOutcome.AuthorizationRequired)
+            {
+                return new CandidateRevalidation.AuthorizationRequired();
+            }
+            if (followed is FollowedLiveChannelsOutcome.Available available)
+            {
+                snapshot = available.Channels.FirstOrDefault(channel =>
+                    string.Equals(
+                        channel.TwitchUserId,
+                        targetTwitchUserId,
+                        StringComparison.Ordinal
+                    )
+                );
+            }
+        }
+        if (snapshot is null)
+        {
+            return new CandidateRevalidation.NotInSource();
+        }
+
+        var recent = await db
+            .RaidCollaborationHistory.AsNoTracking()
+            .Where(value =>
+                value.HostId == hostId
+                && value.Direction == RaidDirection.Outgoing
+                && value.OtherTwitchUserId == targetTwitchUserId
+            )
+            .OrderByDescending(value => value.OccurredAtUtc)
+            .Select(value => (DateTime?)value.OccurredAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        var reasons = FilterReasons(configuration, snapshot, recent);
+        return reasons.Count > 0 ? new CandidateRevalidation.Ineligible(reasons)
+            : !await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken)
+                ? new CandidateRevalidation.FeatureDisabled()
+            : new CandidateRevalidation.Eligible(snapshot);
     }
 
     private async Task<bool> FeatureAcceptsCurrentWorkAsync(
@@ -945,4 +1096,24 @@ public sealed class RaidCollaborationService(
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+
+    private sealed record CandidateSource(
+        RaidChannelSnapshot Snapshot,
+        RaidCandidateProvenance Provenance
+    );
+
+    private abstract record CandidateRevalidation
+    {
+        private CandidateRevalidation() { }
+
+        public sealed record Eligible(RaidChannelSnapshot Snapshot) : CandidateRevalidation;
+
+        public sealed record Ineligible(IReadOnlyList<string> Reasons) : CandidateRevalidation;
+
+        public sealed record NotInSource : CandidateRevalidation;
+
+        public sealed record AuthorizationRequired : CandidateRevalidation;
+
+        public sealed record FeatureDisabled : CandidateRevalidation;
+    }
 }

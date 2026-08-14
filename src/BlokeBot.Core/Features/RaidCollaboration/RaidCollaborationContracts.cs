@@ -12,7 +12,8 @@ public sealed record RaidCollaborationConfiguration(
     string Language,
     IReadOnlyList<string> EligibleCategories,
     int RelationshipCooldownHours,
-    IReadOnlyList<ApprovedRaidChannelDraft> ApprovedChannels
+    IReadOnlyList<ApprovedRaidChannelDraft> ApprovedChannels,
+    bool IncludeFollowedLiveChannels
 )
 {
     public static RaidCollaborationConfiguration Defaults { get; } =
@@ -24,7 +25,8 @@ public sealed record RaidCollaborationConfiguration(
             "en",
             [],
             336,
-            []
+            [],
+            false
         );
 }
 
@@ -32,7 +34,10 @@ public sealed record ApprovedRaidChannelDraft(
     string Login,
     string DisplayName,
     string? ApprovedClipId
-);
+)
+{
+    public string? TwitchUserId { get; init; }
+}
 
 public sealed record RaidCollaborationDashboard(
     RaidCollaborationConfiguration Configuration,
@@ -42,8 +47,23 @@ public sealed record RaidCollaborationDashboard(
     RaidArrivalSummary? LatestArrival,
     ShoutoutDashboardState ShoutoutContext,
     IReadOnlyList<AutomaticRaidShoutoutOutcomeView> AutomaticShoutoutOutcomes,
-    bool RaidManagementAuthorized
+    bool RaidManagementAuthorized,
+    FollowedLiveSourceState FollowedLiveSource
 );
+
+public enum RaidCandidateProvenance
+{
+    Approved,
+    Followed,
+}
+
+public enum FollowedLiveSourceState
+{
+    Disabled,
+    Ready,
+    AuthorizationRequired,
+    Unavailable,
+}
 
 public sealed record RaidShortlistEntry(
     string TwitchUserId,
@@ -55,7 +75,8 @@ public sealed record RaidShortlistEntry(
     string Title,
     int ViewerCount,
     IReadOnlyList<string> EligibilityReasons,
-    ApprovedRaidClip? ApprovedClip
+    ApprovedRaidClip? ApprovedClip,
+    RaidCandidateProvenance Provenance
 );
 
 public sealed record ApprovedRaidClip(
@@ -70,6 +91,7 @@ public sealed record RaidShortlistExclusion(string Login, IReadOnlyList<string> 
 
 public sealed record RaidRelationshipHistory(
     RaidDirection Direction,
+    string TwitchUserId,
     string Login,
     string DisplayName,
     int ViewerCount,
@@ -119,6 +141,10 @@ public abstract record RaidCollaborationSaveOutcome
     public sealed record FeatureDisabled : RaidCollaborationSaveOutcome;
 
     public sealed record HostNotFound : RaidCollaborationSaveOutcome;
+
+    public sealed record FollowedLiveAuthorizationRequired(
+        RaidCollaborationConfiguration Configuration
+    ) : RaidCollaborationSaveOutcome;
 }
 
 public abstract record ApproveRaidChannelOutcome
@@ -165,6 +191,18 @@ public abstract record RaidChannelSnapshotOutcome
     public sealed record Unavailable : RaidChannelSnapshotOutcome;
 }
 
+public abstract record FollowedLiveChannelsOutcome
+{
+    private FollowedLiveChannelsOutcome() { }
+
+    public sealed record Available(IReadOnlyList<RaidChannelSnapshot> Channels)
+        : FollowedLiveChannelsOutcome;
+
+    public sealed record AuthorizationRequired : FollowedLiveChannelsOutcome;
+
+    public sealed record Unavailable : FollowedLiveChannelsOutcome;
+}
+
 public sealed record RaidChannelSnapshot(
     string TwitchUserId,
     string Login,
@@ -185,6 +223,20 @@ public interface IRaidCollaborationProvider
         string? approvedClipId,
         CancellationToken cancellationToken
     );
+
+    Task<RaidChannelSnapshotOutcome> LoadLiveChannelByIdAsync(
+        int hostId,
+        string twitchUserId,
+        string? approvedClipId,
+        CancellationToken cancellationToken
+    );
+
+    Task<FollowedLiveChannelsOutcome> LoadFollowedLiveChannelsAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    );
+
+    Task<bool> HasFollowedLiveAuthorizationAsync(int hostId, CancellationToken cancellationToken);
 
     Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
         int hostId,

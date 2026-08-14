@@ -31,7 +31,7 @@
         }
         else if (_loading)
         {
-            <PageState Kind="PageStateKind.Loading" Title="Loading raid hub" Description="Checking approved channels and live Twitch context." />
+            <PageState Kind="PageStateKind.Loading" Title="Loading raid hub" Description="Checking shortlist sources and live Twitch context." />
         }
         else if (_disabled)
         {
@@ -75,16 +75,24 @@
 
                     <div class="raid-hub">
                         <div class="raid-hub__column">
-                            <TaskPanel Title="Eligible channels" Description="Approved channels that match your current filters.">
+                            <TaskPanel Title="Eligible channels" Description="Live shortlist channels that match your current filters.">
+                                @if (dashboard.FollowedLiveSource == FollowedLiveSourceState.AuthorizationRequired)
+                                {
+                                    <div class="card mb-3 p-4 text-sm"><strong>Followed live channels need Twitch permission.</strong><p class="mt-1 text-xs text-muted-foreground">Reconnect the channel owner. BlokeBot will request permission to read followed channels.</p><a class="btn-secondary mt-3 inline-flex" href="/oauth/broadcaster/start?followed-live=true">Reconnect followed channels</a></div>
+                                }
+                                else if (dashboard.FollowedLiveSource == FollowedLiveSourceState.Unavailable)
+                                {
+                                    <p class="card mb-3 p-3 text-sm" role="status">Followed live channels are unavailable. Approved channels can still appear.</p>
+                                }
                                 @if (dashboard.EligibleChannels.Count == 0)
                                 {
-                                    @if (dashboard.Configuration.ApprovedChannels.Count == 0)
+                                    @if (dashboard.Configuration.ApprovedChannels.Count == 0 && !dashboard.Configuration.IncludeFollowedLiveChannels)
                                     {
-                                        <p class="text-sm text-muted-foreground">No channel is approved yet. Add an approved channel in Settings to build your shortlist.</p>
+                                        <p class="text-sm text-muted-foreground">No shortlist source is ready. Add an approved channel or include followed live channels in Settings.</p>
                                     }
                                     else
                                     {
-                                        <p class="text-sm text-muted-foreground">No approved channel currently passes every live filter. Review why each channel is hidden below.</p>
+                                        <p class="text-sm text-muted-foreground">No shortlist channel passes every live filter. Review the hidden channels and source status.</p>
                                     }
                                 }
                                 else
@@ -92,7 +100,7 @@
                                     <div class="grid gap-3" data-raid-shortlist>
                                         @foreach (var candidate in dashboard.EligibleChannels)
                                         {
-                                            <article class="surface-muted rounded-xl p-4" @key="candidate.Login">
+                                            <article class="surface-muted rounded-xl p-4" @key="candidate.TwitchUserId">
                                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                                     <div class="min-w-0">
                                                         <h3 class="font-bold text-[var(--app-text-strong)]">@candidate.DisplayName <span class="text-sm font-medium text-muted-foreground">@@@candidate.Login</span></h3>
@@ -106,8 +114,8 @@
                                                         </div>
                                                     </div>
                                                     <div class="flex flex-wrap gap-2">
-                                                        <button class="btn-secondary" type="button" @onclick="() => SendShortlistShoutoutAsync(candidate.Login)">Shoutout</button>
-                                                        <button class="btn-primary" type="button" @onclick="() => PrepareRaid(candidate.Login)">Prepare raid</button>
+                                                        <button class="btn-secondary" type="button" @onclick="() => SendShortlistShoutoutAsync(candidate.TwitchUserId, candidate.Login)">Shoutout</button>
+                                                        <button class="btn-primary" type="button" @onclick="() => PrepareRaid(candidate.TwitchUserId)">Prepare raid</button>
                                                     </div>
                                                 </div>
                                                 @if (candidate.ApprovedClip is { } clip)
@@ -117,13 +125,13 @@
                                                         <span class="text-xs text-muted-foreground">@Math.Round(clip.DurationSeconds)s</span>
                                                     </a>
                                                 }
-                                                @if (_preparedRaidLogin == candidate.Login)
+                                                @if (_preparedRaidLogin == candidate.TwitchUserId)
                                                 {
                                                     <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm" data-raid-confirmation>
                                                         <strong>Confirm outgoing raid to @@candidate.Login?</strong>
                                                         <p class="mt-1 text-xs text-muted-foreground">This starts Twitch’s native raid. It is never triggered automatically from the shortlist.</p>
                                                         <div class="mt-3 flex flex-wrap gap-2">
-                                                            <button class="btn-primary" type="button" @onclick="() => ConfirmRaidAsync(candidate.Login)">Confirm and start raid</button>
+                                                            <button class="btn-primary" type="button" @onclick="() => ConfirmRaidAsync(candidate.TwitchUserId, candidate.Login)">Confirm and start raid</button>
                                                             <button class="btn-secondary" type="button" @onclick="CancelPreparedRaid">Cancel</button>
                                                         </div>
                                                     </div>
@@ -135,7 +143,7 @@
                                 @if (dashboard.ExcludedChannels.Count > 0)
                                 {
                                     <details class="mt-4 rounded-xl border border-[var(--app-border)] p-3" data-raid-exclusions>
-                                        <summary class="cursor-pointer font-semibold">Why @dashboard.ExcludedChannels.Count approved channel(s) are hidden</summary>
+                                        <summary class="cursor-pointer font-semibold">Why @dashboard.ExcludedChannels.Count shortlist channel(s) are hidden</summary>
                                         <div class="mt-3 grid gap-2">
                                             @foreach (var exclusion in dashboard.ExcludedChannels)
                                             {
@@ -313,6 +321,20 @@
                                 </div>
                             </header>
                             <div class="raid-section__body">
+                                <div class="raid-toggle mb-4">
+                                    <div class="min-w-0">
+                                        <strong id="raid-followed-live-label" class="raid-toggle__title">Include followed live channels</strong>
+                                        <span id="raid-followed-live-hint" class="raid-toggle__hint">This source needs the channel owner’s permission. A Twitch follow is not approval or safety evidence.</span>
+                                    </div>
+                                    <button id="raid-followed-live"
+                                            class="studio-toggle"
+                                            type="button"
+                                            role="switch"
+                                            aria-checked="@(_draft.IncludeFollowedLiveChannels ? "true" : "false")"
+                                            aria-labelledby="raid-followed-live-label"
+                                            aria-describedby="raid-followed-live-hint"
+                                            @onclick="() => _draft.IncludeFollowedLiveChannels = !_draft.IncludeFollowedLiveChannels"></button>
+                                </div>
                                 <div class="raid-split">
                                     <div class="raid-field raid-field--wide">
                                         <div class="field">
@@ -358,14 +380,14 @@
                                 <span class="raid-section__step" aria-hidden="true">4</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Approved channels</h2>
-                                    <p class="raid-section__description">Only approved channels can appear in your shortlist. Approval is an allowlist you control, and Twitch supplies no safety or reputation signal for it. An optional clip ID is shown only when Twitch confirms it belongs to that channel and is at most 30 days old.</p>
+                                    <p class="raid-section__description">Approved channels always supply shortlist candidates. Approval is your decision. Twitch supplies no safety or reputation evidence. An approved clip must belong to the channel and be 30 days old or less.</p>
                                 </div>
                                 <button class="btn-secondary raid-section__action" type="button" @onclick="AddApprovedChannel">Add channel</button>
                             </header>
                             <div class="raid-section__body">
                                 @if (_draft.ApprovedChannels.Count == 0)
                                 {
-                                    <p class="text-sm text-muted-foreground">No channel is approved yet. Add one to build your shortlist.</p>
+                                    <p class="text-sm text-muted-foreground">No channel is approved. Add one, or use the optional followed live source.</p>
                                 }
                                 else
                                 {
@@ -409,6 +431,11 @@
                                 }
                             </div>
                         </section>
+
+                        @if (_followedLiveReconnectRequired)
+                        {
+                            <div class="card p-4 text-sm"><strong>Followed live channels need Twitch permission.</strong><p class="mt-1 text-xs text-muted-foreground">Reconnect the channel owner. Then turn on the source and save the settings again.</p><a class="btn-secondary mt-3 inline-flex" href="/oauth/broadcaster/start?followed-live=true">Reconnect followed channels</a></div>
+                        }
 
                         <StickySaveRegion Scope="StickySaveScope.Editor" Feedback="_saveFeedback">
                             <button class="btn-primary" type="button" disabled="@_saving" @onclick="SaveAsync">@(_saving ? "Saving…" : "Save settings")</button>

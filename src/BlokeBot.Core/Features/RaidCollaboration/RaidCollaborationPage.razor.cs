@@ -35,6 +35,7 @@ public partial class RaidCollaborationPage
     private bool _disabled;
     private bool _loadFailed;
     private bool _saving;
+    private bool _followedLiveReconnectRequired;
     private PageSaveFeedback? _saveFeedback;
     private IReadOnlyList<AutomaticRaidShoutoutValidationError> _shoutoutErrors = [];
 
@@ -67,6 +68,7 @@ public partial class RaidCollaborationPage
         _loading = true;
         _disabled = false;
         _loadFailed = false;
+        _followedLiveReconnectRequired = false;
         _preparedRaidLogin = null;
         _ = await LoadPageContextAsync();
         if (HostId == 0)
@@ -111,6 +113,7 @@ public partial class RaidCollaborationPage
                 switch (outcome)
                 {
                     case RaidCollaborationSaveOutcome.Saved saved:
+                        _followedLiveReconnectRequired = false;
                         _draft = ConfigurationDraft.From(saved.Configuration);
                         _shoutoutErrors = [];
                         _saveFeedback = new("Settings saved.", PageSaveFeedbackKind.Success);
@@ -125,6 +128,14 @@ public partial class RaidCollaborationPage
                                     invalid.ShoutoutErrors.Select(error => error.Message)
                                 )
                             ),
+                            PageSaveFeedbackKind.Validation
+                        );
+                        break;
+                    case RaidCollaborationSaveOutcome.FollowedLiveAuthorizationRequired required:
+                        _followedLiveReconnectRequired = true;
+                        _draft = ConfigurationDraft.From(required.Configuration);
+                        _saveFeedback = new(
+                            "Reconnect Twitch with followed-channel permission. The settings did not change.",
                             PageSaveFeedbackKind.Validation
                         );
                         break;
@@ -157,10 +168,16 @@ public partial class RaidCollaborationPage
         }
     }
 
-    private Task SendShortlistShoutoutAsync(string login) =>
+    private Task SendShortlistShoutoutAsync(string twitchUserId, string login) =>
         RunShoutoutAsync(
             login,
-            () => _service.SendShortlistShoutoutAsync(HostId, login, CancellationToken.None)
+            () =>
+                _service.SendShortlistShoutoutAsync(
+                    HostId,
+                    twitchUserId,
+                    login,
+                    CancellationToken.None
+                )
         );
 
     private Task SendShoutoutAsync() =>
@@ -226,6 +243,7 @@ public partial class RaidCollaborationPage
             {
                 var outcome = await _service.ApproveChannelAsync(
                     HostId,
+                    entry.TwitchUserId,
                     entry.Login,
                     entry.DisplayName,
                     CancellationToken.None
@@ -252,17 +270,17 @@ public partial class RaidCollaborationPage
         _approvingLogin = null;
     }
 
-    private void PrepareRaid(string login)
+    private void PrepareRaid(string twitchUserId)
     {
-        _preparedRaidLogin = login;
+        _preparedRaidLogin = twitchUserId;
         _operationFeedback = string.Empty;
     }
 
     private void CancelPreparedRaid() => _preparedRaidLogin = null;
 
-    private async Task ConfirmRaidAsync(string login)
+    private async Task ConfirmRaidAsync(string twitchUserId, string login)
     {
-        if (_preparedRaidLogin != login)
+        if (_preparedRaidLogin != twitchUserId)
         {
             return;
         }
@@ -272,6 +290,7 @@ public partial class RaidCollaborationPage
             {
                 var outcome = await _service.StartConfirmedRaidAsync(
                     HostId,
+                    twitchUserId,
                     login,
                     CancellationToken.None
                 );
@@ -361,6 +380,7 @@ public partial class RaidCollaborationPage
         public string Language { get; set; } = string.Empty;
         public List<string> Categories { get; } = [];
         public int RelationshipCooldownHours { get; set; }
+        public bool IncludeFollowedLiveChannels { get; set; }
         public List<ApprovedChannelDraft> ApprovedChannels { get; } = [];
 
         public static ConfigurationDraft From(RaidCollaborationConfiguration value)
@@ -373,6 +393,7 @@ public partial class RaidCollaborationPage
                 DeduplicationWindowMinutes = value.DeduplicationWindowMinutes,
                 Language = value.Language,
                 RelationshipCooldownHours = value.RelationshipCooldownHours,
+                IncludeFollowedLiveChannels = value.IncludeFollowedLiveChannels,
             };
             draft.Categories.AddRange(value.EligibleCategories);
             draft.ApprovedChannels.AddRange(
@@ -390,7 +411,8 @@ public partial class RaidCollaborationPage
                 Language,
                 [.. Categories],
                 RelationshipCooldownHours,
-                ApprovedChannels.Select(value => value.ToDraft()).ToArray()
+                ApprovedChannels.Select(value => value.ToDraft()).ToArray(),
+                IncludeFollowedLiveChannels
             );
     }
 
@@ -399,6 +421,7 @@ public partial class RaidCollaborationPage
         public string Login { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string? ApprovedClipId { get; set; }
+        public string? TwitchUserId { get; set; }
 
         public static ApprovedChannelDraft From(ApprovedRaidChannelDraft value) =>
             new()
@@ -406,8 +429,10 @@ public partial class RaidCollaborationPage
                 Login = value.Login,
                 DisplayName = value.DisplayName,
                 ApprovedClipId = value.ApprovedClipId,
+                TwitchUserId = value.TwitchUserId,
             };
 
-        public ApprovedRaidChannelDraft ToDraft() => new(Login, DisplayName, ApprovedClipId);
+        public ApprovedRaidChannelDraft ToDraft() =>
+            new(Login, DisplayName, ApprovedClipId) { TwitchUserId = TwitchUserId };
     }
 }

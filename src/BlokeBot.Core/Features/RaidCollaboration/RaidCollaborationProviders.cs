@@ -75,6 +75,91 @@ internal sealed class TwitchRaidCollaborationProvider(
         }
     }
 
+    public async Task<RaidChannelSnapshotOutcome> LoadLiveChannelByIdAsync(
+        int hostId,
+        string twitchUserId,
+        string? approvedClipId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!await FeatureEnabledAsync(hostId, cancellationToken))
+        {
+            return new RaidChannelSnapshotOutcome.Unavailable();
+        }
+        var context = await ProviderContextAsync(hostId, [], cancellationToken);
+        if (context is null)
+        {
+            return new RaidChannelSnapshotOutcome.Unavailable();
+        }
+
+        try
+        {
+            var stream = await helix.GetStreamByUserIdAsync(
+                context,
+                twitchUserId,
+                cancellationToken
+            );
+            return stream is null || stream.ViewerCount <= 0
+                ? new RaidChannelSnapshotOutcome.Offline(twitchUserId)
+                : new RaidChannelSnapshotOutcome.Available(
+                    await SnapshotAsync(context, stream, approvedClipId, cancellationToken)
+                );
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception is HttpRequestException or IOException or TimeoutException)
+        {
+            return new RaidChannelSnapshotOutcome.Unavailable();
+        }
+    }
+
+    public async Task<FollowedLiveChannelsOutcome> LoadFollowedLiveChannelsAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        var authority = await FollowedLiveAuthorityAsync(hostId, cancellationToken);
+        if (authority is null)
+        {
+            return new FollowedLiveChannelsOutcome.AuthorizationRequired();
+        }
+        var (context, twitchUserId) = authority.Value;
+        return await helix.GetFollowedLiveStreamsAsync(
+            context,
+            twitchUserId,
+            cancellationToken
+        ) switch
+        {
+            HelixFollowedLiveStreamsOutcome.Available available =>
+                new FollowedLiveChannelsOutcome.Available(
+                    available
+                        .Streams.Select(static stream => new RaidChannelSnapshot(
+                            stream.UserId,
+                            stream.UserLogin,
+                            stream.UserName,
+                            stream.Id,
+                            stream.GameName,
+                            stream.Language,
+                            stream.Title,
+                            stream.ViewerCount,
+                            null
+                        ))
+                        .ToArray()
+                ),
+            HelixFollowedLiveStreamsOutcome.Unauthorized =>
+                new FollowedLiveChannelsOutcome.AuthorizationRequired(),
+            _ => new FollowedLiveChannelsOutcome.Unavailable(),
+        };
+    }
+
+    public async Task<bool> HasFollowedLiveAuthorizationAsync(
+        int hostId,
+        CancellationToken cancellationToken
+    ) => await FollowedLiveAuthorityAsync(hostId, cancellationToken) is not null;
+
     public async Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
         int hostId,
         string targetTwitchUserId,
@@ -139,6 +224,54 @@ internal sealed class TwitchRaidCollaborationProvider(
             is TokenStatus.Ready ready
             ? new HelixRequestContext(botSettings.Identity.ClientId, ready.AccessToken)
             : null;
+
+    private async Task<(
+        HelixRequestContext Context,
+        string TwitchUserId
+    )?> FollowedLiveAuthorityAsync(int hostId, CancellationToken cancellationToken)
+    {
+        if (!await FeatureEnabledAsync(hostId, cancellationToken))
+        {
+            return null;
+        }
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var twitchUserId = await db
+            .Hosts.AsNoTracking()
+            .Where(host => host.Id == hostId)
+            .Select(host => host.TwitchUserId)
+            .SingleOrDefaultAsync(cancellationToken);
+        return string.IsNullOrWhiteSpace(twitchUserId) ? null
+            : await broadcasters.GetTokenStatusAsync(
+                hostId,
+                HostBroadcasterAuthorizationService.FollowedLiveScopes,
+                cancellationToken
+            )
+                is TokenStatus.Ready ready
+            && string.Equals(ready.Validation.UserId, twitchUserId, StringComparison.Ordinal)
+                ? (
+                    new HelixRequestContext(botSettings.Identity.ClientId, ready.AccessToken),
+                    twitchUserId
+                )
+            : null;
+    }
+
+    private async Task<RaidChannelSnapshot> SnapshotAsync(
+        HelixRequestContext context,
+        HelixStream stream,
+        string? approvedClipId,
+        CancellationToken cancellationToken
+    ) =>
+        new(
+            stream.UserId,
+            stream.UserLogin,
+            stream.UserName,
+            stream.Id,
+            stream.GameName,
+            stream.Language,
+            stream.Title,
+            stream.ViewerCount,
+            await LoadApprovedClipAsync(context, stream.UserId, approvedClipId, cancellationToken)
+        );
 
     private async Task<bool> FeatureEnabledAsync(int hostId, CancellationToken cancellationToken)
     {

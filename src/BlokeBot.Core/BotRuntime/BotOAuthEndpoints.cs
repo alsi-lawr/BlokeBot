@@ -370,7 +370,9 @@ internal static class BotOAuthEndpoints
                                 OAuthAuthorizationScopeSet.Create(
                                     context.Request.Query.ContainsKey("raid")
                                         ? HostBroadcasterAuthorizationService.RaidManagementScopes
-                                        : HostBroadcasterAuthorizationService.MilestoneScopes
+                                    : context.Request.Query.ContainsKey("followed-live")
+                                        ? HostBroadcasterAuthorizationService.FollowedLiveScopes
+                                    : HostBroadcasterAuthorizationService.MilestoneScopes
                                 )
                             )
                             .Match<IResult>(

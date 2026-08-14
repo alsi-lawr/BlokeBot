@@ -12,6 +12,7 @@ public sealed class HelixClient(
 )
 {
     private const int _streamMarkerLookupPageLimit = 3;
+    private const int _followedLiveCursorLimit = 1000;
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -1013,6 +1014,139 @@ public sealed class HelixClient(
             : null;
     }
 
+    public Task<HelixStream?> GetStreamByUserIdAsync(
+        HelixRequestContext context,
+        string twitchUserId,
+        CancellationToken cancellationToken
+    ) => GetStreamAsync(context, "user_id", twitchUserId, cancellationToken);
+
+    public async Task<HelixFollowedLiveStreamsOutcome> GetFollowedLiveStreamsAsync(
+        HelixRequestContext context,
+        string userId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return new HelixFollowedLiveStreamsOutcome.Unavailable();
+        }
+
+        var streams = new Dictionary<string, HelixStream>(StringComparer.Ordinal);
+        var cursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        try
+        {
+            do
+            {
+                var query = new Dictionary<string, string?>
+                {
+                    ["user_id"] = userId,
+                    ["first"] = "100",
+                };
+                if (!string.IsNullOrWhiteSpace(cursor))
+                {
+                    query["after"] = cursor;
+                }
+                using var request = HelixRequest.Create(
+                    HttpMethod.Get,
+                    $"{endpointPolicy.HelixEndpoint("streams/followed").AbsoluteUri}?{QueryString.Create(query)}",
+                    context
+                );
+                using var response = await _http.SendAsync(request, cancellationToken);
+                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                {
+                    return new HelixFollowedLiveStreamsOutcome.Unauthorized();
+                }
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new HelixFollowedLiveStreamsOutcome.Unavailable();
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<FollowedStreamsResponse>(
+                    _jsonOptions,
+                    cancellationToken
+                );
+                if (payload is null || payload.Data.IsDefault || payload.Pagination is null)
+                {
+                    return new HelixFollowedLiveStreamsOutcome.Unavailable();
+                }
+                foreach (var row in payload.Data)
+                {
+                    if (!ValidFollowedStream(row))
+                    {
+                        return new HelixFollowedLiveStreamsOutcome.Unavailable();
+                    }
+                    _ = streams.TryAdd(row.UserId, MapStream(row));
+                }
+
+                cursor = payload.Pagination.Cursor;
+                if (
+                    !string.IsNullOrWhiteSpace(cursor)
+                    && (!cursors.Add(cursor) || cursors.Count > _followedLiveCursorLimit)
+                )
+                {
+                    return new HelixFollowedLiveStreamsOutcome.Unavailable();
+                }
+            } while (!string.IsNullOrWhiteSpace(cursor));
+
+            return new HelixFollowedLiveStreamsOutcome.Available(streams.Values.ToArray());
+        }
+        catch (Exception exception)
+            when (exception
+                    is OperationCanceledException
+                        or HttpRequestException
+                        or IOException
+                        or JsonException
+                        or TimeoutException
+            )
+        {
+            return new HelixFollowedLiveStreamsOutcome.Unavailable();
+        }
+    }
+
+    private async Task<HelixStream?> GetStreamAsync(
+        HelixRequestContext context,
+        string identityParameter,
+        string identity,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            $"{endpointPolicy.HelixEndpoint("streams").AbsoluteUri}?"
+            + QueryString.Create([new KeyValuePair<string, string?>(identityParameter, identity)]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        _ = response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<StreamResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault() is { } stream ? MapStream(stream) : null;
+    }
+
+    private static bool ValidFollowedStream(StreamItem stream) =>
+        !string.IsNullOrWhiteSpace(stream.Id)
+        && !string.IsNullOrWhiteSpace(stream.UserId)
+        && !string.IsNullOrWhiteSpace(stream.UserLogin)
+        && !string.IsNullOrWhiteSpace(stream.UserName)
+        && !string.IsNullOrWhiteSpace(stream.Language)
+        && stream.ViewerCount > 0
+        && stream.StartedAt != default;
+
+    private static HelixStream MapStream(StreamItem stream) =>
+        new(
+            stream.Id,
+            stream.UserId,
+            stream.UserLogin,
+            stream.UserName,
+            stream.GameName,
+            stream.Title,
+            stream.Language,
+            stream.ViewerCount,
+            stream.StartedAt
+        );
+
     public async Task<ChatSettings> GetChatSettingsAsync(
         HelixRequestContext context,
         string broadcasterId,
@@ -1454,6 +1588,15 @@ public sealed class HelixClient(
     {
         [JsonPropertyName("data")]
         public required ImmutableArray<StreamItem> Data { get; init; }
+    }
+
+    private sealed record FollowedStreamsResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<StreamItem> Data { get; init; }
+
+        [JsonPropertyName("pagination")]
+        public required Pagination? Pagination { get; init; }
     }
 
     private sealed record ChannelInformationResponse

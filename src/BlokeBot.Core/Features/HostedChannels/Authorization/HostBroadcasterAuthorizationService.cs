@@ -49,6 +49,12 @@ public sealed class HostBroadcasterAuthorizationService(
         Scopes.ChannelManageRaids,
     ];
 
+    public static readonly string[] FollowedLiveScopes =
+    [
+        .. MilestoneScopes,
+        Scopes.UserReadFollows,
+    ];
+
     public async Task<HostBroadcasterAuthorizationOutcome> AuthorizeAsync(
         int hostId,
         HostBotAccountAuthorizationGrant grant,

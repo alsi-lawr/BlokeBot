@@ -26,6 +26,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.Property(static x => x.Language).HasMaxLength(16).HasDefaultValue("en");
             _ = b.Property(static x => x.EligibleCategories).HasMaxLength(1000);
             _ = b.Property(static x => x.RelationshipCooldownHours).HasDefaultValue(336);
+            _ = b.Property(static x => x.IncludeFollowedLiveChannels).HasDefaultValue(false);
             _ = b.HasIndex(static x => x.HostId).IsUnique();
             _ = b.HasOne<BotHost>()
                 .WithMany()

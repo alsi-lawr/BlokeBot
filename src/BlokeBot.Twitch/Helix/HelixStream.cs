@@ -12,6 +12,18 @@ public sealed record HelixStream(
     DateTimeOffset StartedAt
 );
 
+public abstract record HelixFollowedLiveStreamsOutcome
+{
+    private HelixFollowedLiveStreamsOutcome() { }
+
+    public sealed record Available(IReadOnlyList<HelixStream> Streams)
+        : HelixFollowedLiveStreamsOutcome;
+
+    public sealed record Unauthorized : HelixFollowedLiveStreamsOutcome;
+
+    public sealed record Unavailable : HelixFollowedLiveStreamsOutcome;
+}
+
 public abstract record HelixRaidStartOutcome
 {
     private HelixRaidStartOutcome() { }

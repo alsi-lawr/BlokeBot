@@ -532,8 +532,14 @@ public partial class PageHelpButton
         [
             new(
                 "Choose where to raid",
-                "The Hub shows approved live channels that match your filters.",
-                ["You control the approval allowlist.", "Prepare raid always asks you to confirm."]
+                "The Hub shows live shortlist channels that match your filters.",
+                [
+                    "Approved channels always supply candidates.",
+                    "You can also include live channels that the channel owner follows.",
+                    "Reconnect Twitch to give BlokeBot permission to read followed channels.",
+                    "A Twitch follow is not approval or safety evidence.",
+                    "Prepare raid always asks you to confirm.",
+                ]
             ),
             new(
                 "Recommend a live channel now",
@@ -579,6 +585,7 @@ public partial class PageHelpButton
                 "Twitch gives only the total viewer count for a raid.",
                 [
                     "Open Settings.",
+                    "Choose whether to include followed live channels.",
                     "Make your changes.",
                     "Save the changes.",
                     "BlokeBot records no individual viewer from the raid.",

@@ -212,6 +212,95 @@ public sealed class RaidCollaborationServiceTests
     }
 
     [Test]
+    public async Task FollowedSourceEnableWithoutAuthorization_DoesNotMutateOrRetrieve()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(database, hostId, []);
+        var fixture = Fixture(database);
+        var requested = RaidCollaborationConfiguration.Defaults with
+        {
+            WelcomeMessage = "This change must not persist.",
+            IncludeFollowedLiveChannels = true,
+        };
+
+        _ = (
+            await fixture.Service.SaveAsync(hostId, requested, default)
+        ).ShouldBeOfType<RaidCollaborationSaveOutcome.FollowedLiveAuthorizationRequired>();
+
+        fixture.Provider.FollowedRequests.ShouldBeEmpty();
+        await using var verify = await database.CreateDbContextAsync();
+        var settings = await verify.RaidCollaborationSettings.SingleAsync();
+        settings.IncludeFollowedLiveChannels.ShouldBeFalse();
+        settings.WelcomeMessage.ShouldNotBe(requested.WelcomeMessage);
+    }
+
+    [Test]
+    public async Task FollowedCandidates_AreHostIsolated()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var firstId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        var secondId = await SeedHostAsync(database, "beta", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(database, firstId, [], includeFollowedLiveChannels: true);
+        await SeedConfigurationAsync(database, secondId, [], includeFollowedLiveChannels: true);
+        var fixture = Fixture(database);
+        fixture.Provider.SetFollowed(firstId, Snapshot("alpha-follow", "alpha-friend"));
+        fixture.Provider.SetFollowed(secondId, Snapshot("beta-follow", "beta-friend"));
+
+        var loaded = (await fixture.Service.LoadAsync(firstId, null, default))
+            .ShouldBeOfType<RaidCollaborationLoadOutcome.Loaded>()
+            .Dashboard;
+
+        loaded.EligibleChannels.ShouldHaveSingleItem().TwitchUserId.ShouldBe("alpha-follow");
+        fixture.Provider.FollowedRequests.ShouldBe([firstId]);
+    }
+
+    [Test]
+    public async Task StableIdentity_MergesRenamedApprovalAndPreservesProvenance()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
+        await SeedConfigurationAsync(
+            database,
+            hostId,
+            ["old-login"],
+            includeFollowedLiveChannels: true
+        );
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            (await db.ApprovedRaidChannels.SingleAsync()).TwitchUserId = "stable-id";
+            _ = await db.SaveChangesAsync();
+        }
+        var fixture = Fixture(database);
+        var approvedClip = new ApprovedRaidClip(
+            "approved-clip",
+            "https://clips.example/approved",
+            "Approved clip",
+            _now.AddDays(-1),
+            20
+        );
+        fixture.Provider.SetLive("new-login", "Celeste", "en", 70, "stable-id", approvedClip);
+        fixture.Provider.SetFollowed(
+            hostId,
+            Snapshot("stable-id", "new-login", approvedClip),
+            Snapshot("followed-only-id", "followed-only", approvedClip)
+        );
+
+        var channels = (await fixture.Service.LoadAsync(hostId, null, default))
+            .ShouldBeOfType<RaidCollaborationLoadOutcome.Loaded>()
+            .Dashboard.EligibleChannels;
+
+        channels.Count.ShouldBe(2);
+        var overlap = channels.Single(channel => channel.TwitchUserId == "stable-id");
+        overlap.Login.ShouldBe("new-login");
+        overlap.Provenance.ShouldBe(RaidCandidateProvenance.Approved);
+        overlap.ApprovedClip.ShouldBe(approvedClip);
+        var followedOnly = channels.Single(channel => channel.TwitchUserId == "followed-only-id");
+        followedOnly.Provenance.ShouldBe(RaidCandidateProvenance.Followed);
+        followedOnly.ApprovedClip.ShouldBeNull();
+    }
+
+    [Test]
     public async Task ApprovingFromHistory_PersistsOnceAndIsRejectedOnRepeat()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -220,10 +309,17 @@ public sealed class RaidCollaborationServiceTests
         var fixture = Fixture(database);
 
         var approved = (
-            await fixture.Service.ApproveChannelAsync(hostId, "MaplePixel", "MaplePixel", default)
+            await fixture.Service.ApproveChannelAsync(
+                hostId,
+                "maple-id",
+                "MaplePixel",
+                "MaplePixel",
+                default
+            )
         ).ShouldBeOfType<ApproveRaidChannelOutcome.Approved>();
         var repeated = await fixture.Service.ApproveChannelAsync(
             hostId,
+            "maple-id",
             "maplepixel",
             "MaplePixel",
             default
@@ -282,13 +378,18 @@ public sealed class RaidCollaborationServiceTests
             );
         fixture.Provider.LoadedLogins.ShouldNotContain("private-other");
         _ = (
-            await fixture.Service.SendShortlistShoutoutAsync(hostId, "eligible", default)
+            await fixture.Service.SendShortlistShoutoutAsync(
+                hostId,
+                "eligible-id",
+                "eligible",
+                default
+            )
         ).ShouldBeOfType<ShoutoutOperationOutcome.Sent>();
         fixture.Shoutouts.Targets.ShouldBe(["eligible"]);
     }
 
     [Test]
-    public async Task ConfirmedRaid_RechecksApprovalEligibilityAndFeatureBeforeProviderStart()
+    public async Task StaleShortlistActions_AreRejectedBeforeExternalAction()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "alpha", HostFeatureFlags.RaidCollaboration);
@@ -297,9 +398,24 @@ public sealed class RaidCollaborationServiceTests
         fixture.Provider.SetLive("eligible", "Celeste", "en", 70);
 
         _ = (
-            await fixture.Service.StartConfirmedRaidAsync(hostId, "unapproved", default)
+            await fixture.Service.SendShortlistShoutoutAsync(
+                hostId,
+                "removed-id",
+                "removed",
+                default
+            )
+        ).ShouldBeOfType<ShoutoutOperationOutcome.NotReady>();
+        _ = (
+            await fixture.Service.StartConfirmedRaidAsync(
+                hostId,
+                "unapproved-id",
+                "unapproved",
+                default
+            )
         ).ShouldBeOfType<ConfirmedRaidStartOutcome.TargetNotApproved>();
+        fixture.Shoutouts.Targets.ShouldBeEmpty();
         fixture.Provider.StartedLogins.ShouldBeEmpty();
+        fixture.Provider.LoadedLogins.Clear();
         await using (var disable = await database.CreateDbContextAsync())
         {
             var host = await disable.Hosts.SingleAsync(value => value.Id == hostId);
@@ -307,7 +423,12 @@ public sealed class RaidCollaborationServiceTests
             _ = await disable.SaveChangesAsync();
         }
         _ = (
-            await fixture.Service.StartConfirmedRaidAsync(hostId, "eligible", default)
+            await fixture.Service.StartConfirmedRaidAsync(
+                hostId,
+                "eligible-id",
+                "eligible",
+                default
+            )
         ).ShouldBeOfType<ConfirmedRaidStartOutcome.FeatureDisabled>();
         fixture.Provider.LoadedLogins.ShouldBeEmpty();
         fixture.Provider.StartedLogins.ShouldBeEmpty();
@@ -382,7 +503,8 @@ public sealed class RaidCollaborationServiceTests
         string language = "",
         IReadOnlyList<string>? categories = null,
         bool automaticShoutouts = false,
-        bool onlyApprovedChannels = false
+        bool onlyApprovedChannels = false,
+        bool includeFollowedLiveChannels = false
     )
     {
         await using var db = await database.CreateDbContextAsync();
@@ -395,6 +517,7 @@ public sealed class RaidCollaborationServiceTests
                 Language = language,
                 EligibleCategories = string.Join('\n', categories ?? []),
                 RelationshipCooldownHours = 336,
+                IncludeFollowedLiveChannels = includeFollowedLiveChannels,
                 UpdatedAtUtc = _now.UtcDateTime,
             }
         );
@@ -469,6 +592,23 @@ public sealed class RaidCollaborationServiceTests
             RecordedAtUtc = occurredAt.UtcDateTime,
         };
 
+    private static RaidChannelSnapshot Snapshot(
+        string twitchUserId,
+        string login,
+        ApprovedRaidClip? clip = null
+    ) =>
+        new(
+            twitchUserId,
+            login,
+            login,
+            $"{twitchUserId}-stream",
+            "Celeste",
+            "en",
+            $"{login} title",
+            50,
+            clip
+        );
+
     private sealed record FixtureState(
         RaidCollaborationService Service,
         RecordingProvider Provider,
@@ -481,13 +621,23 @@ public sealed class RaidCollaborationServiceTests
     private sealed class RecordingProvider : IRaidCollaborationProvider
     {
         private readonly Dictionary<string, RaidChannelSnapshotOutcome> _channels = [];
+        private readonly Dictionary<int, IReadOnlyList<RaidChannelSnapshot>> _followed = [];
         internal List<string> LoadedLogins { get; } = [];
         internal List<string> StartedLogins { get; } = [];
+        internal List<int> FollowedRequests { get; } = [];
+        internal bool FollowedAuthorization { get; set; }
 
-        internal void SetLive(string login, string category, string language, int viewers) =>
+        internal void SetLive(
+            string login,
+            string category,
+            string language,
+            int viewers,
+            string? twitchUserId = null,
+            ApprovedRaidClip? clip = null
+        ) =>
             _channels[login] = new RaidChannelSnapshotOutcome.Available(
                 new(
-                    $"{login}-id",
+                    twitchUserId ?? $"{login}-id",
                     login,
                     login,
                     $"{login}-stream",
@@ -495,9 +645,15 @@ public sealed class RaidCollaborationServiceTests
                     language,
                     $"{login} title",
                     viewers,
-                    null
+                    clip
                 )
             );
+
+        internal void SetFollowed(int hostId, params RaidChannelSnapshot[] channels)
+        {
+            _followed[hostId] = channels;
+            FollowedAuthorization = true;
+        }
 
         internal void SetOffline(string login) =>
             _channels[login] = new RaidChannelSnapshotOutcome.Offline(login);
@@ -514,6 +670,39 @@ public sealed class RaidCollaborationServiceTests
                 _channels.GetValueOrDefault(login, new RaidChannelSnapshotOutcome.Offline(login))
             );
         }
+
+        public Task<RaidChannelSnapshotOutcome> LoadLiveChannelByIdAsync(
+            int hostId,
+            string twitchUserId,
+            string? approvedClipId,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult(
+                _channels.Values.FirstOrDefault(outcome =>
+                    outcome is RaidChannelSnapshotOutcome.Available available
+                    && available.Snapshot.TwitchUserId == twitchUserId
+                ) ?? new RaidChannelSnapshotOutcome.Offline(twitchUserId)
+            );
+
+        public Task<FollowedLiveChannelsOutcome> LoadFollowedLiveChannelsAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
+        {
+            FollowedRequests.Add(hostId);
+            return Task.FromResult<FollowedLiveChannelsOutcome>(
+                FollowedAuthorization
+                    ? new FollowedLiveChannelsOutcome.Available(
+                        _followed.GetValueOrDefault(hostId, [])
+                    )
+                    : new FollowedLiveChannelsOutcome.AuthorizationRequired()
+            );
+        }
+
+        public Task<bool> HasFollowedLiveAuthorizationAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(FollowedAuthorization);
 
         public Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
             int hostId,

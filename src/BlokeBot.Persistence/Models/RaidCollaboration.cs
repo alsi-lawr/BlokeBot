@@ -10,6 +10,7 @@ public sealed class RaidCollaborationSettings
     public string Language { get; set; } = "en";
     public string EligibleCategories { get; set; } = string.Empty;
     public int RelationshipCooldownHours { get; set; } = 336;
+    public bool IncludeFollowedLiveChannels { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }
 
