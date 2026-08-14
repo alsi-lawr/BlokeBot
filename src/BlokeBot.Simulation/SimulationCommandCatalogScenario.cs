@@ -2,6 +2,7 @@ using BlokeBot.Commands;
 using BlokeBot.Core;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Eventing;
@@ -24,7 +25,8 @@ internal sealed class SimulationCommandCatalogScenario(
     HostBotStatusService productionStreams,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     EventBus<AppEventKind> events,
-    PointsGiveawayChangeNotifier giveawayChanges
+    PointsGiveawayChangeNotifier giveawayChanges,
+    HostFeatureService hostFeatures
 ) : IHostStreamLivenessProvider
 {
     private SimulationStreamLiveness _liveness = SimulationStreamLiveness.Production;
@@ -183,8 +185,7 @@ internal sealed class SimulationCommandCatalogScenario(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await HostIdAsync(db, ct);
-        var host = await db.Hosts.SingleAsync(value => value.Id == hostId, ct);
-        host.EnabledFeatures = state.ToLowerInvariant() switch
+        var enabledFeatures = state.ToLowerInvariant() switch
         {
             "available" => HostFeatureFlags.All,
             "all-enabled" => HostFeatureFlags.All,
@@ -203,7 +204,17 @@ internal sealed class SimulationCommandCatalogScenario(
                 "Unknown feature state."
             ),
         };
-        _ = await db.SaveChangesAsync(ct);
+        foreach (var feature in HostFeatureCatalog.Features)
+        {
+            if (enabledFeatures.Contains(feature))
+            {
+                await hostFeatures.EnableAsync(hostId, feature, ct);
+            }
+            else
+            {
+                await hostFeatures.DisableAsync(hostId, feature, ct);
+            }
+        }
         _ = await events.PublishAsync(AppEventKind.CommandsChanged, ct);
     }
 

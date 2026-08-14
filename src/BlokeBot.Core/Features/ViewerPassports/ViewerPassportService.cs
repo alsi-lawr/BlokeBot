@@ -378,25 +378,44 @@ public sealed class ViewerPassportService(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var host = await db.Hosts.SingleOrDefaultAsync(
-                value =>
-                    value.Login == channel
-                    && (value.EnabledFeatures & HostFeatureFlags.ViewerPassports)
-                        == HostFeatureFlags.ViewerPassports,
-                cancellationToken
-            );
-            if (host is null)
+            var hostId = await db
+                .Hosts.AsNoTracking()
+                .Where(value => value.Login == channel)
+                .Select(value => (int?)value.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (hostId is null)
             {
                 return false;
             }
 
-            var claimGate = LoginClaimGate(host.Id, identity.Login);
+            var claimGate = LoginClaimGate(hostId.Value, identity.Login);
             await claimGate.WaitAsync(cancellationToken);
             try
             {
                 await using var transaction = await db.Database.BeginTransactionAsync(
                     cancellationToken
                 );
+                // Acquire SQLite's write boundary before reading the feature state and generation.
+                _ = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    UPDATE hosts
+                    SET EnabledFeatures = EnabledFeatures
+                    WHERE Id = {hostId.Value};
+                    """,
+                    cancellationToken
+                );
+                var host = await db.Hosts.SingleOrDefaultAsync(
+                    value =>
+                        value.Id == hostId.Value
+                        && (value.EnabledFeatures & HostFeatureFlags.ViewerPassports)
+                            == HostFeatureFlags.ViewerPassports,
+                    cancellationToken
+                );
+                if (host is null)
+                {
+                    return false;
+                }
+
                 var now = clock.GetUtcNow().UtcDateTime;
                 _ = await db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
@@ -747,7 +766,11 @@ public sealed class ViewerPassportService(
             .ViewerPassportStreamSessions.AsNoTracking()
             .Where(value =>
                 value.HostId == passport.HostId
-                && value.ContinuityGeneration == continuityGeneration
+                && db.ViewerPassportStreamAttendances.Any(attendance =>
+                    attendance.HostId == passport.HostId
+                    && attendance.StreamSessionId == value.Id
+                    && attendance.ContinuityGeneration == continuityGeneration
+                )
             )
             .OrderByDescending(value => value.StartedAtUtc)
             .ThenByDescending(value => value.TwitchStreamId)
