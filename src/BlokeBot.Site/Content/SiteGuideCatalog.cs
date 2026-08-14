@@ -1776,7 +1776,7 @@ internal static partial class SiteGuideCatalog
                     ],
                     Paragraphs =
                     [
-                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save. BlokeBot does not silently replace the current command.",
+                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save. BlokeBot does not silently replace the existing command.",
                     ],
                 },
                 new SiteGuideSection
@@ -1860,7 +1860,7 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Guessing games",
             Title = "Set up and run a guessing game",
             Summary =
-                "Create reusable round types and answers, collect one guess per viewer, then record the correct answer.",
+                "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/points-and-guessing/phone-dark-guessing-workflow.webp",
                 LightPhoneSource: "media/points-and-guessing/phone-light-guessing-workflow.webp",
@@ -1888,8 +1888,8 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Open the Guessing game Dashboard and choose the round type.",
-                        "Start the round, let viewers submit guesses, then close the round to new guesses.",
-                        "Enter the correct answer or one of its aliases and declare the winner.",
+                        "Start the round, let viewers submit guesses, then select Stop guessing.",
+                        "Enter the winning answer or one of its aliases and declare the winner.",
                     ],
                     Paragraphs =
                     [
