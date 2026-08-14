@@ -102,6 +102,18 @@ internal static class SimulationServiceCollectionExtensions
     private sealed class SimulationRaidCollaborationProvider(TimeProvider clock)
         : IRaidCollaborationProvider
     {
+        private static readonly RaidChannelSnapshot _followedLiveChannel = new(
+            "lunarforge-id",
+            "lunarforge",
+            "LunarForge",
+            "lunarforge-stream",
+            "Celeste",
+            "en",
+            "Learning the golden route with chat",
+            58,
+            null
+        );
+
         public Task<RaidChannelSnapshotOutcome> LoadLiveChannelAsync(
             int hostId,
             string login,
@@ -143,6 +155,7 @@ internal static class SimulationServiceCollectionExtensions
                             null
                         )
                     ),
+                    "lunarforge" => new RaidChannelSnapshotOutcome.Available(_followedLiveChannel),
                     _ => new RaidChannelSnapshotOutcome.Offline(login),
                 }
             );
@@ -159,6 +172,7 @@ internal static class SimulationServiceCollectionExtensions
                 {
                     "maple-id" => "maplepixel",
                     "cozy-id" => "cozyworkshop",
+                    "lunarforge-id" => "lunarforge",
                     _ => twitchUserId,
                 },
                 approvedClipId,
@@ -170,13 +184,13 @@ internal static class SimulationServiceCollectionExtensions
             CancellationToken cancellationToken
         ) =>
             Task.FromResult<FollowedLiveChannelsOutcome>(
-                new FollowedLiveChannelsOutcome.Unavailable()
+                new FollowedLiveChannelsOutcome.Available([_followedLiveChannel])
             );
 
         public Task<bool> HasFollowedLiveAuthorizationAsync(
             int hostId,
             CancellationToken cancellationToken
-        ) => Task.FromResult(false);
+        ) => Task.FromResult(true);
 
         public Task<ConfirmedRaidStartOutcome> StartConfirmedRaidAsync(
             int hostId,

@@ -2684,6 +2684,7 @@ internal sealed class SimulationFixtureSeeder(
                 Language = "en",
                 EligibleCategories = "Celeste\nMakers & Crafting",
                 RelationshipCooldownHours = 336,
+                IncludeFollowedLiveChannels = true,
                 UpdatedAtUtc = now,
             }
         );
