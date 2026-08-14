@@ -691,7 +691,11 @@ public partial class PageHelpButton
             new(
                 "Set up a Browser Source",
                 "The private Browser Source URL appears only after overlay creation or URL rotation.",
-                ["Copy its private Browser Source URL.", "Add it to OBS at 1920 by 1080."]
+                [
+                    "Create an overlay.",
+                    "Copy its private Browser Source URL.",
+                    "Add it to OBS at 1920 by 1080.",
+                ]
             ),
             new(
                 "Rotate a URL",
