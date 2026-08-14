@@ -5,6 +5,10 @@
         min-width: 0;
     }
 
+    .raid-workspace:has(.raid-settings__save) {
+        animation-fill-mode: none;
+    }
+
     .raid-section {
         min-width: 0;
     }
@@ -12,10 +16,25 @@
     .raid-section__header {
         align-items: center;
         border-bottom: 1px solid var(--app-border);
+        cursor: pointer;
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
+        list-style: none;
         padding: 1rem 1.25rem;
+    }
+
+    .raid-section__header::-webkit-details-marker {
+        display: none;
+    }
+
+    .raid-section:not([open]) > .raid-section__header {
+        border-bottom: 0;
+    }
+
+    .raid-section__header:focus-visible {
+        box-shadow: inset var(--app-focus-shadow);
+        outline: none;
     }
 
     .raid-section__step {
@@ -47,7 +66,20 @@
     }
 
     .raid-section__action {
+        justify-self: start;
         margin-left: auto;
+    }
+
+    .raid-section__chevron {
+        color: var(--app-text-muted);
+        flex: none;
+        font-size: 1.35rem;
+        margin-left: auto;
+        transition: transform 180ms ease;
+    }
+
+    .raid-section[open] > .raid-section__header .raid-section__chevron {
+        transform: rotate(90deg);
     }
 
     .raid-section__body {

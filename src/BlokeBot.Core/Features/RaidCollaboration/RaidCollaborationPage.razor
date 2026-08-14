@@ -245,14 +245,15 @@
                 else
                 {
                     <div class="raid-settings" data-sticky-save-scope data-raid-settings>
-                        <section class="card raid-section">
-                            <header class="raid-section__header">
+                        <details class="card raid-section" open>
+                            <summary class="raid-section__header">
                                 <span class="raid-section__step" aria-hidden="true">1</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Welcome flow</h2>
                                     <p class="raid-section__description">Choose what happens when another channel raids you.</p>
                                 </div>
-                            </header>
+                                <span class="raid-section__chevron" aria-hidden="true">›</span>
+                            </summary>
                             <div class="raid-section__body">
                                 <div class="raid-split">
                                     <div class="raid-toggle">
@@ -294,32 +295,34 @@
                                     </div>
                                 </div>
                             </div>
-                        </section>
+                        </details>
 
-                        <section class="card raid-section">
-                            <header class="raid-section__header">
+                        <details class="card raid-section" open>
+                            <summary class="raid-section__header">
                                 <span class="raid-section__step" aria-hidden="true">2</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Automatic raid shoutouts</h2>
                                     <p class="raid-section__description">Decide how a qualifying incoming raid is shouted out.</p>
                                 </div>
-                            </header>
+                                <span class="raid-section__chevron" aria-hidden="true">›</span>
+                            </summary>
                             <div class="raid-section__body">
                                 <AutomaticShoutoutSection Value="_draft.AutomaticShoutout"
                                                           ValueChanged="@(value => _draft.AutomaticShoutout = value)"
                                                           Errors="_shoutoutErrors"
                                                           ErrorCleared="ClearShoutoutError" />
                             </div>
-                        </section>
+                        </details>
 
-                        <section class="card raid-section">
-                            <header class="raid-section__header">
+                        <details class="card raid-section" open>
+                            <summary class="raid-section__header">
                                 <span class="raid-section__step" aria-hidden="true">3</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Shortlist rules</h2>
                                     <p class="raid-section__description">Keep the next-channel list focused.</p>
                                 </div>
-                            </header>
+                                <span class="raid-section__chevron" aria-hidden="true">›</span>
+                            </summary>
                             <div class="raid-section__body">
                                 <div class="raid-toggle mb-4">
                                     <div class="min-w-0">
@@ -373,18 +376,19 @@
                                     </div>
                                 </div>
                             </div>
-                        </section>
+                        </details>
 
-                        <section class="card raid-section">
-                            <header class="raid-section__header">
+                        <details class="card raid-section" open>
+                            <summary class="raid-section__header">
                                 <span class="raid-section__step" aria-hidden="true">4</span>
                                 <div class="min-w-0">
                                     <h2 class="raid-section__heading">Approved channels</h2>
                                     <p class="raid-section__description">Approved channels always supply shortlist candidates. Approval is your decision. Twitch supplies no safety or reputation evidence. An approved clip must belong to the channel and be 30 days old or less.</p>
                                 </div>
-                                <button class="btn-secondary raid-section__action" type="button" @onclick="AddApprovedChannel">Add channel</button>
-                            </header>
+                                <span class="raid-section__chevron" aria-hidden="true">›</span>
+                            </summary>
                             <div class="raid-section__body">
+                                <button class="btn-secondary raid-section__action" type="button" @onclick="AddApprovedChannel">Add channel</button>
                                 @if (_draft.ApprovedChannels.Count == 0)
                                 {
                                     <p class="text-sm text-muted-foreground">No channel is approved. Add one, or use the optional followed live source.</p>
@@ -430,14 +434,16 @@
                                     </div>
                                 }
                             </div>
-                        </section>
+                        </details>
 
                         @if (_followedLiveReconnectRequired)
                         {
                             <div class="card p-4 text-sm"><strong>Followed live channels need Twitch permission.</strong><p class="mt-1 text-xs text-muted-foreground">Reconnect the channel owner. Then turn on the source and save the settings again.</p><a class="btn-secondary mt-3 inline-flex" href="/oauth/broadcaster/start?followed-live=true">Reconnect followed channels</a></div>
                         }
 
-                        <StickySaveRegion Scope="StickySaveScope.Editor" Feedback="_saveFeedback">
+                        <StickySaveRegion Scope="StickySaveScope.Page"
+                                          Class="raid-settings__save"
+                                          Feedback="_saveFeedback">
                             <button class="btn-primary" type="button" disabled="@_saving" @onclick="SaveAsync">@(_saving ? "Saving…" : "Save settings")</button>
                         </StickySaveRegion>
                     </div>
