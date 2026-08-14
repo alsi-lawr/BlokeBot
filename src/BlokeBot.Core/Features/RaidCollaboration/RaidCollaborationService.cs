@@ -616,6 +616,20 @@ public sealed class RaidCollaborationService(
     {
         var candidates = new Dictionary<string, CandidateSource>(StringComparer.Ordinal);
         var excluded = new List<RaidShortlistExclusion>();
+        FollowedLiveChannelsOutcome? followed = null;
+        var followedState = FollowedLiveSourceState.Disabled;
+        if (configuration.IncludeFollowedLiveChannels)
+        {
+            followed = await provider.LoadFollowedLiveChannelsAsync(hostId, cancellationToken);
+            followedState = followed switch
+            {
+                FollowedLiveChannelsOutcome.Available => FollowedLiveSourceState.Ready,
+                FollowedLiveChannelsOutcome.AuthorizationRequired =>
+                    FollowedLiveSourceState.AuthorizationRequired,
+                _ => FollowedLiveSourceState.Unavailable,
+            };
+        }
+
         foreach (var approved in configuration.ApprovedChannels)
         {
             if (!await FeatureAcceptsCurrentWorkAsync(hostId, null, cancellationToken))
@@ -637,7 +651,9 @@ public sealed class RaidCollaborationService(
                 );
             if (outcome is RaidChannelSnapshotOutcome.Unavailable)
             {
-                return null;
+                return followedState == FollowedLiveSourceState.AuthorizationRequired
+                    ? ([], [], followedState)
+                    : null;
             }
             if (outcome is not RaidChannelSnapshotOutcome.Available available)
             {
@@ -656,26 +672,14 @@ public sealed class RaidCollaborationService(
             );
         }
 
-        var followedState = FollowedLiveSourceState.Disabled;
-        if (configuration.IncludeFollowedLiveChannels)
+        if (followed is FollowedLiveChannelsOutcome.Available followedAvailable)
         {
-            var followed = await provider.LoadFollowedLiveChannelsAsync(hostId, cancellationToken);
-            followedState = followed switch
+            foreach (var snapshot in followedAvailable.Channels)
             {
-                FollowedLiveChannelsOutcome.Available => FollowedLiveSourceState.Ready,
-                FollowedLiveChannelsOutcome.AuthorizationRequired =>
-                    FollowedLiveSourceState.AuthorizationRequired,
-                _ => FollowedLiveSourceState.Unavailable,
-            };
-            if (followed is FollowedLiveChannelsOutcome.Available available)
-            {
-                foreach (var snapshot in available.Channels)
-                {
-                    _ = candidates.TryAdd(
-                        snapshot.TwitchUserId,
-                        new(snapshot with { ApprovedClip = null }, RaidCandidateProvenance.Followed)
-                    );
-                }
+                _ = candidates.TryAdd(
+                    snapshot.TwitchUserId,
+                    new(snapshot with { ApprovedClip = null }, RaidCandidateProvenance.Followed)
+                );
             }
         }
 
