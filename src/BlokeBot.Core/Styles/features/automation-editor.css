@@ -1199,6 +1199,44 @@
     gap: 0.45rem;
 }
 
+.automation-dirty-dialog-backdrop {
+    align-items: center;
+    backdrop-filter: blur(3px);
+    background: rgb(5 8 11 / 63%);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 1.25rem;
+    position: fixed;
+    z-index: 500;
+}
+
+.automation-dirty-dialog {
+    background: var(--app-surface-solid);
+    border: 1px solid var(--app-border);
+    border-radius: 0.9rem;
+    box-shadow: var(--app-shadow-surface);
+    max-width: 100%;
+    padding: calc(1.35rem + 5px);
+    width: 27rem;
+}
+
+.automation-dirty-dialog h2,
+.automation-dirty-dialog p {
+    margin-top: 0;
+}
+
+.automation-dirty-dialog p {
+    color: var(--app-text-muted);
+    margin: 5px 0;
+}
+
+.automation-dirty-dialog-actions {
+    display: flex;
+    gap: 0.55rem;
+    justify-content: flex-end;
+}
+
 @media (max-width: 74rem) {
     .automation-editor-body {
         grid-template-columns: 10.5rem minmax(26rem, 1fr);
@@ -1213,6 +1251,16 @@
 
     .automation-page-actions > * {
         flex: 1;
+    }
+
+    .automation-dirty-dialog-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .automation-dirty-dialog-actions .btn-primary {
+        grid-column: 1 / -1;
+        grid-row: 1;
     }
 
     .automation-editor {

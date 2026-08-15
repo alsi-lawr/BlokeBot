@@ -5,16 +5,22 @@
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Routing
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
 @inject AutomationCatalogService _catalogService
 @inject AutomationFlowService _flowsService
 @inject AutomationRunQueryService _runsService
 @inject IDbContextFactory<BlokeBotDbContext> _dbFactory
 @inject IOverlayCueAdmissionService _overlayCues
 @inject EventBus<AppEventKind> _events
+@inject IJSRuntime _js
+@inject NavigationManager _navigation
 
 <PageTitle>BlokeBot | Visual automations</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_hasChanges"
+                OnBeforeInternalNavigation="HandleInternalNavigation" />
 
 <DashboardPage Kicker="Automation"
                Title="Visual automations"
@@ -52,7 +58,7 @@
     else
     {
         <div class="automation-page-actions">
-            <button class="btn-primary" type="button" @onclick="NewFlow">+ New flow</button>
+            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync">+ New flow</button>
         </div>
 
         @if (_flowRecoveryMessage is not null)
@@ -69,7 +75,7 @@
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
                 <p>Add a trigger. Then, connect an action and validate the flow.</p>
-                <button class="btn-primary" type="button" @onclick="NewFlow">Create flow</button>
+                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync">Create flow</button>
             </section>
         }
         else
@@ -127,14 +133,14 @@
 
                 <div class="automation-editor-body">
                     <aside class="automation-flow-rail" aria-label="Flow library">
-                        <div class="automation-flow-rail-heading"><strong>Flows</strong><button type="button" aria-label="New flow" @onclick="NewFlow">+</button></div>
+                        <div class="automation-flow-rail-heading"><strong>Flows</strong><button type="button" aria-label="New flow" @onclick="RequestNewFlowAsync">+</button></div>
                         @foreach (var flow in _flowSnapshots)
                         {
                             <button @key="flow.Draft.Id"
                                     type="button"
                                     class="@(flow.Draft.Id == _editor.Id ? "automation-flow-item automation-flow-item--active" : "automation-flow-item")"
-                                    @onclick="() => SelectFlow(flow)">
-                                <strong>@flow.Draft.Name</strong>
+                                    @onclick="() => RequestSelectFlowAsync(flow)">
+                                <strong>@FlowDisplayName(flow)</strong>
                                 <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
                             </button>
                         }
@@ -148,7 +154,7 @@
                         @if (_editor.Id is not null)
                         {
                             <div class="automation-flow-rail-actions">
-                                <button type="button" @onclick="DuplicateAsync">Duplicate</button>
+                                <button type="button" @onclick="RequestDuplicateAsync">Duplicate</button>
                                 <button type="button" @onclick="RequestDelete">@(_deleteConfirmation ? "Confirm delete" : "Delete")</button>
                             </div>
                         }
@@ -261,3 +267,22 @@
         }
     }
 </DashboardPage>
+
+@if (_dirtyDialogOpen)
+{
+    <div class="automation-dirty-dialog-backdrop" @onclick="CancelDirtyTransition">
+        <section class="automation-dirty-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="automation-dirty-dialog-title"
+                 @onclick:stopPropagation="true">
+            <h2 id="automation-dirty-dialog-title">Are you sure?</h2>
+            <p>This flow has unsaved changes. Save the flow, discard the changes, or stay on this flow.</p>
+            <div class="automation-dirty-dialog-actions">
+                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelDirtyTransition">Cancel</button>
+                <button class="automation-danger-button" type="button" disabled="@_busy" @onclick="DiscardDirtyTransitionAsync">Discard</button>
+                <button class="btn-primary" type="button" disabled="@_busy" autofocus @onclick="SaveDirtyTransitionAsync">Save</button>
+            </div>
+        </section>
+    </div>
+}

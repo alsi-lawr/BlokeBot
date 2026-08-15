@@ -2,7 +2,9 @@ using System.Collections.Immutable;
 using System.Globalization;
 using BlokeBot.Core.Components;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.Automations.Page;
 
@@ -42,6 +44,11 @@ public partial class AutomationEditorPage
     private string _nodeSearch = string.Empty;
     private string _canvasViewportKey = Guid.NewGuid().ToString("N");
     private CancellationTokenSource? _validationFeedbackCancellation;
+    private Func<Task>? _pendingTransition;
+    private Func<Task>? _acceptedTransition;
+    private bool _dirtyDialogOpen;
+    private IJSObjectReference? _pageModule;
+    private DotNetObjectReference<AutomationEditorPage>? _pageReference;
 
     private AutomationEditorNode? _selectedNode =>
         _selectedNodeIds.Count == 1
@@ -157,12 +164,50 @@ public partial class AutomationEditorPage
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.CustomCommandsChanged],
                 InvokeAsync,
-                LoadAsync,
+                RefreshPageAsync,
                 StateHasChanged
             )
         );
         await LoadAsync();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                _pageModule = await _js.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./Features/Automations/Page/AutomationEditorPage.razor.js"
+                );
+                _pageReference = DotNetObjectReference.Create(this);
+                await _pageModule.InvokeVoidAsync(
+                    "initializeDirtyNavigation",
+                    _pageReference,
+                    _hasChanges
+                );
+            }
+            else if (_pageModule is not null)
+            {
+                await _pageModule.InvokeVoidAsync("setDirtyNavigation", _hasChanges);
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (TaskCanceledException) { }
+
+        if (_acceptedTransition is not { } transition)
+        {
+            return;
+        }
+
+        _acceptedTransition = null;
+        await transition();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task RefreshPageAsync() => _hasChanges ? Task.CompletedTask : LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -278,7 +323,7 @@ public partial class AutomationEditorPage
             .ToArray();
     }
 
-    private void NewFlow()
+    private void StartNewFlow()
     {
         ResetCanvasViewport();
         ResetTransientState();
@@ -291,7 +336,7 @@ public partial class AutomationEditorPage
         _hasChanges = true;
     }
 
-    private async Task SelectFlow(AutomationFlowSnapshot snapshot)
+    private async Task SelectFlowCoreAsync(AutomationFlowSnapshot snapshot)
     {
         if (snapshot.Draft.Id != _editor?.Id)
         {
@@ -302,6 +347,18 @@ public partial class AutomationEditorPage
             await ValidateCoreAsync(showFeedback: false);
         }
     }
+
+    private Task RequestNewFlowAsync() =>
+        RequestTransitionAsync(() =>
+        {
+            StartNewFlow();
+            return Task.CompletedTask;
+        });
+
+    private Task RequestSelectFlowAsync(AutomationFlowSnapshot snapshot) =>
+        snapshot.Draft.Id == _editor?.Id
+            ? Task.CompletedTask
+            : RequestTransitionAsync(() => SelectFlowCoreAsync(snapshot));
 
     private bool RestoreEditor(AutomationFlowSnapshot snapshot)
     {
@@ -525,14 +582,17 @@ public partial class AutomationEditorPage
         _inspectorFocusMode = _selectedNodeId is null ? null : AutomationEditorMode.Grid;
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync() => _ = await SaveCoreAsync();
+
+    private async Task<bool> SaveCoreAsync()
     {
         if (_editor is null || HostId == 0)
         {
-            return;
+            return false;
         }
 
         _busy = true;
+        var succeeded = false;
         var requestedHostId = HostId;
         try
         {
@@ -551,6 +611,7 @@ public partial class AutomationEditorPage
                             _feedback = "Flow saved.";
                             _operationFailed = false;
                             _hasChanges = false;
+                            succeeded = true;
                             break;
                         case AutomationFlowSaveOutcome.Invalid invalid:
                             ShowValidation(invalid.Errors, "Correct the flow before you save it.");
@@ -566,6 +627,8 @@ public partial class AutomationEditorPage
         {
             _busy = false;
         }
+
+        return succeeded;
     }
 
     private Task ValidateAsync() => ValidateCoreAsync(showFeedback: true);
@@ -738,7 +801,9 @@ public partial class AutomationEditorPage
         }
     }
 
-    private async Task DuplicateAsync()
+    private Task RequestDuplicateAsync() => RequestTransitionAsync(DuplicateCoreAsync);
+
+    private async Task DuplicateCoreAsync()
     {
         if (_editor?.Id is not { } flowId || HostId == 0)
         {
@@ -910,6 +975,102 @@ public partial class AutomationEditorPage
         _hasChanges = true;
     }
 
+    private async Task RequestTransitionAsync(Func<Task> transition)
+    {
+        if (!_hasChanges)
+        {
+            await transition();
+            return;
+        }
+
+        _pendingTransition = transition;
+        _dirtyDialogOpen = true;
+    }
+
+    private void HandleInternalNavigation(LocationChangingContext context)
+    {
+        if (!_hasChanges)
+        {
+            return;
+        }
+
+        context.PreventNavigation();
+        var targetLocation = context.TargetLocation;
+        _pendingTransition = () =>
+        {
+            _navigation.NavigateTo(targetLocation);
+            return Task.CompletedTask;
+        };
+        _dirtyDialogOpen = true;
+    }
+
+    [JSInvokable]
+    public Task RequestFullNavigationAsync(string targetLocation) =>
+        InvokeAsync(async () =>
+        {
+            var target = _navigation.ToAbsoluteUri(targetLocation);
+            var current = new Uri(_navigation.Uri);
+            if (
+                !string.Equals(target.Scheme, current.Scheme, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(target.Host, current.Host, StringComparison.OrdinalIgnoreCase)
+                || target.Port != current.Port
+            )
+            {
+                return;
+            }
+
+            await RequestTransitionAsync(() =>
+                _pageModule!.InvokeVoidAsync("navigateDocument", target.ToString()).AsTask()
+            );
+            StateHasChanged();
+        });
+
+    private async Task SaveDirtyTransitionAsync()
+    {
+        var transition = _pendingTransition;
+        if (transition is null)
+        {
+            CancelDirtyTransition();
+            return;
+        }
+
+        if (!await SaveCoreAsync())
+        {
+            CancelDirtyTransition();
+            return;
+        }
+
+        await AcceptDirtyTransitionAsync(transition);
+    }
+
+    private async Task DiscardDirtyTransitionAsync()
+    {
+        var transition = _pendingTransition;
+        if (transition is null)
+        {
+            CancelDirtyTransition();
+            return;
+        }
+
+        _hasChanges = false;
+        await AcceptDirtyTransitionAsync(transition);
+    }
+
+    private Task AcceptDirtyTransitionAsync(Func<Task> transition)
+    {
+        CloseDirtyDialog();
+        _acceptedTransition = transition;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void CancelDirtyTransition() => CloseDirtyDialog();
+
+    private void CloseDirtyDialog()
+    {
+        _dirtyDialogOpen = false;
+        _pendingTransition = null;
+    }
+
     private void ResetTransientState()
     {
         CancelValidationFeedback();
@@ -1021,6 +1182,15 @@ public partial class AutomationEditorPage
             ? "automation-status-dot automation-status-dot--draft"
             : "automation-status-dot";
 
+    private string FlowDisplayName(AutomationFlowSnapshot flow)
+    {
+        var name =
+            _editor is { Id: { } editorId } && flow.Draft.Id == editorId
+                ? _editor.Name
+                : flow.Draft.Name;
+        return string.IsNullOrWhiteSpace(name) ? "Untitled flow" : name;
+    }
+
     private static string ModeToken(AutomationEditorMode mode) =>
         mode == AutomationEditorMode.Grid ? "grid" : "list";
 
@@ -1076,6 +1246,30 @@ public partial class AutomationEditorPage
         }
 
         base.Dispose(disposing);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pageModule is not null)
+        {
+            try
+            {
+                await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (TaskCanceledException) { }
+
+            try
+            {
+                await _pageModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+        }
+
+        _pageReference?.Dispose();
+        Dispose();
     }
 
     private enum AutomationEditorMode
