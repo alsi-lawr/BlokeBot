@@ -44,6 +44,7 @@ public partial class HostConfigPage
                 HostFeatureFlags.ViewerPassports => $"{_featureIconBase} text-indigo-700",
                 HostFeatureFlags.Bingo => $"{_featureIconBase} text-cyan-700",
                 HostFeatureFlags.CustomCommands => $"{_featureIconBase} text-violet-600",
+                HostFeatureFlags.Automations => $"{_featureIconBase} text-fuchsia-700",
                 HostFeatureFlags.Polls
                 or HostFeatureFlags.ClipsAndMarkers
                 or HostFeatureFlags.RewardsAndRedemptions
@@ -132,6 +133,14 @@ public partial class HostConfigPage
                     <path d="M4 12h10" />
                     <path d="M4 17h7" />
                     <path d="m16 14 3 3-3 3" />
+                </svg>
+                """,
+                HostFeatureFlags.Automations => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="6" cy="6" r="2" />
+                    <circle cx="18" cy="12" r="2" />
+                    <circle cx="6" cy="18" r="2" />
+                    <path d="M8 6h2a4 4 0 0 1 4 4M8 18h2a4 4 0 0 0 4-4" />
                 </svg>
                 """,
                 HostFeatureFlags.Polls
@@ -234,6 +243,10 @@ public partial class HostConfigPage
     private static string FeatureImpact(HostFeatureFlags feature, bool enabled) =>
         feature switch
         {
+            HostFeatureFlags.Automations when enabled =>
+                "Its flow editor, validation, sample runs, and current live triggers are available again; suppressed work is not replayed.",
+            HostFeatureFlags.Automations =>
+                "Its editor, triggers, queued work, and actions are paused while saved flows and history remain.",
             HostFeatureFlags.Overlays when enabled =>
                 "Its dashboard and Browser Sources are available again.",
             HostFeatureFlags.Overlays =>
@@ -263,6 +276,7 @@ public partial class HostConfigPage
             HostFeatureFlags.ViewerPassports => "Viewer passports",
             HostFeatureFlags.Bingo => "Bingo",
             HostFeatureFlags.CustomCommands => "Custom commands",
+            HostFeatureFlags.Automations => "Automations",
             HostFeatureFlags.Polls => "Polls",
             HostFeatureFlags.ClipsAndMarkers => "Clips & markers",
             HostFeatureFlags.RewardsAndRedemptions => "Rewards & redemptions",

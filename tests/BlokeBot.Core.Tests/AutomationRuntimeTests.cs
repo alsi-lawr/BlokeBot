@@ -14,6 +14,151 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomationRuntimeTests
 {
     [Test]
+    public async Task AuthoringLifecycle_RoundTripsTypedGraphAndPositionsWithinSelectedHost()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""") with
+        {
+            Position = new(new(48), new(216)),
+        };
+        var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""") with
+        {
+            Position = new(new(600), new(72)),
+        };
+        var saved = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]) with
+                {
+                    IsEnabled = false,
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var otherHost = await fixture.SeedHostAsync("other-author", HostFeatureFlags.Automations);
+
+        _ = (
+            await fixture.Flows.DeleteAsync(new(otherHost), saved.FlowId, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowDeleteOutcome.FlowNotFound>();
+        _ = (
+            await fixture.Flows.DuplicateAsync(new(otherHost), saved.FlowId, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.FlowNotFound>();
+
+        var loaded = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        var roundTrip = loaded.Flows.ShouldHaveSingleItem().Draft;
+        roundTrip.Nodes.Single(node => node.Id == source.Id).Position.ShouldBe(source.Position);
+        roundTrip
+            .Nodes.Single(node => node.Id == action.Id)
+            .Definition.Configuration.GetProperty("message")
+            .GetString()
+            .ShouldBe("Welcome ${actor.display_name}!");
+
+        var moved = roundTrip with
+        {
+            Name = "Moved flow",
+            Nodes = roundTrip
+                .Nodes.Select(node =>
+                    node.Id == action.Id ? node with { Position = new(new(648), new(96)) } : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.SaveAsync(moved, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var duplicate = (
+            await fixture.Flows.DuplicateAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.Duplicated>();
+        var afterDuplicate = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        var copied = afterDuplicate.Flows.Single(flow => flow.Draft.Id == duplicate.FlowId).Draft;
+        copied.IsEnabled.ShouldBeFalse();
+        copied
+            .Nodes.Select(static node => node.Position)
+            .ShouldBe(moved.Nodes.Select(static node => node.Position), ignoreOrder: true);
+
+        _ = (
+            await fixture.Flows.DeleteAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowDeleteOutcome.Deleted>();
+        var afterDelete = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        afterDelete.Flows.Select(static flow => flow.Draft.Id).ShouldBe([duplicate.FlowId]);
+    }
+
+    [Test]
+    public async Task SampleRun_EvaluatesTypedBranchWithoutEffectsOrDurableRun()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var condition = Node("condition", """{"expression":"viewer_count >= 20"}""");
+        var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""");
+
+        var outcome = await fixture.Flows.RunSampleAsync(
+            Draft(
+                fixture.HostId,
+                [source, condition, action],
+                [Edge(source, "flow", condition), Edge(condition, "true", action)]
+            ),
+            CancellationToken.None
+        );
+
+        var completed = outcome.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        completed
+            .Nodes.Select(static node => node.OutcomeCode)
+            .ShouldBe(["source-received", "condition-true", "action-simulated"]);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Enablement_RejectsFlowWhoseSelectedCommandWasDeleted()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var action = Node("send-chat", """{"message":"hello"}""");
+        var saved = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]) with
+                {
+                    IsEnabled = false,
+                },
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            _ = await db.CustomCommands.Where(command => command.Id == 7).ExecuteDeleteAsync();
+        }
+
+        var outcome = await fixture.Flows.SetEnabledAsync(
+            new(fixture.HostId),
+            saved.FlowId,
+            enabled: true,
+            CancellationToken.None
+        );
+
+        outcome
+            .ShouldBeOfType<AutomationFlowEnableOutcome.Invalid>()
+            .Errors.ShouldContain(static error =>
+                error.Code == "custom-command-reference-unavailable"
+            );
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        (await verified.AutomationFlows.SingleAsync()).IsEnabled.ShouldBeFalse();
+    }
+
+    [Test]
     public async Task FlowValidation_RejectsJoinsCyclesDisconnectedAndIncompatibleEdges()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -1079,6 +1224,7 @@ public sealed class AutomationRuntimeTests
                 0
             );
             var hostId = await fixture.SeedHostAsync("streamer", hostFeatures);
+            await fixture.SeedAutomationCommandsAsync(hostId);
             return new RuntimeFixture(
                 database,
                 clock,
@@ -1119,6 +1265,32 @@ public sealed class AutomationRuntimeTests
             _ = db.Hosts.Add(host);
             _ = await db.SaveChangesAsync();
             return host.Id;
+        }
+
+        private async Task SeedAutomationCommandsAsync(int hostId)
+        {
+            await using var db = await Database.CreateDbContextAsync();
+            db.CustomCommands.AddRange(
+                new CustomCommand
+                {
+                    Id = 7,
+                    HostId = hostId,
+                    Name = "automation-seven",
+                    CreatedAtUtc = Clock.GetUtcNow().UtcDateTime,
+                    UpdatedAtUtc = Clock.GetUtcNow().UtcDateTime,
+                    Action = new AutomationCustomCommandAction { HostId = hostId },
+                },
+                new CustomCommand
+                {
+                    Id = 8,
+                    HostId = hostId,
+                    Name = "automation-eight",
+                    CreatedAtUtc = Clock.GetUtcNow().UtcDateTime,
+                    UpdatedAtUtc = Clock.GetUtcNow().UtcDateTime,
+                    Action = new AutomationCustomCommandAction { HostId = hostId },
+                }
+            );
+            _ = await db.SaveChangesAsync();
         }
 
         public async ValueTask DisposeAsync() => await Database.DisposeAsync();

@@ -1,0 +1,60 @@
+@using Microsoft.AspNetCore.Components.Web
+@implements IAsyncDisposable
+@inject IJSRuntime _js
+
+<div class="automation-canvas-wrap"
+     style="@($"--automation-mobile-canvas-height: {_mobileCanvasHeight}px")"
+     @ref="_root"
+     data-automation-canvas>
+    <div class="automation-canvas-label">24 px grid <span aria-hidden="true">·</span> @_connectionSummary</div>
+    <div class="automation-canvas" role="group" aria-label="Automation flow canvas">
+        <svg class="automation-edges automation-edges--desktop" viewBox="0 0 960 620" aria-hidden="true">
+            @foreach (var edge in Edges)
+            {
+                <path @key="edge.Id" class="automation-edge" d="@DesktopPath(edge)" />
+            }
+        </svg>
+        <svg class="automation-edges automation-edges--mobile" viewBox="0 0 358 @_mobileCanvasHeight" aria-hidden="true">
+            @foreach (var edge in Edges)
+            {
+                <path @key="edge.Id" class="automation-edge" d="@MobilePath(edge)" />
+            }
+        </svg>
+        @foreach (var node in Nodes)
+        {
+            var errors = ErrorsFor(node.Id);
+            var outcome = OutcomeFor(node.Id);
+            <button @key="node.Id"
+                    type="button"
+                    class="@NodeClass(node, errors.Count > 0, outcome)"
+                    style="@NodeStyle(node)"
+                    data-automation-node="@node.Id.Value"
+                    data-node-x="@node.Position.X.Value"
+                    data-node-y="@node.Position.Y.Value"
+                    aria-pressed="@(node.Id == SelectedNodeId ? "true" : "false")"
+                    aria-describedby="@(errors.Count > 0 ? ErrorId(node.Id) : null)"
+                    @onclick="() => SelectNode.InvokeAsync(node.Id)"
+                    @onkeydown="args => HandleNodeKeyAsync(node, args)">
+                <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
+                <strong>@node.Definition.Display.Name</strong>
+                <span class="automation-node-description">@node.Definition.Display.Description</span>
+                @foreach (var input in node.Definition.Inputs.Where(IsFlowPort))
+                {
+                    <span class="automation-port automation-port--input" title="@input.Name" aria-hidden="true"></span>
+                }
+                @foreach (var output in node.Definition.Outputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
+                {
+                    <span class="automation-port automation-port--output automation-port--output-@output.Index" title="@output.Port.Name" aria-hidden="true"></span>
+                }
+                @if (errors.Count > 0)
+                {
+                    <span id="@ErrorId(node.Id)" class="automation-node-error">@errors[0].Message</span>
+                }
+                else if (outcome is not null)
+                {
+                    <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
+                }
+            </button>
+        }
+    </div>
+</div>

@@ -1,0 +1,218 @@
+@page "/automations"
+@using BlokeBot.Core.Features.Overlays
+@using BlokeBot.Eventing
+@using BlokeBot.Persistence
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject AutomationCatalogService _catalogService
+@inject AutomationFlowService _flowsService
+@inject AutomationRunQueryService _runsService
+@inject IDbContextFactory<BlokeBotDbContext> _dbFactory
+@inject IOverlayCueAdmissionService _overlayCues
+@inject EventBus<AppEventKind> _events
+
+<PageTitle>BlokeBot | Visual automations</PageTitle>
+
+<DashboardPage Kicker="Automation"
+               Title="Visual automations"
+               Description="Connect an event to conditions and actions. Validate the flow before you enable it."
+               Width="DashboardPageWidth.Wide"
+               data-automation-editor-page>
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure"
+                   Title="Automations could not load"
+                   Description="Try again. Your saved flows and run history have not changed.">
+            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
+    }
+    else if (_loading)
+    {
+        <PageState Kind="PageStateKind.Loading"
+                   Title="Loading visual automations"
+                   Description="Loading the flow library and typed node catalog." />
+    }
+    else if (Host is null)
+    {
+        <PageState Kind="PageStateKind.Empty"
+                   Title="Choose a channel"
+                   Description="Choose a channel to build and inspect its automation flows." />
+    }
+    else if (!_featureEnabled)
+    {
+        <PageState Kind="PageStateKind.Unavailable"
+                   Title="Automations are off"
+                   Description="Saved flows and run history are retained. Editing, validation, sample runs, and enablement stay paused until you turn Automations on.">
+            <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
+        </PageState>
+    }
+    else
+    {
+        <div class="automation-page-actions">
+            <button class="btn-secondary" type="button" @onclick="OpenHelp">?</button>
+            <button class="btn-primary" type="button" @onclick="NewFlow">+ New flow</button>
+        </div>
+
+        @if (_editor is null)
+        {
+            <section class="automation-empty card">
+                <span class="automation-empty-icon" aria-hidden="true">⌘</span>
+                <h2>Create your first visual automation</h2>
+                <p>Start with an event source, connect an action, validate the graph, and enable it when you are ready.</p>
+                <button class="btn-primary" type="button" @onclick="NewFlow">Create flow</button>
+            </section>
+        }
+        else
+        {
+            <section class="automation-editor" aria-label="Visual automation editor" data-editor-mode="@ModeToken(_mode)">
+                <header class="automation-editor-bar">
+                    <div class="automation-flow-name">
+                        <label for="automation-flow-name">Flow name</label>
+                        <input id="automation-flow-name"
+                               maxlength="200"
+                               value="@_editor.Name"
+                               @oninput="RenameFlow" />
+                        <span>@_flowSubtitle</span>
+                    </div>
+                    <div class="automation-editor-actions">
+                        <div class="automation-mode-switch" role="group" aria-label="Editor view">
+                            <button type="button" aria-pressed="@(_mode == AutomationEditorMode.Grid)" @onclick="() => SetMode(AutomationEditorMode.Grid)">Grid</button>
+                            <button type="button" aria-pressed="@(_mode == AutomationEditorMode.List)" @onclick="() => SetMode(AutomationEditorMode.List)">List</button>
+                        </div>
+                        <span class="@_validationClass" role="status">@_validationLabel</span>
+                        <details class="automation-node-library" open="@_nodeLibraryOpen">
+                            <summary @onclick="ToggleNodeLibrary">+ Node</summary>
+                            <div class="automation-node-library-panel">
+                                <div>
+                                    <strong>Node library</strong>
+                                    <span>Registered for this channel</span>
+                                </div>
+                                @foreach (var group in _definitions.GroupBy(definition => definition.Display.Category).OrderBy(static group => group.Key))
+                                {
+                                    <section>
+                                        <h3>@group.Key</h3>
+                                        @foreach (var definition in group)
+                                        {
+                                            <button type="button"
+                                                    disabled="@CannotAdd(definition)"
+                                                    @onclick="() => AddNode(definition)">
+                                                <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
+                                                <strong>@definition.Display.Name</strong>
+                                                <small>@definition.Display.Description</small>
+                                            </button>
+                                        }
+                                    </section>
+                                }
+                            </div>
+                        </details>
+                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync">Validate</button>
+                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync">Test flow</button>
+                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync">Save</button>
+                        <button class="@(_editor.IsEnabled ? "btn-secondary" : "btn-primary")"
+                                type="button"
+                                disabled="@(_busy || _editor.Id is null || _hasChanges)"
+                                title="@(_hasChanges ? "Save changes before changing enablement." : null)"
+                                @onclick="ToggleEnabledAsync">@(_editor.IsEnabled ? "Disable" : _enableConfirmation ? "Enable anyway" : "Enable")</button>
+                    </div>
+                </header>
+
+                @if (_feedback is not null)
+                {
+                    <div class="@(_operationFailed ? "automation-feedback automation-feedback--error" : "automation-feedback")"
+                         role="@(_operationFailed ? "alert" : "status")">@_feedback</div>
+                }
+                @if (_enableConfirmation)
+                {
+                    <div class="automation-enable-warning" role="alert">
+                        <div>
+                            <strong>This flow can affect your live channel</strong>
+                            <span>@_impactWarning</span>
+                        </div>
+                        <button type="button" @onclick="CancelEnable">Cancel</button>
+                    </div>
+                }
+
+                <div class="automation-editor-body">
+                    <aside class="automation-flow-rail" aria-label="Flow library">
+                        <div class="automation-flow-rail-heading"><strong>Flows</strong><button type="button" aria-label="New flow" @onclick="NewFlow">+</button></div>
+                        @foreach (var flow in _flowSnapshots)
+                        {
+                            <button @key="flow.Draft.Id"
+                                    type="button"
+                                    class="@(flow.Draft.Id == _editor.Id ? "automation-flow-item automation-flow-item--active" : "automation-flow-item")"
+                                    @onclick="() => SelectFlow(flow)">
+                                <strong>@flow.Draft.Name</strong>
+                                <span><span><i class="@FlowStatusDotClass(flow)"></i>@FlowStatusLabel(flow)</span><span>@flow.Draft.Nodes.Length nodes</span></span>
+                            </button>
+                        }
+                        @if (_editor.Id is null)
+                        {
+                            <div class="automation-flow-item automation-flow-item--active">
+                                <strong>@_editor.Name</strong>
+                                <span><span><i class="automation-status-dot automation-status-dot--draft"></i>Not saved</span><span>@_editor.Nodes.Count nodes</span></span>
+                            </div>
+                        }
+                        @if (_editor.Id is not null)
+                        {
+                            <div class="automation-flow-rail-actions">
+                                <button type="button" @onclick="DuplicateAsync">Duplicate</button>
+                                <button type="button" @onclick="RequestDelete">@(_deleteConfirmation ? "Confirm delete" : "Delete")</button>
+                            </div>
+                        }
+                        <p>Flows use the selected channel. Duplicating copies the graph, not run history.</p>
+                    </aside>
+
+                    <div class="automation-workspace" role="region" aria-label="Flow workspace">
+                        @if (_mode == AutomationEditorMode.Grid)
+                        {
+                            <AutomationFlowCanvas Nodes="_editor.Nodes"
+                                                  Edges="_editor.Edges"
+                                                  SelectedNodeId="_selectedNodeId"
+                                                  Errors="_validationErrors"
+                                                  SampleOutcomes="_sampleOutcomes"
+                                                  SelectNode="SelectNode"
+                                                  MoveNode="MoveNode"
+                                                  DeleteNode="DeleteNode" />
+                        }
+                        else
+                        {
+                            <AutomationFlowList Nodes="_editor.Nodes"
+                                                Edges="_editor.Edges"
+                                                SelectedNodeId="_selectedNodeId"
+                                                Errors="_validationErrors"
+                                                SampleOutcomes="_sampleOutcomes"
+                                                SelectNode="SelectNode"
+                                                DeleteNode="DeleteNode" />
+                        }
+                    </div>
+
+                    <AutomationNodeInspector Node="_selectedNode"
+                                             Nodes="_editor.Nodes"
+                                             Edges="_editor.Edges"
+                                             Errors="_validationErrors"
+                                             ReferenceChoices="_referenceChoices"
+                                             Changed="EditorChanged"
+                                             ClearSelection="ClearSelection"
+                                             Connect="ConnectNodes"
+                                             DeleteEdge="DeleteEdge"
+                                             DeleteNode="DeleteNode"
+                                             MoveNode="MoveNode" />
+                </div>
+
+                <footer class="automation-run-drawer" data-automation-run-kind="@(_sampleOutcomes.IsEmpty ? "history" : "sample")">
+                    <div class="automation-run-summary">
+                        <span class="@_runIconClass" aria-hidden="true">@_runIcon</span>
+                        <div><strong>@_runTitle</strong><span>@_runDescription</span></div>
+                    </div>
+                    <div class="automation-run-actions">
+                        <button class="btn-secondary" type="button" disabled="@(_recentRuns.Length == 0)" @onclick="ShowRunDetails">Run details</button>
+                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" @onclick="RunSampleAsync">Test again</button>
+                    </div>
+                </footer>
+            </section>
+        }
+    }
+</DashboardPage>

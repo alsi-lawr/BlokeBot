@@ -389,10 +389,6 @@ public sealed class HostConfigFaultRoutingTests
         {
             var polls = FindFeatureButton(page, "Polls");
             polls.HasAttribute("aria-pressed").ShouldBeTrue();
-            page.FindAll("#chat-tools button")
-                .ShouldNotContain(static button =>
-                    button.TextContent.Contains("Automations", StringComparison.Ordinal)
-                );
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
         });

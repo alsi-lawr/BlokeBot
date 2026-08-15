@@ -204,7 +204,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task StoredAutomationAction_EditingFineTuning_UsesUnavailableRecoveryAndPreservesIt()
+    public async Task StoredAutomationAction_EditingFineTuning_UsesVisibleFlowAuthoringAndPreservesIt()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -221,9 +221,8 @@ public sealed class CustomCommandSettingsUiTests
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var cut = context.Render<CustomCommandSettingsPage>();
 
-        cut.FindAll("[data-action-kind='Automation']").ShouldBeEmpty();
-        cut.FindAll(".studio-choice-card[aria-pressed='true']").ShouldBeEmpty();
-        _ = cut.Find("[data-unavailable-command-action]");
+        cut.Find("[data-action-kind='Automation']").GetAttribute("aria-pressed").ShouldBe("true");
+        _ = cut.Find("[data-automation-command]");
         cut.FindAll($"#command-{seeded.CommandId}-0-argument-reply").ShouldBeEmpty();
         cut.FindAll("select[data-flow-picker]").ShouldBeEmpty();
         cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");

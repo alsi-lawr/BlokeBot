@@ -1,0 +1,145 @@
+@if (Node is null)
+{
+    <aside class="automation-inspector automation-inspector--empty" aria-label="Node inspector">
+        <p class="automation-inspector-eyebrow">Inspector</p>
+        <h2>Select a node</h2>
+        <p>Choose a node in Grid or List view to edit its typed configuration and connections.</p>
+    </aside>
+}
+else
+{
+    <aside class="automation-inspector" aria-label="Node inspector" data-automation-inspector="@Node.Id.Value">
+        <header class="automation-inspector-header">
+            <div>
+                <p class="automation-inspector-eyebrow">Selected @KindLabel(Node.Definition.Kind)</p>
+                <h2>@Node.Definition.Display.Name</h2>
+            </div>
+            <button class="automation-icon-button" type="button" aria-label="Close inspector" @onclick="ClearSelection">&times;</button>
+        </header>
+
+        @foreach (var field in Node.Definition.Configuration)
+        {
+            var choices = ChoicesFor(field);
+            <div class="automation-field" @key="field.Id">
+                <label for="@FieldId(Node.Id, field.Id)">@field.Name</label>
+                @if (field.FieldType is AutomationConfigurationFieldType.Text { Multiline: true })
+                {
+                    <textarea id="@FieldId(Node.Id, field.Id)"
+                              value="@Node.Value(field.Id)"
+                              maxlength="@MaximumLength(field)"
+                              required="@field.Required"
+                              @oninput="args => SetValueAsync(field.Id, args.Value)"></textarea>
+                }
+                else if (choices.Count > 0)
+                {
+                    <select id="@FieldId(Node.Id, field.Id)"
+                            value="@Node.Value(field.Id)"
+                            required="@field.Required"
+                            @onchange="args => SetValueAsync(field.Id, args.Value)">
+                        @if (!field.Required)
+                        {
+                            <option value="">Any</option>
+                        }
+                        else if (string.IsNullOrWhiteSpace(Node.Value(field.Id)))
+                        {
+                            <option value="">Choose @field.Name.ToLowerInvariant()</option>
+                        }
+                        @foreach (var choice in choices)
+                        {
+                            <option value="@choice.Value">@choice.Label</option>
+                        }
+                    </select>
+                }
+                else if (field.FieldType is AutomationConfigurationFieldType.Number number)
+                {
+                    <input id="@FieldId(Node.Id, field.Id)"
+                           type="number"
+                           min="@number.Minimum"
+                           max="@number.Maximum"
+                           value="@Node.Value(field.Id)"
+                           required="@field.Required"
+                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                }
+                else if (field.FieldType is AutomationConfigurationFieldType.Duration duration)
+                {
+                    <input id="@FieldId(Node.Id, field.Id)"
+                           type="number"
+                           min="@DurationMinimum(field, duration)"
+                           max="@DurationMaximum(field, duration)"
+                           value="@Node.Value(field.Id)"
+                           required="@field.Required"
+                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                }
+                else
+                {
+                    <input id="@FieldId(Node.Id, field.Id)"
+                           type="text"
+                           value="@Node.Value(field.Id)"
+                           maxlength="@MaximumLength(field)"
+                           required="@field.Required"
+                           @oninput="args => SetValueAsync(field.Id, args.Value)" />
+                }
+                <p>@field.Description</p>
+                @foreach (var error in Errors.Where(error => error.NodeId == Node.Id && (error.FieldId is null || error.FieldId == field.Id)))
+                {
+                    <span class="automation-field-error" role="alert">@error.Message</span>
+                }
+            </div>
+        }
+
+        @if (Node.Definition.Kind is not AutomationNodeKind.Source)
+        {
+            <div class="automation-field">
+                <label for="automation-failure-policy">If this node fails</label>
+                <select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync">
+                    <option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option>
+                    <option value="@AutomationNodeFailurePolicy.Continue">Continue the branch</option>
+                </select>
+            </div>
+        }
+
+        @if (Node.Definition.Outputs.Any(IsFlowPort))
+        {
+            <section class="automation-inspector-section" aria-labelledby="automation-connections-heading">
+                <h3 id="automation-connections-heading">Connections</h3>
+                @foreach (var output in Node.Definition.Outputs.Where(IsFlowPort))
+                {
+                    <div class="automation-connection-editor" @key="output.Id">
+                        <label for="@ConnectionId(Node.Id, output.Id)">@output.Name goes to</label>
+                        <select id="@ConnectionId(Node.Id, output.Id)"
+                                value=""
+                                @onchange="args => ConnectAsync(output, args.Value)">
+                            <option value="">Choose a compatible node</option>
+                            @foreach (var target in CompatibleTargets(output))
+                            {
+                                <option value="@target.Id.Value">@target.Definition.Display.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                @foreach (var edge in Edges.Where(edge => edge.SourceNodeId == Node.Id))
+                {
+                    <div class="automation-connected-row" @key="edge.Id">
+                        <span>@PortLabel(edge.SourcePortId) → @NodeLabel(edge.TargetNodeId)</span>
+                        <button type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Remove</button>
+                    </div>
+                }
+            </section>
+        }
+
+        <section class="automation-inspector-section" aria-labelledby="automation-position-heading">
+            <h3 id="automation-position-heading">Grid position</h3>
+            <div class="automation-position-controls">
+                <button type="button" aria-label="Move node left" @onclick="() => NudgeAsync(-24, 0)">←</button>
+                <button type="button" aria-label="Move node up" @onclick="() => NudgeAsync(0, -24)">↑</button>
+                <button type="button" aria-label="Move node down" @onclick="() => NudgeAsync(0, 24)">↓</button>
+                <button type="button" aria-label="Move node right" @onclick="() => NudgeAsync(24, 0)">→</button>
+            </div>
+        </section>
+
+        <footer class="automation-inspector-footer">
+            <button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)">Delete node</button>
+            <button class="btn-primary" type="button" @onclick="ChangedAsync">Apply</button>
+        </footer>
+    </aside>
+}

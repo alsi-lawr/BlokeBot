@@ -15,6 +15,7 @@
 @import "./features/points-dashboard.css";
 @import "./features/responsive-data-cards.css";
 @import "./features/custom-command-workspace.css";
+@import "./features/automation-editor.css";
 @import "./features/bounties.css";
 @import "./features/bingo.css";
 @import "./features/community-progression.css";

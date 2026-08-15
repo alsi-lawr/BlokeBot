@@ -72,6 +72,8 @@ internal sealed class SimulationFixtureSeeder(
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await SeedOverlayAsync(db, hostId, now, cancellationToken);
         _ = await db.SaveChangesAsync(cancellationToken);
+        await SeedAutomationsAsync(db, hostId, now, cancellationToken);
+        _ = await db.SaveChangesAsync(cancellationToken);
 
         return new BotHostChoice(
             hostId,
@@ -80,6 +82,226 @@ internal sealed class SimulationFixtureSeeder(
             AuthRole.Streamer
         );
     }
+
+    private static async Task SeedAutomationsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.AutomationFlows.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+
+        var flowId = Guid.Parse("1b10be82-0000-4000-8000-000000000001");
+        var sourceId = Guid.Parse("1b10be82-0000-4000-8000-000000000011");
+        var conditionId = Guid.Parse("1b10be82-0000-4000-8000-000000000012");
+        var chatId = Guid.Parse("1b10be82-0000-4000-8000-000000000013");
+        var overlayId = Guid.Parse("1b10be82-0000-4000-8000-000000000014");
+        var target = await db
+            .OverlayInstances.Where(value =>
+                value.HostId == hostId && value.Type == OverlayType.CuePlayer
+            )
+            .OrderBy(static value => value.Id)
+            .FirstAsync(cancellationToken);
+        var cue = await db
+            .OverlayCues.Where(value => value.HostId == hostId)
+            .OrderBy(static value => value.Id)
+            .FirstAsync(cancellationToken);
+        var flow = new AutomationFlow
+        {
+            Id = flowId,
+            HostId = hostId,
+            Name = "Welcome a qualifying raid",
+            SchemaVersion = 1,
+            IsEnabled = false,
+            CreatedAtUtc = now.AddDays(-4),
+            UpdatedAtUtc = now.AddMinutes(-1),
+            Nodes =
+            [
+                AutomationNode(
+                    sourceId,
+                    flowId,
+                    "incoming-raid",
+                    """{"minimum-viewers":20}""",
+                    24,
+                    216
+                ),
+                AutomationNode(
+                    conditionId,
+                    flowId,
+                    "condition",
+                    """{"expression":"viewer_count >= 20"}""",
+                    240,
+                    216
+                ),
+                AutomationNode(
+                    chatId,
+                    flowId,
+                    "send-chat",
+                    """{"message":"Welcome ${actor.display_name}!"}""",
+                    456,
+                    72
+                ),
+                AutomationNode(
+                    overlayId,
+                    flowId,
+                    "play-overlay-cue",
+                    $$"""{"target-id":"{{target.PublicId:D}}","cue-id":"{{cue.PublicId:D}}"}""",
+                    456,
+                    360
+                ),
+            ],
+            Edges =
+            [
+                AutomationEdge(flowId, sourceId, "flow", conditionId),
+                AutomationEdge(flowId, conditionId, "true", chatId),
+                AutomationEdge(flowId, conditionId, "false", overlayId),
+            ],
+        };
+        _ = db.AutomationFlows.Add(flow);
+        db.AutomationFlows.AddRange(
+            SampleFlow(
+                hostId,
+                "Celebrate a new follow",
+                "stream-online",
+                now.AddMinutes(-10),
+                Guid.Parse("1b10be82-0000-4000-8000-000000000002"),
+                enabled: false
+            ),
+            SampleFlow(
+                hostId,
+                "Thank large cheers",
+                "cheer",
+                now.AddMinutes(-20),
+                Guid.Parse("1b10be82-0000-4000-8000-000000000003"),
+                """{"minimum-bits":500}"""
+            ),
+            SampleFlow(
+                hostId,
+                "Close predictions",
+                "prediction-ended",
+                now.AddMinutes(-30),
+                Guid.Parse("1b10be82-0000-4000-8000-000000000004")
+            )
+        );
+        _ = db.AutomationFlowRuns.Add(
+            new AutomationFlowRun
+            {
+                Id = Guid.Parse("1b10be82-0000-4000-8000-000000000021"),
+                FlowId = flowId,
+                HostId = hostId,
+                AutomationGeneration = 0,
+                RequiredFeatures = HostFeatureFlags.Automations,
+                ContextSchemaVersion = 1,
+                SourceDefinitionId = "incoming-raid",
+                SourceOccurrenceId = Guid.Parse("1b10be82-0000-4000-8000-000000000022"),
+                ContextJson = "{}",
+                DefinitionJson = "{}",
+                Status = AutomationFlowRunStatus.Completed,
+                StartedAtUtc = now.AddMinutes(-12),
+                CompletedAtUtc = now.AddMinutes(-12).AddSeconds(1),
+                NodeRuns =
+                [
+                    AutomationNodeRun(sourceId, 0, "source-received", now),
+                    AutomationNodeRun(conditionId, 1, "condition-true", now),
+                    AutomationNodeRun(chatId, 2, "action-succeeded", now),
+                ],
+            }
+        );
+    }
+
+    private static AutomationFlow SampleFlow(
+        int hostId,
+        string name,
+        string sourceDefinition,
+        DateTime updatedAtUtc,
+        Guid id,
+        string configuration = "{}",
+        bool enabled = true
+    )
+    {
+        var nodeBytes = id.ToByteArray();
+        nodeBytes[15] = (byte)(nodeBytes[15] + 32);
+        var nodeId = new Guid(nodeBytes);
+        return new AutomationFlow
+        {
+            Id = id,
+            HostId = hostId,
+            Name = name,
+            SchemaVersion = 1,
+            IsEnabled = enabled,
+            CreatedAtUtc = updatedAtUtc.AddDays(-2),
+            UpdatedAtUtc = updatedAtUtc,
+            Nodes = [AutomationNode(nodeId, id, sourceDefinition, configuration, 72, 168)],
+        };
+    }
+
+    private static AutomationFlowNode AutomationNode(
+        Guid id,
+        Guid flowId,
+        string definitionId,
+        string configuration,
+        int canvasX,
+        int canvasY
+    ) =>
+        new()
+        {
+            Id = id,
+            FlowId = flowId,
+            DefinitionId = definitionId,
+            DefinitionSchemaVersion = 1,
+            ConfigurationJson = configuration,
+            FieldExpressionsJson = "{}",
+            ExpressionLanguageVersion = 1,
+            CanvasX = canvasX,
+            CanvasY = canvasY,
+        };
+
+    private static AutomationFlowEdge AutomationEdge(
+        Guid flowId,
+        Guid sourceNodeId,
+        string sourcePortId,
+        Guid targetNodeId
+    )
+    {
+        var edgeBytes = sourceNodeId.ToByteArray();
+        var targetBytes = targetNodeId.ToByteArray();
+        for (var index = 0; index < edgeBytes.Length; index++)
+        {
+            edgeBytes[index] ^= targetBytes[index];
+        }
+
+        edgeBytes[15] ^= (byte)sourcePortId.Length;
+        return new()
+        {
+            Id = new(edgeBytes),
+            FlowId = flowId,
+            SourceNodeId = sourceNodeId,
+            SourcePortId = sourcePortId,
+            TargetNodeId = targetNodeId,
+            TargetPortId = "flow",
+        };
+    }
+
+    private static AutomationNodeRun AutomationNodeRun(
+        Guid nodeId,
+        long sequence,
+        string outcomeCode,
+        DateTime now
+    ) =>
+        new()
+        {
+            NodeId = nodeId,
+            Sequence = sequence,
+            Status = AutomationNodeRunStatus.Succeeded,
+            AvailableAtUtc = now,
+            StartedAtUtc = now,
+            CompletedAtUtc = now,
+            OutcomeCode = outcomeCode,
+        };
 
     private static async Task SeedBlokeRaidAsync(
         BlokeBotDbContext db,

@@ -17,6 +17,193 @@ public sealed class AutomationFlowService(
     IEventSubChannelReconciliationTrigger? eventSub = null
 )
 {
+    public async Task<AutomationFlowQueryOutcome> ListAsync(
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        var availability = await catalog.DiscoverAsync(hostId, cancellationToken);
+        if (availability.Availability == AutomationCatalogAvailability.Disabled)
+        {
+            return new AutomationFlowQueryOutcome.FeatureDisabled();
+        }
+
+        if (availability.Availability == AutomationCatalogAvailability.HostNotFound)
+        {
+            return new AutomationFlowQueryOutcome.HostNotFound();
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var flows = await db
+            .AutomationFlows.AsNoTracking()
+            .Include(static value => value.Nodes)
+            .Include(static value => value.Edges)
+            .Where(value => value.HostId == hostId.Value)
+            .OrderByDescending(static value => value.UpdatedAtUtc)
+            .ThenBy(static value => value.Name)
+            .ToArrayAsync(cancellationToken);
+        return new AutomationFlowQueryOutcome.Available(
+            flows
+                .Select(static flow => new AutomationFlowSnapshot(
+                    Draft(flow),
+                    new DateTimeOffset(flow.CreatedAtUtc, TimeSpan.Zero),
+                    new DateTimeOffset(flow.UpdatedAtUtc, TimeSpan.Zero)
+                ))
+                .ToImmutableArray()
+        );
+    }
+
+    public async Task<AutomationFlowValidationOutcome> ValidateDraftAsync(
+        AutomationFlowDraft draft,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await ValidateAsync(draft, cancellationToken);
+        return validation.Gate switch
+        {
+            AutomationCatalogAvailability.Disabled =>
+                new AutomationFlowValidationOutcome.FeatureDisabled(),
+            AutomationCatalogAvailability.HostNotFound =>
+                new AutomationFlowValidationOutcome.HostNotFound(),
+            null when validation.Errors.IsEmpty => new AutomationFlowValidationOutcome.Valid(),
+            null => new AutomationFlowValidationOutcome.Invalid(validation.Errors),
+            _ => throw new InvalidOperationException("Unexpected automation catalog state."),
+        };
+    }
+
+    public async Task<AutomationFlowDeleteOutcome> DeleteAsync(
+        AutomationHostId hostId,
+        AutomationFlowId flowId,
+        CancellationToken cancellationToken
+    )
+    {
+        var availability = await catalog.DiscoverAsync(hostId, cancellationToken);
+        if (availability.Availability == AutomationCatalogAvailability.Disabled)
+        {
+            return new AutomationFlowDeleteOutcome.FeatureDisabled();
+        }
+
+        if (availability.Availability == AutomationCatalogAvailability.HostNotFound)
+        {
+            return new AutomationFlowDeleteOutcome.HostNotFound();
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var deleted = await db
+            .AutomationFlows.Where(value =>
+                value.Id == flowId.Value && value.HostId == hostId.Value
+            )
+            .ExecuteDeleteAsync(cancellationToken);
+        if (deleted == 0)
+        {
+            return new AutomationFlowDeleteOutcome.FlowNotFound();
+        }
+
+        await ReconcileEventSubAsync(cancellationToken);
+        return new AutomationFlowDeleteOutcome.Deleted();
+    }
+
+    public async Task<AutomationFlowDuplicateOutcome> DuplicateAsync(
+        AutomationHostId hostId,
+        AutomationFlowId flowId,
+        CancellationToken cancellationToken
+    )
+    {
+        var availability = await catalog.DiscoverAsync(hostId, cancellationToken);
+        if (availability.Availability == AutomationCatalogAvailability.Disabled)
+        {
+            return new AutomationFlowDuplicateOutcome.FeatureDisabled();
+        }
+
+        if (availability.Availability == AutomationCatalogAvailability.HostNotFound)
+        {
+            return new AutomationFlowDuplicateOutcome.HostNotFound();
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var flow = await db
+            .AutomationFlows.AsNoTracking()
+            .Include(static value => value.Nodes)
+            .Include(static value => value.Edges)
+            .SingleOrDefaultAsync(
+                value => value.Id == flowId.Value && value.HostId == hostId.Value,
+                cancellationToken
+            );
+        if (flow is null)
+        {
+            return new AutomationFlowDuplicateOutcome.FlowNotFound();
+        }
+
+        var original = Draft(flow);
+        var nodeIds = original.Nodes.ToDictionary(
+            static node => node.Id,
+            static _ => new AutomationNodeId(Guid.NewGuid())
+        );
+        var duplicate = original with
+        {
+            Id = null,
+            Name = DuplicateName(original.Name),
+            IsEnabled = false,
+            Nodes = original
+                .Nodes.Select(node => node with { Id = nodeIds[node.Id] })
+                .ToImmutableArray(),
+            Edges = original
+                .Edges.Select(edge =>
+                    edge with
+                    {
+                        Id = Guid.NewGuid(),
+                        SourceNodeId = nodeIds[edge.SourceNodeId],
+                        TargetNodeId = nodeIds[edge.TargetNodeId],
+                    }
+                )
+                .ToImmutableArray(),
+        };
+        return await SaveAsync(duplicate, cancellationToken) switch
+        {
+            AutomationFlowSaveOutcome.Saved saved => new AutomationFlowDuplicateOutcome.Duplicated(
+                saved.FlowId
+            ),
+            AutomationFlowSaveOutcome.Invalid invalid => new AutomationFlowDuplicateOutcome.Invalid(
+                invalid.Errors
+            ),
+            AutomationFlowSaveOutcome.FeatureDisabled =>
+                new AutomationFlowDuplicateOutcome.FeatureDisabled(),
+            AutomationFlowSaveOutcome.HostNotFound =>
+                new AutomationFlowDuplicateOutcome.HostNotFound(),
+            AutomationFlowSaveOutcome.FlowNotFound =>
+                new AutomationFlowDuplicateOutcome.FlowNotFound(),
+            _ => throw new InvalidOperationException("Unknown automation duplicate outcome."),
+        };
+    }
+
+    public async Task<AutomationSampleRunOutcome> RunSampleAsync(
+        AutomationFlowDraft draft,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await ValidateAsync(draft, cancellationToken);
+        if (validation.Gate == AutomationCatalogAvailability.Disabled)
+        {
+            return new AutomationSampleRunOutcome.FeatureDisabled();
+        }
+
+        if (validation.Gate == AutomationCatalogAvailability.HostNotFound)
+        {
+            return new AutomationSampleRunOutcome.HostNotFound();
+        }
+
+        if (!validation.Errors.IsEmpty)
+        {
+            return new AutomationSampleRunOutcome.Invalid(validation.Errors);
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db
+            .Hosts.AsNoTracking()
+            .SingleAsync(value => value.Id == draft.HostId.Value, cancellationToken);
+        return EvaluateSample(draft, SampleContext(host));
+    }
+
     public async Task<AutomationFlowSaveOutcome> SaveAsync(
         AutomationFlowDraft draft,
         CancellationToken cancellationToken
@@ -303,6 +490,23 @@ public sealed class AutomationFlowService(
             node.Definition,
             cancellationToken
         );
+        if (check is AutomationConfigurationCheck.Invalid invalid)
+        {
+            foreach (var error in invalid.Errors)
+            {
+                errors.Add(
+                    new(
+                        node.Id,
+                        "configuration-invalid",
+                        error.Message,
+                        error.Target is AutomationValidationTarget.Field field ? field.Id : null
+                    )
+                );
+            }
+
+            return;
+        }
+
         if (check is not AutomationConfigurationCheck.Valid valid)
         {
             errors.Add(
@@ -393,6 +597,28 @@ public sealed class AutomationFlowService(
                         node.Id,
                         "reward-reference-unavailable",
                         "Choose a Custom Reward that exists on this channel."
+                    )
+                );
+            }
+        }
+
+        if (valid.Configuration is CustomCommandSourceConfiguration command)
+        {
+            await using var commandDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var known = await commandDb
+                .CustomCommands.AsNoTracking()
+                .AnyAsync(
+                    candidate =>
+                        candidate.HostId == hostId.Value && candidate.Id == command.CommandId.Value,
+                    cancellationToken
+                );
+            if (!known)
+            {
+                errors.Add(
+                    new(
+                        node.Id,
+                        "custom-command-reference-unavailable",
+                        "Choose a custom command that exists on this channel."
                     )
                 );
             }
@@ -532,6 +758,8 @@ public sealed class AutomationFlowService(
             ),
             ExpressionLanguageVersion = node.ExpressionLanguageVersion.Value,
             ContinueOnFailure = node.FailurePolicy == AutomationNodeFailurePolicy.Continue,
+            CanvasX = node.Position.X.Value,
+            CanvasY = node.Position.Y.Value,
         };
 
     private static AutomationFlowEdge Persist(Guid flowId, AutomationFlowDraftEdge edge) =>
@@ -563,7 +791,10 @@ public sealed class AutomationFlowService(
                     node.ContinueOnFailure
                         ? AutomationNodeFailurePolicy.Continue
                         : AutomationNodeFailurePolicy.Stop,
-                    AutomationRuntimeSerialization.DeserializeExpressions(node.FieldExpressionsJson)
+                    AutomationRuntimeSerialization.DeserializeExpressions(
+                        node.FieldExpressionsJson
+                    ),
+                    new(new(node.CanvasX), new(node.CanvasY))
                 ))
                 .ToImmutableArray(),
             flow.Edges.Select(static edge => new AutomationFlowDraftEdge(
@@ -575,6 +806,152 @@ public sealed class AutomationFlowService(
                 ))
                 .ToImmutableArray()
         );
+
+    private static string DuplicateName(string name)
+    {
+        const string Prefix = "Copy of ";
+        var maximumOriginalLength = 200 - Prefix.Length;
+        return Prefix + name[..Math.Min(name.Length, maximumOriginalLength)];
+    }
+
+    private AutomationSampleRunOutcome EvaluateSample(
+        AutomationFlowDraft draft,
+        AutomationContext context
+    )
+    {
+        var source = draft.Nodes.Single(node =>
+            catalog.ValidatePersistedDefinition(node.Definition)
+                is AutomationConfigurationCheck.Valid { Definition.Kind: AutomationNodeKind.Source }
+        );
+        var outcomes = ImmutableArray.CreateBuilder<AutomationSampleNodeOutcome>();
+        outcomes.Add(new(source.Id, AutomationNodeRunState.Succeeded, "source-received"));
+        var pending = new Queue<AutomationNodeId>(Outgoing(draft.Edges, source.Id, null));
+        var visited = new HashSet<AutomationNodeId> { source.Id };
+        while (pending.TryDequeue(out var nodeId))
+        {
+            if (!visited.Add(nodeId))
+            {
+                continue;
+            }
+
+            var node = draft.Nodes.Single(candidate => candidate.Id == nodeId);
+            var check = catalog.ValidatePersistedDefinition(node.Definition);
+            if (check is not AutomationConfigurationCheck.Valid valid)
+            {
+                outcomes.Add(new(node.Id, AutomationNodeRunState.Failed, "configuration-invalid"));
+                return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
+            }
+
+            var evaluated = EvaluateSampleNode(valid.Configuration, context);
+            outcomes.Add(new(node.Id, evaluated.State, evaluated.OutcomeCode));
+            if (evaluated.State == AutomationNodeRunState.Failed)
+            {
+                return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
+            }
+
+            foreach (var target in Outgoing(draft.Edges, node.Id, evaluated.SourcePort))
+            {
+                pending.Enqueue(target);
+            }
+        }
+
+        return new AutomationSampleRunOutcome.Completed(outcomes.ToImmutable());
+    }
+
+    private SampleNodeEvaluation EvaluateSampleNode(
+        AutomationConfiguration configuration,
+        AutomationContext context
+    ) =>
+        configuration switch
+        {
+            ConditionControlConfiguration condition => EvaluateSampleCondition(condition, context),
+            DelayControlConfiguration => new(
+                AutomationNodeRunState.Succeeded,
+                "delay-skipped",
+                "complete"
+            ),
+            SendChatActionConfiguration chat
+                when expressions.Interpolate(chat.Message, context)
+                    is AutomationExpressionResult.Invalid => new(
+                AutomationNodeRunState.Failed,
+                "action-expression-invalid",
+                null
+            ),
+            _ => new(AutomationNodeRunState.Succeeded, "action-simulated", "complete"),
+        };
+
+    private SampleNodeEvaluation EvaluateSampleCondition(
+        ConditionControlConfiguration condition,
+        AutomationContext context
+    ) =>
+        expressions.Evaluate(
+            new(AutomationExpressionLanguage.CurrentVersion, condition.Expression),
+            context
+        ) switch
+        {
+            AutomationExpressionResult.Value { Result: bool result } => new(
+                AutomationNodeRunState.Succeeded,
+                result ? "condition-true" : "condition-false",
+                result ? "true" : "false"
+            ),
+            _ => new(AutomationNodeRunState.Failed, "condition-invalid", null),
+        };
+
+    private static AutomationContext SampleContext(BotHost host)
+    {
+        var now = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        return new(
+            new(Guid.NewGuid(), AutomationDefinitionIds.IncomingRaidSource),
+            new("sample-viewer", "sample_viewer", "Sample Viewer"),
+            new(
+                new(host.Id),
+                host.TwitchUserId ?? string.Empty,
+                host.Login,
+                string.IsNullOrWhiteSpace(host.DisplayName) ? host.Login : host.DisplayName
+            ),
+            new("sample-stream", "Sample stream", "Just Chatting", now.AddHours(-1)),
+            new(now, now),
+            [new(0, "sample")],
+            new(
+                new Dictionary<AutomationVariableName, AutomationVariable>
+                {
+                    [new("viewer_count")] = new(
+                        new AutomationValue.Number(24),
+                        AutomationDataSensitivity.Safe
+                    ),
+                    [new("bits")] = new(
+                        new AutomationValue.Number(100),
+                        AutomationDataSensitivity.Safe
+                    ),
+                    [new("category")] = new(
+                        new AutomationValue.Text("Just Chatting"),
+                        AutomationDataSensitivity.Safe
+                    ),
+                }
+            )
+        );
+    }
+
+    private static ImmutableArray<AutomationNodeId> Outgoing(
+        IEnumerable<AutomationFlowDraftEdge> edges,
+        AutomationNodeId sourceNodeId,
+        string? sourcePort
+    ) =>
+        edges
+            .Where(edge =>
+                edge.SourceNodeId == sourceNodeId
+                && (sourcePort is null || edge.SourcePortId.Value == sourcePort)
+            )
+            .OrderBy(static edge => edge.SourcePortId.Value, StringComparer.Ordinal)
+            .ThenBy(static edge => edge.TargetNodeId.Value)
+            .Select(static edge => edge.TargetNodeId)
+            .ToImmutableArray();
+
+    private sealed record SampleNodeEvaluation(
+        AutomationNodeRunState State,
+        string OutcomeCode,
+        string? SourcePort
+    );
 }
 
 internal sealed record AutomationGraphValidation(

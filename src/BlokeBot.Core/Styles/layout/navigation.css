@@ -151,6 +151,10 @@ html[data-nav-custom-commands-open="false"]
     .nav-menu[data-navigation-mode="labelled"]
     .nav-menu__group[data-nav-section="custom-commands"]
     .nav-menu__section-body,
+html[data-nav-automations-open="false"]
+    .nav-menu[data-navigation-mode="labelled"]
+    .nav-menu__group[data-nav-section="automations"]
+    .nav-menu__section-body,
 html[data-nav-native-twitch-open="false"]
     .nav-menu[data-navigation-mode="labelled"]
     .nav-menu__group[data-nav-section="twitch-operations"]

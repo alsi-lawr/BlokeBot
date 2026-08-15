@@ -54,8 +54,6 @@ public partial class CustomCommandSettingsPage
 
     private static readonly string[] _fragmentKeys = ["commands", "message-library"];
 
-    // Automation is deliberately absent: BLOKEBOT-D-199 withdraws the action's visibility while
-    // stored automation commands keep working and keep their recovery notice.
     private static readonly IReadOnlyList<ActionChoice> _actionChoices =
     [
         new(
@@ -75,6 +73,12 @@ public partial class CustomCommandSettingsPage
             "🔢",
             "Update a counter",
             "Count things (deaths, wins, hugs) and say the total."
+        ),
+        new(
+            CustomCommandActionKind.Automation,
+            "⌘",
+            "Run automation flows",
+            "Start every enabled flow connected to this command."
         ),
     ];
 
@@ -128,6 +132,7 @@ public partial class CustomCommandSettingsPage
     private string? _loadFailureMessage;
     private bool _featureEnabled;
     private bool _overlaysEnabled;
+    private bool _automationsEnabled;
     private OverlayCueAdmissionCatalog _cueCatalog = new([], []);
     private string? _cueTestOutcome;
     private bool _isLoading = true;
@@ -207,6 +212,13 @@ public partial class CustomCommandSettingsPage
             && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Overlays,
+                CancellationToken.None
+            );
+        _automationsEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Automations,
                 CancellationToken.None
             );
         _cueCatalog =
@@ -1800,6 +1812,13 @@ public partial class CustomCommandSettingsPage
             CustomCommandActionKind.Automation => "Run automation flow",
             _ => "Choose what happens",
         };
+
+    private IEnumerable<ActionChoice> ActionChoices(CustomCommandEditor command) =>
+        _actionChoices.Where(choice =>
+            choice.Kind != CustomCommandActionKind.Automation
+            || _automationsEnabled
+            || command.ActionKind == CustomCommandActionKind.Automation
+        );
 
     private static string CueQueuePolicyLabel(OverlayCueQueuePolicy policy) =>
         policy switch

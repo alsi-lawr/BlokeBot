@@ -1,0 +1,50 @@
+<div class="automation-list-view" role="region" aria-label="Automation execution order">
+    <div class="automation-list-heading">
+        <div>
+            <p>Keyboard editing</p>
+            <h2>Execution order</h2>
+        </div>
+        <span>Same nodes and validation as Grid</span>
+    </div>
+    @if (Nodes.Count == 0)
+    {
+        <p class="automation-list-empty">Add an event source to begin this flow.</p>
+    }
+    else
+    {
+        <ol class="automation-order-list">
+            @foreach (var item in _orderedNodes.Select((node, index) => new { Node = node, Index = index }))
+            {
+                var errors = Errors.Where(error => error.NodeId == item.Node.Id).ToArray();
+                var outcome = SampleOutcomes.FirstOrDefault(candidate => candidate.NodeId == item.Node.Id);
+                <li @key="item.Node.Id" class="@(errors.Length > 0 ? "automation-order-row automation-order-row--invalid" : "automation-order-row")">
+                    <button type="button"
+                            class="automation-order-select"
+                            aria-pressed="@(item.Node.Id == SelectedNodeId ? "true" : "false")"
+                            @onclick="() => SelectNode.InvokeAsync(item.Node.Id)">
+                        <span class="automation-order-number">@(item.Index + 1)</span>
+                        <span>
+                            <strong>@item.Node.Definition.Display.Name</strong>
+                            <small>@KindLabel(item.Node.Definition.Kind) · @ConnectionLabel(item.Node.Id)</small>
+                        </span>
+                    </button>
+                    <div class="automation-order-state">
+                        @if (errors.Length > 0)
+                        {
+                            <span class="automation-order-error">@errors[0].Message</span>
+                        }
+                        else if (outcome is not null)
+                        {
+                            <span>@OutcomeLabel(outcome)</span>
+                        }
+                        else
+                        {
+                            <span>Ready</span>
+                        }
+                        <button type="button" aria-label="Delete @item.Node.Definition.Display.Name" @onclick="() => DeleteNode.InvokeAsync(item.Node.Id)">Delete</button>
+                    </div>
+                </li>
+            }
+        </ol>
+    }
+</div>

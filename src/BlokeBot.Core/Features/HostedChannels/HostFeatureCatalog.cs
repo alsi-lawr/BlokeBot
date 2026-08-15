@@ -31,6 +31,12 @@ public static class HostFeatureCatalog
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
         [
             new(
+                HostFeatureFlags.Automations,
+                "Automations",
+                "Build typed event flows with conditions, delays, chat, overlays, and Twitch actions.",
+                enabledFeatures.Contains(HostFeatureFlags.Automations)
+            ),
+            new(
                 HostFeatureFlags.Polls,
                 "Polls",
                 "Create and manage native Twitch polls.",

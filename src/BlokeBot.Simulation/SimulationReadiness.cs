@@ -47,7 +47,7 @@ internal sealed class SimulationReadiness(
 
         if (ready)
         {
-            Interlocked.Exchange(ref _everReady, 1);
+            _ = Interlocked.Exchange(ref _everReady, 1);
         }
 
         return new SimulationReadinessProjection(

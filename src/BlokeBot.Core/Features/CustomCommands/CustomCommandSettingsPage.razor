@@ -285,7 +285,7 @@
                                                            AriaLabel="What happens"
                                                            CaptureElement="@(element => _controls[CommandActionFieldId(command)] = element)"
                                                            @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))">
-                                            @foreach (var choice in _actionChoices)
+                                            @foreach (var choice in ActionChoices(command))
                                             {
                                                 <StudioChoiceCard @key="choice.Kind"
                                                                   data-action-kind="@choice.Kind"
@@ -301,11 +301,21 @@
                                     @if (command.Action is AutomationCustomCommandActionEditor)
                                     {
                                         <div class="studio-span-12 surface-muted space-y-2 rounded-lg p-3"
-                                             data-unavailable-command-action>
-                                            <p class="text-sm font-semibold text-slate-900">Saved action unavailable</p>
-                                            <p class="text-sm text-muted-foreground" role="status">
-                                                This action cannot be changed in this release. Saving preserves it.
-                                            </p>
+                                             data-automation-command>
+                                            @if (_automationsEnabled)
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Connected visual automations</p>
+                                                <p class="text-sm text-muted-foreground">
+                                                    This command starts every enabled flow whose Custom command event selects it. Build and inspect those connections in <a class="font-semibold text-blue-700 underline" href="/automations">Visual automations</a>.
+                                                </p>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-sm font-semibold text-slate-900">Automations are off</p>
+                                                <p class="text-sm text-muted-foreground" role="status">
+                                                    This action is retained, but flow starts and downstream actions stay paused. Turn Automations on in <a class="font-semibold text-blue-700 underline" href="/host#chat-tools">Channel setup</a>.
+                                                </p>
+                                            }
                                         </div>
                                     }
                                     else

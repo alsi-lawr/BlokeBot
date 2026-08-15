@@ -24,6 +24,7 @@ DEFINITIONS=(
   "channel-setup-scroll.lua:43224"
   "guessing-workflow.lua:43219"
   "custom-commands.lua:43220"
+  "automations.lua:43221"
   "points-and-guessing.lua:43222"
   "native-twitch-operations.lua:43223"
   "viewer-command-catalog.lua:5334"

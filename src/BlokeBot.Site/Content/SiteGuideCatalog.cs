@@ -81,6 +81,14 @@ internal static partial class SiteGuideCatalog
             ]
         ),
         new(
+            "Automations",
+            [
+                GuideLink("Visual flow editor", "automations"),
+                GuideLink("Twitch events", "automations/events"),
+                GuideLink("Actions", "automations/actions"),
+            ]
+        ),
+        new(
             "Help and administration",
             [
                 GuideLink("Troubleshooting", "troubleshooting"),
@@ -392,6 +400,7 @@ internal static partial class SiteGuideCatalog
                         new SiteLink("Public leaderboards", "leaderboards"),
                         new SiteLink("Native Twitch", "twitch-operations"),
                         new SiteLink("Overlays and Browser Sources", "overlays"),
+                        new SiteLink("Visual automations", "automations"),
                     ],
                 },
             ],
@@ -1738,6 +1747,21 @@ internal static partial class SiteGuideCatalog
                         "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
                     ],
                 },
+                new SiteGuideSection
+                {
+                    Heading = "Start visual automation flows",
+                    Paragraphs =
+                    [
+                        "Choose Run automation flows under What happens. Every enabled flow whose Custom command event selects this command starts from the same chat invocation.",
+                    ],
+                    Bullets =
+                    [
+                        "Custom commands and Automations must both be on for a command to start a flow.",
+                        "Build the connection in Visual automations. The command does not keep a second flow picker.",
+                        "Turning either feature off keeps the command, flow, and run history but suppresses new work without replaying it later.",
+                    ],
+                    Links = [new SiteLink("Build a visual automation", "automations")],
+                },
             ],
             Next =
             [
@@ -2036,7 +2060,16 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Automations",
             Title = "Connect channel events to automatic actions",
             Summary =
-                "Automations run saved flows. A Twitch event or custom command starts a flow. Conditions and delays control it. Actions do the work. This release ships the runtime foundation. The visual flow builder arrives in a later release.",
+                "Build host-scoped flows on a snapped grid. Connect a typed event to conditions and actions, validate it, test it without live effects, and enable it from the dashboard.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/automations/phone-dark-visual-automations.png",
+                LightPhoneSource: "media/automations/phone-light-visual-automations.png",
+                DarkLaptopSource: "media/automations/desktop-dark-visual-automations.png",
+                LightLaptopSource: "media/automations/desktop-light-visual-automations.png",
+                PhoneAlt: "BlokeBot Visual automations at 390 pixels with the current flow, vertical snapped nodes and validation state.",
+                LaptopAlt: "BlokeBot Visual automations with a flow library, snapped typed nodes, orthogonal connections and selected-node inspector.",
+                "Grid is the primary desktop editor. The same flow remains usable in the vertical mobile layout and List view."
+            ),
             Sections =
             [
                 new SiteGuideSection
@@ -2046,7 +2079,7 @@ internal static partial class SiteGuideCatalog
                     [
                         "Choose the channel in the top bar and open Channel setup.",
                         "Open Chat tools and turn on Automations. The feature card persists the change immediately.",
-                        "Open Automations in the navigation, then Twitch events, to see the event sources and the Twitch approval each one needs.",
+                        "Open Automations, then Flows. Create a flow and choose one event source from the registered node library.",
                     ],
                     Paragraphs =
                     [
@@ -2054,6 +2087,30 @@ internal static partial class SiteGuideCatalog
                     ],
                     Note =
                         "If Automations is off, saved automations and run history remain. Events do not start flows. BlokeBot keeps no automation subscriptions. If you turn it on again, it resumes from the current state. It does not replay suppressed events.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Build on the snapped grid",
+                    Steps =
+                    [
+                        "Add one event source. Add conditions, delays, and actions from the node library.",
+                        "Select a node to edit its typed fields. Connect each output only to a compatible input.",
+                        "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use List view for the same nodes and execution order without the canvas.",
+                        "Save the draft, validate it, and fix any disconnected node, incompatible port, cycle, missing reference, or missing capability.",
+                    ],
+                    Note =
+                        "A flow can have one event source and no joins or cycles. The runtime catalog and validator are authoritative; the browser does not invent a second type system.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Test and enable safely",
+                    Bullets =
+                    [
+                        "Test flow runs a representative event through the graph and reports each node outcome. It sends no chat, changes no points, plays no overlay, and calls no Twitch operation.",
+                        "Invalid graphs cannot be enabled. A flow that can send public messages, change points, play overlays, or call Twitch shows an explicit warning before enablement.",
+                        "The run drawer shows the latest sample and recent live outcomes, including the node that failed.",
+                        "Duplicate copies the graph and node positions as a disabled draft without copying run history.",
+                    ],
                 },
                 new SiteGuideSection
                 {
@@ -2070,7 +2127,7 @@ internal static partial class SiteGuideCatalog
                         "Actions send chat messages, play overlay cues, complete Channel Points redemptions and run native Twitch operations.",
                     ],
                     Note =
-                        "Tools to build and edit flows arrive in a later release. In this release the dashboard shows the runtime surfaces: the Twitch events page and the Run automation flow command action.",
+                        "Grid and List views edit the same persisted graph. Saving round-trips each node's typed configuration and snapped position.",
                 },
                 new SiteGuideSection
                 {

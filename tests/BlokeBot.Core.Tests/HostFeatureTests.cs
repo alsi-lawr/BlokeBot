@@ -60,15 +60,12 @@ public sealed class HostFeatureTests
         HostFeatureCatalog.Features.ShouldBeUnique();
         HostFeatureCatalog
             .Cards(HostFeatureFlags.Automations)
-            .ShouldAllBe(static card => !card.Enabled);
+            .Single(static card => card.Feature == HostFeatureFlags.Automations)
+            .Enabled.ShouldBeTrue();
         HostFeatureCatalog
             .Cards(HostFeatureFlags.All)
             .Select(static card => card.Feature)
-            .ShouldBe(
-                HostFeatureCatalog.Features.Where(static feature =>
-                    feature != HostFeatureFlags.Automations
-                )
-            );
+            .ShouldBe(HostFeatureCatalog.Features);
         ((ulong)HostFeatureFlags.RaidCollaboration).ShouldBe(1UL << 18);
         ((ulong)HostFeatureFlags.CooperativeGame).ShouldBe(1UL << 19);
         ((ulong)HostFeatureFlags.Collectives).ShouldBe(1UL << 20);

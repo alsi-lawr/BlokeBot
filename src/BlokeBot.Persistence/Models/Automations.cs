@@ -42,6 +42,8 @@ public sealed class AutomationFlowNode
     public string FieldExpressionsJson { get; set; } = string.Empty;
     public int ExpressionLanguageVersion { get; set; }
     public bool ContinueOnFailure { get; set; }
+    public int CanvasX { get; set; }
+    public int CanvasY { get; set; }
     public AutomationFlow Flow { get; set; } = null!;
 }
 

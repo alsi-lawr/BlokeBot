@@ -8,6 +8,13 @@ public readonly record struct AutomationNodeId(Guid Value);
 
 public readonly record struct AutomationRunId(Guid Value);
 
+public readonly record struct AutomationCanvasCoordinate(int Value);
+
+public readonly record struct AutomationCanvasPosition(
+    AutomationCanvasCoordinate X,
+    AutomationCanvasCoordinate Y
+);
+
 public readonly record struct AutomationExpressionLanguageVersion(int Value);
 
 public static class AutomationExpressionLanguage
@@ -41,7 +48,11 @@ public sealed record AutomationFlowDraftNode(
     PersistedAutomationNodeDefinition Definition,
     AutomationExpressionLanguageVersion ExpressionLanguageVersion,
     AutomationNodeFailurePolicy FailurePolicy,
-    ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> FieldExpressions
+    ImmutableDictionary<
+        AutomationConfigurationFieldId,
+        AutomationExpressionSource
+    > FieldExpressions,
+    AutomationCanvasPosition Position = default
 );
 
 public sealed record AutomationFlowDraftEdge(
@@ -62,7 +73,97 @@ public sealed record AutomationFlowDraft(
     ImmutableArray<AutomationFlowDraftEdge> Edges
 );
 
-public sealed record AutomationGraphError(AutomationNodeId? NodeId, string Code, string Message);
+public sealed record AutomationGraphError(
+    AutomationNodeId? NodeId,
+    string Code,
+    string Message,
+    AutomationConfigurationFieldId? FieldId = null
+);
+
+public abstract record AutomationFlowValidationOutcome
+{
+    private AutomationFlowValidationOutcome() { }
+
+    public sealed record Valid : AutomationFlowValidationOutcome;
+
+    public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
+        : AutomationFlowValidationOutcome;
+
+    public sealed record FeatureDisabled : AutomationFlowValidationOutcome;
+
+    public sealed record HostNotFound : AutomationFlowValidationOutcome;
+}
+
+public sealed record AutomationFlowSnapshot(
+    AutomationFlowDraft Draft,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc
+);
+
+public abstract record AutomationFlowQueryOutcome
+{
+    private AutomationFlowQueryOutcome() { }
+
+    public sealed record Available(ImmutableArray<AutomationFlowSnapshot> Flows)
+        : AutomationFlowQueryOutcome;
+
+    public sealed record FeatureDisabled : AutomationFlowQueryOutcome;
+
+    public sealed record HostNotFound : AutomationFlowQueryOutcome;
+}
+
+public abstract record AutomationFlowDeleteOutcome
+{
+    private AutomationFlowDeleteOutcome() { }
+
+    public sealed record Deleted : AutomationFlowDeleteOutcome;
+
+    public sealed record FeatureDisabled : AutomationFlowDeleteOutcome;
+
+    public sealed record HostNotFound : AutomationFlowDeleteOutcome;
+
+    public sealed record FlowNotFound : AutomationFlowDeleteOutcome;
+}
+
+public abstract record AutomationFlowDuplicateOutcome
+{
+    private AutomationFlowDuplicateOutcome() { }
+
+    public sealed record Duplicated(AutomationFlowId FlowId) : AutomationFlowDuplicateOutcome;
+
+    public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
+        : AutomationFlowDuplicateOutcome;
+
+    public sealed record FeatureDisabled : AutomationFlowDuplicateOutcome;
+
+    public sealed record HostNotFound : AutomationFlowDuplicateOutcome;
+
+    public sealed record FlowNotFound : AutomationFlowDuplicateOutcome;
+}
+
+public sealed record AutomationSampleNodeOutcome(
+    AutomationNodeId NodeId,
+    AutomationNodeRunState State,
+    string OutcomeCode
+);
+
+public abstract record AutomationSampleRunOutcome
+{
+    private AutomationSampleRunOutcome() { }
+
+    public sealed record Completed(ImmutableArray<AutomationSampleNodeOutcome> Nodes)
+        : AutomationSampleRunOutcome;
+
+    public sealed record Failed(ImmutableArray<AutomationSampleNodeOutcome> Nodes)
+        : AutomationSampleRunOutcome;
+
+    public sealed record Invalid(ImmutableArray<AutomationGraphError> Errors)
+        : AutomationSampleRunOutcome;
+
+    public sealed record FeatureDisabled : AutomationSampleRunOutcome;
+
+    public sealed record HostNotFound : AutomationSampleRunOutcome;
+}
 
 public abstract record AutomationFlowSaveOutcome
 {

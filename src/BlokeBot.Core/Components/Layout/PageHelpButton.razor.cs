@@ -106,6 +106,8 @@ public partial class PageHelpButton
             "/points" => new(_pointsDashboardHelp, "/points"),
             "/points/settings" => new(_pointsSettingsHelp, "/points"),
             "/custom-commands/settings" => new(_customCommandsHelp, "/commands"),
+            "/automations" => new(_automationsHelp, "/automations"),
+            "/automations/events" => new(_automationEventsHelp, "/automations/events"),
             "/host" => new(_hostConfigHelp, "/channels"),
             "/requests" => new(_requestBoardsHelp, "/community/request-boards"),
             "/bounties" => new(_bountiesHelp, "/community/bounties"),
@@ -1072,6 +1074,8 @@ public partial class PageHelpButton
                     "Test cue checks the selected cue and Browser Source without a chat message.",
                     "Test cue does not start a cooldown.",
                     "Test cue does not consume a one-time viewer use.",
+                    "Run automation flows starts every enabled visual flow connected to this command.",
+                    "Custom commands and Automations must both be on. Disabled commands and flows keep their saved setup without replaying suppressed work.",
                 ]
             ),
             new(
@@ -1082,6 +1086,61 @@ public partial class PageHelpButton
                     "A scheduled reply can use a timer.",
                     "A scheduled reply can run after enough chat activity.",
                     "A scheduled reply can run once a week.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _automationsHelp = new(
+        "Visual automations",
+        [
+            new(
+                "Build a typed flow",
+                "Add one event source, connect compatible flow ports, and configure each node in the inspector.",
+                [
+                    "Grid view snaps nodes to a 24-pixel grid. Drag a node or use its arrow keys to move it.",
+                    "List view exposes the same nodes, order, validation, and inspector without the canvas.",
+                    "Only matching typed ports can be selected. Cycles, joins, disconnected nodes, and unavailable capabilities are reported before enablement.",
+                ]
+            ),
+            new(
+                "Validate and test",
+                "Save a valid draft, then test it with a representative event before enabling it.",
+                [
+                    "A sample run evaluates conditions and shows node outcomes without sending chat, changing points, playing overlays, or calling Twitch.",
+                    "Enabling a flow with public or provider effects requires an explicit warning confirmation.",
+                    "Recent live run outcomes identify the node that failed.",
+                ]
+            ),
+            new(
+                "Turning this tool on or off",
+                "Automations are opt-in per channel in Channel setup.",
+                [
+                    "While off, the editor, catalog, validation, sample runs, triggers, queued work, and actions are blocked.",
+                    "Saved flows and run history remain. Turning Automations back on does not replay suppressed work.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _automationEventsHelp = new(
+        "Automation Twitch events",
+        [
+            new(
+                "Source readiness",
+                "Each source shows the Twitch subscription and broadcaster approval it needs.",
+                [
+                    "Reconnect the selected channel when a source reports missing approval.",
+                    "Only sources used by enabled flows keep their required automation subscriptions active.",
+                    "Open Visual automations to add, configure, validate, test, and enable an event flow.",
+                ]
+            ),
+            new(
+                "Disabled behavior",
+                "Turning Automations off pauses event starts and removes automation-owned subscriptions.",
+                [
+                    "Saved flows and history remain available after re-enable.",
+                    "Events suppressed while the feature is off are not replayed.",
                 ]
             ),
         ]
