@@ -93,34 +93,6 @@ public sealed class RedemptionAutomationTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
-
-        await fixture.SetFeatureAsync(HostFeatureFlags.RaidCollaboration, enabled: true);
-        var actorlessSource = Node("stream-online", "{}");
-        var shoutoutAction = Node("send-shoutout", "{}");
-        var actorless = await fixture.Flows.SaveAsync(
-            Draft(
-                fixture.HostId,
-                [actorlessSource, shoutoutAction],
-                [Edge(actorlessSource, "flow", shoutoutAction)]
-            ),
-            CancellationToken.None
-        );
-
-        actorless
-            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
-            .Errors.ShouldContain(error =>
-                error.NodeId == shoutoutAction.Id && error.Code == "trigger-context-incompatible"
-            );
-        _ = (
-            await fixture.Flows.SaveAsync(
-                Draft(
-                    fixture.HostId,
-                    [source, shoutoutAction],
-                    [Edge(source, "flow", shoutoutAction)]
-                ),
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
     }
 
     [Test]
@@ -265,6 +237,36 @@ public sealed class RedemptionAutomationTests
         _ = (
             await fixture.Flows.SaveAsync(
                 Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+
+        await fixture.SetFeatureAsync(HostFeatureFlags.RaidCollaboration, enabled: true);
+        var actorlessSource = Node("stream-online", "{}");
+        var actorlessAction = Node("send-shoutout", "{}");
+        var actorless = await fixture.Flows.SaveAsync(
+            Draft(
+                fixture.HostId,
+                [actorlessSource, actorlessAction],
+                [Edge(actorlessSource, "flow", actorlessAction)]
+            ),
+            CancellationToken.None
+        );
+
+        actorless
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
+            .Errors.ShouldContain(error =>
+                error.NodeId == actorlessAction.Id && error.Code == "trigger-context-incompatible"
+            );
+        var knownActorSource = Node("reward-redemption", """{"completion-policy":"manual"}""");
+        var knownActorAction = Node("send-shoutout", "{}");
+        _ = (
+            await fixture.Flows.SaveAsync(
+                Draft(
+                    fixture.HostId,
+                    [knownActorSource, knownActorAction],
+                    [Edge(knownActorSource, "flow", knownActorAction)]
+                ),
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
