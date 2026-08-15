@@ -1100,8 +1100,8 @@ public partial class PageHelpButton
                 [
                     "Select Node to open the node library.",
                     "Search for a node by its name or category.",
-                    "Connect an output port to a compatible input port.",
-                    "Select a node to edit its fields in the inspector.",
+                    "Drag an output port to a compatible input port or node.",
+                    "Select a node to open its inspector from the right.",
                     "Use List view to edit the same flow without the canvas.",
                 ]
             ),

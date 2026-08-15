@@ -309,15 +309,9 @@ public partial class AutomationEditorPage
         }
 
         _editor = AutomationEditorState.Restore(snapshot, definitions);
-        _selectedNodeId =
-            _editor
-                .Nodes.FirstOrDefault(static node =>
-                    node.Definition.Kind == AutomationNodeKind.Action
-                )
-                ?.Id
-            ?? _editor.Nodes.FirstOrDefault()?.Id;
+        _selectedNodeId = null;
         ResetTransientState();
-        SetSingleNodeSelection(_selectedNodeId);
+        SetSingleNodeSelection(null);
         _hasChanges = false;
         return true;
     }
@@ -395,6 +389,12 @@ public partial class AutomationEditorPage
         _selectedNodeId = null;
         EditorChanged();
     }
+
+    private void RejectConnection() =>
+        ShowTimedValidationFeedback(
+            "Release the connection on one compatible input or node.",
+            failed: true
+        );
 
     private static bool CompatibleConnection(
         AutomationEditorState editor,

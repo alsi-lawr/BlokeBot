@@ -1,6 +1,18 @@
 const states = new WeakMap();
 const gridSize = 24;
 const obstacleMargin = 18;
+const zoomSteps = [
+  { scale: 0.5, label: "50%" },
+  { scale: 0.625, label: "62.5%" },
+  { scale: 0.75, label: "75%" },
+  { scale: 0.875, label: "87.5%" },
+  { scale: 1, label: "100%" },
+  { scale: 1.125, label: "112.5%" },
+  { scale: 1.25, label: "125%" },
+  { scale: 1.5, label: "150%" },
+  { scale: 1.75, label: "175%" },
+];
+const defaultZoomIndex = zoomSteps.findIndex((step) => step.scale === 1);
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -42,16 +54,58 @@ function notifySelection(state) {
   );
 }
 
-function applyTransform(state) {
-  state.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-  state.zoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
+function zoomScale(state) {
+  return zoomSteps[state.zoomIndex].scale;
 }
 
-function stagePoint(state, clientX, clientY) {
+function applyTransform(state) {
+  const step = zoomSteps[state.zoomIndex];
+  state.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${step.scale})`;
+  state.zoomReset.textContent = step.label;
+}
+
+function viewportPoint(state, clientX, clientY) {
   const viewport = state.root.getBoundingClientRect();
   return {
-    x: (clientX - viewport.left - state.panX) / state.zoom,
-    y: (clientY - viewport.top - state.panY) / state.zoom,
+    x: clientX - viewport.left - state.root.clientLeft,
+    y: clientY - viewport.top - state.root.clientTop,
+  };
+}
+
+function screenToGraph(state, clientX, clientY) {
+  const point = viewportPoint(state, clientX, clientY);
+  const scale = zoomScale(state);
+  return {
+    x: (point.x - state.panX) / scale,
+    y: (point.y - state.panY) / scale,
+  };
+}
+
+function nodeGraphPosition(node) {
+  if (node.dataset.automationGraphX !== undefined) {
+    return {
+      x: Number(node.dataset.automationGraphX),
+      y: Number(node.dataset.automationGraphY),
+    };
+  }
+  const style = getComputedStyle(node);
+  return { x: Number.parseFloat(style.left), y: Number.parseFloat(style.top) };
+}
+
+function setNodeGraphPosition(node, x, y) {
+  node.dataset.automationGraphX = `${x}`;
+  node.dataset.automationGraphY = `${y}`;
+  node.style.left = `${x}px`;
+  node.style.top = `${y}px`;
+}
+
+function nodeGraphRectangle(node, margin = 0) {
+  const position = nodeGraphPosition(node);
+  return {
+    left: position.x - margin,
+    top: position.y - margin,
+    right: position.x + node.offsetWidth + margin,
+    bottom: position.y + node.offsetHeight + margin,
   };
 }
 
@@ -60,19 +114,29 @@ function portPoint(state, nodeId, portId, direction) {
     `[data-automation-port][data-node-id="${CSS.escape(nodeId)}"][data-port-id="${CSS.escape(portId)}"][data-port-direction="${direction}"]`,
   );
   if (!(port instanceof HTMLElement)) return null;
-  const bounds = port.getBoundingClientRect();
-  return stagePoint(state, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+  const node = port.closest("[data-automation-node]");
+  if (!(node instanceof HTMLElement)) return null;
+  const position = nodeGraphPosition(node);
+  const portStyle = getComputedStyle(port);
+  const portTransform = new DOMMatrixReadOnly(portStyle.transform);
+  return {
+    x: position.x
+      + node.clientLeft
+      + Number.parseFloat(portStyle.left)
+      + Number.parseFloat(portStyle.width) / 2
+      + portTransform.e,
+    y: position.y
+      + node.clientTop
+      + Number.parseFloat(portStyle.top)
+      + Number.parseFloat(portStyle.height) / 2
+      + portTransform.f,
+  };
 }
 
 function nodeObstacles(state, excluded) {
   return [...state.root.querySelectorAll("[data-automation-node]")]
     .filter((node) => !excluded.has(node.dataset.automationNode))
-    .map((node) => ({
-      left: node.offsetLeft - obstacleMargin,
-      top: node.offsetTop - obstacleMargin,
-      right: node.offsetLeft + node.offsetWidth + obstacleMargin,
-      bottom: node.offsetTop + node.offsetHeight + obstacleMargin,
-    }));
+    .map((node) => nodeGraphRectangle(node, obstacleMargin));
 }
 
 function segmentHitsRectangle(first, second, rectangle) {
@@ -147,27 +211,89 @@ function angularPath(points) {
   );
 }
 
-function smoothPath(points) {
-  if (points.length < 3) return angularPath(points);
-  let path = `M ${points[0].x} ${points[0].y}`;
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
-    const next = points[index + 1];
-    const incoming = Math.min(14, Math.hypot(current.x - previous.x, current.y - previous.y) / 2);
-    const outgoing = Math.min(14, Math.hypot(next.x - current.x, next.y - current.y) / 2);
-    const before = {
-      x: current.x + Math.sign(previous.x - current.x) * incoming,
-      y: current.y + Math.sign(previous.y - current.y) * incoming,
-    };
-    const after = {
-      x: current.x + Math.sign(next.x - current.x) * outgoing,
-      y: current.y + Math.sign(next.y - current.y) * outgoing,
-    };
-    path += ` L ${before.x} ${before.y} Q ${current.x} ${current.y} ${after.x} ${after.y}`;
+function cubicPoint(curve, progress) {
+  const inverse = 1 - progress;
+  const firstWeight = inverse ** 3;
+  const secondWeight = 3 * inverse ** 2 * progress;
+  const thirdWeight = 3 * inverse * progress ** 2;
+  const fourthWeight = progress ** 3;
+  return {
+    x: firstWeight * curve.start.x
+      + secondWeight * curve.firstControl.x
+      + thirdWeight * curve.secondControl.x
+      + fourthWeight * curve.end.x,
+    y: firstWeight * curve.start.y
+      + secondWeight * curve.firstControl.y
+      + thirdWeight * curve.secondControl.y
+      + fourthWeight * curve.end.y,
+  };
+}
+
+function directCurve(start, end, orientation) {
+  const horizontal = orientation !== "vertical";
+  const distance = horizontal ? Math.abs(end.x - start.x) : Math.abs(end.y - start.y);
+  const reach = Math.max(54, distance * 0.48);
+  const direction = horizontal
+    ? Math.sign(end.x - start.x) || 1
+    : Math.sign(end.y - start.y) || 1;
+  return {
+    start,
+    firstControl: horizontal
+      ? { x: start.x + direction * reach, y: start.y }
+      : { x: start.x, y: start.y + direction * reach },
+    secondControl: horizontal
+      ? { x: end.x - direction * reach, y: end.y }
+      : { x: end.x, y: end.y - direction * reach },
+    end,
+  };
+}
+
+function curvePath(curve) {
+  return `M ${curve.start.x} ${curve.start.y} C ${curve.firstControl.x} ${curve.firstControl.y}, ${curve.secondControl.x} ${curve.secondControl.y}, ${curve.end.x} ${curve.end.y}`;
+}
+
+function pointInsideRectangle(point, rectangle) {
+  return point.x >= rectangle.left
+    && point.x <= rectangle.right
+    && point.y >= rectangle.top
+    && point.y <= rectangle.bottom;
+}
+
+function curveHitsObstacles(curve, obstacles) {
+  for (let step = 1; step < 24; step += 1) {
+    const point = cubicPoint(curve, step / 24);
+    if (obstacles.some((obstacle) => pointInsideRectangle(point, obstacle))) return true;
   }
-  const last = points.at(-1);
-  return `${path} L ${last.x} ${last.y}`;
+  return false;
+}
+
+function splinePath(points) {
+  let path = `M ${points[0].x} ${points[0].y}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const previous = points[Math.max(0, index - 1)];
+    const start = points[index];
+    const end = points[index + 1];
+    const next = points[Math.min(points.length - 1, index + 2)];
+    const firstControl = {
+      x: start.x + (end.x - previous.x) / 6,
+      y: start.y + (end.y - previous.y) / 6,
+    };
+    const secondControl = {
+      x: end.x - (next.x - start.x) / 6,
+      y: end.y - (next.y - start.y) / 6,
+    };
+    path += ` C ${firstControl.x} ${firstControl.y}, ${secondControl.x} ${secondControl.y}, ${end.x} ${end.y}`;
+  }
+  return path;
+}
+
+function smoothRoute(start, end, orientation, obstacles) {
+  const direct = directCurve(start, end, orientation);
+  if (!curveHitsObstacles(direct, obstacles)) {
+    return { path: curvePath(direct), label: cubicPoint(direct, 0.5) };
+  }
+  const points = routePoints(start, end, orientation, obstacles);
+  return { path: splinePath(points), label: points[Math.floor(points.length / 2)] };
 }
 
 function routeEdge(state, group) {
@@ -176,19 +302,17 @@ function routeEdge(state, group) {
   const start = portPoint(state, sourceNode, group.dataset.sourcePort, "output");
   const end = portPoint(state, targetNode, group.dataset.targetPort, "input");
   if (start === null || end === null) return;
-  const points = routePoints(
-    start,
-    end,
-    state.shell.dataset.orientation,
-    nodeObstacles(state, new Set([sourceNode, targetNode])),
-  );
-  const path = state.shell.dataset.edgeStyle === "smooth"
-    ? smoothPath(points)
-    : angularPath(points);
+  const orientation = state.shell.dataset.orientation;
+  const obstacles = nodeObstacles(state, new Set([sourceNode, targetNode]));
+  const points = routePoints(start, end, orientation, obstacles);
+  const route = state.shell.dataset.edgeStyle === "smooth"
+    ? smoothRoute(start, end, orientation, obstacles)
+    : { path: angularPath(points), label: points[Math.floor(points.length / 2)] };
+  const path = route.path;
   for (const element of group.querySelectorAll("path")) element.setAttribute("d", path);
   const label = group.querySelector("text");
   if (label !== null) {
-    const anchor = points[Math.floor(points.length / 2)];
+    const anchor = route.label;
     label.setAttribute("x", `${anchor.x + 8}`);
     label.setAttribute("y", `${anchor.y - 8}`);
   }
@@ -226,12 +350,97 @@ function startConnection(state, port) {
   }
 }
 
+function beginConnectionDrag(state, event, port) {
+  event.preventDefault();
+  event.stopPropagation();
+  startConnection(state, port);
+  try {
+    port.setPointerCapture(event.pointerId);
+  } catch (error) {
+    if (event.isTrusted) throw error;
+  }
+  state.connectionDrag = {
+    pointerId: event.pointerId,
+    capture: port,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false,
+  };
+  updateConnectionPreview(state, event.clientX, event.clientY);
+}
+
 function compatibleTarget(state, port) {
   return state.connection !== null
     && port.dataset.portDirection === "input"
     && port.dataset.nodeId !== state.connection.nodeId
     && port.dataset.portType === state.connection.type
     && port.dataset.portSensitivity === state.connection.sensitivity;
+}
+
+function connectionReleaseTarget(state, clientX, clientY) {
+  const hit = document.elementFromPoint(clientX, clientY);
+  if (!(hit instanceof Element)) return { port: null, rejected: false };
+  const port = hit.closest("[data-automation-port]");
+  if (port instanceof HTMLButtonElement) {
+    if (
+      port.dataset.portDirection === "output"
+      && port.dataset.nodeId === state.connection?.nodeId
+      && port.dataset.portId === state.connection?.portId
+    ) {
+      return { port: null, rejected: false };
+    }
+    return { port: compatibleTarget(state, port) ? port : null, rejected: true };
+  }
+  const node = hit.closest("[data-automation-node]");
+  if (!(node instanceof HTMLElement)) return { port: null, rejected: false };
+  const compatible = [...node.querySelectorAll('[data-port-direction="input"]')]
+    .filter((candidate) => compatibleTarget(state, candidate));
+  return {
+    port: compatible.length === 1 ? compatible[0] : null,
+    rejected: compatible.length !== 1,
+  };
+}
+
+function completeConnection(state, port) {
+  const connection = state.connection;
+  if (connection === null) return;
+  cancelConnection(state);
+  void state.dotnet.invokeMethodAsync(
+    "ConnectFromCanvasAsync",
+    connection.nodeId,
+    connection.portId,
+    port.dataset.nodeId,
+    port.dataset.portId,
+  );
+}
+
+function finishConnectionDrag(state, event, cancelled = false) {
+  const drag = state.connectionDrag;
+  if (drag === null || drag.pointerId !== event.pointerId) return false;
+  state.connectionDrag = null;
+  if (drag.capture.hasPointerCapture(event.pointerId)) {
+    drag.capture.releasePointerCapture(event.pointerId);
+  }
+  const target = cancelled
+    ? { port: null, rejected: false }
+    : connectionReleaseTarget(state, event.clientX, event.clientY);
+  if (target.port !== null) completeConnection(state, target.port);
+  else {
+    cancelConnection(state);
+    if (target.rejected) void state.dotnet.invokeMethodAsync("RejectConnectionFromCanvasAsync");
+  }
+  state.suppressPortClick = drag.moved;
+  return true;
+}
+
+function cancelConnectionDrag(state) {
+  const drag = state.connectionDrag;
+  if (drag !== null && drag.capture.hasPointerCapture(drag.pointerId)) {
+    drag.capture.releasePointerCapture(drag.pointerId);
+  }
+  state.connectionDrag = null;
+  state.suppressPortClick = true;
+  cancelConnection(state);
 }
 
 function updateConnectionPreview(state, clientX, clientY) {
@@ -243,15 +452,19 @@ function updateConnectionPreview(state, clientX, clientY) {
     "output",
   );
   if (start === null) return;
-  const end = stagePoint(state, clientX, clientY);
+  const end = screenToGraph(state, clientX, clientY);
   const orientation = state.shell.dataset.orientation;
-  const points = orientation === "vertical"
-    ? [start, { x: start.x, y: start.y + (end.y - start.y) / 2 }, { x: end.x, y: start.y + (end.y - start.y) / 2 }, end]
-    : [start, { x: start.x + (end.x - start.x) / 2, y: start.y }, { x: start.x + (end.x - start.x) / 2, y: end.y }, end];
+  const points = routePoints(start, end, orientation, []);
   state.preview.setAttribute(
     "d",
-    state.shell.dataset.edgeStyle === "smooth" ? smoothPath(points) : angularPath(points),
+    state.shell.dataset.edgeStyle === "smooth"
+      ? smoothRoute(start, end, orientation, []).path
+      : angularPath(points),
   );
+  if (state.connectionDrag !== null) {
+    state.connectionDrag.moved ||= Math.abs(clientX - state.connectionDrag.startX) > 3
+      || Math.abs(clientY - state.connectionDrag.startY) > 3;
+  }
 }
 
 function beginNodeDrag(state, event, node) {
@@ -268,15 +481,25 @@ function beginNodeDrag(state, event, node) {
   setLocalSelection(state.root, selected, null);
   void notifySelection(state);
   if (!selected.has(nodeId)) return;
+  node.focus({ preventScroll: true });
   const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
     .filter((candidate) => selected.has(candidate.dataset.automationNode))
-    .map((candidate) => ({
-      element: candidate,
-      nodeId: candidate.dataset.automationNode,
-      startLeft: candidate.offsetLeft,
-      startTop: candidate.offsetTop,
-    }));
-  node.setPointerCapture(event.pointerId);
+    .map((candidate) => {
+      const position = nodeGraphPosition(candidate);
+      return {
+        element: candidate,
+        nodeId: candidate.dataset.automationNode,
+        startX: position.x,
+        startY: position.y,
+        x: position.x,
+        y: position.y,
+      };
+    });
+  try {
+    node.setPointerCapture(event.pointerId);
+  } catch (error) {
+    if (event.isTrusted) throw error;
+  }
   state.drag = {
     pointerId: event.pointerId,
     capture: node,
@@ -292,12 +515,14 @@ function beginNodeDrag(state, event, node) {
 function moveNodeDrag(state, event) {
   const drag = state.drag;
   if (drag === null || drag.pointerId !== event.pointerId) return false;
-  const deltaX = (event.clientX - drag.startX) / state.zoom;
-  const deltaY = (event.clientY - drag.startY) / state.zoom;
+  const scale = zoomScale(state);
+  const deltaX = (event.clientX - drag.startX) / scale;
+  const deltaY = (event.clientY - drag.startY) / scale;
   drag.moved ||= Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2;
   for (const item of drag.nodes) {
-    item.element.style.left = `${Math.max(0, item.startLeft + deltaX)}px`;
-    item.element.style.top = `${Math.max(0, item.startTop + deltaY)}px`;
+    item.x = Math.max(0, item.startX + deltaX);
+    item.y = Math.max(0, item.startY + deltaY);
+    setNodeGraphPosition(item.element, item.x, item.y);
   }
   routeAll(state);
   return true;
@@ -307,15 +532,16 @@ function finishNodeDrag(state, event) {
   const drag = state.drag;
   if (drag === null || drag.pointerId !== event.pointerId) return false;
   state.drag = null;
-  drag.capture.releasePointerCapture(event.pointerId);
+  if (drag.capture.hasPointerCapture(event.pointerId)) {
+    drag.capture.releasePointerCapture(event.pointerId);
+  }
   state.root.classList.remove("automation-canvas--node-dragging");
   const vertical = state.shell.dataset.orientation === "vertical";
   const moves = drag.nodes.map((item) => {
     item.element.classList.remove("automation-node--moving");
-    const displayX = snap(item.element.offsetLeft);
-    const displayY = snap(item.element.offsetTop);
-    item.element.style.left = `${displayX}px`;
-    item.element.style.top = `${displayY}px`;
+    const displayX = snap(item.x);
+    const displayY = snap(item.y);
+    setNodeGraphPosition(item.element, displayX, displayY);
     return {
       nodeId: item.nodeId,
       x: vertical ? displayY : displayX,
@@ -333,9 +559,13 @@ function beginBackgroundAction(state, event) {
   if (!(target instanceof Element)) return;
   if (target.closest("[data-automation-node], [data-automation-edge], [data-automation-port]")) return;
   event.preventDefault();
-  state.root.setPointerCapture(event.pointerId);
+  try {
+    state.root.setPointerCapture(event.pointerId);
+  } catch (error) {
+    if (event.isTrusted) throw error;
+  }
   if (event.altKey) {
-    const start = stagePoint(state, event.clientX, event.clientY);
+    const start = screenToGraph(state, event.clientX, event.clientY);
     state.marqueeState = { pointerId: event.pointerId, start, current: start };
     state.marquee.hidden = false;
     state.root.classList.add("automation-canvas--selecting");
@@ -348,19 +578,22 @@ function beginBackgroundAction(state, event) {
     startY: event.clientY,
     originX: state.panX,
     originY: state.panY,
+    moved: false,
   };
   state.root.classList.add("automation-canvas--panning");
 }
 
 function moveBackgroundAction(state, event) {
   if (state.panState?.pointerId === event.pointerId) {
+    state.panState.moved ||= Math.abs(event.clientX - state.panState.startX) > 3
+      || Math.abs(event.clientY - state.panState.startY) > 3;
     state.panX = state.panState.originX + event.clientX - state.panState.startX;
     state.panY = state.panState.originY + event.clientY - state.panState.startY;
     applyTransform(state);
     return true;
   }
   if (state.marqueeState?.pointerId !== event.pointerId) return false;
-  state.marqueeState.current = stagePoint(state, event.clientX, event.clientY);
+  state.marqueeState.current = screenToGraph(state, event.clientX, event.clientY);
   const left = Math.min(state.marqueeState.start.x, state.marqueeState.current.x);
   const top = Math.min(state.marqueeState.start.y, state.marqueeState.current.y);
   const width = Math.abs(state.marqueeState.current.x - state.marqueeState.start.x);
@@ -372,10 +605,13 @@ function moveBackgroundAction(state, event) {
     height: `${height}px`,
   });
   const ids = [...state.root.querySelectorAll("[data-automation-node]")]
-    .filter((node) => node.offsetLeft < left + width
-      && node.offsetLeft + node.offsetWidth > left
-      && node.offsetTop < top + height
-      && node.offsetTop + node.offsetHeight > top)
+    .filter((node) => {
+      const rectangle = nodeGraphRectangle(node);
+      return rectangle.left < left + width
+        && rectangle.right > left
+        && rectangle.top < top + height
+        && rectangle.bottom > top;
+    })
     .map((node) => node.dataset.automationNode);
   setLocalSelection(state.root, ids, null);
   return true;
@@ -383,14 +619,28 @@ function moveBackgroundAction(state, event) {
 
 function finishBackgroundAction(state, event) {
   if (state.panState?.pointerId === event.pointerId) {
+    const deselect = !state.panState.moved;
+    if (deselect) {
+      state.panX = state.panState.originX;
+      state.panY = state.panState.originY;
+      applyTransform(state);
+    }
     state.panState = null;
-    state.root.releasePointerCapture(event.pointerId);
+    if (state.root.hasPointerCapture(event.pointerId)) {
+      state.root.releasePointerCapture(event.pointerId);
+    }
     state.root.classList.remove("automation-canvas--panning");
+    if (deselect) {
+      setLocalSelection(state.root, [], null);
+      void notifySelection(state);
+    }
     return true;
   }
   if (state.marqueeState?.pointerId !== event.pointerId) return false;
   state.marqueeState = null;
-  state.root.releasePointerCapture(event.pointerId);
+  if (state.root.hasPointerCapture(event.pointerId)) {
+    state.root.releasePointerCapture(event.pointerId);
+  }
   state.marquee.hidden = true;
   state.root.classList.remove("automation-canvas--selecting");
   void notifySelection(state);
@@ -400,6 +650,76 @@ function finishBackgroundAction(state, event) {
 function register(state, element, name, handler, options) {
   element.addEventListener(name, handler, options);
   state.listeners.push(() => element.removeEventListener(name, handler, options));
+}
+
+function changeZoom(state, direction, clientX, clientY) {
+  const targetIndex = clamp(state.zoomIndex + direction, 0, zoomSteps.length - 1);
+  if (targetIndex === state.zoomIndex) return;
+  const pointer = viewportPoint(state, clientX, clientY);
+  const previous = {
+    zoomIndex: state.zoomIndex,
+    panX: state.panX,
+    panY: state.panY,
+  };
+  const reverse = state.zoomTransition !== null
+    && state.zoomTransition.to.zoomIndex === state.zoomIndex
+    && state.zoomTransition.from.zoomIndex === targetIndex
+    && state.zoomTransition.pointer.x === pointer.x
+    && state.zoomTransition.pointer.y === pointer.y
+    && state.zoomTransition.to.panX === state.panX
+    && state.zoomTransition.to.panY === state.panY;
+  if (reverse) {
+    state.zoomIndex = state.zoomTransition.from.zoomIndex;
+    state.panX = state.zoomTransition.from.panX;
+    state.panY = state.zoomTransition.from.panY;
+  } else {
+    const graphX = (pointer.x - state.panX) / zoomScale(state);
+    const graphY = (pointer.y - state.panY) / zoomScale(state);
+    state.zoomIndex = targetIndex;
+    state.panX = pointer.x - graphX * zoomScale(state);
+    state.panY = pointer.y - graphY * zoomScale(state);
+  }
+  state.zoomTransition = {
+    from: previous,
+    to: {
+      zoomIndex: state.zoomIndex,
+      panX: state.panX,
+      panY: state.panY,
+    },
+    pointer,
+  };
+  applyTransform(state);
+}
+
+function isEditingControl(target) {
+  return target instanceof Element
+    && target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']") !== null;
+}
+
+function moveSelectionByKeyboard(state, key) {
+  const movement = {
+    ArrowLeft: { x: -gridSize, y: 0 },
+    ArrowRight: { x: gridSize, y: 0 },
+    ArrowUp: { x: 0, y: -gridSize },
+    ArrowDown: { x: 0, y: gridSize },
+  }[key];
+  if (movement === undefined) return false;
+  const vertical = state.shell.dataset.orientation === "vertical";
+  const moves = selectedNodes(state.root).map((node) => {
+    const position = nodeGraphPosition(node);
+    const x = Math.max(0, position.x + movement.x);
+    const y = Math.max(0, position.y + movement.y);
+    setNodeGraphPosition(node, x, y);
+    return {
+      nodeId: node.dataset.automationNode,
+      x: vertical ? y : x,
+      y: vertical ? x : y,
+    };
+  });
+  if (moves.length === 0) return true;
+  routeAll(state);
+  void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
+  return true;
 }
 
 export function initialize(root, dotnet) {
@@ -423,18 +743,29 @@ export function initialize(root, dotnet) {
     marquee,
     zoomReset,
     dotnet,
-    zoom: 1,
+    zoomIndex: defaultZoomIndex,
     panX: 0,
     panY: 0,
+    zoomTransition: null,
     drag: null,
     panState: null,
     marqueeState: null,
     connection: null,
+    connectionDrag: null,
+    suppressPortClick: false,
     listeners: [],
   };
 
   register(state, root, "pointerdown", (event) => {
     const port = event.target instanceof Element ? event.target.closest("[data-automation-port]") : null;
+    if (
+      port instanceof HTMLButtonElement
+      && port.dataset.portDirection === "output"
+      && event.button === 0
+    ) {
+      beginConnectionDrag(state, event, port);
+      return;
+    }
     if (port !== null) return;
     const node = event.target instanceof Element ? event.target.closest("[data-automation-node]") : null;
     if (node instanceof HTMLElement && event.button === 0 && !event.altKey) {
@@ -448,10 +779,12 @@ export function initialize(root, dotnet) {
     updateConnectionPreview(state, event.clientX, event.clientY);
   });
   register(state, root, "pointerup", (event) => {
+    if (finishConnectionDrag(state, event)) return;
     if (finishNodeDrag(state, event)) return;
     finishBackgroundAction(state, event);
   });
   register(state, root, "pointercancel", (event) => {
+    if (finishConnectionDrag(state, event, true)) return;
     if (finishNodeDrag(state, event)) return;
     finishBackgroundAction(state, event);
   });
@@ -460,43 +793,36 @@ export function initialize(root, dotnet) {
     if (!(port instanceof HTMLButtonElement)) return;
     event.preventDefault();
     event.stopPropagation();
+    if (state.suppressPortClick) {
+      state.suppressPortClick = false;
+      return;
+    }
     if (port.dataset.portDirection === "output") {
       startConnection(state, port);
       return;
     }
     if (!compatibleTarget(state, port)) return;
-    const connection = state.connection;
-    cancelConnection(state);
-    void dotnet.invokeMethodAsync(
-      "ConnectFromCanvasAsync",
-      connection.nodeId,
-      connection.portId,
-      port.dataset.nodeId,
-      port.dataset.portId,
-    );
+    completeConnection(state, port);
   }, true);
   register(state, root, "wheel", (event) => {
-    if (!event.ctrlKey) return;
+    if (!event.ctrlKey || event.deltaY === 0) return;
     event.preventDefault();
-    const viewport = root.getBoundingClientRect();
-    const pointerX = event.clientX - viewport.left;
-    const pointerY = event.clientY - viewport.top;
-    const previousZoom = state.zoom;
-    state.zoom = clamp(previousZoom * (event.deltaY < 0 ? 1.1 : 0.9), 0.5, 1.75);
-    state.panX = pointerX - ((pointerX - state.panX) * state.zoom / previousZoom);
-    state.panY = pointerY - ((pointerY - state.panY) * state.zoom / previousZoom);
-    applyTransform(state);
+    changeZoom(state, event.deltaY < 0 ? 1 : -1, event.clientX, event.clientY);
   }, { passive: false });
   register(state, root, "keydown", (event) => {
     if (event.key === "Escape") {
-      cancelConnection(state);
+      cancelConnectionDrag(state);
+      return;
+    }
+    if (isEditingControl(event.target)) return;
+    if (moveSelectionByKeyboard(state, event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
     if (event.key !== "Delete" && event.key !== "Backspace") return;
-    if (event.target instanceof HTMLInputElement
-      || event.target instanceof HTMLTextAreaElement
-      || event.target instanceof HTMLSelectElement) return;
     event.preventDefault();
+    event.stopPropagation();
     void dotnet.invokeMethodAsync(
       "DeleteSelectionFromCanvasAsync",
       selectionIds(root),
@@ -504,9 +830,10 @@ export function initialize(root, dotnet) {
     );
   });
   register(state, zoomReset, "click", () => {
-    state.zoom = 1;
+    state.zoomIndex = defaultZoomIndex;
     state.panX = 0;
     state.panY = 0;
+    state.zoomTransition = null;
     applyTransform(state);
   });
   register(state, window, "resize", () => routeAll(state));
@@ -521,6 +848,14 @@ export function refresh(root) {
   if (state === undefined) return;
   state.preview = root.querySelector("[data-connection-preview]");
   state.marquee = root.querySelector("[data-automation-marquee]");
+  if (state.drag === null) {
+    for (const node of root.querySelectorAll("[data-automation-node]")) {
+      delete node.dataset.automationGraphX;
+      delete node.dataset.automationGraphY;
+      node.style.removeProperty("left");
+      node.style.removeProperty("top");
+    }
+  }
   cancelConnection(state);
   routeAll(state);
 }

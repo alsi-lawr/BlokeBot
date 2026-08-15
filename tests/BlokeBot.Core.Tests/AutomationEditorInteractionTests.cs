@@ -16,16 +16,17 @@ public sealed class AutomationEditorInteractionTests
         var definition = new CoreAutomationCatalogModule()
             .Definitions.Select(static value => value.Descriptor)
             .Single(static value => value.Id == AutomationDefinitionIds.SendChatAction);
-        var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        var firstNode = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        var secondNode = AutomationEditorNode.Create(definition, new(new(96), new(120)));
         IReadOnlyList<AutomationNodeMoveRequest>? moved = null;
         IReadOnlyList<AutomationNodeId>? deleted = null;
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
             parameters
-                .Add(component => component.Nodes, [node])
+                .Add(component => component.Nodes, [firstNode, secondNode])
                 .Add(component => component.Edges, [])
                 .Add(
                     component => component.SelectedNodeIds,
-                    new HashSet<AutomationNodeId> { node.Id }
+                    new HashSet<AutomationNodeId> { firstNode.Id, secondNode.Id }
                 )
                 .Add(component => component.MoveNodes, requests => moved = requests)
                 .Add(component => component.DeleteNodes, nodeIds => deleted = nodeIds)
@@ -34,10 +35,13 @@ public sealed class AutomationEditorInteractionTests
 
         nodeElement.KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
-        moved.ShouldBe([new AutomationNodeMoveRequest(node.Id, 72, 72)]);
+        moved.ShouldBe([
+            new AutomationNodeMoveRequest(firstNode.Id, 72, 72),
+            new AutomationNodeMoveRequest(secondNode.Id, 120, 120),
+        ]);
 
         nodeElement.KeyDown(new KeyboardEventArgs { Key = "Delete" });
 
-        deleted.ShouldBe([node.Id]);
+        deleted.ShouldBe([firstNode.Id, secondNode.Id]);
     }
 }

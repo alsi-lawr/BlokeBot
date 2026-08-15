@@ -27,6 +27,15 @@ device_scale = 1.0
 width = 1440
 height = 1000
 
+[devices.wide]
+mobile = false
+touch = false
+device_scale = 1.0
+
+[devices.wide.viewport]
+width = 1920
+height = 1080
+
 [devices.phone]
 mobile = true
 touch = true
@@ -79,6 +88,7 @@ end
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local mode = viset.context.axes.mode
+  local device = viset.context.device.name
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=automations&theme=" .. theme)
   viset.page.wait_for(
@@ -108,6 +118,23 @@ local succeeded, failure = pcall(function()
       ]=]),
       "20s"
     )
+    viset.page.evaluate(viset.javascript([=[
+      (() => {
+        const select = [...document.querySelectorAll(".automation-canvas-tools select")]
+          .find((candidate) => [...candidate.options].some((option) => option.value === "Smooth"));
+        select.value = "Smooth";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      })()
+    ]=]))
+    viset.page.wait_for(
+      viset.javascript([=[
+        document.querySelector('[data-automation-canvas-shell][data-edge-style="smooth"]') !== null
+          && [...document.querySelectorAll('[data-automation-edge] .automation-edge')]
+            .every((path) => path.getAttribute("d").includes(" C "))
+      ]=]),
+      "20s"
+    )
   end
   viset.page.evaluate(viset.javascript([=[
     document.querySelector("[data-automation-test-flow]").click();
@@ -119,6 +146,26 @@ local succeeded, failure = pcall(function()
     ]=]),
     "40s"
   )
+  if device == "wide" and mode == "grid" then
+    viset.page.evaluate(viset.javascript([=[
+      (() => {
+        const node = [...document.querySelectorAll("[data-automation-node]")]
+          .find((candidate) => candidate.querySelector("strong")?.textContent.trim() === "Condition");
+        node.click();
+        return true;
+      })()
+    ]=]))
+    viset.page.wait_for(
+      viset.javascript([=[
+        (() => {
+          const inspector = document.querySelector("[data-automation-inspector]");
+          return inspector !== null
+            && inspector.getAnimations().every((animation) => animation.playState === "finished");
+        })()
+      ]=]),
+      "20s"
+    )
+  end
   viset.snapshot()
 end)
 

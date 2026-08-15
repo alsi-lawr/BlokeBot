@@ -51,6 +51,9 @@ public partial class AutomationFlowCanvas
     public EventCallback<AutomationConnectionRequest> Connect { get; set; }
 
     [Parameter]
+    public EventCallback ConnectionRejected { get; set; }
+
+    [Parameter]
     public EventCallback<AutomationFlowCanvasSettings> SettingsChanged { get; set; }
 
     private bool _noNodeSelection => SelectedNodeIds.Count == 0;
@@ -122,6 +125,9 @@ public partial class AutomationFlowCanvas
             new(new(sourceNodeId), new(sourcePortId), new(targetNodeId), new(targetPortId))
         );
 
+    [JSInvokable]
+    public Task RejectConnectionFromCanvasAsync() => ConnectionRejected.InvokeAsync();
+
     private Task SelectNodeAsync(AutomationNodeId nodeId, bool toggle)
     {
         var selected = SelectedNodeIds.ToHashSet();
@@ -168,24 +174,31 @@ public partial class AutomationFlowCanvas
         var ids = SelectedNodeIds.Contains(node.Id)
             ? SelectedNodeIds
             : new HashSet<AutomationNodeId> { node.Id };
-        await MoveNodes.InvokeAsync(MoveRequests(ids, movement.Item1, movement.Item2));
+        await MoveNodes.InvokeAsync(
+            MoveRequestsInDisplayDirection(ids, movement.Item1, movement.Item2)
+        );
     }
 
     private Task NudgeSelectedAsync(int x, int y) =>
-        MoveNodes.InvokeAsync(MoveRequests(SelectedNodeIds, x, y));
+        MoveNodes.InvokeAsync(MoveRequestsInDisplayDirection(SelectedNodeIds, x, y));
 
-    private IReadOnlyList<AutomationNodeMoveRequest> MoveRequests(
+    private IReadOnlyList<AutomationNodeMoveRequest> MoveRequestsInDisplayDirection(
         IEnumerable<AutomationNodeId> ids,
         int x,
         int y
     ) =>
         Nodes
             .Where(node => ids.Contains(node.Id))
-            .Select(node => new AutomationNodeMoveRequest(
-                node.Id,
-                Math.Max(0, node.Position.X.Value + x),
-                Math.Max(0, node.Position.Y.Value + y)
-            ))
+            .Select(node =>
+            {
+                var display = DisplayPosition(node.Position, Settings.Orientation);
+                var moved = new AutomationCanvasPosition(
+                    new(Math.Max(0, display.X.Value + x)),
+                    new(Math.Max(0, display.Y.Value + y))
+                );
+                var position = DisplayPosition(moved, Settings.Orientation);
+                return new AutomationNodeMoveRequest(node.Id, position.X.Value, position.Y.Value);
+            })
             .ToArray();
 
     private Task ChangeOrientationAsync(ChangeEventArgs args) =>

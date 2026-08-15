@@ -2094,7 +2094,7 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Search the Node library. Add one or more triggers, then add controls and actions.",
-                        "Select a node to edit its typed fields. Connect an output to a compatible input.",
+                        "Select a node to open its inspector from the right. Drag an output port to a compatible input port or node.",
                         "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use the canvas controls to set the flow direction and connection style.",
                         "Use Ctrl and the mouse wheel to zoom. Drag the background to move the canvas. Hold Alt and drag to select nodes.",
                         "Save the draft. Validate it, and fix each disconnected node, invalid input, cycle, missing reference, or unavailable channel tool.",

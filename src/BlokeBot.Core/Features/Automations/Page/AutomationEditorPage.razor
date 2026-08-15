@@ -170,6 +170,7 @@
                                                   DeleteNodes="DeleteNodes"
                                                   DeleteEdge="DeleteEdge"
                                                   Connect="ConnectNodes"
+                                                  ConnectionRejected="RejectConnection"
                                                   SettingsChanged="ChangeCanvasSettings" />
                         }
                         else
@@ -184,16 +185,19 @@
                         }
                     </div>
 
-                    <AutomationNodeInspector Node="_selectedNode"
-                                             Nodes="_editor.Nodes"
-                                             Edges="_editor.Edges"
-                                             Errors="_validationErrors"
-                                             ReferenceChoices="_referenceChoices"
-                                             Changed="EditorChanged"
-                                             ClearSelection="ClearSelection"
-                                             Connect="ConnectNodes"
-                                             DeleteEdge="DeleteEdge"
-                                             DeleteNode="DeleteNode" />
+                    @if (_selectedNode is not null)
+                    {
+                        <AutomationNodeInspector Node="_selectedNode"
+                                                 Nodes="_editor.Nodes"
+                                                 Edges="_editor.Edges"
+                                                 Errors="_validationErrors"
+                                                 ReferenceChoices="_referenceChoices"
+                                                 Changed="EditorChanged"
+                                                 ClearSelection="ClearSelection"
+                                                 Connect="ConnectNodes"
+                                                 DeleteEdge="DeleteEdge"
+                                                 DeleteNode="DeleteNode" />
+                    }
                 </div>
 
                 <footer class="automation-run-drawer" data-automation-run-kind="@(_sampleOutcomes.IsEmpty ? "history" : "sample")">
