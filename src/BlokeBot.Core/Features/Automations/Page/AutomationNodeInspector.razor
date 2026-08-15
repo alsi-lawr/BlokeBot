@@ -10,19 +10,22 @@ else
 {
     <aside class="automation-inspector" aria-label="Node inspector: @Node.EffectiveName" data-automation-inspector="@Node.Id.Value">
         <header class="automation-inspector-header">
-            <div>
-                <p class="automation-inspector-eyebrow">Selected @KindLabel(Node.Definition.Kind)</p>
-                <input id="automation-node-display-alias"
-                       class="automation-inspector-title"
-                       type="text"
-                       aria-label="Node name"
-                       maxlength="@AutomationFlowSchema.NodeDisplayAliasMaximumLength"
-                       value="@Node.DisplayAlias"
-                       placeholder="@Node.Definition.Display.Name"
-                       title="Edit node name"
-                       @oninput="args => SetDisplayAliasAsync(args.Value)" />
+            <div class="automation-inspector-identity">
+                <AutomationNodeIcon DefinitionId="Node.Definition.Id" />
+                <div>
+                    <p class="automation-inspector-eyebrow">Selected @KindLabel(Node.Definition.Kind)</p>
+                    <input id="automation-node-display-alias"
+                           class="automation-inspector-title"
+                           type="text"
+                           aria-label="Node name"
+                           maxlength="@AutomationFlowSchema.NodeDisplayAliasMaximumLength"
+                           value="@Node.DisplayAlias"
+                           placeholder="@Node.Definition.Display.Name"
+                           title="Edit node name"
+                           @oninput="args => SetDisplayAliasAsync(args.Value)" />
+                </div>
             </div>
-            <button class="automation-icon-button" type="button" aria-label="Close inspector" @onclick="ClearSelection">&times;</button>
+            <button class="automation-icon-button" type="button" aria-label="Close inspector" title="Close inspector" @onclick="ClearSelection"><AutomationIcon Name="close" /></button>
         </header>
 
         @foreach (var field in Node.Definition.Configuration)
@@ -132,9 +135,10 @@ else
                 }
                 @foreach (var edge in Edges.Where(edge => edge.SourceNodeId == Node.Id))
                 {
+                    var target = Nodes.Single(node => node.Id == edge.TargetNodeId);
                     <div class="automation-connected-row" @key="edge.Id">
-                        <span>@PortLabel(edge.SourcePortId) → @NodeLabel(edge.TargetNodeId)</span>
-                        <button type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)">Remove</button>
+                        <span><AutomationNodeIcon DefinitionId="target.Definition.Id" />@PortLabel(edge.SourcePortId) → @target.EffectiveName</span>
+                        <button type="button" @onclick="() => DeleteEdge.InvokeAsync(edge.Id)"><AutomationIcon Name="remove" />Remove</button>
                     </div>
                 }
             </section>
@@ -152,8 +156,8 @@ else
         }
 
         <footer class="automation-inspector-footer">
-            <button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)">Delete node</button>
-            <button class="btn-primary" type="button" @onclick="ChangedAsync">Apply</button>
+            <button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)"><AutomationIcon Name="delete" />Delete node</button>
+            <button class="btn-primary" type="button" @onclick="ChangedAsync"><AutomationIcon Name="apply" />Apply</button>
         </footer>
     </aside>
 }

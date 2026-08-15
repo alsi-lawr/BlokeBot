@@ -13,6 +13,22 @@
     min-width: 2.5rem;
 }
 
+.automation-page-actions button,
+.automation-empty button,
+.automation-editor-actions button,
+.automation-flow-rail-actions button,
+.automation-run-actions button,
+.automation-dirty-dialog-actions button,
+.automation-inspector-footer button,
+.automation-connected-row button,
+.automation-order-state button,
+.automation-restore-tab {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.35rem;
+    justify-content: center;
+}
+
 .automation-empty {
     align-items: center;
     display: flex;
@@ -137,19 +153,35 @@
 }
 
 .automation-mode-switch button {
+    align-items: center;
     background: transparent;
-    border: 0;
+    border: 1px solid transparent;
     border-radius: 0.42rem;
     color: var(--app-text-muted);
     cursor: pointer;
+    display: inline-flex;
     font-size: 0.75rem;
     font-weight: 800;
+    gap: 0.35rem;
+    justify-content: center;
     min-height: 2rem;
     padding-inline: 0.85rem;
 }
 
-.automation-mode-switch button[aria-pressed="true"] {
+.automation-mode-switch button:hover {
     background: var(--app-control-hover);
+    color: var(--app-text-strong);
+}
+
+.automation-mode-switch button:focus-visible {
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 0;
+}
+
+.automation-mode-switch button[aria-selected="true"] {
+    background: var(--app-surface-solid);
+    border-color: var(--app-control-hover-border);
     color: var(--app-text-strong);
     box-shadow: var(--app-shadow-sm);
 }
@@ -187,6 +219,7 @@
     color: var(--app-text-strong);
     cursor: pointer;
     display: inline-flex;
+    gap: 0.35rem;
     font-size: 0.78rem;
     font-weight: 800;
     min-height: 2.4rem;
@@ -236,6 +269,24 @@
     display: inline-flex;
     font-size: 1.25rem;
     justify-content: center;
+    height: 2rem;
+    width: 2rem;
+}
+
+.automation-node-library-panel > header button:hover,
+.automation-flow-rail-heading button:hover,
+.automation-icon-button:hover {
+    background: var(--app-control-hover);
+    color: var(--app-text-strong);
+}
+
+.automation-node-library-panel > header button:focus-visible,
+.automation-flow-rail-heading button:focus-visible,
+.automation-icon-button:focus-visible,
+.automation-canvas-tool-group button:focus-visible {
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 1px solid var(--tone-blue-solid);
+    outline-offset: 1px;
 }
 
 .automation-node-library-panel > header span,
@@ -276,6 +327,19 @@
 .automation-node-library-panel section button small {
     color: var(--app-text-muted);
     grid-column: 1 / -1;
+}
+
+.automation-library-node-title {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.automation-library-node-title strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .automation-node-search {
@@ -365,10 +429,13 @@
 }
 
 .automation-enable-warning button {
+    align-items: center;
     background: transparent;
     border: 0;
     color: inherit;
     cursor: pointer;
+    display: inline-flex;
+    gap: 0.3rem;
     font-weight: 800;
 }
 
@@ -559,8 +626,11 @@
 }
 
 .automation-canvas-tools label span {
+    align-items: center;
+    display: inline-flex;
     font-size: 0.62rem;
     font-weight: 800;
+    gap: 0.28rem;
     text-transform: uppercase;
 }
 
@@ -573,6 +643,12 @@
     font-size: 0.68rem;
     min-height: 1.9rem;
     padding: 0.3rem 0.5rem;
+}
+
+.automation-canvas-tools > button {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.3rem;
 }
 
 .automation-canvas-tool-group {
@@ -792,9 +868,18 @@
     display: block;
 }
 
-.automation-node strong {
+.automation-node-title {
+    align-items: center;
+    display: flex;
+    gap: 0.38rem;
+    min-width: 0;
+}
+
+.automation-node-title strong {
+    flex: 1;
     font-size: 0.8rem;
     margin-bottom: 0.28rem;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -913,6 +998,22 @@
     display: flex;
     justify-content: space-between;
     padding-bottom: 0.85rem;
+}
+
+.automation-inspector-identity {
+    align-items: center;
+    display: flex;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.automation-inspector-identity > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.automation-inspector-identity .automation-inspector-title {
+    max-width: 100%;
 }
 
 .automation-inspector-eyebrow {
@@ -1053,6 +1154,13 @@
     font-weight: 800;
 }
 
+.automation-connected-row > span {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
 .automation-danger-button {
     background: var(--tone-red-bg);
     border: 1px solid var(--tone-red-ring);
@@ -1063,6 +1171,25 @@
     font-weight: 900;
     min-height: 2.35rem;
     padding: 0.45rem 0.7rem;
+}
+
+.automation-danger-button:focus-visible {
+    box-shadow: 0 0 0 3px var(--tone-red-ring);
+    outline: 1px solid var(--tone-red-solid);
+    outline-offset: 1px;
+}
+
+.automation-node-library-button:focus-visible,
+.automation-focus-action:focus-visible,
+.automation-restore-tab:focus-visible,
+.automation-canvas-tools > button:focus-visible,
+.automation-connected-row button:focus-visible,
+.automation-order-state button:focus-visible,
+.automation-enable-warning button:focus-visible,
+.automation-port:focus-visible {
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 1px solid var(--tone-blue-solid);
+    outline-offset: 1px;
 }
 
 .automation-position-controls {
@@ -1147,6 +1274,11 @@
     text-align: left;
 }
 
+.automation-order-select > .automation-node-icon {
+    height: 1.5rem;
+    width: 1.5rem;
+}
+
 .automation-order-number {
     align-items: center;
     background: var(--app-surface-muted);
@@ -1224,6 +1356,20 @@
     display: block;
     height: 1.05rem;
     width: 1.05rem;
+}
+
+.automation-node-icon {
+    color: var(--tone-blue-fg);
+    display: block;
+    flex: none;
+    height: 1.2rem;
+    width: 1.2rem;
+}
+
+.automation-library-node-title .automation-node-icon,
+.automation-inspector-identity > .automation-node-icon {
+    height: 1.65rem;
+    width: 1.65rem;
 }
 
 .automation-focus-controls {
@@ -1559,12 +1705,20 @@
     }
 
     .automation-inspector {
-        bottom: auto;
-        border-radius: 0.8rem 0 0;
-        height: min(34rem, calc(100dvh - 1rem));
+        background: var(--app-surface-solid);
+        border: 1px solid var(--app-border);
+        border-bottom: 0;
+        border-radius: 1rem 1rem 0 0;
+        bottom: 0;
+        height: min(75dvh, 38rem);
+        left: 0;
         max-height: none;
-        max-width: calc(100% - 0.75rem);
-        width: 22rem;
+        max-width: none;
+        position: fixed;
+        right: 0;
+        top: auto;
+        width: 100%;
+        z-index: 460;
     }
 
     .automation-run-drawer {

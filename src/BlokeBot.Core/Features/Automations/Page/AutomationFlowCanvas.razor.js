@@ -72,7 +72,7 @@ function applyTransform(state) {
   state.root.style.setProperty("--automation-grid-y", `${state.panY}px`);
   state.root.style.setProperty("--automation-grid-step", `${gridSize * step.scale}px`);
   state.root.style.setProperty("--automation-grid-dot", `${1.1 * step.scale}px`);
-  state.zoomReset.textContent = step.label;
+  state.zoomResetLabel.textContent = step.label;
   savedViewports.set(state.viewportKey, {
     zoomIndex: state.zoomIndex,
     panX: state.panX,
@@ -1541,11 +1541,13 @@ export function initialize(root, dotnet) {
   const preview = root.querySelector("[data-connection-preview]");
   const marquee = root.querySelector("[data-automation-marquee]");
   const zoomReset = shell?.querySelector("[data-canvas-zoom-reset]");
+  const zoomResetLabel = zoomReset?.querySelector("[data-canvas-zoom-label]");
   if (!(shell instanceof HTMLElement)
     || !(stage instanceof HTMLElement)
     || !(preview instanceof SVGPathElement)
     || !(marquee instanceof HTMLElement)
-    || !(zoomReset instanceof HTMLButtonElement)) return;
+    || !(zoomReset instanceof HTMLButtonElement)
+    || !(zoomResetLabel instanceof HTMLElement)) return;
 
   const state = {
     root,
@@ -1554,6 +1556,7 @@ export function initialize(root, dotnet) {
     preview,
     marquee,
     zoomReset,
+    zoomResetLabel,
     dotnet,
     viewportKey: shell.dataset.viewportKey ?? "",
     zoomIndex: defaultZoomIndex,

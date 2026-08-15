@@ -32,7 +32,7 @@
         <PageState Kind="PageStateKind.Failure"
                    Title="BlokeBot cannot load automations"
                    Description="Your saved flows and run history did not change.">
-            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button></Actions>
+            <Actions><button class="btn-primary" type="button" @onclick="LoadAsync"><AutomationIcon Name="history" />Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
@@ -58,7 +58,7 @@
     else
     {
         <div class="automation-page-actions">
-            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync">+ New flow</button>
+            <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />New flow</button>
         </div>
 
         @if (_flowRecoveryMessage is not null)
@@ -75,7 +75,7 @@
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
                 <p>Add a trigger. Then, connect an action and validate the flow.</p>
-                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync">Create flow</button>
+                <button class="btn-primary" type="button" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" />Create flow</button>
             </section>
         }
         else
@@ -93,24 +93,24 @@
                         <span>@_flowSubtitle</span>
                     </div>
                     <div class="automation-editor-actions">
-                        <div class="automation-mode-switch" role="group" aria-label="Editor view">
-                            <button type="button" data-automation-mode="grid" aria-pressed="@(_mode == AutomationEditorMode.Grid)" @onclick="() => SetMode(AutomationEditorMode.Grid)">Grid</button>
-                            <button type="button" data-automation-mode="list" aria-pressed="@(_mode == AutomationEditorMode.List)" @onclick="() => SetMode(AutomationEditorMode.List)">List</button>
+                        <div class="automation-mode-switch" role="tablist" aria-label="Editor view">
+                            <button type="button" role="tab" data-automation-mode="grid" aria-selected="@(_mode == AutomationEditorMode.Grid ? "true" : "false")" @onclick="() => SetMode(AutomationEditorMode.Grid)"><AutomationIcon Name="grid" />Grid</button>
+                            <button type="button" role="tab" data-automation-mode="list" aria-selected="@(_mode == AutomationEditorMode.List ? "true" : "false")" @onclick="() => SetMode(AutomationEditorMode.List)"><AutomationIcon Name="list" />List</button>
                         </div>
                         <span class="@_validationClass" role="status">@_validationLabel</span>
-                        <button class="automation-node-library-button" type="button" aria-expanded="@_nodeLibraryOpen" @onclick="ToggleNodeLibrary">+ Node</button>
-                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync">Validate</button>
-                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync">Test flow</button>
-                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync">Save</button>
+                        <button class="automation-node-library-button" type="button" aria-expanded="@_nodeLibraryOpen" @onclick="ToggleNodeLibrary"><AutomationIcon Name="node" />Node</button>
+                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync"><AutomationIcon Name="validate" />Validate</button>
+                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync"><AutomationIcon Name="test" />Test flow</button>
+                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync"><AutomationIcon Name="save" />Save</button>
                         @if (_focusMode)
                         {
-                            <button class="automation-focus-action" type="button" @onclick="ToggleEditorTools">Hide tools</button>
+                            <button class="automation-focus-action" type="button" @onclick="ToggleEditorTools"><AutomationIcon Name="hide" />Hide tools</button>
                         }
                         <button class="@(_editor.IsEnabled ? "btn-secondary" : "btn-primary")"
                                 type="button"
                                 disabled="@(_busy || _editor.Id is null || _hasChanges)"
                                 title="@(_hasChanges ? "Save the flow before you change its state." : null)"
-                                @onclick="ToggleEnabledAsync">@(_editor.IsEnabled ? "Disable" : _enableConfirmation ? "Enable anyway" : "Enable")</button>
+                                @onclick="ToggleEnabledAsync"><AutomationIcon Name="power" />@(_editor.IsEnabled ? "Disable" : _enableConfirmation ? "Enable anyway" : "Enable")</button>
                     </div>
                 </header>
                 }
@@ -152,7 +152,7 @@
                                 <strong>This flow can affect your live channel</strong>
                                 <span>@_impactWarning</span>
                             </div>
-                            <button type="button" @onclick="CancelEnable">Cancel</button>
+                            <button type="button" @onclick="CancelEnable"><AutomationIcon Name="cancel" />Cancel</button>
                         </div>
                     }
                 </div>
@@ -166,9 +166,9 @@
                             <span>
                                 @if (_focusMode)
                                 {
-                                    <button type="button" aria-label="Hide flow list" @onclick="ToggleFlowRail">‹</button>
+                                    <button type="button" aria-label="Hide flow list" title="Hide flow list" @onclick="ToggleFlowRail"><AutomationIcon Name="collapse-left" /></button>
                                 }
-                                <button type="button" aria-label="New flow" @onclick="RequestNewFlowAsync">+</button>
+                                <button type="button" aria-label="New flow" title="New flow" @onclick="RequestNewFlowAsync"><AutomationIcon Name="add" /></button>
                             </span>
                         </div>
                         @foreach (var flow in _flowSnapshots)
@@ -191,8 +191,8 @@
                         @if (_editor.Id is not null)
                         {
                             <div class="automation-flow-rail-actions">
-                                <button class="btn-secondary" type="button" @onclick="RequestDuplicateAsync">Duplicate</button>
-                                <button class="automation-danger-button" type="button" @onclick="RequestDelete">@(_deleteConfirmation ? "Confirm delete" : "Delete")</button>
+                                <button class="btn-secondary" type="button" @onclick="RequestDuplicateAsync"><AutomationIcon Name="duplicate" />Duplicate</button>
+                                <button class="automation-danger-button" type="button" @onclick="RequestDelete"><AutomationIcon Name="delete" />@(_deleteConfirmation ? "Confirm delete" : "Delete")</button>
                             </div>
                         }
                         <p>Flows use the selected channel. Duplicating copies the graph, not run history.</p>
@@ -257,10 +257,10 @@
                     <div class="automation-run-actions">
                         @if (_focusMode)
                         {
-                            <button class="btn-secondary" type="button" @onclick="ToggleRunDrawer">Hide runs</button>
+                            <button class="btn-secondary" type="button" @onclick="ToggleRunDrawer"><AutomationIcon Name="hide" />Hide runs</button>
                         }
-                        <button class="btn-secondary" type="button" disabled="@(_recentRuns.Length == 0)" @onclick="ShowRunDetails">Run details</button>
-                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" @onclick="RunSampleAsync">Test again</button>
+                        <button class="btn-secondary" type="button" disabled="@(_recentRuns.Length == 0)" @onclick="ShowRunDetails"><AutomationIcon Name="history" />Run details</button>
+                        <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" @onclick="RunSampleAsync"><AutomationIcon Name="test" />Test again</button>
                     </div>
                 </footer>
                 }
@@ -269,15 +269,15 @@
                 {
                     @if (_flowRailCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail">Flows</button>
+                        <button class="automation-restore-tab automation-restore-tab--flows" type="button" @onclick="ToggleFlowRail"><AutomationIcon Name="flow-list" />Flows</button>
                     }
                     @if (_editorToolsCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools">Tools</button>
+                        <button class="automation-restore-tab automation-restore-tab--tools" type="button" @onclick="ToggleEditorTools"><AutomationIcon Name="tools" />Tools</button>
                     }
                     @if (_runDrawerCollapsed)
                     {
-                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer">Runs</button>
+                        <button class="automation-restore-tab automation-restore-tab--runs" type="button" @onclick="ToggleRunDrawer"><AutomationIcon Name="history" />Runs</button>
                     }
                 }
             </section>
@@ -296,7 +296,7 @@
                             <strong id="automation-node-library-title">Node library</strong>
                             <span>@(_editor.Nodes.Count == 0 ? "Select a trigger." : "Select a node.")</span>
                         </div>
-                        <button type="button" aria-label="Close the node library" @onclick="CloseNodeLibrary">×</button>
+                        <button type="button" aria-label="Close the node library" title="Close the node library" @onclick="CloseNodeLibrary"><AutomationIcon Name="close" /></button>
                     </header>
                     <label class="automation-node-search">
                         <span>Search nodes</span>
@@ -311,9 +311,9 @@
                                 <button type="button"
                                         disabled="@(!DefinitionIsAvailable(definition))"
                                         title="@DefinitionUnavailableReason(definition)"
-                                        @onclick="() => AddNode(definition)">
+                                    @onclick="() => AddNode(definition)">
                                     <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
-                                    <strong>@definition.Display.Name</strong>
+                                    <span class="automation-library-node-title"><AutomationNodeIcon DefinitionId="definition.Id" /><strong>@definition.Display.Name</strong></span>
                                     <small>@DefinitionLibraryHelp(definition)</small>
                                 </button>
                             }
@@ -340,9 +340,9 @@
             <h2 id="automation-dirty-dialog-title">Are you sure?</h2>
             <p>This flow has unsaved changes. Save the flow, discard the changes, or stay on this flow.</p>
             <div class="automation-dirty-dialog-actions">
-                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelDirtyTransition">Cancel</button>
-                <button class="automation-danger-button" type="button" disabled="@_busy" @onclick="DiscardDirtyTransitionAsync">Discard</button>
-                <button class="btn-primary" type="button" disabled="@_busy" autofocus @onclick="SaveDirtyTransitionAsync">Save</button>
+                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelDirtyTransition"><AutomationIcon Name="cancel" />Cancel</button>
+                <button class="automation-danger-button" type="button" disabled="@_busy" @onclick="DiscardDirtyTransitionAsync"><AutomationIcon Name="delete" />Discard</button>
+                <button class="btn-primary" type="button" disabled="@_busy" autofocus @onclick="SaveDirtyTransitionAsync"><AutomationIcon Name="save" />Save</button>
             </div>
         </section>
     </div>

@@ -25,6 +25,7 @@
                             aria-pressed="@(item.Node.Id == SelectedNodeId ? "true" : "false")"
                             @onclick="() => SelectNode.InvokeAsync(item.Node.Id)">
                         <span class="automation-order-number">@(item.Index + 1)</span>
+                        <AutomationNodeIcon DefinitionId="item.Node.Definition.Id" />
                         <span>
                             <strong>@item.Node.EffectiveName</strong>
                             <small>@KindLabel(item.Node.Definition.Kind) · @ConnectionLabel(item.Node.Id)</small>
@@ -43,7 +44,7 @@
                         {
                             <span>Ready</span>
                         }
-                        <button type="button" aria-label="Delete @item.Node.EffectiveName" @onclick="() => DeleteNode.InvokeAsync(item.Node.Id)">Delete</button>
+                        <button type="button" aria-label="Delete @item.Node.EffectiveName" @onclick="() => DeleteNode.InvokeAsync(item.Node.Id)"><AutomationIcon Name="delete" />Delete</button>
                     </div>
                 </li>
             }

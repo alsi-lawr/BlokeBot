@@ -112,9 +112,6 @@ public partial class AutomationNodeInspector
             _ => [],
         };
 
-    private string NodeLabel(AutomationNodeId nodeId) =>
-        Nodes.Single(node => node.Id == nodeId).EffectiveName;
-
     private string PortLabel(AutomationPortId portId) =>
         Node?.Definition.Outputs.Single(port => port.Id == portId).Name ?? portId.Value;
 

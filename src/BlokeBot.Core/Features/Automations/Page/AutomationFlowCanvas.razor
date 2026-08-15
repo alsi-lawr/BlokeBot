@@ -9,26 +9,26 @@
      data-edge-style="@EdgeStyleToken(Settings.EdgeStyle)">
     <div class="automation-canvas-tools" role="toolbar" aria-label="Canvas controls">
         <div class="automation-canvas-tool-group" role="group" aria-label="Move selected nodes">
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)">←</button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)">↑</button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)">↓</button>
-            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)">→</button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" title="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)"><AutomationIcon Name="arrow-left" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" title="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)"><AutomationIcon Name="arrow-up" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" title="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)"><AutomationIcon Name="arrow-down" /></button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" title="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)"><AutomationIcon Name="arrow-right" /></button>
         </div>
         <label>
-            <span>Flow direction</span>
+            <span><AutomationIcon Name="direction" />Flow direction</span>
             <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
                 <option value="@AutomationFlowOrientation.Horizontal">Horizontal</option>
                 <option value="@AutomationFlowOrientation.Vertical">Vertical</option>
             </select>
         </label>
         <label>
-            <span>Connection style</span>
+            <span><AutomationIcon Name="tools" />Connection style</span>
             <select value="@Settings.EdgeStyle" @onchange="ChangeEdgeStyleAsync">
                 <option value="@AutomationEdgeStyle.Angular">Angular</option>
                 <option value="@AutomationEdgeStyle.Smooth">Smooth</option>
             </select>
         </label>
-        <button type="button" data-canvas-zoom-reset>100%</button>
+        <button type="button" data-canvas-zoom-reset><AutomationIcon Name="zoom-reset" /><span data-canvas-zoom-label>100%</span></button>
     </div>
 
     <div class="automation-canvas-viewport"
@@ -86,7 +86,7 @@
                             @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
-                        <strong title="@node.EffectiveName">@node.EffectiveName</strong>
+                        <span class="automation-node-title"><AutomationNodeIcon DefinitionId="node.Definition.Id" /><strong title="@node.EffectiveName">@node.EffectiveName</strong></span>
                         <span class="automation-node-description">@NodeSummary(node)</span>
                         @if (outcome is not null)
                         {
