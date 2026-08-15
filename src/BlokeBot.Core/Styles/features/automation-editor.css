@@ -493,6 +493,27 @@
     padding: 0.45rem;
 }
 
+.automation-flow-rail-actions .btn-secondary {
+    background: var(--app-control-bg);
+    border-color: var(--app-control-border);
+    color: var(--app-text-medium);
+    height: auto;
+}
+
+.automation-flow-rail-actions .btn-secondary:hover {
+    background: var(--app-control-hover);
+    border-color: var(--app-control-hover-border);
+    color: var(--app-text-strong);
+    transform: translateY(-1px);
+}
+
+.automation-flow-rail-actions .automation-danger-button {
+    background: var(--tone-red-bg);
+    border-color: var(--tone-red-ring);
+    color: var(--tone-red-fg);
+    min-height: 2.35rem;
+}
+
 .automation-flow-rail > p {
     color: var(--app-text-muted);
     font-size: 0.68rem;
@@ -569,6 +590,13 @@
 
 .automation-canvas-viewport {
     background-color: var(--app-background);
+    background-image: radial-gradient(
+        circle,
+        color-mix(in srgb, var(--app-text-muted) 34%, transparent) var(--automation-grid-dot, 1.1px),
+        transparent var(--automation-grid-dot, 1.1px)
+    );
+    background-position: var(--automation-grid-x, 0) var(--automation-grid-y, 0);
+    background-size: var(--automation-grid-step, 24px) var(--automation-grid-step, 24px);
     cursor: grab;
     height: 100%;
     min-height: 0;
@@ -592,9 +620,6 @@
 }
 
 .automation-canvas-stage {
-    background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text-muted) 34%, transparent) 1.1px, transparent 1.1px);
-    background-position: 0 0;
-    background-size: 24px 24px;
     height: 100%;
     position: relative;
     transform-origin: 0 0;
@@ -647,13 +672,20 @@
 }
 
 .automation-edge-label {
+    pointer-events: none;
+}
+
+.automation-edge-label rect {
+    fill: var(--app-surface-solid);
+    stroke: currentColor;
+    stroke-width: 1px;
+}
+
+.automation-edge-label text {
     fill: currentColor;
     font-size: 11px;
     font-weight: 900;
-    paint-order: stroke;
     pointer-events: none;
-    stroke: var(--app-background);
-    stroke-width: 4px;
 }
 
 .automation-edge--preview {

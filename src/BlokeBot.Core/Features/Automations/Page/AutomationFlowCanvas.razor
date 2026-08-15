@@ -56,7 +56,10 @@
                         <path class="automation-edge" d="" />
                         @if (BranchLabel(edge) is { } label)
                         {
-                            <svg:text class="automation-edge-label"><tspan>@label</tspan></svg:text>
+                            <svg:g class="automation-edge-label" data-edge-label style="display:none">
+                                <svg:rect x="-19" y="-11" width="38" height="22" rx="11" />
+                                <svg:text text-anchor="middle" dominant-baseline="central"><tspan>@label</tspan></svg:text>
+                            </svg:g>
                         }
                     </g>
                 }
