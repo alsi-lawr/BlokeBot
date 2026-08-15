@@ -196,7 +196,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                     new(
                         new("message"),
                         "Message",
-                        "The chat message, including any automation variables.",
+                        "The chat message can contain automation variables.",
                         new AutomationConfigurationFieldType.Text(500, true),
                         true
                     ),
@@ -296,7 +296,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Control,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Delay", "Waits before continuing the automation.", "Control"),
+                new("Delay", "Waits before the next node.", "Control"),
                 [_flowInput],
                 [_completeOutput],
                 [
@@ -373,7 +373,7 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ),
             { Length: > 500 } => AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Field(new("message")),
-                "Chat messages cannot exceed 500 characters."
+                "Use 500 characters or fewer in the chat message."
             ),
             _ => AutomationValidationResult.Valid,
         };

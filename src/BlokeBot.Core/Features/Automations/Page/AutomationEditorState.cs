@@ -10,6 +10,7 @@ internal sealed class AutomationEditorState
         AutomationFlowId? id,
         string name,
         bool isEnabled,
+        AutomationFlowCanvasSettings canvas,
         IEnumerable<AutomationEditorNode> nodes,
         IEnumerable<AutomationFlowDraftEdge> edges
     )
@@ -17,6 +18,7 @@ internal sealed class AutomationEditorState
         Id = id;
         Name = name;
         IsEnabled = isEnabled;
+        Canvas = canvas;
         Nodes.AddRange(nodes);
         Edges.AddRange(edges);
     }
@@ -27,11 +29,14 @@ internal sealed class AutomationEditorState
 
     internal bool IsEnabled { get; set; }
 
+    internal AutomationFlowCanvasSettings Canvas { get; set; }
+
     internal List<AutomationEditorNode> Nodes { get; } = [];
 
     internal List<AutomationFlowDraftEdge> Edges { get; } = [];
 
-    internal static AutomationEditorState Create(string name) => new(null, name, false, [], []);
+    internal static AutomationEditorState Create(string name) =>
+        new(null, name, false, default, [], []);
 
     internal static AutomationEditorState Restore(
         AutomationFlowSnapshot snapshot,
@@ -41,6 +46,7 @@ internal sealed class AutomationEditorState
             snapshot.Draft.Id,
             snapshot.Draft.Name,
             snapshot.Draft.IsEnabled,
+            snapshot.Draft.Canvas,
             snapshot.Draft.Nodes.Select(node =>
                 AutomationEditorNode.Restore(node, definitions[new(node.Definition.TypeId)])
             ),
@@ -55,7 +61,8 @@ internal sealed class AutomationEditorState
             AutomationFlowSchema.CurrentVersion,
             IsEnabled,
             Nodes.Select(static node => node.Draft()).ToImmutableArray(),
-            Edges.ToImmutableArray()
+            Edges.ToImmutableArray(),
+            Canvas
         );
 
     internal AutomationEditorNode AddNode(AutomationDefinitionDescriptor definition)

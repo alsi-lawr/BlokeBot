@@ -1095,29 +1095,45 @@ public partial class PageHelpButton
         "Visual automations",
         [
             new(
-                "Build a typed flow",
-                "Add one event source, connect compatible flow ports, and configure each node in the inspector.",
+                "Build a flow",
+                "A flow starts from one or more triggers. Each trigger starts a separate run.",
                 [
-                    "Grid view snaps nodes to a 24-pixel grid. Drag a node or use its arrow keys to move it.",
-                    "List view exposes the same nodes, order, validation, and inspector without the canvas.",
-                    "Only matching typed ports can be selected. Cycles, joins, disconnected nodes, and unavailable capabilities are reported before enablement.",
+                    "Select Node to open the node library.",
+                    "Search for a node by its name or category.",
+                    "Connect an output port to a compatible input port.",
+                    "Select a node to edit its fields in the inspector.",
+                    "Use List view to edit the same flow without the canvas.",
+                ]
+            ),
+            new(
+                "Use the canvas",
+                "The canvas uses a 24-pixel grid. It supports horizontal and vertical flow directions.",
+                [
+                    "Drag the background to move the canvas.",
+                    "Press Ctrl and use the mouse wheel to zoom.",
+                    "Press Alt and drag to select nodes.",
+                    "Press Shift and select a node to change the node selection.",
+                    "Select a connection to delete it.",
                 ]
             ),
             new(
                 "Validate and test",
-                "Save a valid draft, then test it with a representative event before enabling it.",
+                "A sample run shows node results. It does not send actions to Twitch or the live channel.",
                 [
-                    "A sample run evaluates conditions and shows node outcomes without sending chat, changing points, playing overlays, or calling Twitch.",
-                    "Enabling a flow with public or provider effects requires an explicit warning confirmation.",
-                    "Recent live run outcomes identify the node that failed.",
+                    "Validate the flow before you save or enable it.",
+                    "Correct each red node or field.",
+                    "Test the flow with a sample event.",
+                    "Read the run summary to find a failed node.",
+                    "Confirm the warning before you enable actions with public effects.",
                 ]
             ),
             new(
-                "Turning this tool on or off",
-                "Automations are opt-in per channel in Channel setup.",
+                "Turn Automations on or off",
+                "Use the Automations switch in Channel setup.",
                 [
-                    "While off, the editor, catalog, validation, sample runs, triggers, queued work, and actions are blocked.",
-                    "Saved flows and run history remain. Turning Automations back on does not replay suppressed work.",
+                    "When Automations is off, BlokeBot blocks flow edits, tests, triggers, and actions.",
+                    "Saved flows and run history remain.",
+                    "BlokeBot does not replay events that it blocked while Automations was off.",
                 ]
             ),
         ]

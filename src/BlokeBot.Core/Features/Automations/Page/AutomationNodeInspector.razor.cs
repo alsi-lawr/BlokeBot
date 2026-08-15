@@ -38,9 +38,6 @@ public partial class AutomationNodeInspector
     [Parameter]
     public EventCallback<AutomationNodeId> DeleteNode { get; set; }
 
-    [Parameter]
-    public EventCallback<AutomationNodeMoveRequest> MoveNode { get; set; }
-
     private Task ChangedAsync() => Changed.InvokeAsync();
 
     private async Task SetValueAsync(AutomationConfigurationFieldId fieldId, object? value)
@@ -61,16 +58,20 @@ public partial class AutomationNodeInspector
         await Connect.InvokeAsync(new(Node.Id, output.Id, target.Id, input.Id));
     }
 
-    private Task NudgeAsync(int x, int y) =>
+    private IReadOnlyList<AutomationGraphError> _genericErrors =>
         Node is null
-            ? Task.CompletedTask
-            : MoveNode.InvokeAsync(
-                new(
-                    Node.Id,
-                    Math.Max(0, Node.Position.X.Value + x),
-                    Math.Max(0, Node.Position.Y.Value + y)
-                )
-            );
+            ? []
+            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId is null).ToArray();
+
+    private IReadOnlyList<AutomationGraphError> FieldErrors(
+        AutomationConfigurationFieldId fieldId
+    ) =>
+        Node is null
+            ? []
+            : Errors.Where(error => error.NodeId == Node.Id && error.FieldId == fieldId).ToArray();
+
+    private static string FieldHelp(AutomationConfigurationFieldMetadata field) =>
+        field.Description;
 
     private IReadOnlyList<AutomationEditorNode> CompatibleTargets(AutomationPortMetadata output) =>
         Nodes

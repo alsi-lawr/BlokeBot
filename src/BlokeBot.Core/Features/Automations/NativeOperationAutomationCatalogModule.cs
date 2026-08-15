@@ -220,7 +220,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 [],
                 [
                     FlowPort(),
-                    ActorPort("Shouting channel", "The broadcaster who sent the shoutout."),
+                    ActorPort("Source channel", "The broadcaster who sent the shoutout."),
                     ChannelPort(),
                     EventTimePort(),
                 ],
@@ -289,7 +289,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Send shoutout",
-                    "Sends a Twitch shoutout to the broadcaster who triggered this automation, such as an incoming raider. The triggering event must have a viewer or broadcaster attached.",
+                    "Sends a Twitch shoutout to the broadcaster from the trigger. Use a trigger that includes a viewer or broadcaster.",
                     "Shoutouts"
                 ),
                 [_flowInput],
@@ -311,7 +311,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Start poll",
-                    "Starts a Twitch poll in the channel. Fails when another poll is already running.",
+                    "Starts a Twitch poll in the channel. The action fails when another poll is active.",
                     "Polls"
                 ),
                 [_flowInput],
@@ -320,7 +320,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     new(
                         new("title"),
                         "Question",
-                        "The poll question viewers see, including any automation variables.",
+                        "The poll question can contain automation variables.",
                         new AutomationConfigurationFieldType.Text(
                             NativeOperationAutomations.PollTitleMaximumLength
                         ),
@@ -350,7 +350,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     new(
                         new("channel-points-per-vote"),
                         "Channel Points per extra vote",
-                        "Lets viewers buy additional votes at this Channel Points cost. Leave unset to disable Channel Points voting.",
+                        "Viewers can buy more votes at this Channel Points cost. Leave this field empty to turn off the option.",
                         new AutomationConfigurationFieldType.Number(
                             NativeOperationAutomations.PollChannelPointsPerVoteMinimum,
                             NativeOperationAutomations.PollChannelPointsPerVoteMaximum
@@ -404,8 +404,8 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 [
                     new(
                         new("delay-mode"),
-                        "Capture timing",
-                        "Capture immediately, or add Twitch's broadcast delay so the clip matches what viewers just saw.",
+                        "Capture time",
+                        "Choose Immediate to capture now. Choose Stream delay to include the Twitch broadcast delay.",
                         new AutomationConfigurationFieldType.Choice(
                             NativeOperationAutomations.ClipDelayModes
                         ),
@@ -428,7 +428,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Create stream marker",
-                    "Adds a marker to the channel's live stream for later highlighting, including any automation variables in the description.",
+                    "Adds a marker to the live stream. You can find the marked time later. The description can contain automation variables.",
                     "Clips & markers"
                 ),
                 [_flowInput],
@@ -460,7 +460,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Start prediction",
-                    "Starts a Twitch prediction in the channel. Fails when another prediction is already running.",
+                    "Starts a Twitch prediction in the channel. The action fails when another prediction is active.",
                     "Predictions"
                 ),
                 [_flowInput],
@@ -469,7 +469,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     new(
                         new("title"),
                         "Question",
-                        "The prediction question viewers see, including any automation variables.",
+                        "The prediction question can contain automation variables.",
                         new AutomationConfigurationFieldType.Text(
                             NativeOperationAutomations.PredictionTitleMaximumLength
                         ),
@@ -557,7 +557,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 _schema,
                 new(
                     "Resolve prediction",
-                    "Resolves the channel's active prediction with a winning outcome identifier, usually supplied by an automation variable or expression.",
+                    "Resolves the active prediction with an outcome ID. An automation variable or expression usually supplies the ID.",
                     "Predictions"
                 ),
                 [_flowInput],
@@ -565,8 +565,8 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 [
                     new(
                         new("winning-outcome-id"),
-                        "Winning outcome",
-                        "The Twitch identifier of the winning outcome, including any automation variables.",
+                        "Outcome",
+                        "The Twitch ID of the selected outcome can contain automation variables.",
                         new AutomationConfigurationFieldType.Text(
                             NativeOperationAutomations.OutcomeIdentifierMaximumLength
                         ),
@@ -630,7 +630,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     or > NativeOperationAutomations.PollTitleMaximumLength
                 ? AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Field(new("title")),
-                    "Poll questions must be 1–60 characters."
+                    "Use 1–60 characters in the poll question."
                 )
             : choices.Length
                 is < NativeOperationAutomations.PollChoiceMinimumCount
@@ -647,7 +647,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     or > NativeOperationAutomations.PollDurationMaximumSeconds
                 ? AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Field(new("duration-seconds")),
-                    "Poll duration must be 15–1800 seconds."
+                    "Choose a poll duration from 15 to 1800 seconds."
                 )
             : configuration.ChannelPointsPerVote
                 is null
@@ -658,7 +658,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 ? AutomationValidationResult.Valid
             : AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Field(new("channel-points-per-vote")),
-                "Channel Points voting needs a cost from 1 to 1,000,000 per vote."
+                "Enter a cost from 1 to 1,000,000 Channel Points for each extra vote."
             );
     }
 
@@ -685,7 +685,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
             { Length: > NativeOperationAutomations.MarkerDescriptionMaximumLength } =>
                 AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Field(new("description")),
-                    "Marker descriptions cannot exceed 140 characters."
+                    "Use 140 characters or fewer in the marker description."
                 ),
             _ => AutomationValidationResult.Valid,
         };
@@ -709,7 +709,7 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                     or > NativeOperationAutomations.PredictionTitleMaximumLength
                 ? AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Field(new("title")),
-                    "Prediction questions must be 1–45 characters."
+                    "Use 1–45 characters in the prediction question."
                 )
             : outcomes.Length
                 is < NativeOperationAutomations.PredictionOutcomeMinimumCount
@@ -727,14 +727,14 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 ? AutomationValidationResult.Valid
             : AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Field(new("window-seconds")),
-                "Prediction windows must be 30–1800 seconds."
+                "Choose a prediction window from 30 to 1800 seconds."
             );
     }
 
     private static AutomationConfigurationParseResult ParseResolvePrediction(JsonElement json) =>
         TryReadString(json, "winning-outcome-id", out var winningOutcomeId)
             ? Parsed(new ResolvePredictionActionConfiguration(winningOutcomeId))
-            : Invalid("winning-outcome-id", "Enter the winning outcome identifier.");
+            : Invalid("winning-outcome-id", "Enter the outcome ID.");
 
     private static AutomationValidationResult ValidateResolvePrediction(
         ResolvePredictionActionConfiguration configuration
@@ -743,12 +743,12 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
         {
             [] => AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Field(new("winning-outcome-id")),
-                "Enter the winning outcome identifier."
+                "Enter the outcome ID."
             ),
             { Length: > NativeOperationAutomations.OutcomeIdentifierMaximumLength } =>
                 AutomationValidationResult.Invalid(
                     new AutomationValidationTarget.Field(new("winning-outcome-id")),
-                    "Winning outcome identifiers cannot exceed 128 characters."
+                    "Use 128 characters or fewer in the outcome ID."
                 ),
             _ => AutomationValidationResult.Valid,
         };

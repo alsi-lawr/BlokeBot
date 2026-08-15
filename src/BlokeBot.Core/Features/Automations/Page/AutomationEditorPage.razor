@@ -18,14 +18,14 @@
 
 <DashboardPage Kicker="Automation"
                Title="Visual automations"
-               Description="Connect an event to conditions and actions. Validate the flow before you enable it."
+               Description="Connect triggers to conditions and actions. Validate the flow before you enable it."
                Width="DashboardPageWidth.Wide"
                data-automation-editor-page>
     @if (_loadFailed)
     {
         <PageState Kind="PageStateKind.Failure"
                    Title="Automations could not load"
-                   Description="Try again. Your saved flows and run history have not changed.">
+                   Description="Select Retry. Your saved flows and run history did not change.">
             <Actions><button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
@@ -33,35 +33,42 @@
     {
         <PageState Kind="PageStateKind.Loading"
                    Title="Loading visual automations"
-                   Description="Loading the flow library and typed node catalog." />
+                   Description="BlokeBot loads the flows and the node library." />
     }
     else if (Host is null)
     {
         <PageState Kind="PageStateKind.Empty"
                    Title="Choose a channel"
-                   Description="Choose a channel to build and inspect its automation flows." />
+                   Description="Choose a channel. Then, build or inspect its automation flows." />
     }
     else if (!_featureEnabled)
     {
         <PageState Kind="PageStateKind.Unavailable"
                    Title="Automations are off"
-                   Description="Saved flows and run history are retained. Editing, validation, sample runs, and enablement stay paused until you turn Automations on.">
+                   Description="Saved flows and run history remain. Turn on Automations to edit, validate, test, or enable a flow.">
             <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
         </PageState>
     }
     else
     {
         <div class="automation-page-actions">
-            <button class="btn-secondary" type="button" @onclick="OpenHelp">?</button>
             <button class="btn-primary" type="button" @onclick="NewFlow">+ New flow</button>
         </div>
 
-        @if (_editor is null)
+        @if (_flowRecoveryMessage is not null)
+        {
+            <PageState Kind="PageStateKind.Unavailable"
+                       Title="This flow needs a node provider"
+                       Description="@_flowRecoveryMessage">
+                <Actions><a class="btn-primary" href="/host#chat-tools">Open Channel setup</a></Actions>
+            </PageState>
+        }
+        else if (_editor is null)
         {
             <section class="automation-empty card">
                 <span class="automation-empty-icon" aria-hidden="true">⌘</span>
                 <h2>Create your first visual automation</h2>
-                <p>Start with an event source, connect an action, validate the graph, and enable it when you are ready.</p>
+                <p>Add a trigger. Then, connect an action and validate the flow.</p>
                 <button class="btn-primary" type="button" @onclick="NewFlow">Create flow</button>
             </section>
         }
@@ -79,50 +86,33 @@
                     </div>
                     <div class="automation-editor-actions">
                         <div class="automation-mode-switch" role="group" aria-label="Editor view">
-                            <button type="button" aria-pressed="@(_mode == AutomationEditorMode.Grid)" @onclick="() => SetMode(AutomationEditorMode.Grid)">Grid</button>
-                            <button type="button" aria-pressed="@(_mode == AutomationEditorMode.List)" @onclick="() => SetMode(AutomationEditorMode.List)">List</button>
+                            <button type="button" data-automation-mode="grid" aria-pressed="@(_mode == AutomationEditorMode.Grid)" @onclick="() => SetMode(AutomationEditorMode.Grid)">Grid</button>
+                            <button type="button" data-automation-mode="list" aria-pressed="@(_mode == AutomationEditorMode.List)" @onclick="() => SetMode(AutomationEditorMode.List)">List</button>
                         </div>
                         <span class="@_validationClass" role="status">@_validationLabel</span>
-                        <details class="automation-node-library" open="@_nodeLibraryOpen">
-                            <summary @onclick="ToggleNodeLibrary">+ Node</summary>
-                            <div class="automation-node-library-panel">
-                                <div>
-                                    <strong>Node library</strong>
-                                    <span>Registered for this channel</span>
-                                </div>
-                                @foreach (var group in _definitions.GroupBy(definition => definition.Display.Category).OrderBy(static group => group.Key))
-                                {
-                                    <section>
-                                        <h3>@group.Key</h3>
-                                        @foreach (var definition in group)
-                                        {
-                                            <button type="button"
-                                                    disabled="@CannotAdd(definition)"
-                                                    @onclick="() => AddNode(definition)">
-                                                <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
-                                                <strong>@definition.Display.Name</strong>
-                                                <small>@definition.Display.Description</small>
-                                            </button>
-                                        }
-                                    </section>
-                                }
-                            </div>
-                        </details>
+                        <button class="automation-node-library-button" type="button" aria-expanded="@_nodeLibraryOpen" @onclick="ToggleNodeLibrary">+ Node</button>
                         <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ValidateAsync">Validate</button>
                         <button class="btn-secondary" type="button" disabled="@(_busy || _editor.Nodes.Count == 0)" data-automation-test-flow @onclick="RunSampleAsync">Test flow</button>
                         <button class="btn-secondary" type="button" disabled="@_busy" @onclick="SaveAsync">Save</button>
                         <button class="@(_editor.IsEnabled ? "btn-secondary" : "btn-primary")"
                                 type="button"
                                 disabled="@(_busy || _editor.Id is null || _hasChanges)"
-                                title="@(_hasChanges ? "Save changes before changing enablement." : null)"
+                                title="@(_hasChanges ? "Save the flow before you change its state." : null)"
                                 @onclick="ToggleEnabledAsync">@(_editor.IsEnabled ? "Disable" : _enableConfirmation ? "Enable anyway" : "Enable")</button>
                     </div>
                 </header>
 
                 @if (_feedback is not null)
                 {
-                    <div class="@(_operationFailed ? "automation-feedback automation-feedback--error" : "automation-feedback")"
+                    <div class="@($"automation-feedback{(_operationFailed ? " automation-feedback--error" : string.Empty)}{(_feedbackFading ? " automation-feedback--fading" : string.Empty)}")"
                          role="@(_operationFailed ? "alert" : "status")">@_feedback</div>
+                }
+                @if (_unavailableDefinitionIds.Count > 0)
+                {
+                    <div class="automation-capability-recovery" role="alert">
+                        <span>One or more nodes need a channel tool that is off.</span>
+                        <a href="/host#chat-tools">Open Channel setup</a>
+                    </div>
                 }
                 @if (_enableConfirmation)
                 {
@@ -170,12 +160,17 @@
                         {
                             <AutomationFlowCanvas Nodes="_editor.Nodes"
                                                   Edges="_editor.Edges"
-                                                  SelectedNodeId="_selectedNodeId"
+                                                  SelectedNodeIds="_selectedNodeIds"
+                                                  SelectedEdgeId="_selectedEdgeId"
                                                   Errors="_validationErrors"
                                                   SampleOutcomes="_sampleOutcomes"
-                                                  SelectNode="SelectNode"
-                                                  MoveNode="MoveNode"
-                                                  DeleteNode="DeleteNode" />
+                                                  Settings="_editor.Canvas"
+                                                  SelectionChanged="ChangeCanvasSelection"
+                                                  MoveNodes="MoveNodes"
+                                                  DeleteNodes="DeleteNodes"
+                                                  DeleteEdge="DeleteEdge"
+                                                  Connect="ConnectNodes"
+                                                  SettingsChanged="ChangeCanvasSettings" />
                         }
                         else
                         {
@@ -198,8 +193,7 @@
                                              ClearSelection="ClearSelection"
                                              Connect="ConnectNodes"
                                              DeleteEdge="DeleteEdge"
-                                             DeleteNode="DeleteNode"
-                                             MoveNode="MoveNode" />
+                                             DeleteNode="DeleteNode" />
                 </div>
 
                 <footer class="automation-run-drawer" data-automation-run-kind="@(_sampleOutcomes.IsEmpty ? "history" : "sample")">
@@ -213,6 +207,47 @@
                     </div>
                 </footer>
             </section>
+        }
+
+        @if (_nodeLibraryOpen && _editor is not null)
+        {
+            <div class="automation-node-library-backdrop" @onclick="CloseNodeLibrary">
+                <section class="automation-node-library-panel"
+                         role="dialog"
+                         aria-modal="true"
+                         aria-labelledby="automation-node-library-title"
+                         @onclick:stopPropagation="true">
+                    <header>
+                        <div>
+                            <strong id="automation-node-library-title">Node library</strong>
+                            <span>@(_editor.Nodes.Count == 0 ? "Select a trigger." : "Select a node.")</span>
+                        </div>
+                        <button type="button" aria-label="Close the node library" @onclick="CloseNodeLibrary">×</button>
+                    </header>
+                    <label class="automation-node-search">
+                        <span>Search nodes</span>
+                        <input type="search" placeholder="Search by name or category" @bind="_nodeSearch" @bind:event="oninput" />
+                    </label>
+                    @foreach (var group in _filteredDefinitions.GroupBy(definition => definition.Display.Category).OrderBy(static group => group.Key))
+                    {
+                        <section>
+                            <h3>@group.Key</h3>
+                            @foreach (var definition in group)
+                            {
+                                <button type="button" @onclick="() => AddNode(definition)">
+                                    <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
+                                    <strong>@definition.Display.Name</strong>
+                                    <small>@definition.Display.Description</small>
+                                </button>
+                            }
+                        </section>
+                    }
+                    @if (!_filteredDefinitions.Any())
+                    {
+                        <p class="automation-node-search-empty">No nodes match this search.</p>
+                    }
+                </section>
+            </div>
         }
     }
 </DashboardPage>

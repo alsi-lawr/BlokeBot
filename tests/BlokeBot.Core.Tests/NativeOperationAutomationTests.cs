@@ -306,50 +306,53 @@ public sealed class NativeOperationAutomationTests
     }
 
     [Test]
-    public async Task DisabledBackingFeature_RetainsSavedFlowsAndBlocksSaveAndDispatch()
+    public async Task DisabledBackingFeature_ListsSavedFlowAndReturnsActionableValidation()
     {
         await using var fixture = await NativeFixture.CreateAsync();
         var source = Node("prediction-started", "{}");
         var action = Node("send-chat", """{"message":"Prediction!"}""");
-        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
-
-        await fixture.SetFeatureAsync(HostFeatureFlags.Predictions, enabled: false);
-        _ = (
+        var edge = Edge(source, "flow", action);
+        var saved = (
             await fixture.Flows.SaveAsync(
-                Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]),
+                Draft(fixture.HostId, [source, action], [edge]) with
+                {
+                    IsEnabled = false,
+                },
                 CancellationToken.None
             )
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.FeatureDisabled>();
-        await using (var db = await fixture.Database.CreateDbContextAsync())
-        {
-            (await db.AutomationFlows.CountAsync()).ShouldBe(1);
-        }
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
 
-        await fixture.SetFeatureAsync(HostFeatureFlags.Predictions, enabled: true);
-        await fixture.Runtime.PredictionChangedAsync(
-            fixture.Prediction("fresh-1", EventSubPredictionStage.Begin, "active"),
-            CancellationToken.None
-        );
-        (await fixture.RunCountAsync()).ShouldBe(1);
-
-        AutomationRequiredFeatures
-            .ForDefinitions(["shoutout-sent", "send-shoutout"])
-            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.RaidCollaboration);
-        AutomationRequiredFeatures
-            .ForDefinitions(["poll-started", "start-poll", "end-poll"])
-            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.Polls);
-        AutomationRequiredFeatures
-            .ForDefinitions(["create-clip", "create-marker"])
-            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.ClipsAndMarkers);
-        AutomationRequiredFeatures
-            .ForDefinitions([
-                "prediction-ended",
-                "start-prediction",
-                "lock-prediction",
-                "cancel-prediction",
-                "resolve-prediction",
-            ])
-            .ShouldBe(HostFeatureFlags.Automations | HostFeatureFlags.Predictions);
+        await fixture.SetFeatureAsync(HostFeatureFlags.Predictions, enabled: false);
+        var listed = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        listed.Flows.ShouldHaveSingleItem().Draft.Nodes.ShouldContain(node => node.Id == source.Id);
+        var validation = (
+            await fixture.Flows.ValidateDraftAsync(
+                Draft(fixture.HostId, [source, action], [edge]),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        validation.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
+        var save = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [source, action], [edge]),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        save.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
+        var enable = (
+            await fixture.Flows.SetEnabledAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                enabled: true,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowEnableOutcome.Invalid>();
+        enable.Errors.ShouldContain(static error => error.Code == "capability-unavailable");
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var retained = await db.AutomationFlows.SingleAsync();
+        retained.IsEnabled.ShouldBeFalse();
     }
 
     [Test]

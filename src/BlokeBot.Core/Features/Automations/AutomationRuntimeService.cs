@@ -113,18 +113,21 @@ public sealed class AutomationRuntimeService(
         var matching = new List<(AutomationFlow Flow, AutomationFlowNode Source)>();
         foreach (var flow in flows)
         {
-            var source = flow.Nodes.SingleOrDefault(node =>
-                node.DefinitionId == context.Event.SourceDefinitionId.Value && IsSource(flow, node)
-            );
-            if (source is null)
+            foreach (
+                var source in flow.Nodes.Where(node =>
+                    node.DefinitionId == context.Event.SourceDefinitionId.Value
+                    && IsSource(flow, node)
+                )
+            )
             {
-                continue;
-            }
-
-            var check = catalog.ValidatePersistedDefinition(Definition(source));
-            if (check is AutomationConfigurationCheck.Valid valid && matches(valid.Configuration))
-            {
-                matching.Add((flow, source));
+                var check = catalog.ValidatePersistedDefinition(Definition(source));
+                if (
+                    check is AutomationConfigurationCheck.Valid valid
+                    && matches(valid.Configuration)
+                )
+                {
+                    matching.Add((flow, source));
+                }
             }
         }
 
@@ -179,12 +182,13 @@ public sealed class AutomationRuntimeService(
                 $"""
                 INSERT OR IGNORE INTO automation_flow_runs
                     (Id, FlowId, HostId, AutomationGeneration, RequiredFeatures,
-                     ContextSchemaVersion, SourceDefinitionId, SourceOccurrenceId, ContextJson,
+                     ContextSchemaVersion, SourceDefinitionId, SourceNodeId, SourceOccurrenceId, ContextJson,
                      DefinitionJson, Status, StartedAtUtc, CompletedAtUtc, ExecutionLeaseId)
                 VALUES
                     ({runId}, {flow.Id}, {flow.HostId}, {host.AutomationGeneration},
                      {(long)requiredFeatures}, {AutomationContextSchema.CurrentVersion},
                      {context.Event.SourceDefinitionId.Value},
+                     {source.Id},
                      {context.Event.OccurrenceId},
                      {AutomationRuntimeSerialization.SerializeContext(context)},
                      {AutomationRuntimeSerialization.SerializeDefinition(flow)},
@@ -198,6 +202,7 @@ public sealed class AutomationRuntimeService(
                     value =>
                         value.FlowId == flow.Id
                         && value.SourceDefinitionId == context.Event.SourceDefinitionId.Value
+                        && value.SourceNodeId == source.Id
                         && value.SourceOccurrenceId == context.Event.OccurrenceId,
                     cancellationToken
                 );
@@ -912,10 +917,11 @@ public sealed class AutomationRuntimeService(
         nodeRun.OutcomeCode = succeeded.Code;
         nodeRun.CompletedAtUtc = now;
         var next = Outgoing(flow.Edges, node.Id, succeeded.OutputPort);
+        var existingNodes = run.NodeRuns.Select(static value => value.NodeId).ToHashSet();
         AddPending(
             db,
             run.Id,
-            next,
+            next.Where(existingNodes.Add).ToImmutableArray(),
             succeeded.NextAvailableAtUtc,
             run.NodeRuns.Max(static value => value.Sequence) + 1
         );
@@ -972,7 +978,14 @@ public sealed class AutomationRuntimeService(
 
         nodeRun.Status = AutomationNodeRunStatus.ContinuedAfterFailure;
         var next = Outgoing(flow.Edges, node.Id, "complete");
-        AddPending(db, run.Id, next, now, run.NodeRuns.Max(static value => value.Sequence) + 1);
+        var existingNodes = run.NodeRuns.Select(static value => value.NodeId).ToHashSet();
+        AddPending(
+            db,
+            run.Id,
+            next.Where(existingNodes.Add).ToImmutableArray(),
+            now,
+            run.NodeRuns.Max(static value => value.Sequence) + 1
+        );
         _ = await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return AutomationFailureCompletion.Continued;

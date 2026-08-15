@@ -51,8 +51,8 @@
     border-radius: 0.95rem;
     box-shadow: var(--app-shadow-surface);
     display: grid;
-    grid-template-rows: auto auto auto minmax(35rem, 1fr) auto;
-    min-height: 46.5rem;
+    grid-template-rows: auto auto auto minmax(30rem, 1fr) auto;
+    min-height: 42rem;
     overflow: hidden;
 }
 
@@ -167,11 +167,7 @@
     color: var(--tone-red-fg);
 }
 
-.automation-node-library {
-    position: relative;
-}
-
-.automation-node-library > summary {
+.automation-node-library-button {
     align-items: center;
     background: var(--app-control-bg);
     border: 1px solid var(--app-control-border);
@@ -185,8 +181,15 @@
     padding: 0 0.75rem;
 }
 
-.automation-node-library > summary::marker {
-    content: "";
+.automation-node-library-backdrop {
+    align-items: flex-start;
+    background: rgb(15 23 42 / 0.46);
+    display: flex;
+    inset: 0;
+    justify-content: flex-end;
+    padding: 5rem 1.5rem 1.5rem;
+    position: fixed;
+    z-index: 120;
 }
 
 .automation-node-library-panel {
@@ -196,22 +199,34 @@
     box-shadow: var(--app-shadow-surface);
     display: grid;
     gap: 0.8rem;
-    max-height: 31rem;
+    max-height: calc(100vh - 6.5rem);
     overflow-y: auto;
     padding: 0.85rem;
-    position: absolute;
-    right: 0;
-    top: calc(100% + 0.45rem);
     width: min(26rem, calc(100vw - 2rem));
-    z-index: 30;
 }
 
-.automation-node-library-panel > div {
+.automation-node-library-panel > header,
+.automation-node-library-panel > header > div {
+    align-items: flex-start;
     display: flex;
     justify-content: space-between;
 }
 
-.automation-node-library-panel > div span,
+.automation-node-library-panel > header > div {
+    flex-direction: column;
+}
+
+.automation-node-library-panel > header button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--app-text-muted);
+    display: inline-flex;
+    font-size: 1.25rem;
+    justify-content: center;
+}
+
+.automation-node-library-panel > header span,
 .automation-node-library-panel h3 {
     color: var(--app-text-muted);
     font-size: 0.7rem;
@@ -251,6 +266,34 @@
     grid-column: 1 / -1;
 }
 
+.automation-node-search {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.automation-node-search span {
+    color: var(--app-text-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.automation-node-search input {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.5rem;
+    color: var(--app-text-strong);
+    min-height: 2.5rem;
+    padding: 0.5rem 0.65rem;
+}
+
+.automation-node-search-empty {
+    color: var(--app-text-muted);
+    font-size: 0.8rem;
+    margin: 1rem 0;
+    text-align: center;
+}
+
 .automation-feedback,
 .automation-enable-warning {
     align-items: center;
@@ -268,6 +311,29 @@
     background: var(--tone-red-bg);
     border-color: var(--tone-red-ring);
     color: var(--tone-red-fg);
+}
+
+.automation-feedback--fading {
+    opacity: 0;
+    transition: opacity 1s ease;
+}
+
+.automation-capability-recovery {
+    align-items: center;
+    background: var(--tone-amber-bg);
+    border-bottom: 1px solid var(--tone-amber-ring);
+    color: var(--tone-amber-fg);
+    display: flex;
+    font-size: 0.78rem;
+    font-weight: 700;
+    justify-content: space-between;
+    padding: 0.55rem 1rem;
+}
+
+.automation-capability-recovery a {
+    color: inherit;
+    font-weight: 900;
+    text-decoration: underline;
 }
 
 .automation-enable-warning {
@@ -297,6 +363,7 @@
 .automation-editor-body {
     display: grid;
     grid-template-columns: 12rem minmax(31rem, 1fr) 16rem;
+    height: clamp(28rem, calc(100dvh - 28rem), 36rem);
     min-height: 0;
 }
 
@@ -417,57 +484,159 @@
 }
 
 .automation-canvas-wrap {
-    background-color: var(--app-background);
-    background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text-muted) 30%, transparent) 1.1px, transparent 1.1px);
-    background-size: 24px 24px;
     height: 100%;
-    min-height: 38rem;
-    overflow: auto;
+    min-height: 31rem;
     position: relative;
 }
 
-.automation-canvas-label {
+.automation-canvas-tools {
+    align-items: center;
     backdrop-filter: blur(6px);
     background: color-mix(in srgb, var(--app-surface-solid) 88%, transparent);
     border: 1px solid var(--app-border);
-    border-radius: 0.45rem;
+    border-radius: 0.6rem;
     color: var(--app-text-muted);
-    font-size: 0.68rem;
-    left: 0.8rem;
-    padding: 0.38rem 0.55rem;
-    position: sticky;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    left: 0.7rem;
+    padding: 0.4rem;
+    position: absolute;
+    right: 0.7rem;
     top: 0.7rem;
-    width: max-content;
-    z-index: 5;
+    z-index: 8;
 }
 
-.automation-canvas {
-    height: 620px;
-    margin: -1.5rem auto 0;
-    min-width: 960px;
+.automation-canvas-tools label {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+}
+
+.automation-canvas-tools label span {
+    font-size: 0.62rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.automation-canvas-tools button,
+.automation-canvas-tools select {
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 0.4rem;
+    color: var(--app-text-strong);
+    font-size: 0.68rem;
+    min-height: 1.9rem;
+    padding: 0.3rem 0.5rem;
+}
+
+.automation-canvas-tool-group {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.automation-canvas-tool-group button {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+    padding: 0;
+    width: 1.9rem;
+}
+
+.automation-canvas-viewport {
+    background-color: var(--app-background);
+    background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text-muted) 34%, transparent) 1.1px, transparent 1.1px);
+    background-position: 0 0;
+    background-size: 24px 24px;
+    cursor: grab;
+    height: 100%;
+    min-height: 31rem;
+    overflow: hidden;
     position: relative;
-    width: 960px;
+    touch-action: none;
+}
+
+.automation-canvas-viewport:focus-visible {
+    outline: 2px solid var(--tone-blue-solid);
+    outline-offset: -2px;
+}
+
+.automation-canvas--panning,
+.automation-canvas--node-dragging {
+    cursor: grabbing;
+}
+
+.automation-canvas-stage {
+    position: relative;
+    transform-origin: 0 0;
+    will-change: transform;
 }
 
 .automation-edges {
-    height: 620px;
+    height: 100%;
     inset: 0;
     overflow: visible;
     pointer-events: none;
     position: absolute;
-    width: 960px;
+    width: 100%;
 }
 
-.automation-edges--mobile {
-    display: none;
+.automation-edge-group {
+    color: var(--tone-blue-solid);
+    cursor: pointer;
+    pointer-events: stroke;
 }
 
 .automation-edge {
     fill: none;
-    stroke: var(--tone-blue-solid);
+    stroke: currentColor;
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 2.5;
+    transition: stroke-width 120ms ease;
+}
+
+.automation-edge-hit {
+    fill: none;
+    pointer-events: stroke;
+    stroke: transparent;
+    stroke-width: 16;
+}
+
+.automation-edge-group--selected .automation-edge {
+    filter: drop-shadow(0 0 3px currentColor);
+    stroke-width: 4;
+}
+
+.automation-edge-group.automation-branch--true {
+    color: var(--tone-green-solid);
+}
+
+.automation-edge-group.automation-branch--false {
+    color: var(--tone-amber-solid);
+}
+
+.automation-edge-label {
+    fill: currentColor;
+    font-size: 11px;
+    font-weight: 900;
+    paint-order: stroke;
+    pointer-events: none;
+    stroke: var(--app-background);
+    stroke-width: 4px;
+}
+
+.automation-edge--preview {
+    pointer-events: none;
+    stroke-dasharray: 7 5;
+}
+
+.automation-marquee {
+    background: color-mix(in srgb, var(--tone-blue-bg) 60%, transparent);
+    border: 1px solid var(--tone-blue-solid);
+    pointer-events: none;
+    position: absolute;
+    z-index: 6;
 }
 
 .automation-node {
@@ -478,9 +647,9 @@
     color: var(--app-text-strong);
     cursor: grab;
     display: block;
-    height: 116px;
+    height: 104px;
     left: calc(var(--automation-node-x) * 1px);
-    padding: 0.75rem;
+    padding: 0.62rem 0.68rem;
     position: absolute;
     text-align: left;
     top: calc(var(--automation-node-y) * 1px);
@@ -505,6 +674,7 @@
 .automation-node--invalid,
 .automation-node--failed {
     border-color: var(--tone-red-solid);
+    box-shadow: 0 0 0 2px var(--tone-red-ring), 0 0.7rem 1.5rem rgb(15 23 42 / 0.15);
 }
 
 .automation-node--ran {
@@ -517,8 +687,8 @@
     font-size: 0.61rem;
     font-weight: 900;
     letter-spacing: 0.08em;
-    margin-bottom: 0.48rem;
-    padding: 0.22rem 0.4rem;
+    margin-bottom: 0.35rem;
+    padding: 0.18rem 0.35rem;
     text-transform: uppercase;
 }
 
@@ -539,7 +709,6 @@
 
 .automation-node strong,
 .automation-node-description,
-.automation-node-error,
 .automation-node-outcome {
     display: block;
 }
@@ -559,14 +728,10 @@
 .automation-node-outcome {
     font-size: 0.6rem;
     font-weight: 800;
-    margin-top: 0.35rem;
+    margin-top: 0.2rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.automation-node-error {
-    color: var(--tone-red-fg);
 }
 
 .automation-node-outcome {
@@ -577,11 +742,14 @@
     background: var(--tone-blue-solid);
     border: 2px solid var(--app-surface-solid);
     border-radius: 50%;
-    height: 0.75rem;
+    cursor: crosshair;
+    height: 0.85rem;
+    padding: 0;
     position: absolute;
-    top: 50%;
+    top: calc(50% + (var(--automation-port-offset) * 1px));
     transform: translateY(-50%);
-    width: 0.75rem;
+    width: 0.85rem;
+    z-index: 5;
 }
 
 .automation-port--input {
@@ -592,12 +760,26 @@
     right: -0.42rem;
 }
 
-.automation-port--output-0 {
-    top: 38%;
+.automation-port--compatible {
+    box-shadow: 0 0 0 5px var(--tone-green-ring);
 }
 
-.automation-port--output-1 {
-    top: 68%;
+.automation-port--source {
+    box-shadow: 0 0 0 5px var(--tone-blue-ring);
+}
+
+[data-orientation="vertical"] .automation-port--input {
+    left: calc(50% + (var(--automation-port-offset) * 1px));
+    top: -0.42rem;
+    transform: translateX(-50%);
+}
+
+[data-orientation="vertical"] .automation-port--output {
+    bottom: -0.42rem;
+    left: calc(50% + (var(--automation-port-offset) * 1px));
+    right: auto;
+    top: auto;
+    transform: translateX(-50%);
 }
 
 .automation-inspector {
@@ -675,6 +857,13 @@
     resize: vertical;
 }
 
+.automation-field--invalid input,
+.automation-field--invalid select,
+.automation-field--invalid textarea {
+    border-color: var(--tone-red-solid);
+    box-shadow: 0 0 0 2px var(--tone-red-ring);
+}
+
 .automation-field > p {
     color: var(--app-text-muted);
     font-size: 0.66rem;
@@ -686,6 +875,18 @@
     color: var(--tone-red-fg);
     font-size: 0.67rem;
     font-weight: 700;
+}
+
+.automation-node-errors {
+    background: var(--tone-red-bg);
+    border: 1px solid var(--tone-red-ring);
+    border-radius: 0.5rem;
+    color: var(--tone-red-fg);
+    display: grid;
+    font-size: 0.7rem;
+    gap: 0.3rem;
+    margin-top: 0.85rem;
+    padding: 0.65rem;
 }
 
 .automation-inspector-section {
@@ -717,14 +918,25 @@
     padding: 0.45rem;
 }
 
-.automation-connected-row button,
-.automation-danger-button {
+.automation-connected-row button {
     background: transparent;
     border: 0;
     color: var(--tone-red-fg);
     cursor: pointer;
     font-size: 0.68rem;
     font-weight: 800;
+}
+
+.automation-danger-button {
+    background: var(--tone-red-bg);
+    border: 1px solid var(--tone-red-ring);
+    border-radius: 0.5rem;
+    color: var(--tone-red-fg);
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 900;
+    min-height: 2.35rem;
+    padding: 0.45rem 0.7rem;
 }
 
 .automation-position-controls {
@@ -946,13 +1158,15 @@
     }
 
     .automation-editor-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        justify-content: stretch;
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: 0.2rem;
     }
 
     .automation-mode-switch {
-        grid-column: 1 / -1;
+        flex: none;
         min-width: 0;
     }
 
@@ -963,14 +1177,22 @@
     .automation-editor-actions > .btn-primary,
     .automation-editor-actions > .btn-secondary,
     .automation-validation,
-    .automation-node-library > summary {
+    .automation-node-library-button {
         justify-content: center;
-        width: 100%;
+        white-space: nowrap;
+    }
+
+    .automation-node-library-backdrop {
+        align-items: flex-end;
+        padding: 0;
     }
 
     .automation-node-library-panel {
-        left: 0;
-        right: auto;
+        border-bottom: 0;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        max-height: 78vh;
+        width: 100%;
     }
 
     .automation-feedback,
@@ -981,6 +1203,7 @@
 
     .automation-editor-body {
         display: block;
+        height: auto;
     }
 
     .automation-flow-rail {
@@ -1001,30 +1224,34 @@
     }
 
     .automation-workspace {
-        min-height: 32rem;
+        min-height: 30rem;
     }
 
     .automation-canvas-wrap {
-        height: var(--automation-mobile-canvas-height, 32rem);
-        min-height: 32rem;
-        overflow: hidden;
+        height: var(--automation-mobile-canvas-height, 30rem);
+        min-height: 30rem;
     }
 
-    .automation-canvas {
-        height: var(--automation-mobile-canvas-height, 720px);
-        margin: -1.5rem auto 0;
-        min-width: 358px;
-        width: 358px;
+    .automation-canvas-tools {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        position: relative;
     }
 
-    .automation-edges--desktop {
-        display: none;
+    .automation-canvas-tool-group {
+        flex: none;
     }
 
-    .automation-edges--mobile {
-        display: block;
-        height: auto;
-        width: 358px;
+    .automation-canvas-tools label {
+        align-items: center;
+        display: flex;
+        flex: none;
+    }
+
+    .automation-canvas-viewport {
+        height: var(--automation-mobile-canvas-height, 30rem);
+        min-height: 30rem;
     }
 
     .automation-node {
@@ -1034,22 +1261,17 @@
     }
 
     .automation-port--input {
-        left: 50%;
+        left: calc(50% + (var(--automation-port-offset) * 1px));
         top: -0.42rem;
         transform: translateX(-50%);
     }
 
-    .automation-port--output,
-    .automation-port--output-0 {
+    .automation-port--output {
         bottom: -0.42rem;
-        left: 50%;
+        left: calc(50% + (var(--automation-port-offset) * 1px));
         right: auto;
         top: auto;
         transform: translateX(-50%);
-    }
-
-    .automation-port--output-1 {
-        display: none;
     }
 
     .automation-inspector {

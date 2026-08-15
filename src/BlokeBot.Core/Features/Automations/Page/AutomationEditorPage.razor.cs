@@ -17,8 +17,11 @@ public partial class AutomationEditorPage
     private ImmutableArray<AutomationGraphError> _validationErrors = [];
     private ImmutableArray<AutomationSampleNodeOutcome> _sampleOutcomes = [];
     private ImmutableArray<AutomationRunSummary> _recentRuns = [];
+    private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
+    private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];
     private AutomationEditorState? _editor;
     private AutomationNodeId? _selectedNodeId;
+    private Guid? _selectedEdgeId;
     private AutomationEditorMode _mode;
     private bool _loading = true;
     private bool _loadFailed;
@@ -30,10 +33,43 @@ public partial class AutomationEditorPage
     private bool _enableConfirmation;
     private bool _deleteConfirmation;
     private bool _hasChanges;
+    private bool _feedbackFading;
     private string? _feedback;
+    private string? _flowRecoveryMessage;
+    private string _nodeSearch = string.Empty;
+    private CancellationTokenSource? _validationFeedbackCancellation;
 
     private AutomationEditorNode? _selectedNode =>
-        _editor?.Nodes.FirstOrDefault(node => node.Id == _selectedNodeId);
+        _selectedNodeIds.Count == 1
+            ? _editor?.Nodes.FirstOrDefault(node => node.Id == _selectedNodeIds.Single())
+            : null;
+
+    private IEnumerable<AutomationDefinitionDescriptor> _filteredDefinitions
+    {
+        get
+        {
+            var definitions =
+                _editor?.Nodes.Count == 0
+                    ? _definitions.Where(static definition =>
+                        definition.Kind == AutomationNodeKind.Source
+                    )
+                    : _definitions;
+            if (string.IsNullOrWhiteSpace(_nodeSearch))
+            {
+                return definitions;
+            }
+
+            var search = _nodeSearch.Trim();
+            return definitions.Where(definition =>
+                definition.Display.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || definition.Display.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || definition.Display.Description.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+        }
+    }
 
     private string _flowSubtitle =>
         _editor?.Id is null ? "Not saved · changes stay private"
@@ -93,7 +129,7 @@ public partial class AutomationEditorPage
     private string _runDescription =>
         _sampleOutcomes.IsEmpty
             ? _recentRuns.IsEmpty
-                ? "Test this flow without contacting Twitch or running live actions."
+                ? "Test this flow. The sample does not contact Twitch or run live actions."
                 : RecentRunDescription(_recentRuns[0])
             : string.Join(
                 " → ",
@@ -176,8 +212,10 @@ public partial class AutomationEditorPage
             : _flowSnapshots.FirstOrDefault();
         if (selected is not null)
         {
-            RestoreEditor(selected);
-            await ValidateCoreAsync(showFeedback: false);
+            if (RestoreEditor(selected))
+            {
+                await ValidateCoreAsync(showFeedback: false);
+            }
         }
         else
         {
@@ -231,22 +269,46 @@ public partial class AutomationEditorPage
         ResetTransientState();
         _editor = AutomationEditorState.Create("New automation");
         _selectedNodeId = null;
+        _selectedNodeIds.Clear();
+        _selectedEdgeId = null;
+        _nodeSearch = string.Empty;
         _nodeLibraryOpen = true;
         _hasChanges = true;
     }
 
     private async Task SelectFlow(AutomationFlowSnapshot snapshot)
     {
-        RestoreEditor(snapshot);
-        await ValidateCoreAsync(showFeedback: false);
+        if (RestoreEditor(snapshot))
+        {
+            await ValidateCoreAsync(showFeedback: false);
+        }
     }
 
-    private void RestoreEditor(AutomationFlowSnapshot snapshot)
+    private bool RestoreEditor(AutomationFlowSnapshot snapshot)
     {
-        _editor = AutomationEditorState.Restore(
-            snapshot,
-            _definitions.ToDictionary(static definition => definition.Id)
-        );
+        _unavailableDefinitionIds.Clear();
+        var definitions = _definitions.ToDictionary(static definition => definition.Id);
+        foreach (var node in snapshot.Draft.Nodes)
+        {
+            var id = new AutomationDefinitionId(node.Definition.TypeId);
+            if (definitions.ContainsKey(id))
+            {
+                continue;
+            }
+
+            if (!_catalogService.TryDescribe(id, out var descriptor))
+            {
+                _editor = null;
+                _flowRecoveryMessage =
+                    $"The saved flow '{snapshot.Draft.Name}' uses an unavailable node type. Restore the node provider, or delete the flow.";
+                return false;
+            }
+
+            definitions.Add(id, descriptor);
+            _ = _unavailableDefinitionIds.Add(id);
+        }
+
+        _editor = AutomationEditorState.Restore(snapshot, definitions);
         _selectedNodeId =
             _editor
                 .Nodes.FirstOrDefault(static node =>
@@ -255,12 +317,14 @@ public partial class AutomationEditorPage
                 ?.Id
             ?? _editor.Nodes.FirstOrDefault()?.Id;
         ResetTransientState();
+        SetSingleNodeSelection(_selectedNodeId);
         _hasChanges = false;
+        return true;
     }
 
     private void AddNode(AutomationDefinitionDescriptor definition)
     {
-        if (_editor is null || CannotAdd(definition))
+        if (_editor is null)
         {
             return;
         }
@@ -268,7 +332,9 @@ public partial class AutomationEditorPage
         var node = _editor.AddNode(definition);
         ApplyFirstReferenceDefaults(node);
         _selectedNodeId = node.Id;
+        SetSingleNodeSelection(node.Id);
         _nodeLibraryOpen = false;
+        _nodeSearch = string.Empty;
         EditorChanged();
     }
 
@@ -304,6 +370,7 @@ public partial class AutomationEditorPage
     {
         if (
             _editor is null
+            || !CompatibleConnection(_editor, request)
             || _editor.Edges.Any(edge =>
                 edge.SourceNodeId == request.SourceNodeId
                 && edge.SourcePortId == request.SourcePortId
@@ -315,44 +382,114 @@ public partial class AutomationEditorPage
             return;
         }
 
-        _editor.Edges.Add(
-            new(
-                Guid.NewGuid(),
-                request.SourceNodeId,
-                request.SourcePortId,
-                request.TargetNodeId,
-                request.TargetPortId
-            )
+        var edge = new AutomationFlowDraftEdge(
+            Guid.NewGuid(),
+            request.SourceNodeId,
+            request.SourcePortId,
+            request.TargetNodeId,
+            request.TargetPortId
         );
+        _editor.Edges.Add(edge);
+        _selectedEdgeId = edge.Id;
+        _selectedNodeIds.Clear();
+        _selectedNodeId = null;
         EditorChanged();
+    }
+
+    private static bool CompatibleConnection(
+        AutomationEditorState editor,
+        AutomationConnectionRequest request
+    )
+    {
+        var source = editor.Nodes.FirstOrDefault(node => node.Id == request.SourceNodeId);
+        var target = editor.Nodes.FirstOrDefault(node => node.Id == request.TargetNodeId);
+        var output = source?.Definition.Outputs.FirstOrDefault(port =>
+            port.Id == request.SourcePortId
+        );
+        var input = target?.Definition.Inputs.FirstOrDefault(port =>
+            port.Id == request.TargetPortId
+        );
+        return source is not null
+            && target is not null
+            && source.Id != target.Id
+            && output is not null
+            && input is not null
+            && output.ValueType == AutomationPortValueType.Flow
+            && output.ValueType == input.ValueType
+            && output.Sensitivity == input.Sensitivity;
     }
 
     private void DeleteEdge(Guid edgeId)
     {
         _ = _editor?.Edges.RemoveAll(edge => edge.Id == edgeId);
+        _selectedEdgeId = null;
         EditorChanged();
     }
 
-    private void DeleteNode(AutomationNodeId nodeId)
-    {
-        _editor?.RemoveNode(nodeId);
-        if (_selectedNodeId == nodeId)
-        {
-            _selectedNodeId = _editor?.Nodes.FirstOrDefault()?.Id;
-        }
-        EditorChanged();
-    }
+    private void DeleteNode(AutomationNodeId nodeId) => DeleteNodes([nodeId]);
 
-    private void MoveNode(AutomationNodeMoveRequest request)
+    private void DeleteNodes(IReadOnlyList<AutomationNodeId> nodeIds)
     {
-        var node = _editor?.Nodes.FirstOrDefault(candidate => candidate.Id == request.NodeId);
-        if (node is null)
+        if (_editor is null || nodeIds.Count == 0)
         {
             return;
         }
 
-        node.Position = new(new(request.X), new(request.Y));
+        foreach (var nodeId in nodeIds)
+        {
+            _editor.RemoveNode(nodeId);
+            _ = _selectedNodeIds.Remove(nodeId);
+        }
+
+        _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
+        _selectedEdgeId = null;
         EditorChanged();
+    }
+
+    private void MoveNode(AutomationNodeMoveRequest request) => MoveNodes([request]);
+
+    private void MoveNodes(IReadOnlyList<AutomationNodeMoveRequest> requests)
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        foreach (var request in requests)
+        {
+            var node = _editor.Nodes.FirstOrDefault(candidate => candidate.Id == request.NodeId);
+            if (node is null)
+            {
+                continue;
+            }
+
+            node.Position = new(new(request.X), new(request.Y));
+        }
+
+        EditorChanged();
+    }
+
+    private void ChangeCanvasSettings(AutomationFlowCanvasSettings settings)
+    {
+        if (_editor is null)
+        {
+            return;
+        }
+
+        _editor.Canvas = settings;
+        EditorChanged();
+    }
+
+    private void ChangeCanvasSelection(AutomationCanvasSelectionRequest selection)
+    {
+        _selectedNodeIds.Clear();
+        foreach (var nodeId in selection.NodeIds)
+        {
+            _ = _selectedNodeIds.Add(nodeId);
+        }
+
+        _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
+        _selectedEdgeId = selection.EdgeId;
     }
 
     private async Task SaveAsync()
@@ -383,7 +520,7 @@ public partial class AutomationEditorPage
                             _hasChanges = false;
                             break;
                         case AutomationFlowSaveOutcome.Invalid invalid:
-                            ShowValidation(invalid.Errors, "Fix the graph issues before saving.");
+                            ShowValidation(invalid.Errors, "Correct the flow before you save it.");
                             break;
                         default:
                             ShowUnavailable();
@@ -426,12 +563,18 @@ public partial class AutomationEditorPage
                             _validationErrors = [];
                             if (showFeedback)
                             {
-                                _feedback = "This flow is ready to enable.";
-                                _operationFailed = false;
+                                ShowTimedValidationFeedback(
+                                    "The flow is valid. You can enable it.",
+                                    failed: false
+                                );
                             }
                             break;
                         case AutomationFlowValidationOutcome.Invalid invalid:
-                            ShowValidation(invalid.Errors, "Review the highlighted graph issues.");
+                            ShowValidation(
+                                invalid.Errors,
+                                "Correct the highlighted items.",
+                                fade: showFeedback
+                            );
                             break;
                         default:
                             ShowUnavailable();
@@ -461,8 +604,18 @@ public partial class AutomationEditorPage
                 requestedHostId,
                 async () =>
                 {
+                    if (SampleSourceId() is not { } sourceNodeId)
+                    {
+                        ShowValidation(
+                            [new(null, "source-count", "Add one or more trigger nodes.")],
+                            "Correct the flow before you test it."
+                        );
+                        return;
+                    }
+
                     var outcome = await _flowsService.RunSampleAsync(
                         _editor.Draft(new(requestedHostId)),
+                        sourceNodeId,
                         CancellationToken.None
                     );
                     switch (outcome)
@@ -478,7 +631,7 @@ public partial class AutomationEditorPage
                             _operationFailed = true;
                             break;
                         case AutomationSampleRunOutcome.Invalid invalid:
-                            ShowValidation(invalid.Errors, "Fix the graph before testing it.");
+                            ShowValidation(invalid.Errors, "Correct the flow before you test it.");
                             break;
                         default:
                             ShowUnavailable();
@@ -533,7 +686,10 @@ public partial class AutomationEditorPage
                             _operationFailed = false;
                             break;
                         case AutomationFlowEnableOutcome.Invalid invalid:
-                            ShowValidation(invalid.Errors, "Invalid flows cannot be enabled.");
+                            ShowValidation(
+                                invalid.Errors,
+                                "Correct the flow before you enable it."
+                            );
                             break;
                         default:
                             ShowUnavailable();
@@ -572,7 +728,7 @@ public partial class AutomationEditorPage
                     if (outcome is AutomationFlowDuplicateOutcome.Duplicated duplicated)
                     {
                         await LoadCoreAsync(duplicated.FlowId);
-                        _feedback = "Flow duplicated as a disabled draft.";
+                        _feedback = "BlokeBot copied the flow as a disabled draft.";
                         _operationFailed = false;
                     }
                     else
@@ -593,7 +749,8 @@ public partial class AutomationEditorPage
         if (!_deleteConfirmation)
         {
             _deleteConfirmation = true;
-            _feedback = "Delete this flow and its run history? Select Confirm delete to continue.";
+            _feedback =
+                "This action deletes the flow and its run history. Select Confirm delete to continue.";
             _operationFailed = true;
             return;
         }
@@ -641,24 +798,75 @@ public partial class AutomationEditorPage
         }
     }
 
-    private void ShowValidation(ImmutableArray<AutomationGraphError> errors, string feedback)
+    private void ShowValidation(
+        ImmutableArray<AutomationGraphError> errors,
+        string feedback,
+        bool fade = false
+    )
     {
         _validationErrors = errors;
         _validated = true;
-        _feedback = feedback;
-        _operationFailed = true;
-        _selectedNodeId ??= errors.FirstOrDefault(error => error.NodeId is not null)?.NodeId;
+        if (fade)
+        {
+            ShowTimedValidationFeedback(feedback, failed: true);
+        }
+        else
+        {
+            CancelValidationFeedback();
+            _feedback = feedback;
+            _operationFailed = true;
+        }
+        if (_selectedNodeIds.Count == 0)
+        {
+            SetSingleNodeSelection(
+                errors.FirstOrDefault(error => error.NodeId is not null)?.NodeId
+            );
+        }
+    }
+
+    private void ShowTimedValidationFeedback(string message, bool failed)
+    {
+        CancelValidationFeedback();
+        _feedback = message;
+        _operationFailed = failed;
+        _feedbackFading = false;
+        _validationFeedbackCancellation = new();
+        _ = FadeValidationFeedbackAsync(_validationFeedbackCancellation.Token);
+    }
+
+    private async Task FadeValidationFeedbackAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(9), cancellationToken);
+            _feedbackFading = true;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            _feedback = null;
+            _feedbackFading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private void CancelValidationFeedback()
+    {
+        _validationFeedbackCancellation?.Cancel();
+        _validationFeedbackCancellation?.Dispose();
+        _validationFeedbackCancellation = null;
+        _feedbackFading = false;
     }
 
     private void ShowUnavailable()
     {
         _feedback =
-            "Automations are unavailable for this channel. Check Channel setup and try again.";
+            "Automations are unavailable for this channel. Check Channel setup. Then, try again.";
         _operationFailed = true;
     }
 
     private void EditorChanged()
     {
+        CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];
         _sampleOutcomes = [];
@@ -671,6 +879,7 @@ public partial class AutomationEditorPage
 
     private void ResetTransientState()
     {
+        CancelValidationFeedback();
         _validated = false;
         _validationErrors = [];
         _sampleOutcomes = [];
@@ -680,12 +889,8 @@ public partial class AutomationEditorPage
         _enableConfirmation = false;
         _deleteConfirmation = false;
         _hasChanges = false;
+        _flowRecoveryMessage = null;
     }
-
-    private bool CannotAdd(AutomationDefinitionDescriptor definition) =>
-        definition.Kind == AutomationNodeKind.Source
-        && _editor?.Nodes.Any(static node => node.Definition.Kind == AutomationNodeKind.Source)
-            == true;
 
     private AutomationActionCapabilities CurrentCapabilities() =>
         _editor?.Nodes.Aggregate(
@@ -693,13 +898,53 @@ public partial class AutomationEditorPage
             static (capabilities, node) => capabilities | node.Definition.Capabilities
         ) ?? AutomationActionCapabilities.None;
 
-    private void SelectNode(AutomationNodeId nodeId) => _selectedNodeId = nodeId;
+    private AutomationNodeId? SampleSourceId()
+    {
+        var sources = _editor?.Nodes.Where(static node =>
+            node.Definition.Kind == AutomationNodeKind.Source
+        );
+        return sources?.FirstOrDefault(node => node.Id == _selectedNodeId)?.Id
+            ?? sources
+                ?.OrderBy(static node => node.Position.Y.Value)
+                .ThenBy(static node => node.Position.X.Value)
+                .ThenBy(static node => node.Id.Value)
+                .FirstOrDefault()
+                ?.Id;
+    }
 
-    private void ClearSelection() => _selectedNodeId = null;
+    private void SelectNode(AutomationNodeId nodeId) => SetSingleNodeSelection(nodeId);
+
+    private void SetSingleNodeSelection(AutomationNodeId? nodeId)
+    {
+        _selectedNodeIds.Clear();
+        if (nodeId is { } selected)
+        {
+            _ = _selectedNodeIds.Add(selected);
+        }
+
+        _selectedNodeId = nodeId;
+        _selectedEdgeId = null;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedNodeIds.Clear();
+        _selectedNodeId = null;
+        _selectedEdgeId = null;
+    }
 
     private void SetMode(AutomationEditorMode mode) => _mode = mode;
 
-    private void ToggleNodeLibrary() => _nodeLibraryOpen = !_nodeLibraryOpen;
+    private void ToggleNodeLibrary()
+    {
+        _nodeLibraryOpen = !_nodeLibraryOpen;
+        if (_nodeLibraryOpen)
+        {
+            _nodeSearch = string.Empty;
+        }
+    }
+
+    private void CloseNodeLibrary() => _nodeLibraryOpen = false;
 
     private void CancelEnable() => _enableConfirmation = false;
 
@@ -707,9 +952,6 @@ public partial class AutomationEditorPage
         _feedback = _recentRuns.FirstOrDefault() is { } run
             ? $"Recent run: {RecentRunDescription(run)}"
             : "No persisted runs are available for this channel.";
-
-    private void OpenHelp() =>
-        _feedback = "Use the Page help (?) button in the top bar for the complete guide.";
 
     private string FlowStatusLabel(AutomationFlowSnapshot flow) =>
         flow.Draft.IsEnabled ? "Enabled"
@@ -747,26 +989,38 @@ public partial class AutomationEditorPage
         {
             AutomationFlowRunState.Completed => "Last live run completed",
             AutomationFlowRunState.Failed => "Last live run failed",
-            AutomationFlowRunState.Waiting => "Live run is waiting",
-            AutomationFlowRunState.Running => "Live run is running",
+            AutomationFlowRunState.Waiting => "Live run waits",
+            AutomationFlowRunState.Running => "Live run is active",
             _ => "Last live run was stopped",
         };
 
     private string RecentRunDescription(AutomationRunSummary run)
     {
-        var failed = run.Nodes.FirstOrDefault(node => node.State == AutomationNodeRunState.Failed);
+        var failed = run.FailedNode;
         var failedName = failed is null
             ? null
             : _editor
                 ?.Nodes.FirstOrDefault(node => node.Id == failed.NodeId)
                 ?.Definition.Display.Name;
         return failedName is null
-            ? $"{run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}"
+                ? $"{run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}"
+            : failed!.State == AutomationNodeRunState.ContinuedAfterFailure
+                ? $"Failure continued at {failedName} · {run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}"
             : $"Failed at {failedName} · {run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}";
     }
 
     private static string FormatTimestamp(DateTimeOffset timestamp) =>
         timestamp.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            CancelValidationFeedback();
+        }
+
+        base.Dispose(disposing);
+    }
 
     private enum AutomationEditorMode
     {

@@ -178,6 +178,7 @@ public sealed class AutomationFlowService(
 
     public async Task<AutomationSampleRunOutcome> RunSampleAsync(
         AutomationFlowDraft draft,
+        AutomationNodeId sourceNodeId,
         CancellationToken cancellationToken
     )
     {
@@ -201,7 +202,17 @@ public sealed class AutomationFlowService(
         var host = await db
             .Hosts.AsNoTracking()
             .SingleAsync(value => value.Id == draft.HostId.Value, cancellationToken);
-        return EvaluateSample(draft, SampleContext(host));
+        var sourceDefinitionId = draft
+            .Nodes.FirstOrDefault(node => node.Id == sourceNodeId)
+            ?.Definition.TypeId;
+        return EvaluateSample(
+            draft,
+            sourceNodeId,
+            SampleContext(
+                host,
+                sourceDefinitionId ?? AutomationDefinitionIds.IncomingRaidSource.Value
+            )
+        );
     }
 
     public async Task<AutomationFlowSaveOutcome> SaveAsync(
@@ -263,6 +274,8 @@ public sealed class AutomationFlowService(
         flow.Name = draft.Name.Trim();
         flow.SchemaVersion = draft.SchemaVersion;
         flow.IsEnabled = draft.IsEnabled;
+        flow.UseVerticalLayout = draft.Canvas.Orientation == AutomationFlowOrientation.Vertical;
+        flow.UseSmoothEdges = draft.Canvas.EdgeStyle == AutomationEdgeStyle.Smooth;
         flow.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         db.AutomationFlowNodes.AddRange(draft.Nodes.Select(node => Persist(flow.Id, node)));
         db.AutomationFlowEdges.AddRange(draft.Edges.Select(edge => Persist(flow.Id, edge)));
@@ -308,12 +321,13 @@ public sealed class AutomationFlowService(
             .Where(value => value.Id == hostId.Value)
             .Select(static value => value.EnabledFeatures)
             .SingleAsync(cancellationToken);
-        var required = AutomationRequiredFeatures.ForDefinitions(
-            flow.Nodes.Select(static node => node.DefinitionId)
+        var capabilityErrors = CapabilityUnavailableErrors(
+            flow.Nodes.Select(static node => (new AutomationNodeId(node.Id), node.DefinitionId)),
+            enabledFeatures
         );
-        if (!enabledFeatures.Contains(required))
+        if (enabled && !capabilityErrors.IsEmpty)
         {
-            return new AutomationFlowEnableOutcome.FeatureDisabled();
+            return new AutomationFlowEnableOutcome.Invalid(capabilityErrors);
         }
 
         if (enabled)
@@ -359,7 +373,7 @@ public sealed class AutomationFlowService(
         }
         else if (draft.Name.Trim().Length > 200)
         {
-            errors.Add(new(null, "name-too-long", "Flow names cannot exceed 200 characters."));
+            errors.Add(new(null, "name-too-long", "Use 200 characters or fewer in the flow name."));
         }
 
         if (draft.SchemaVersion != AutomationFlowSchema.CurrentVersion)
@@ -367,13 +381,32 @@ public sealed class AutomationFlowService(
             errors.Add(new(null, "schema-invalid", "Choose a supported flow schema version."));
         }
 
+        if (!Enum.IsDefined(draft.Canvas.Orientation) || !Enum.IsDefined(draft.Canvas.EdgeStyle))
+        {
+            errors.Add(new(null, "canvas-settings-invalid", "Select a supported flow layout."));
+        }
+
         var definitions = snapshot.Definitions.ToDictionary(static value => value.Id);
+        foreach (
+            var definitionId in draft.Nodes.Select(static node => new AutomationDefinitionId(
+                node.Definition.TypeId
+            ))
+        )
+        {
+            if (
+                !definitions.ContainsKey(definitionId)
+                && catalog.TryDescribe(definitionId, out var descriptor)
+            )
+            {
+                definitions.Add(definitionId, descriptor);
+            }
+        }
         var nodes = new Dictionary<AutomationNodeId, AutomationFlowDraftNode>();
         foreach (var node in draft.Nodes)
         {
             if (node.Id.Value == Guid.Empty || !nodes.TryAdd(node.Id, node))
             {
-                errors.Add(new(node.Id, "node-id-invalid", "Every node needs a unique identity."));
+                errors.Add(new(node.Id, "node-id-invalid", "Delete this duplicate node."));
                 continue;
             }
 
@@ -386,11 +419,9 @@ public sealed class AutomationFlowService(
                 && definition.Kind == AutomationNodeKind.Source
             )
             .ToArray();
-        if (sources.Length != 1)
+        if (sources.Length == 0)
         {
-            errors.Add(
-                new(null, "source-count", "A flow must contain exactly one event source node.")
-            );
+            errors.Add(new(null, "source-count", "Add one or more trigger nodes."));
         }
 
         var incoming = nodes.Keys.ToDictionary(static id => id, static _ => 0);
@@ -403,7 +434,7 @@ public sealed class AutomationFlowService(
         {
             if (edge.Id == Guid.Empty || !edgeIds.Add(edge.Id))
             {
-                errors.Add(new(null, "edge-id-invalid", "Every edge needs a unique identity."));
+                errors.Add(new(null, "edge-id-invalid", "Delete the duplicate connection."));
             }
 
             if (
@@ -411,7 +442,7 @@ public sealed class AutomationFlowService(
                 || !nodes.TryGetValue(edge.TargetNodeId, out var target)
             )
             {
-                errors.Add(new(null, "edge-node-missing", "Every edge must connect saved nodes."));
+                errors.Add(new(null, "edge-node-missing", "Reconnect the saved nodes."));
                 continue;
             }
 
@@ -429,37 +460,33 @@ public sealed class AutomationFlowService(
             if (isSource && count != 0)
             {
                 errors.Add(
-                    new(nodeId, "source-incoming", "An event source cannot have an incoming edge.")
+                    new(nodeId, "source-incoming", "Remove the input connection from this trigger.")
                 );
             }
-            else if (!isSource && count != 1)
+            else if (!isSource && count == 0)
             {
                 errors.Add(
                     new(
                         nodeId,
-                        count > 1 ? "join-not-supported" : "node-disconnected",
-                        count > 1
-                            ? "A v1 flow node cannot join multiple incoming branches."
-                            : "Every non-source node must have one incoming edge."
+                        "node-disconnected",
+                        "Connect this node to a trigger or another node."
                     )
                 );
             }
         }
 
-        if (sources.Length == 1)
+        if (sources.Length > 0)
         {
-            var reached = Reachable(sources[0].Id, adjacency);
+            var reached = Reachable(sources.Select(static source => source.Id), adjacency);
             foreach (var nodeId in nodes.Keys.Where(nodeId => !reached.Contains(nodeId)))
             {
-                errors.Add(
-                    new(nodeId, "node-disconnected", "Every node must connect to the event source.")
-                );
+                errors.Add(new(nodeId, "node-disconnected", "Connect this node to a trigger."));
             }
         }
 
         if (HasCycle(adjacency))
         {
-            errors.Add(new(null, "cycle", "Automation flows cannot contain cycles."));
+            errors.Add(new(null, "cycle", "Remove the connection that creates a loop."));
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -468,12 +495,14 @@ public sealed class AutomationFlowService(
             .Where(value => value.Id == draft.HostId.Value)
             .Select(static value => value.EnabledFeatures)
             .SingleAsync(cancellationToken);
-        var required = AutomationRequiredFeatures.ForDefinitions(
-            draft.Nodes.Select(static node => node.Definition.TypeId)
+        errors.AddRange(
+            CapabilityUnavailableErrors(
+                draft.Nodes.Select(static node => (node.Id, node.Definition.TypeId)),
+                enabledFeatures
+            )
         );
-        return enabledFeatures.Contains(required)
-            ? new(null, errors.ToImmutable())
-            : new(AutomationCatalogAvailability.Disabled, []);
+
+        return new(null, errors.ToImmutable());
     }
 
     private async Task ValidateNodeAsync(
@@ -510,20 +539,14 @@ public sealed class AutomationFlowService(
         if (check is not AutomationConfigurationCheck.Valid valid)
         {
             errors.Add(
-                new(
-                    node.Id,
-                    "configuration-invalid",
-                    "The node type, schema, or configuration is not valid."
-                )
+                new(node.Id, "configuration-invalid", "Restore this node type, or delete the node.")
             );
             return;
         }
 
         if (!Enum.IsDefined(node.FailurePolicy))
         {
-            errors.Add(
-                new(node.Id, "failure-policy-invalid", "Choose stop or continue on failure.")
-            );
+            errors.Add(new(node.Id, "failure-policy-invalid", "Choose Stop or Continue."));
         }
 
         if (node.ExpressionLanguageVersion != AutomationExpressionLanguage.CurrentVersion)
@@ -532,7 +555,7 @@ public sealed class AutomationFlowService(
                 new(
                     node.Id,
                     "expression-version-unsupported",
-                    "The node expression language version is not supported."
+                    "Replace this node. Its expression version is not supported."
                 )
             );
         }
@@ -544,7 +567,14 @@ public sealed class AutomationFlowService(
             ) is AutomationExpressionCheck.Invalid
         )
         {
-            errors.Add(new(node.Id, "condition-invalid", "The condition expression is not valid."));
+            errors.Add(
+                new(
+                    node.Id,
+                    "condition-invalid",
+                    "Enter a valid condition expression.",
+                    new("expression")
+                )
+            );
         }
 
         if (
@@ -556,7 +586,8 @@ public sealed class AutomationFlowService(
                 new(
                     node.Id,
                     "action-expression-invalid",
-                    "The chat message expression is not valid."
+                    "Enter a valid chat message expression.",
+                    new("message")
                 )
             );
         }
@@ -573,7 +604,7 @@ public sealed class AutomationFlowService(
                     new(
                         node.Id,
                         "overlay-reference-unavailable",
-                        "Choose an available Cue player and saved cue for this channel."
+                        "Choose an available Cue player and saved cue."
                     )
                 );
             }
@@ -596,7 +627,7 @@ public sealed class AutomationFlowService(
                     new(
                         node.Id,
                         "reward-reference-unavailable",
-                        "Choose a Custom Reward that exists on this channel."
+                        "Choose a Custom Reward from this channel."
                     )
                 );
             }
@@ -618,7 +649,7 @@ public sealed class AutomationFlowService(
                     new(
                         node.Id,
                         "custom-command-reference-unavailable",
-                        "Choose a custom command that exists on this channel."
+                        "Choose a custom command from this channel."
                     )
                 );
             }
@@ -637,17 +668,13 @@ public sealed class AutomationFlowService(
             )
             {
                 errors.Add(
-                    new(
-                        node.Id,
-                        "action-field-invalid",
-                        "The expression must target an action configuration field."
-                    )
+                    new(node.Id, "action-field-invalid", "Select a field from this action.")
                 );
             }
             else if (expressions.Validate(expression) is AutomationExpressionCheck.Invalid)
             {
                 errors.Add(
-                    new(node.Id, "action-expression-invalid", "The action expression is not valid.")
+                    new(node.Id, "action-expression-invalid", "Enter a valid action expression.")
                 );
             }
         }
@@ -674,7 +701,7 @@ public sealed class AutomationFlowService(
         if (output is null || input is null)
         {
             errors.Add(
-                new(edge.TargetNodeId, "port-missing", "The edge references an unavailable port.")
+                new(edge.TargetNodeId, "port-missing", "Reconnect this node to an available port.")
             );
         }
         else if (
@@ -687,20 +714,23 @@ public sealed class AutomationFlowService(
                 new(
                     edge.TargetNodeId,
                     "port-incompatible",
-                    "The connected ports are not type-compatible flow ports."
+                    "Connect ports that have the same type."
                 )
             );
         }
     }
 
     private static HashSet<AutomationNodeId> Reachable(
-        AutomationNodeId source,
+        IEnumerable<AutomationNodeId> sources,
         IReadOnlyDictionary<AutomationNodeId, List<AutomationNodeId>> adjacency
     )
     {
         var reached = new HashSet<AutomationNodeId>();
         var pending = new Stack<AutomationNodeId>();
-        pending.Push(source);
+        foreach (var source in sources)
+        {
+            pending.Push(source);
+        }
         while (pending.TryPop(out var nodeId) && reached.Add(nodeId))
         {
             foreach (var target in adjacency[nodeId])
@@ -804,7 +834,13 @@ public sealed class AutomationFlowService(
                     new(edge.TargetNodeId),
                     new(edge.TargetPortId)
                 ))
-                .ToImmutableArray()
+                .ToImmutableArray(),
+            new(
+                flow.UseVerticalLayout
+                    ? AutomationFlowOrientation.Vertical
+                    : AutomationFlowOrientation.Horizontal,
+                flow.UseSmoothEdges ? AutomationEdgeStyle.Smooth : AutomationEdgeStyle.Angular
+            )
         );
 
     private static string DuplicateName(string name)
@@ -814,15 +850,62 @@ public sealed class AutomationFlowService(
         return Prefix + name[..Math.Min(name.Length, maximumOriginalLength)];
     }
 
+    private static ImmutableArray<AutomationGraphError> CapabilityUnavailableErrors(
+        IEnumerable<(AutomationNodeId NodeId, string DefinitionId)> nodes,
+        HostFeatureFlags enabled
+    ) =>
+        [
+            .. nodes
+                .Select(node =>
+                    (
+                        node.NodeId,
+                        Unavailable: AutomationRequiredFeatures.ForDefinitions([node.DefinitionId])
+                            & ~enabled
+                    )
+                )
+                .Where(static node => node.Unavailable != HostFeatureFlags.None)
+                .Select(static node => CapabilityUnavailableError(node.NodeId, node.Unavailable)),
+        ];
+
+    private static AutomationGraphError CapabilityUnavailableError(
+        AutomationNodeId nodeId,
+        HostFeatureFlags unavailable
+    )
+    {
+        var names = HostFeatureCatalog
+            .Cards(unavailable)
+            .Where(static card => card.Enabled)
+            .Select(static card => card.Name)
+            .ToArray();
+        return new(
+            nodeId,
+            "capability-unavailable",
+            names.Length == 0
+                ? "Turn on the required channel tool in Channel setup."
+                : $"Turn on {string.Join(", ", names)} in Channel setup."
+        );
+    }
+
     private AutomationSampleRunOutcome EvaluateSample(
         AutomationFlowDraft draft,
+        AutomationNodeId sourceNodeId,
         AutomationContext context
     )
     {
-        var source = draft.Nodes.Single(node =>
-            catalog.ValidatePersistedDefinition(node.Definition)
-                is AutomationConfigurationCheck.Valid { Definition.Kind: AutomationNodeKind.Source }
-        );
+        var source = draft.Nodes.FirstOrDefault(node => node.Id == sourceNodeId);
+        if (
+            source is null
+            || catalog.ValidatePersistedDefinition(source.Definition)
+                is not AutomationConfigurationCheck.Valid
+                {
+                    Definition.Kind: AutomationNodeKind.Source,
+                }
+        )
+        {
+            return new AutomationSampleRunOutcome.Invalid([
+                new(sourceNodeId, "sample-source-invalid", "Select a trigger node for the sample."),
+            ]);
+        }
         var outcomes = ImmutableArray.CreateBuilder<AutomationSampleNodeOutcome>();
         outcomes.Add(new(source.Id, AutomationNodeRunState.Succeeded, "source-received"));
         var pending = new Queue<AutomationNodeId>(Outgoing(draft.Edges, source.Id, null));
@@ -897,11 +980,11 @@ public sealed class AutomationFlowService(
             _ => new(AutomationNodeRunState.Failed, "condition-invalid", null),
         };
 
-    private static AutomationContext SampleContext(BotHost host)
+    private static AutomationContext SampleContext(BotHost host, string sourceDefinitionId)
     {
         var now = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
         return new(
-            new(Guid.NewGuid(), AutomationDefinitionIds.IncomingRaidSource),
+            new(Guid.NewGuid(), new(sourceDefinitionId)),
             new("sample-viewer", "sample_viewer", "Sample Viewer"),
             new(
                 new(host.Id),

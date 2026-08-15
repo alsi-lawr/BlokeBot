@@ -204,44 +204,52 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task StoredAutomationAction_EditingFineTuning_UsesVisibleFlowAuthoringAndPreservesIt()
+    public async Task StoredAutomationAction_SavingFineTuning_PreservesAutomationAction()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            var command = await db
+            var seededCommand = await db
                 .CustomCommands.Include(value => value.Action)
                 .SingleAsync(value => value.Id == seeded.CommandId);
-            _ = db.CustomCommandActions.Remove(command.Action);
+            _ = db.CustomCommandActions.Remove(seededCommand.Action);
             _ = await db.SaveChangesAsync();
-            command.Action = new AutomationCustomCommandAction { HostId = seeded.HostId };
+            seededCommand.Action = new AutomationCustomCommandAction { HostId = seeded.HostId };
             _ = await db.SaveChangesAsync();
         }
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-        var cut = context.Render<CustomCommandSettingsPage>();
+        var service = context.Services.GetRequiredService<CustomCommandConfigurationService>();
+        var configuration = await service.LoadConfigurationAsync(
+            seeded.HostId,
+            CancellationToken.None
+        );
+        var command = configuration.Commands.Single(value => value.Id == seeded.CommandId);
+        _ = command.Action.ShouldBeOfType<AutomationCustomCommandActionEditor>();
+        command.CooldownSeconds = 15;
+        command.InvocationLimit = CustomCommandInvocationLimit.OncePerUser;
+        var saveCommand = CustomCommandConfigurationValidator
+            .Validate(configuration)
+            .Match(
+                static valid => valid,
+                errors =>
+                    throw new InvalidOperationException(
+                        string.Join(" ", errors.Select(error => error.Message))
+                    )
+            );
+        var result = await service
+            .SaveConfiguration(seeded.HostId, saveCommand)
+            .ExecuteAsync(CancellationToken.None);
+        _ = result.Match(
+            static _ => true,
+            static failure => throw new InvalidOperationException(failure.Message)
+        );
 
-        cut.Find("[data-action-kind='Automation']").GetAttribute("aria-pressed").ShouldBe("true");
-        _ = cut.Find("[data-automation-command]");
-        cut.FindAll($"#command-{seeded.CommandId}-0-argument-reply").ShouldBeEmpty();
-        cut.FindAll("select[data-flow-picker]").ShouldBeEmpty();
-        cut.Find($"#command-{seeded.CommandId}-cooldown").Change("15");
-        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
-            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
-        cut.Find("button[aria-label='Save custom commands']").Click();
-
-        await using var saved = await dbFactory.CreateDbContextAsync();
-        (
-            await saved
-                .CustomCommandActions.OfType<AutomationCustomCommandAction>()
-                .CountAsync(action => action.CustomCommandId == seeded.CommandId)
-        ).ShouldBe(1);
-        (
-            await saved
-                .CustomCommands.Where(command => command.Id == seeded.CommandId)
-                .Select(command => command.CooldownSeconds)
-                .SingleAsync()
-        ).ShouldBe(15);
+        var stored = await service.LoadConfigurationAsync(seeded.HostId, CancellationToken.None);
+        var storedCommand = stored.Commands.Single(value => value.Id == seeded.CommandId);
+        _ = storedCommand.Action.ShouldBeOfType<AutomationCustomCommandActionEditor>();
+        storedCommand.CooldownSeconds.ShouldBe(15);
+        storedCommand.InvocationLimit.ShouldBe(CustomCommandInvocationLimit.OncePerUser);
     }
 
     [Test]

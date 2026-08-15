@@ -84,7 +84,7 @@ internal sealed class RedemptionCompletionPolicyObserver(
             return;
         }
 
-        if (ReadPolicy(run.DefinitionJson) is not { } policy)
+        if (ReadPolicy(run.DefinitionJson, run.SourceNodeId) is not { } policy)
         {
             return;
         }
@@ -173,12 +173,20 @@ internal sealed class RedemptionCompletionPolicyObserver(
         }
     }
 
-    private static RedemptionCompletionPolicy? ReadPolicy(string definitionJson)
+    private static RedemptionCompletionPolicy? ReadPolicy(string definitionJson, Guid sourceNodeId)
     {
         var flow = AutomationRuntimeSerialization.DeserializeDefinition(definitionJson);
-        var source = flow.Nodes.FirstOrDefault(node =>
-            node.DefinitionId == AutomationDefinitionIds.RewardRedemptionSource.Value
-        );
+        var sources = flow
+            .Nodes.Where(node =>
+                node.DefinitionId == AutomationDefinitionIds.RewardRedemptionSource.Value
+            )
+            .ToArray();
+        var source =
+            sourceNodeId == Guid.Empty
+                ? sources.Length == 1
+                    ? sources[0]
+                    : null
+                : sources.FirstOrDefault(node => node.Id == sourceNodeId);
         if (source is null)
         {
             return null;

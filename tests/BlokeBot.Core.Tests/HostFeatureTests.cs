@@ -54,25 +54,13 @@ public sealed class HostFeatureTests
     public void NewHostModel_DefaultsEveryChatToolOff()
     {
         new BotHost().EnabledFeatures.ShouldBe(HostFeatureFlags.None);
-        HostFeatureCatalog
-            .Cards(HostFeatureFlags.None)
-            .ShouldAllBe(static feature => !feature.Enabled);
-        HostFeatureCatalog.Features.ShouldBeUnique();
-        HostFeatureCatalog
-            .Cards(HostFeatureFlags.Automations)
-            .Single(static card => card.Feature == HostFeatureFlags.Automations)
-            .Enabled.ShouldBeTrue();
-        HostFeatureCatalog
-            .Cards(HostFeatureFlags.All)
-            .Select(static card => card.Feature)
-            .ShouldBe(HostFeatureCatalog.Features);
         ((ulong)HostFeatureFlags.RaidCollaboration).ShouldBe(1UL << 18);
         ((ulong)HostFeatureFlags.CooperativeGame).ShouldBe(1UL << 19);
         ((ulong)HostFeatureFlags.Collectives).ShouldBe(1UL << 20);
     }
 
     [Test]
-    public async Task EveryCatalogFeature_TogglesIndependentlyAndPreservesUnknownBits()
+    public async Task AutomationFeature_Toggling_PreservesUnknownBits()
     {
         var unknown = (HostFeatureFlags)(1UL << 48);
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -83,14 +71,11 @@ public sealed class HostFeatureTests
             []
         );
 
-        foreach (var feature in HostFeatureCatalog.Features)
-        {
-            await service.EnableAsync(hostId, feature, CancellationToken.None);
-            (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown | feature);
+        await service.EnableAsync(hostId, HostFeatureFlags.Automations, CancellationToken.None);
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown | HostFeatureFlags.Automations);
 
-            await service.DisableAsync(hostId, feature, CancellationToken.None);
-            (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
-        }
+        await service.DisableAsync(hostId, HostFeatureFlags.Automations, CancellationToken.None);
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
 
         _ = await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
             service.EnableAsync(

@@ -97,6 +97,7 @@ internal sealed class SimulationFixtureSeeder(
 
         var flowId = Guid.Parse("1b10be82-0000-4000-8000-000000000001");
         var sourceId = Guid.Parse("1b10be82-0000-4000-8000-000000000011");
+        var commandSourceId = Guid.Parse("1b10be82-0000-4000-8000-000000000015");
         var conditionId = Guid.Parse("1b10be82-0000-4000-8000-000000000012");
         var chatId = Guid.Parse("1b10be82-0000-4000-8000-000000000013");
         var overlayId = Guid.Parse("1b10be82-0000-4000-8000-000000000014");
@@ -110,6 +111,10 @@ internal sealed class SimulationFixtureSeeder(
             .OverlayCues.Where(value => value.HostId == hostId)
             .OrderBy(static value => value.Id)
             .FirstAsync(cancellationToken);
+        var commandId = await db
+            .CustomCommands.Where(value => value.HostId == hostId && value.Name == "Welcome viewer")
+            .Select(static value => value.Id)
+            .SingleAsync(cancellationToken);
         var flow = new AutomationFlow
         {
             Id = flowId,
@@ -128,6 +133,14 @@ internal sealed class SimulationFixtureSeeder(
                     """{"minimum-viewers":20}""",
                     24,
                     216
+                ),
+                AutomationNode(
+                    commandSourceId,
+                    flowId,
+                    "custom-command",
+                    $$"""{"custom-command-id":{{commandId}}}""",
+                    24,
+                    408
                 ),
                 AutomationNode(
                     conditionId,
@@ -156,9 +169,34 @@ internal sealed class SimulationFixtureSeeder(
             ],
             Edges =
             [
-                AutomationEdge(flowId, sourceId, "flow", conditionId),
-                AutomationEdge(flowId, conditionId, "true", chatId),
-                AutomationEdge(flowId, conditionId, "false", overlayId),
+                AutomationEdge(
+                    Guid.Parse("1b10be82-0000-4000-8000-000000000031"),
+                    flowId,
+                    sourceId,
+                    "flow",
+                    conditionId
+                ),
+                AutomationEdge(
+                    Guid.Parse("1b10be82-0000-4000-8000-000000000032"),
+                    flowId,
+                    commandSourceId,
+                    "flow",
+                    conditionId
+                ),
+                AutomationEdge(
+                    Guid.Parse("1b10be82-0000-4000-8000-000000000033"),
+                    flowId,
+                    conditionId,
+                    "true",
+                    chatId
+                ),
+                AutomationEdge(
+                    Guid.Parse("1b10be82-0000-4000-8000-000000000034"),
+                    flowId,
+                    conditionId,
+                    "false",
+                    overlayId
+                ),
             ],
         };
         _ = db.AutomationFlows.Add(flow);
@@ -197,6 +235,7 @@ internal sealed class SimulationFixtureSeeder(
                 RequiredFeatures = HostFeatureFlags.Automations,
                 ContextSchemaVersion = 1,
                 SourceDefinitionId = "incoming-raid",
+                SourceNodeId = sourceId,
                 SourceOccurrenceId = Guid.Parse("1b10be82-0000-4000-8000-000000000022"),
                 ContextJson = "{}",
                 DefinitionJson = "{}",
@@ -261,30 +300,21 @@ internal sealed class SimulationFixtureSeeder(
         };
 
     private static AutomationFlowEdge AutomationEdge(
+        Guid id,
         Guid flowId,
         Guid sourceNodeId,
         string sourcePortId,
         Guid targetNodeId
-    )
-    {
-        var edgeBytes = sourceNodeId.ToByteArray();
-        var targetBytes = targetNodeId.ToByteArray();
-        for (var index = 0; index < edgeBytes.Length; index++)
+    ) =>
+        new()
         {
-            edgeBytes[index] ^= targetBytes[index];
-        }
-
-        edgeBytes[15] ^= (byte)sourcePortId.Length;
-        return new()
-        {
-            Id = new(edgeBytes),
+            Id = id,
             FlowId = flowId,
             SourceNodeId = sourceNodeId,
             SourcePortId = sourcePortId,
             TargetNodeId = targetNodeId,
             TargetPortId = "flow",
         };
-    }
 
     private static AutomationNodeRun AutomationNodeRun(
         Guid nodeId,

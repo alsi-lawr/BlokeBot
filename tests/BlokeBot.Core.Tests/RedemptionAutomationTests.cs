@@ -420,6 +420,28 @@ public sealed class RedemptionAutomationTests
     }
 
     [Test]
+    public async Task MultipleRedemptionTriggers_ApplyThePolicyOfEachIndependentRun()
+    {
+        await using var fixture = await RedemptionFixture.CreateAsync();
+        await fixture.SeedRewardAsync("reward-a", manageable: true);
+        var fulfil = Node("reward-redemption", """{"completion-policy":"fulfil-on-success"}""");
+        var manual = Node("reward-redemption", """{"completion-policy":"manual"}""");
+        var action = Node("send-chat", """{"message":"Redeemed!"}""");
+        _ = await fixture.SaveAsync(
+            [fulfil, manual, action],
+            [Edge(fulfil, "flow", action), Edge(manual, "flow", action)]
+        );
+
+        await fixture.Runtime.RewardRedemptionReceivedAsync(
+            fixture.Redemption("message-1"),
+            CancellationToken.None
+        );
+
+        (await fixture.RunCountAsync()).ShouldBe(2);
+        fixture.Redemptions.Calls.ShouldBe([(fixture.HostId, "redemption-1", true)]);
+    }
+
+    [Test]
     public async Task CompletionPolicy_CancelsOnFailureAndOnlyOnFailure()
     {
         await using var fixture = await RedemptionFixture.CreateAsync();

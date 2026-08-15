@@ -15,6 +15,23 @@ public readonly record struct AutomationCanvasPosition(
     AutomationCanvasCoordinate Y
 );
 
+public enum AutomationFlowOrientation
+{
+    Horizontal,
+    Vertical,
+}
+
+public enum AutomationEdgeStyle
+{
+    Angular,
+    Smooth,
+}
+
+public readonly record struct AutomationFlowCanvasSettings(
+    AutomationFlowOrientation Orientation,
+    AutomationEdgeStyle EdgeStyle
+);
+
 public readonly record struct AutomationExpressionLanguageVersion(int Value);
 
 public static class AutomationExpressionLanguage
@@ -70,7 +87,8 @@ public sealed record AutomationFlowDraft(
     int SchemaVersion,
     bool IsEnabled,
     ImmutableArray<AutomationFlowDraftNode> Nodes,
-    ImmutableArray<AutomationFlowDraftEdge> Edges
+    ImmutableArray<AutomationFlowDraftEdge> Edges,
+    AutomationFlowCanvasSettings Canvas = default
 );
 
 public sealed record AutomationGraphError(
@@ -250,7 +268,15 @@ public sealed record AutomationRunSummary(
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     ImmutableArray<AutomationNodeRunSummary> Nodes
-);
+)
+{
+    public AutomationNodeRunSummary? FailedNode =>
+        Nodes.FirstOrDefault(static node =>
+            node.State
+                is AutomationNodeRunState.Failed
+                    or AutomationNodeRunState.ContinuedAfterFailure
+        );
+}
 
 public enum AutomationFlowRunState
 {

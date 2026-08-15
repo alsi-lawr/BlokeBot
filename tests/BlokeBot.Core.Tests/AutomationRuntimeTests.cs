@@ -30,6 +30,7 @@ public sealed class AutomationRuntimeTests
                 Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]) with
                 {
                     IsEnabled = false,
+                    Canvas = new(AutomationFlowOrientation.Vertical, AutomationEdgeStyle.Smooth),
                 },
                 CancellationToken.None
             )
@@ -53,6 +54,9 @@ public sealed class AutomationRuntimeTests
             .Definition.Configuration.GetProperty("message")
             .GetString()
             .ShouldBe("Welcome ${actor.display_name}!");
+        roundTrip.Canvas.ShouldBe(
+            new(AutomationFlowOrientation.Vertical, AutomationEdgeStyle.Smooth)
+        );
 
         var moved = roundTrip with
         {
@@ -78,6 +82,7 @@ public sealed class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
         var copied = afterDuplicate.Flows.Single(flow => flow.Draft.Id == duplicate.FlowId).Draft;
         copied.IsEnabled.ShouldBeFalse();
+        copied.Canvas.ShouldBe(moved.Canvas);
         copied
             .Nodes.Select(static node => node.Position)
             .ShouldBe(moved.Nodes.Select(static node => node.Position), ignoreOrder: true);
@@ -109,6 +114,7 @@ public sealed class AutomationRuntimeTests
                 [source, condition, action],
                 [Edge(source, "flow", condition), Edge(condition, "true", action)]
             ),
+            source.Id,
             CancellationToken.None
         );
 
@@ -159,7 +165,7 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task FlowValidation_RejectsJoinsCyclesDisconnectedAndIncompatibleEdges()
+    public async Task FlowValidation_RejectsCyclesDisconnectedNodesAndIncompatibleEdges()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
@@ -181,12 +187,44 @@ public sealed class AutomationRuntimeTests
         );
 
         var invalid = outcome.ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
-        invalid.Errors.Select(static error => error.Code).ShouldContain("join-not-supported");
         invalid.Errors.Select(static error => error.Code).ShouldContain("cycle");
         invalid.Errors.Select(static error => error.Code).ShouldContain("node-disconnected");
         invalid.Errors.Select(static error => error.Code).ShouldContain("port-incompatible");
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlows.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task MultipleMatchingTriggers_StartIndependentRunsThroughSharedNode()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var firstSource = Node("custom-command", """{"custom-command-id":7}""");
+        var secondSource = Node("custom-command", """{"custom-command-id":7}""");
+        var shared = Node("send-chat", """{"message":"shared"}""");
+        _ = await fixture.SaveAsync(
+            [firstSource, secondSource, shared],
+            [Edge(firstSource, "flow", shared), Edge(secondSource, "flow", shared)]
+        );
+        var trigger = new AutomationTrigger(
+            Context(fixture.HostId),
+            new CustomCommandSourceConfiguration(new(7))
+        );
+
+        var first = await fixture.Runtime.DispatchAsync(trigger, CancellationToken.None);
+        var duplicate = await fixture.Runtime.DispatchAsync(trigger, CancellationToken.None);
+
+        first.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        first.RunIds.Length.ShouldBe(2);
+        duplicate.Status.ShouldBe(AutomationDispatchStatus.Duplicate);
+        fixture.Chat.Messages.ShouldBe(["shared", "shared"]);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var runs = await db
+            .AutomationFlowRuns.Include(static run => run.NodeRuns)
+            .OrderBy(static run => run.SourceNodeId)
+            .ToArrayAsync();
+        runs.Select(static run => run.SourceNodeId)
+            .ShouldBe([firstSource.Id.Value, secondSource.Id.Value], ignoreOrder: true);
+        runs.ShouldAllBe(run => run.NodeRuns.Count(node => node.NodeId == shared.Id.Value) == 1);
     }
 
     [Test]
@@ -542,6 +580,7 @@ public sealed class AutomationRuntimeTests
                 (AutomationNodeRunState.ContinuedAfterFailure, "chat-rejected"),
                 (AutomationNodeRunState.Succeeded, "action-succeeded"),
             ]);
+        continuedSummary.FailedNode?.NodeId.ShouldBe(continueFailure.Id);
         continued.Chat.Messages.ShouldBe(["reject", "after"]);
         (
             await continued.Runtime.ResumeAsync(

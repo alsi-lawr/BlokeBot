@@ -2060,15 +2060,15 @@ internal static partial class SiteGuideCatalog
             Eyebrow = "Automations",
             Title = "Connect channel events to automatic actions",
             Summary =
-                "Build host-scoped flows on a snapped grid. Connect a typed event to conditions and actions, validate it, test it without live effects, and enable it from the dashboard.",
+                "Build channel flows on a snapped grid. Connect typed triggers to conditions and actions. Then, validate and test the flow before you enable it.",
             Media = new SiteMedia(
-                DarkPhoneSource: "media/automations/phone-dark-visual-automations.png",
-                LightPhoneSource: "media/automations/phone-light-visual-automations.png",
-                DarkLaptopSource: "media/automations/desktop-dark-visual-automations.png",
-                LightLaptopSource: "media/automations/desktop-light-visual-automations.png",
-                PhoneAlt: "BlokeBot Visual automations at 390 pixels with the current flow, vertical snapped nodes and validation state.",
-                LaptopAlt: "BlokeBot Visual automations with a flow library, snapped typed nodes, orthogonal connections and selected-node inspector.",
-                "Grid is the primary desktop editor. The same flow remains usable in the vertical mobile layout and List view."
+                DarkPhoneSource: "media/automations/phone-dark-grid-visual-automations.png",
+                LightPhoneSource: "media/automations/phone-light-grid-visual-automations.png",
+                DarkLaptopSource: "media/automations/desktop-dark-grid-visual-automations.png",
+                LightLaptopSource: "media/automations/desktop-light-grid-visual-automations.png",
+                PhoneAlt: "The Visual automations editor at 390 pixels. It shows snapped nodes and the validation state.",
+                LaptopAlt: "The Visual automations editor. It shows the flow library, typed nodes, connections, and the node inspector.",
+                "Use Grid view to arrange nodes. Use List view to inspect the same flow in its run order."
             ),
             Sections =
             [
@@ -2078,37 +2078,38 @@ internal static partial class SiteGuideCatalog
                     Steps =
                     [
                         "Choose the channel in the top bar and open Channel setup.",
-                        "Open Chat tools and turn on Automations. The feature card persists the change immediately.",
-                        "Open Automations, then Flows. Create a flow and choose one event source from the registered node library.",
+                        "Open Chat tools and turn on Automations. BlokeBot saves the change at once.",
+                        "Open Automations. Create a flow and choose a trigger from the Node library.",
                     ],
                     Paragraphs =
                     [
-                        "Automations is opt-in per channel like every Chat Tools feature. The channel owner or a permitted moderator manages it for the selected channel.",
+                        "Automations is off by default for each channel. The channel owner or a permitted moderator manages it for the selected channel.",
                     ],
                     Note =
-                        "If Automations is off, saved automations and run history remain. Events do not start flows. BlokeBot keeps no automation subscriptions. If you turn it on again, it resumes from the current state. It does not replay suppressed events.",
+                        "If Automations is off, saved flows and run history remain. Events do not start flows.",
                 },
                 new SiteGuideSection
                 {
                     Heading = "Build on the snapped grid",
                     Steps =
                     [
-                        "Add one event source. Add conditions, delays, and actions from the node library.",
-                        "Select a node to edit its typed fields. Connect each output only to a compatible input.",
-                        "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use List view for the same nodes and execution order without the canvas.",
-                        "Save the draft, validate it, and fix any disconnected node, incompatible port, cycle, missing reference, or missing capability.",
+                        "Search the Node library. Add one or more triggers, then add controls and actions.",
+                        "Select a node to edit its typed fields. Connect an output to a compatible input.",
+                        "Drag nodes on the 24-pixel grid, or move them with the keyboard. Use the canvas controls to set the flow direction and connection style.",
+                        "Use Ctrl and the mouse wheel to zoom. Drag the background to move the canvas. Hold Alt and drag to select nodes.",
+                        "Save the draft. Validate it, and fix each disconnected node, invalid input, cycle, missing reference, or unavailable channel tool.",
                     ],
                     Note =
-                        "A flow can have one event source and no joins or cycles. The runtime catalog and validator are authoritative; the browser does not invent a second type system.",
+                        "Each trigger starts a separate flow run. If triggers connect to the same node, each run continues through that node. A flow cannot contain a cycle.",
                 },
                 new SiteGuideSection
                 {
                     Heading = "Test and enable safely",
                     Bullets =
                     [
-                        "Test flow runs a representative event through the graph and reports each node outcome. It sends no chat, changes no points, plays no overlay, and calls no Twitch operation.",
+                        "Test flow runs a sample event through the graph and reports each node result. It does not send chat, change points, play an overlay, or call Twitch.",
                         "Invalid graphs cannot be enabled. A flow that can send public messages, change points, play overlays, or call Twitch shows an explicit warning before enablement.",
-                        "The run drawer shows the latest sample and recent live outcomes, including the node that failed.",
+                        "The run drawer shows the latest sample and recent live results. It identifies the node that failed, even if the flow continued.",
                         "Duplicate copies the graph and node positions as a disabled draft without copying run history.",
                     ],
                 },
@@ -2117,17 +2118,17 @@ internal static partial class SiteGuideCatalog
                     Heading = "Understand a flow",
                     Paragraphs =
                     [
-                        "A flow connects sources to actions through typed connections, so each step only receives the kind of value it understands.",
+                        "A flow connects triggers to actions through typed connections. Each step receives only a compatible value.",
                     ],
                     Bullets =
                     [
                         "A selected custom command, Twitch event or Channel Points redemption can start a flow.",
-                        "A Condition evaluates a CEL expression against the source event data. The flow continues through Matches or Does not match.",
+                        "A Condition checks a CEL expression against the trigger data. The flow continues through Matches or Does not match.",
                         "A Delay waits the configured time before the flow continues. Delayed flows do not block chat or other automations.",
                         "Actions send chat messages, play overlay cues, complete Channel Points redemptions and run native Twitch operations.",
                     ],
                     Note =
-                        "Grid and List views edit the same persisted graph. Saving round-trips each node's typed configuration and snapped position.",
+                        "Grid and List views edit the same saved graph. BlokeBot saves each node configuration and snapped position.",
                 },
                 new SiteGuideSection
                 {

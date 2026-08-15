@@ -595,7 +595,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Channel Points redemption",
-                    "Starts an automation when a viewer redeems a Custom Reward. Externally created rewards trigger read-only automations; only BlokeBot-manageable rewards can be fulfilled or cancelled.",
+                    "Starts an automation when a viewer redeems a Custom Reward. Only BlokeBot can change rewards that it manages.",
                     "Twitch events"
                 ),
                 [],
@@ -609,7 +609,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                     new(
                         new("reward-id"),
                         "Reward filter",
-                        "Only redemptions of the selected Custom Reward start this automation. Leave unset to start on every redemption.",
+                        "Select a Custom Reward to filter the redemptions. Leave this field empty to accept all redemptions.",
                         new AutomationConfigurationFieldType.Reference(
                             AutomationReferenceKind.CustomReward
                         ),
@@ -618,7 +618,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                     new(
                         new("completion-policy"),
                         "Completion policy",
-                        "How the redemption status is updated when the flow finishes: keep it manual, fulfil it when the flow succeeds, or cancel it when the flow fails. Automatic updates apply only to BlokeBot-manageable rewards.",
+                        "Choose how BlokeBot updates the redemption status. You can keep the status manual, fulfil it after success, or cancel it after failure. BlokeBot changes only the rewards that it manages.",
                         new AutomationConfigurationFieldType.Choice(
                             TwitchEventAutomationSources.RedemptionCompletionPolicies
                         ),
@@ -641,7 +641,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Fulfil redemption",
-                    "Marks the triggering Channel Points redemption as fulfilled. Available only for BlokeBot-manageable rewards and unfulfilled redemptions.",
+                    "Marks the Channel Points redemption from the trigger as fulfilled. Use this action only for rewards that BlokeBot manages.",
                     "Channel Points"
                 ),
                 [FlowInput()],
@@ -663,7 +663,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 _schema,
                 new(
                     "Cancel redemption",
-                    "Cancels the triggering Channel Points redemption so Twitch refunds the viewer's points. Available only for BlokeBot-manageable rewards and unfulfilled redemptions.",
+                    "Cancels the Channel Points redemption from the trigger. Twitch refunds the points. Use this action only for rewards that BlokeBot manages.",
                     "Channel Points"
                 ),
                 [FlowInput()],
@@ -683,7 +683,7 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
             || TwitchEventAutomationSources.ParseCompletionPolicy(policyToken) is not { } policy
         )
         {
-            return Invalid("completion-policy", "Choose how the redemption status is completed.");
+            return Invalid("completion-policy", "Choose the result for the redemption status.");
         }
 
         string? rewardId = null;

@@ -1,14 +1,14 @@
-<div class="automation-list-view" role="region" aria-label="Automation execution order">
+<div class="automation-list-view" role="region" aria-label="Automation execution order" data-automation-list>
     <div class="automation-list-heading">
         <div>
-            <p>Keyboard editing</p>
+            <p>Use the keyboard to edit.</p>
             <h2>Execution order</h2>
         </div>
-        <span>Same nodes and validation as Grid</span>
+        <span>This view shows the same nodes and validation.</span>
     </div>
     @if (Nodes.Count == 0)
     {
-        <p class="automation-list-empty">Add an event source to begin this flow.</p>
+        <p class="automation-list-empty">Add a trigger to start this flow.</p>
     }
     else
     {
@@ -31,7 +31,7 @@
                     <div class="automation-order-state">
                         @if (errors.Length > 0)
                         {
-                            <span class="automation-order-error">@errors[0].Message</span>
+                            <span class="automation-order-error">Needs attention</span>
                         }
                         else if (outcome is not null)
                         {

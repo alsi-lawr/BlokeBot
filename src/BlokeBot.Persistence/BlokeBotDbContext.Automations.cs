@@ -58,7 +58,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.HasIndex(static x => new
                 {
                     x.FlowId,
-                    x.SourceDefinitionId,
+                    x.SourceNodeId,
                     x.SourceOccurrenceId,
                 })
                 .IsUnique();

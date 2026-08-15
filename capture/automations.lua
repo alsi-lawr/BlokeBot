@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../src/BlokeBot.Site/wwwroot/media/automations"
-output = "{device}-{theme}-visual-automations.png"
+output = "{device}-{theme}-{mode}-visual-automations.png"
 frame = "builtin:auto"
 browser_arguments = [
   "--disable-background-networking",
@@ -38,6 +38,7 @@ height = 844
 
 [matrix]
 theme = ["light", "dark"]
+mode = ["grid", "list"]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
@@ -68,7 +69,7 @@ local function startServer()
 end
 
 local reachable = pcall(function()
-  viset.http.wait({ url = base_url .. "/app.css", timeout = "3s" })
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "3s" })
 end)
 local server = nil
 if not reachable then
@@ -77,7 +78,8 @@ end
 
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
-  viset.http.wait({ url = base_url .. "/app.css", timeout = "90s" })
+  local mode = viset.context.axes.mode
+  viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "90s" })
   viset.page.navigate(base_url .. "/simulation/login?view=automations&theme=" .. theme)
   viset.page.wait_for(
     viset.javascript([=[
@@ -88,6 +90,25 @@ local succeeded, failure = pcall(function()
     ]=]),
     "40s"
   )
+  if mode == "list" then
+    viset.page.evaluate(viset.javascript([=[
+      document.querySelector('[data-automation-mode="list"]').click();
+      true
+    ]=]))
+    viset.page.wait_for(
+      viset.javascript([=[
+        document.querySelector("[data-automation-list]") !== null
+      ]=]),
+      "20s"
+    )
+  else
+    viset.page.wait_for(
+      viset.javascript([=[
+        document.querySelector('[data-automation-canvas-ready="true"]') !== null
+      ]=]),
+      "20s"
+    )
+  end
   viset.page.evaluate(viset.javascript([=[
     document.querySelector("[data-automation-test-flow]").click();
     true

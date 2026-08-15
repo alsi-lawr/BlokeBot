@@ -26,6 +26,8 @@ public sealed class AutomationFlow
     public string Name { get; set; } = string.Empty;
     public int SchemaVersion { get; set; }
     public bool IsEnabled { get; set; }
+    public bool UseVerticalLayout { get; set; }
+    public bool UseSmoothEdges { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public List<AutomationFlowNode> Nodes { get; set; } = [];
@@ -67,6 +69,7 @@ public sealed class AutomationFlowRun
     public HostFeatureFlags RequiredFeatures { get; set; }
     public int ContextSchemaVersion { get; set; }
     public string SourceDefinitionId { get; set; } = string.Empty;
+    public Guid SourceNodeId { get; set; }
     public Guid SourceOccurrenceId { get; set; }
     public string ContextJson { get; set; } = string.Empty;
     public string DefinitionJson { get; set; } = string.Empty;

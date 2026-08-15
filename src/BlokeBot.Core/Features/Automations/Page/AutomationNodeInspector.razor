@@ -3,7 +3,7 @@
     <aside class="automation-inspector automation-inspector--empty" aria-label="Node inspector">
         <p class="automation-inspector-eyebrow">Inspector</p>
         <h2>Select a node</h2>
-        <p>Choose a node in Grid or List view to edit its typed configuration and connections.</p>
+        <p>Select one node in Grid or List view. Then, edit its fields and connections.</p>
     </aside>
 }
 else
@@ -20,7 +20,8 @@ else
         @foreach (var field in Node.Definition.Configuration)
         {
             var choices = ChoicesFor(field);
-            <div class="automation-field" @key="field.Id">
+            var fieldErrors = FieldErrors(field.Id);
+            <div class="@(fieldErrors.Count > 0 ? "automation-field automation-field--invalid" : "automation-field")" @key="field.Id">
                 <label for="@FieldId(Node.Id, field.Id)">@field.Name</label>
                 @if (field.FieldType is AutomationConfigurationFieldType.Text { Multiline: true })
                 {
@@ -28,6 +29,7 @@ else
                               value="@Node.Value(field.Id)"
                               maxlength="@MaximumLength(field)"
                               required="@field.Required"
+                              aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
                               @oninput="args => SetValueAsync(field.Id, args.Value)"></textarea>
                 }
                 else if (choices.Count > 0)
@@ -35,6 +37,7 @@ else
                     <select id="@FieldId(Node.Id, field.Id)"
                             value="@Node.Value(field.Id)"
                             required="@field.Required"
+                            aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
                             @onchange="args => SetValueAsync(field.Id, args.Value)">
                         @if (!field.Required)
                         {
@@ -58,6 +61,7 @@ else
                            max="@number.Maximum"
                            value="@Node.Value(field.Id)"
                            required="@field.Required"
+                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
                            @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
                 else if (field.FieldType is AutomationConfigurationFieldType.Duration duration)
@@ -68,6 +72,7 @@ else
                            max="@DurationMaximum(field, duration)"
                            value="@Node.Value(field.Id)"
                            required="@field.Required"
+                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
                            @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
                 else
@@ -77,24 +82,24 @@ else
                            value="@Node.Value(field.Id)"
                            maxlength="@MaximumLength(field)"
                            required="@field.Required"
+                           aria-invalid="@(fieldErrors.Count > 0 ? "true" : null)"
                            @oninput="args => SetValueAsync(field.Id, args.Value)" />
                 }
-                <p>@field.Description</p>
-                @foreach (var error in Errors.Where(error => error.NodeId == Node.Id && (error.FieldId is null || error.FieldId == field.Id)))
+                <p>@FieldHelp(field)</p>
+                @foreach (var error in fieldErrors)
                 {
                     <span class="automation-field-error" role="alert">@error.Message</span>
                 }
             </div>
         }
 
-        @if (Node.Definition.Kind is not AutomationNodeKind.Source)
+        @if (_genericErrors.Count > 0)
         {
-            <div class="automation-field">
-                <label for="automation-failure-policy">If this node fails</label>
-                <select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync">
-                    <option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option>
-                    <option value="@AutomationNodeFailurePolicy.Continue">Continue the branch</option>
-                </select>
+            <div class="automation-node-errors" role="alert">
+                @foreach (var error in _genericErrors)
+                {
+                    <span>@error.Message</span>
+                }
             </div>
         }
 
@@ -127,15 +132,16 @@ else
             </section>
         }
 
-        <section class="automation-inspector-section" aria-labelledby="automation-position-heading">
-            <h3 id="automation-position-heading">Grid position</h3>
-            <div class="automation-position-controls">
-                <button type="button" aria-label="Move node left" @onclick="() => NudgeAsync(-24, 0)">←</button>
-                <button type="button" aria-label="Move node up" @onclick="() => NudgeAsync(0, -24)">↑</button>
-                <button type="button" aria-label="Move node down" @onclick="() => NudgeAsync(0, 24)">↓</button>
-                <button type="button" aria-label="Move node right" @onclick="() => NudgeAsync(24, 0)">→</button>
+        @if (Node.Definition.Kind is not AutomationNodeKind.Source)
+        {
+            <div class="automation-field">
+                <label for="automation-failure-policy">If this node fails</label>
+                <select id="automation-failure-policy" @bind="Node.FailurePolicy" @bind:after="ChangedAsync">
+                    <option value="@AutomationNodeFailurePolicy.Stop">Stop this run</option>
+                    <option value="@AutomationNodeFailurePolicy.Continue">Continue this branch</option>
+                </select>
             </div>
-        </section>
+        }
 
         <footer class="automation-inspector-footer">
             <button class="automation-danger-button" type="button" @onclick="() => DeleteNode.InvokeAsync(Node.Id)">Delete node</button>

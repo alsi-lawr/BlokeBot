@@ -3,58 +3,120 @@
 @inject IJSRuntime _js
 
 <div class="automation-canvas-wrap"
-     style="@($"--automation-mobile-canvas-height: {_mobileCanvasHeight}px")"
-     @ref="_root"
-     data-automation-canvas>
-    <div class="automation-canvas-label">24 px grid <span aria-hidden="true">·</span> @_connectionSummary</div>
-    <div class="automation-canvas" role="group" aria-label="Automation flow canvas">
-        <svg class="automation-edges automation-edges--desktop" viewBox="0 0 960 620" aria-hidden="true">
-            @foreach (var edge in Edges)
+     data-automation-canvas-shell
+     data-orientation="@OrientationToken(Settings.Orientation)"
+     data-edge-style="@EdgeStyleToken(Settings.EdgeStyle)">
+    <div class="automation-canvas-tools" aria-label="Canvas controls">
+        <div class="automation-canvas-tool-group" role="group" aria-label="Move selected nodes">
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)">←</button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)">↑</button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes down" @onclick="() => NudgeSelectedAsync(0, 24)">↓</button>
+            <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes right" @onclick="() => NudgeSelectedAsync(24, 0)">→</button>
+        </div>
+        <label>
+            <span>Flow direction</span>
+            <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
+                <option value="@AutomationFlowOrientation.Horizontal">Horizontal</option>
+                <option value="@AutomationFlowOrientation.Vertical">Vertical</option>
+            </select>
+        </label>
+        <label>
+            <span>Connection style</span>
+            <select value="@Settings.EdgeStyle" @onchange="ChangeEdgeStyleAsync">
+                <option value="@AutomationEdgeStyle.Angular">Angular</option>
+                <option value="@AutomationEdgeStyle.Smooth">Smooth</option>
+            </select>
+        </label>
+        <button type="button" data-canvas-zoom-reset>100%</button>
+    </div>
+
+    <div class="automation-canvas-viewport"
+         style="@_canvasViewportStyle"
+         tabindex="0"
+         role="application"
+         aria-label="Automation flow canvas"
+         @ref="_root"
+         data-automation-canvas>
+        <div class="automation-canvas-stage" style="@_canvasStageStyle">
+            <svg class="automation-edges" viewBox="0 0 @_canvasWidth @_canvasHeight" aria-label="Flow connections">
+                @foreach (var edge in Edges)
+                {
+                    <g @key="edge.Id"
+                       class="@EdgeGroupClass(edge)"
+                       data-automation-edge="@edge.Id"
+                       data-source-node="@edge.SourceNodeId.Value"
+                       data-source-port="@edge.SourcePortId.Value"
+                       data-target-node="@edge.TargetNodeId.Value"
+                       data-target-port="@edge.TargetPortId.Value"
+                       @onclick:stopPropagation="true"
+                       @onclick="() => SelectEdgeAsync(edge.Id)">
+                        <path class="automation-edge-hit" d="@InitialPath(edge)" />
+                        <path class="automation-edge" d="@InitialPath(edge)" />
+                        @if (BranchLabel(edge) is { } label)
+                        {
+                            <svg:text class="automation-edge-label"><tspan>@label</tspan></svg:text>
+                        }
+                    </g>
+                }
+                <path class="automation-edge automation-edge--preview" data-connection-preview d="" />
+            </svg>
+
+            <div class="automation-marquee" data-automation-marquee hidden></div>
+
+            @foreach (var node in Nodes)
             {
-                <path @key="edge.Id" class="automation-edge" d="@DesktopPath(edge)" />
+                var errors = ErrorsFor(node.Id);
+                var outcome = OutcomeFor(node.Id);
+                <article @key="node.Id"
+                         class="@NodeClass(node, errors.Count > 0, outcome)"
+                         style="@NodeStyle(node)"
+                         data-automation-node="@node.Id.Value"
+                         data-node-x="@node.Position.X.Value"
+                         data-node-y="@node.Position.Y.Value"
+                         tabindex="0"
+                         role="button"
+                         aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
+                         @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
+                         @onkeydown="args => HandleNodeKeyAsync(node, args)">
+                    @foreach (var input in node.Definition.Inputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
+                    {
+                        <button type="button"
+                                class="automation-port automation-port--input"
+                                style="@PortStyle(input.Index, node.Definition.Inputs.Count(IsFlowPort))"
+                                title="@input.Port.Name"
+                                aria-label="@($"{node.Definition.Display.Name}: {input.Port.Name} input")"
+                                data-automation-port
+                                data-port-direction="input"
+                                data-node-id="@node.Id.Value"
+                                data-port-id="@input.Port.Id.Value"
+                                data-port-type="@input.Port.ValueType"
+                                data-port-sensitivity="@input.Port.Sensitivity"
+                                @onclick:stopPropagation="true"></button>
+                    }
+                    @foreach (var output in node.Definition.Outputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
+                    {
+                        <button type="button"
+                                class="automation-port automation-port--output automation-port--branch-@BranchToken(output.Port.Id)"
+                                style="@PortStyle(output.Index, node.Definition.Outputs.Count(IsFlowPort))"
+                                title="@output.Port.Name"
+                                aria-label="@($"{node.Definition.Display.Name}: {output.Port.Name} output")"
+                                data-automation-port
+                                data-port-direction="output"
+                                data-node-id="@node.Id.Value"
+                                data-port-id="@output.Port.Id.Value"
+                                data-port-type="@output.Port.ValueType"
+                                data-port-sensitivity="@output.Port.Sensitivity"
+                                @onclick:stopPropagation="true"></button>
+                    }
+                    <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
+                    <strong>@node.Definition.Display.Name</strong>
+                    <span class="automation-node-description">@NodeSummary(node)</span>
+                    @if (outcome is not null)
+                    {
+                        <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
+                    }
+                </article>
             }
-        </svg>
-        <svg class="automation-edges automation-edges--mobile" viewBox="0 0 358 @_mobileCanvasHeight" aria-hidden="true">
-            @foreach (var edge in Edges)
-            {
-                <path @key="edge.Id" class="automation-edge" d="@MobilePath(edge)" />
-            }
-        </svg>
-        @foreach (var node in Nodes)
-        {
-            var errors = ErrorsFor(node.Id);
-            var outcome = OutcomeFor(node.Id);
-            <button @key="node.Id"
-                    type="button"
-                    class="@NodeClass(node, errors.Count > 0, outcome)"
-                    style="@NodeStyle(node)"
-                    data-automation-node="@node.Id.Value"
-                    data-node-x="@node.Position.X.Value"
-                    data-node-y="@node.Position.Y.Value"
-                    aria-pressed="@(node.Id == SelectedNodeId ? "true" : "false")"
-                    aria-describedby="@(errors.Count > 0 ? ErrorId(node.Id) : null)"
-                    @onclick="() => SelectNode.InvokeAsync(node.Id)"
-                    @onkeydown="args => HandleNodeKeyAsync(node, args)">
-                <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
-                <strong>@node.Definition.Display.Name</strong>
-                <span class="automation-node-description">@node.Definition.Display.Description</span>
-                @foreach (var input in node.Definition.Inputs.Where(IsFlowPort))
-                {
-                    <span class="automation-port automation-port--input" title="@input.Name" aria-hidden="true"></span>
-                }
-                @foreach (var output in node.Definition.Outputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
-                {
-                    <span class="automation-port automation-port--output automation-port--output-@output.Index" title="@output.Port.Name" aria-hidden="true"></span>
-                }
-                @if (errors.Count > 0)
-                {
-                    <span id="@ErrorId(node.Id)" class="automation-node-error">@errors[0].Message</span>
-                }
-                else if (outcome is not null)
-                {
-                    <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
-                }
-            </button>
-        }
+        </div>
     </div>
 </div>

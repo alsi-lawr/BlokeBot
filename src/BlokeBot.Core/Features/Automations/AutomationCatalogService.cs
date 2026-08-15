@@ -68,6 +68,21 @@ public sealed class AutomationCatalogService
             persisted.Configuration
         );
 
+    public bool TryDescribe(
+        AutomationDefinitionId definitionId,
+        out AutomationDefinitionDescriptor descriptor
+    )
+    {
+        if (_catalog.TryResolve(definitionId, out var definition))
+        {
+            descriptor = definition.Descriptor;
+            return true;
+        }
+
+        descriptor = null!;
+        return false;
+    }
+
     public async Task<AutomationConfigurationCheck> ValidateBeforeExecutionAsync(
         AutomationHostId requestedHostId,
         AutomationContext context,

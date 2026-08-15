@@ -17,23 +17,27 @@ public sealed class AutomationEditorInteractionTests
             .Definitions.Select(static value => value.Descriptor)
             .Single(static value => value.Id == AutomationDefinitionIds.SendChatAction);
         var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
-        AutomationNodeMoveRequest? moved = null;
-        AutomationNodeId? deleted = null;
+        IReadOnlyList<AutomationNodeMoveRequest>? moved = null;
+        IReadOnlyList<AutomationNodeId>? deleted = null;
         var canvas = context.Render<AutomationFlowCanvas>(parameters =>
             parameters
                 .Add(component => component.Nodes, [node])
                 .Add(component => component.Edges, [])
-                .Add(component => component.MoveNode, request => moved = request)
-                .Add(component => component.DeleteNode, nodeId => deleted = nodeId)
+                .Add(
+                    component => component.SelectedNodeIds,
+                    new HashSet<AutomationNodeId> { node.Id }
+                )
+                .Add(component => component.MoveNodes, requests => moved = requests)
+                .Add(component => component.DeleteNodes, nodeIds => deleted = nodeIds)
         );
-        var nodeButton = canvas.Find("button[aria-pressed]");
+        var nodeElement = canvas.Find("[data-automation-node]");
 
-        nodeButton.KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
+        nodeElement.KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
-        moved.ShouldBe(new AutomationNodeMoveRequest(node.Id, 72, 72));
+        moved.ShouldBe([new AutomationNodeMoveRequest(node.Id, 72, 72)]);
 
-        nodeButton.KeyDown(new KeyboardEventArgs { Key = "Delete" });
+        nodeElement.KeyDown(new KeyboardEventArgs { Key = "Delete" });
 
-        deleted.ShouldBe(node.Id);
+        deleted.ShouldBe([node.Id]);
     }
 }
