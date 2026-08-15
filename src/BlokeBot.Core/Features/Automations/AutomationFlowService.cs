@@ -42,15 +42,27 @@ public sealed class AutomationFlowService(
             .OrderByDescending(static value => value.UpdatedAtUtc)
             .ThenBy(static value => value.Name)
             .ToArrayAsync(cancellationToken);
-        return new AutomationFlowQueryOutcome.Available(
-            flows
-                .Select(static flow => new AutomationFlowSnapshot(
-                    Draft(flow),
+        var snapshots = ImmutableArray.CreateBuilder<AutomationFlowSnapshot>();
+        foreach (var flow in flows)
+        {
+            if (RestoreDraft(flow) is not AutomationFlowDraftRestoreOutcome.Available available)
+            {
+                return new AutomationFlowQueryOutcome.Invalid(
+                    new(flow.Id),
+                    [MalformedGraphError()]
+                );
+            }
+
+            snapshots.Add(
+                new(
+                    available.Draft,
                     new DateTimeOffset(flow.CreatedAtUtc, TimeSpan.Zero),
                     new DateTimeOffset(flow.UpdatedAtUtc, TimeSpan.Zero)
-                ))
-                .ToImmutableArray()
-        );
+                )
+            );
+        }
+
+        return new AutomationFlowQueryOutcome.Available(snapshots.ToImmutable());
     }
 
     public async Task<AutomationFlowValidationOutcome> ValidateDraftAsync(
@@ -134,7 +146,12 @@ public sealed class AutomationFlowService(
             return new AutomationFlowDuplicateOutcome.FlowNotFound();
         }
 
-        var original = Draft(flow);
+        if (RestoreDraft(flow) is not AutomationFlowDraftRestoreOutcome.Available restored)
+        {
+            return new AutomationFlowDuplicateOutcome.Invalid([MalformedGraphError()]);
+        }
+
+        var original = restored.Draft;
         var nodeIds = original.Nodes.ToDictionary(
             static node => node.Id,
             static _ => new AutomationNodeId(Guid.NewGuid())
@@ -332,7 +349,15 @@ public sealed class AutomationFlowService(
 
         if (enabled)
         {
-            var validation = await ValidateAsync(Draft(flow, enabled), cancellationToken);
+            if (
+                RestoreDraft(flow, enabled)
+                is not AutomationFlowDraftRestoreOutcome.Available restored
+            )
+            {
+                return new AutomationFlowEnableOutcome.Invalid([MalformedGraphError()]);
+            }
+
+            var validation = await ValidateAsync(restored.Draft, cancellationToken);
             if (!validation.Errors.IsEmpty)
             {
                 return new AutomationFlowEnableOutcome.Invalid(validation.Errors);
@@ -435,11 +460,20 @@ public sealed class AutomationFlowService(
             errors.Add(new(null, "source-count", "Add one or more trigger nodes."));
         }
 
-        var incoming = nodes.Keys.ToDictionary(static id => id, static _ => 0);
-        var adjacency = nodes.Keys.ToDictionary(
+        var flowIncoming = nodes.Keys.ToDictionary(static id => id, static _ => 0);
+        var flowAdjacency = nodes.Keys.ToDictionary(
             static id => id,
             static _ => new List<AutomationNodeId>()
         );
+        var dataAdjacency = nodes.Keys.ToDictionary(
+            static id => id,
+            static _ => new List<AutomationNodeId>()
+        );
+        var combinedAdjacency = nodes.Keys.ToDictionary(
+            static id => id,
+            static _ => new List<AutomationNodeId>()
+        );
+        var dataIncoming = new Dictionary<(AutomationNodeId, AutomationPortId), int>();
         var edgeIds = new HashSet<Guid>();
         foreach (var edge in draft.Edges)
         {
@@ -457,24 +491,53 @@ public sealed class AutomationFlowService(
                 continue;
             }
 
-            incoming[edge.TargetNodeId]++;
-            adjacency[edge.SourceNodeId].Add(edge.TargetNodeId);
+            if (!Enum.IsDefined(edge.Kind))
+            {
+                errors.Add(
+                    new(edge.TargetNodeId, "edge-kind-invalid", "Reconnect this saved connection.")
+                );
+                continue;
+            }
+
+            if (edge.Kind == AutomationEdgeKind.Flow)
+            {
+                flowIncoming[edge.TargetNodeId]++;
+                flowAdjacency[edge.SourceNodeId].Add(edge.TargetNodeId);
+            }
+            else
+            {
+                var input = (edge.TargetNodeId, edge.TargetPortId);
+                dataIncoming[input] = dataIncoming.GetValueOrDefault(input) + 1;
+                dataAdjacency[edge.SourceNodeId].Add(edge.TargetNodeId);
+            }
+
+            combinedAdjacency[edge.SourceNodeId].Add(edge.TargetNodeId);
             ValidateEdge(edge, source, target, definitions, errors);
         }
 
-        foreach (var (nodeId, count) in incoming)
+        foreach (var ((nodeId, _), count) in dataIncoming.Where(static pair => pair.Value > 1))
         {
-            var isSource =
+            errors.Add(
+                new(nodeId, "data-input-duplicate", "Keep only one Data connection for this input.")
+            );
+        }
+
+        ValidateBindings(nodes, definitions, dataIncoming, errors);
+
+        foreach (var (nodeId, count) in flowIncoming)
+        {
+            var kind =
                 nodes.TryGetValue(nodeId, out var node)
                 && definitions.TryGetValue(new(node.Definition.TypeId), out var definition)
-                && definition.Kind == AutomationNodeKind.Source;
-            if (isSource && count != 0)
+                    ? definition.Kind
+                    : (AutomationNodeKind?)null;
+            if (kind == AutomationNodeKind.Source && count != 0)
             {
                 errors.Add(
                     new(nodeId, "source-incoming", "Remove the input connection from this trigger.")
                 );
             }
-            else if (!isSource && count == 0)
+            else if (kind is AutomationNodeKind.Action or AutomationNodeKind.Control && count == 0)
             {
                 errors.Add(
                     new(
@@ -488,18 +551,44 @@ public sealed class AutomationFlowService(
 
         if (sources.Length > 0)
         {
-            var reached = Reachable(sources.Select(static source => source.Id), adjacency);
-            foreach (var nodeId in nodes.Keys.Where(nodeId => !reached.Contains(nodeId)))
+            var reached = Reachable(sources.Select(static source => source.Id), flowAdjacency);
+            foreach (
+                var nodeId in nodes.Keys.Where(nodeId =>
+                    definitions.TryGetValue(
+                        new(nodes[nodeId].Definition.TypeId),
+                        out var definition
+                    )
+                    && definition.Kind is AutomationNodeKind.Action or AutomationNodeKind.Control
+                    && !reached.Contains(nodeId)
+                )
+            )
             {
                 errors.Add(new(nodeId, "node-disconnected", "Connect this node to a trigger."));
             }
         }
 
-        ValidateTriggerContexts(nodes, definitions, sources, adjacency, errors);
+        ValidateTriggerContexts(nodes, definitions, sources, flowAdjacency, errors);
+        ValidateSourceAvailability(nodes, definitions, sources, draft.Edges, flowAdjacency, errors);
 
-        if (HasCycle(adjacency))
+        if (HasCycle(flowAdjacency))
         {
-            errors.Add(new(null, "cycle", "Remove the connection that creates a loop."));
+            errors.Add(new(null, "flow-cycle", "Remove the Flow connection that creates a loop."));
+        }
+
+        if (HasCycle(dataAdjacency))
+        {
+            errors.Add(new(null, "data-cycle", "Remove the Data connection that creates a loop."));
+        }
+
+        if (!HasCycle(flowAdjacency) && !HasCycle(dataAdjacency) && HasCycle(combinedAdjacency))
+        {
+            errors.Add(
+                new(
+                    null,
+                    "dependency-cycle",
+                    "Remove the Flow or Data connection that creates a dependency loop."
+                )
+            );
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -705,22 +794,115 @@ public sealed class AutomationFlowService(
             return;
         }
 
-        foreach (var (fieldId, expression) in node.FieldExpressions)
+        foreach (var (fieldId, binding) in node.InputBindings)
         {
-            if (
-                descriptor.Kind != AutomationNodeKind.Action
-                || !descriptor.Configuration.Any(field => field.Id == fieldId)
+            if (!descriptor.Configuration.Any(field => field.Id == fieldId))
+            {
+                errors.Add(
+                    new(
+                        node.Id,
+                        "binding-field-invalid",
+                        "Select an input from this node.",
+                        fieldId
+                    )
+                );
+            }
+            else if (
+                !Enum.IsDefined(binding.Mode)
+                || (
+                    binding.Mode == AutomationInputBindingMode.Expression
+                    && binding.Expression is null
+                )
             )
             {
                 errors.Add(
-                    new(node.Id, "action-field-invalid", "Select a field from this action.")
+                    new(
+                        node.Id,
+                        "binding-mode-invalid",
+                        "Choose Fixed, Connected, or Expression for this input.",
+                        fieldId
+                    )
                 );
             }
-            else if (expressions.Validate(expression) is AutomationExpressionCheck.Invalid)
+            else if (
+                binding.Expression is { } expression
+                && (
+                    expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
+                    || expressions.Validate(expression) is AutomationExpressionCheck.Invalid
+                )
+            )
             {
                 errors.Add(
-                    new(node.Id, "action-expression-invalid", "Enter a valid action expression.")
+                    new(
+                        node.Id,
+                        "binding-expression-invalid",
+                        "Enter a valid input expression.",
+                        fieldId
+                    )
                 );
+            }
+        }
+    }
+
+    private static void ValidateBindings(
+        IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
+        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyDictionary<(AutomationNodeId, AutomationPortId), int> dataIncoming,
+        ImmutableArray<AutomationGraphError>.Builder errors
+    )
+    {
+        foreach (var node in nodes.Values)
+        {
+            if (!definitions.TryGetValue(new(node.Definition.TypeId), out var definition))
+            {
+                continue;
+            }
+
+            foreach (
+                var input in definition.Inputs.Where(static port =>
+                    port.ValueType != AutomationPortValueType.Flow
+                )
+            )
+            {
+                if (
+                    input.BindingFieldId is not { } fieldId
+                    || !node.InputBindings.TryGetValue(fieldId, out var binding)
+                )
+                {
+                    errors.Add(
+                        new(
+                            node.Id,
+                            "binding-missing",
+                            "Choose Fixed, Connected, or Expression for this input.",
+                            input.BindingFieldId
+                        )
+                    );
+                    continue;
+                }
+
+                var incoming = dataIncoming.GetValueOrDefault((node.Id, input.Id));
+                if (binding.Mode == AutomationInputBindingMode.Connected && incoming != 1)
+                {
+                    errors.Add(
+                        new(
+                            node.Id,
+                            "binding-connection-missing",
+                            "Connect one Data output to this input.",
+                            fieldId
+                        )
+                    );
+                }
+                else if (binding.Mode != AutomationInputBindingMode.Connected && incoming != 0)
+                {
+                    errors.Add(
+                        new(
+                            node.Id,
+                            "binding-connection-inactive",
+                            "Remove the Data connection or switch this input to Connected.",
+                            fieldId
+                        )
+                    );
+                }
             }
         }
     }
@@ -749,20 +931,163 @@ public sealed class AutomationFlowService(
                 new(edge.TargetNodeId, "port-missing", "Reconnect this node to an available port.")
             );
         }
+        else if (edge.Kind == AutomationEdgeKind.Flow)
+        {
+            if (
+                output.ValueType != AutomationPortValueType.Flow
+                || input.ValueType != AutomationPortValueType.Flow
+            )
+            {
+                errors.Add(
+                    new(
+                        edge.TargetNodeId,
+                        "flow-port-incompatible",
+                        "Connect Flow outputs only to Flow inputs."
+                    )
+                );
+            }
+        }
         else if (
-            output.ValueType != input.ValueType
-            || output.Sensitivity != input.Sensitivity
-            || output.ValueType != AutomationPortValueType.Flow
+            output.ValueType == AutomationPortValueType.Flow
+            || input.ValueType == AutomationPortValueType.Flow
+            || output.ValueType != input.ValueType
         )
         {
             errors.Add(
                 new(
                     edge.TargetNodeId,
-                    "port-incompatible",
-                    "Connect ports that have the same type."
+                    "data-type-incompatible",
+                    "Connect Data ports that have the same exact type."
                 )
             );
         }
+        else if (sourceDefinition.Kind == AutomationNodeKind.Action)
+        {
+            errors.Add(
+                new(
+                    edge.TargetNodeId,
+                    "data-source-incompatible",
+                    "Use a trigger, Value, Transform, or Control output as Data."
+                )
+            );
+        }
+        else if (
+            output.Nullability == AutomationPortNullability.Nullable
+            && input.Nullability == AutomationPortNullability.NonNullable
+        )
+        {
+            errors.Add(
+                new(
+                    edge.TargetNodeId,
+                    "data-nullability-incompatible",
+                    "Connect this nullable output to an input that accepts null."
+                )
+            );
+        }
+        else if (
+            output.Sensitivity == AutomationDataSensitivity.Sensitive
+            && input.Sensitivity == AutomationDataSensitivity.Safe
+        )
+        {
+            errors.Add(
+                new(
+                    edge.TargetNodeId,
+                    "data-sensitivity-incompatible",
+                    "This input cannot accept Sensitive Data."
+                )
+            );
+        }
+    }
+
+    private static void ValidateSourceAvailability(
+        IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
+        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyCollection<AutomationFlowDraftNode> sources,
+        IEnumerable<AutomationFlowDraftEdge> edges,
+        IReadOnlyDictionary<AutomationNodeId, List<AutomationNodeId>> flowAdjacency,
+        ImmutableArray<AutomationGraphError>.Builder errors
+    )
+    {
+        var dataInputs = edges
+            .Where(static edge => edge.Kind == AutomationEdgeKind.Data)
+            .GroupBy(static edge => edge.TargetNodeId)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Select(static edge => edge.SourceNodeId).ToArray()
+            );
+        var sourceIds = sources.Select(static source => source.Id).ToHashSet();
+        var cachedBackings = new Dictionary<AutomationNodeId, HashSet<AutomationNodeId>>();
+        foreach (var edge in edges.Where(static edge => edge.Kind == AutomationEdgeKind.Data))
+        {
+            if (
+                !nodes.TryGetValue(edge.TargetNodeId, out var target)
+                || !definitions.TryGetValue(new(target.Definition.TypeId), out var targetDefinition)
+                || targetDefinition.Kind
+                    is not (AutomationNodeKind.Action or AutomationNodeKind.Control)
+            )
+            {
+                continue;
+            }
+
+            var backings = SourceBackings(
+                edge.SourceNodeId,
+                sourceIds,
+                dataInputs,
+                cachedBackings,
+                []
+            );
+            if (backings.Count == 0)
+            {
+                continue;
+            }
+
+            var reachingSources = sources
+                .Where(source => Reachable([source.Id], flowAdjacency).Contains(edge.TargetNodeId))
+                .Select(static source => source.Id)
+                .ToHashSet();
+            if (backings.Count != 1 || !reachingSources.SetEquals(backings))
+            {
+                errors.Add(
+                    new(
+                        edge.TargetNodeId,
+                        "data-source-unavailable",
+                        "This source Data is not available on every Flow path to the input."
+                    )
+                );
+            }
+        }
+    }
+
+    private static HashSet<AutomationNodeId> SourceBackings(
+        AutomationNodeId nodeId,
+        IReadOnlySet<AutomationNodeId> sources,
+        IReadOnlyDictionary<AutomationNodeId, AutomationNodeId[]> dataInputs,
+        IDictionary<AutomationNodeId, HashSet<AutomationNodeId>> cached,
+        HashSet<AutomationNodeId> visiting
+    )
+    {
+        if (cached.TryGetValue(nodeId, out var known))
+        {
+            return known;
+        }
+
+        if (!visiting.Add(nodeId))
+        {
+            return [];
+        }
+
+        var backings = sources.Contains(nodeId) ? new HashSet<AutomationNodeId> { nodeId } : [];
+        if (dataInputs.TryGetValue(nodeId, out var producers))
+        {
+            foreach (var producer in producers)
+            {
+                backings.UnionWith(SourceBackings(producer, sources, dataInputs, cached, visiting));
+            }
+        }
+
+        _ = visiting.Remove(nodeId);
+        cached[nodeId] = backings;
+        return backings;
     }
 
     private static HashSet<AutomationNodeId> Reachable(
@@ -828,8 +1153,8 @@ public sealed class AutomationFlowService(
             DefinitionId = node.Definition.TypeId,
             DefinitionSchemaVersion = node.Definition.SchemaVersion,
             ConfigurationJson = node.Definition.Configuration.GetRawText(),
-            FieldExpressionsJson = AutomationRuntimeSerialization.SerializeExpressions(
-                node.FieldExpressions
+            InputBindingsJson = AutomationRuntimeSerialization.SerializeInputBindings(
+                node.InputBindings
             ),
             ExpressionLanguageVersion = node.ExpressionLanguageVersion.Value,
             ContinueOnFailure = node.FailurePolicy == AutomationNodeFailurePolicy.Continue,
@@ -843,52 +1168,105 @@ public sealed class AutomationFlowService(
         {
             Id = edge.Id,
             FlowId = flowId,
+            Kind = Persist(edge.Kind),
             SourceNodeId = edge.SourceNodeId.Value,
             SourcePortId = edge.SourcePortId.Value,
             TargetNodeId = edge.TargetNodeId.Value,
             TargetPortId = edge.TargetPortId.Value,
         };
 
-    internal static AutomationFlowDraft Draft(AutomationFlow flow, bool? enabled = null) =>
-        new(
-            new(flow.Id),
-            new(flow.HostId),
-            flow.Name,
-            flow.SchemaVersion,
-            enabled ?? flow.IsEnabled,
-            flow.Nodes.Select(static node => new AutomationFlowDraftNode(
+    internal static AutomationFlowDraftRestoreOutcome RestoreDraft(
+        AutomationFlow flow,
+        bool? enabled = null
+    )
+    {
+        var nodes = ImmutableArray.CreateBuilder<AutomationFlowDraftNode>();
+        foreach (var node in flow.Nodes)
+        {
+            JsonElement configuration;
+            try
+            {
+                configuration = JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone();
+            }
+            catch (JsonException)
+            {
+                return new AutomationFlowDraftRestoreOutcome.Invalid();
+            }
+
+            if (
+                AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+                is not AutomationInputBindingsRestoreOutcome.Available bindings
+            )
+            {
+                return new AutomationFlowDraftRestoreOutcome.Invalid();
+            }
+
+            nodes.Add(
+                new(
                     new(node.Id),
-                    new(
-                        node.DefinitionId,
-                        node.DefinitionSchemaVersion,
-                        JsonDocument.Parse(node.ConfigurationJson).RootElement.Clone()
-                    ),
+                    new(node.DefinitionId, node.DefinitionSchemaVersion, configuration),
                     new(node.ExpressionLanguageVersion),
                     node.ContinueOnFailure
                         ? AutomationNodeFailurePolicy.Continue
                         : AutomationNodeFailurePolicy.Stop,
-                    AutomationRuntimeSerialization.DeserializeExpressions(
-                        node.FieldExpressionsJson
-                    ),
+                    bindings.Bindings,
                     new(new(node.CanvasX), new(node.CanvasY)),
                     node.DisplayAlias
-                ))
-                .ToImmutableArray(),
-            flow.Edges.Select(static edge => new AutomationFlowDraftEdge(
-                    edge.Id,
-                    new(edge.SourceNodeId),
-                    new(edge.SourcePortId),
-                    new(edge.TargetNodeId),
-                    new(edge.TargetPortId)
-                ))
-                .ToImmutableArray(),
-            new(
-                flow.UseVerticalLayout
-                    ? AutomationFlowOrientation.Vertical
-                    : AutomationFlowOrientation.Horizontal,
-                flow.UseSmoothEdges ? AutomationEdgeStyle.Smooth : AutomationEdgeStyle.Angular
-            )
-        );
+                )
+            );
+        }
+
+        var edges = flow
+            .Edges.Select(static edge => new AutomationFlowDraftEdge(
+                edge.Id,
+                Restore(edge.Kind),
+                new(edge.SourceNodeId),
+                new(edge.SourcePortId),
+                new(edge.TargetNodeId),
+                new(edge.TargetPortId)
+            ))
+            .ToImmutableArray();
+        return edges.Any(static edge => !Enum.IsDefined(edge.Kind))
+            ? new AutomationFlowDraftRestoreOutcome.Invalid()
+            : new AutomationFlowDraftRestoreOutcome.Available(
+                new(
+                    new(flow.Id),
+                    new(flow.HostId),
+                    flow.Name,
+                    flow.SchemaVersion,
+                    enabled ?? flow.IsEnabled,
+                    nodes.ToImmutable(),
+                    edges,
+                    new(
+                        flow.UseVerticalLayout
+                            ? AutomationFlowOrientation.Vertical
+                            : AutomationFlowOrientation.Horizontal,
+                        flow.UseSmoothEdges
+                            ? AutomationEdgeStyle.Smooth
+                            : AutomationEdgeStyle.Angular
+                    )
+                )
+            );
+    }
+
+    private static PersistedAutomationEdgeKind Persist(AutomationEdgeKind kind) =>
+        kind switch
+        {
+            AutomationEdgeKind.Flow => PersistedAutomationEdgeKind.Flow,
+            AutomationEdgeKind.Data => PersistedAutomationEdgeKind.Data,
+            _ => (PersistedAutomationEdgeKind)(-1),
+        };
+
+    private static AutomationEdgeKind Restore(PersistedAutomationEdgeKind kind) =>
+        kind switch
+        {
+            PersistedAutomationEdgeKind.Flow => AutomationEdgeKind.Flow,
+            PersistedAutomationEdgeKind.Data => AutomationEdgeKind.Data,
+            _ => (AutomationEdgeKind)(-1),
+        };
+
+    private static AutomationGraphError MalformedGraphError() =>
+        new(null, "graph-data-invalid", "Repair or remove this malformed automation flow.");
 
     private static string DuplicateName(string name)
     {
@@ -1069,7 +1447,8 @@ public sealed class AutomationFlowService(
     ) =>
         edges
             .Where(edge =>
-                edge.SourceNodeId == sourceNodeId
+                edge.Kind == AutomationEdgeKind.Flow
+                && edge.SourceNodeId == sourceNodeId
                 && (sourcePort is null || edge.SourcePortId.Value == sourcePort)
             )
             .OrderBy(static edge => edge.SourcePortId.Value, StringComparer.Ordinal)
@@ -1088,3 +1467,12 @@ internal sealed record AutomationGraphValidation(
     AutomationCatalogAvailability? Gate,
     ImmutableArray<AutomationGraphError> Errors
 );
+
+internal abstract record AutomationFlowDraftRestoreOutcome
+{
+    private AutomationFlowDraftRestoreOutcome() { }
+
+    internal sealed record Available(AutomationFlowDraft Draft) : AutomationFlowDraftRestoreOutcome;
+
+    internal sealed record Invalid : AutomationFlowDraftRestoreOutcome;
+}

@@ -443,7 +443,7 @@ public sealed class TwitchEventAutomationTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 
@@ -451,7 +451,15 @@ public sealed class TwitchEventAutomationTests
         AutomationFlowDraftNode source,
         string sourcePort,
         AutomationFlowDraftNode target
-    ) => new(Guid.NewGuid(), source.Id, new(sourcePort), target.Id, new("flow"));
+    ) =>
+        new(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Flow,
+            source.Id,
+            new(sourcePort),
+            target.Id,
+            new("flow")
+        );
 
     private sealed class RecordingReconciliationTrigger : IEventSubChannelReconciliationTrigger
     {
@@ -549,14 +557,15 @@ public sealed class TwitchEventAutomationTests
             var expressions = new AutomationExpressionService();
             var overlays = new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
+            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var flowRuntime = new AutomationRuntimeService(
                 database,
                 catalog,
+                flows,
                 expressions,
                 actions,
                 clock
             );
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

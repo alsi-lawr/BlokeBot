@@ -363,6 +363,11 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<Guid>("FlowId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("SourceNodeId")
                         .HasColumnType("TEXT");
 
@@ -420,7 +425,7 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("ExpressionLanguageVersion")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FieldExpressionsJson")
+                    b.Property<string>("InputBindingsJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

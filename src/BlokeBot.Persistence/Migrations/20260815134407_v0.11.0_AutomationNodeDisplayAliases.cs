@@ -11,6 +11,15 @@ namespace BlokeBot.Persistence.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
+                name: "Kind",
+                table: "automation_flow_edges",
+                type: "TEXT",
+                maxLength: 16,
+                nullable: false,
+                defaultValue: "Flow"
+            );
+
+            migrationBuilder.AddColumn<string>(
                 name: "DisplayAlias",
                 table: "automation_flow_nodes",
                 type: "TEXT",
@@ -23,6 +32,8 @@ namespace BlokeBot.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(name: "DisplayAlias", table: "automation_flow_nodes");
+
+            migrationBuilder.DropColumn(name: "Kind", table: "automation_flow_edges");
         }
     }
 }

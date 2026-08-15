@@ -423,24 +423,6 @@ public sealed class NativeOperationAutomationTests
     }
 
     [Test]
-    public async Task SendShoutout_WithoutATriggeringActorFailsBeforeAnyTwitchCall()
-    {
-        await using var fixture = await NativeFixture.CreateAsync();
-        var source = Node("poll-started", "{}");
-        var action = Node("send-shoutout", "{}");
-        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
-
-        await fixture.Runtime.PollChangedAsync(
-            fixture.Poll("message-1", EventSubPollStage.Begin),
-            CancellationToken.None
-        );
-
-        fixture.Shoutouts.Sent.ShouldBeEmpty();
-        (await fixture.NodeOutcomeCodesAsync()).ShouldContain("shoutout-target-missing");
-        (await fixture.RunStatusesAsync()).ShouldBe([AutomationFlowRunStatus.Failed]);
-    }
-
-    [Test]
     public async Task StartPoll_InterpolatesTitleAndChoicesIntoTheValidatedDraft()
     {
         await using var fixture = await NativeFixture.CreateAsync();
@@ -715,7 +697,7 @@ public sealed class NativeOperationAutomationTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 
@@ -723,7 +705,15 @@ public sealed class NativeOperationAutomationTests
         AutomationFlowDraftNode source,
         string sourcePort,
         AutomationFlowDraftNode target
-    ) => new(Guid.NewGuid(), source.Id, new(sourcePort), target.Id, new("flow"));
+    ) =>
+        new(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Flow,
+            source.Id,
+            new(sourcePort),
+            target.Id,
+            new("flow")
+        );
 
     private sealed class FixedBroadcasterTokens(TokenStatus status)
         : IHostBroadcasterTokenStatusProvider
@@ -1033,14 +1023,15 @@ public sealed class NativeOperationAutomationTests
                 polls,
                 predictions
             );
+            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var flowRuntime = new AutomationRuntimeService(
                 database,
                 catalog,
+                flows,
                 expressions,
                 executor,
                 clock
             );
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

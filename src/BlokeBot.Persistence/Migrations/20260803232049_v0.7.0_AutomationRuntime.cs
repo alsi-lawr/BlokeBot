@@ -91,7 +91,7 @@ namespace BlokeBot.Persistence.Migrations
                     ),
                     DefinitionSchemaVersion = table.Column<int>(type: "INTEGER", nullable: false),
                     ConfigurationJson = table.Column<string>(type: "TEXT", nullable: false),
-                    FieldExpressionsJson = table.Column<string>(type: "TEXT", nullable: false),
+                    InputBindingsJson = table.Column<string>(type: "TEXT", nullable: false),
                     ExpressionLanguageVersion = table.Column<int>(type: "INTEGER", nullable: false),
                     ContinueOnFailure = table.Column<bool>(type: "INTEGER", nullable: false),
                 },

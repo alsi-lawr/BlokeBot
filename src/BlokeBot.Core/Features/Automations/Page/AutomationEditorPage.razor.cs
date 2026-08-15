@@ -501,6 +501,7 @@ public partial class AutomationEditorPage
 
         var edge = new AutomationFlowDraftEdge(
             Guid.NewGuid(),
+            AutomationEdgeKind.Flow,
             request.SourceNodeId,
             request.SourcePortId,
             request.TargetNodeId,

@@ -57,9 +57,27 @@ public enum AutomationNodeFailurePolicy
     Continue,
 }
 
+public enum AutomationEdgeKind
+{
+    Flow,
+    Data,
+}
+
+public enum AutomationInputBindingMode
+{
+    Fixed,
+    Connected,
+    Expression,
+}
+
 public sealed record AutomationExpressionSource(
     AutomationExpressionLanguageVersion LanguageVersion,
     string Source
+);
+
+public sealed record AutomationInputBinding(
+    AutomationInputBindingMode Mode,
+    AutomationExpressionSource? Expression
 );
 
 public sealed record AutomationFlowDraftNode(
@@ -67,16 +85,14 @@ public sealed record AutomationFlowDraftNode(
     PersistedAutomationNodeDefinition Definition,
     AutomationExpressionLanguageVersion ExpressionLanguageVersion,
     AutomationNodeFailurePolicy FailurePolicy,
-    ImmutableDictionary<
-        AutomationConfigurationFieldId,
-        AutomationExpressionSource
-    > FieldExpressions,
+    ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding> InputBindings,
     AutomationCanvasPosition Position = default,
     string? DisplayAlias = null
 );
 
 public sealed record AutomationFlowDraftEdge(
     Guid Id,
+    AutomationEdgeKind Kind,
     AutomationNodeId SourceNodeId,
     AutomationPortId SourcePortId,
     AutomationNodeId TargetNodeId,
@@ -127,6 +143,11 @@ public abstract record AutomationFlowQueryOutcome
 
     public sealed record Available(ImmutableArray<AutomationFlowSnapshot> Flows)
         : AutomationFlowQueryOutcome;
+
+    public sealed record Invalid(
+        AutomationFlowId FlowId,
+        ImmutableArray<AutomationGraphError> Errors
+    ) : AutomationFlowQueryOutcome;
 
     public sealed record FeatureDisabled : AutomationFlowQueryOutcome;
 
@@ -228,6 +249,7 @@ public enum AutomationDispatchStatus
     Accepted,
     Duplicate,
     NoMatchingFlow,
+    InvalidFlow,
     FeatureDisabled,
     HostNotFound,
 }

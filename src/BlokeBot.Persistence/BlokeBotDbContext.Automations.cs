@@ -40,6 +40,7 @@ public sealed partial class BlokeBotDbContext
         {
             _ = b.ToTable("automation_flow_edges");
             _ = b.HasKey(static x => x.Id);
+            _ = b.Property(static x => x.Kind).HasConversion<string>().HasMaxLength(16);
             _ = b.Property(static x => x.SourcePortId).HasMaxLength(96);
             _ = b.Property(static x => x.TargetPortId).HasMaxLength(96);
             _ = b.HasIndex(static x => new { x.FlowId, x.TargetNodeId });

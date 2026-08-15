@@ -1,5 +1,6 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.Bingo;
 using BlokeBot.Core.Features.Competitions;
 using BlokeBot.Core.Features.Overlays;
@@ -238,7 +239,7 @@ internal sealed class SimulationFixtureSeeder(
                 SourceNodeId = sourceId,
                 SourceOccurrenceId = Guid.Parse("1b10be82-0000-4000-8000-000000000022"),
                 ContextJson = "{}",
-                DefinitionJson = "{}",
+                DefinitionJson = AutomationRuntimeSerialization.SerializeDefinition(flow),
                 Status = AutomationFlowRunStatus.Completed,
                 StartedAtUtc = now.AddMinutes(-12),
                 CompletedAtUtc = now.AddMinutes(-12).AddSeconds(1),
@@ -293,7 +294,7 @@ internal sealed class SimulationFixtureSeeder(
             DefinitionId = definitionId,
             DefinitionSchemaVersion = 1,
             ConfigurationJson = configuration,
-            FieldExpressionsJson = "{}",
+            InputBindingsJson = "{}",
             ExpressionLanguageVersion = 1,
             CanvasX = canvasX,
             CanvasY = canvasY,
@@ -310,6 +311,7 @@ internal sealed class SimulationFixtureSeeder(
         {
             Id = id,
             FlowId = flowId,
+            Kind = PersistedAutomationEdgeKind.Flow,
             SourceNodeId = sourceNodeId,
             SourcePortId = sourcePortId,
             TargetNodeId = targetNodeId,

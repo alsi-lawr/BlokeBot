@@ -44,4 +44,40 @@ public sealed class AutomationEditorInteractionTests
 
         deleted.ShouldBe([firstNode.Id, secondNode.Id]);
     }
+
+    [Test]
+    public void BindingModes_RoundTripWithoutDiscardingInactiveFixedOrExpressionPayloads()
+    {
+        var definition = new CoreAutomationCatalogModule()
+            .Definitions.Select(static value => value.Descriptor)
+            .Single(static value => value.Id == AutomationDefinitionIds.SendChatAction);
+        var fieldId = new AutomationConfigurationFieldId("message");
+        var expression = new AutomationExpressionSource(
+            AutomationExpressionLanguage.CurrentVersion,
+            "actor.display_name"
+        );
+        var node = AutomationEditorNode.Create(definition, new(new(48), new(72)));
+        node.SetValue(fieldId, "Retained fixed message");
+        node.SetExpression(fieldId, expression);
+        node.SetBindingMode(fieldId, AutomationInputBindingMode.Connected);
+
+        var restored = AutomationEditorNode.Restore(node.Draft(), definition);
+
+        restored.Value(fieldId).ShouldBe("Retained fixed message");
+        restored.Binding(fieldId).ShouldBe(new(AutomationInputBindingMode.Connected, expression));
+
+        restored.SetBindingMode(fieldId, AutomationInputBindingMode.Fixed);
+        restored.Binding(fieldId).Expression.ShouldBe(expression);
+        restored.Value(fieldId).ShouldBe("Retained fixed message");
+
+        restored.SetBindingMode(fieldId, AutomationInputBindingMode.Expression);
+        var drafted = restored.Draft();
+        drafted
+            .InputBindings[fieldId]
+            .ShouldBe(new(AutomationInputBindingMode.Expression, expression));
+        drafted
+            .Definition.Configuration.GetProperty("message")
+            .GetString()
+            .ShouldBe("Retained fixed message");
+    }
 }

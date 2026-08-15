@@ -26,6 +26,8 @@ public readonly record struct AutomationOverlayTargetId(Guid Value);
 public enum AutomationNodeKind
 {
     Source,
+    Value,
+    Transform,
     Action,
     Control,
 }
@@ -65,6 +67,12 @@ public enum AutomationDataSensitivity
     Sensitive,
 }
 
+public enum AutomationPortNullability
+{
+    NonNullable,
+    Nullable,
+}
+
 public enum AutomationActionRetrySafety
 {
     NotApplicable,
@@ -101,7 +109,9 @@ public sealed record AutomationPortMetadata(
     string Name,
     string Description,
     AutomationPortValueType ValueType,
-    AutomationDataSensitivity Sensitivity = AutomationDataSensitivity.Safe
+    AutomationDataSensitivity Sensitivity = AutomationDataSensitivity.Safe,
+    AutomationPortNullability Nullability = AutomationPortNullability.NonNullable,
+    AutomationConfigurationFieldId? BindingFieldId = null
 );
 
 public abstract record AutomationConfigurationFieldType
@@ -347,6 +357,8 @@ public abstract record AutomationValue
     public sealed record Channel(AutomationChannel Value) : AutomationValue;
 
     public sealed record Stream(AutomationStream Value) : AutomationValue;
+
+    public sealed record Null(AutomationPortValueType ValueType) : AutomationValue;
 }
 
 public sealed record AutomationVariable(

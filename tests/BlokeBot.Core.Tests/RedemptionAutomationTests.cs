@@ -205,12 +205,14 @@ public sealed class RedemptionAutomationTests
         var source = Node("reward-redemption", """{"completion-policy":"manual"}""");
         var action = Node("send-chat", """{"message":"Redeemed!"}""");
 
-        _ = (
+        (
             await fixture.Flows.SaveAsync(
                 Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]),
                 CancellationToken.None
             )
-        ).ShouldBeOfType<AutomationFlowSaveOutcome.FeatureDisabled>();
+        )
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
+            .Errors.ShouldContain(static error => error.Code == "capability-unavailable");
 
         AutomationRequiredFeatures
             .ForDefinitions(["reward-redemption", "fulfil-redemption", "cancel-redemption"])
@@ -432,7 +434,7 @@ public sealed class RedemptionAutomationTests
     }
 
     [Test]
-    public async Task Actions_RequireARedemptionContext()
+    public async Task MalformedPersistedTrigger_IsRejectedBeforeRedemptionAction()
     {
         await using var fixture = await RedemptionFixture.CreateAsync();
         await fixture.SeedRewardAsync("reward-a", manageable: true);
@@ -455,7 +457,8 @@ public sealed class RedemptionAutomationTests
         );
 
         fixture.Redemptions.Calls.ShouldBeEmpty();
-        (await fixture.NodeOutcomeCodesAsync()).ShouldContain("redemption-context-missing");
+        (await fixture.NodeOutcomeCodesAsync()).ShouldBeEmpty();
+        (await fixture.RunCountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -636,7 +639,7 @@ public sealed class RedemptionAutomationTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 
@@ -644,7 +647,15 @@ public sealed class RedemptionAutomationTests
         AutomationFlowDraftNode source,
         string sourcePort,
         AutomationFlowDraftNode target
-    ) => new(Guid.NewGuid(), source.Id, new(sourcePort), target.Id, new("flow"));
+    ) =>
+        new(
+            Guid.NewGuid(),
+            AutomationEdgeKind.Flow,
+            source.Id,
+            new(sourcePort),
+            target.Id,
+            new("flow")
+        );
 
     private sealed class FixedBroadcasterTokens(TokenStatus status)
         : IHostBroadcasterTokenStatusProvider
@@ -785,15 +796,16 @@ public sealed class RedemptionAutomationTests
                 redemptions,
                 NullLogger<RedemptionCompletionPolicyObserver>.Instance
             );
+            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var flowRuntime = new AutomationRuntimeService(
                 database,
                 catalog,
+                flows,
                 expressions,
                 actions,
                 clock,
                 [policyObserver]
             );
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var runtime = new TwitchEventAutomationRuntime(
                 database,
                 flowRuntime,

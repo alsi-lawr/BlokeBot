@@ -87,6 +87,7 @@ internal sealed class AutomationEditorState
 public sealed class AutomationEditorNode
 {
     private readonly Dictionary<AutomationConfigurationFieldId, string> _values;
+    private readonly Dictionary<AutomationConfigurationFieldId, AutomationInputBinding> _bindings;
 
     private AutomationEditorNode(
         AutomationNodeId id,
@@ -94,7 +95,8 @@ public sealed class AutomationEditorNode
         AutomationCanvasPosition position,
         AutomationNodeFailurePolicy failurePolicy,
         string? displayAlias,
-        Dictionary<AutomationConfigurationFieldId, string> values
+        Dictionary<AutomationConfigurationFieldId, string> values,
+        Dictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
     )
     {
         Id = id;
@@ -103,6 +105,7 @@ public sealed class AutomationEditorNode
         FailurePolicy = failurePolicy;
         DisplayAlias = displayAlias;
         _values = values;
+        _bindings = bindings;
     }
 
     internal AutomationNodeId Id { get; }
@@ -131,6 +134,10 @@ public sealed class AutomationEditorNode
             definition.Configuration.ToDictionary(
                 static field => field.Id,
                 static field => DefaultValue(field)
+            ),
+            definition.Configuration.ToDictionary(
+                static field => field.Id,
+                static _ => new AutomationInputBinding(AutomationInputBindingMode.Fixed, null)
             )
         );
 
@@ -147,6 +154,12 @@ public sealed class AutomationEditorNode
             definition.Configuration.ToDictionary(
                 static field => field.Id,
                 field => ReadValue(node.Definition.Configuration, field.Id)
+            ),
+            definition.Configuration.ToDictionary(
+                static field => field.Id,
+                field =>
+                    node.InputBindings.GetValueOrDefault(field.Id)
+                    ?? new(AutomationInputBindingMode.Fixed, null)
             )
         );
 
@@ -154,6 +167,19 @@ public sealed class AutomationEditorNode
 
     internal void SetValue(AutomationConfigurationFieldId fieldId, string value) =>
         _values[fieldId] = value;
+
+    internal AutomationInputBinding Binding(AutomationConfigurationFieldId fieldId) =>
+        _bindings[fieldId];
+
+    internal void SetBindingMode(
+        AutomationConfigurationFieldId fieldId,
+        AutomationInputBindingMode mode
+    ) => _bindings[fieldId] = _bindings[fieldId] with { Mode = mode };
+
+    internal void SetExpression(
+        AutomationConfigurationFieldId fieldId,
+        AutomationExpressionSource expression
+    ) => _bindings[fieldId] = _bindings[fieldId] with { Expression = expression };
 
     internal void SetDisplayAlias(string? value) => DisplayAlias = value;
 
@@ -163,7 +189,7 @@ public sealed class AutomationEditorNode
             new(Definition.Id.Value, Definition.Schema.Current.Value, ConfigurationJson()),
             AutomationExpressionLanguage.CurrentVersion,
             FailurePolicy,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty,
+            _bindings.ToImmutableDictionary(),
             Position,
             string.IsNullOrWhiteSpace(DisplayAlias) ? null : DisplayAlias
         );

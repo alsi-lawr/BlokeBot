@@ -10,6 +10,7 @@ namespace BlokeBot.Core.Features.Automations;
 public sealed class AutomationRuntimeService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationCatalogService catalog,
+    AutomationFlowService flowService,
     AutomationExpressionService expressions,
     AutomationActionExecutor actions,
     TimeProvider clock,
@@ -111,23 +112,54 @@ public sealed class AutomationRuntimeService(
             .OrderBy(static flow => flow.Id)
             .ToArrayAsync(cancellationToken);
         var matching = new List<(AutomationFlow Flow, AutomationFlowNode Source)>();
+        var invalidFlow = false;
         foreach (var flow in flows)
         {
-            foreach (
-                var source in flow.Nodes.Where(node =>
+            var potentialSources = flow
+                .Nodes.Where(node =>
                     node.DefinitionId == context.Event.SourceDefinitionId.Value
-                    && IsSource(flow, node)
+                    && IsSourceDefinition(node)
                 )
+                .ToArray();
+            if (potentialSources.Length == 0)
+            {
+                continue;
+            }
+
+            if (
+                AutomationFlowService.RestoreDraft(flow)
+                is not AutomationFlowDraftRestoreOutcome.Available restored
             )
             {
-                var check = catalog.ValidatePersistedDefinition(Definition(source));
-                if (
-                    check is AutomationConfigurationCheck.Valid valid
+                invalidFlow = true;
+                continue;
+            }
+
+            var matchingSources = potentialSources
+                .Where(source =>
+                    catalog.ValidatePersistedDefinition(Definition(source))
+                        is AutomationConfigurationCheck.Valid valid
                     && matches(valid.Configuration)
                 )
-                {
-                    matching.Add((flow, source));
-                }
+                .ToArray();
+            if (matchingSources.Length == 0)
+            {
+                continue;
+            }
+
+            var validation = await flowService.ValidateAsync(restored.Draft, cancellationToken);
+            if (
+                validation.Gate is not null
+                || validation.Errors.Any(static error => error.Code != "capability-unavailable")
+            )
+            {
+                invalidFlow = true;
+                continue;
+            }
+
+            foreach (var source in matchingSources)
+            {
+                matching.Add((flow, source));
             }
         }
 
@@ -158,6 +190,11 @@ public sealed class AutomationRuntimeService(
         if (!host.EnabledFeatures.Contains(HostFeatureFlags.Automations))
         {
             return Dispatched(AutomationDispatchStatus.FeatureDisabled);
+        }
+
+        if (invalidFlow)
+        {
+            return Dispatched(AutomationDispatchStatus.InvalidFlow);
         }
 
         if (matching.Count == 0)
@@ -309,10 +346,15 @@ public sealed class AutomationRuntimeService(
         var commandIds = new HashSet<int>();
         foreach (var flow in flows)
         {
+            if (!await ValidFlowAsync(flow, hostId, cancellationToken))
+            {
+                continue;
+            }
+
             foreach (
                 var source in flow.Nodes.Where(node =>
                     node.DefinitionId == AutomationDefinitionIds.CustomCommandSource.Value
-                    && IsSource(flow, node)
+                    && IsSourceDefinition(node)
                 )
             )
             {
@@ -361,7 +403,12 @@ public sealed class AutomationRuntimeService(
         var definitionIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var flow in flows)
         {
-            foreach (var node in flow.Nodes.Where(node => IsSource(flow, node)))
+            if (!await ValidFlowAsync(flow, hostId, cancellationToken))
+            {
+                continue;
+            }
+
+            foreach (var node in flow.Nodes.Where(IsSourceDefinition))
             {
                 _ = definitionIds.Add(node.DefinitionId);
             }
@@ -551,7 +598,17 @@ public sealed class AutomationRuntimeService(
                 );
             }
 
-            var flow = AutomationRuntimeSerialization.DeserializeDefinition(run.DefinitionJson);
+            if (
+                AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+                is not AutomationDefinitionRestoreOutcome.Available restoredDefinition
+            )
+            {
+                FailMalformedRun(run, now);
+                _ = await db.SaveChangesAsync(cancellationToken);
+                return new(AutomationResumeStatus.Failed);
+            }
+
+            var flow = restoredDefinition.Flow;
             var node = flow.Nodes.Single(value => value.Id == pending.NodeId);
             var scope = new AutomationNodeExecutionScope(db, run, pending, node, flow, leaseId);
             if (node.ExpressionLanguageVersion != AutomationExpressionLanguage.CurrentVersion.Value)
@@ -702,7 +759,16 @@ public sealed class AutomationRuntimeService(
                 continue;
             }
 
-            var flow = AutomationRuntimeSerialization.DeserializeDefinition(run.DefinitionJson);
+            if (
+                AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+                is not AutomationDefinitionRestoreOutcome.Available restoredDefinition
+            )
+            {
+                FailMalformedRun(run, now);
+                continue;
+            }
+
+            var flow = restoredDefinition.Flow;
             var definitions = flow.Nodes.ToDictionary(static node => node.Id);
             if (interrupted.Any(node => !definitions[node.NodeId].ContinueOnFailure))
             {
@@ -733,6 +799,22 @@ public sealed class AutomationRuntimeService(
                 terminalStatus == AutomationFlowRunStatus.Invalidated
                     ? "automation-disabled"
                     : "execution-interrupted";
+            node.CompletedAtUtc = now;
+        }
+    }
+
+    private static void FailMalformedRun(AutomationFlowRun run, DateTime now)
+    {
+        run.Status = AutomationFlowRunStatus.Failed;
+        run.CompletedAtUtc = now;
+        foreach (
+            var node in run.NodeRuns.Where(static node =>
+                node.Status is AutomationNodeRunStatus.Pending or AutomationNodeRunStatus.Running
+            )
+        )
+        {
+            node.Status = AutomationNodeRunStatus.Failed;
+            node.OutcomeCode = "definition-invalid";
             node.CompletedAtUtc = now;
         }
     }
@@ -1085,10 +1167,30 @@ public sealed class AutomationRuntimeService(
         CancellationToken cancellationToken
     )
     {
+        if (
+            AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+            is not AutomationInputBindingsRestoreOutcome.Available restored
+        )
+        {
+            return new AutomationNodeExecution.Failed("binding-invalid");
+        }
+
+        if (
+            restored.Bindings.Values.Any(static binding =>
+                binding.Mode == AutomationInputBindingMode.Connected
+            )
+        )
+        {
+            return new AutomationNodeExecution.Failed("input-resolution-unavailable");
+        }
+
+        var activeExpressions = restored
+            .Bindings.Where(static pair => pair.Value.Mode == AutomationInputBindingMode.Expression)
+            .ToImmutableDictionary(static pair => pair.Key, static pair => pair.Value.Expression!);
         var outcome = await actions.ExecuteAsync(
             hostId,
             configuration,
-            AutomationRuntimeSerialization.DeserializeExpressions(node.FieldExpressionsJson),
+            activeExpressions,
             context,
             cancellationToken
         );
@@ -1153,7 +1255,8 @@ public sealed class AutomationRuntimeService(
     ) =>
         edges
             .Where(edge =>
-                edge.SourceNodeId == sourceNodeId
+                edge.Kind == PersistedAutomationEdgeKind.Flow
+                && edge.SourceNodeId == sourceNodeId
                 && (sourcePort is null || edge.SourcePortId == sourcePort)
             )
             .OrderBy(static edge => edge.SourcePortId, StringComparer.Ordinal)
@@ -1168,7 +1271,8 @@ public sealed class AutomationRuntimeService(
     ) =>
         edges
             .Where(edge =>
-                edge.SourceNodeId == sourceNodeId
+                edge.Kind == AutomationEdgeKind.Flow
+                && edge.SourceNodeId == sourceNodeId
                 && (sourcePort is null || edge.SourcePortId == sourcePort)
             )
             .OrderBy(static edge => edge.SourcePortId, StringComparer.Ordinal)
@@ -1176,8 +1280,29 @@ public sealed class AutomationRuntimeService(
             .Select(static edge => edge.TargetNodeId)
             .ToImmutableArray();
 
-    private static bool IsSource(AutomationFlow flow, AutomationFlowNode node) =>
-        flow.Edges.All(edge => edge.TargetNodeId != node.Id);
+    private bool IsSourceDefinition(AutomationFlowNode node) =>
+        catalog.TryDescribe(new(node.DefinitionId), out var definition)
+        && definition.Kind == AutomationNodeKind.Source;
+
+    private async Task<bool> ValidFlowAsync(
+        AutomationFlow flow,
+        AutomationHostId hostId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            AutomationFlowService.RestoreDraft(flow)
+                is not AutomationFlowDraftRestoreOutcome.Available restored
+            || restored.Draft.HostId != hostId
+        )
+        {
+            return false;
+        }
+
+        var validation = await flowService.ValidateAsync(restored.Draft, cancellationToken);
+        return validation.Gate is null
+            && validation.Errors.All(static error => error.Code == "capability-unavailable");
+    }
 
     private static PersistedAutomationNodeDefinition Definition(AutomationFlowNode node) =>
         new(

@@ -13,38 +13,113 @@ internal abstract record AutomationContextRestoreOutcome
     internal sealed record Unsupported : AutomationContextRestoreOutcome;
 }
 
+internal abstract record AutomationInputBindingsRestoreOutcome
+{
+    private AutomationInputBindingsRestoreOutcome() { }
+
+    internal sealed record Available(
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding> Bindings
+    ) : AutomationInputBindingsRestoreOutcome;
+
+    internal sealed record Invalid : AutomationInputBindingsRestoreOutcome;
+}
+
+internal abstract record AutomationDefinitionRestoreOutcome
+{
+    private AutomationDefinitionRestoreOutcome() { }
+
+    internal sealed record Available(AutomationRuntimeSerialization.PersistedFlow Flow)
+        : AutomationDefinitionRestoreOutcome;
+
+    internal sealed record Invalid : AutomationDefinitionRestoreOutcome;
+}
+
 internal static class AutomationRuntimeSerialization
 {
     private static readonly JsonSerializerOptions _options = new(JsonSerializerDefaults.Web);
 
-    internal static string SerializeExpressions(
-        ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> expressions
+    internal static string SerializeInputBindings(
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding> bindings
     ) =>
         JsonSerializer.Serialize(
-            expressions.ToDictionary(
+            bindings.ToDictionary(
                 static pair => pair.Key.Value,
-                static pair => new PersistedExpression(
-                    pair.Value.LanguageVersion.Value,
-                    pair.Value.Source
+                static pair => new PersistedInputBinding(
+                    pair.Value.Mode.ToString(),
+                    pair.Value.Expression is { } expression
+                        ? new PersistedExpression(
+                            expression.LanguageVersion.Value,
+                            expression.Source
+                        )
+                        : null
                 ),
                 StringComparer.Ordinal
             ),
             _options
         );
 
-    internal static ImmutableDictionary<
-        AutomationConfigurationFieldId,
-        AutomationExpressionSource
-    > DeserializeExpressions(string json) =>
-        JsonSerializer
-            .Deserialize<Dictionary<string, PersistedExpression>>(json, _options)!
-            .ToImmutableDictionary(
-                static pair => new AutomationConfigurationFieldId(pair.Key),
-                static pair => new AutomationExpressionSource(
-                    new(pair.Value.LanguageVersion),
-                    pair.Value.Source
+    internal static AutomationInputBindingsRestoreOutcome RestoreInputBindings(string json)
+    {
+        Dictionary<string, PersistedInputBinding>? persisted;
+        try
+        {
+            persisted = JsonSerializer.Deserialize<Dictionary<string, PersistedInputBinding>>(
+                json,
+                _options
+            );
+        }
+        catch (JsonException)
+        {
+            return new AutomationInputBindingsRestoreOutcome.Invalid();
+        }
+        catch (NotSupportedException)
+        {
+            return new AutomationInputBindingsRestoreOutcome.Invalid();
+        }
+
+        if (persisted is null)
+        {
+            return new AutomationInputBindingsRestoreOutcome.Invalid();
+        }
+
+        var bindings = ImmutableDictionary.CreateBuilder<
+            AutomationConfigurationFieldId,
+            AutomationInputBinding
+        >();
+        foreach (var (fieldId, binding) in persisted)
+        {
+            if (
+                string.IsNullOrWhiteSpace(fieldId)
+                || binding is null
+                || !Enum.TryParse<AutomationInputBindingMode>(binding.Mode, out var mode)
+                || !Enum.IsDefined(mode)
+                || binding.Mode != mode.ToString()
+                || (mode == AutomationInputBindingMode.Expression && binding.Expression is null)
+                || (
+                    binding.Expression is { } expression
+                    && (
+                        expression.LanguageVersion <= 0
+                        || string.IsNullOrWhiteSpace(expression.Source)
+                    )
+                )
+            )
+            {
+                return new AutomationInputBindingsRestoreOutcome.Invalid();
+            }
+
+            bindings.Add(
+                new(fieldId),
+                new(
+                    mode,
+                    binding.Expression is { } source
+                        ? new(new(source.LanguageVersion), source.Source)
+                        : null
                 )
             );
+        }
+
+        return new AutomationInputBindingsRestoreOutcome.Available(bindings.ToImmutable());
+    }
 
     internal static string SerializeContext(AutomationContext context) =>
         JsonSerializer.Serialize(
@@ -101,13 +176,14 @@ internal static class AutomationRuntimeSerialization
                         node.DefinitionId,
                         node.DefinitionSchemaVersion,
                         node.ConfigurationJson,
-                        node.FieldExpressionsJson,
+                        node.InputBindingsJson,
                         node.ExpressionLanguageVersion,
                         node.ContinueOnFailure
                     ))
                     .ToImmutableArray(),
                 flow.Edges.Select(static edge => new PersistedEdge(
                         edge.Id,
+                        Restore(edge.Kind),
                         edge.SourceNodeId,
                         edge.SourcePortId,
                         edge.TargetNodeId,
@@ -118,8 +194,59 @@ internal static class AutomationRuntimeSerialization
             _options
         );
 
-    internal static PersistedFlow DeserializeDefinition(string json) =>
-        JsonSerializer.Deserialize<PersistedFlow>(json, _options)!;
+    internal static AutomationDefinitionRestoreOutcome RestoreDefinition(string json)
+    {
+        PersistedFlow? flow;
+        try
+        {
+            flow = JsonSerializer.Deserialize<PersistedFlow>(json, _options);
+        }
+        catch (JsonException)
+        {
+            return new AutomationDefinitionRestoreOutcome.Invalid();
+        }
+        catch (NotSupportedException)
+        {
+            return new AutomationDefinitionRestoreOutcome.Invalid();
+        }
+
+        return (
+            flow is null
+            || flow.SchemaVersion != AutomationFlowSchema.CurrentVersion
+            || flow.Nodes.IsDefault
+            || flow.Edges.IsDefault
+            || flow.Nodes.Any(static node =>
+                node.Id == Guid.Empty || !IsValidJson(node.ConfigurationJson)
+            )
+            || flow.Nodes.Select(static node => node.Id).Distinct().Count() != flow.Nodes.Length
+            || flow.Nodes.Any(static node =>
+                RestoreInputBindings(node.InputBindingsJson)
+                is AutomationInputBindingsRestoreOutcome.Invalid
+            )
+            || flow.Edges.Any(static edge => edge.Id == Guid.Empty)
+            || flow.Edges.Select(static edge => edge.Id).Distinct().Count() != flow.Edges.Length
+            || flow.Edges.Any(static edge => !Enum.IsDefined(edge.Kind))
+            || flow.Edges.Any(edge =>
+                flow.Nodes.All(node => node.Id != edge.SourceNodeId)
+                || flow.Nodes.All(node => node.Id != edge.TargetNodeId)
+            )
+        )
+            ? new AutomationDefinitionRestoreOutcome.Invalid()
+            : new AutomationDefinitionRestoreOutcome.Available(flow);
+    }
+
+    private static bool IsValidJson(string json)
+    {
+        try
+        {
+            using var _ = JsonDocument.Parse(json);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     internal static PersistedAutomationNodeDefinition Definition(PersistedNode node) =>
         new(
@@ -176,6 +303,13 @@ internal static class AutomationRuntimeSerialization
                 JsonSerializer.Serialize(stream.Value, _options),
                 variable.Sensitivity
             ),
+            AutomationValue.Null nullValue
+                when nullValue.ValueType != AutomationPortValueType.Flow => new(
+                name.Value,
+                "null",
+                JsonSerializer.Serialize(nullValue.ValueType, _options),
+                variable.Sensitivity
+            ),
             _ => throw new InvalidOperationException("Unknown automation variable value."),
         };
 
@@ -204,12 +338,23 @@ internal static class AutomationRuntimeSerialization
                 "stream" => new AutomationValue.Stream(
                     JsonSerializer.Deserialize<AutomationStream>(variable.ValueJson, _options)!
                 ),
+                "null" => RestoreNull(variable.ValueJson),
                 _ => throw new InvalidOperationException("Unknown persisted automation value."),
             },
             variable.Sensitivity
         );
 
+    private static AutomationValue RestoreNull(string json)
+    {
+        var valueType = JsonSerializer.Deserialize<AutomationPortValueType>(json, _options);
+        return valueType != AutomationPortValueType.Flow && Enum.IsDefined(valueType)
+            ? new AutomationValue.Null(valueType)
+            : throw new InvalidOperationException("Unknown persisted automation null type.");
+    }
+
     private sealed record PersistedExpression(int LanguageVersion, string Source);
+
+    private sealed record PersistedInputBinding(string Mode, PersistedExpression? Expression);
 
     private sealed record PersistedContext(
         Guid OccurrenceId,
@@ -242,16 +387,25 @@ internal static class AutomationRuntimeSerialization
         string DefinitionId,
         int DefinitionSchemaVersion,
         string ConfigurationJson,
-        string FieldExpressionsJson,
+        string InputBindingsJson,
         int ExpressionLanguageVersion,
         bool ContinueOnFailure
     );
 
     internal sealed record PersistedEdge(
         Guid Id,
+        AutomationEdgeKind Kind,
         Guid SourceNodeId,
         string SourcePortId,
         Guid TargetNodeId,
         string TargetPortId
     );
+
+    private static AutomationEdgeKind Restore(PersistedAutomationEdgeKind kind) =>
+        kind switch
+        {
+            PersistedAutomationEdgeKind.Flow => AutomationEdgeKind.Flow,
+            PersistedAutomationEdgeKind.Data => AutomationEdgeKind.Data,
+            _ => (AutomationEdgeKind)(-1),
+        };
 }

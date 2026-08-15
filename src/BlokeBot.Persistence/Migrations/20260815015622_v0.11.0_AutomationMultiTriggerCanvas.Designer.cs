@@ -416,7 +416,7 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("ExpressionLanguageVersion")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FieldExpressionsJson")
+                    b.Property<string>("InputBindingsJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

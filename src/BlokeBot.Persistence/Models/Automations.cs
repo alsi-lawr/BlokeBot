@@ -19,6 +19,12 @@ public enum AutomationNodeRunStatus
     Invalidated,
 }
 
+public enum PersistedAutomationEdgeKind
+{
+    Flow,
+    Data,
+}
+
 public sealed class AutomationFlow
 {
     public Guid Id { get; set; }
@@ -41,7 +47,7 @@ public sealed class AutomationFlowNode
     public string DefinitionId { get; set; } = string.Empty;
     public int DefinitionSchemaVersion { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
-    public string FieldExpressionsJson { get; set; } = string.Empty;
+    public string InputBindingsJson { get; set; } = string.Empty;
     public int ExpressionLanguageVersion { get; set; }
     public bool ContinueOnFailure { get; set; }
     public int CanvasX { get; set; }
@@ -54,6 +60,7 @@ public sealed class AutomationFlowEdge
 {
     public Guid Id { get; set; }
     public Guid FlowId { get; set; }
+    public PersistedAutomationEdgeKind Kind { get; set; }
     public Guid SourceNodeId { get; set; }
     public string SourcePortId { get; set; } = string.Empty;
     public Guid TargetNodeId { get; set; }

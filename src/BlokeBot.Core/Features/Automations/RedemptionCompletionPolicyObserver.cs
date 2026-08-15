@@ -175,7 +175,15 @@ internal sealed class RedemptionCompletionPolicyObserver(
 
     private static RedemptionCompletionPolicy? ReadPolicy(string definitionJson, Guid sourceNodeId)
     {
-        var flow = AutomationRuntimeSerialization.DeserializeDefinition(definitionJson);
+        if (
+            AutomationRuntimeSerialization.RestoreDefinition(definitionJson)
+            is not AutomationDefinitionRestoreOutcome.Available restored
+        )
+        {
+            return null;
+        }
+
+        var flow = restored.Flow;
         var sources = flow
             .Nodes.Where(node =>
                 node.DefinitionId == AutomationDefinitionIds.RewardRedemptionSource.Value

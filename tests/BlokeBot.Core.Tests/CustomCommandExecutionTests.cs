@@ -1327,7 +1327,16 @@ public sealed class CustomCommandExecutionTests
                     AutomationFlowSchema.CurrentVersion,
                     true,
                     [source, action],
-                    [new(Guid.NewGuid(), source.Id, new("flow"), action.Id, new("flow"))]
+                    [
+                        new(
+                            Guid.NewGuid(),
+                            AutomationEdgeKind.Flow,
+                            source.Id,
+                            new("flow"),
+                            action.Id,
+                            new("flow")
+                        ),
+                    ]
                 ),
                 CancellationToken.None
             );
@@ -1342,7 +1351,7 @@ public sealed class CustomCommandExecutionTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 

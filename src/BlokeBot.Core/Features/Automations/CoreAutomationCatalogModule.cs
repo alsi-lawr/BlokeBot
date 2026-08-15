@@ -161,7 +161,8 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         new("stream"),
                         "Stream",
                         "The active stream identity, when the channel is live.",
-                        AutomationPortValueType.Stream
+                        AutomationPortValueType.Stream,
+                        Nullability: AutomationPortNullability.Nullable
                     ),
                 ],
                 [

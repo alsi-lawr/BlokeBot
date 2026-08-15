@@ -169,18 +169,19 @@ internal sealed class AutomationDefinitionCatalog
             throw Invalid(descriptor, moduleId, "Display metadata must be complete.");
         }
 
-        ValidatePorts(descriptor, moduleId, descriptor.Inputs, "input");
-        ValidatePorts(descriptor, moduleId, descriptor.Outputs, "output");
         ValidateFields(descriptor, moduleId);
+        ValidatePorts(descriptor, moduleId, descriptor.Inputs, isInput: true);
+        ValidatePorts(descriptor, moduleId, descriptor.Outputs, isInput: false);
     }
 
     private static void ValidatePorts(
         AutomationDefinitionDescriptor descriptor,
         AutomationModuleId moduleId,
         ImmutableArray<AutomationPortMetadata> ports,
-        string direction
+        bool isInput
     )
     {
+        var direction = isInput ? "input" : "output";
         var ids = new HashSet<AutomationPortId>();
         foreach (var port in ports)
         {
@@ -199,6 +200,7 @@ internal sealed class AutomationDefinitionCatalog
                 || string.IsNullOrWhiteSpace(port.Description)
                 || !Enum.IsDefined(port.ValueType)
                 || !Enum.IsDefined(port.Sensitivity)
+                || !Enum.IsDefined(port.Nullability)
             )
             {
                 throw Invalid(
@@ -207,8 +209,70 @@ internal sealed class AutomationDefinitionCatalog
                     $"The {direction} port '{port.Id.Value}' needs complete display metadata."
                 );
             }
+
+            if (
+                port.ValueType == AutomationPortValueType.Flow
+                && (
+                    port.Sensitivity != AutomationDataSensitivity.Safe
+                    || port.Nullability != AutomationPortNullability.NonNullable
+                    || port.BindingFieldId is not null
+                )
+            )
+            {
+                throw Invalid(
+                    descriptor,
+                    moduleId,
+                    $"The {direction} Flow port '{port.Id.Value}' cannot declare Data metadata."
+                );
+            }
+
+            if (!isInput && port.BindingFieldId is not null)
+            {
+                throw Invalid(
+                    descriptor,
+                    moduleId,
+                    $"The output port '{port.Id.Value}' cannot bind a configuration field."
+                );
+            }
+
+            if (isInput && port.ValueType != AutomationPortValueType.Flow)
+            {
+                var field = descriptor.Configuration.SingleOrDefault(candidate =>
+                    candidate.Id == port.BindingFieldId
+                );
+                if (
+                    field is null
+                    || FieldValueType(field.FieldType) != port.ValueType
+                    || field.Sensitivity != port.Sensitivity
+                    || (
+                        field.Required
+                            ? AutomationPortNullability.NonNullable
+                            : AutomationPortNullability.Nullable
+                    ) != port.Nullability
+                )
+                {
+                    throw Invalid(
+                        descriptor,
+                        moduleId,
+                        $"The Data input port '{port.Id.Value}' must bind a matching configuration field."
+                    );
+                }
+            }
         }
     }
+
+    private static AutomationPortValueType? FieldValueType(
+        AutomationConfigurationFieldType fieldType
+    ) =>
+        fieldType switch
+        {
+            AutomationConfigurationFieldType.Text => AutomationPortValueType.Text,
+            AutomationConfigurationFieldType.Choice => AutomationPortValueType.Text,
+            AutomationConfigurationFieldType.Reference => AutomationPortValueType.Text,
+            AutomationConfigurationFieldType.Number => AutomationPortValueType.Number,
+            AutomationConfigurationFieldType.Duration => AutomationPortValueType.Number,
+            _ => null,
+        };
 
     private static void ValidateFields(
         AutomationDefinitionDescriptor descriptor,

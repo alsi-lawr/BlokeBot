@@ -26,6 +26,11 @@ public sealed class AutomationRuntimeTests
         {
             Position = new(new(600), new(72)),
             DisplayAlias = "Welcome the viewer in chat",
+            InputBindings = Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "actor.display_name")
+            ),
         };
         var saved = (
             await fixture.Flows.SaveAsync(
@@ -56,6 +61,11 @@ public sealed class AutomationRuntimeTests
             .Definition.Configuration.GetProperty("message")
             .GetString()
             .ShouldBe("Welcome ${actor.display_name}!");
+        roundTrip
+            .Nodes.Single(node => node.Id == action.Id)
+            .InputBindings[new("message")]
+            .ShouldBe(action.InputBindings[new("message")]);
+        roundTrip.Edges.ShouldAllBe(static edge => edge.Kind == AutomationEdgeKind.Flow);
         roundTrip.Canvas.ShouldBe(
             new(AutomationFlowOrientation.Vertical, AutomationEdgeStyle.Smooth)
         );
@@ -202,11 +212,305 @@ public sealed class AutomationRuntimeTests
         );
 
         var invalid = outcome.ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
-        invalid.Errors.Select(static error => error.Code).ShouldContain("cycle");
+        invalid.Errors.Select(static error => error.Code).ShouldContain("flow-cycle");
         invalid.Errors.Select(static error => error.Code).ShouldContain("node-disconnected");
-        invalid.Errors.Select(static error => error.Code).ShouldContain("port-incompatible");
+        invalid.Errors.Select(static error => error.Code).ShouldContain("flow-port-incompatible");
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlows.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task DataValidation_SeparatesTopologyAndEnforcesInputContracts()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var value = Node("test-number-value", "{}");
+        var secondValue = Node("test-number-value", "{}");
+        var first = ConnectedNode("test-number-consumer");
+        var second = ConnectedNode("test-number-consumer");
+        var fanOut = Draft(
+            fixture.HostId,
+            [source, value, first, second],
+            [
+                Edge(source, "flow", first),
+                Edge(source, "flow", second),
+                Edge(value, "value", first, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", second, "value", AutomationEdgeKind.Data),
+            ]
+        );
+
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(fanOut, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        var duplicate = fanOut with
+        {
+            Nodes = [source, value, secondValue, first],
+            Edges =
+            [
+                Edge(source, "flow", first),
+                Edge(value, "value", first, "value", AutomationEdgeKind.Data),
+                Edge(secondValue, "value", first, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        await AssertValidationCode(fixture, duplicate, "data-input-duplicate");
+
+        var dataOnly = fanOut with
+        {
+            Nodes = [source, value, first],
+            Edges = [Edge(value, "value", first, "value", AutomationEdgeKind.Data)],
+        };
+        await AssertValidationCode(fixture, dataOnly, "node-disconnected");
+
+        var textValue = Node("test-text-value", "{}");
+        var exactType = fanOut with
+        {
+            Nodes = [source, textValue, first],
+            Edges =
+            [
+                Edge(source, "flow", first),
+                Edge(textValue, "value", first, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        await AssertValidationCode(fixture, exactType, "data-type-incompatible");
+
+        var nullableValue = Node("test-nullable-number-value", "{}");
+        var nullRejected = fanOut with
+        {
+            Nodes = [source, nullableValue, first],
+            Edges =
+            [
+                Edge(source, "flow", first),
+                Edge(nullableValue, "value", first, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        await AssertValidationCode(fixture, nullRejected, "data-nullability-incompatible");
+
+        var nullableConsumer = ConnectedNode("test-nullable-number-consumer");
+        var nullAccepted = fanOut with
+        {
+            Nodes = [source, nullableValue, nullableConsumer],
+            Edges =
+            [
+                Edge(source, "flow", nullableConsumer),
+                Edge(nullableValue, "value", nullableConsumer, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(nullAccepted, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        var sensitiveValue = Node("test-sensitive-number-value", "{}");
+        var sensitivity = fanOut with
+        {
+            Nodes = [source, sensitiveValue, first],
+            Edges =
+            [
+                Edge(source, "flow", first),
+                Edge(sensitiveValue, "value", first, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        await AssertValidationCode(fixture, sensitivity, "data-sensitivity-incompatible");
+
+        var flowMisuse = fanOut with
+        {
+            Nodes = [source, value, first],
+            Edges =
+            [
+                Edge(source, "flow", first),
+                Edge(value, "value", first, "value", AutomationEdgeKind.Flow),
+            ],
+        };
+        await AssertValidationCode(fixture, flowMisuse, "flow-port-incompatible");
+    }
+
+    [Test]
+    public async Task DataValidation_RequiresEveryFlowPathAndRejectsCombinedCycles()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var firstSource = Node("test-number-source", "{}");
+        var secondSource = Node("test-number-source", "{}");
+        var consumer = ConnectedNode("test-number-consumer");
+        var alternatePath = Draft(
+            fixture.HostId,
+            [firstSource, secondSource, consumer],
+            [
+                Edge(firstSource, "flow", consumer),
+                Edge(secondSource, "flow", consumer),
+                Edge(firstSource, "value", consumer, "value", AutomationEdgeKind.Data),
+            ]
+        );
+
+        await AssertValidationCode(fixture, alternatePath, "data-source-unavailable");
+
+        var onePath = alternatePath with
+        {
+            Edges =
+            [
+                Edge(firstSource, "flow", consumer),
+                Edge(firstSource, "value", consumer, "value", AutomationEdgeKind.Data),
+            ],
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(onePath, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        var control = Node(
+            "test-data-control",
+            """{"value":1}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+        var producer = Node("test-data-control-output", "{}");
+        var combined = Draft(
+            fixture.HostId,
+            [firstSource, control, producer],
+            [
+                Edge(firstSource, "flow", control),
+                Edge(control, "complete", producer),
+                Edge(producer, "value", control, "value", AutomationEdgeKind.Data),
+            ]
+        );
+        var codes = await ValidationCodes(fixture, combined);
+        codes.ShouldContain("dependency-cycle");
+        codes.ShouldNotContain("flow-cycle");
+        codes.ShouldNotContain("data-cycle");
+    }
+
+    [Test]
+    public async Task DataEdges_DoNotScheduleNodesOrContributeFlowReachability()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var transform = ConnectedNode("test-number-transform");
+        var action = Node("send-chat", """{"message":"flow only"}""");
+        _ = await fixture.SaveAsync(
+            [source, transform, action],
+            [
+                Edge(source, "value", transform, "value", AutomationEdgeKind.Data),
+                Edge(source, "flow", action),
+            ]
+        );
+        var context = Context(fixture.HostId) with
+        {
+            Event = new(Guid.NewGuid(), new("test-number-source")),
+        };
+
+        var outcome = await fixture.Runtime.DispatchAsync(
+            new(context, new DataContractConfiguration()),
+            CancellationToken.None
+        );
+
+        outcome.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        fixture.Chat.Messages.ShouldBe(["flow only"]);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var run = await db
+            .AutomationFlowRuns.Include(static candidate => candidate.NodeRuns)
+            .SingleAsync();
+        run.NodeRuns.Select(static node => node.NodeId)
+            .ShouldBe([source.Id.Value, action.Id.Value], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task MalformedPersistedBindings_BlockDispatchBeforeExternalAction()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var savedAction = await db.AutomationFlowNodes.SingleAsync(node =>
+                node.Id == action.Id.Value
+            );
+            savedAction.InputBindingsJson = "{malformed";
+            _ = await db.SaveChangesAsync();
+        }
+
+        var outcome = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        outcome.Status.ShouldBe(AutomationDispatchStatus.InvalidFlow);
+        outcome.RunIds.ShouldBeEmpty();
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        (await verified.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public void TypedNull_ContextSerializationPreservesTheDeclaredTypeAndSensitivity()
+    {
+        var context = Context(hostId: 42) with
+        {
+            Variables = new(
+                new Dictionary<AutomationVariableName, AutomationVariable>
+                {
+                    [new("optional_number")] = new(
+                        new AutomationValue.Null(AutomationPortValueType.Number),
+                        AutomationDataSensitivity.Safe
+                    ),
+                }
+            ),
+        };
+
+        var restored = AutomationRuntimeSerialization
+            .RestoreContext(
+                AutomationContextSchema.CurrentVersion,
+                AutomationRuntimeSerialization.SerializeContext(context)
+            )
+            .ShouldBeOfType<AutomationContextRestoreOutcome.Available>();
+
+        restored
+            .Context.Variables.ForExecution()[new("optional_number")]
+            .ShouldBe(
+                new(
+                    new AutomationValue.Null(AutomationPortValueType.Number),
+                    AutomationDataSensitivity.Safe
+                )
+            );
+    }
+
+    [Test]
+    public async Task MalformedFrozenDefinition_FailsPendingRunWithoutExternalAction()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        var runId = dispatched.RunIds.ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db.AutomationFlowRuns.SingleAsync(candidate =>
+                candidate.Id == runId.Value
+            );
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            frozen.Flow.Edges.ShouldAllBe(static edge => edge.Kind == AutomationEdgeKind.Flow);
+            run.DefinitionJson = "{malformed";
+            _ = await db.SaveChangesAsync();
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        var failed = await verified
+            .AutomationFlowRuns.Include(static run => run.NodeRuns)
+            .SingleAsync(run => run.Id == runId.Value);
+        failed.Status.ShouldBe(AutomationFlowRunStatus.Failed);
+        failed.NodeRuns.ShouldContain(static node => node.OutcomeCode == "definition-invalid");
     }
 
     [Test]
@@ -1129,7 +1433,8 @@ public sealed class AutomationRuntimeTests
         string json,
         AutomationNodeFailurePolicy policy = AutomationNodeFailurePolicy.Stop,
         ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>? fields =
-            null
+            null,
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>? bindings = null
     )
     {
         using var document = JsonDocument.Parse(json);
@@ -1138,11 +1443,15 @@ public sealed class AutomationRuntimeTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             policy,
-            fields
-                ?? ImmutableDictionary<
-                    AutomationConfigurationFieldId,
-                    AutomationExpressionSource
-                >.Empty
+            bindings
+                ?? fields?.ToImmutableDictionary(
+                    static pair => pair.Key,
+                    static pair => new AutomationInputBinding(
+                        AutomationInputBindingMode.Expression,
+                        pair.Value
+                    )
+                )
+                ?? ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 
@@ -1152,12 +1461,48 @@ public sealed class AutomationRuntimeTests
         return new(type, 1, document.RootElement.Clone());
     }
 
+    private static AutomationFlowDraftNode ConnectedNode(string type) =>
+        Node(
+            type,
+            """{"value":1}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+
+    private static ImmutableDictionary<
+        AutomationConfigurationFieldId,
+        AutomationInputBinding
+    > Bindings(
+        string fieldId,
+        AutomationInputBindingMode mode,
+        AutomationExpressionSource? expression = null
+    ) =>
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty.Add(
+            new(fieldId),
+            new(mode, expression)
+        );
+
+    private static async Task<ImmutableArray<string>> ValidationCodes(
+        RuntimeFixture fixture,
+        AutomationFlowDraft draft
+    ) =>
+        (await fixture.Flows.ValidateDraftAsync(draft, CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>()
+            .Errors.Select(static error => error.Code)
+            .ToImmutableArray();
+
+    private static async Task AssertValidationCode(
+        RuntimeFixture fixture,
+        AutomationFlowDraft draft,
+        string expected
+    ) => (await ValidationCodes(fixture, draft)).ShouldContain(expected);
+
     private static AutomationFlowDraftEdge Edge(
         AutomationFlowDraftNode source,
         string sourcePort,
         AutomationFlowDraftNode target,
-        string targetPort = "flow"
-    ) => new(Guid.NewGuid(), source.Id, new(sourcePort), target.Id, new(targetPort));
+        string targetPort = "flow",
+        AutomationEdgeKind kind = AutomationEdgeKind.Flow
+    ) => new(Guid.NewGuid(), kind, source.Id, new(sourcePort), target.Id, new(targetPort));
 
     private static AutomationContext Context(
         int hostId,
@@ -1186,6 +1531,166 @@ public sealed class AutomationRuntimeTests
                 }
             )
         );
+
+    private sealed record DataContractConfiguration : AutomationConfiguration;
+
+    private sealed class DataContractAutomationModule : IAutomationCatalogModule
+    {
+        private static readonly AutomationSchemaCompatibility _schema = new(new(1), new(1));
+        private static readonly AutomationPortMetadata _flowInput = new(
+            new("flow"),
+            "Flow",
+            "Runs this node.",
+            AutomationPortValueType.Flow
+        );
+        private static readonly AutomationPortMetadata _completeOutput = new(
+            new("complete"),
+            "Complete",
+            "Continues after this node.",
+            AutomationPortValueType.Flow
+        );
+
+        public AutomationModuleId Id => new("tests.data-contract");
+
+        public IEnumerable<IAutomationDefinition> Definitions =>
+            [
+                Definition(
+                    "test-number-source",
+                    AutomationNodeKind.Source,
+                    [],
+                    [
+                        new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
+                        DataOutput(AutomationPortValueType.Number),
+                    ],
+                    []
+                ),
+                Definition(
+                    "test-number-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [DataOutput(AutomationPortValueType.Number)],
+                    []
+                ),
+                Definition(
+                    "test-text-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [DataOutput(AutomationPortValueType.Text)],
+                    []
+                ),
+                Definition(
+                    "test-nullable-number-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [
+                        DataOutput(
+                            AutomationPortValueType.Number,
+                            nullability: AutomationPortNullability.Nullable
+                        ),
+                    ],
+                    []
+                ),
+                Definition(
+                    "test-sensitive-number-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [
+                        DataOutput(
+                            AutomationPortValueType.Number,
+                            sensitivity: AutomationDataSensitivity.Sensitive
+                        ),
+                    ],
+                    []
+                ),
+                Definition(
+                    "test-number-transform",
+                    AutomationNodeKind.Transform,
+                    [DataInput(required: true)],
+                    [DataOutput(AutomationPortValueType.Number)],
+                    [Field(required: true)]
+                ),
+                Consumer("test-number-consumer", required: true),
+                Consumer("test-nullable-number-consumer", required: false),
+                Definition(
+                    "test-data-control",
+                    AutomationNodeKind.Control,
+                    [_flowInput, DataInput(required: true)],
+                    [_completeOutput],
+                    [Field(required: true)]
+                ),
+                Definition(
+                    "test-data-control-output",
+                    AutomationNodeKind.Control,
+                    [_flowInput],
+                    [_completeOutput, DataOutput(AutomationPortValueType.Number)],
+                    []
+                ),
+            ];
+
+        private static IAutomationDefinition Consumer(string id, bool required) =>
+            Definition(
+                id,
+                AutomationNodeKind.Action,
+                [_flowInput, DataInput(required)],
+                [_completeOutput],
+                [Field(required)]
+            );
+
+        private static IAutomationDefinition Definition(
+            string id,
+            AutomationNodeKind kind,
+            ImmutableArray<AutomationPortMetadata> inputs,
+            ImmutableArray<AutomationPortMetadata> outputs,
+            ImmutableArray<AutomationConfigurationFieldMetadata> fields
+        ) =>
+            new AutomationDefinition<DataContractConfiguration>(
+                new(
+                    new(id),
+                    kind,
+                    AutomationDefinitionScope.Host,
+                    _schema,
+                    new(id, "Exercises the typed graph contract.", "Test"),
+                    inputs,
+                    outputs,
+                    fields,
+                    AutomationActionCapabilities.None,
+                    kind == AutomationNodeKind.Action
+                        ? AutomationActionRetrySafety.Unsafe
+                        : AutomationActionRetrySafety.NotApplicable
+                ),
+                static _ => new AutomationConfigurationParseResult.Parsed(
+                    new DataContractConfiguration()
+                ),
+                static _ => AutomationValidationResult.Valid
+            );
+
+        private static AutomationPortMetadata DataInput(bool required) =>
+            new(
+                new("value"),
+                "Value",
+                "Receives the exact Number value.",
+                AutomationPortValueType.Number,
+                Nullability: required
+                    ? AutomationPortNullability.NonNullable
+                    : AutomationPortNullability.Nullable,
+                BindingFieldId: new("value")
+            );
+
+        private static AutomationPortMetadata DataOutput(
+            AutomationPortValueType type,
+            AutomationDataSensitivity sensitivity = AutomationDataSensitivity.Safe,
+            AutomationPortNullability nullability = AutomationPortNullability.NonNullable
+        ) => new(new("value"), "Value", "Supplies a typed value.", type, sensitivity, nullability);
+
+        private static AutomationConfigurationFieldMetadata Field(bool required) =>
+            new(
+                new("value"),
+                "Value",
+                "The retained Fixed value.",
+                new AutomationConfigurationFieldType.Number(0, null),
+                required
+            );
+    }
 
     private sealed class RuntimeFixture : IAsyncDisposable
     {
@@ -1249,20 +1754,21 @@ public sealed class AutomationRuntimeTests
                 [observer]
             );
             var catalog = new AutomationCatalogService(
-                new([new CoreAutomationCatalogModule()]),
+                new([new CoreAutomationCatalogModule(), new DataContractAutomationModule()]),
                 features
             );
             var expressions = new AutomationExpressionService();
             overlays ??= new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
+            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var runtime = new AutomationRuntimeService(
                 database,
                 catalog,
+                flows,
                 expressions,
                 actions,
                 clock
             );
-            var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
             var queries = new AutomationRunQueryService(database, features);
             var fixture = new RuntimeFixture(
                 database,
@@ -1295,7 +1801,7 @@ public sealed class AutomationRuntimeTests
         }
 
         internal AutomationRuntimeService NewRuntime() =>
-            new(Database, Catalog, Expressions, Actions, Clock);
+            new(Database, Catalog, Flows, Expressions, Actions, Clock);
 
         internal async Task<AutomationFlowId> SaveAsync(
             ImmutableArray<AutomationFlowDraftNode> nodes,
