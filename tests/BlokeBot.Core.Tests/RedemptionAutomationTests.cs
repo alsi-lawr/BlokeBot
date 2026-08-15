@@ -93,6 +93,34 @@ public sealed class RedemptionAutomationTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+
+        await fixture.SetFeatureAsync(HostFeatureFlags.RaidCollaboration, enabled: true);
+        var actorlessSource = Node("stream-online", "{}");
+        var shoutoutAction = Node("send-shoutout", "{}");
+        var actorless = await fixture.Flows.SaveAsync(
+            Draft(
+                fixture.HostId,
+                [actorlessSource, shoutoutAction],
+                [Edge(actorlessSource, "flow", shoutoutAction)]
+            ),
+            CancellationToken.None
+        );
+
+        actorless
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
+            .Errors.ShouldContain(error =>
+                error.NodeId == shoutoutAction.Id && error.Code == "trigger-context-incompatible"
+            );
+        _ = (
+            await fixture.Flows.SaveAsync(
+                Draft(
+                    fixture.HostId,
+                    [source, shoutoutAction],
+                    [Edge(source, "flow", shoutoutAction)]
+                ),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
     }
 
     [Test]
@@ -732,7 +760,11 @@ public sealed class RedemptionAutomationTests
                 [new AutomationFeatureDisableObserver(database, clock)]
             );
             var catalog = new AutomationCatalogService(
-                new([new CoreAutomationCatalogModule(), new TwitchEventAutomationCatalogModule()]),
+                new([
+                    new CoreAutomationCatalogModule(),
+                    new TwitchEventAutomationCatalogModule(),
+                    new NativeOperationAutomationCatalogModule(),
+                ]),
                 features
             );
             var expressions = new AutomationExpressionService();

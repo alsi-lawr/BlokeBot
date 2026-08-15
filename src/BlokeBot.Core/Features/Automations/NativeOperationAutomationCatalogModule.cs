@@ -296,10 +296,26 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
                 [_completeOutput],
                 [],
                 AutomationActionCapabilities.CallsTwitchApi,
-                AutomationActionRetrySafety.Unsafe
+                AutomationActionRetrySafety.Unsafe,
+                KnownActorTriggerContext()
             ),
             static _ => Parsed(new SendShoutoutActionConfiguration()),
             static _ => AutomationValidationResult.Valid
+        );
+
+    private static AutomationTriggerContextRequirement KnownActorTriggerContext() =>
+        new(
+            [
+                AutomationDefinitionIds.CustomCommandSource,
+                AutomationDefinitionIds.FollowSource,
+                AutomationDefinitionIds.SubscriptionSource,
+                AutomationDefinitionIds.IncomingRaidSource,
+                AutomationDefinitionIds.RewardRedemptionSource,
+                AutomationDefinitionIds.ShoutoutSentSource,
+                AutomationDefinitionIds.ShoutoutReceivedSource,
+            ],
+            "Add a trigger with a known viewer or broadcaster to use this action.",
+            "Connect this action to a trigger with a known viewer or broadcaster."
         );
 
     private static AutomationDefinition<StartPollActionConfiguration> StartPollAction() =>
