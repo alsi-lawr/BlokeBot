@@ -46,6 +46,7 @@ public sealed class AutomationFlowNode
     public bool ContinueOnFailure { get; set; }
     public int CanvasX { get; set; }
     public int CanvasY { get; set; }
+    public string? DisplayAlias { get; set; }
     public AutomationFlow Flow { get; set; } = null!;
 }
 

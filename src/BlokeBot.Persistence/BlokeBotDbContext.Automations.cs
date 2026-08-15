@@ -32,6 +32,7 @@ public sealed partial class BlokeBotDbContext
             _ = b.ToTable("automation_flow_nodes");
             _ = b.HasKey(static x => x.Id);
             _ = b.Property(static x => x.DefinitionId).HasMaxLength(96);
+            _ = b.Property(static x => x.DisplayAlias).HasMaxLength(200);
             _ = b.HasIndex(static x => new { x.FlowId, x.DefinitionId });
         });
 

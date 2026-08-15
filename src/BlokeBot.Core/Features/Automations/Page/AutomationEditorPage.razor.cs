@@ -138,9 +138,7 @@ public partial class AutomationEditorPage
             : string.Join(
                 " → ",
                 _sampleOutcomes.Select(outcome =>
-                    _editor
-                        ?.Nodes.FirstOrDefault(node => node.Id == outcome.NodeId)
-                        ?.Definition.Display.Name
+                    _editor?.Nodes.FirstOrDefault(node => node.Id == outcome.NodeId)?.EffectiveName
                     ?? "Unknown node"
                 )
             ) + " · No live action was sent";
@@ -1059,9 +1057,7 @@ public partial class AutomationEditorPage
         var failed = run.FailedNode;
         var failedName = failed is null
             ? null
-            : _editor
-                ?.Nodes.FirstOrDefault(node => node.Id == failed.NodeId)
-                ?.Definition.Display.Name;
+            : _editor?.Nodes.FirstOrDefault(node => node.Id == failed.NodeId)?.EffectiveName;
         return failedName is null
                 ? $"{run.Nodes.Length} node outcomes · {FormatTimestamp(run.StartedAtUtc)}"
             : failed!.State == AutomationNodeRunState.ContinuedAfterFailure

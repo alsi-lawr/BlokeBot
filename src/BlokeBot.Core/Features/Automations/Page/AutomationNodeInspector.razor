@@ -8,11 +8,19 @@
 }
 else
 {
-    <aside class="automation-inspector" aria-label="Node inspector: @Node.Definition.Display.Name" data-automation-inspector="@Node.Id.Value">
+    <aside class="automation-inspector" aria-label="Node inspector: @Node.EffectiveName" data-automation-inspector="@Node.Id.Value">
         <header class="automation-inspector-header">
             <div>
                 <p class="automation-inspector-eyebrow">Selected @KindLabel(Node.Definition.Kind)</p>
-                <h2>@Node.Definition.Display.Name</h2>
+                <input id="automation-node-display-alias"
+                       class="automation-inspector-title"
+                       type="text"
+                       aria-label="Node name"
+                       maxlength="@AutomationFlowSchema.NodeDisplayAliasMaximumLength"
+                       value="@Node.DisplayAlias"
+                       placeholder="@Node.Definition.Display.Name"
+                       title="Edit node name"
+                       @oninput="args => SetDisplayAliasAsync(args.Value)" />
             </div>
             <button class="automation-icon-button" type="button" aria-label="Close inspector" @onclick="ClearSelection">&times;</button>
         </header>
@@ -117,7 +125,7 @@ else
                             <option value="">Choose a compatible node</option>
                             @foreach (var target in CompatibleTargets(output))
                             {
-                                <option value="@target.Id.Value">@target.Definition.Display.Name</option>
+                                <option value="@target.Id.Value">@target.EffectiveName</option>
                             }
                         </select>
                     </div>

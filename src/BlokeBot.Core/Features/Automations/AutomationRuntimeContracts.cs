@@ -42,6 +42,8 @@ public static class AutomationExpressionLanguage
 public static class AutomationFlowSchema
 {
     public const int CurrentVersion = 1;
+
+    public const int NodeDisplayAliasMaximumLength = 200;
 }
 
 public static class AutomationContextSchema
@@ -69,7 +71,8 @@ public sealed record AutomationFlowDraftNode(
         AutomationConfigurationFieldId,
         AutomationExpressionSource
     > FieldExpressions,
-    AutomationCanvasPosition Position = default
+    AutomationCanvasPosition Position = default,
+    string? DisplayAlias = null
 );
 
 public sealed record AutomationFlowDraftEdge(

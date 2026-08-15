@@ -46,6 +46,12 @@ public partial class AutomationNodeInspector
         await Changed.InvokeAsync();
     }
 
+    private async Task SetDisplayAliasAsync(object? value)
+    {
+        Node?.SetDisplayAlias(value?.ToString());
+        await Changed.InvokeAsync();
+    }
+
     private async Task ConnectAsync(AutomationPortMetadata output, object? value)
     {
         if (Node is null || !Guid.TryParse(value?.ToString(), out var targetId))
@@ -84,7 +90,7 @@ public partial class AutomationNodeInspector
                     && edge.TargetNodeId == candidate.Id
                 )
             )
-            .OrderBy(static candidate => candidate.Definition.Display.Name)
+            .OrderBy(static candidate => candidate.EffectiveName)
             .ToArray();
 
     private static bool Compatible(AutomationPortMetadata output, AutomationPortMetadata input) =>
@@ -107,7 +113,7 @@ public partial class AutomationNodeInspector
         };
 
     private string NodeLabel(AutomationNodeId nodeId) =>
-        Nodes.Single(node => node.Id == nodeId).Definition.Display.Name;
+        Nodes.Single(node => node.Id == nodeId).EffectiveName;
 
     private string PortLabel(AutomationPortId portId) =>
         Node?.Definition.Outputs.Single(port => port.Id == portId).Name ?? portId.Value;

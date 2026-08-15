@@ -20,10 +20,12 @@ public sealed class AutomationRuntimeTests
         var source = Node("custom-command", """{"custom-command-id":7}""") with
         {
             Position = new(new(48), new(216)),
+            DisplayAlias = "Chat command received",
         };
         var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""") with
         {
             Position = new(new(600), new(72)),
+            DisplayAlias = "Welcome the viewer in chat",
         };
         var saved = (
             await fixture.Flows.SaveAsync(
@@ -46,6 +48,9 @@ public sealed class AutomationRuntimeTests
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
         var roundTrip = loaded.Flows.ShouldHaveSingleItem().Draft;
         roundTrip.Nodes.Single(node => node.Id == source.Id).Position.ShouldBe(source.Position);
+        roundTrip
+            .Nodes.Single(node => node.Id == source.Id)
+            .DisplayAlias.ShouldBe(source.DisplayAlias);
         roundTrip
             .Nodes.Single(node => node.Id == action.Id)
             .Definition.Configuration.GetProperty("message")
@@ -75,10 +80,32 @@ public sealed class AutomationRuntimeTests
             .Draft.Nodes.Single(node => node.Id == action.Id)
             .Position.ShouldBe(new(new(648), new(96)));
 
+        var duplicated = (
+            await fixture.Flows.DuplicateAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.Duplicated>();
+        var afterDuplicate = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        var duplicate = afterDuplicate.Flows.Single(flow => flow.Draft.Id == duplicated.FlowId);
+        duplicate
+            .Draft.Nodes.Select(static node => node.DisplayAlias)
+            .ShouldBe([source.DisplayAlias, action.DisplayAlias], ignoreOrder: true);
+
         _ = (
             await fixture.Flows.DeleteAsync(
                 new(fixture.HostId),
                 saved.FlowId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowDeleteOutcome.Deleted>();
+        _ = (
+            await fixture.Flows.DeleteAsync(
+                new(fixture.HostId),
+                duplicated.FlowId,
                 CancellationToken.None
             )
         ).ShouldBeOfType<AutomationFlowDeleteOutcome.Deleted>();

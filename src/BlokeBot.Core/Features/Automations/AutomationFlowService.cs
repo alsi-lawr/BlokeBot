@@ -410,6 +410,17 @@ public sealed class AutomationFlowService(
                 continue;
             }
 
+            if (node.DisplayAlias?.Length > AutomationFlowSchema.NodeDisplayAliasMaximumLength)
+            {
+                errors.Add(
+                    new(
+                        node.Id,
+                        "node-alias-too-long",
+                        $"Use {AutomationFlowSchema.NodeDisplayAliasMaximumLength} characters or fewer in the node name."
+                    )
+                );
+            }
+
             await ValidateNodeAsync(draft.HostId, node, definitions, errors, cancellationToken);
         }
 
@@ -824,6 +835,7 @@ public sealed class AutomationFlowService(
             ContinueOnFailure = node.FailurePolicy == AutomationNodeFailurePolicy.Continue,
             CanvasX = node.Position.X.Value,
             CanvasY = node.Position.Y.Value,
+            DisplayAlias = string.IsNullOrWhiteSpace(node.DisplayAlias) ? null : node.DisplayAlias,
         };
 
     private static AutomationFlowEdge Persist(Guid flowId, AutomationFlowDraftEdge edge) =>
@@ -858,7 +870,8 @@ public sealed class AutomationFlowService(
                     AutomationRuntimeSerialization.DeserializeExpressions(
                         node.FieldExpressionsJson
                     ),
-                    new(new(node.CanvasX), new(node.CanvasY))
+                    new(new(node.CanvasX), new(node.CanvasY)),
+                    node.DisplayAlias
                 ))
                 .ToImmutableArray(),
             flow.Edges.Select(static edge => new AutomationFlowDraftEdge(

@@ -93,6 +93,7 @@ public sealed class AutomationEditorNode
         AutomationDefinitionDescriptor definition,
         AutomationCanvasPosition position,
         AutomationNodeFailurePolicy failurePolicy,
+        string? displayAlias,
         Dictionary<AutomationConfigurationFieldId, string> values
     )
     {
@@ -100,6 +101,7 @@ public sealed class AutomationEditorNode
         Definition = definition;
         Position = position;
         FailurePolicy = failurePolicy;
+        DisplayAlias = displayAlias;
         _values = values;
     }
 
@@ -111,6 +113,11 @@ public sealed class AutomationEditorNode
 
     internal AutomationNodeFailurePolicy FailurePolicy { get; set; }
 
+    internal string? DisplayAlias { get; set; }
+
+    internal string EffectiveName =>
+        string.IsNullOrWhiteSpace(DisplayAlias) ? Definition.Display.Name : DisplayAlias;
+
     internal static AutomationEditorNode Create(
         AutomationDefinitionDescriptor definition,
         AutomationCanvasPosition position
@@ -120,6 +127,7 @@ public sealed class AutomationEditorNode
             definition,
             position,
             AutomationNodeFailurePolicy.Stop,
+            null,
             definition.Configuration.ToDictionary(
                 static field => field.Id,
                 static field => DefaultValue(field)
@@ -135,6 +143,7 @@ public sealed class AutomationEditorNode
             definition,
             node.Position,
             node.FailurePolicy,
+            node.DisplayAlias,
             definition.Configuration.ToDictionary(
                 static field => field.Id,
                 field => ReadValue(node.Definition.Configuration, field.Id)
@@ -146,6 +155,8 @@ public sealed class AutomationEditorNode
     internal void SetValue(AutomationConfigurationFieldId fieldId, string value) =>
         _values[fieldId] = value;
 
+    internal void SetDisplayAlias(string? value) => DisplayAlias = value;
+
     internal AutomationFlowDraftNode Draft() =>
         new(
             Id,
@@ -153,7 +164,8 @@ public sealed class AutomationEditorNode
             AutomationExpressionLanguage.CurrentVersion,
             FailurePolicy,
             ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty,
-            Position
+            Position,
+            string.IsNullOrWhiteSpace(DisplayAlias) ? null : DisplayAlias
         );
 
     private JsonElement ConfigurationJson()

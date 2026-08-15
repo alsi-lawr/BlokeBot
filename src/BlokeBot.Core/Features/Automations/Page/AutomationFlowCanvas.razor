@@ -78,11 +78,12 @@
                     <button type="button"
                             class="automation-node-select"
                             data-automation-node-select
+                            aria-label="Select @node.EffectiveName"
                             aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
                             @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
                             @onkeydown="args => HandleNodeKeyAsync(node, args)">
                         <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
-                        <strong>@node.Definition.Display.Name</strong>
+                        <strong title="@node.EffectiveName">@node.EffectiveName</strong>
                         <span class="automation-node-description">@NodeSummary(node)</span>
                         @if (outcome is not null)
                         {
@@ -95,7 +96,7 @@
                                 class="automation-port automation-port--input"
                                 style="@PortStyle(input.Index, node.Definition.Inputs.Count(IsFlowPort))"
                                 title="@input.Port.Name"
-                                aria-label="@($"{node.Definition.Display.Name}: {input.Port.Name} input")"
+                                aria-label="@($"{node.EffectiveName}: {input.Port.Name} input")"
                                 data-automation-port
                                 data-port-direction="input"
                                 data-node-id="@node.Id.Value"
@@ -110,7 +111,7 @@
                                 class="automation-port automation-port--output automation-port--branch-@BranchToken(output.Port.Id)"
                                 style="@PortStyle(output.Index, node.Definition.Outputs.Count(IsFlowPort))"
                                 title="@output.Port.Name"
-                                aria-label="@($"{node.Definition.Display.Name}: {output.Port.Name} output")"
+                                aria-label="@($"{node.EffectiveName}: {output.Port.Name} output")"
                                 data-automation-port
                                 data-port-direction="output"
                                 data-node-id="@node.Id.Value"

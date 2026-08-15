@@ -742,6 +742,9 @@
 .automation-node strong {
     font-size: 0.8rem;
     margin-bottom: 0.28rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .automation-node-description {
@@ -868,9 +871,29 @@
     text-transform: uppercase;
 }
 
-.automation-inspector-header h2 {
+.automation-inspector-title {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    color: var(--app-text-strong);
+    font: inherit;
     font-size: 1rem;
-    margin: 0.28rem 0 0;
+    font-weight: 800;
+    margin: 0.16rem 0 0 -0.4rem;
+    max-width: 16rem;
+    padding: 0.1rem 0.35rem;
+    width: 100%;
+}
+
+.automation-inspector-title:hover {
+    border-color: var(--app-control-border);
+}
+
+.automation-inspector-title:focus {
+    background: var(--app-control-bg);
+    border-color: var(--tone-blue-solid);
+    box-shadow: 0 0 0 3px var(--tone-blue-ring);
+    outline: 0;
 }
 
 .automation-field {
