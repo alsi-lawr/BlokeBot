@@ -34,6 +34,9 @@ public partial class AutomationFlowCanvas
     [Parameter]
     public AutomationFlowCanvasSettings Settings { get; set; }
 
+    [Parameter, EditorRequired]
+    public string ViewportKey { get; set; } = string.Empty;
+
     [Parameter]
     public EventCallback<AutomationCanvasSelectionRequest> SelectionChanged { get; set; }
 

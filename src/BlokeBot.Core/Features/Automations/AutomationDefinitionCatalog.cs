@@ -43,6 +43,7 @@ internal sealed class AutomationDefinitionCatalog
         }
 
         _definitions = definitions.ToImmutable();
+        ValidateTriggerContextRequirements(_definitions);
         Descriptors = _definitions
             .Values.Select(static definition => definition.Descriptor)
             .OrderBy(static definition => definition.Id.Value, StringComparer.Ordinal)
@@ -53,6 +54,43 @@ internal sealed class AutomationDefinitionCatalog
 
     internal bool TryResolve(AutomationDefinitionId id, out IAutomationDefinition definition) =>
         _definitions.TryGetValue(id, out definition!);
+
+    private static void ValidateTriggerContextRequirements(
+        IReadOnlyDictionary<AutomationDefinitionId, IAutomationDefinition> definitions
+    )
+    {
+        foreach (var definition in definitions.Values)
+        {
+            var descriptor = definition.Descriptor;
+            var requirement = descriptor.TriggerContextRequirement;
+            if (requirement is null)
+            {
+                continue;
+            }
+
+            if (descriptor.Kind != AutomationNodeKind.Action)
+            {
+                throw new AutomationCatalogRegistrationException(
+                    $"Automation definition '{descriptor.Id.Value}' is invalid. Only actions can declare a trigger requirement."
+                );
+            }
+
+            if (
+                requirement.CompatibleSources.IsEmpty
+                || string.IsNullOrWhiteSpace(requirement.UnavailableReason)
+                || string.IsNullOrWhiteSpace(requirement.ValidationMessage)
+                || requirement.CompatibleSources.Any(sourceId =>
+                    !definitions.TryGetValue(sourceId, out var source)
+                    || source.Descriptor.Kind != AutomationNodeKind.Source
+                )
+            )
+            {
+                throw new AutomationCatalogRegistrationException(
+                    $"Automation definition '{descriptor.Id.Value}' is invalid. Declare one or more registered trigger sources and complete user help."
+                );
+            }
+        }
+    }
 
     private static void Validate(
         AutomationDefinitionDescriptor descriptor,

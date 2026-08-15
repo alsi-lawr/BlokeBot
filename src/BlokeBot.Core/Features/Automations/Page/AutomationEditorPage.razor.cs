@@ -40,6 +40,7 @@ public partial class AutomationEditorPage
     private string? _feedback;
     private string? _flowRecoveryMessage;
     private string _nodeSearch = string.Empty;
+    private string _canvasViewportKey = Guid.NewGuid().ToString("N");
     private CancellationTokenSource? _validationFeedbackCancellation;
 
     private AutomationEditorNode? _selectedNode =>
@@ -184,8 +185,12 @@ public partial class AutomationEditorPage
         }
     }
 
-    private async Task LoadCoreAsync(AutomationFlowId? preferredFlowId = null)
+    private async Task LoadCoreAsync(
+        AutomationFlowId? preferredFlowId = null,
+        bool preserveViewport = false
+    )
     {
+        var previousFlowId = _editor?.Id;
         _ = await LoadPageContextAsync();
         ResetTransientState();
         if (HostId == 0)
@@ -215,6 +220,10 @@ public partial class AutomationEditorPage
             : _flowSnapshots.FirstOrDefault();
         if (selected is not null)
         {
+            if (!preserveViewport && selected.Draft.Id != previousFlowId)
+            {
+                ResetCanvasViewport();
+            }
             if (RestoreEditor(selected))
             {
                 await ValidateCoreAsync(showFeedback: false);
@@ -222,6 +231,10 @@ public partial class AutomationEditorPage
         }
         else
         {
+            if (!preserveViewport && previousFlowId is not null)
+            {
+                ResetCanvasViewport();
+            }
             _editor = null;
         }
 
@@ -269,6 +282,7 @@ public partial class AutomationEditorPage
 
     private void NewFlow()
     {
+        ResetCanvasViewport();
         ResetTransientState();
         _editor = AutomationEditorState.Create("New automation");
         _selectedNodeId = null;
@@ -281,6 +295,10 @@ public partial class AutomationEditorPage
 
     private async Task SelectFlow(AutomationFlowSnapshot snapshot)
     {
+        if (snapshot.Draft.Id != _editor?.Id)
+        {
+            ResetCanvasViewport();
+        }
         if (RestoreEditor(snapshot))
         {
             await ValidateCoreAsync(showFeedback: false);
@@ -321,7 +339,7 @@ public partial class AutomationEditorPage
 
     private void AddNode(AutomationDefinitionDescriptor definition)
     {
-        if (_editor is null)
+        if (_editor is null || !DefinitionIsAvailable(definition))
         {
             return;
         }
@@ -334,6 +352,19 @@ public partial class AutomationEditorPage
         _nodeSearch = string.Empty;
         EditorChanged();
     }
+
+    private bool DefinitionIsAvailable(AutomationDefinitionDescriptor definition) =>
+        definition.TriggerContextRequirement is not { } requirement
+        || _editor?.Nodes.Any(node => requirement.CompatibleSources.Contains(node.Definition.Id))
+            == true;
+
+    private string? DefinitionUnavailableReason(AutomationDefinitionDescriptor definition) =>
+        DefinitionIsAvailable(definition)
+            ? null
+            : definition.TriggerContextRequirement?.UnavailableReason;
+
+    private string DefinitionLibraryHelp(AutomationDefinitionDescriptor definition) =>
+        DefinitionUnavailableReason(definition) ?? definition.Display.Description;
 
     private void ApplyFirstReferenceDefaults(AutomationEditorNode node)
     {
@@ -518,7 +549,7 @@ public partial class AutomationEditorPage
                     switch (outcome)
                     {
                         case AutomationFlowSaveOutcome.Saved saved:
-                            await LoadCoreAsync(saved.FlowId);
+                            await LoadCoreAsync(saved.FlowId, preserveViewport: true);
                             _feedback = "Flow saved.";
                             _operationFailed = false;
                             _hasChanges = false;
@@ -961,6 +992,8 @@ public partial class AutomationEditorPage
     }
 
     private void SetMode(AutomationEditorMode mode) => _mode = mode;
+
+    private void ResetCanvasViewport() => _canvasViewportKey = Guid.NewGuid().ToString("N");
 
     private void ToggleNodeLibrary()
     {

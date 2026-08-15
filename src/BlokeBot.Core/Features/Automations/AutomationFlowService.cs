@@ -484,6 +484,8 @@ public sealed class AutomationFlowService(
             }
         }
 
+        ValidateTriggerContexts(nodes, definitions, sources, adjacency, errors);
+
         if (HasCycle(adjacency))
         {
             errors.Add(new(null, "cycle", "Remove the connection that creates a loop."));
@@ -503,6 +505,38 @@ public sealed class AutomationFlowService(
         );
 
         return new(null, errors.ToImmutable());
+    }
+
+    private static void ValidateTriggerContexts(
+        IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
+        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyCollection<AutomationFlowDraftNode> sources,
+        IReadOnlyDictionary<AutomationNodeId, List<AutomationNodeId>> adjacency,
+        ImmutableArray<AutomationGraphError>.Builder errors
+    )
+    {
+        foreach (var node in nodes.Values)
+        {
+            if (
+                !definitions.TryGetValue(new(node.Definition.TypeId), out var definition)
+                || definition.TriggerContextRequirement is not { } requirement
+            )
+            {
+                continue;
+            }
+
+            var hasCompatiblePath = sources
+                .Where(source =>
+                    requirement.CompatibleSources.Contains(new(source.Definition.TypeId))
+                )
+                .Any(source => Reachable([source.Id], adjacency).Contains(node.Id));
+            if (!hasCompatiblePath)
+            {
+                errors.Add(
+                    new(node.Id, "trigger-context-incompatible", requirement.ValidationMessage)
+                );
+            }
+        }
     }
 
     private async Task ValidateNodeAsync(

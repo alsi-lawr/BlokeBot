@@ -166,6 +166,7 @@
                                                   Errors="_validationErrors"
                                                   SampleOutcomes="_sampleOutcomes"
                                                   Settings="_editor.Canvas"
+                                                  ViewportKey="_canvasViewportKey"
                                                   SelectionChanged="ChangeCanvasSelection"
                                                   MoveNodes="MoveNodes"
                                                   DeleteNodes="DeleteNodes"
@@ -240,10 +241,13 @@
                             <h3>@group.Key</h3>
                             @foreach (var definition in group)
                             {
-                                <button type="button" @onclick="() => AddNode(definition)">
+                                <button type="button"
+                                        disabled="@(!DefinitionIsAvailable(definition))"
+                                        title="@DefinitionUnavailableReason(definition)"
+                                        @onclick="() => AddNode(definition)">
                                     <span class="automation-node-kind automation-node-kind--@KindToken(definition.Kind)">@KindLabel(definition.Kind)</span>
                                     <strong>@definition.Display.Name</strong>
-                                    <small>@definition.Display.Description</small>
+                                    <small>@DefinitionLibraryHelp(definition)</small>
                                 </button>
                             }
                         </section>

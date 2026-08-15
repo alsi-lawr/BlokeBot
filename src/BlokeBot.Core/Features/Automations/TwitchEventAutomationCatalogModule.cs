@@ -648,7 +648,8 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 [CompleteOutput()],
                 [],
                 AutomationActionCapabilities.ChangesPoints,
-                AutomationActionRetrySafety.Unsafe
+                AutomationActionRetrySafety.Unsafe,
+                RedemptionTriggerContext()
             ),
             static _ => Parsed(new FulfilRedemptionActionConfiguration()),
             static _ => AutomationValidationResult.Valid
@@ -670,10 +671,18 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                 [CompleteOutput()],
                 [],
                 AutomationActionCapabilities.ChangesPoints,
-                AutomationActionRetrySafety.Unsafe
+                AutomationActionRetrySafety.Unsafe,
+                RedemptionTriggerContext()
             ),
             static _ => Parsed(new CancelRedemptionActionConfiguration()),
             static _ => AutomationValidationResult.Valid
+        );
+
+    private static AutomationTriggerContextRequirement RedemptionTriggerContext() =>
+        new(
+            [AutomationDefinitionIds.RewardRedemptionSource],
+            "Add a Channel Points redemption trigger to use this action.",
+            "Connect this action to a Channel Points redemption trigger."
         );
 
     private static AutomationConfigurationParseResult ParseRewardRedemption(JsonElement json)

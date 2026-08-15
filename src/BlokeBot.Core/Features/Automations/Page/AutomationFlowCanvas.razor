@@ -4,6 +4,7 @@
 
 <div class="automation-canvas-wrap"
      data-automation-canvas-shell
+     data-viewport-key="@ViewportKey"
      data-orientation="@OrientationToken(Settings.Orientation)"
      data-edge-style="@EdgeStyleToken(Settings.EdgeStyle)">
     <div class="automation-canvas-tools" role="toolbar" aria-label="Canvas controls">
@@ -37,7 +38,8 @@
          aria-label="Automation flow canvas"
          @ref="_root"
          data-automation-canvas>
-        <div class="automation-canvas-stage" style="@_canvasStageStyle">
+        <div class="automation-canvas-stage-size" style="@_canvasStageStyle">
+        <div class="automation-canvas-stage">
             <svg class="automation-edges" viewBox="0 0 @_canvasWidth @_canvasHeight" aria-label="Flow connections">
                 @foreach (var edge in Edges)
                 {
@@ -119,6 +121,7 @@
                     }
                 </article>
             }
+        </div>
         </div>
     </div>
 </div>

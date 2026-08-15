@@ -51,8 +51,9 @@
     border-radius: 0.95rem;
     box-shadow: var(--app-shadow-surface);
     display: grid;
-    grid-template-rows: auto auto auto minmax(30rem, 1fr) auto;
-    min-height: 42rem;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    height: var(--automation-editor-height, min(52rem, calc(100dvh - 14rem)));
+    min-height: 36rem;
     overflow: hidden;
 }
 
@@ -363,7 +364,7 @@
 .automation-editor-body {
     display: grid;
     grid-template-columns: 12rem minmax(31rem, 1fr);
-    height: clamp(28rem, calc(100dvh - 28rem), 42rem);
+    height: auto;
     min-height: 0;
     position: relative;
 }
@@ -487,7 +488,7 @@
 
 .automation-canvas-wrap {
     height: 100%;
-    min-height: 31rem;
+    min-height: 0;
     position: relative;
 }
 
@@ -547,12 +548,9 @@
 
 .automation-canvas-viewport {
     background-color: var(--app-background);
-    background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text-muted) 34%, transparent) 1.1px, transparent 1.1px);
-    background-position: 0 0;
-    background-size: 24px 24px;
     cursor: grab;
     height: 100%;
-    min-height: 31rem;
+    min-height: 0;
     overflow: hidden;
     position: relative;
     touch-action: none;
@@ -568,10 +566,19 @@
     cursor: grabbing;
 }
 
+.automation-canvas-stage-size {
+    position: relative;
+}
+
 .automation-canvas-stage {
+    background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text-muted) 34%, transparent) 1.1px, transparent 1.1px);
+    background-position: 0 0;
+    background-size: 24px 24px;
+    height: 100%;
     position: relative;
     transform-origin: 0 0;
     will-change: transform;
+    width: 100%;
 }
 
 .automation-edges {
@@ -1187,6 +1194,7 @@
 
     .automation-editor {
         display: block;
+        height: auto;
         min-height: 47.5rem;
     }
 

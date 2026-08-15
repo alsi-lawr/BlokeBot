@@ -90,6 +90,12 @@ public enum AutomationSchemaCompatibilityStatus
 
 public sealed record AutomationDisplayMetadata(string Name, string Description, string Category);
 
+public sealed record AutomationTriggerContextRequirement(
+    ImmutableArray<AutomationDefinitionId> CompatibleSources,
+    string UnavailableReason,
+    string ValidationMessage
+);
+
 public sealed record AutomationPortMetadata(
     AutomationPortId Id,
     string Name,
@@ -153,7 +159,8 @@ public sealed record AutomationDefinitionDescriptor(
     ImmutableArray<AutomationPortMetadata> Outputs,
     ImmutableArray<AutomationConfigurationFieldMetadata> Configuration,
     AutomationActionCapabilities Capabilities,
-    AutomationActionRetrySafety RetrySafety
+    AutomationActionRetrySafety RetrySafety,
+    AutomationTriggerContextRequirement? TriggerContextRequirement = null
 );
 
 public abstract record AutomationValidationTarget

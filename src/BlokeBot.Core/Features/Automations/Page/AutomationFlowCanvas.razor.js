@@ -1,4 +1,5 @@
 const states = new WeakMap();
+const savedViewports = new Map();
 const gridSize = 24;
 const obstacleMargin = 18;
 const routeClearance = 12;
@@ -66,6 +67,36 @@ function applyTransform(state) {
   const step = zoomSteps[state.zoomIndex];
   state.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${step.scale})`;
   state.zoomReset.textContent = step.label;
+  savedViewports.set(state.viewportKey, {
+    zoomIndex: state.zoomIndex,
+    panX: state.panX,
+    panY: state.panY,
+  });
+}
+
+function restoreViewport(state) {
+  state.viewportKey = state.shell.dataset.viewportKey ?? "";
+  const saved = savedViewports.get(state.viewportKey);
+  state.zoomIndex = saved?.zoomIndex ?? defaultZoomIndex;
+  state.panX = saved?.panX ?? 0;
+  state.panY = saved?.panY ?? 0;
+  state.zoomTransition = null;
+  applyTransform(state);
+}
+
+function updateEditorHeight(state) {
+  const editor = state.shell.closest(".automation-editor");
+  if (!(editor instanceof HTMLElement)) return;
+  if (window.matchMedia("(max-width: 48rem)").matches) {
+    editor.style.removeProperty("--automation-editor-height");
+    return;
+  }
+  const parent = editor.parentElement;
+  const bottomPadding = parent instanceof HTMLElement
+    ? Number.parseFloat(getComputedStyle(parent).paddingBottom) || 0
+    : 0;
+  const available = Math.max(480, window.innerHeight - editor.getBoundingClientRect().top - bottomPadding);
+  editor.style.setProperty("--automation-editor-height", `${available}px`);
 }
 
 function viewportPoint(state, clientX, clientY) {
@@ -310,7 +341,15 @@ function gridCoordinates(start, end, obstacles) {
   };
 }
 
-function gridRoute(start, end, obstacles) {
+function routeAxis(first, second) {
+  return first.x === second.x ? "vertical" : "horizontal";
+}
+
+function compareRouteCost(first, second) {
+  return first.bends - second.bends || first.distance - second.distance;
+}
+
+function gridRoute(start, end, obstacles, initialAxis = null, finalAxis = null) {
   const coordinates = gridCoordinates(start, end, obstacles);
   const nodes = new Map();
   for (const x of coordinates.x) {
@@ -343,32 +382,57 @@ function gridRoute(start, end, obstacles) {
     connectLine([...nodes.values()].filter((point) => point.x === x).sort((a, b) => a.y - b.y));
   }
 
-  const distances = new Map([[startKey, 0]]);
+  const stateKey = (pointKey, axis) => `${pointKey}|${axis ?? "none"}`;
+  const startStateKey = stateKey(startKey, initialAxis);
+  const costs = new Map([[startStateKey, { bends: 0, distance: 0 }]]);
   const previous = new Map();
-  const unvisited = new Set(nodes.keys());
-  while (unvisited.size > 0) {
-    const currentKey = [...unvisited].reduce((best, candidate) =>
-      (distances.get(candidate) ?? Number.POSITIVE_INFINITY)
-        < (distances.get(best) ?? Number.POSITIVE_INFINITY) ? candidate : best);
-    if (!distances.has(currentKey)) break;
-    unvisited.delete(currentKey);
-    if (currentKey === endKey) break;
-    for (const neighbour of neighbours.get(currentKey)) {
+  const pending = [{ pointKey: startKey, axis: initialAxis, key: startStateKey }];
+  const visited = new Set();
+  let bestEnd = null;
+  while (pending.length > 0) {
+    pending.sort((first, second) =>
+      compareRouteCost(costs.get(first.key), costs.get(second.key))
+      || first.key.localeCompare(second.key));
+    const current = pending.shift();
+    if (visited.has(current.key)) continue;
+    visited.add(current.key);
+    const currentCost = costs.get(current.key);
+    if (current.pointKey === endKey) {
+      const total = {
+        bends: currentCost.bends
+          + (finalAxis !== null && current.axis !== null && current.axis !== finalAxis ? 1 : 0),
+        distance: currentCost.distance,
+      };
+      if (bestEnd === null || compareRouteCost(total, bestEnd.cost) < 0) {
+        bestEnd = { key: current.key, cost: total };
+      }
+      continue;
+    }
+    for (const neighbour of neighbours.get(current.pointKey)) {
       const neighbourKey = coordinateKey(neighbour.point);
-      if (!unvisited.has(neighbourKey)) continue;
-      const distance = distances.get(currentKey) + neighbour.distance;
-      if (distance >= (distances.get(neighbourKey) ?? Number.POSITIVE_INFINITY)) continue;
-      distances.set(neighbourKey, distance);
-      previous.set(neighbourKey, currentKey);
+      const nextAxis = routeAxis(nodes.get(current.pointKey), neighbour.point);
+      const nextKey = stateKey(neighbourKey, nextAxis);
+      const cost = {
+        bends: currentCost.bends
+          + (current.axis !== null && current.axis !== nextAxis ? 1 : 0),
+        distance: currentCost.distance + neighbour.distance,
+      };
+      const existing = costs.get(nextKey);
+      if (existing !== undefined && compareRouteCost(cost, existing) >= 0) continue;
+      costs.set(nextKey, cost);
+      previous.set(nextKey, current.key);
+      pending.push({ pointKey: neighbourKey, axis: nextAxis, key: nextKey });
     }
   }
-  if (!distances.has(endKey)) return null;
+  if (bestEnd === null) return null;
   const result = [];
-  let currentKey = endKey;
-  while (currentKey !== undefined) {
-    result.unshift(nodes.get(currentKey));
-    if (currentKey === startKey) break;
-    currentKey = previous.get(currentKey);
+  let currentStateKey = bestEnd.key;
+  while (currentStateKey !== undefined) {
+    const separator = currentStateKey.lastIndexOf("|");
+    const pointKey = currentStateKey.slice(0, separator);
+    result.unshift(nodes.get(pointKey));
+    if (currentStateKey === startStateKey) break;
+    currentStateKey = previous.get(currentStateKey);
   }
   const route = normalizePath(result);
   return pathIsSafe(route, obstacles) ? route : null;
@@ -385,7 +449,14 @@ function routePoints(start, end, orientation, obstacles, endpoints = []) {
   const endpointRectangles = endpoints.map((endpoint) => endpoint.rectangle);
   if (pathIsSafe([start, startLead], obstacles, endpoints.filter((item) => item.endpoint === "source"))
     && pathIsSafe([endLead, end], obstacles, endpoints.filter((item) => item.endpoint === "target"))) {
-    const interior = gridRoute(startLead, endLead, [...obstacles, ...endpointRectangles]);
+    const leadAxis = vertical ? "vertical" : "horizontal";
+    const interior = gridRoute(
+      startLead,
+      endLead,
+      [...obstacles, ...endpointRectangles],
+      leadAxis,
+      leadAxis,
+    );
     if (interior !== null) {
       const directed = normalizePath([start, ...interior, end]);
       if (pathIsSafe(directed, obstacles, endpoints)) return directed;
@@ -557,12 +628,14 @@ function routeEdge(state, group) {
     endpointObstacle(state, sourceNode, "source"),
     endpointObstacle(state, targetNode, "target"),
   ].filter((endpoint) => endpoint !== null);
-  const points = routePoints(start, end, orientation, obstacles, endpoints);
-  const route = points === null
-    ? null
-    : state.shell.dataset.edgeStyle === "smooth"
+  const route = state.shell.dataset.edgeStyle === "smooth"
     ? smoothRoute(start, end, orientation, obstacles, endpoints)
-    : { path: angularPath(points), label: points[Math.floor(points.length / 2)] };
+    : (() => {
+      const points = routePoints(start, end, orientation, obstacles, endpoints);
+      return points === null
+        ? null
+        : { path: angularPath(points), label: points[Math.floor(points.length / 2)] };
+    })();
   const path = route?.path ?? "";
   for (const element of group.querySelectorAll("path")) element.setAttribute("d", path);
   const label = group.querySelector("text");
@@ -576,6 +649,23 @@ function routeEdge(state, group) {
 function routeAll(state) {
   for (const edge of state.root.querySelectorAll("[data-automation-edge]")) routeEdge(state, edge);
   state.root.dataset.automationCanvasReady = "true";
+}
+
+function cancelScheduledRoutes(state) {
+  if (state.routeFrame === null) return;
+  cancelAnimationFrame(state.routeFrame);
+  state.routeFrame = null;
+}
+
+function scheduleRouteAll(state) {
+  if (state.routeFrame !== null) return;
+  state.routeFrame = requestAnimationFrame(() => {
+    state.routeFrame = null;
+    for (const edge of state.root.querySelectorAll("[data-automation-edge]")) {
+      routeEdge(state, edge);
+    }
+    state.root.dataset.automationCanvasReady = "true";
+  });
 }
 
 function cancelConnection(state) {
@@ -782,7 +872,7 @@ function moveNodeDrag(state, event) {
     item.y = Math.max(0, item.startY + deltaY);
     setNodeGraphPosition(item.element, item.x, item.y);
   }
-  routeAll(state);
+  scheduleRouteAll(state);
   return true;
 }
 
@@ -806,6 +896,7 @@ function finishNodeDrag(state, event) {
       y: vertical ? displayX : displayY,
     };
   });
+  cancelScheduledRoutes(state);
   routeAll(state);
   if (drag.moved) void state.dotnet.invokeMethodAsync("MoveNodesFromCanvasAsync", moves);
   return true;
@@ -825,6 +916,12 @@ function beginBackgroundAction(state, event) {
   if (event.altKey) {
     const start = screenToGraph(state, event.clientX, event.clientY);
     state.marqueeState = { pointerId: event.pointerId, start, current: start };
+    Object.assign(state.marquee.style, {
+      left: `${start.x}px`,
+      top: `${start.y}px`,
+      width: "0px",
+      height: "0px",
+    });
     state.marquee.hidden = false;
     state.root.classList.add("automation-canvas--selecting");
     return;
@@ -1002,6 +1099,7 @@ export function initialize(root, dotnet) {
     marquee,
     zoomReset,
     dotnet,
+    viewportKey: shell.dataset.viewportKey ?? "",
     zoomIndex: defaultZoomIndex,
     panX: 0,
     panY: 0,
@@ -1012,6 +1110,7 @@ export function initialize(root, dotnet) {
     connection: null,
     connectionDrag: null,
     suppressPortClick: false,
+    routeFrame: null,
     listeners: [],
   };
 
@@ -1095,18 +1194,31 @@ export function initialize(root, dotnet) {
     state.zoomTransition = null;
     applyTransform(state);
   });
-  register(state, window, "resize", () => routeAll(state));
+  register(state, window, "resize", () => {
+    updateEditorHeight(state);
+    scheduleRouteAll(state);
+  });
 
   states.set(root, state);
-  applyTransform(state);
+  restoreViewport(state);
+  updateEditorHeight(state);
   routeAll(state);
 }
 
 export function refresh(root) {
   const state = states.get(root);
   if (state === undefined) return;
+  const stage = root.querySelector(".automation-canvas-stage");
+  if (!(stage instanceof HTMLElement)) return;
+  state.stage = stage;
   state.preview = root.querySelector("[data-connection-preview]");
   state.marquee = root.querySelector("[data-automation-marquee]");
+  if (state.viewportKey !== (state.shell.dataset.viewportKey ?? "")) {
+    restoreViewport(state);
+  } else {
+    applyTransform(state);
+  }
+  updateEditorHeight(state);
   if (state.drag === null) {
     for (const node of root.querySelectorAll("[data-automation-node]")) {
       delete node.dataset.automationGraphX;
@@ -1116,6 +1228,7 @@ export function refresh(root) {
     }
   }
   cancelConnection(state);
+  cancelScheduledRoutes(state);
   routeAll(state);
 }
 
@@ -1128,6 +1241,7 @@ export function focusNode(root, nodeId) {
 export function dispose(root) {
   const state = states.get(root);
   if (state === undefined) return;
+  cancelScheduledRoutes(state);
   for (const remove of state.listeners.reverse()) remove();
   states.delete(root);
 }

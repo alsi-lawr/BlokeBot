@@ -218,6 +218,31 @@ public sealed class RedemptionAutomationTests
     }
 
     [Test]
+    public async Task ContextDependentAction_RequiresAConnectedCompatibleSource()
+    {
+        await using var fixture = await RedemptionFixture.CreateAsync();
+        var source = Node("reward-redemption", """{"completion-policy":"manual"}""");
+        var action = Node("fulfil-redemption", "{}");
+
+        var disconnected = await fixture.Flows.SaveAsync(
+            Draft(fixture.HostId, [source, action], []),
+            CancellationToken.None
+        );
+
+        disconnected
+            .ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>()
+            .Errors.ShouldContain(error =>
+                error.NodeId == action.Id && error.Code == "trigger-context-incompatible"
+            );
+        _ = (
+            await fixture.Flows.SaveAsync(
+                Draft(fixture.HostId, [source, action], [Edge(source, "flow", action)]),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+    }
+
+    [Test]
     public async Task Redemptions_AreHostIsolated()
     {
         await using var fixture = await RedemptionFixture.CreateAsync();
@@ -381,9 +406,18 @@ public sealed class RedemptionAutomationTests
     {
         await using var fixture = await RedemptionFixture.CreateAsync();
         await fixture.SeedRewardAsync("reward-a", manageable: true);
-        var source = Node("stream-online", "{}");
+        var source = Node("reward-redemption", """{"completion-policy":"manual"}""");
         var action = Node("fulfil-redemption", "{}");
-        _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        var flowId = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var persistedSource = await db.AutomationFlowNodes.SingleAsync(node =>
+                node.FlowId == flowId.Value && node.Id == source.Id.Value
+            );
+            persistedSource.DefinitionId = "stream-online";
+            persistedSource.ConfigurationJson = "{}";
+            _ = await db.SaveChangesAsync();
+        }
 
         await fixture.Runtime.StreamOnlineAsync(
             fixture.StreamOnline("stream-1"),
