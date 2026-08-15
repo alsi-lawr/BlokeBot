@@ -21,6 +21,8 @@ public partial class AutomationEditorPage
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];
     private AutomationEditorState? _editor;
     private AutomationFlowCanvas? _canvas;
+    private AutomationFlowList? _list;
+    private AutomationEditorMode? _inspectorFocusMode;
     private AutomationNodeId? _selectedNodeId;
     private Guid? _selectedEdgeId;
     private AutomationEditorMode _mode;
@@ -491,6 +493,7 @@ public partial class AutomationEditorPage
 
         _selectedNodeId = _selectedNodeIds.Count == 1 ? _selectedNodeIds.Single() : null;
         _selectedEdgeId = selection.EdgeId;
+        _inspectorFocusMode = _selectedNodeId is null ? null : AutomationEditorMode.Grid;
     }
 
     private async Task SaveAsync()
@@ -925,6 +928,7 @@ public partial class AutomationEditorPage
 
         _selectedNodeId = nodeId;
         _selectedEdgeId = null;
+        _inspectorFocusMode = nodeId is null ? null : _mode;
     }
 
     private void ClearSelection()
@@ -932,13 +936,25 @@ public partial class AutomationEditorPage
         _selectedNodeIds.Clear();
         _selectedNodeId = null;
         _selectedEdgeId = null;
+        _inspectorFocusMode = null;
     }
 
     private void CloseInspector()
     {
         if (_selectedNodeId is { } nodeId)
         {
-            _canvas?.RestoreFocusAfterRender(nodeId);
+            var focusMode =
+                _inspectorFocusMode is { } requestedMode && requestedMode == _mode
+                    ? requestedMode
+                    : _mode;
+            if (focusMode == AutomationEditorMode.List)
+            {
+                _list?.RestoreFocusAfterRender(nodeId);
+            }
+            else
+            {
+                _canvas?.RestoreFocusAfterRender(nodeId);
+            }
         }
 
         ClearSelection();

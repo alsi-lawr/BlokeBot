@@ -176,7 +176,8 @@
                         }
                         else
                         {
-                            <AutomationFlowList Nodes="_editor.Nodes"
+                            <AutomationFlowList @ref="_list"
+                                                Nodes="_editor.Nodes"
                                                 Edges="_editor.Edges"
                                                 SelectedNodeId="_selectedNodeId"
                                                 Errors="_validationErrors"

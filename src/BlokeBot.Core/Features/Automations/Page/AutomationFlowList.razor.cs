@@ -4,6 +4,9 @@ namespace BlokeBot.Core.Features.Automations.Page;
 
 public partial class AutomationFlowList
 {
+    private readonly Dictionary<AutomationNodeId, ElementReference> _nodeSelectors = [];
+    private AutomationNodeId? _focusNodeAfterRender;
+
     [Parameter, EditorRequired]
     public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];
 
@@ -24,6 +27,23 @@ public partial class AutomationFlowList
 
     [Parameter]
     public EventCallback<AutomationNodeId> DeleteNode { get; set; }
+
+    public void RestoreFocusAfterRender(AutomationNodeId nodeId) => _focusNodeAfterRender = nodeId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (
+            _focusNodeAfterRender is not { } nodeId
+            || !Nodes.Any(node => node.Id == nodeId)
+            || !_nodeSelectors.TryGetValue(nodeId, out var selector)
+        )
+        {
+            return;
+        }
+
+        _focusNodeAfterRender = null;
+        await selector.FocusAsync();
+    }
 
     private IReadOnlyList<AutomationEditorNode> _orderedNodes
     {

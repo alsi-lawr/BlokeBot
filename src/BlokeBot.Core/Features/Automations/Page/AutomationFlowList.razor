@@ -20,6 +20,8 @@
                 <li @key="item.Node.Id" class="@(errors.Length > 0 ? "automation-order-row automation-order-row--invalid" : "automation-order-row")">
                     <button type="button"
                             class="automation-order-select"
+                            data-automation-list-node="@item.Node.Id.Value"
+                            @ref="_nodeSelectors[item.Node.Id]"
                             aria-pressed="@(item.Node.Id == SelectedNodeId ? "true" : "false")"
                             @onclick="() => SelectNode.InvokeAsync(item.Node.Id)">
                         <span class="automation-order-number">@(item.Index + 1)</span>

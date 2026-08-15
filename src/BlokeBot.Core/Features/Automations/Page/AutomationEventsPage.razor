@@ -17,8 +17,8 @@
     @if (_loadFailed)
     {
         <PageState Kind="PageStateKind.Failure"
-                   Title="Twitch events could not load"
-                   Description="Try again. Your saved automations have not changed.">
+                   Title="Twitch events did not load"
+                   Description="Your saved automations did not change.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
