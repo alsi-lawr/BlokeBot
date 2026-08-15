@@ -132,7 +132,7 @@ internal sealed class SimulationFixtureSeeder(
                     "incoming-raid",
                     """{"minimum-viewers":20}""",
                     24,
-                    216
+                    72
                 ),
                 AutomationNode(
                     commandSourceId,

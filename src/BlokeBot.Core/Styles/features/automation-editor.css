@@ -651,7 +651,7 @@
     display: block;
     height: 104px;
     left: calc(var(--automation-node-x) * 1px);
-    padding: 0.62rem 0.68rem;
+    padding: 0;
     position: absolute;
     text-align: left;
     top: calc(var(--automation-node-y) * 1px);
@@ -660,10 +660,27 @@
     z-index: 2;
 }
 
-.automation-node:focus-visible,
+.automation-node:has(.automation-node-select:focus-visible),
 .automation-node--selected {
     border-color: var(--tone-blue-solid);
     box-shadow: 0 0 0 3px var(--tone-blue-ring), 0 0.85rem 1.7rem rgb(15 23 42 / 0.18);
+    outline: none;
+}
+
+.automation-node-select {
+    background: transparent;
+    border: 0;
+    border-radius: inherit;
+    color: inherit;
+    cursor: inherit;
+    display: block;
+    height: 100%;
+    padding: 0.62rem 0.68rem;
+    text-align: left;
+    width: 100%;
+}
+
+.automation-node-select:focus-visible {
     outline: none;
 }
 
@@ -1261,8 +1278,11 @@
     .automation-canvas-tools {
         display: flex;
         flex-wrap: nowrap;
+        inset: auto;
+        margin: 0.45rem;
         overflow-x: auto;
         position: relative;
+        width: calc(100% - 0.9rem);
     }
 
     .automation-canvas-tool-group {
@@ -1276,28 +1296,12 @@
     }
 
     .automation-canvas-viewport {
-        height: var(--automation-mobile-canvas-height, 30rem);
-        min-height: 30rem;
+        height: calc(var(--automation-mobile-canvas-height, 30rem) - 3.7rem);
+        min-height: 26.3rem;
     }
 
     .automation-node {
-        left: 76px !important;
-        top: calc(var(--automation-mobile-y) * 1px) !important;
         width: 206px;
-    }
-
-    .automation-port--input {
-        left: calc(50% + (var(--automation-port-offset) * 1px));
-        top: -0.42rem;
-        transform: translateX(-50%);
-    }
-
-    .automation-port--output {
-        bottom: -0.42rem;
-        left: calc(50% + (var(--automation-port-offset) * 1px));
-        right: auto;
-        top: auto;
-        transform: translateX(-50%);
     }
 
     .automation-inspector {

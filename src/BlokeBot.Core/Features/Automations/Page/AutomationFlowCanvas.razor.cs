@@ -7,11 +7,10 @@ namespace BlokeBot.Core.Features.Automations.Page;
 public partial class AutomationFlowCanvas
 {
     private const int _gridSize = 24;
-    private const int _nodeWidth = 168;
-    private const int _nodeHeight = 104;
     private ElementReference _root;
     private IJSObjectReference? _module;
     private DotNetObjectReference<AutomationFlowCanvas>? _self;
+    private AutomationNodeId? _focusNodeAfterRender;
 
     [Parameter, EditorRequired]
     public IReadOnlyList<AutomationEditorNode> Nodes { get; set; } = [];
@@ -85,8 +84,15 @@ public partial class AutomationFlowCanvas
         if (_module is not null)
         {
             await _module.InvokeVoidAsync("refresh", _root);
+            if (_focusNodeAfterRender is { } nodeId)
+            {
+                _focusNodeAfterRender = null;
+                await _module.InvokeVoidAsync("focusNode", _root, nodeId.Value.ToString("D"));
+            }
         }
     }
+
+    public void RestoreFocusAfterRender(AutomationNodeId nodeId) => _focusNodeAfterRender = nodeId;
 
     [JSInvokable]
     public Task MoveNodesFromCanvasAsync(AutomationNodeMovePayload[] moves) =>
@@ -229,9 +235,8 @@ public partial class AutomationFlowCanvas
     private string NodeStyle(AutomationEditorNode node)
     {
         var display = DisplayPosition(node.Position, Settings.Orientation);
-        var mobileIndex = Nodes.ToList().FindIndex(candidate => candidate.Id == node.Id);
         return FormattableString.Invariant(
-            $"--automation-node-x:{display.X.Value};--automation-node-y:{display.Y.Value};--automation-mobile-y:{72 + (mobileIndex * 132)}"
+            $"--automation-node-x:{display.X.Value};--automation-node-y:{display.Y.Value}"
         );
     }
 
@@ -239,34 +244,6 @@ public partial class AutomationFlowCanvas
     {
         var offset = (index - ((count - 1) / 2d)) * 28;
         return FormattableString.Invariant($"--automation-port-offset:{offset}");
-    }
-
-    private string InitialPath(AutomationFlowDraftEdge edge)
-    {
-        var source = Nodes.Single(node => node.Id == edge.SourceNodeId);
-        var target = Nodes.Single(node => node.Id == edge.TargetNodeId);
-        var sourcePosition = DisplayPosition(source.Position, Settings.Orientation);
-        var targetPosition = DisplayPosition(target.Position, Settings.Orientation);
-        if (Settings.Orientation == AutomationFlowOrientation.Vertical)
-        {
-            var sourceX = sourcePosition.X.Value + (_nodeWidth / 2);
-            var sourceY = sourcePosition.Y.Value + _nodeHeight;
-            var targetX = targetPosition.X.Value + (_nodeWidth / 2);
-            var targetY = targetPosition.Y.Value;
-            var middleY = sourceY + ((targetY - sourceY) / 2);
-            return FormattableString.Invariant(
-                $"M {sourceX} {sourceY} V {middleY} H {targetX} V {targetY}"
-            );
-        }
-
-        var horizontalSourceX = sourcePosition.X.Value + _nodeWidth;
-        var horizontalSourceY = sourcePosition.Y.Value + (_nodeHeight / 2);
-        var horizontalTargetX = targetPosition.X.Value;
-        var horizontalTargetY = targetPosition.Y.Value + (_nodeHeight / 2);
-        var middleX = horizontalSourceX + ((horizontalTargetX - horizontalSourceX) / 2);
-        return FormattableString.Invariant(
-            $"M {horizontalSourceX} {horizontalSourceY} H {middleX} V {horizontalTargetY} H {horizontalTargetX}"
-        );
     }
 
     private IReadOnlyList<AutomationGraphError> ErrorsFor(AutomationNodeId nodeId) =>

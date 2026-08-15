@@ -6,7 +6,7 @@
      data-automation-canvas-shell
      data-orientation="@OrientationToken(Settings.Orientation)"
      data-edge-style="@EdgeStyleToken(Settings.EdgeStyle)">
-    <div class="automation-canvas-tools" aria-label="Canvas controls">
+    <div class="automation-canvas-tools" role="toolbar" aria-label="Canvas controls">
         <div class="automation-canvas-tool-group" role="group" aria-label="Move selected nodes">
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes left" @onclick="() => NudgeSelectedAsync(-24, 0)">←</button>
             <button type="button" disabled="@_noNodeSelection" aria-label="Move selected nodes up" @onclick="() => NudgeSelectedAsync(0, -24)">↑</button>
@@ -33,7 +33,7 @@
     <div class="automation-canvas-viewport"
          style="@_canvasViewportStyle"
          tabindex="0"
-         role="application"
+         role="region"
          aria-label="Automation flow canvas"
          @ref="_root"
          data-automation-canvas>
@@ -50,8 +50,8 @@
                        data-target-port="@edge.TargetPortId.Value"
                        @onclick:stopPropagation="true"
                        @onclick="() => SelectEdgeAsync(edge.Id)">
-                        <path class="automation-edge-hit" d="@InitialPath(edge)" />
-                        <path class="automation-edge" d="@InitialPath(edge)" />
+                        <path class="automation-edge-hit" d="" />
+                        <path class="automation-edge" d="" />
                         @if (BranchLabel(edge) is { } label)
                         {
                             <svg:text class="automation-edge-label"><tspan>@label</tspan></svg:text>
@@ -72,12 +72,21 @@
                          style="@NodeStyle(node)"
                          data-automation-node="@node.Id.Value"
                          data-node-x="@node.Position.X.Value"
-                         data-node-y="@node.Position.Y.Value"
-                         tabindex="0"
-                         role="button"
-                         aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
-                         @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
-                         @onkeydown="args => HandleNodeKeyAsync(node, args)">
+                         data-node-y="@node.Position.Y.Value">
+                    <button type="button"
+                            class="automation-node-select"
+                            data-automation-node-select
+                            aria-pressed="@(SelectedNodeIds.Contains(node.Id) ? "true" : "false")"
+                            @onclick="args => SelectNodeAsync(node.Id, args.ShiftKey)"
+                            @onkeydown="args => HandleNodeKeyAsync(node, args)">
+                        <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
+                        <strong>@node.Definition.Display.Name</strong>
+                        <span class="automation-node-description">@NodeSummary(node)</span>
+                        @if (outcome is not null)
+                        {
+                            <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
+                        }
+                    </button>
                     @foreach (var input in node.Definition.Inputs.Where(IsFlowPort).Select((port, index) => new { Port = port, Index = index }))
                     {
                         <button type="button"
@@ -107,13 +116,6 @@
                                 data-port-type="@output.Port.ValueType"
                                 data-port-sensitivity="@output.Port.Sensitivity"
                                 @onclick:stopPropagation="true"></button>
-                    }
-                    <span class="automation-node-kind automation-node-kind--@KindToken(node.Definition.Kind)">@KindLabel(node.Definition.Kind)</span>
-                    <strong>@node.Definition.Display.Name</strong>
-                    <span class="automation-node-description">@NodeSummary(node)</span>
-                    @if (outcome is not null)
-                    {
-                        <span class="automation-node-outcome">@OutcomeLabel(outcome)</span>
                     }
                 </article>
             }

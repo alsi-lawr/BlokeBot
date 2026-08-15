@@ -20,6 +20,7 @@ public partial class AutomationEditorPage
     private readonly HashSet<AutomationNodeId> _selectedNodeIds = [];
     private readonly HashSet<AutomationDefinitionId> _unavailableDefinitionIds = [];
     private AutomationEditorState? _editor;
+    private AutomationFlowCanvas? _canvas;
     private AutomationNodeId? _selectedNodeId;
     private Guid? _selectedEdgeId;
     private AutomationEditorMode _mode;
@@ -931,6 +932,16 @@ public partial class AutomationEditorPage
         _selectedNodeIds.Clear();
         _selectedNodeId = null;
         _selectedEdgeId = null;
+    }
+
+    private void CloseInspector()
+    {
+        if (_selectedNodeId is { } nodeId)
+        {
+            _canvas?.RestoreFocusAfterRender(nodeId);
+        }
+
+        ClearSelection();
     }
 
     private void SetMode(AutomationEditorMode mode) => _mode = mode;

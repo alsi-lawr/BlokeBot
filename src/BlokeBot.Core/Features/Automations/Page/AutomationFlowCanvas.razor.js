@@ -1,6 +1,8 @@
 const states = new WeakMap();
 const gridSize = 24;
 const obstacleMargin = 18;
+const routeClearance = 12;
+const curveSampleCount = 96;
 const zoomSteps = [
   { scale: 0.5, label: "50%" },
   { scale: 0.625, label: "62.5%" },
@@ -38,8 +40,10 @@ function selectionIds(root) {
 function setLocalSelection(root, nodeIds, edgeId = null) {
   const selected = new Set(nodeIds);
   for (const node of root.querySelectorAll("[data-automation-node]")) {
-    node.classList.toggle("automation-node--selected", selected.has(node.dataset.automationNode));
-    node.setAttribute("aria-pressed", selected.has(node.dataset.automationNode) ? "true" : "false");
+    const isSelected = selected.has(node.dataset.automationNode);
+    node.classList.toggle("automation-node--selected", isSelected);
+    node.querySelector("[data-automation-node-select]")
+      ?.setAttribute("aria-pressed", isSelected ? "true" : "false");
   }
   for (const edge of root.querySelectorAll("[data-automation-edge]")) {
     edge.classList.toggle("automation-edge-group--selected", edge.dataset.automationEdge === edgeId);
@@ -139,20 +143,44 @@ function nodeObstacles(state, excluded) {
     .map((node) => nodeGraphRectangle(node, obstacleMargin));
 }
 
+function endpointObstacle(state, nodeId, endpoint) {
+  const node = state.root.querySelector(
+    `[data-automation-node="${CSS.escape(nodeId)}"]`,
+  );
+  return node instanceof HTMLElement
+    ? { rectangle: nodeGraphRectangle(node), endpoint }
+    : null;
+}
+
+function pointInsideRectangle(point, rectangle) {
+  return point.x >= rectangle.left
+    && point.x <= rectangle.right
+    && point.y >= rectangle.top
+    && point.y <= rectangle.bottom;
+}
+
 function segmentHitsRectangle(first, second, rectangle) {
-  if (first.x === second.x) {
-    return first.x >= rectangle.left
-      && first.x <= rectangle.right
-      && Math.max(first.y, second.y) >= rectangle.top
-      && Math.min(first.y, second.y) <= rectangle.bottom;
+  const deltaX = second.x - first.x;
+  const deltaY = second.y - first.y;
+  let minimum = 0;
+  let maximum = 1;
+  const boundaries = [
+    [-deltaX, first.x - rectangle.left],
+    [deltaX, rectangle.right - first.x],
+    [-deltaY, first.y - rectangle.top],
+    [deltaY, rectangle.bottom - first.y],
+  ];
+  for (const [direction, distance] of boundaries) {
+    if (direction === 0) {
+      if (distance < 0) return false;
+      continue;
+    }
+    const ratio = distance / direction;
+    if (direction < 0) minimum = Math.max(minimum, ratio);
+    else maximum = Math.min(maximum, ratio);
+    if (minimum > maximum) return false;
   }
-  if (first.y === second.y) {
-    return first.y >= rectangle.top
-      && first.y <= rectangle.bottom
-      && Math.max(first.x, second.x) >= rectangle.left
-      && Math.min(first.x, second.x) <= rectangle.right;
-  }
-  return false;
+  return true;
 }
 
 function pathHitsObstacles(points, obstacles) {
@@ -164,44 +192,207 @@ function pathHitsObstacles(points, obstacles) {
   return false;
 }
 
-function routePoints(start, end, orientation, obstacles) {
-  if (orientation === "vertical") {
-    const middleY = start.y + (end.y - start.y) / 2;
-    const direct = [start, { x: start.x, y: middleY }, { x: end.x, y: middleY }, end];
-    if (!pathHitsObstacles(direct, obstacles)) return direct;
-    const left = Math.min(start.x, end.x, ...obstacles.map((item) => item.left)) - 30;
-    const right = Math.max(start.x, end.x, ...obstacles.map((item) => item.right)) + 30;
-    const leftDistance = Math.abs(start.x - left) + Math.abs(end.x - left);
-    const detourX = leftDistance <= Math.abs(right - start.x) + Math.abs(right - end.x)
-      ? left
-      : right;
-    return [
-      start,
-      { x: start.x, y: start.y + 24 },
-      { x: detourX, y: start.y + 24 },
-      { x: detourX, y: end.y - 24 },
-      { x: end.x, y: end.y - 24 },
-      end,
-    ];
+function pointOnSegment(point, first, second) {
+  const cross = (point.y - first.y) * (second.x - first.x)
+    - (point.x - first.x) * (second.y - first.y);
+  return Math.abs(cross) < 0.0001
+    && point.x >= Math.min(first.x, second.x) - 0.0001
+    && point.x <= Math.max(first.x, second.x) + 0.0001
+    && point.y >= Math.min(first.y, second.y) - 0.0001
+    && point.y <= Math.max(first.y, second.y) + 0.0001;
+}
+
+function segmentDirection(first, second, third) {
+  return (second.y - first.y) * (third.x - second.x)
+    - (second.x - first.x) * (third.y - second.y);
+}
+
+function segmentsIntersect(firstStart, firstEnd, secondStart, secondEnd) {
+  if (Math.max(firstStart.x, firstEnd.x) + 0.0001 < Math.min(secondStart.x, secondEnd.x)
+    || Math.max(secondStart.x, secondEnd.x) + 0.0001 < Math.min(firstStart.x, firstEnd.x)
+    || Math.max(firstStart.y, firstEnd.y) + 0.0001 < Math.min(secondStart.y, secondEnd.y)
+    || Math.max(secondStart.y, secondEnd.y) + 0.0001 < Math.min(firstStart.y, firstEnd.y)) {
+    return false;
+  }
+  const firstDirection = segmentDirection(firstStart, firstEnd, secondStart);
+  const secondDirection = segmentDirection(firstStart, firstEnd, secondEnd);
+  const thirdDirection = segmentDirection(secondStart, secondEnd, firstStart);
+  const fourthDirection = segmentDirection(secondStart, secondEnd, firstEnd);
+  if (((firstDirection > 0 && secondDirection < 0) || (firstDirection < 0 && secondDirection > 0))
+    && ((thirdDirection > 0 && fourthDirection < 0) || (thirdDirection < 0 && fourthDirection > 0))) {
+    return true;
+  }
+  return (Math.abs(firstDirection) < 0.0001 && pointOnSegment(secondStart, firstStart, firstEnd))
+    || (Math.abs(secondDirection) < 0.0001 && pointOnSegment(secondEnd, firstStart, firstEnd))
+    || (Math.abs(thirdDirection) < 0.0001 && pointOnSegment(firstStart, secondStart, secondEnd))
+    || (Math.abs(fourthDirection) < 0.0001 && pointOnSegment(firstEnd, secondStart, secondEnd));
+}
+
+function pathSelfIntersects(points) {
+  for (let first = 1; first < points.length; first += 1) {
+    for (let second = first + 3; second < points.length; second += 1) {
+      if (segmentsIntersect(points[first - 1], points[first], points[second - 1], points[second])) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function samePoint(first, second) {
+  return Math.abs(first.x - second.x) < 0.0001
+    && Math.abs(first.y - second.y) < 0.0001;
+}
+
+function normalizePath(points) {
+  const unique = points.filter((point, index) => index === 0 || !samePoint(point, points[index - 1]));
+  return unique.filter((point, index) => {
+    if (index === 0 || index === unique.length - 1) return true;
+    const previous = unique[index - 1];
+    const next = unique[index + 1];
+    return !((previous.x === point.x && point.x === next.x)
+      || (previous.y === point.y && point.y === next.y));
+  });
+}
+
+function pathAvoidsEndpoints(points, endpoints) {
+  for (const endpoint of endpoints) {
+    if (endpoint.endpoint === "source") {
+      let exited = false;
+      for (let index = 1; index < points.length; index += 1) {
+        if (!exited) {
+          exited = !pointInsideRectangle(points[index], endpoint.rectangle);
+          continue;
+        }
+        if (segmentHitsRectangle(points[index - 1], points[index], endpoint.rectangle)) {
+          return false;
+        }
+      }
+      continue;
+    }
+    let exited = false;
+    for (let index = points.length - 2; index >= 0; index -= 1) {
+      if (!exited) {
+        exited = !pointInsideRectangle(points[index], endpoint.rectangle);
+        continue;
+      }
+      if (segmentHitsRectangle(points[index], points[index + 1], endpoint.rectangle)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function pathIsSafe(points, obstacles, endpoints = []) {
+  return points.length >= 2
+    && !pathHitsObstacles(points, obstacles)
+    && pathAvoidsEndpoints(points, endpoints)
+    && !pathSelfIntersects(points);
+}
+
+function coordinateKey(point) {
+  return `${point.x}:${point.y}`;
+}
+
+function gridCoordinates(start, end, obstacles) {
+  const xValues = new Set([start.x, end.x]);
+  const yValues = new Set([start.y, end.y]);
+  for (const obstacle of obstacles) {
+    xValues.add(obstacle.left - routeClearance);
+    xValues.add(obstacle.right + routeClearance);
+    yValues.add(obstacle.top - routeClearance);
+    yValues.add(obstacle.bottom + routeClearance);
+  }
+  return {
+    x: [...xValues].sort((first, second) => first - second),
+    y: [...yValues].sort((first, second) => first - second),
+  };
+}
+
+function gridRoute(start, end, obstacles) {
+  const coordinates = gridCoordinates(start, end, obstacles);
+  const nodes = new Map();
+  for (const x of coordinates.x) {
+    for (const y of coordinates.y) {
+      const point = { x, y };
+      if (!obstacles.some((obstacle) => pointInsideRectangle(point, obstacle))) {
+        nodes.set(coordinateKey(point), point);
+      }
+    }
+  }
+  const startKey = coordinateKey(start);
+  const endKey = coordinateKey(end);
+  nodes.set(startKey, start);
+  nodes.set(endKey, end);
+  const neighbours = new Map([...nodes.keys()].map((key) => [key, []]));
+  const connectLine = (line) => {
+    for (let index = 1; index < line.length; index += 1) {
+      const first = line[index - 1];
+      const second = line[index];
+      if (obstacles.some((obstacle) => segmentHitsRectangle(first, second, obstacle))) continue;
+      const distance = Math.abs(first.x - second.x) + Math.abs(first.y - second.y);
+      neighbours.get(coordinateKey(first)).push({ point: second, distance });
+      neighbours.get(coordinateKey(second)).push({ point: first, distance });
+    }
+  };
+  for (const y of coordinates.y) {
+    connectLine([...nodes.values()].filter((point) => point.y === y).sort((a, b) => a.x - b.x));
+  }
+  for (const x of coordinates.x) {
+    connectLine([...nodes.values()].filter((point) => point.x === x).sort((a, b) => a.y - b.y));
   }
 
-  const middleX = start.x + (end.x - start.x) / 2;
-  const direct = [start, { x: middleX, y: start.y }, { x: middleX, y: end.y }, end];
-  if (!pathHitsObstacles(direct, obstacles)) return direct;
-  const above = Math.min(start.y, end.y, ...obstacles.map((item) => item.top)) - 30;
-  const below = Math.max(start.y, end.y, ...obstacles.map((item) => item.bottom)) + 30;
-  const aboveDistance = Math.abs(start.y - above) + Math.abs(end.y - above);
-  const detourY = aboveDistance <= Math.abs(below - start.y) + Math.abs(below - end.y)
-    ? above
-    : below;
-  return [
-    start,
-    { x: start.x + 24, y: start.y },
-    { x: start.x + 24, y: detourY },
-    { x: end.x - 24, y: detourY },
-    { x: end.x - 24, y: end.y },
-    end,
-  ];
+  const distances = new Map([[startKey, 0]]);
+  const previous = new Map();
+  const unvisited = new Set(nodes.keys());
+  while (unvisited.size > 0) {
+    const currentKey = [...unvisited].reduce((best, candidate) =>
+      (distances.get(candidate) ?? Number.POSITIVE_INFINITY)
+        < (distances.get(best) ?? Number.POSITIVE_INFINITY) ? candidate : best);
+    if (!distances.has(currentKey)) break;
+    unvisited.delete(currentKey);
+    if (currentKey === endKey) break;
+    for (const neighbour of neighbours.get(currentKey)) {
+      const neighbourKey = coordinateKey(neighbour.point);
+      if (!unvisited.has(neighbourKey)) continue;
+      const distance = distances.get(currentKey) + neighbour.distance;
+      if (distance >= (distances.get(neighbourKey) ?? Number.POSITIVE_INFINITY)) continue;
+      distances.set(neighbourKey, distance);
+      previous.set(neighbourKey, currentKey);
+    }
+  }
+  if (!distances.has(endKey)) return null;
+  const result = [];
+  let currentKey = endKey;
+  while (currentKey !== undefined) {
+    result.unshift(nodes.get(currentKey));
+    if (currentKey === startKey) break;
+    currentKey = previous.get(currentKey);
+  }
+  const route = normalizePath(result);
+  return pathIsSafe(route, obstacles) ? route : null;
+}
+
+function routePoints(start, end, orientation, obstacles, endpoints = []) {
+  const vertical = orientation === "vertical";
+  const startLead = vertical
+    ? { x: start.x, y: start.y + gridSize }
+    : { x: start.x + gridSize, y: start.y };
+  const endLead = vertical
+    ? { x: end.x, y: end.y - gridSize }
+    : { x: end.x - gridSize, y: end.y };
+  const endpointRectangles = endpoints.map((endpoint) => endpoint.rectangle);
+  if (pathIsSafe([start, startLead], obstacles, endpoints.filter((item) => item.endpoint === "source"))
+    && pathIsSafe([endLead, end], obstacles, endpoints.filter((item) => item.endpoint === "target"))) {
+    const interior = gridRoute(startLead, endLead, [...obstacles, ...endpointRectangles]);
+    if (interior !== null) {
+      const directed = normalizePath([start, ...interior, end]);
+      if (pathIsSafe(directed, obstacles, endpoints)) return directed;
+    }
+  }
+  const fallback = gridRoute(start, end, obstacles);
+  return fallback !== null && pathIsSafe(fallback, obstacles, endpoints) ? fallback : null;
 }
 
 function angularPath(points) {
@@ -233,17 +424,14 @@ function directCurve(start, end, orientation) {
   const horizontal = orientation !== "vertical";
   const distance = horizontal ? Math.abs(end.x - start.x) : Math.abs(end.y - start.y);
   const reach = Math.max(54, distance * 0.48);
-  const direction = horizontal
-    ? Math.sign(end.x - start.x) || 1
-    : Math.sign(end.y - start.y) || 1;
   return {
     start,
     firstControl: horizontal
-      ? { x: start.x + direction * reach, y: start.y }
-      : { x: start.x, y: start.y + direction * reach },
+      ? { x: start.x + reach, y: start.y }
+      : { x: start.x, y: start.y + reach },
     secondControl: horizontal
-      ? { x: end.x - direction * reach, y: end.y }
-      : { x: end.x, y: end.y - direction * reach },
+      ? { x: end.x - reach, y: end.y }
+      : { x: end.x, y: end.y - reach },
     end,
   };
 }
@@ -252,48 +440,109 @@ function curvePath(curve) {
   return `M ${curve.start.x} ${curve.start.y} C ${curve.firstControl.x} ${curve.firstControl.y}, ${curve.secondControl.x} ${curve.secondControl.y}, ${curve.end.x} ${curve.end.y}`;
 }
 
-function pointInsideRectangle(point, rectangle) {
-  return point.x >= rectangle.left
-    && point.x <= rectangle.right
-    && point.y >= rectangle.top
-    && point.y <= rectangle.bottom;
+function lineCurve(start, end) {
+  return {
+    start,
+    firstControl: {
+      x: start.x + (end.x - start.x) / 3,
+      y: start.y + (end.y - start.y) / 3,
+    },
+    secondControl: {
+      x: start.x + 2 * (end.x - start.x) / 3,
+      y: start.y + 2 * (end.y - start.y) / 3,
+    },
+    end,
+  };
 }
 
-function curveHitsObstacles(curve, obstacles) {
-  for (let step = 1; step < 24; step += 1) {
-    const point = cubicPoint(curve, step / 24);
-    if (obstacles.some((obstacle) => pointInsideRectangle(point, obstacle))) return true;
-  }
-  return false;
+function unitVector(start, end) {
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  return { x: (end.x - start.x) / length, y: (end.y - start.y) / length, length };
 }
 
-function splinePath(points) {
-  let path = `M ${points[0].x} ${points[0].y}`;
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[Math.max(0, index - 1)];
-    const start = points[index];
-    const end = points[index + 1];
-    const next = points[Math.min(points.length - 1, index + 2)];
-    const firstControl = {
-      x: start.x + (end.x - previous.x) / 6,
-      y: start.y + (end.y - previous.y) / 6,
+function roundedRouteCurves(points, maximumRadius) {
+  const curves = [];
+  let cursor = points[0];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const corner = points[index];
+    const incoming = unitVector(points[index - 1], corner);
+    const outgoing = unitVector(corner, points[index + 1]);
+    const radius = Math.min(maximumRadius, incoming.length * 0.45, outgoing.length * 0.45);
+    const entry = {
+      x: corner.x - incoming.x * radius,
+      y: corner.y - incoming.y * radius,
     };
-    const secondControl = {
-      x: end.x - (next.x - start.x) / 6,
-      y: end.y - (next.y - start.y) / 6,
+    const exit = {
+      x: corner.x + outgoing.x * radius,
+      y: corner.y + outgoing.y * radius,
     };
-    path += ` C ${firstControl.x} ${firstControl.y}, ${secondControl.x} ${secondControl.y}, ${end.x} ${end.y}`;
+    if (!samePoint(cursor, entry)) curves.push(lineCurve(cursor, entry));
+    const controlDistance = radius * 0.55228475;
+    curves.push({
+      start: entry,
+      firstControl: {
+        x: entry.x + incoming.x * controlDistance,
+        y: entry.y + incoming.y * controlDistance,
+      },
+      secondControl: {
+        x: exit.x - outgoing.x * controlDistance,
+        y: exit.y - outgoing.y * controlDistance,
+      },
+      end: exit,
+    });
+    cursor = exit;
   }
-  return path;
+  if (!samePoint(cursor, points.at(-1))) curves.push(lineCurve(cursor, points.at(-1)));
+  return curves;
 }
 
-function smoothRoute(start, end, orientation, obstacles) {
+function sampleCurves(curves) {
+  const points = [curves[0].start];
+  for (const curve of curves) {
+    for (let step = 1; step <= curveSampleCount; step += 1) {
+      points.push(cubicPoint(curve, step / curveSampleCount));
+    }
+  }
+  return points;
+}
+
+function curvesAreSafe(curves, obstacles, endpoints = []) {
+  if (curves.length === 0) return false;
+  const points = sampleCurves(curves);
+  return !pathHitsObstacles(points, obstacles)
+    && pathAvoidsEndpoints(points, endpoints)
+    && !pathSelfIntersects(points);
+}
+
+function curvesPath(curves) {
+  return curves.reduce(
+    (path, curve, index) => `${path}${index === 0 ? `M ${curve.start.x} ${curve.start.y}` : ""} C ${curve.firstControl.x} ${curve.firstControl.y}, ${curve.secondControl.x} ${curve.secondControl.y}, ${curve.end.x} ${curve.end.y}`,
+    "",
+  );
+}
+
+function curveLabel(curves) {
+  const points = sampleCurves(curves);
+  return points[Math.floor(points.length / 2)];
+}
+
+function smoothRoute(start, end, orientation, obstacles, endpoints = []) {
   const direct = directCurve(start, end, orientation);
-  if (!curveHitsObstacles(direct, obstacles)) {
+  if (curvesAreSafe([direct], obstacles, endpoints)) {
     return { path: curvePath(direct), label: cubicPoint(direct, 0.5) };
   }
-  const points = routePoints(start, end, orientation, obstacles);
-  return { path: splinePath(points), label: points[Math.floor(points.length / 2)] };
+  const points = routePoints(start, end, orientation, obstacles, endpoints);
+  if (points === null) return null;
+  for (const radius of [48, 36, 24, 12, 6]) {
+    const curves = roundedRouteCurves(points, radius);
+    if (curvesAreSafe(curves, obstacles, endpoints)) {
+      return { path: curvesPath(curves), label: curveLabel(curves) };
+    }
+  }
+  const safeCurves = points.slice(1).map((point, index) => lineCurve(points[index], point));
+  return curvesAreSafe(safeCurves, obstacles, endpoints)
+    ? { path: curvesPath(safeCurves), label: curveLabel(safeCurves) }
+    : null;
 }
 
 function routeEdge(state, group) {
@@ -304,14 +553,20 @@ function routeEdge(state, group) {
   if (start === null || end === null) return;
   const orientation = state.shell.dataset.orientation;
   const obstacles = nodeObstacles(state, new Set([sourceNode, targetNode]));
-  const points = routePoints(start, end, orientation, obstacles);
-  const route = state.shell.dataset.edgeStyle === "smooth"
-    ? smoothRoute(start, end, orientation, obstacles)
+  const endpoints = [
+    endpointObstacle(state, sourceNode, "source"),
+    endpointObstacle(state, targetNode, "target"),
+  ].filter((endpoint) => endpoint !== null);
+  const points = routePoints(start, end, orientation, obstacles, endpoints);
+  const route = points === null
+    ? null
+    : state.shell.dataset.edgeStyle === "smooth"
+    ? smoothRoute(start, end, orientation, obstacles, endpoints)
     : { path: angularPath(points), label: points[Math.floor(points.length / 2)] };
-  const path = route.path;
+  const path = route?.path ?? "";
   for (const element of group.querySelectorAll("path")) element.setAttribute("d", path);
   const label = group.querySelector("text");
-  if (label !== null) {
+  if (label !== null && route !== null) {
     const anchor = route.label;
     label.setAttribute("x", `${anchor.x + 8}`);
     label.setAttribute("y", `${anchor.y - 8}`);
@@ -454,12 +709,15 @@ function updateConnectionPreview(state, clientX, clientY) {
   if (start === null) return;
   const end = screenToGraph(state, clientX, clientY);
   const orientation = state.shell.dataset.orientation;
-  const points = routePoints(start, end, orientation, []);
+  const sourceEndpoint = endpointObstacle(state, state.connection.nodeId, "source");
+  const endpoints = sourceEndpoint === null ? [] : [sourceEndpoint];
+  const points = routePoints(start, end, orientation, [], endpoints);
+  const route = state.shell.dataset.edgeStyle === "smooth"
+    ? smoothRoute(start, end, orientation, [], endpoints)
+    : points === null ? null : { path: angularPath(points) };
   state.preview.setAttribute(
     "d",
-    state.shell.dataset.edgeStyle === "smooth"
-      ? smoothRoute(start, end, orientation, []).path
-      : angularPath(points),
+    route?.path ?? "",
   );
   if (state.connectionDrag !== null) {
     state.connectionDrag.moved ||= Math.abs(clientX - state.connectionDrag.startX) > 3
@@ -481,7 +739,7 @@ function beginNodeDrag(state, event, node) {
   setLocalSelection(state.root, selected, null);
   void notifySelection(state);
   if (!selected.has(nodeId)) return;
-  node.focus({ preventScroll: true });
+  node.querySelector("[data-automation-node-select]")?.focus({ preventScroll: true });
   const nodes = [...state.root.querySelectorAll("[data-automation-node]")]
     .filter((candidate) => selected.has(candidate.dataset.automationNode))
     .map((candidate) => {
@@ -632,6 +890,7 @@ function finishBackgroundAction(state, event) {
     state.root.classList.remove("automation-canvas--panning");
     if (deselect) {
       setLocalSelection(state.root, [], null);
+      state.root.focus({ preventScroll: true });
       void notifySelection(state);
     }
     return true;
@@ -858,6 +1117,12 @@ export function refresh(root) {
   }
   cancelConnection(state);
   routeAll(state);
+}
+
+export function focusNode(root, nodeId) {
+  root.querySelector(
+    `[data-automation-node="${CSS.escape(nodeId)}"] [data-automation-node-select]`,
+  )?.focus({ preventScroll: true });
 }
 
 export function dispose(root) {

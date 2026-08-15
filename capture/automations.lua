@@ -51,7 +51,16 @@ mode = ["grid", "list"]
 ]]
 
 local repo_root = viset.script.directory .. "/.."
-local port = os.getenv("BLOKEBOT_CAPTURE_PORT") or "43221"
+local configured_port = os.getenv("BLOKEBOT_CAPTURE_PORT")
+local device_offsets = { desktop = 0, wide = 4, phone = 8 }
+local theme_offsets = { light = 0, dark = 2 }
+local mode_offsets = { grid = 0, list = 1 }
+local port = configured_port or tostring(
+  43221
+    + device_offsets[viset.context.device.name]
+    + theme_offsets[viset.context.axes.theme]
+    + mode_offsets[viset.context.axes.mode]
+)
 local base_url = "http://127.0.0.1:" .. port
 
 local function startServer()
@@ -151,7 +160,7 @@ local succeeded, failure = pcall(function()
       (() => {
         const node = [...document.querySelectorAll("[data-automation-node]")]
           .find((candidate) => candidate.querySelector("strong")?.textContent.trim() === "Condition");
-        node.click();
+        node.querySelector("[data-automation-node-select]").click();
         return true;
       })()
     ]=]))

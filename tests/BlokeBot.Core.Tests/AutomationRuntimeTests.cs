@@ -40,9 +40,6 @@ public sealed class AutomationRuntimeTests
         _ = (
             await fixture.Flows.DeleteAsync(new(otherHost), saved.FlowId, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowDeleteOutcome.FlowNotFound>();
-        _ = (
-            await fixture.Flows.DuplicateAsync(new(otherHost), saved.FlowId, CancellationToken.None)
-        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.FlowNotFound>();
 
         var loaded = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
@@ -70,22 +67,13 @@ public sealed class AutomationRuntimeTests
         _ = (
             await fixture.Flows.SaveAsync(moved, CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
-        var duplicate = (
-            await fixture.Flows.DuplicateAsync(
-                new(fixture.HostId),
-                saved.FlowId,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<AutomationFlowDuplicateOutcome.Duplicated>();
-        var afterDuplicate = (
+        var afterUpdate = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
-        var copied = afterDuplicate.Flows.Single(flow => flow.Draft.Id == duplicate.FlowId).Draft;
-        copied.IsEnabled.ShouldBeFalse();
-        copied.Canvas.ShouldBe(moved.Canvas);
-        copied
-            .Nodes.Select(static node => node.Position)
-            .ShouldBe(moved.Nodes.Select(static node => node.Position), ignoreOrder: true);
+        afterUpdate
+            .Flows.ShouldHaveSingleItem()
+            .Draft.Nodes.Single(node => node.Id == action.Id)
+            .Position.ShouldBe(new(new(648), new(96)));
 
         _ = (
             await fixture.Flows.DeleteAsync(
@@ -97,7 +85,7 @@ public sealed class AutomationRuntimeTests
         var afterDelete = (
             await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
         ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
-        afterDelete.Flows.Select(static flow => flow.Draft.Id).ShouldBe([duplicate.FlowId]);
+        afterDelete.Flows.ShouldBeEmpty();
     }
 
     [Test]

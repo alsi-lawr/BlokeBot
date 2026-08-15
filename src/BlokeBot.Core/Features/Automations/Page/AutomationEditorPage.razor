@@ -24,8 +24,8 @@
     @if (_loadFailed)
     {
         <PageState Kind="PageStateKind.Failure"
-                   Title="Automations could not load"
-                   Description="Select Retry. Your saved flows and run history did not change.">
+                   Title="BlokeBot cannot load automations"
+                   Description="Your saved flows and run history did not change.">
             <Actions><button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
@@ -158,7 +158,8 @@
                     <div class="automation-workspace" role="region" aria-label="Flow workspace">
                         @if (_mode == AutomationEditorMode.Grid)
                         {
-                            <AutomationFlowCanvas Nodes="_editor.Nodes"
+                            <AutomationFlowCanvas @ref="_canvas"
+                                                  Nodes="_editor.Nodes"
                                                   Edges="_editor.Edges"
                                                   SelectedNodeIds="_selectedNodeIds"
                                                   SelectedEdgeId="_selectedEdgeId"
@@ -193,7 +194,7 @@
                                                  Errors="_validationErrors"
                                                  ReferenceChoices="_referenceChoices"
                                                  Changed="EditorChanged"
-                                                 ClearSelection="ClearSelection"
+                                                 ClearSelection="CloseInspector"
                                                  Connect="ConnectNodes"
                                                  DeleteEdge="DeleteEdge"
                                                  DeleteNode="DeleteNode" />

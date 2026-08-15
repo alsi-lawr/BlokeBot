@@ -31,7 +31,7 @@ public sealed class AutomationEditorInteractionTests
                 .Add(component => component.MoveNodes, requests => moved = requests)
                 .Add(component => component.DeleteNodes, nodeIds => deleted = nodeIds)
         );
-        var nodeElement = canvas.Find("[data-automation-node]");
+        var nodeElement = canvas.Find("[data-automation-node-select]");
 
         nodeElement.KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
