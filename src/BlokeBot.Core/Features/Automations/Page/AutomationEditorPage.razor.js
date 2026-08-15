@@ -1,4 +1,5 @@
 let dirtyNavigation = null;
+let fullscreenState = null;
 
 function fullNavigationTarget(event) {
     if (
@@ -52,4 +53,32 @@ export function disposeDirtyNavigation() {
 
 export function navigateDocument(target) {
     requestAnimationFrame(() => window.location.assign(target));
+}
+
+export function initializeFullscreen(dotnet) {
+    disposeFullscreen();
+    const change = () => {
+        void dotnet.invokeMethodAsync(
+            "BrowserFullscreenChangedAsync",
+            document.fullscreenElement !== null,
+        );
+    };
+    fullscreenState = { change };
+    document.addEventListener("fullscreenchange", change);
+    change();
+}
+
+export function disposeFullscreen() {
+    if (fullscreenState === null) return;
+    document.removeEventListener("fullscreenchange", fullscreenState.change);
+    fullscreenState = null;
+}
+
+export async function toggleBrowserFullscreen() {
+    if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+    }
+
+    await document.documentElement.requestFullscreen();
 }

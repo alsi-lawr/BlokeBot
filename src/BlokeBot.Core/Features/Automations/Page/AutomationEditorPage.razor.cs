@@ -49,6 +49,11 @@ public partial class AutomationEditorPage
     private bool _dirtyDialogOpen;
     private IJSObjectReference? _pageModule;
     private DotNetObjectReference<AutomationEditorPage>? _pageReference;
+    private bool _focusMode;
+    private bool _browserFullscreen;
+    private bool _flowRailCollapsed;
+    private bool _editorToolsCollapsed;
+    private bool _runDrawerCollapsed;
 
     private AutomationEditorNode? _selectedNode =>
         _selectedNodeIds.Count == 1
@@ -158,6 +163,34 @@ public partial class AutomationEditorPage
     private string _runIcon =>
         _runTitle.Contains("failed", StringComparison.OrdinalIgnoreCase) ? "!" : "✓";
 
+    private string _editorClass
+    {
+        get
+        {
+            var classes = new List<string> { "automation-editor" };
+            if (!_focusMode)
+            {
+                return classes[0];
+            }
+
+            classes.Add("automation-editor--focus");
+            if (_editorToolsCollapsed)
+            {
+                classes.Add("automation-editor--tools-collapsed");
+            }
+            if (_runDrawerCollapsed)
+            {
+                classes.Add("automation-editor--runs-collapsed");
+            }
+            return string.Join(' ', classes);
+        }
+    }
+
+    private string _editorBodyClass =>
+        _focusMode && _flowRailCollapsed
+            ? "automation-editor-body automation-editor-body--flows-collapsed"
+            : "automation-editor-body";
+
     protected override async Task OnInitializedAsync()
     {
         _ = TrackSubscription(
@@ -187,6 +220,7 @@ public partial class AutomationEditorPage
                     _pageReference,
                     _hasChanges
                 );
+                await _pageModule.InvokeVoidAsync("initializeFullscreen", _pageReference);
             }
             else if (_pageModule is not null)
             {
@@ -1152,6 +1186,43 @@ public partial class AutomationEditorPage
 
     private void SetMode(AutomationEditorMode mode) => _mode = mode;
 
+    private void ToggleFocusMode() => _focusMode = !_focusMode;
+
+    private void ToggleFlowRail() => _flowRailCollapsed = !_flowRailCollapsed;
+
+    private void ToggleEditorTools() => _editorToolsCollapsed = !_editorToolsCollapsed;
+
+    private void ToggleRunDrawer() => _runDrawerCollapsed = !_runDrawerCollapsed;
+
+    private async Task ToggleBrowserFullscreenAsync()
+    {
+        if (_pageModule is null)
+        {
+            _feedback = "Browser full screen did not start. Try again.";
+            _operationFailed = true;
+            return;
+        }
+
+        try
+        {
+            await _pageModule.InvokeVoidAsync("toggleBrowserFullscreen");
+        }
+        catch (JSException exception)
+        {
+            _feedback = "Browser full screen did not start. Try again.";
+            _operationFailed = true;
+            ReportUiFault(nameof(ToggleBrowserFullscreenAsync), exception);
+        }
+    }
+
+    [JSInvokable]
+    public Task BrowserFullscreenChangedAsync(bool active) =>
+        InvokeAsync(() =>
+        {
+            _browserFullscreen = active;
+            StateHasChanged();
+        });
+
     private void ResetCanvasViewport() => _canvasViewportKey = Guid.NewGuid().ToString("N");
 
     private void ToggleNodeLibrary()
@@ -1255,6 +1326,7 @@ public partial class AutomationEditorPage
             try
             {
                 await _pageModule.InvokeVoidAsync("disposeDirtyNavigation");
+                await _pageModule.InvokeVoidAsync("disposeFullscreen");
             }
             catch (JSDisconnectedException) { }
             catch (JSException) { }
