@@ -532,6 +532,70 @@ public sealed class RedemptionAutomationTests
     }
 
     [Test]
+    public async Task MalformedFrozenDefinition_CancelsRedemptionWithoutExecutingPendingNodeAction()
+    {
+        await using var fixture = await RedemptionFixture.CreateAsync();
+        await fixture.SeedRewardAsync("reward-a", manageable: true);
+        var source = Node("reward-redemption", """{"completion-policy":"cancel-on-failure"}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+
+        await fixture.Runtime.RewardRedemptionReceivedAsync(
+            fixture.Redemption("message-1"),
+            CancellationToken.None
+        );
+        var runId = (await fixture.RunIdsAsync()).ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db
+                .AutomationFlowRuns.Include(static candidate => candidate.NodeRuns)
+                .SingleAsync(candidate => candidate.Id == runId);
+            run.Status.ShouldBe(AutomationFlowRunStatus.Waiting);
+            run.NodeRuns.ShouldContain(candidate =>
+                candidate.NodeId == action.Id.Value
+                && candidate.Status == AutomationNodeRunStatus.Pending
+            );
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            var mutated = frozen.Flow with
+            {
+                Edges = frozen
+                    .Flow.Edges.Select(edge =>
+                        edge.TargetNodeId == action.Id.Value
+                            ? edge with
+                            {
+                                SourcePortId = "unknown-output",
+                            }
+                            : edge
+                    )
+                    .ToImmutableArray(),
+            };
+            var mutatedJson = JsonSerializer.Serialize(mutated, JsonSerializerOptions.Web);
+            _ = AutomationRuntimeSerialization
+                .RestoreDefinition(mutatedJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            run.DefinitionJson = mutatedJson;
+            _ = await db.SaveChangesAsync();
+        }
+
+        fixture.Chat.Messages.ShouldBeEmpty();
+        fixture.Redemptions.Calls.ShouldBeEmpty();
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture.FlowRuntime.ResumeAsync(new(runId), CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        fixture.Redemptions.Calls.ShouldBe([(fixture.HostId, "redemption-1", false)]);
+        (await fixture.RunStatusesAsync()).ShouldBe([AutomationFlowRunStatus.Failed]);
+        (await fixture.NodeOutcomeCodesAsync()).ShouldContain("definition-invalid");
+    }
+
+    [Test]
     public async Task CompletionPolicy_ManualNeverTouchesTheRedemption()
     {
         await using var fixture = await RedemptionFixture.CreateAsync();
