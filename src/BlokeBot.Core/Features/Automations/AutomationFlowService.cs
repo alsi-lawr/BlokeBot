@@ -261,16 +261,34 @@ public sealed class AutomationFlowService(
         AutomationFlow flow;
         if (draft.Id is { } existingId)
         {
-            flow =
-                await db.AutomationFlows.SingleOrDefaultAsync(
+            var existing = await db
+                .AutomationFlows.AsNoTracking()
+                .Include(static value => value.Nodes)
+                .Include(static value => value.Edges)
+                .SingleOrDefaultAsync(
                     value => value.Id == existingId.Value && value.HostId == draft.HostId.Value,
                     cancellationToken
-                ) ?? null!;
-            if (flow is null)
+                );
+            if (existing is null)
             {
                 return new AutomationFlowSaveOutcome.FlowNotFound();
             }
 
+            if (RestoreDraft(existing) is not AutomationFlowDraftRestoreOutcome.Available restored)
+            {
+                return new AutomationFlowSaveOutcome.Invalid([MalformedGraphError()]);
+            }
+
+            var identityErrors = TransformInputIdentityErrors(restored.Draft, draft);
+            if (!identityErrors.IsEmpty)
+            {
+                return new AutomationFlowSaveOutcome.Invalid(identityErrors);
+            }
+
+            flow = await db.AutomationFlows.SingleAsync(
+                value => value.Id == existingId.Value && value.HostId == draft.HostId.Value,
+                cancellationToken
+            );
             _ = await db
                 .AutomationFlowEdges.Where(value => value.FlowId == flow.Id)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -301,6 +319,61 @@ public sealed class AutomationFlowService(
         await transaction.CommitAsync(cancellationToken);
         await ReconcileEventSubAsync(cancellationToken);
         return new AutomationFlowSaveOutcome.Saved(new(flow.Id));
+    }
+
+    private ImmutableArray<AutomationGraphError> TransformInputIdentityErrors(
+        AutomationFlowDraft existing,
+        AutomationFlowDraft candidate
+    )
+    {
+        var candidateNodes = candidate.Nodes.ToDictionary(static node => node.Id);
+        var errors = ImmutableArray.CreateBuilder<AutomationGraphError>();
+        foreach (var existingNode in existing.Nodes)
+        {
+            if (
+                !candidateNodes.TryGetValue(existingNode.Id, out var candidateNode)
+                || catalog.ValidatePersistedDefinition(existingNode.Definition)
+                    is not AutomationConfigurationCheck.Valid
+                    {
+                        Configuration: AutomationCelTransformConfiguration existingTransform,
+                    }
+                || catalog.ValidatePersistedDefinition(candidateNode.Definition)
+                    is not AutomationConfigurationCheck.Valid
+                    {
+                        Configuration: AutomationCelTransformConfiguration candidateTransform,
+                    }
+            )
+            {
+                continue;
+            }
+
+            var candidateInputs = candidateTransform.Inputs.ToDictionary(static input =>
+                input.PortId
+            );
+            foreach (var existingInput in existingTransform.Inputs)
+            {
+                if (
+                    candidateInputs.TryGetValue(existingInput.PortId, out var candidateInput)
+                    && (
+                        candidateInput.Identifier != existingInput.Identifier
+                        || candidateInput.BindingFieldId != existingInput.BindingFieldId
+                    )
+                )
+                {
+                    errors.Add(
+                        new(
+                            existingNode.Id,
+                            "transform-input-identity-changed",
+                            "Create a new Transform input instead of changing its CEL identifier or binding field.",
+                            existingInput.BindingFieldId,
+                            existingInput.PortId
+                        )
+                    );
+                }
+            }
+        }
+
+        return errors.ToImmutable();
     }
 
     public async Task<AutomationFlowEnableOutcome> SetEnabledAsync(

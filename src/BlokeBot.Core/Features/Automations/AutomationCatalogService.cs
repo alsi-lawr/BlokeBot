@@ -276,6 +276,7 @@ public sealed class AutomationCatalogService
                 && Enum.IsDefined(field.ValueType)
                 && Enum.IsDefined(field.Nullability)
                 && Enum.IsDefined(field.Provenance)
+                && AutomationSafeTriggerManifest.IsValid(field)
             )
         );
 

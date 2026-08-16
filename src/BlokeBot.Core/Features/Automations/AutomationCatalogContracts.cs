@@ -17,7 +17,7 @@ public readonly record struct AutomationHostId(int Value);
 
 public readonly record struct AutomationVariableName(string Value);
 
-public readonly record struct AutomationCelIdentifier(string Value);
+internal readonly record struct AutomationCelIdentifier(string Value);
 
 public readonly record struct AutomationSafeTriggerFieldId(string Value);
 
@@ -179,7 +179,7 @@ public sealed record AutomationDefinitionDescriptor(
     AutomationTriggerContextRequirement? TriggerContextRequirement = null
 );
 
-public sealed record AutomationSafeTriggerFieldContract(
+internal sealed record AutomationSafeTriggerFieldContract(
     AutomationSafeTriggerFieldId Id,
     string Path,
     AutomationPortValueType ValueType,
@@ -187,7 +187,7 @@ public sealed record AutomationSafeTriggerFieldContract(
     AutomationValueProvenance Provenance
 );
 
-public sealed record AutomationSafeTriggerSourceContract(
+internal sealed record AutomationSafeTriggerSourceContract(
     ImmutableArray<AutomationSafeTriggerFieldContract> Fields
 );
 
@@ -453,9 +453,18 @@ public abstract record AutomationConfigurationCheck
 
     public sealed record Valid(
         AutomationDefinitionDescriptor Definition,
-        AutomationConfiguration Configuration,
-        AutomationSafeTriggerSourceContract? SafeTriggerSource = null
-    ) : AutomationConfigurationCheck;
+        AutomationConfiguration Configuration
+    ) : AutomationConfigurationCheck
+    {
+        internal Valid(
+            AutomationDefinitionDescriptor definition,
+            AutomationConfiguration configuration,
+            AutomationSafeTriggerSourceContract? safeTriggerSource
+        )
+            : this(definition, configuration) => SafeTriggerSource = safeTriggerSource;
+
+        internal AutomationSafeTriggerSourceContract? SafeTriggerSource { get; }
+    }
 
     public sealed record Invalid(ImmutableArray<AutomationValidationError> Errors)
         : AutomationConfigurationCheck;

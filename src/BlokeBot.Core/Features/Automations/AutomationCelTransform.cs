@@ -1168,7 +1168,10 @@ internal static class AutomationCelStaticTypes
                     && inferred[0].NumberKind == AutomationCelNumberKind.Decimal
                     && !inferred[0].CanBeNull
                     && inferred[1].NumberKind == AutomationCelNumberKind.Integer
-                    && inferred[1].IntegerConstant is >= 0 and <= 6:
+                    && (
+                        inferred[1].IntegerConstant is null
+                        || inferred[1].IntegerConstant is >= 0 and <= 6
+                    ):
                 type = Text();
                 return true;
             case "timestamp" when OneNonNullable(inferred, AutomationPortValueType.Text):

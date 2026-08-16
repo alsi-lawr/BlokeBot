@@ -20,42 +20,65 @@ internal interface IAutomationEffectiveDefinition
     AutomationSafeTriggerSourceContract? SafeTriggerSource(AutomationConfiguration configuration);
 }
 
-public sealed class AutomationDefinition<TConfiguration>(
-    AutomationDefinitionDescriptor descriptor,
-    Func<JsonElement, AutomationConfigurationParseResult> parse,
-    Func<TConfiguration, AutomationValidationResult> validate,
-    Func<TConfiguration, AutomationDefinitionDescriptor>? effectiveDescriptor = null,
-    Func<TConfiguration, AutomationSafeTriggerSourceContract?>? safeTriggerSource = null
-) : IAutomationDefinition, IAutomationEffectiveDefinition
+public sealed class AutomationDefinition<TConfiguration>
+    : IAutomationDefinition,
+        IAutomationEffectiveDefinition
     where TConfiguration : AutomationConfiguration
 {
-    public AutomationDefinitionDescriptor Descriptor { get; } = descriptor;
+    private readonly Func<JsonElement, AutomationConfigurationParseResult> _parse;
+    private readonly Func<TConfiguration, AutomationValidationResult> _validate;
+    private readonly Func<TConfiguration, AutomationDefinitionDescriptor>? _effectiveDescriptor;
+    private readonly Func<TConfiguration, AutomationSafeTriggerSourceContract?>? _safeTriggerSource;
+
+    public AutomationDefinition(
+        AutomationDefinitionDescriptor descriptor,
+        Func<JsonElement, AutomationConfigurationParseResult> parse,
+        Func<TConfiguration, AutomationValidationResult> validate
+    )
+        : this(descriptor, parse, validate, null, null) { }
+
+    internal AutomationDefinition(
+        AutomationDefinitionDescriptor descriptor,
+        Func<JsonElement, AutomationConfigurationParseResult> parse,
+        Func<TConfiguration, AutomationValidationResult> validate,
+        Func<TConfiguration, AutomationDefinitionDescriptor>? effectiveDescriptor = null,
+        Func<TConfiguration, AutomationSafeTriggerSourceContract?>? safeTriggerSource = null
+    )
+    {
+        Descriptor = descriptor;
+        _parse = parse;
+        _validate = validate;
+        _effectiveDescriptor = effectiveDescriptor;
+        _safeTriggerSource = safeTriggerSource;
+    }
+
+    public AutomationDefinitionDescriptor Descriptor { get; }
 
     public AutomationValidationResult Validate(AutomationConfiguration configuration) =>
         configuration is TConfiguration typed
-            ? validate(typed)
+            ? _validate(typed)
             : AutomationValidationResult.Invalid(
                 new AutomationValidationTarget.Definition(),
                 $"Configuration does not match automation definition '{Descriptor.Id.Value}'."
             );
 
     public AutomationConfigurationParseResult Parse(JsonElement configuration) =>
-        parse(configuration);
+        _parse(configuration);
 
     AutomationDefinitionDescriptor IAutomationEffectiveDefinition.EffectiveDescriptor(
         AutomationConfiguration configuration
     ) =>
-        configuration is TConfiguration typed && effectiveDescriptor is not null
-            ? effectiveDescriptor(typed)
+        configuration is TConfiguration typed && _effectiveDescriptor is not null
+            ? _effectiveDescriptor(typed)
             : Descriptor;
 
-    bool IAutomationEffectiveDefinition.UsesEffectiveDescriptor => effectiveDescriptor is not null;
+    bool IAutomationEffectiveDefinition.UsesEffectiveDescriptor => _effectiveDescriptor is not null;
 
     AutomationSafeTriggerSourceContract? IAutomationEffectiveDefinition.SafeTriggerSource(
         AutomationConfiguration configuration
     ) =>
-        configuration is TConfiguration typed && safeTriggerSource is not null
-            ? safeTriggerSource(typed)
+        configuration is TConfiguration typed && _safeTriggerSource is not null
+            ? _safeTriggerSource(typed)
             : null;
 }
 

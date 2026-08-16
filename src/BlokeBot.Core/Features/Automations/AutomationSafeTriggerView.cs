@@ -3,12 +3,12 @@ using Cel;
 
 namespace BlokeBot.Core.Features.Automations;
 
-public static class AutomationSafeTriggerView
+internal static class AutomationSafeTriggerView
 {
     public const int CurrentVersion = 1;
 }
 
-public enum AutomationSafeTriggerFieldStatus
+internal enum AutomationSafeTriggerFieldStatus
 {
     Available,
     ReservedName,
@@ -16,7 +16,7 @@ public enum AutomationSafeTriggerFieldStatus
     Incompatible,
 }
 
-public sealed record AutomationSafeTriggerViewField(
+internal sealed record AutomationSafeTriggerViewField(
     AutomationSafeTriggerFieldId Id,
     string Path,
     AutomationPortValueType ValueType,
@@ -25,17 +25,95 @@ public sealed record AutomationSafeTriggerViewField(
     AutomationSafeTriggerFieldStatus Status
 );
 
-public sealed record AutomationSafeTriggerViewDescriptor(
+internal sealed record AutomationSafeTriggerViewDescriptor(
     int Version,
     ImmutableArray<AutomationSafeTriggerViewField> Fields
 )
 {
-    public ImmutableArray<AutomationSafeTriggerViewField> AvailableFields =>
+    internal ImmutableArray<AutomationSafeTriggerViewField> AvailableFields =>
         [
             .. Fields.Where(static candidate =>
                 candidate.Status == AutomationSafeTriggerFieldStatus.Available
             ),
         ];
+}
+
+internal static class AutomationSafeTriggerManifest
+{
+    private static readonly ImmutableDictionary<
+        string,
+        AutomationSafeTriggerFieldContract
+    > _fields = new AutomationSafeTriggerFieldContract[]
+    {
+        new(
+            new("actor-login"),
+            "actor.login",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.Nullable,
+            AutomationValueProvenance.PublicLogin
+        ),
+        new(
+            new("actor-display-name"),
+            "actor.display_name",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.Nullable,
+            AutomationValueProvenance.PublicDisplayName
+        ),
+        new(
+            new("channel-login"),
+            "channel.login",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.NonNullable,
+            AutomationValueProvenance.PublicLogin
+        ),
+        new(
+            new("channel-display-name"),
+            "channel.display_name",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.NonNullable,
+            AutomationValueProvenance.PublicDisplayName
+        ),
+        new(
+            new("stream-title"),
+            "stream.title",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.Nullable,
+            AutomationValueProvenance.Generated
+        ),
+        new(
+            new("stream-game-name"),
+            "stream.game_name",
+            AutomationPortValueType.Text,
+            AutomationPortNullability.Nullable,
+            AutomationValueProvenance.Generated
+        ),
+        new(
+            new("stream-started-at"),
+            "stream.started_at",
+            AutomationPortValueType.Timestamp,
+            AutomationPortNullability.Nullable,
+            AutomationValueProvenance.Generated
+        ),
+        new(
+            new("arguments"),
+            "arguments",
+            AutomationPortValueType.Arguments,
+            AutomationPortNullability.NonNullable,
+            AutomationValueProvenance.PublicChat
+        ),
+    }.ToImmutableDictionary(static field => field.Path, StringComparer.Ordinal);
+
+    internal static bool IsValid(AutomationSafeTriggerFieldContract field)
+    {
+        if (_fields.TryGetValue(field.Path, out var canonical))
+        {
+            return field == canonical;
+        }
+
+        var separator = field.Path.IndexOf('.');
+        var root = separator < 0 ? field.Path : field.Path[..separator];
+        return root is not ("actor" or "channel" or "stream" or "arguments");
+    }
 }
 
 internal static class AutomationSafeTriggerViewResolver

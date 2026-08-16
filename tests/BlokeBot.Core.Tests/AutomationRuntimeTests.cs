@@ -1529,6 +1529,137 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    public void CelTransform_FoundationKeepsSafeContractsOffThePublicCatalogSurface()
+    {
+        var constructor = typeof(AutomationDefinition<DataContractConfiguration>)
+            .GetConstructors()
+            .ShouldHaveSingleItem();
+        constructor.GetParameters().Length.ShouldBe(3);
+        typeof(AutomationSafeTriggerFieldContract).IsPublic.ShouldBeFalse();
+        typeof(AutomationSafeTriggerSourceContract).IsPublic.ShouldBeFalse();
+        typeof(AutomationSafeTriggerViewDescriptor).IsPublic.ShouldBeFalse();
+        typeof(AutomationSafeTriggerViewField).IsPublic.ShouldBeFalse();
+    }
+
+    [Test]
+    [Arguments("replacement", "amount-binding")]
+    [Arguments("amount", "replacement-binding")]
+    public async Task CelTransform_UpdateRejectsRetainedInputIdentityReplacementAndPreservesStoredGraph(
+        string identifier,
+        string bindingFieldId
+    )
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var transform = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "amount-input",
+                        "amount",
+                        "Amount",
+                        "amount-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        1m
+                    ),
+                ],
+                [
+                    new(
+                        "text-output",
+                        "Text",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "format_number(amount, 2)"
+                    ),
+                ]
+            ),
+            bindings: Bindings("amount-binding", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var flowId = await fixture.SaveAsync(
+            [source, transform, action],
+            [
+                Edge(source, "flow", action),
+                Edge(source, "value", transform, "amount-input", AutomationEdgeKind.Data),
+                Edge(transform, "text-output", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        var before = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == flowId);
+        var replacementConfiguration = TransformJson(
+            [
+                new(
+                    "amount-input",
+                    identifier,
+                    "Amount",
+                    bindingFieldId,
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    1m
+                ),
+            ],
+            [
+                new(
+                    "text-output",
+                    "Text",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    $"format_number({identifier}, 2)"
+                ),
+            ]
+        );
+        var update = before.Draft with
+        {
+            Name = "Must not persist",
+            Nodes = before
+                .Draft.Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? Node(
+                            "test-cel-transform",
+                            replacementConfiguration,
+                            bindings: Bindings(bindingFieldId, AutomationInputBindingMode.Connected)
+                        ) with
+                        {
+                            Id = node.Id,
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(update, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        var rejected = (
+            await fixture.Flows.SaveAsync(update, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Invalid>();
+        var error = rejected.Errors.ShouldHaveSingleItem();
+        error.Code.ShouldBe("transform-input-identity-changed");
+        error.NodeId.ShouldBe(transform.Id);
+        error.PortId.ShouldBe(new("amount-input"));
+
+        var after = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == flowId);
+        after.Draft.Name.ShouldBe(before.Draft.Name);
+        after.UpdatedAtUtc.ShouldBe(before.UpdatedAtUtc);
+        after.Draft.Edges.ShouldBe(before.Draft.Edges, ignoreOrder: true);
+        var original = before.Draft.Nodes.Single(node => node.Id == transform.Id);
+        var retained = after.Draft.Nodes.Single(node => node.Id == transform.Id);
+        retained
+            .Definition.Configuration.GetRawText()
+            .ShouldBe(original.Definition.Configuration.GetRawText());
+        retained.InputBindings.ShouldBe(original.InputBindings);
+    }
+
+    [Test]
     public async Task CelTransform_RestrictedInputAdmissionUsesResolvedAstAndFrozenSafeView()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -1893,6 +2024,67 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    [Arguments("WrongPath")]
+    [Arguments("WrongType")]
+    [Arguments("WrongNullability")]
+    [Arguments("WrongProvenance")]
+    public async Task CelTransform_CanonicalSafeManifestRejectsMalformedCandidateFrozenAndRuntimeContracts(
+        string mutationName
+    )
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var mutation = Enum.Parse<DynamicSafeContractMutation>(mutationName);
+        var configurationJson = JsonSerializer.Serialize(
+            new Dictionary<string, object?>
+            {
+                ["include-display-name"] = true,
+                ["contract-mutation"] = mutation.ToString(),
+            },
+            JsonSerializerOptions.Web
+        );
+        var source = Node("test-dynamic-safe-source", configurationJson);
+        var candidate = Draft(fixture.HostId, [source], []);
+        await AssertValidationCode(fixture, candidate, "configuration-invalid");
+
+        var frozen = new AutomationRuntimeSerialization.PersistedFlow(
+            Guid.NewGuid(),
+            fixture.HostId,
+            AutomationFlowSchema.CurrentVersion,
+            [
+                new(
+                    source.Id.Value,
+                    source.Definition.TypeId,
+                    source.Definition.SchemaVersion,
+                    source.Definition.Configuration.GetRawText(),
+                    AutomationRuntimeSerialization.SerializeInputBindings(source.InputBindings),
+                    source.ExpressionLanguageVersion.Value,
+                    ContinueOnFailure: false
+                ),
+            ],
+            []
+        );
+        var frozenValidation = await fixture.Flows.ValidateFrozenDefinitionAsync(
+            new(fixture.HostId),
+            frozen,
+            CancellationToken.None
+        );
+        frozenValidation
+            .Errors.Select(static error => error.Code)
+            .ShouldContain("configuration-invalid");
+
+        _ = (
+            await fixture.Catalog.ValidateBeforeExecutionAsync(
+                new(fixture.HostId),
+                Context(fixture.HostId, sourceDefinitionId: new("test-dynamic-safe-source")),
+                new("test-dynamic-safe-source"),
+                new(1),
+                new DynamicSafeSourceConfiguration(true, mutation),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+    }
+
+    [Test]
     public void CelTransform_EvaluatesOnlyExactScalarOutputsAndTypedNull()
     {
         var timestamp = new DateTimeOffset(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
@@ -1996,6 +2188,15 @@ public sealed class AutomationRuntimeTests
                 AutomationPortNullability.NonNullable,
                 new AutomationValue.Number(1m)
             ),
+            new AutomationCelTransformInput(
+                new("precision-input"),
+                new("precision"),
+                "Precision",
+                new("precision-binding"),
+                AutomationPortValueType.Number,
+                AutomationPortNullability.NonNullable,
+                new AutomationValue.Number(2m)
+            ),
         }.ToImmutableDictionary(static input => input.Identifier.Value, StringComparer.Ordinal);
         foreach (var precision in new[] { "0", "2", "6" })
         {
@@ -2026,6 +2227,27 @@ public sealed class AutomationRuntimeTests
                     declaredInputs
                 )
                 .ShouldBeFalse();
+        }
+        foreach (
+            var source in new[]
+            {
+                "format_number(amount, int(precision))",
+                "value ${format_number(amount, int(precision))}",
+            }
+        )
+        {
+            AutomationTransformCelService
+                .ValidateOutput(
+                    new(
+                        new("output"),
+                        "Output",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        source
+                    ),
+                    declaredInputs
+                )
+                .ShouldBeTrue();
         }
 
         try
@@ -2069,6 +2291,59 @@ public sealed class AutomationRuntimeTests
                             $"value {(-1234.5m).ToString("F2", CultureInfo.CurrentCulture)}"
                         )
                     );
+            }
+
+            var dynamicInputs = inputs.Add(
+                new("precision-input"),
+                new(new AutomationValue.Number(2m), [AutomationValueProvenance.Generated])
+            );
+            var dynamicOutputs = service
+                .Execute(
+                    TransformDynamicPrecisionConfiguration(
+                        "format_number(amount, int(precision))",
+                        "value ${format_number(amount, int(precision))}"
+                    ),
+                    dynamicInputs
+                )
+                .ShouldBeOfType<AutomationPureNodeResult.Succeeded>()
+                .Outputs;
+            dynamicOutputs[new("first-output")]
+                .Value.ShouldBe(
+                    new AutomationValue.Text((-1234.5m).ToString("F2", CultureInfo.CurrentCulture))
+                );
+            dynamicOutputs[new("second-output")]
+                .Value.ShouldBe(
+                    new AutomationValue.Text(
+                        $"value {(-1234.5m).ToString("F2", CultureInfo.CurrentCulture)}"
+                    )
+                );
+            foreach (var precision in new[] { -1m, 7m })
+            {
+                var outOfRange = inputs.Add(
+                    new("precision-input"),
+                    new(
+                        new AutomationValue.Number(precision),
+                        [AutomationValueProvenance.Generated]
+                    )
+                );
+                _ = service
+                    .Execute(
+                        TransformDynamicPrecisionConfiguration(
+                            "format_number(amount, int(precision))",
+                            "'unused'"
+                        ),
+                        outOfRange
+                    )
+                    .ShouldBeOfType<AutomationPureNodeResult.Failed>();
+                _ = service
+                    .Execute(
+                        TransformDynamicPrecisionConfiguration(
+                            "'unused'",
+                            "value ${format_number(amount, int(precision))}"
+                        ),
+                        outOfRange
+                    )
+                    .ShouldBeOfType<AutomationPureNodeResult.Failed>();
             }
 
             foreach (var precision in new[] { "-1", "7", "2.0", "null", "'2'" })
@@ -2170,6 +2445,23 @@ public sealed class AutomationRuntimeTests
             AutomationValueProvenance.PublicDisplayName,
         ]);
         absent.SafeTriggerFields.ShouldBe([new("actor-display-name")]);
+        var safeArgument = service
+            .Evaluate(
+                new(AutomationExpressionLanguage.CurrentVersion, "arguments[0]"),
+                port with
+                {
+                    Nullability = AutomationPortNullability.NonNullable,
+                },
+                descriptor,
+                context
+            )
+            .ShouldNotBeNull();
+        safeArgument.Value.ShouldBe(new AutomationValue.Text("yes"));
+        safeArgument.Provenance.ShouldBe([
+            AutomationValueProvenance.Generated,
+            AutomationValueProvenance.PublicChat,
+        ]);
+        safeArgument.SafeTriggerFields.ShouldBe([new("arguments")]);
 
         var collisions = AutomationSafeTriggerViewResolver.Build([
             new([
@@ -2585,6 +2877,187 @@ public sealed class AutomationRuntimeTests
             )
         );
         fixture.TransformHandler.Calls.ShouldBe(4);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CelTransform_LeaseLossAfterMultiOutputEvaluationBeforeCheckpointHonorsScheduledFailurePolicy(
+        bool continueOnFailure
+    )
+    {
+        var outputsReady = new TaskCompletionSource<AutomationPureNodeResult.Succeeded>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var fixture = await RuntimeFixture.CreateAsync(
+            transformDecorator: handler => new PausingPureHandler(
+                handler,
+                outputsReady,
+                release.Task
+            )
+        );
+        var policy = continueOnFailure
+            ? AutomationNodeFailurePolicy.Continue
+            : AutomationNodeFailurePolicy.Stop;
+        var source = Node("test-dynamic-safe-source", """{"include-display-name":true}""");
+        var transform = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "name-input",
+                        "name",
+                        "Name",
+                        "name-binding",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "Viewer"
+                    ),
+                ],
+                [
+                    new(
+                        "first-output",
+                        "First",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "name"
+                    ),
+                    new(
+                        "second-output",
+                        "Second",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'second'"
+                    ),
+                ]
+            ),
+            bindings: Bindings("name-binding", AutomationInputBindingMode.Fixed)
+        ) with
+        {
+            FailurePolicy = policy,
+        };
+        var consumer = Node(
+            "test-text-consumer",
+            """{"message":"must not send"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        ) with
+        {
+            FailurePolicy = policy,
+        };
+        var continued = Node("condition", """{"expression":"arguments[0] == 'yes'"}""");
+        _ = await fixture.SaveAsync(
+            [source, transform, consumer, continued],
+            [
+                Edge(source, "flow", consumer),
+                Edge(consumer, "complete", continued),
+                Edge(transform, "first-output", consumer, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var dispatch = fixture.Runtime.DispatchAsync(
+            new(
+                Context(fixture.HostId, sourceDefinitionId: new("test-dynamic-safe-source")),
+                new DynamicSafeSourceConfiguration(IncludeDisplayName: true)
+            ),
+            CancellationToken.None
+        );
+        var computed = await outputsReady.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        computed.Outputs.Keys.ShouldBe(
+            [new AutomationPortId("first-output"), new("second-output")],
+            ignoreOrder: true
+        );
+        fixture.TransformHandler.Calls.ShouldBe(1);
+
+        var foreignLease = Guid.NewGuid();
+        Guid runId;
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db
+                .AutomationFlowRuns.Include(static value => value.NodeRuns)
+                .SingleAsync();
+            runId = run.Id;
+            _ = run.ExecutionLeaseId.ShouldNotBeNull();
+            run.NodeRuns.Single(node => node.NodeId == transform.Id.Value)
+                .Status.ShouldBe(AutomationNodeRunStatus.Running);
+            run.NodeRuns.Single(node => node.NodeId == consumer.Id.Value)
+                .Status.ShouldBe(AutomationNodeRunStatus.Running);
+            run.NodeRuns.ShouldNotContain(node => node.NodeId == continued.Id.Value);
+            _ = await db
+                .AutomationFlowRuns.Where(value => value.Id == runId)
+                .ExecuteUpdateAsync(setters =>
+                    setters.SetProperty(static value => value.ExecutionLeaseId, _ => foreignLease)
+                );
+        }
+        release.SetResult();
+        (await dispatch.WaitAsync(TimeSpan.FromSeconds(5))).Status.ShouldBe(
+            AutomationDispatchStatus.Accepted
+        );
+
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db
+                .AutomationFlowRuns.AsNoTracking()
+                .Include(static value => value.NodeRuns)
+                .SingleAsync();
+            run.Status.ShouldBe(AutomationFlowRunStatus.Running);
+            run.ExecutionLeaseId.ShouldBe(foreignLease);
+            var checkpoint = run.NodeRuns.Single(node => node.NodeId == transform.Id.Value);
+            checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Running);
+            checkpoint.OutcomeCode.ShouldBeNull();
+            checkpoint.OutputJson.ShouldBeNull();
+            checkpoint.CompletedAtUtc.ShouldBeNull();
+            var scheduled = run.NodeRuns.Single(node => node.NodeId == consumer.Id.Value);
+            scheduled.Status.ShouldBe(AutomationNodeRunStatus.Running);
+            scheduled.OutcomeCode.ShouldBeNull();
+            scheduled.CompletedAtUtc.ShouldBeNull();
+            run.NodeRuns.ShouldNotContain(node => node.NodeId == continued.Id.Value);
+        }
+        fixture.Chat.Messages.ShouldBeEmpty();
+        var diagnostics = (
+            await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
+        )
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem()
+            .Nodes.Single(node => node.NodeId == transform.Id)
+            .Outputs;
+        diagnostics.ShouldBeEmpty();
+
+        var resumed = await fixture.NewRuntime().ResumeAsync(new(runId), CancellationToken.None);
+        resumed.Status.ShouldBe(
+            continueOnFailure ? AutomationResumeStatus.Completed : AutomationResumeStatus.Failed
+        );
+        fixture.Chat.Messages.ShouldBeEmpty();
+        fixture.TransformHandler.Calls.ShouldBe(1);
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        var recovered = await verified
+            .AutomationFlowRuns.AsNoTracking()
+            .Include(static value => value.NodeRuns)
+            .SingleAsync();
+        recovered.Status.ShouldBe(
+            continueOnFailure ? AutomationFlowRunStatus.Completed : AutomationFlowRunStatus.Failed
+        );
+        var recoveredCheckpoint = recovered.NodeRuns.Single(node =>
+            node.NodeId == transform.Id.Value
+        );
+        recoveredCheckpoint.OutputJson.ShouldBeNull();
+        recoveredCheckpoint.Status.ShouldBe(
+            continueOnFailure
+                ? AutomationNodeRunStatus.ContinuedAfterFailure
+                : AutomationNodeRunStatus.Failed
+        );
+        var recoveredConsumer = recovered.NodeRuns.Single(node => node.NodeId == consumer.Id.Value);
+        recoveredConsumer.Status.ShouldBe(recoveredCheckpoint.Status);
+        if (continueOnFailure)
+        {
+            var continuation = recovered.NodeRuns.Single(node => node.NodeId == continued.Id.Value);
+            continuation.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+            continuation.OutcomeCode.ShouldBe("condition-true");
+        }
+        else
+        {
+            recovered.NodeRuns.ShouldNotContain(node => node.NodeId == continued.Id.Value);
+        }
     }
 
     [Test]
@@ -3602,6 +4075,49 @@ public sealed class AutomationRuntimeTests
             ]
         );
 
+    private static AutomationCelTransformConfiguration TransformDynamicPrecisionConfiguration(
+        string first,
+        string second
+    ) =>
+        new(
+            [
+                new(
+                    new("amount-input"),
+                    new("amount"),
+                    "Amount",
+                    new("amount-binding"),
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    new AutomationValue.Number(0m)
+                ),
+                new(
+                    new("precision-input"),
+                    new("precision"),
+                    "Precision",
+                    new("precision-binding"),
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    new AutomationValue.Number(2m)
+                ),
+            ],
+            [
+                new(
+                    new("first-output"),
+                    "First",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    first
+                ),
+                new(
+                    new("second-output"),
+                    "Second",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    second
+                ),
+            ]
+        );
+
     private sealed record TransformInput(
         string PortId,
         string Identifier,
@@ -3694,8 +4210,19 @@ public sealed class AutomationRuntimeTests
 
     private sealed record DataContractConfiguration : AutomationConfiguration;
 
-    private sealed record DynamicSafeSourceConfiguration(bool IncludeDisplayName)
-        : AutomationConfiguration;
+    private enum DynamicSafeContractMutation
+    {
+        Valid,
+        WrongPath,
+        WrongType,
+        WrongNullability,
+        WrongProvenance,
+    }
+
+    private sealed record DynamicSafeSourceConfiguration(
+        bool IncludeDisplayName,
+        DynamicSafeContractMutation ContractMutation = DynamicSafeContractMutation.Valid
+    ) : AutomationConfiguration;
 
     private sealed class TestPureHandler(
         AutomationPureHandlerContract contract,
@@ -3715,6 +4242,30 @@ public sealed class AutomationRuntimeTests
         {
             _ = Interlocked.Increment(ref _calls);
             return ValueTask.FromResult(execute(input));
+        }
+    }
+
+    private sealed class PausingPureHandler(
+        IAutomationPureNodeHandler inner,
+        TaskCompletionSource<AutomationPureNodeResult.Succeeded> outputsReady,
+        Task release
+    ) : IAutomationPureNodeHandler
+    {
+        public AutomationPureHandlerContract Contract => inner.Contract;
+
+        public async ValueTask<AutomationPureNodeResult> ExecuteAsync(
+            AutomationPureNodeInput input,
+            CancellationToken cancellationToken
+        )
+        {
+            var result = await inner.ExecuteAsync(input, cancellationToken);
+            if (result is AutomationPureNodeResult.Succeeded succeeded)
+            {
+                outputsReady.SetResult(succeeded);
+                await release;
+            }
+
+            return result;
         }
     }
 
@@ -3913,27 +4464,85 @@ public sealed class AutomationRuntimeTests
                     AutomationActionRetrySafety.NotApplicable
                 ),
                 static json =>
-                    json.TryGetProperty("include-display-name", out var include)
-                    && include.ValueKind is JsonValueKind.True or JsonValueKind.False
-                        ? new AutomationConfigurationParseResult.Parsed(
-                            new DynamicSafeSourceConfiguration(include.GetBoolean())
-                        )
+                    TryDynamicSafeSourceConfiguration(json, out var configuration)
+                        ? new AutomationConfigurationParseResult.Parsed(configuration)
                         : new AutomationConfigurationParseResult.Invalid([]),
                 static _ => AutomationValidationResult.Valid,
-                safeTriggerSource: static configuration =>
-                    configuration.IncludeDisplayName
-                        ? SafeTriggerContract()
-                        : SafeTriggerContract() with
-                        {
-                            Fields =
-                            [
-                                .. SafeTriggerContract()
-                                    .Fields.Where(static field =>
-                                        field.Path != "actor.display_name"
-                                    ),
-                            ],
-                        }
+                safeTriggerSource: static configuration => SafeTriggerContract(configuration)
             );
+
+        private static bool TryDynamicSafeSourceConfiguration(
+            JsonElement json,
+            out DynamicSafeSourceConfiguration configuration
+        )
+        {
+            configuration = null!;
+            if (
+                !json.TryGetProperty("include-display-name", out var include)
+                || include.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            )
+            {
+                return false;
+            }
+
+            var mutation = DynamicSafeContractMutation.Valid;
+            if (json.TryGetProperty("contract-mutation", out var persistedMutation))
+            {
+                if (
+                    persistedMutation.ValueKind != JsonValueKind.String
+                    || !Enum.TryParse(persistedMutation.GetString(), out mutation)
+                    || !Enum.IsDefined(mutation)
+                    || persistedMutation.GetString() != mutation.ToString()
+                )
+                {
+                    return false;
+                }
+            }
+
+            configuration = new(include.GetBoolean(), mutation);
+            return true;
+        }
+
+        private static AutomationSafeTriggerSourceContract SafeTriggerContract(
+            DynamicSafeSourceConfiguration configuration
+        )
+        {
+            var fields = configuration.IncludeDisplayName
+                ? SafeTriggerContract().Fields
+                :
+                [
+                    .. SafeTriggerContract()
+                        .Fields.Where(static field => field.Path != "actor.display_name"),
+                ];
+            return configuration.ContractMutation == DynamicSafeContractMutation.Valid
+                ? new(fields)
+                : new([
+                    .. fields.Select(field =>
+                        field.Path != "actor.login"
+                            ? field
+                            : configuration.ContractMutation switch
+                            {
+                                DynamicSafeContractMutation.WrongPath => field with
+                                {
+                                    Path = "actor.stable_id",
+                                },
+                                DynamicSafeContractMutation.WrongType => field with
+                                {
+                                    ValueType = AutomationPortValueType.Number,
+                                },
+                                DynamicSafeContractMutation.WrongNullability => field with
+                                {
+                                    Nullability = AutomationPortNullability.NonNullable,
+                                },
+                                DynamicSafeContractMutation.WrongProvenance => field with
+                                {
+                                    Provenance = AutomationValueProvenance.PublicChat,
+                                },
+                                _ => field,
+                            }
+                    ),
+                ]);
+        }
 
         private static IAutomationDefinition TextConsumer() =>
             new AutomationDefinition<SendChatActionConfiguration>(
@@ -4331,7 +4940,9 @@ public sealed class AutomationRuntimeTests
             HostFeatureFlags hostFeatures =
                 HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands,
             RecordingChatSender? chat = null,
-            IEnumerable<IAutomationPureNodeHandler>? handlers = null
+            IEnumerable<IAutomationPureNodeHandler>? handlers = null,
+            Func<AutomationCelTransformHandler, IAutomationPureNodeHandler>? transformDecorator =
+                null
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -4348,11 +4959,13 @@ public sealed class AutomationRuntimeTests
             );
             var expressions = new AutomationExpressionService();
             var transformHandler = new AutomationCelTransformHandler(new("test-cel-transform"));
+            var registeredTransformHandler =
+                transformDecorator?.Invoke(transformHandler) ?? transformHandler;
             var catalog = new AutomationCatalogService(
                 new([new CoreAutomationCatalogModule(), new DataContractAutomationModule()]),
                 features,
                 expressions,
-                (handlers ?? []).Append(transformHandler)
+                (handlers ?? []).Append(registeredTransformHandler)
             );
             overlays ??= new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
