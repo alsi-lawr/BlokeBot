@@ -17,6 +17,10 @@ public readonly record struct AutomationHostId(int Value);
 
 public readonly record struct AutomationVariableName(string Value);
 
+public readonly record struct AutomationCelIdentifier(string Value);
+
+public readonly record struct AutomationSafeTriggerFieldId(string Value);
+
 public readonly record struct AutomationCustomCommandId(int Value);
 
 public readonly record struct AutomationOverlayCueId(Guid Value);
@@ -175,6 +179,18 @@ public sealed record AutomationDefinitionDescriptor(
     AutomationTriggerContextRequirement? TriggerContextRequirement = null
 );
 
+public sealed record AutomationSafeTriggerFieldContract(
+    AutomationSafeTriggerFieldId Id,
+    string Path,
+    AutomationPortValueType ValueType,
+    AutomationPortNullability Nullability,
+    AutomationValueProvenance Provenance
+);
+
+public sealed record AutomationSafeTriggerSourceContract(
+    ImmutableArray<AutomationSafeTriggerFieldContract> Fields
+);
+
 public abstract record AutomationValidationTarget
 {
     private AutomationValidationTarget() { }
@@ -182,6 +198,8 @@ public abstract record AutomationValidationTarget
     public sealed record Definition : AutomationValidationTarget;
 
     public sealed record Field(AutomationConfigurationFieldId Id) : AutomationValidationTarget;
+
+    public sealed record Port(AutomationPortId Id) : AutomationValidationTarget;
 }
 
 public sealed record AutomationValidationError(AutomationValidationTarget Target, string Message);
@@ -435,7 +453,8 @@ public abstract record AutomationConfigurationCheck
 
     public sealed record Valid(
         AutomationDefinitionDescriptor Definition,
-        AutomationConfiguration Configuration
+        AutomationConfiguration Configuration,
+        AutomationSafeTriggerSourceContract? SafeTriggerSource = null
     ) : AutomationConfigurationCheck;
 
     public sealed record Invalid(ImmutableArray<AutomationValidationError> Errors)

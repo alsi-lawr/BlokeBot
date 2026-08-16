@@ -9,7 +9,8 @@ namespace BlokeBot.Core.Features.Automations;
 
 public sealed class AutomationRunQueryService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    HostFeatureService features
+    HostFeatureService features,
+    AutomationCatalogService catalog
 )
 {
     public async Task<AutomationRunQueryOutcome> ListAsync(
@@ -42,13 +43,15 @@ public sealed class AutomationRunQueryService(
             .Where(value => value.HostId == hostId.Value)
             .OrderByDescending(static value => value.StartedAtUtc)
             .ToArrayAsync(cancellationToken);
-        return new AutomationRunQueryOutcome.Available(
-            runs.Select(static run => Summary(run)).ToImmutableArray()
-        );
+        return new AutomationRunQueryOutcome.Available(runs.Select(Summary).ToImmutableArray());
     }
 
-    private static AutomationRunSummary Summary(AutomationFlowRun run) =>
-        new(
+    private AutomationRunSummary Summary(AutomationFlowRun run)
+    {
+        var frozen =
+            AutomationRuntimeSerialization.RestoreDefinition(run.DefinitionJson)
+            as AutomationDefinitionRestoreOutcome.Available;
+        return new(
             new(run.Id),
             new(run.FlowId),
             (AutomationFlowRunState)run.Status,
@@ -57,22 +60,38 @@ public sealed class AutomationRunQueryService(
                 ? new DateTimeOffset(completed, TimeSpan.Zero)
                 : null,
             run.NodeRuns.OrderBy(static value => value.Sequence)
-                .Select(static node => new AutomationNodeRunSummary(
+                .Select(node => new AutomationNodeRunSummary(
                     new(node.NodeId),
                     (AutomationNodeRunState)node.Status,
                     node.OutcomeCode,
                     node.CompletedAtUtc is { } completed
                         ? new DateTimeOffset(completed, TimeSpan.Zero)
                         : null,
-                    Diagnostics(node.OutputJson)
+                    Diagnostics(node.OutputJson, frozen?.Flow, node.NodeId)
                 ))
                 .ToImmutableArray()
         );
+    }
 
-    private static ImmutableArray<AutomationValueDiagnostic> Diagnostics(string? outputJson) =>
-        outputJson is not null
-        && AutomationDataValueSerialization.RestoreOutputs(outputJson)
-            is AutomationOutputRestoreOutcome.Available restored
+    private ImmutableArray<AutomationValueDiagnostic> Diagnostics(
+        string? outputJson,
+        AutomationRuntimeSerialization.PersistedFlow? flow,
+        Guid nodeId
+    )
+    {
+        var node = flow?.Nodes.SingleOrDefault(candidate => candidate.Id == nodeId);
+        return
+            outputJson is not null
+            && node is not null
+            && catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
+                is AutomationConfigurationCheck.Valid valid
+            && AutomationDataValueSerialization.RestoreOutputs(outputJson)
+                is AutomationOutputRestoreOutcome.Available restored
+            && AutomationPureHandlerRegistry.ValidCheckpointShape(
+                valid.Definition,
+                restored.Outputs
+            )
             ? AutomationDataValueSerialization.Diagnostics(restored.Outputs)
             : [];
+    }
 }

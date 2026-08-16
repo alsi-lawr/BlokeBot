@@ -81,24 +81,63 @@ internal static class AutomationDataValueSerialization
                     pair.Key,
                     AutomationPureHandlerRegistry.ValueType(pair.Value.Value),
                     pair.Value.Provenance,
-                    Display(pair.Value.Value)
+                    pair.Value.ValueFreeDiagnostic ? "available" : Display(pair.Value.Value),
+                    pair.Value.SafeTriggerFields
                 )),
         ];
 
     private static PersistedValue Persist(AutomationResolvedValue resolved) =>
         resolved.Value switch
         {
-            AutomationValue.Text text => Value("text", text.Value, resolved.Provenance),
-            AutomationValue.Number number => Value("number", number.Value, resolved.Provenance),
-            AutomationValue.Boolean boolean => Value("boolean", boolean.Value, resolved.Provenance),
+            AutomationValue.Text text => Value(
+                "text",
+                text.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
+            AutomationValue.Number number => Value(
+                "number",
+                number.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
+            AutomationValue.Boolean boolean => Value(
+                "boolean",
+                boolean.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
             AutomationValue.Timestamp timestamp => Value(
                 "timestamp",
                 timestamp.Value,
-                resolved.Provenance
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
             ),
-            AutomationValue.Actor actor => Value("actor", actor.Value, resolved.Provenance),
-            AutomationValue.Channel channel => Value("channel", channel.Value, resolved.Provenance),
-            AutomationValue.Stream stream => Value("stream", stream.Value, resolved.Provenance),
+            AutomationValue.Actor actor => Value(
+                "actor",
+                actor.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
+            AutomationValue.Channel channel => Value(
+                "channel",
+                channel.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
+            AutomationValue.Stream stream => Value(
+                "stream",
+                stream.Value,
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
+            ),
             AutomationValue.Arguments arguments => Value(
                 "arguments",
                 arguments
@@ -108,13 +147,17 @@ internal static class AutomationDataValueSerialization
                         Names(argument.Provenance)
                     ))
                     .ToImmutableArray(),
-                resolved.Provenance
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
             ),
             AutomationValue.Null nullValue
                 when nullValue.ValueType != AutomationPortValueType.Flow => Value(
                 "null",
                 nullValue.ValueType.ToString(),
-                resolved.Provenance
+                resolved.Provenance,
+                resolved.SafeTriggerFields,
+                resolved.ValueFreeDiagnostic
             ),
             _ => throw new InvalidOperationException("Unknown automation output value."),
         };
@@ -122,8 +165,24 @@ internal static class AutomationDataValueSerialization
     private static PersistedValue Value<T>(
         string kind,
         T value,
-        ImmutableArray<AutomationValueProvenance> provenance
-    ) => new(kind, JsonSerializer.Serialize(value, _options), Names(provenance));
+        ImmutableArray<AutomationValueProvenance> provenance,
+        ImmutableArray<AutomationSafeTriggerFieldId> safeTriggerFields,
+        bool valueFreeDiagnostic
+    ) =>
+        new(
+            kind,
+            JsonSerializer.Serialize(value, _options),
+            Names(provenance),
+            safeTriggerFields.IsDefaultOrEmpty
+                ? []
+                :
+                [
+                    .. safeTriggerFields
+                        .OrderBy(static field => field.Value, StringComparer.Ordinal)
+                        .Select(static field => field.Value),
+                ],
+            valueFreeDiagnostic
+        );
 
     private static bool TryRestore(PersistedValue? persisted, out AutomationResolvedValue value)
     {
@@ -133,6 +192,7 @@ internal static class AutomationDataValueSerialization
             || string.IsNullOrWhiteSpace(persisted.Kind)
             || persisted.ValueJson is null
             || !TryRestoreProvenance(persisted.Provenance, out var provenance)
+            || !TryRestoreSafeTriggerFields(persisted.SafeTriggerFields, out var safeTriggerFields)
         )
         {
             return false;
@@ -185,7 +245,7 @@ internal static class AutomationDataValueSerialization
                 return false;
             }
 
-            value = new(restored, provenance);
+            value = new(restored, provenance, safeTriggerFields, persisted.ValueFreeDiagnostic);
             return ValidRestoredValue(value);
         }
         catch (JsonException)
@@ -269,6 +329,34 @@ internal static class AutomationDataValueSerialization
         return provenance.Length == names.Length;
     }
 
+    private static bool TryRestoreSafeTriggerFields(
+        ImmutableArray<string> names,
+        out ImmutableArray<AutomationSafeTriggerFieldId> fields
+    )
+    {
+        fields = [];
+        if (names.IsDefaultOrEmpty)
+        {
+            return true;
+        }
+
+        if (
+            names.Any(static name => string.IsNullOrWhiteSpace(name) || name.Length > 96)
+            || names.Distinct(StringComparer.Ordinal).Count() != names.Length
+        )
+        {
+            return false;
+        }
+
+        fields =
+        [
+            .. names
+                .Order(StringComparer.Ordinal)
+                .Select(static name => new AutomationSafeTriggerFieldId(name)),
+        ];
+        return true;
+    }
+
     private static bool ValidRestoredValue(AutomationResolvedValue resolved)
     {
         if (resolved.Value is AutomationValue.Actor actor)
@@ -346,7 +434,9 @@ internal static class AutomationDataValueSerialization
     private sealed record PersistedValue(
         string Kind,
         string ValueJson,
-        ImmutableArray<string> Provenance
+        ImmutableArray<string> Provenance,
+        ImmutableArray<string> SafeTriggerFields,
+        bool ValueFreeDiagnostic
     );
 
     private sealed record PersistedArgument(

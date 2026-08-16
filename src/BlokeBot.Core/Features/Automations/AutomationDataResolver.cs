@@ -53,6 +53,8 @@ internal sealed class AutomationDataResolver(
     AutomationExpressionService expressions
 )
 {
+    private readonly AutomationSafeTriggerExpressionService _safeExpressions = new();
+
     internal async ValueTask<AutomationInputResolution> ResolveInputsAsync(
         AutomationHostId hostId,
         AutomationContext context,
@@ -84,7 +86,10 @@ internal sealed class AutomationDataResolver(
         if (
             AutomationRuntimeSerialization.RestoreInputBindings(consumer.InputBindingsJson)
                 is not AutomationInputBindingsRestoreOutcome.Available bindings
-            || !catalog.TryDescribe(new(consumer.DefinitionId), out var descriptor)
+            || catalog.ValidatePersistedDefinition(
+                AutomationRuntimeSerialization.Definition(consumer)
+            )
+                is not AutomationConfigurationCheck.Valid valid
         )
         {
             return new AutomationInputResolution.Failed("binding-invalid");
@@ -99,21 +104,44 @@ internal sealed class AutomationDataResolver(
             AutomationResolvedValue
         >();
         foreach (
-            var input in descriptor.Inputs.Where(static port =>
+            var input in valid.Definition.Inputs.Where(static port =>
                 port.ValueType != AutomationPortValueType.Flow && port.BindingFieldId is not null
             )
         )
         {
-            if (
-                !bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding)
-                || binding.Mode == AutomationInputBindingMode.Fixed
-            )
+            if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
             {
                 continue;
             }
 
             AutomationResolvedValue? resolved;
-            if (binding.Mode == AutomationInputBindingMode.Expression)
+            if (
+                binding.Mode == AutomationInputBindingMode.Fixed
+                && valid.Configuration is AutomationCelTransformConfiguration transform
+            )
+            {
+                var declared = transform.Inputs.Single(candidate => candidate.PortId == input.Id);
+                resolved = new(declared.FixedValue, [AutomationValueProvenance.Generated]);
+            }
+            else if (binding.Mode == AutomationInputBindingMode.Fixed)
+            {
+                continue;
+            }
+            else if (
+                binding.Mode == AutomationInputBindingMode.Expression
+                && valid.Configuration is AutomationCelTransformConfiguration
+            )
+            {
+                resolved = AutomationSafeTriggerViewResolver.TryBuild(
+                    catalog,
+                    flow,
+                    consumer,
+                    out var safeView
+                )
+                    ? _safeExpressions.Evaluate(binding.Expression!, input, safeView, context)
+                    : null;
+            }
+            else if (binding.Mode == AutomationInputBindingMode.Expression)
             {
                 resolved = ResolveExpression(binding.Expression!, input, context);
             }
@@ -177,8 +205,16 @@ internal sealed class AutomationDataResolver(
     )
     {
         if (
-            !catalog.TryDescribe(new(producer.DefinitionId), out var descriptor)
-            || descriptor.Outputs.SingleOrDefault(port => port.Id == outputPortId)
+            catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(producer))
+            is not AutomationConfigurationCheck.Valid valid
+        )
+        {
+            return null;
+        }
+
+        var descriptor = valid.Definition;
+        if (
+            descriptor.Outputs.SingleOrDefault(port => port.Id == outputPortId)
                 is not { } outputPort
             || outputPort.ValueType == AutomationPortValueType.Flow
         )
@@ -223,24 +259,17 @@ internal sealed class AutomationDataResolver(
         CancellationToken cancellationToken
     )
     {
+        if (resolving.Contains(producer.Id))
+        {
+            return null;
+        }
+
         var checkpoint = await checkpoints.ReadOrBeginAsync(producer, cancellationToken);
-        if (checkpoint is AutomationPureCheckpoint.Available available)
-        {
-            if (ValidCheckpoint(descriptor, available.Outputs))
-            {
-                return available.Outputs;
-            }
-
-            await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
-            return null;
-        }
-
-        if (checkpoint is AutomationPureCheckpoint.Failed || resolving.Contains(producer.Id))
+        if (checkpoint is AutomationPureCheckpoint.Failed)
         {
             return null;
         }
 
-        var nextResolving = resolving.Add(producer.Id);
         var check = await catalog.ValidatePersistedBeforeExecutionAsync(
             hostId,
             context,
@@ -256,6 +285,7 @@ internal sealed class AutomationDataResolver(
             return null;
         }
 
+        var nextResolving = resolving.Add(producer.Id);
         var inputs = await ResolveInputsAsync(
             hostId,
             context,
@@ -268,6 +298,17 @@ internal sealed class AutomationDataResolver(
         if (inputs is not AutomationInputResolution.Available resolvedInputs)
         {
             await checkpoints.FailAsync(producer, "input-resolution-failed", cancellationToken);
+            return null;
+        }
+
+        if (checkpoint is AutomationPureCheckpoint.Available available)
+        {
+            if (ValidCheckpoint(descriptor, available.Outputs, resolvedInputs.PortValues))
+            {
+                return available.Outputs;
+            }
+
+            await checkpoints.FailAsync(producer, "output-invalid", cancellationToken);
             return null;
         }
 
@@ -458,16 +499,29 @@ internal sealed class AutomationDataResolver(
 
     private static bool ValidCheckpoint(
         AutomationDefinitionDescriptor descriptor,
-        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs
+        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs,
+        ImmutableDictionary<AutomationPortId, AutomationResolvedValue> inputs
     ) =>
-        outputs.Count == descriptor.Outputs.Length
-        && descriptor.Outputs.All(port =>
-            port.ValueType != AutomationPortValueType.Flow
-            && port.Sensitivity == AutomationDataSensitivity.Safe
-            && outputs.TryGetValue(port.Id, out var output)
-            && Matches(port, output.Value)
-            && !output.Provenance.IsDefaultOrEmpty
-            && output.Provenance.All(Enum.IsDefined)
+        AutomationPureHandlerRegistry.ValidCheckpointShape(descriptor, outputs)
+        && (
+            descriptor.Kind != AutomationNodeKind.Transform
+            || outputs.Values.All(output =>
+                output.Provenance.SequenceEqual(
+                    inputs
+                        .Values.SelectMany(static input => input.Provenance)
+                        .Append(AutomationValueProvenance.Generated)
+                        .Distinct()
+                        .Order()
+                )
+                && output.SafeTriggerFields.SequenceEqual(
+                    inputs
+                        .Values.SelectMany(static input =>
+                            input.SafeTriggerFields.IsDefault ? [] : input.SafeTriggerFields
+                        )
+                        .Distinct()
+                        .OrderBy(static field => field.Value, StringComparer.Ordinal)
+                )
+            )
         );
 
     private static bool StableCode(string code) =>

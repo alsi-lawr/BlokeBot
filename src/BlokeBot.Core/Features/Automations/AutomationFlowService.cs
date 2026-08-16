@@ -428,21 +428,7 @@ public sealed class AutomationFlowService(
             errors.Add(new(null, "canvas-settings-invalid", "Select a supported flow layout."));
         }
 
-        var definitions = snapshot.Definitions.ToDictionary(static value => value.Id);
-        foreach (
-            var definitionId in draft.Nodes.Select(static node => new AutomationDefinitionId(
-                node.Definition.TypeId
-            ))
-        )
-        {
-            if (
-                !definitions.ContainsKey(definitionId)
-                && catalog.TryDescribe(definitionId, out var descriptor)
-            )
-            {
-                definitions.Add(definitionId, descriptor);
-            }
-        }
+        var definitions = new Dictionary<AutomationNodeId, AutomationDefinitionDescriptor>();
         var nodes = new Dictionary<AutomationNodeId, AutomationFlowDraftNode>();
         foreach (var node in draft.Nodes)
         {
@@ -463,19 +449,19 @@ public sealed class AutomationFlowService(
                 );
             }
 
-            await ValidateNodeAsync(
-                draft.HostId,
-                node,
-                definitions,
-                errors,
-                admission,
-                cancellationToken
-            );
+            await ValidateNodeAsync(draft.HostId, node, errors, admission, cancellationToken);
+            if (
+                catalog.ValidatePersistedDefinition(node.Definition)
+                is AutomationConfigurationCheck.Valid valid
+            )
+            {
+                definitions[node.Id] = valid.Definition;
+            }
         }
 
         var sources = nodes
             .Values.Where(node =>
-                definitions.TryGetValue(new(node.Definition.TypeId), out var definition)
+                definitions.TryGetValue(node.Id, out var definition)
                 && definition.Kind == AutomationNodeKind.Source
             )
             .ToArray();
@@ -552,7 +538,7 @@ public sealed class AutomationFlowService(
         {
             var kind =
                 nodes.TryGetValue(nodeId, out var node)
-                && definitions.TryGetValue(new(node.Definition.TypeId), out var definition)
+                && definitions.TryGetValue(node.Id, out var definition)
                     ? definition.Kind
                     : (AutomationNodeKind?)null;
             if (kind == AutomationNodeKind.Source && count != 0)
@@ -578,10 +564,7 @@ public sealed class AutomationFlowService(
             var reached = Reachable(sources.Select(static source => source.Id), flowAdjacency);
             foreach (
                 var nodeId in nodes.Keys.Where(nodeId =>
-                    definitions.TryGetValue(
-                        new(nodes[nodeId].Definition.TypeId),
-                        out var definition
-                    )
+                    definitions.TryGetValue(nodeId, out var definition)
                     && definition.Kind is AutomationNodeKind.Action or AutomationNodeKind.Control
                     && !reached.Contains(nodeId)
                 )
@@ -593,6 +576,7 @@ public sealed class AutomationFlowService(
 
         ValidateTriggerContexts(nodes, definitions, sources, flowAdjacency, errors);
         ValidateSourceAvailability(nodes, definitions, sources, draft.Edges, flowAdjacency, errors);
+        ValidateSafeTriggerExpressions(draft, definitions, errors);
 
         if (HasCycle(flowAdjacency))
         {
@@ -633,7 +617,7 @@ public sealed class AutomationFlowService(
 
     private static void ValidateTriggerContexts(
         IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
-        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
         IReadOnlyCollection<AutomationFlowDraftNode> sources,
         IReadOnlyDictionary<AutomationNodeId, List<AutomationNodeId>> adjacency,
         ImmutableArray<AutomationGraphError>.Builder errors
@@ -642,7 +626,7 @@ public sealed class AutomationFlowService(
         foreach (var node in nodes.Values)
         {
             if (
-                !definitions.TryGetValue(new(node.Definition.TypeId), out var definition)
+                !definitions.TryGetValue(node.Id, out var definition)
                 || definition.TriggerContextRequirement is not { } requirement
             )
             {
@@ -666,13 +650,11 @@ public sealed class AutomationFlowService(
     private async Task ValidateNodeAsync(
         AutomationHostId hostId,
         AutomationFlowDraftNode node,
-        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
         ImmutableArray<AutomationGraphError>.Builder errors,
         AutomationGraphAdmission admission,
         CancellationToken cancellationToken
     )
     {
-        var definitionId = new AutomationDefinitionId(node.Definition.TypeId);
         var check = await catalog.ValidatePersistedForSaveAsync(
             hostId,
             node.Definition,
@@ -687,7 +669,8 @@ public sealed class AutomationFlowService(
                         node.Id,
                         "configuration-invalid",
                         error.Message,
-                        error.Target is AutomationValidationTarget.Field field ? field.Id : null
+                        error.Target is AutomationValidationTarget.Field field ? field.Id : null,
+                        error.Target is AutomationValidationTarget.Port port ? port.Id : null
                     )
                 );
             }
@@ -823,10 +806,7 @@ public sealed class AutomationFlowService(
             }
         }
 
-        if (!definitions.TryGetValue(definitionId, out var descriptor))
-        {
-            return;
-        }
+        var descriptor = valid.Definition;
 
         foreach (var (fieldId, binding) in node.InputBindings)
         {
@@ -860,6 +840,7 @@ public sealed class AutomationFlowService(
             }
             else if (
                 binding.Expression is { } expression
+                && descriptor.Kind != AutomationNodeKind.Transform
                 && (
                     expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
                     || expressions.Validate(expression) is AutomationExpressionCheck.Invalid
@@ -878,16 +859,79 @@ public sealed class AutomationFlowService(
         }
     }
 
+    private void ValidateSafeTriggerExpressions(
+        AutomationFlowDraft draft,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
+        ImmutableArray<AutomationGraphError>.Builder errors
+    )
+    {
+        var flow = SampleFlow(draft);
+        var service = new AutomationSafeTriggerExpressionService();
+        foreach (var node in draft.Nodes)
+        {
+            if (
+                !definitions.TryGetValue(node.Id, out var definition)
+                || definition.Kind != AutomationNodeKind.Transform
+                || flow.Nodes.FirstOrDefault(candidate => candidate.Id == node.Id.Value)
+                    is not { } persisted
+                || !AutomationSafeTriggerViewResolver.TryBuild(
+                    catalog,
+                    flow,
+                    persisted,
+                    out var safeView
+                )
+            )
+            {
+                continue;
+            }
+
+            foreach (var input in definition.Inputs)
+            {
+                if (
+                    input.BindingFieldId is not { } fieldId
+                    || !node.InputBindings.TryGetValue(fieldId, out var binding)
+                    || binding.Mode != AutomationInputBindingMode.Expression
+                    || binding.Expression is null
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !service.Validate(
+                        binding.Expression,
+                        input,
+                        safeView,
+                        out _,
+                        out var invalidSafeField
+                    )
+                )
+                {
+                    errors.Add(
+                        new(
+                            node.Id,
+                            "binding-expression-unavailable",
+                            "Use only Safe trigger fields available on every Flow path.",
+                            fieldId,
+                            input.Id,
+                            invalidSafeField
+                        )
+                    );
+                }
+            }
+        }
+    }
+
     private static void ValidateBindings(
         IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
-        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
         IReadOnlyDictionary<(AutomationNodeId, AutomationPortId), int> dataIncoming,
         ImmutableArray<AutomationGraphError>.Builder errors
     )
     {
         foreach (var node in nodes.Values)
         {
-            if (!definitions.TryGetValue(new(node.Definition.TypeId), out var definition))
+            if (!definitions.TryGetValue(node.Id, out var definition))
             {
                 continue;
             }
@@ -945,13 +989,13 @@ public sealed class AutomationFlowService(
         AutomationFlowDraftEdge edge,
         AutomationFlowDraftNode source,
         AutomationFlowDraftNode target,
-        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
         ImmutableArray<AutomationGraphError>.Builder errors
     )
     {
         if (
-            !definitions.TryGetValue(new(source.Definition.TypeId), out var sourceDefinition)
-            || !definitions.TryGetValue(new(target.Definition.TypeId), out var targetDefinition)
+            !definitions.TryGetValue(source.Id, out var sourceDefinition)
+            || !definitions.TryGetValue(target.Id, out var targetDefinition)
         )
         {
             return;
@@ -962,7 +1006,12 @@ public sealed class AutomationFlowService(
         if (output is null || input is null)
         {
             errors.Add(
-                new(edge.TargetNodeId, "port-missing", "Reconnect this node to an available port.")
+                new(
+                    edge.TargetNodeId,
+                    "port-missing",
+                    "Reconnect this node to an available port.",
+                    PortId: edge.TargetPortId
+                )
             );
         }
         else if (edge.Kind == AutomationEdgeKind.Flow)
@@ -976,7 +1025,8 @@ public sealed class AutomationFlowService(
                     new(
                         edge.TargetNodeId,
                         "flow-port-incompatible",
-                        "Connect Flow outputs only to Flow inputs."
+                        "Connect Flow outputs only to Flow inputs.",
+                        PortId: edge.TargetPortId
                     )
                 );
             }
@@ -991,7 +1041,8 @@ public sealed class AutomationFlowService(
                 new(
                     edge.TargetNodeId,
                     "data-type-incompatible",
-                    "Connect Data ports that have the same exact type."
+                    "Connect Data ports that have the same exact type.",
+                    PortId: edge.TargetPortId
                 )
             );
         }
@@ -1001,7 +1052,8 @@ public sealed class AutomationFlowService(
                 new(
                     edge.TargetNodeId,
                     "data-source-incompatible",
-                    "Use a trigger, Value, Transform, or Control output as Data."
+                    "Use a trigger, Value, Transform, or Control output as Data.",
+                    PortId: edge.TargetPortId
                 )
             );
         }
@@ -1014,7 +1066,8 @@ public sealed class AutomationFlowService(
                 new(
                     edge.TargetNodeId,
                     "data-nullability-incompatible",
-                    "Connect this nullable output to an input that accepts null."
+                    "Connect this nullable output to an input that accepts null.",
+                    PortId: edge.TargetPortId
                 )
             );
         }
@@ -1027,7 +1080,8 @@ public sealed class AutomationFlowService(
                 new(
                     edge.TargetNodeId,
                     "data-sensitivity-incompatible",
-                    "This input cannot accept Sensitive Data."
+                    "This input cannot accept Sensitive Data.",
+                    PortId: edge.TargetPortId
                 )
             );
         }
@@ -1035,7 +1089,7 @@ public sealed class AutomationFlowService(
 
     private static void ValidateSourceAvailability(
         IReadOnlyDictionary<AutomationNodeId, AutomationFlowDraftNode> nodes,
-        IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
+        IReadOnlyDictionary<AutomationNodeId, AutomationDefinitionDescriptor> definitions,
         IReadOnlyCollection<AutomationFlowDraftNode> sources,
         IEnumerable<AutomationFlowDraftEdge> edges,
         IReadOnlyDictionary<AutomationNodeId, List<AutomationNodeId>> flowAdjacency,
@@ -1055,7 +1109,7 @@ public sealed class AutomationFlowService(
         {
             if (
                 !nodes.TryGetValue(edge.TargetNodeId, out var target)
-                || !definitions.TryGetValue(new(target.Definition.TypeId), out var targetDefinition)
+                || !definitions.TryGetValue(target.Id, out var targetDefinition)
                 || targetDefinition.Kind
                     is not (AutomationNodeKind.Action or AutomationNodeKind.Control)
             )

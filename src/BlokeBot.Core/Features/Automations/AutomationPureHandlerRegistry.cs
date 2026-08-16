@@ -44,8 +44,13 @@ internal sealed class AutomationPureHandlerRegistry
                     port.ValueType == AutomationPortValueType.Flow
                     || port.Sensitivity != AutomationDataSensitivity.Safe
                 )
-                || !Matches(definition.Descriptor.Inputs, contract.Inputs)
-                || !Matches(definition.Descriptor.Outputs, contract.Outputs)
+                || (
+                    contract.UsesEffectiveDescriptor
+                        ? definition is not IAutomationEffectiveDefinition
+                            || !((IAutomationEffectiveDefinition)definition).UsesEffectiveDescriptor
+                        : !Matches(definition.Descriptor.Inputs, contract.Inputs)
+                            || !Matches(definition.Descriptor.Outputs, contract.Outputs)
+                )
             )
             {
                 throw new AutomationCatalogRegistrationException(
@@ -78,7 +83,15 @@ internal sealed class AutomationPureHandlerRegistry
         ImmutableHashSet<AutomationValueProvenance> allowedProvenance =
             descriptor.Kind == AutomationNodeKind.Value
                 ? [AutomationValueProvenance.Generated]
-                : inputs.Values.SelectMany(static value => value.Provenance).ToImmutableHashSet();
+                : inputs
+                    .Values.SelectMany(static value => value.Provenance)
+                    .Append(AutomationValueProvenance.Generated)
+                    .ToImmutableHashSet();
+        var allowedSafeTriggerFields = inputs
+            .Values.SelectMany(static value =>
+                value.SafeTriggerFields.IsDefault ? [] : value.SafeTriggerFields
+            )
+            .ToImmutableHashSet();
         var validated = ImmutableDictionary.CreateBuilder<
             AutomationPortId,
             AutomationResolvedValue
@@ -90,14 +103,33 @@ internal sealed class AutomationPureHandlerRegistry
                 || port.ValueType == AutomationPortValueType.Flow
                 || port.Sensitivity != AutomationDataSensitivity.Safe
                 || !Matches(port, output.Value)
-                || !ValidProvenance(output.Provenance, allowedProvenance)
+                || !ValidProvenance(
+                    output.Provenance,
+                    allowedProvenance,
+                    descriptor.Kind == AutomationNodeKind.Transform
+                )
+                || !ValidSafeTriggerFields(
+                    output.SafeTriggerFields,
+                    allowedSafeTriggerFields,
+                    descriptor.Kind == AutomationNodeKind.Transform
+                )
                 || !ValidArguments(output, allowedProvenance)
             )
             {
                 return false;
             }
 
-            validated.Add(port.Id, output with { Provenance = Normalize(output.Provenance) });
+            validated.Add(
+                port.Id,
+                output with
+                {
+                    Provenance = Normalize(output.Provenance),
+                    SafeTriggerFields = Normalize(output.SafeTriggerFields),
+                    ValueFreeDiagnostic =
+                        descriptor.Kind == AutomationNodeKind.Transform
+                        || output.ValueFreeDiagnostic,
+                }
+            );
         }
 
         outputs = validated.ToImmutable();
@@ -118,6 +150,28 @@ internal sealed class AutomationPureHandlerRegistry
             AutomationValue.Null nullValue => nullValue.ValueType,
             _ => throw new InvalidOperationException("Unknown automation value type."),
         };
+
+    internal static bool ValidCheckpointShape(
+        AutomationDefinitionDescriptor descriptor,
+        IReadOnlyDictionary<AutomationPortId, AutomationResolvedValue> outputs
+    ) =>
+        outputs.Count == descriptor.Outputs.Length
+        && descriptor.Outputs.All(port =>
+            port.ValueType != AutomationPortValueType.Flow
+            && port.Sensitivity == AutomationDataSensitivity.Safe
+            && outputs.TryGetValue(port.Id, out var output)
+            && Matches(port, output.Value)
+            && !output.Provenance.IsDefaultOrEmpty
+            && output.Provenance.All(Enum.IsDefined)
+            && (descriptor.Kind != AutomationNodeKind.Transform || output.ValueFreeDiagnostic)
+            && (
+                output.SafeTriggerFields.IsDefaultOrEmpty
+                || output
+                    .SafeTriggerFields.Select(static field => field.Value)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count() == output.SafeTriggerFields.Length
+            )
+        );
 
     private static bool Matches(
         ImmutableArray<AutomationPortMetadata> ports,
@@ -143,11 +197,13 @@ internal sealed class AutomationPureHandlerRegistry
 
     private static bool ValidProvenance(
         ImmutableArray<AutomationValueProvenance> provenance,
-        ImmutableHashSet<AutomationValueProvenance> allowed
+        ImmutableHashSet<AutomationValueProvenance> allowed,
+        bool exact
     ) =>
         !provenance.IsDefaultOrEmpty
         && provenance.All(Enum.IsDefined)
-        && provenance.All(allowed.Contains);
+        && provenance.All(allowed.Contains)
+        && (!exact || provenance.SequenceEqual(allowed.Order()));
 
     private static bool ValidArguments(
         AutomationResolvedValue output,
@@ -197,4 +253,28 @@ internal sealed class AutomationPureHandlerRegistry
     private static ImmutableArray<AutomationValueProvenance> Normalize(
         ImmutableArray<AutomationValueProvenance> provenance
     ) => [.. provenance.Distinct().Order()];
+
+    private static bool ValidSafeTriggerFields(
+        ImmutableArray<AutomationSafeTriggerFieldId> fields,
+        ImmutableHashSet<AutomationSafeTriggerFieldId> allowed,
+        bool exact
+    ) =>
+        (fields.IsDefaultOrEmpty || fields.All(allowed.Contains))
+        && (
+            !exact
+            || (
+                fields.IsDefaultOrEmpty
+                    ? allowed.IsEmpty
+                    : fields.SequenceEqual(
+                        allowed.OrderBy(static field => field.Value, StringComparer.Ordinal)
+                    )
+            )
+        );
+
+    private static ImmutableArray<AutomationSafeTriggerFieldId> Normalize(
+        ImmutableArray<AutomationSafeTriggerFieldId> fields
+    ) =>
+        fields.IsDefaultOrEmpty
+            ? []
+            : [.. fields.Distinct().OrderBy(static field => field.Value, StringComparer.Ordinal)];
 }

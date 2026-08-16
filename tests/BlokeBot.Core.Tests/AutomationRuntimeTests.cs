@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text.Json;
 using BlokeBot.Core.Features.Automations;
 using BlokeBot.Core.Features.HostedChannels;
@@ -1028,7 +1029,11 @@ public sealed class AutomationRuntimeTests
         summary
             .Nodes.Single(node => node.NodeId == projector.Id)
             .Outputs.ShouldHaveSingleItem()
-            .Provenance.ShouldBe([AutomationValueProvenance.PublicDisplayName]);
+            .Provenance.ShouldBe([
+                AutomationValueProvenance.Generated,
+                AutomationValueProvenance.PublicDisplayName,
+                AutomationValueProvenance.PublicLogin,
+            ]);
 
         await using var stableId = await RuntimeFixture.CreateAsync();
         var idSource = Node("custom-command", """{"custom-command-id":7}""");
@@ -1104,7 +1109,7 @@ public sealed class AutomationRuntimeTests
         completed
             .Nodes.Single(node => node.NodeId == actionNode.Id)
             .ResolvedInputs.ShouldHaveSingleItem()
-            .DisplayValue.ShouldBe("Sample Viewer");
+            .DisplayValue.ShouldBe("available");
         sample.Chat.Messages.ShouldBeEmpty();
         await using var db = await sample.Database.CreateDbContextAsync();
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
@@ -1270,6 +1275,1316 @@ public sealed class AutomationRuntimeTests
             .SingleAsync(run => run.Id == runId.Value);
         failed.Status.ShouldBe(AutomationFlowRunStatus.Failed);
         failed.NodeRuns.ShouldContain(static node => node.OutcomeCode == "definition-invalid");
+    }
+
+    [Test]
+    public async Task CelTransform_EffectiveDescriptorRoundTripsAndRetainsRepairableGraphState()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var configuration = TransformJson(
+            [
+                new(
+                    "amount-input",
+                    "amount",
+                    "Amount",
+                    "amount-binding",
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    12.5m
+                ),
+            ],
+            [
+                new(
+                    "text-output",
+                    "Formatted amount",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "format_number(amount, 2)"
+                ),
+            ]
+        );
+        var transform = Node(
+            "test-cel-transform",
+            configuration,
+            bindings: Bindings(
+                "amount-binding",
+                AutomationInputBindingMode.Connected,
+                new(AutomationExpressionLanguage.CurrentVersion, "'inactive-expression'")
+            )
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var draft = Draft(
+            fixture.HostId,
+            [source, transform, action],
+            [
+                Edge(source, "flow", action),
+                Edge(source, "value", transform, "amount-input", AutomationEdgeKind.Data),
+                Edge(transform, "text-output", action, "message", AutomationEdgeKind.Data),
+            ]
+        ) with
+        {
+            IsEnabled = false,
+        };
+
+        var initialValidation = await fixture.Flows.ValidateDraftAsync(
+            draft,
+            CancellationToken.None
+        );
+        _ = initialValidation.ShouldBeOfType<AutomationFlowValidationOutcome.Valid>(
+            JsonSerializer.Serialize(initialValidation)
+        );
+        var saved = (
+            await fixture.Flows.SaveAsync(draft, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+        var restored = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == saved.FlowId)
+            .Draft;
+        _ = (
+            await fixture.Flows.SetEnabledAsync(
+                new(fixture.HostId),
+                saved.FlowId,
+                enabled: true,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationFlowEnableOutcome.Updated>();
+        var restoredTransform = restored.Nodes.Single(node => node.Id == transform.Id);
+        restoredTransform.Definition.Configuration.GetRawText().ShouldBe(configuration);
+        restoredTransform.InputBindings.ShouldBe(transform.InputBindings);
+        restored.Edges.ShouldBe(draft.Edges, ignoreOrder: true);
+
+        var effective = fixture
+            .Catalog.ValidatePersistedDefinition(restoredTransform.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        effective.Definition.Inputs.ShouldHaveSingleItem().Id.ShouldBe(new("amount-input"));
+        effective.Definition.Inputs[0].BindingFieldId.ShouldBe(new("amount-binding"));
+        effective.Definition.Outputs.ShouldHaveSingleItem().Id.ShouldBe(new("text-output"));
+        fixture
+            .Catalog.TryDescribe(new("test-text-value"), out var staticDescriptor)
+            .ShouldBeTrue();
+        staticDescriptor.Outputs.ShouldHaveSingleItem().Id.ShouldBe(new("value"));
+
+        var renamedJson = TransformJson(
+            [
+                new(
+                    "amount-input",
+                    "amount",
+                    "Renamed amount",
+                    "amount-binding",
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    99m
+                ),
+            ],
+            [
+                new(
+                    "text-output",
+                    "Renamed result",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "format_number(amount, 2)"
+                ),
+            ]
+        );
+        var renamed = restored with
+        {
+            Nodes = restored
+                .Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? Node("test-cel-transform", renamedJson, bindings: node.InputBindings) with
+                        {
+                            Id = node.Id,
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(renamed, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+        renamed.Edges.ShouldBe(restored.Edges, ignoreOrder: true);
+
+        var removedInput = renamed with
+        {
+            Nodes = renamed
+                .Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? Node(
+                            "test-cel-transform",
+                            TransformJson(
+                                [],
+                                [
+                                    new(
+                                        "text-output",
+                                        "Renamed result",
+                                        AutomationPortValueType.Text,
+                                        AutomationPortNullability.NonNullable,
+                                        "'literal'"
+                                    ),
+                                ]
+                            ),
+                            bindings: node.InputBindings
+                        ) with
+                        {
+                            Id = node.Id,
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        var removedErrors = (
+            await fixture.Flows.ValidateDraftAsync(removedInput, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        removedErrors.Errors.Select(static error => error.Code).ShouldContain("port-missing");
+        removedErrors
+            .Errors.Select(static error => error.Code)
+            .ShouldContain("binding-field-invalid");
+        removedInput.Edges.ShouldBe(renamed.Edges, ignoreOrder: true);
+        removedInput
+            .Nodes.Single(node => node.Id == transform.Id)
+            .InputBindings.ShouldContainKey(new("amount-binding"));
+
+        var changedContracts = renamed with
+        {
+            Nodes = renamed
+                .Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? Node(
+                            "test-cel-transform",
+                            TransformJson(
+                                [
+                                    new(
+                                        "amount-input",
+                                        "amount",
+                                        "Amount",
+                                        "amount-binding",
+                                        AutomationPortValueType.Text,
+                                        AutomationPortNullability.NonNullable,
+                                        "12.5"
+                                    ),
+                                ],
+                                [
+                                    new(
+                                        "text-output",
+                                        "Result",
+                                        AutomationPortValueType.Text,
+                                        AutomationPortNullability.Nullable,
+                                        "amount"
+                                    ),
+                                ]
+                            ),
+                            bindings: node.InputBindings
+                        ) with
+                        {
+                            Id = node.Id,
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        var changedErrors = (
+            await fixture.Flows.ValidateDraftAsync(changedContracts, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        changedErrors
+            .Errors.Select(static error => error.Code)
+            .ShouldContain("data-type-incompatible");
+        changedErrors
+            .Errors.Select(static error => error.Code)
+            .ShouldContain("data-nullability-incompatible");
+        changedContracts.Edges.ShouldBe(renamed.Edges, ignoreOrder: true);
+
+        var duplicateIdentity = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "same-port",
+                        "format_number",
+                        "Invalid",
+                        "same-field",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        1m
+                    ),
+                ],
+                [
+                    new(
+                        "same-port",
+                        "Invalid",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'x'"
+                    ),
+                ]
+            )
+        );
+        _ = fixture
+            .Catalog.ValidatePersistedDefinition(duplicateIdentity.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+    }
+
+    [Test]
+    public async Task CelTransform_RestrictedInputAdmissionUsesResolvedAstAndFrozenSafeView()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-number-source", "{}");
+        var transform = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "name-input",
+                        "name",
+                        "Name",
+                        "name-binding",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.Nullable,
+                        null
+                    ),
+                ],
+                [
+                    new(
+                        "name-output",
+                        "Name",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "${name}"
+                    ),
+                ]
+            ),
+            bindings: Bindings(
+                "name-binding",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "actor.display_name")
+            )
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var draft = Draft(
+            fixture.HostId,
+            [source, transform, action],
+            [
+                Edge(source, "flow", action),
+                Edge(transform, "name-output", action, "message", AutomationEdgeKind.Data),
+            ]
+        ) with
+        {
+            IsEnabled = false,
+        };
+
+        var restrictedValidation = await fixture.Flows.ValidateDraftAsync(
+            draft,
+            CancellationToken.None
+        );
+        _ = restrictedValidation.ShouldBeOfType<AutomationFlowValidationOutcome.Valid>(
+            restrictedValidation is AutomationFlowValidationOutcome.Invalid invalidOutcome
+                ? string.Join(
+                    "; ",
+                    invalidOutcome.Errors.Select(static error =>
+                        $"{error.Code}:{error.FieldId?.Value}:{error.Message}"
+                    )
+                )
+                : restrictedValidation.GetType().Name
+        );
+        var sample = (
+            await fixture.Flows.RunSampleAsync(draft, source.Id, CancellationToken.None)
+        ).ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        sample
+            .Nodes.Single(node => node.NodeId == action.Id)
+            .ResolvedInputs.ShouldHaveSingleItem()
+            .DisplayValue.ShouldBe("available");
+
+        foreach (
+            var rejected in new[]
+            {
+                "event.source",
+                "timestamps.occurred_at",
+                "actor.twitch_user_id",
+                "private_value",
+                "name",
+                "name_output",
+                "services.send('x')",
+            }
+        )
+        {
+            var invalid = draft with
+            {
+                Nodes = draft
+                    .Nodes.Select(node =>
+                        node.Id == transform.Id
+                            ? node with
+                            {
+                                InputBindings = Bindings(
+                                    "name-binding",
+                                    AutomationInputBindingMode.Expression,
+                                    new(AutomationExpressionLanguage.CurrentVersion, rejected)
+                                ),
+                            }
+                            : node
+                    )
+                    .ToImmutableArray(),
+            };
+            await AssertValidationCode(fixture, invalid, "binding-expression-unavailable");
+        }
+
+        var literal = draft with
+        {
+            Nodes = draft
+                .Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? node with
+                        {
+                            InputBindings = Bindings(
+                                "name-binding",
+                                AutomationInputBindingMode.Expression,
+                                new(
+                                    AutomationExpressionLanguage.CurrentVersion,
+                                    "'actor.display_name'"
+                                )
+                            ),
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(literal, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        var projected = draft with
+        {
+            Nodes = draft
+                .Nodes.Select(node =>
+                    node.Id == transform.Id
+                        ? node with
+                        {
+                            InputBindings = Bindings(
+                                "name-binding",
+                                AutomationInputBindingMode.Expression,
+                                new(AutomationExpressionLanguage.CurrentVersion, "target_id")
+                            ),
+                        }
+                        : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.ValidateDraftAsync(projected, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Valid>();
+
+        foreach (
+            var (valueType, nullability) in new[]
+            {
+                (AutomationPortValueType.Number, AutomationPortNullability.Nullable),
+                (AutomationPortValueType.Text, AutomationPortNullability.NonNullable),
+            }
+        )
+        {
+            var wrongContract = draft with
+            {
+                Nodes = draft
+                    .Nodes.Select(node =>
+                        node.Id == transform.Id
+                            ? Node(
+                                "test-cel-transform",
+                                TransformJson(
+                                    [
+                                        new(
+                                            "name-input",
+                                            "name",
+                                            "Name",
+                                            "name-binding",
+                                            valueType,
+                                            nullability,
+                                            valueType == AutomationPortValueType.Number
+                                                ? 1m
+                                                : "name"
+                                        ),
+                                    ],
+                                    [
+                                        new(
+                                            "name-output",
+                                            "Name",
+                                            AutomationPortValueType.Text,
+                                            AutomationPortNullability.NonNullable,
+                                            "'ok'"
+                                        ),
+                                    ]
+                                ),
+                                bindings: Bindings(
+                                    "name-binding",
+                                    AutomationInputBindingMode.Expression,
+                                    new(
+                                        AutomationExpressionLanguage.CurrentVersion,
+                                        "actor.display_name"
+                                    )
+                                )
+                            ) with
+                            {
+                                Id = node.Id,
+                            }
+                            : node
+                    )
+                    .ToImmutableArray(),
+            };
+            await AssertValidationCode(fixture, wrongContract, "binding-expression-unavailable");
+        }
+
+        var secondSource = Node("custom-command", """{"custom-command-id":7}""");
+        var unavailablePath = draft with
+        {
+            Nodes = draft.Nodes.Add(secondSource),
+            Edges = draft.Edges.Add(Edge(secondSource, "flow", action)),
+        };
+        var unavailable = (
+            await fixture.Flows.ValidateDraftAsync(unavailablePath, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowValidationOutcome.Invalid>();
+        var unavailableDiagnostic = unavailable.Errors.Single(error =>
+            error.Code == "binding-expression-unavailable"
+        );
+        unavailableDiagnostic.FieldId.ShouldBe(new("name-binding"));
+        unavailableDiagnostic.PortId.ShouldBe(new("name-input"));
+        unavailableDiagnostic.SafeTriggerFieldId.ShouldBe(new("actor-display-name"));
+        unavailableDiagnostic.Message.ShouldNotContain("actor.display_name");
+        unavailableDiagnostic.Message.ShouldNotContain("Viewer");
+
+        var outputIdentifierText = Node(
+            "test-cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "literal-output",
+                        "Literal",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'actor.display_name'"
+                    ),
+                ]
+            )
+        );
+        _ = fixture
+            .Catalog.ValidatePersistedDefinition(outputIdentifierText.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        foreach (
+            var rejectedOutput in new[]
+            {
+                "actor.display_name",
+                "Hello ${actor.display_name}",
+                "event.source",
+                "other_output",
+                "{'value': 'x'}",
+                "['x']",
+                "1",
+                "null",
+            }
+        )
+        {
+            var invalidOutput = Node(
+                "test-cel-transform",
+                TransformJson(
+                    [],
+                    [
+                        new(
+                            "invalid-output",
+                            "Invalid",
+                            AutomationPortValueType.Text,
+                            AutomationPortNullability.NonNullable,
+                            rejectedOutput
+                        ),
+                    ]
+                )
+            );
+            _ = fixture
+                .Catalog.ValidatePersistedDefinition(invalidOutput.Definition)
+                .ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+        }
+        var compositeDeclaration = Node(
+            "test-cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "actor-output",
+                        "Actor",
+                        AutomationPortValueType.Actor,
+                        AutomationPortNullability.Nullable,
+                        "null"
+                    ),
+                ]
+            )
+        );
+        _ = fixture
+            .Catalog.ValidatePersistedDefinition(compositeDeclaration.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+
+        var nullableNull = Node(
+            "test-cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "nullable-output",
+                        "Nullable",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.Nullable,
+                        "null"
+                    ),
+                ]
+            )
+        );
+        _ = fixture
+            .Catalog.ValidatePersistedDefinition(nullableNull.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        var compositeInput = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "actor-input",
+                        "safe_actor",
+                        "Actor",
+                        "actor-binding",
+                        AutomationPortValueType.Actor,
+                        AutomationPortNullability.NonNullable,
+                        new Dictionary<string, object?>
+                        {
+                            ["login"] = "viewer",
+                            ["display-name"] = "Viewer",
+                        }
+                    ),
+                ],
+                [
+                    new(
+                        "actor-name-output",
+                        "Actor name",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "safe_actor.display_name"
+                    ),
+                ]
+            )
+        );
+        _ = fixture
+            .Catalog.ValidatePersistedDefinition(compositeInput.Definition)
+            .ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+
+        var duplicateNode = draft with { Nodes = draft.Nodes.Add(transform) };
+        await AssertValidationCode(fixture, duplicateNode, "node-id-invalid");
+        var danglingEdge = draft with
+        {
+            Edges = draft.Edges.Add(
+                draft.Edges[0] with
+                {
+                    Id = Guid.NewGuid(),
+                    SourceNodeId = new(Guid.NewGuid()),
+                }
+            ),
+        };
+        await AssertValidationCode(fixture, danglingEdge, "edge-node-missing");
+    }
+
+    [Test]
+    public void CelTransform_EvaluatesOnlyExactScalarOutputsAndTypedNull()
+    {
+        var timestamp = new DateTimeOffset(2026, 8, 16, 12, 0, 0, TimeSpan.Zero);
+        var configuration = new AutomationCelTransformConfiguration(
+            [
+                new(
+                    new("actor-input"),
+                    new("safe_actor"),
+                    "Actor",
+                    new("actor-binding"),
+                    AutomationPortValueType.Actor,
+                    AutomationPortNullability.NonNullable,
+                    new AutomationValue.Actor(new("viewer", "Viewer"))
+                ),
+            ],
+            [
+                new(
+                    new("text"),
+                    "Text",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "'value'"
+                ),
+                new(
+                    new("number"),
+                    "Number",
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    "1"
+                ),
+                new(
+                    new("boolean"),
+                    "Boolean",
+                    AutomationPortValueType.Boolean,
+                    AutomationPortNullability.NonNullable,
+                    "true"
+                ),
+                new(
+                    new("timestamp"),
+                    "Timestamp",
+                    AutomationPortValueType.Timestamp,
+                    AutomationPortNullability.NonNullable,
+                    $"timestamp('{timestamp:O}')"
+                ),
+                new(
+                    new("nullable"),
+                    "Nullable",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    "null"
+                ),
+                new(
+                    new("actor-name"),
+                    "Actor name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "safe_actor.display_name"
+                ),
+            ]
+        );
+
+        var outputs = new AutomationTransformCelService()
+            .Execute(
+                configuration,
+                ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                    new("actor-input"),
+                    new(
+                        new AutomationValue.Actor(new("viewer", "Viewer")),
+                        [AutomationValueProvenance.Generated]
+                    )
+                )
+            )
+            .ShouldBeOfType<AutomationPureNodeResult.Succeeded>()
+            .Outputs;
+        outputs[new("text")].Value.ShouldBe(new AutomationValue.Text("value"));
+        outputs[new("number")].Value.ShouldBe(new AutomationValue.Number(1m));
+        outputs[new("boolean")].Value.ShouldBe(new AutomationValue.Boolean(true));
+        outputs[new("timestamp")].Value.ShouldBe(new AutomationValue.Timestamp(timestamp));
+        outputs[new("nullable")]
+            .Value.ShouldBe(new AutomationValue.Null(AutomationPortValueType.Text));
+        outputs[new("actor-name")].Value.ShouldBe(new AutomationValue.Text("Viewer"));
+        outputs.ShouldAllBe(static output =>
+            output.Value.Provenance.Length == 1
+            && output.Value.Provenance[0] == AutomationValueProvenance.Generated
+        );
+    }
+
+    [Test]
+    [NotInParallel]
+    public void CelTransform_FormatNumberUsesInvocationCultureAndExactLongPrecision()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var declaredInputs = new[]
+        {
+            new AutomationCelTransformInput(
+                new("amount-input"),
+                new("amount"),
+                "Amount",
+                new("amount-binding"),
+                AutomationPortValueType.Number,
+                AutomationPortNullability.NonNullable,
+                new AutomationValue.Number(1m)
+            ),
+        }.ToImmutableDictionary(static input => input.Identifier.Value, StringComparer.Ordinal);
+        foreach (var precision in new[] { "0", "2", "6" })
+        {
+            AutomationTransformCelService
+                .ValidateOutput(
+                    new(
+                        new("output"),
+                        "Output",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        $"format_number(amount, {precision})"
+                    ),
+                    declaredInputs
+                )
+                .ShouldBeTrue();
+        }
+        foreach (var precision in new[] { "-1", "7", "2.0", "null", "'2'" })
+        {
+            AutomationTransformCelService
+                .ValidateOutput(
+                    new(
+                        new("output"),
+                        "Output",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        $"format_number(amount, {precision})"
+                    ),
+                    declaredInputs
+                )
+                .ShouldBeFalse();
+        }
+
+        try
+        {
+            var service = new AutomationTransformCelService();
+            var inputs = ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                new("amount-input"),
+                new(new AutomationValue.Number(-1234.5m), [AutomationValueProvenance.Generated])
+            );
+            foreach (var (culture, general) in new[] { ("en-GB", "-1234.5"), ("de-DE", "-1234,5") })
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+                foreach (var precision in Enumerable.Range(0, 7))
+                {
+                    var configuration = TransformConfiguration(
+                        "format_number(amount)",
+                        $"format_number(amount, {precision})"
+                    );
+                    var outputs = service
+                        .Execute(configuration, inputs)
+                        .ShouldBeOfType<AutomationPureNodeResult.Succeeded>()
+                        .Outputs;
+                    outputs[new("first-output")].Value.ShouldBe(new AutomationValue.Text(general));
+                    outputs[new("second-output")]
+                        .Value.ShouldBe(
+                            new AutomationValue.Text(
+                                (-1234.5m).ToString($"F{precision}", CultureInfo.CurrentCulture)
+                            )
+                        );
+                }
+                var interpolated = service
+                    .Execute(
+                        TransformConfiguration("value ${format_number(amount, 2)}", "'unused'"),
+                        inputs
+                    )
+                    .ShouldBeOfType<AutomationPureNodeResult.Succeeded>();
+                interpolated
+                    .Outputs[new("first-output")]
+                    .Value.ShouldBe(
+                        new AutomationValue.Text(
+                            $"value {(-1234.5m).ToString("F2", CultureInfo.CurrentCulture)}"
+                        )
+                    );
+            }
+
+            foreach (var precision in new[] { "-1", "7", "2.0", "null", "'2'" })
+            {
+                var invalid = TransformConfiguration(
+                    $"format_number(amount, {precision})",
+                    "'unused'"
+                );
+                _ = service
+                    .Execute(invalid, inputs)
+                    .ShouldBeOfType<AutomationPureNodeResult.Failed>();
+            }
+
+            _ = service
+                .Execute(TransformConfiguration("'first'", "1"), inputs)
+                .ShouldBeOfType<AutomationPureNodeResult.Failed>();
+            foreach (var invalidNumber in new[] { "null", "true", "'1'" })
+            {
+                _ = service
+                    .Execute(
+                        TransformConfiguration($"format_number({invalidNumber})", "'unused'"),
+                        inputs
+                    )
+                    .ShouldBeOfType<AutomationPureNodeResult.Failed>();
+            }
+            using var cancelled = new CancellationTokenSource();
+            cancelled.Cancel();
+            _ = Should.Throw<OperationCanceledException>(() =>
+                service.Execute(
+                    TransformConfiguration("'first'", "'second'"),
+                    inputs,
+                    cancelled.Token
+                )
+            );
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Test]
+    public void CelTransform_SafeExpressionPreservesTypedNullAndUntakenReferenceProvenance()
+    {
+        var sourceContract = DataContractAutomationModule.SafeTriggerContract();
+        var descriptor = AutomationSafeTriggerViewResolver.Build([sourceContract]);
+        descriptor.Fields.ShouldBe(
+            AutomationSafeTriggerViewResolver.Build([sourceContract]).Fields,
+            ignoreOrder: false
+        );
+        descriptor.Version.ShouldBe(AutomationSafeTriggerView.CurrentVersion);
+        var service = new AutomationSafeTriggerExpressionService();
+        var port = new AutomationPortMetadata(
+            new("name-input"),
+            "Name",
+            "Receives a nullable Safe name.",
+            AutomationPortValueType.Text,
+            Nullability: AutomationPortNullability.Nullable,
+            BindingFieldId: new("name-binding")
+        );
+        var context = Context(1, sourceDefinitionId: new("test-number-source"));
+
+        var resolved = service
+            .Evaluate(
+                new(
+                    AutomationExpressionLanguage.CurrentVersion,
+                    "true ? actor.display_name : channel.login"
+                ),
+                port,
+                descriptor,
+                context
+            )
+            .ShouldNotBeNull();
+        resolved.Value.ShouldBe(new AutomationValue.Text("Viewer"));
+        resolved.Provenance.ShouldBe([
+            AutomationValueProvenance.Generated,
+            AutomationValueProvenance.PublicDisplayName,
+            AutomationValueProvenance.PublicLogin,
+        ]);
+        resolved.SafeTriggerFields.ShouldBe([
+            new AutomationSafeTriggerFieldId("actor-display-name"),
+            new("channel-login"),
+        ]);
+
+        var absent = service
+            .Evaluate(
+                new(AutomationExpressionLanguage.CurrentVersion, "actor.display_name"),
+                port,
+                descriptor,
+                context with
+                {
+                    Actor = null,
+                }
+            )
+            .ShouldNotBeNull();
+        absent.Value.ShouldBe(new AutomationValue.Null(AutomationPortValueType.Text));
+        absent.Provenance.ShouldBe([
+            AutomationValueProvenance.Generated,
+            AutomationValueProvenance.PublicDisplayName,
+        ]);
+        absent.SafeTriggerFields.ShouldBe([new("actor-display-name")]);
+
+        var collisions = AutomationSafeTriggerViewResolver.Build([
+            new([
+                new(
+                    new("reserved"),
+                    "format_number",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+                new(
+                    new("first"),
+                    "shared_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+            ]),
+            new([
+                new(
+                    new("second"),
+                    "shared_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+            ]),
+        ]);
+        collisions
+            .Fields.Single(field => field.Path == "format_number")
+            .Status.ShouldBe(AutomationSafeTriggerFieldStatus.ReservedName);
+        collisions
+            .Fields.Single(field => field.Path == "shared_name")
+            .Status.ShouldBe(AutomationSafeTriggerFieldStatus.Collision);
+        var incompatibleProvenance = AutomationSafeTriggerViewResolver.Build([
+            new([
+                new(
+                    new("shared"),
+                    "shared_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    AutomationValueProvenance.PublicLogin
+                ),
+            ]),
+            new([
+                new(
+                    new("shared"),
+                    "shared_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    AutomationValueProvenance.PublicDisplayName
+                ),
+            ]),
+        ]);
+        incompatibleProvenance
+            .Fields.ShouldHaveSingleItem()
+            .Status.ShouldBe(AutomationSafeTriggerFieldStatus.Incompatible);
+
+        AutomationCelSyntax.TryAnalyze("zero()", out var zeroArgumentCall).ShouldBeTrue();
+        zeroArgumentCall.Functions.ShouldContain("zero");
+        zeroArgumentCall.References.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void CelTransform_ResultValidationRequiresExactGeneratedInputProvenance()
+    {
+        var descriptor = new AutomationDefinitionDescriptor(
+            new("test-cel-transform"),
+            AutomationNodeKind.Transform,
+            AutomationDefinitionScope.Host,
+            new(new(1), new(1)),
+            new("Transform", "Validates exact provenance.", "Test"),
+            [
+                new(
+                    new("input"),
+                    "Input",
+                    "Input",
+                    AutomationPortValueType.Text,
+                    BindingFieldId: new("input-binding")
+                ),
+            ],
+            [new(new("output"), "Output", "Output", AutomationPortValueType.Text)],
+            [
+                new(
+                    new("input-binding"),
+                    "Input",
+                    "Input",
+                    new AutomationConfigurationFieldType.Data(AutomationPortValueType.Text),
+                    true
+                ),
+            ],
+            AutomationActionCapabilities.None,
+            AutomationActionRetrySafety.NotApplicable
+        );
+        var inputs = ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+            new("input"),
+            new(new AutomationValue.Text("safe"), [AutomationValueProvenance.PublicLogin])
+        );
+
+        foreach (
+            var provenance in new ImmutableArray<AutomationValueProvenance>[]
+            {
+                [AutomationValueProvenance.PublicLogin],
+                [AutomationValueProvenance.Generated],
+                [AutomationValueProvenance.PublicLogin, AutomationValueProvenance.Generated],
+                [
+                    AutomationValueProvenance.Generated,
+                    AutomationValueProvenance.PublicLogin,
+                    AutomationValueProvenance.PublicLogin,
+                ],
+                [
+                    AutomationValueProvenance.Generated,
+                    AutomationValueProvenance.PublicLogin,
+                    AutomationValueProvenance.PublicChat,
+                ],
+            }
+        )
+        {
+            AutomationPureHandlerRegistry
+                .TryValidateResult(
+                    descriptor,
+                    new(
+                        ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                            new("output"),
+                            new(new AutomationValue.Text("safe"), provenance)
+                        )
+                    ),
+                    inputs,
+                    out _
+                )
+                .ShouldBeFalse();
+        }
+
+        AutomationPureHandlerRegistry
+            .TryValidateResult(
+                descriptor,
+                new(
+                    ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                        new("output"),
+                        new(
+                            new AutomationValue.Text("safe"),
+                            [
+                                AutomationValueProvenance.Generated,
+                                AutomationValueProvenance.PublicLogin,
+                            ]
+                        )
+                    )
+                ),
+                inputs,
+                out var validated
+            )
+            .ShouldBeTrue();
+        validated.ShouldContainKey(new("output"));
+    }
+
+    [Test]
+    public async Task CelTransform_FrozenOutputsCheckpointAtomicallyOnceAcrossDelayedFanOut()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-dynamic-safe-source", """{"include-display-name":true}""");
+        var transform = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "name-input",
+                        "name",
+                        "Name",
+                        "name-binding",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.Nullable,
+                        null
+                    ),
+                ],
+                [
+                    new(
+                        "first-output",
+                        "First",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "${name}"
+                    ),
+                    new(
+                        "second-output",
+                        "Second",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'frozen-second'"
+                    ),
+                ]
+            ),
+            bindings: Bindings(
+                "name-binding",
+                AutomationInputBindingMode.Expression,
+                new(
+                    AutomationExpressionLanguage.CurrentVersion,
+                    "true ? actor.display_name : channel.login"
+                )
+            )
+        );
+        var delay = Node(
+            "test-data-delay",
+            """{"duration-milliseconds":1000}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+        var first = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var second = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var saved = await fixture.SaveAsync(
+            [source, transform, delay, first, second],
+            [
+                Edge(source, "flow", delay),
+                Edge(delay, "complete", first),
+                Edge(delay, "complete", second),
+                Edge(transform, "first-output", delay, "value", AutomationEdgeKind.Data),
+                Edge(transform, "first-output", first, "message", AutomationEdgeKind.Data),
+                Edge(transform, "second-output", second, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(
+                Context(fixture.HostId, sourceDefinitionId: new("test-dynamic-safe-source")),
+                new DynamicSafeSourceConfiguration(IncludeDisplayName: true)
+            ),
+            CancellationToken.None
+        );
+        dispatched.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        fixture.TransformHandler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.NodeId == transform.Id.Value
+            );
+            var restored = AutomationDataValueSerialization
+                .RestoreOutputs(checkpoint.OutputJson!)
+                .ShouldBeOfType<AutomationOutputRestoreOutcome.Available>();
+            restored.Outputs.Keys.ShouldBe(
+                [new AutomationPortId("first-output"), new("second-output")],
+                ignoreOrder: true
+            );
+            restored
+                .Outputs[new("first-output")]
+                .Provenance.ShouldBe([
+                    AutomationValueProvenance.Generated,
+                    AutomationValueProvenance.PublicDisplayName,
+                    AutomationValueProvenance.PublicLogin,
+                ]);
+            restored
+                .Outputs[new("first-output")]
+                .SafeTriggerFields.ShouldBe([
+                    new AutomationSafeTriggerFieldId("actor-display-name"),
+                    new("channel-login"),
+                ]);
+        }
+        var diagnostics = (
+            await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None)
+        )
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem()
+            .Nodes.Single(node => node.NodeId == transform.Id)
+            .Outputs;
+        diagnostics.ShouldAllBe(static diagnostic => diagnostic.DisplayValue == "available");
+        JsonSerializer.Serialize(diagnostics).ShouldNotContain("Viewer");
+        JsonSerializer.Serialize(diagnostics).ShouldNotContain("frozen-second");
+
+        var live = (await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationFlowQueryOutcome.Available>()
+            .Flows.Single(flow => flow.Draft.Id == saved)
+            .Draft;
+        var changedConfiguration = TransformJson(
+            [
+                new(
+                    "name-input",
+                    "name",
+                    "Name",
+                    "name-binding",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "changed-fallback"
+                ),
+            ],
+            [
+                new(
+                    "first-output",
+                    "First",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "'live-first'"
+                ),
+                new(
+                    "second-output",
+                    "Second",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    "'live-second'"
+                ),
+            ]
+        );
+        var changed = live with
+        {
+            Nodes = live
+                .Nodes.Select(node =>
+                    node.Id == source.Id
+                        ? Node(
+                            "test-dynamic-safe-source",
+                            """{"include-display-name":false}"""
+                        ) with
+                        {
+                            Id = node.Id,
+                        }
+                    : node.Id == transform.Id
+                        ? Node(
+                            "test-cel-transform",
+                            changedConfiguration,
+                            bindings: Bindings(
+                                "name-binding",
+                                AutomationInputBindingMode.Fixed,
+                                node.InputBindings[new("name-binding")].Expression
+                            )
+                        ) with
+                        {
+                            Id = node.Id,
+                        }
+                    : node
+                )
+                .ToImmutableArray(),
+        };
+        _ = (
+            await fixture.Flows.SaveAsync(changed, CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowSaveOutcome.Saved>();
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture
+            .NewRuntime()
+            .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None);
+        resumed.Status.ShouldBe(AutomationResumeStatus.Completed);
+        fixture.TransformHandler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["Viewer", "frozen-second"], ignoreOrder: true);
+
+        async Task AssertMalformedCheckpointAsync(
+            Func<
+                ImmutableDictionary<AutomationPortId, AutomationResolvedValue>,
+                ImmutableDictionary<AutomationPortId, AutomationResolvedValue>
+            > mutate
+        )
+        {
+            var malformedDispatch = await fixture.Runtime.DispatchAsync(
+                new(
+                    Context(fixture.HostId, sourceDefinitionId: new("test-dynamic-safe-source")),
+                    new DynamicSafeSourceConfiguration(IncludeDisplayName: false)
+                ),
+                CancellationToken.None
+            );
+            malformedDispatch.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+            await using (var db = await fixture.Database.CreateDbContextAsync())
+            {
+                var malformedRunId = malformedDispatch.RunIds.ShouldHaveSingleItem().Value;
+                var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                    node.RunId == malformedRunId && node.NodeId == transform.Id.Value
+                );
+                var outputs = AutomationDataValueSerialization
+                    .RestoreOutputs(checkpoint.OutputJson!)
+                    .ShouldBeOfType<AutomationOutputRestoreOutcome.Available>()
+                    .Outputs;
+                checkpoint.OutputJson = AutomationDataValueSerialization.SerializeOutputs(
+                    mutate(outputs)
+                );
+                _ = await db.SaveChangesAsync();
+            }
+
+            fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+            var malformedResume = await fixture
+                .NewRuntime()
+                .ResumeAsync(
+                    malformedDispatch.RunIds.ShouldHaveSingleItem(),
+                    CancellationToken.None
+                );
+            malformedResume.Status.ShouldBe(AutomationResumeStatus.Failed);
+            fixture.Chat.Messages.ShouldBe(["Viewer", "frozen-second"], ignoreOrder: true);
+        }
+
+        await AssertMalformedCheckpointAsync(outputs =>
+            outputs.Add(
+                new("extra-output"),
+                new(
+                    new AutomationValue.Text("must-not-escape"),
+                    [AutomationValueProvenance.Generated],
+                    ValueFreeDiagnostic: true
+                )
+            )
+        );
+        await AssertMalformedCheckpointAsync(outputs => outputs.Remove(new("second-output")));
+        await AssertMalformedCheckpointAsync(outputs =>
+            outputs.SetItem(
+                new("first-output"),
+                outputs[new("first-output")] with
+                {
+                    Provenance =
+                    [
+                        AutomationValueProvenance.Generated,
+                        AutomationValueProvenance.PublicChat,
+                    ],
+                }
+            )
+        );
+        fixture.TransformHandler.Calls.ShouldBe(4);
     }
 
     [Test]
@@ -2220,6 +3535,91 @@ public sealed class AutomationRuntimeTests
         return new(type, 1, document.RootElement.Clone());
     }
 
+    private static string TransformJson(
+        ImmutableArray<TransformInput> inputs,
+        ImmutableArray<TransformOutput> outputs
+    ) =>
+        JsonSerializer.Serialize(
+            new Dictionary<string, object?>
+            {
+                ["inputs"] = inputs
+                    .Select(static input => new Dictionary<string, object?>
+                    {
+                        ["port-id"] = input.PortId,
+                        ["cel-identifier"] = input.Identifier,
+                        ["display-name"] = input.DisplayName,
+                        ["binding-field-id"] = input.BindingFieldId,
+                        ["type"] = input.ValueType.ToString(),
+                        ["nullability"] = input.Nullability.ToString(),
+                        ["fixed"] = input.Fixed,
+                    })
+                    .ToArray(),
+                ["outputs"] = outputs
+                    .Select(static output => new Dictionary<string, object?>
+                    {
+                        ["port-id"] = output.PortId,
+                        ["display-name"] = output.DisplayName,
+                        ["type"] = output.ValueType.ToString(),
+                        ["nullability"] = output.Nullability.ToString(),
+                        ["cel"] = output.Source,
+                    })
+                    .ToArray(),
+            },
+            JsonSerializerOptions.Web
+        );
+
+    private static AutomationCelTransformConfiguration TransformConfiguration(
+        string first,
+        string second
+    ) =>
+        new(
+            [
+                new(
+                    new("amount-input"),
+                    new("amount"),
+                    "Amount",
+                    new("amount-binding"),
+                    AutomationPortValueType.Number,
+                    AutomationPortNullability.NonNullable,
+                    new AutomationValue.Number(0m)
+                ),
+            ],
+            [
+                new(
+                    new("first-output"),
+                    "First",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    first
+                ),
+                new(
+                    new("second-output"),
+                    "Second",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    second
+                ),
+            ]
+        );
+
+    private sealed record TransformInput(
+        string PortId,
+        string Identifier,
+        string DisplayName,
+        string BindingFieldId,
+        AutomationPortValueType ValueType,
+        AutomationPortNullability Nullability,
+        object? Fixed
+    );
+
+    private sealed record TransformOutput(
+        string PortId,
+        string DisplayName,
+        AutomationPortValueType ValueType,
+        AutomationPortNullability Nullability,
+        string Source
+    );
+
     private static AutomationFlowDraftNode ConnectedNode(string type) =>
         Node(
             type,
@@ -2267,10 +3667,11 @@ public sealed class AutomationRuntimeTests
         int hostId,
         string argument = "yes",
         string sensitive = "private",
-        Guid? targetId = null
+        Guid? targetId = null,
+        AutomationDefinitionId? sourceDefinitionId = null
     ) =>
         new(
-            new(Guid.NewGuid(), AutomationDefinitionIds.CustomCommandSource),
+            new(Guid.NewGuid(), sourceDefinitionId ?? AutomationDefinitionIds.CustomCommandSource),
             new("viewer-id", "viewer", "Viewer"),
             new(new(hostId), $"channel-{hostId}", $"host-{hostId}", $"Host {hostId}"),
             null,
@@ -2292,6 +3693,9 @@ public sealed class AutomationRuntimeTests
         );
 
     private sealed record DataContractConfiguration : AutomationConfiguration;
+
+    private sealed record DynamicSafeSourceConfiguration(bool IncludeDisplayName)
+        : AutomationConfiguration;
 
     private sealed class TestPureHandler(
         AutomationPureHandlerContract contract,
@@ -2376,7 +3780,17 @@ public sealed class AutomationRuntimeTests
                         new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow),
                         DataOutput(AutomationPortValueType.Number),
                     ],
-                    []
+                    [],
+                    SafeTriggerContract()
+                ),
+                DynamicSafeSource(),
+                AutomationCelTransform.Definition(
+                    new("test-cel-transform"),
+                    new(
+                        "CEL Transform test seam",
+                        "Exercises an authored Transform without product registration.",
+                        "Test"
+                    )
                 ),
                 Definition(
                     "test-number-value",
@@ -2480,6 +3894,47 @@ public sealed class AutomationRuntimeTests
                 [Field(required)]
             );
 
+        private static IAutomationDefinition DynamicSafeSource() =>
+            new AutomationDefinition<DynamicSafeSourceConfiguration>(
+                new(
+                    new("test-dynamic-safe-source"),
+                    AutomationNodeKind.Source,
+                    AutomationDefinitionScope.Host,
+                    _schema,
+                    new(
+                        "Dynamic Safe source",
+                        "Exercises frozen source-projected Safe contracts.",
+                        "Test"
+                    ),
+                    [],
+                    [new(new("flow"), "Flow", "Starts the flow.", AutomationPortValueType.Flow)],
+                    [],
+                    AutomationActionCapabilities.None,
+                    AutomationActionRetrySafety.NotApplicable
+                ),
+                static json =>
+                    json.TryGetProperty("include-display-name", out var include)
+                    && include.ValueKind is JsonValueKind.True or JsonValueKind.False
+                        ? new AutomationConfigurationParseResult.Parsed(
+                            new DynamicSafeSourceConfiguration(include.GetBoolean())
+                        )
+                        : new AutomationConfigurationParseResult.Invalid([]),
+                static _ => AutomationValidationResult.Valid,
+                safeTriggerSource: static configuration =>
+                    configuration.IncludeDisplayName
+                        ? SafeTriggerContract()
+                        : SafeTriggerContract() with
+                        {
+                            Fields =
+                            [
+                                .. SafeTriggerContract()
+                                    .Fields.Where(static field =>
+                                        field.Path != "actor.display_name"
+                                    ),
+                            ],
+                        }
+            );
+
         private static IAutomationDefinition TextConsumer() =>
             new AutomationDefinition<SendChatActionConfiguration>(
                 new(
@@ -2569,7 +4024,8 @@ public sealed class AutomationRuntimeTests
             AutomationNodeKind kind,
             ImmutableArray<AutomationPortMetadata> inputs,
             ImmutableArray<AutomationPortMetadata> outputs,
-            ImmutableArray<AutomationConfigurationFieldMetadata> fields
+            ImmutableArray<AutomationConfigurationFieldMetadata> fields,
+            AutomationSafeTriggerSourceContract? safeTriggerSource = null
         ) =>
             new AutomationDefinition<DataContractConfiguration>(
                 new(
@@ -2589,8 +4045,76 @@ public sealed class AutomationRuntimeTests
                 static _ => new AutomationConfigurationParseResult.Parsed(
                     new DataContractConfiguration()
                 ),
-                static _ => AutomationValidationResult.Valid
+                static _ => AutomationValidationResult.Valid,
+                safeTriggerSource: _ => safeTriggerSource
             );
+
+        internal static AutomationSafeTriggerSourceContract SafeTriggerContract() =>
+            new([
+                new(
+                    new("actor-login"),
+                    "actor.login",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.PublicLogin
+                ),
+                new(
+                    new("actor-display-name"),
+                    "actor.display_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.PublicDisplayName
+                ),
+                new(
+                    new("channel-login"),
+                    "channel.login",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    AutomationValueProvenance.PublicLogin
+                ),
+                new(
+                    new("channel-display-name"),
+                    "channel.display_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.NonNullable,
+                    AutomationValueProvenance.PublicDisplayName
+                ),
+                new(
+                    new("stream-title"),
+                    "stream.title",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+                new(
+                    new("stream-game-name"),
+                    "stream.game_name",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+                new(
+                    new("stream-started-at"),
+                    "stream.started_at",
+                    AutomationPortValueType.Timestamp,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+                new(
+                    new("arguments"),
+                    "arguments",
+                    AutomationPortValueType.Arguments,
+                    AutomationPortNullability.NonNullable,
+                    AutomationValueProvenance.PublicChat
+                ),
+                new(
+                    new("safe-target"),
+                    "target_id",
+                    AutomationPortValueType.Text,
+                    AutomationPortNullability.Nullable,
+                    AutomationValueProvenance.Generated
+                ),
+            ]);
 
         private static AutomationPortMetadata DataInput(bool required) =>
             DataInput("value", AutomationPortValueType.Number, required);
@@ -2703,7 +4227,12 @@ public sealed class AutomationRuntimeTests
                         new("value"),
                         new(
                             new AutomationValue.Text($"{value.Value}-transformed"),
-                            input.Inputs[new("input")].Provenance
+                            input
+                                .Inputs[new("input")]
+                                .Provenance.Append(AutomationValueProvenance.Generated)
+                                .Distinct()
+                                .Order()
+                                .ToImmutableArray()
                         )
                     )
                 );
@@ -2740,7 +4269,12 @@ public sealed class AutomationRuntimeTests
                         new("value"),
                         new(
                             new AutomationValue.Text(actor.Value.DisplayName),
-                            [AutomationValueProvenance.PublicDisplayName]
+                            input
+                                .Inputs[new("actor")]
+                                .Provenance.Append(AutomationValueProvenance.Generated)
+                                .Distinct()
+                                .Order()
+                                .ToImmutableArray()
                         )
                     )
                 );
@@ -2755,6 +4289,7 @@ public sealed class AutomationRuntimeTests
             RecordingChatSender chat,
             HostFeatureService features,
             AutomationCatalogService catalog,
+            AutomationCelTransformHandler transformHandler,
             AutomationExpressionService expressions,
             AutomationActionExecutor actions,
             AutomationRuntimeService runtime,
@@ -2768,6 +4303,7 @@ public sealed class AutomationRuntimeTests
             Chat = chat;
             Features = features;
             Catalog = catalog;
+            TransformHandler = transformHandler;
             Expressions = expressions;
             Actions = actions;
             Runtime = runtime;
@@ -2781,6 +4317,7 @@ public sealed class AutomationRuntimeTests
         internal RecordingChatSender Chat { get; }
         internal HostFeatureService Features { get; }
         internal AutomationCatalogService Catalog { get; }
+        internal AutomationCelTransformHandler TransformHandler { get; }
         internal AutomationExpressionService Expressions { get; }
         internal AutomationActionExecutor Actions { get; }
         internal AutomationRuntimeService Runtime { get; }
@@ -2810,11 +4347,12 @@ public sealed class AutomationRuntimeTests
                 [observer]
             );
             var expressions = new AutomationExpressionService();
+            var transformHandler = new AutomationCelTransformHandler(new("test-cel-transform"));
             var catalog = new AutomationCatalogService(
                 new([new CoreAutomationCatalogModule(), new DataContractAutomationModule()]),
                 features,
                 expressions,
-                handlers ?? []
+                (handlers ?? []).Append(transformHandler)
             );
             overlays ??= new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
@@ -2827,13 +4365,14 @@ public sealed class AutomationRuntimeTests
                 actions,
                 clock
             );
-            var queries = new AutomationRunQueryService(database, features);
+            var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
                 clock,
                 chat,
                 features,
                 catalog,
+                transformHandler,
                 expressions,
                 actions,
                 runtime,
@@ -2849,6 +4388,7 @@ public sealed class AutomationRuntimeTests
                 chat,
                 features,
                 catalog,
+                transformHandler,
                 expressions,
                 actions,
                 runtime,

@@ -14,12 +14,15 @@ public sealed record AutomationValueDiagnostic(
     AutomationPortId PortId,
     AutomationPortValueType ValueType,
     ImmutableArray<AutomationValueProvenance> Provenance,
-    string DisplayValue
+    string DisplayValue,
+    ImmutableArray<AutomationSafeTriggerFieldId> SafeTriggerFields = default
 );
 
 internal sealed record AutomationResolvedValue(
     AutomationValue Value,
-    ImmutableArray<AutomationValueProvenance> Provenance
+    ImmutableArray<AutomationValueProvenance> Provenance,
+    ImmutableArray<AutomationSafeTriggerFieldId> SafeTriggerFields = default,
+    bool ValueFreeDiagnostic = false
 );
 
 internal sealed record AutomationPurePortContract(
@@ -32,7 +35,8 @@ internal sealed record AutomationPureHandlerContract(
     AutomationDefinitionId DefinitionId,
     AutomationNodeKind Kind,
     ImmutableArray<AutomationPurePortContract> Inputs,
-    ImmutableArray<AutomationPurePortContract> Outputs
+    ImmutableArray<AutomationPurePortContract> Outputs,
+    bool UsesEffectiveDescriptor = false
 );
 
 internal sealed record AutomationPureNodeInput(

@@ -11,11 +11,22 @@ public interface IAutomationDefinition
     AutomationConfigurationParseResult Parse(JsonElement configuration);
 }
 
+internal interface IAutomationEffectiveDefinition
+{
+    bool UsesEffectiveDescriptor { get; }
+
+    AutomationDefinitionDescriptor EffectiveDescriptor(AutomationConfiguration configuration);
+
+    AutomationSafeTriggerSourceContract? SafeTriggerSource(AutomationConfiguration configuration);
+}
+
 public sealed class AutomationDefinition<TConfiguration>(
     AutomationDefinitionDescriptor descriptor,
     Func<JsonElement, AutomationConfigurationParseResult> parse,
-    Func<TConfiguration, AutomationValidationResult> validate
-) : IAutomationDefinition
+    Func<TConfiguration, AutomationValidationResult> validate,
+    Func<TConfiguration, AutomationDefinitionDescriptor>? effectiveDescriptor = null,
+    Func<TConfiguration, AutomationSafeTriggerSourceContract?>? safeTriggerSource = null
+) : IAutomationDefinition, IAutomationEffectiveDefinition
     where TConfiguration : AutomationConfiguration
 {
     public AutomationDefinitionDescriptor Descriptor { get; } = descriptor;
@@ -30,6 +41,22 @@ public sealed class AutomationDefinition<TConfiguration>(
 
     public AutomationConfigurationParseResult Parse(JsonElement configuration) =>
         parse(configuration);
+
+    AutomationDefinitionDescriptor IAutomationEffectiveDefinition.EffectiveDescriptor(
+        AutomationConfiguration configuration
+    ) =>
+        configuration is TConfiguration typed && effectiveDescriptor is not null
+            ? effectiveDescriptor(typed)
+            : Descriptor;
+
+    bool IAutomationEffectiveDefinition.UsesEffectiveDescriptor => effectiveDescriptor is not null;
+
+    AutomationSafeTriggerSourceContract? IAutomationEffectiveDefinition.SafeTriggerSource(
+        AutomationConfiguration configuration
+    ) =>
+        configuration is TConfiguration typed && safeTriggerSource is not null
+            ? safeTriggerSource(typed)
+            : null;
 }
 
 public interface IAutomationCatalogModule

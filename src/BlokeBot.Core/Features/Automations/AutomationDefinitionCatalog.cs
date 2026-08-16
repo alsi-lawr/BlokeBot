@@ -55,6 +55,35 @@ internal sealed class AutomationDefinitionCatalog
     internal bool TryResolve(AutomationDefinitionId id, out IAutomationDefinition definition) =>
         _definitions.TryGetValue(id, out definition!);
 
+    internal static bool IsValidEffectiveDescriptor(
+        AutomationDefinitionDescriptor registered,
+        AutomationDefinitionDescriptor effective
+    )
+    {
+        if (
+            effective.Id != registered.Id
+            || effective.Kind != registered.Kind
+            || effective.Scope != registered.Scope
+            || effective.Schema != registered.Schema
+            || effective.Capabilities != registered.Capabilities
+            || effective.RetrySafety != registered.RetrySafety
+            || effective.TriggerContextRequirement != registered.TriggerContextRequirement
+        )
+        {
+            return false;
+        }
+
+        try
+        {
+            Validate(effective, new("effective"));
+            return true;
+        }
+        catch (AutomationCatalogRegistrationException)
+        {
+            return false;
+        }
+    }
+
     private static void ValidateTriggerContextRequirements(
         IReadOnlyDictionary<AutomationDefinitionId, IAutomationDefinition> definitions
     )

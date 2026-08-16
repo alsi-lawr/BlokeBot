@@ -173,7 +173,7 @@ public sealed class AutomationCatalogService
             ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
             : ValidateResolvedPersisted(definition, schemaVersion, configuration);
 
-    private static AutomationConfigurationCheck ValidateResolvedPersisted(
+    private AutomationConfigurationCheck ValidateResolvedPersisted(
         IAutomationDefinition definition,
         AutomationSchemaVersion schemaVersion,
         JsonElement configuration
@@ -207,7 +207,7 @@ public sealed class AutomationCatalogService
             ? new AutomationConfigurationCheck.DefinitionMissing(definitionId)
             : ValidateResolved(definition, schemaVersion, configuration);
 
-    private static AutomationConfigurationCheck ValidateResolved(
+    private AutomationConfigurationCheck ValidateResolved(
         IAutomationDefinition definition,
         AutomationSchemaVersion schemaVersion,
         AutomationConfiguration configuration
@@ -229,10 +229,55 @@ public sealed class AutomationCatalogService
     )
     {
         var validation = definition.Validate(configuration);
-        return validation.IsValid
-            ? new AutomationConfigurationCheck.Valid(definition.Descriptor, configuration)
-            : new AutomationConfigurationCheck.Invalid(validation.Errors);
+        if (!validation.IsValid)
+        {
+            return new AutomationConfigurationCheck.Invalid(validation.Errors);
+        }
+
+        var effective = definition is IAutomationEffectiveDefinition effectiveDefinition
+            ? effectiveDefinition.EffectiveDescriptor(configuration)
+            : definition.Descriptor;
+        var safeTriggerSource = definition is IAutomationEffectiveDefinition sourceDefinition
+            ? sourceDefinition.SafeTriggerSource(configuration)
+            : null;
+        return
+            !AutomationDefinitionCatalog.IsValidEffectiveDescriptor(
+                definition.Descriptor,
+                effective
+            ) || !ValidSafeTriggerSource(effective, safeTriggerSource)
+            ? new AutomationConfigurationCheck.Invalid([
+                new(
+                    new AutomationValidationTarget.Definition(),
+                    "The persisted automation schema is invalid."
+                ),
+            ])
+            : new AutomationConfigurationCheck.Valid(effective, configuration, safeTriggerSource);
     }
+
+    private static bool ValidSafeTriggerSource(
+        AutomationDefinitionDescriptor definition,
+        AutomationSafeTriggerSourceContract? source
+    ) =>
+        source is null
+        || (
+            definition.Kind == AutomationNodeKind.Source
+            && !source.Fields.IsDefault
+            && source.Fields.Select(static field => field.Id).Distinct().Count()
+                == source.Fields.Length
+            && source
+                .Fields.Select(static field => field.Path)
+                .Distinct(StringComparer.Ordinal)
+                .Count() == source.Fields.Length
+            && source.Fields.All(static field =>
+                !string.IsNullOrWhiteSpace(field.Id.Value)
+                && field.Id.Value.Length <= 96
+                && field.Path.Split('.').All(AutomationCelSyntax.IsIdentifier)
+                && field.ValueType != AutomationPortValueType.Flow
+                && Enum.IsDefined(field.ValueType)
+                && Enum.IsDefined(field.Nullability)
+                && Enum.IsDefined(field.Provenance)
+            )
+        );
 
     private async Task<AutomationCatalogAvailability> AvailabilityAsync(
         AutomationHostId hostId,
