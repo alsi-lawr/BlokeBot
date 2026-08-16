@@ -13,12 +13,17 @@ public sealed class AutomationCatalogService
 
     internal AutomationCatalogService(
         AutomationDefinitionCatalog catalog,
-        HostFeatureService features
+        HostFeatureService features,
+        AutomationExpressionService? expressions = null,
+        IEnumerable<IAutomationPureNodeHandler>? handlers = null
     )
     {
         _catalog = catalog;
         _features = features;
+        Data = new(this, new(catalog, handlers ?? []), expressions ?? new());
     }
+
+    internal AutomationDataResolver Data { get; }
 
     public async Task<AutomationCatalogSnapshot> DiscoverAsync(
         AutomationHostId hostId,

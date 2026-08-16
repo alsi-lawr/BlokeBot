@@ -114,5 +114,6 @@ public sealed class AutomationNodeRun
     public DateTime? StartedAtUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
     public string? OutcomeCode { get; set; }
+    public string? OutputJson { get; set; }
     public AutomationFlowRun Run { get; set; } = null!;
 }

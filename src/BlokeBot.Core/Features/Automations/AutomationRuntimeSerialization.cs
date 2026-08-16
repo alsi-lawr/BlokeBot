@@ -303,6 +303,12 @@ internal static class AutomationRuntimeSerialization
                 JsonSerializer.Serialize(stream.Value, _options),
                 variable.Sensitivity
             ),
+            AutomationValue.Arguments arguments => new(
+                name.Value,
+                "arguments",
+                JsonSerializer.Serialize(arguments.Values, _options),
+                variable.Sensitivity
+            ),
             AutomationValue.Null nullValue
                 when nullValue.ValueType != AutomationPortValueType.Flow => new(
                 name.Value,
@@ -330,13 +336,25 @@ internal static class AutomationRuntimeSerialization
                     JsonSerializer.Deserialize<DateTimeOffset>(variable.ValueJson, _options)
                 ),
                 "actor" => new AutomationValue.Actor(
-                    JsonSerializer.Deserialize<AutomationActor>(variable.ValueJson, _options)!
+                    JsonSerializer.Deserialize<AutomationPublicActor>(variable.ValueJson, _options)!
                 ),
                 "channel" => new AutomationValue.Channel(
-                    JsonSerializer.Deserialize<AutomationChannel>(variable.ValueJson, _options)!
+                    JsonSerializer.Deserialize<AutomationPublicChannel>(
+                        variable.ValueJson,
+                        _options
+                    )!
                 ),
                 "stream" => new AutomationValue.Stream(
-                    JsonSerializer.Deserialize<AutomationStream>(variable.ValueJson, _options)!
+                    JsonSerializer.Deserialize<AutomationPublicStream>(
+                        variable.ValueJson,
+                        _options
+                    )!
+                ),
+                "arguments" => new AutomationValue.Arguments(
+                    JsonSerializer.Deserialize<ImmutableArray<AutomationValueArgument>>(
+                        variable.ValueJson,
+                        _options
+                    )
                 ),
                 "null" => RestoreNull(variable.ValueJson),
                 _ => throw new InvalidOperationException("Unknown persisted automation value."),

@@ -135,15 +135,13 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         new("actor"),
                         "Viewer",
                         "The viewer who used the command.",
-                        AutomationPortValueType.Actor,
-                        AutomationDataSensitivity.Sensitive
+                        AutomationPortValueType.Actor
                     ),
                     new(
                         new("arguments"),
                         "Arguments",
                         "The words entered after the command.",
-                        AutomationPortValueType.Arguments,
-                        AutomationDataSensitivity.Sensitive
+                        AutomationPortValueType.Arguments
                     ),
                     new(
                         new("channel"),
@@ -155,13 +153,15 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                         new("event-time"),
                         "Event time",
                         "When the command was received.",
-                        AutomationPortValueType.Timestamp
+                        AutomationPortValueType.Timestamp,
+                        AutomationDataSensitivity.Sensitive
                     ),
                     new(
                         new("stream"),
                         "Stream",
                         "The active stream identity, when the channel is live.",
                         AutomationPortValueType.Stream,
+                        AutomationDataSensitivity.Sensitive,
                         Nullability: AutomationPortNullability.Nullable
                     ),
                 ],

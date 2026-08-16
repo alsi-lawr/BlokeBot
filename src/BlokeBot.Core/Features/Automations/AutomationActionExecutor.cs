@@ -39,6 +39,7 @@ public sealed class AutomationActionExecutor(
         AutomationHostId hostId,
         AutomationConfiguration configuration,
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> fields,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         AutomationContext context,
         CancellationToken cancellationToken
     )
@@ -51,6 +52,7 @@ public sealed class AutomationActionExecutor(
                     hostId,
                     sendChat,
                     fields,
+                    inputs,
                     context,
                     cancellationToken
                 ),
@@ -138,6 +140,7 @@ public sealed class AutomationActionExecutor(
         AutomationHostId hostId,
         SendChatActionConfiguration configuration,
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> fields,
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         AutomationContext context,
         CancellationToken cancellationToken
     )
@@ -147,25 +150,32 @@ public sealed class AutomationActionExecutor(
             return new AutomationActionOutcome.Failed("feature-disabled");
         }
 
-        var message = fields.TryGetValue(new("message"), out var expression)
-            ? expressions.Evaluate(expression, context)
-            : expressions.Interpolate(configuration.Message, context);
-        if (
-            message is not AutomationExpressionResult.Value value
-            || value.Result is not string text
-        )
+        AutomationPublicTextAdmission admission;
+        if (inputs.TryGetValue(new("message"), out var input))
         {
-            return new AutomationActionOutcome.Failed("action-expression-invalid");
+            admission = AutomationPublicSinkAdmission.AdmitText(input);
+        }
+        else
+        {
+            var message = fields.TryGetValue(new("message"), out var expression)
+                ? expressions.Evaluate(expression, context)
+                : expressions.Interpolate(configuration.Message, context);
+            if (message is not AutomationExpressionResult.Value value)
+            {
+                return new AutomationActionOutcome.Failed("action-expression-invalid");
+            }
+
+            admission = AutomationPublicSinkAdmission.AdmitText(value);
         }
 
-        if (value.UsesSensitiveValues)
+        if (admission is not AutomationPublicTextAdmission.Admitted admitted)
         {
             return new AutomationActionOutcome.Failed("sensitive-output-blocked");
         }
 
         var outcome = await chat.SendAsync(
             context.Channel.Login,
-            text,
+            admitted.Text,
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
@@ -682,20 +692,20 @@ public sealed class AutomationActionExecutor(
         var result = fields.TryGetValue(new(fieldId), out var expression)
             ? expressions.Evaluate(expression, context)
             : expressions.Interpolate(template, context);
-        if (
-            result is not AutomationExpressionResult.Value value
-            || value.Result is not string resolved
-        )
+        if (result is not AutomationExpressionResult.Value value)
         {
             return new AutomationActionOutcome.Failed("action-expression-invalid");
         }
 
-        if (value.UsesSensitiveValues)
+        if (
+            AutomationPublicSinkAdmission.AdmitText(value)
+            is not AutomationPublicTextAdmission.Admitted admitted
+        )
         {
             return new AutomationActionOutcome.Failed("sensitive-output-blocked");
         }
 
-        text = resolved;
+        text = admitted.Text;
         return null;
     }
 
@@ -723,20 +733,20 @@ public sealed class AutomationActionExecutor(
         foreach (var line in NativeOperationAutomations.SplitEntries(template))
         {
             var result = expressions.Interpolate(line, context);
-            if (
-                result is not AutomationExpressionResult.Value value
-                || value.Result is not string entry
-            )
+            if (result is not AutomationExpressionResult.Value value)
             {
                 return new AutomationActionOutcome.Failed("action-expression-invalid");
             }
 
-            if (value.UsesSensitiveValues)
+            if (
+                AutomationPublicSinkAdmission.AdmitText(value)
+                is not AutomationPublicTextAdmission.Admitted admitted
+            )
             {
                 return new AutomationActionOutcome.Failed("sensitive-output-blocked");
             }
 
-            entries.Add(entry.Trim());
+            entries.Add(admitted.Text.Trim());
         }
 
         lines = [.. entries.Where(static entry => entry.Length > 0)];

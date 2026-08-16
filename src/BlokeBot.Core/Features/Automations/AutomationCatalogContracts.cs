@@ -126,6 +126,8 @@ public abstract record AutomationConfigurationFieldType
 
     public sealed record Number(long Minimum, long? Maximum) : AutomationConfigurationFieldType;
 
+    public sealed record Data(AutomationPortValueType ValueType) : AutomationConfigurationFieldType;
+
     public sealed record Reference(AutomationReferenceKind ReferenceKind)
         : AutomationConfigurationFieldType;
 
@@ -340,6 +342,22 @@ public sealed record AutomationTimestamps(
 
 public sealed record AutomationArgument(int Position, string Value);
 
+public sealed record AutomationPublicActor(string Login, string DisplayName);
+
+public sealed record AutomationPublicChannel(string Login, string DisplayName);
+
+public sealed record AutomationPublicStream(
+    string? Title,
+    string? GameName,
+    DateTimeOffset? StartedAtUtc
+);
+
+public sealed record AutomationValueArgument(
+    int Position,
+    string Value,
+    ImmutableArray<AutomationValueProvenance> Provenance
+);
+
 public abstract record AutomationValue
 {
     private AutomationValue() { }
@@ -352,11 +370,14 @@ public abstract record AutomationValue
 
     public sealed record Timestamp(DateTimeOffset Value) : AutomationValue;
 
-    public sealed record Actor(AutomationActor Value) : AutomationValue;
+    public sealed record Actor(AutomationPublicActor Value) : AutomationValue;
 
-    public sealed record Channel(AutomationChannel Value) : AutomationValue;
+    public sealed record Channel(AutomationPublicChannel Value) : AutomationValue;
 
-    public sealed record Stream(AutomationStream Value) : AutomationValue;
+    public sealed record Stream(AutomationPublicStream Value) : AutomationValue;
+
+    public sealed record Arguments(ImmutableArray<AutomationValueArgument> Values)
+        : AutomationValue;
 
     public sealed record Null(AutomationPortValueType ValueType) : AutomationValue;
 }

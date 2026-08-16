@@ -61,9 +61,10 @@ public sealed class AutomationExpressionService
             var program = _environment.Compile(expression.Source);
             return new AutomationExpressionResult.Value(
                 program(evaluation.Values),
-                evaluation.SensitiveIdentifiers.Any(identifier =>
-                    ContainsIdentifier(expression.Source, identifier)
-                )
+                UsesSensitiveContext(expression.Source)
+                    || evaluation.SensitiveIdentifiers.Any(identifier =>
+                        ContainsIdentifier(expression.Source, identifier)
+                    )
             );
         }
         catch (CelException)
@@ -183,7 +184,6 @@ public sealed class AutomationExpressionService
                 .ToArray(),
         };
         var sensitive = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        _ = sensitive.Add("arguments");
         foreach (var (name, variable) in context.Variables.ForExecution())
         {
             values[name.Value] = ToCelValue(variable.Value);
@@ -205,26 +205,65 @@ public sealed class AutomationExpressionService
             AutomationValue.Timestamp timestamp => timestamp.Value,
             AutomationValue.Actor actor => new Dictionary<string, object?>
             {
-                ["twitch_user_id"] = actor.Value.TwitchUserId,
                 ["login"] = actor.Value.Login,
                 ["display_name"] = actor.Value.DisplayName,
             },
             AutomationValue.Channel channel => new Dictionary<string, object?>
             {
-                ["host_id"] = channel.Value.HostId.Value,
-                ["twitch_channel_id"] = channel.Value.TwitchChannelId,
                 ["login"] = channel.Value.Login,
                 ["display_name"] = channel.Value.DisplayName,
             },
             AutomationValue.Stream stream => new Dictionary<string, object?>
             {
-                ["twitch_stream_id"] = stream.Value.TwitchStreamId,
                 ["title"] = stream.Value.Title,
                 ["game_name"] = stream.Value.GameName,
                 ["started_at"] = stream.Value.StartedAtUtc,
             },
+            AutomationValue.Arguments arguments => arguments
+                .Values.Select(static argument => argument.Value)
+                .ToArray(),
             _ => null,
         };
+
+    private static bool UsesSensitiveContext(string source) =>
+        ContainsIdentifier(source, "event")
+        || ContainsIdentifier(source, "stream")
+        || ContainsIdentifier(source, "timestamps")
+        || ContainsUnapprovedField(source, "actor", ["display_name", "login"])
+        || ContainsUnapprovedField(source, "channel", ["display_name", "login"]);
+
+    private static bool ContainsUnapprovedField(
+        string source,
+        string root,
+        ImmutableArray<string> approvedFields
+    )
+    {
+        var offset = 0;
+        while ((offset = source.IndexOf(root, offset, StringComparison.Ordinal)) >= 0)
+        {
+            var before = offset == 0 || !IsIdentifierCharacter(source[offset - 1]);
+            var rootEnd = offset + root.Length;
+            var after = rootEnd == source.Length || !IsIdentifierCharacter(source[rootEnd]);
+            if (before && after)
+            {
+                var approved = approvedFields.Any(field =>
+                    source.AsSpan(rootEnd).StartsWith($".{field}", StringComparison.Ordinal)
+                    && (
+                        rootEnd + field.Length + 1 == source.Length
+                        || !IsIdentifierCharacter(source[rootEnd + field.Length + 1])
+                    )
+                );
+                if (!approved)
+                {
+                    return true;
+                }
+            }
+
+            offset = rootEnd;
+        }
+
+        return false;
+    }
 
     private static bool ContainsIdentifier(string source, string identifier)
     {

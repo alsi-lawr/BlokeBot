@@ -63,8 +63,16 @@ public sealed class AutomationRunQueryService(
                     node.OutcomeCode,
                     node.CompletedAtUtc is { } completed
                         ? new DateTimeOffset(completed, TimeSpan.Zero)
-                        : null
+                        : null,
+                    Diagnostics(node.OutputJson)
                 ))
                 .ToImmutableArray()
         );
+
+    private static ImmutableArray<AutomationValueDiagnostic> Diagnostics(string? outputJson) =>
+        outputJson is not null
+        && AutomationDataValueSerialization.RestoreOutputs(outputJson)
+            is AutomationOutputRestoreOutcome.Available restored
+            ? AutomationDataValueSerialization.Diagnostics(restored.Outputs)
+            : [];
 }

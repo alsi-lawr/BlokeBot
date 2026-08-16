@@ -670,6 +670,7 @@ public sealed class NativeOperationAutomationTests
             new(fixture.HostId),
             new SendShoutoutActionConfiguration(),
             ImmutableDictionary<AutomationConfigurationFieldId, AutomationExpressionSource>.Empty,
+            ImmutableDictionary<AutomationConfigurationFieldId, AutomationResolvedValue>.Empty,
             context,
             CancellationToken.None
         );

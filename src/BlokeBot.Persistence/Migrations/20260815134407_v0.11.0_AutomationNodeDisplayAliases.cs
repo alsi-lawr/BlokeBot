@@ -26,11 +26,20 @@ namespace BlokeBot.Persistence.Migrations
                 maxLength: 200,
                 nullable: true
             );
+
+            migrationBuilder.AddColumn<string>(
+                name: "OutputJson",
+                table: "automation_node_runs",
+                type: "TEXT",
+                nullable: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(name: "OutputJson", table: "automation_node_runs");
+
             migrationBuilder.DropColumn(name: "DisplayAlias", table: "automation_flow_nodes");
 
             migrationBuilder.DropColumn(name: "Kind", table: "automation_flow_edges");

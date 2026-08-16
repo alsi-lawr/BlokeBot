@@ -222,13 +222,14 @@ public sealed class AutomationFlowService(
         var sourceDefinitionId = draft
             .Nodes.FirstOrDefault(node => node.Id == sourceNodeId)
             ?.Definition.TypeId;
-        return EvaluateSample(
+        return await EvaluateSampleAsync(
             draft,
             sourceNodeId,
             SampleContext(
                 host,
                 sourceDefinitionId ?? AutomationDefinitionIds.IncomingRaidSource.Value
-            )
+            ),
+            cancellationToken
         );
     }
 
@@ -1394,10 +1395,11 @@ public sealed class AutomationFlowService(
         );
     }
 
-    private AutomationSampleRunOutcome EvaluateSample(
+    private async Task<AutomationSampleRunOutcome> EvaluateSampleAsync(
         AutomationFlowDraft draft,
         AutomationNodeId sourceNodeId,
-        AutomationContext context
+        AutomationContext context,
+        CancellationToken cancellationToken
     )
     {
         var source = draft.Nodes.FirstOrDefault(node => node.Id == sourceNodeId);
@@ -1416,6 +1418,8 @@ public sealed class AutomationFlowService(
         }
         var outcomes = ImmutableArray.CreateBuilder<AutomationSampleNodeOutcome>();
         outcomes.Add(new(source.Id, AutomationNodeRunState.Succeeded, "source-received"));
+        var persisted = SampleFlow(draft);
+        var checkpoints = new AutomationSampleCheckpointStore();
         var pending = new Queue<AutomationNodeId>(Outgoing(draft.Edges, source.Id, null));
         var visited = new HashSet<AutomationNodeId> { source.Id };
         while (pending.TryDequeue(out var nodeId))
@@ -1433,8 +1437,37 @@ public sealed class AutomationFlowService(
                 return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
             }
 
+            var persistedNode = persisted.Nodes.Single(candidate => candidate.Id == node.Id.Value);
+            var inputs = await catalog.Data.ResolveInputsAsync(
+                draft.HostId,
+                context,
+                persisted,
+                persistedNode,
+                checkpoints,
+                cancellationToken
+            );
+            if (inputs is not AutomationInputResolution.Available resolvedInputs)
+            {
+                outcomes.Add(
+                    new(node.Id, AutomationNodeRunState.Failed, "input-resolution-failed")
+                );
+                return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
+            }
+
             var evaluated = EvaluateSampleNode(valid.Configuration, context);
-            outcomes.Add(new(node.Id, evaluated.State, evaluated.OutcomeCode));
+            outcomes.Add(
+                new(
+                    node.Id,
+                    evaluated.State,
+                    evaluated.OutcomeCode,
+                    AutomationDataValueSerialization.Diagnostics(
+                        resolvedInputs.FieldValues.ToDictionary(
+                            static pair => new AutomationPortId(pair.Key.Value),
+                            static pair => pair.Value
+                        )
+                    )
+                )
+            );
             if (evaluated.State == AutomationNodeRunState.Failed)
             {
                 return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
@@ -1448,6 +1481,36 @@ public sealed class AutomationFlowService(
 
         return new AutomationSampleRunOutcome.Completed(outcomes.ToImmutable());
     }
+
+    private static AutomationRuntimeSerialization.PersistedFlow SampleFlow(
+        AutomationFlowDraft draft
+    ) =>
+        new(
+            draft.Id?.Value ?? Guid.Empty,
+            draft.HostId.Value,
+            draft.SchemaVersion,
+            draft
+                .Nodes.Select(static node => new AutomationRuntimeSerialization.PersistedNode(
+                    node.Id.Value,
+                    node.Definition.TypeId,
+                    node.Definition.SchemaVersion,
+                    node.Definition.Configuration.GetRawText(),
+                    AutomationRuntimeSerialization.SerializeInputBindings(node.InputBindings),
+                    node.ExpressionLanguageVersion.Value,
+                    node.FailurePolicy == AutomationNodeFailurePolicy.Continue
+                ))
+                .ToImmutableArray(),
+            draft
+                .Edges.Select(static edge => new AutomationRuntimeSerialization.PersistedEdge(
+                    edge.Id,
+                    edge.Kind,
+                    edge.SourceNodeId.Value,
+                    edge.SourcePortId.Value,
+                    edge.TargetNodeId.Value,
+                    edge.TargetPortId.Value
+                ))
+                .ToImmutableArray()
+        );
 
     private SampleNodeEvaluation EvaluateSampleNode(
         AutomationConfiguration configuration,

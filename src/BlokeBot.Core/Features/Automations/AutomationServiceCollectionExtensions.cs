@@ -13,7 +13,9 @@ public static class AutomationServiceCollectionExtensions
         services.TryAddSingleton<AutomationDefinitionCatalog>();
         services.TryAddSingleton(static serviceProvider => new AutomationCatalogService(
             serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),
-            serviceProvider.GetRequiredService<HostFeatureService>()
+            serviceProvider.GetRequiredService<HostFeatureService>(),
+            serviceProvider.GetRequiredService<AutomationExpressionService>(),
+            serviceProvider.GetServices<IAutomationPureNodeHandler>()
         ));
         services.TryAddSingleton<AutomationExpressionService>();
         services.TryAddSingleton<AutomationActionExecutor>();

@@ -246,17 +246,12 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
             new("event-time"),
             "Event time",
             "When Twitch reported the event.",
-            AutomationPortValueType.Timestamp
+            AutomationPortValueType.Timestamp,
+            AutomationDataSensitivity.Sensitive
         );
 
     private static AutomationPortMetadata ActorPort(string name, string description) =>
-        new(
-            new("actor"),
-            name,
-            description,
-            AutomationPortValueType.Actor,
-            AutomationDataSensitivity.Sensitive
-        );
+        new(new("actor"), name, description, AutomationPortValueType.Actor);
 
     private static AutomationDefinition<StreamOnlineSourceConfiguration> StreamOnlineSource() =>
         new(
@@ -279,7 +274,8 @@ internal sealed class TwitchEventAutomationCatalogModule : IAutomationCatalogMod
                         new("stream"),
                         "Stream",
                         "The stream that just went live.",
-                        AutomationPortValueType.Stream
+                        AutomationPortValueType.Stream,
+                        AutomationDataSensitivity.Sensitive
                     ),
                 ],
                 [],

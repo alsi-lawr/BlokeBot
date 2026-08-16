@@ -519,6 +519,9 @@ namespace BlokeBot.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OutputJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("RunId")
                         .HasColumnType("TEXT");
 

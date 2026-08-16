@@ -172,6 +172,25 @@ internal sealed class AutomationDefinitionCatalog
         ValidateFields(descriptor, moduleId);
         ValidatePorts(descriptor, moduleId, descriptor.Inputs, isInput: true);
         ValidatePorts(descriptor, moduleId, descriptor.Outputs, isInput: false);
+
+        if (
+            descriptor.Kind == AutomationNodeKind.Action
+            && descriptor.Outputs.Any(static port => port.ValueType != AutomationPortValueType.Flow)
+        )
+        {
+            throw Invalid(descriptor, moduleId, "Effectful actions cannot declare Data outputs.");
+        }
+
+        if (
+            descriptor.Kind == AutomationNodeKind.Transform
+            && descriptor.Inputs.Any(static port =>
+                port.ValueType != AutomationPortValueType.Flow
+                && port.Sensitivity != AutomationDataSensitivity.Safe
+            )
+        )
+        {
+            throw Invalid(descriptor, moduleId, "Transforms cannot accept Sensitive Data inputs.");
+        }
     }
 
     private static void ValidatePorts(
@@ -271,6 +290,7 @@ internal sealed class AutomationDefinitionCatalog
             AutomationConfigurationFieldType.Reference => AutomationPortValueType.Text,
             AutomationConfigurationFieldType.Number => AutomationPortValueType.Number,
             AutomationConfigurationFieldType.Duration => AutomationPortValueType.Number,
+            AutomationConfigurationFieldType.Data data => data.ValueType,
             _ => null,
         };
 
@@ -313,6 +333,9 @@ internal sealed class AutomationDefinitionCatalog
                     && (duration.Maximum is null || duration.Maximum >= duration.Minimum),
                 AutomationConfigurationFieldType.Number number => number.Maximum is null
                     || number.Maximum >= number.Minimum,
+                AutomationConfigurationFieldType.Data data => data.ValueType
+                    != AutomationPortValueType.Flow
+                    && Enum.IsDefined(data.ValueType),
                 AutomationConfigurationFieldType.Reference reference => Enum.IsDefined(
                     reference.ReferenceKind
                 ),

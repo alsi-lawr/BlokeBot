@@ -186,7 +186,8 @@ public abstract record AutomationFlowDuplicateOutcome
 public sealed record AutomationSampleNodeOutcome(
     AutomationNodeId NodeId,
     AutomationNodeRunState State,
-    string OutcomeCode
+    string OutcomeCode,
+    ImmutableArray<AutomationValueDiagnostic> ResolvedInputs = default
 );
 
 public abstract record AutomationSampleRunOutcome
@@ -316,7 +317,8 @@ public sealed record AutomationNodeRunSummary(
     AutomationNodeId NodeId,
     AutomationNodeRunState State,
     string? OutcomeCode,
-    DateTimeOffset? CompletedAtUtc
+    DateTimeOffset? CompletedAtUtc,
+    ImmutableArray<AutomationValueDiagnostic> Outputs = default
 );
 
 public enum AutomationNodeRunState

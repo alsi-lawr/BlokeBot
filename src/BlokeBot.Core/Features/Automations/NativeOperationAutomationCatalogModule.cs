@@ -166,17 +166,12 @@ internal sealed class NativeOperationAutomationCatalogModule : IAutomationCatalo
             new("event-time"),
             "Event time",
             "When Twitch reported the event.",
-            AutomationPortValueType.Timestamp
+            AutomationPortValueType.Timestamp,
+            AutomationDataSensitivity.Sensitive
         );
 
     private static AutomationPortMetadata ActorPort(string name, string description) =>
-        new(
-            new("actor"),
-            name,
-            description,
-            AutomationPortValueType.Actor,
-            AutomationDataSensitivity.Sensitive
-        );
+        new(new("actor"), name, description, AutomationPortValueType.Actor);
 
     private static AutomationDefinition<ShoutoutSentSourceConfiguration> ShoutoutSentSource() =>
         new(

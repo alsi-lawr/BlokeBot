@@ -472,6 +472,646 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    public void TypedOutputs_RoundTripEveryValueKindOrderedArgumentsAndTypedNull()
+    {
+        var timestamp = new DateTimeOffset(2026, 8, 16, 10, 11, 12, TimeSpan.Zero);
+        var outputs = new Dictionary<AutomationPortId, AutomationResolvedValue>
+        {
+            [new("text")] = new(
+                new AutomationValue.Text("hello"),
+                [AutomationValueProvenance.Generated]
+            ),
+            [new("number")] = new(
+                new AutomationValue.Number(12.75m),
+                [AutomationValueProvenance.Generated]
+            ),
+            [new("boolean")] = new(
+                new AutomationValue.Boolean(true),
+                [AutomationValueProvenance.Generated]
+            ),
+            [new("timestamp")] = new(
+                new AutomationValue.Timestamp(timestamp),
+                [AutomationValueProvenance.Generated]
+            ),
+            [new("actor")] = new(
+                new AutomationValue.Actor(new("viewer", "Viewer")),
+                [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]
+            ),
+            [new("channel")] = new(
+                new AutomationValue.Channel(new("streamer", "Streamer")),
+                [AutomationValueProvenance.PublicDisplayName, AutomationValueProvenance.PublicLogin]
+            ),
+            [new("stream")] = new(
+                new AutomationValue.Stream(new("Title", "Game", timestamp)),
+                [AutomationValueProvenance.Generated]
+            ),
+            [new("arguments")] = new(
+                new AutomationValue.Arguments([
+                    new(0, "first", [AutomationValueProvenance.PublicChat]),
+                    new(1, "second", [AutomationValueProvenance.PublicChat]),
+                ]),
+                [AutomationValueProvenance.PublicChat]
+            ),
+            [new("null")] = new(
+                new AutomationValue.Null(AutomationPortValueType.Number),
+                [AutomationValueProvenance.Generated]
+            ),
+        };
+
+        var json = AutomationDataValueSerialization.SerializeOutputs(outputs);
+        var restored = AutomationDataValueSerialization
+            .RestoreOutputs(json)
+            .ShouldBeOfType<AutomationOutputRestoreOutcome.Available>();
+
+        restored.Outputs.Count.ShouldBe(outputs.Count);
+        foreach (var (port, expected) in outputs)
+        {
+            var actual = restored.Outputs[port];
+            actual.Provenance.ShouldBe(expected.Provenance);
+            if (expected.Value is not AutomationValue.Arguments)
+            {
+                actual.Value.ShouldBe(expected.Value);
+            }
+        }
+
+        restored
+            .Outputs[new("arguments")]
+            .Value.ShouldBeOfType<AutomationValue.Arguments>()
+            .Values.Select(static argument => (argument.Position, argument.Value))
+            .ShouldBe([(0, "first"), (1, "second")]);
+        restored
+            .Outputs[new("null")]
+            .Value.ShouldBe(new AutomationValue.Null(AutomationPortValueType.Number));
+        var catalog = new AutomationDefinitionCatalog([new DataContractAutomationModule()]);
+        _ = catalog.TryResolve(new("test-nullable-number-value"), out var nullableDefinition);
+        AutomationPureHandlerRegistry
+            .TryValidateResult(
+                nullableDefinition.Descriptor,
+                new(
+                    ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                        new("value"),
+                        new(
+                            new AutomationValue.Null(AutomationPortValueType.Number),
+                            [AutomationValueProvenance.Generated]
+                        )
+                    )
+                ),
+                ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty,
+                out var validatedNull
+            )
+            .ShouldBeTrue();
+        validatedNull[new("value")]
+            .Value.ShouldBe(new AutomationValue.Null(AutomationPortValueType.Number));
+        _ = AutomationDataValueSerialization
+            .RestoreOutputs("[{\"portId\":\"value\",\"value\":{\"kind\":\"unknown\"}}]")
+            .ShouldBeOfType<AutomationOutputRestoreOutcome.Invalid>();
+    }
+
+    [Test]
+    public void PureHandlerRegistry_RejectsDuplicatesDescriptorMismatchesAndEffectOutputs()
+    {
+        var catalog = new AutomationDefinitionCatalog([new DataContractAutomationModule()]);
+        var handler = TextValueHandler("test-counting-text-value", "value");
+
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
+            new AutomationPureHandlerRegistry(catalog, [handler, handler])
+        );
+        var mismatch = new TestPureHandler(
+            handler.Contract with
+            {
+                Kind = AutomationNodeKind.Transform,
+            },
+            static _ => new AutomationPureNodeResult.Failed("unused")
+        );
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
+            new AutomationPureHandlerRegistry(catalog, [mismatch])
+        );
+        var sensitive = new TestPureHandler(
+            new(
+                new("test-sensitive-number-value"),
+                AutomationNodeKind.Value,
+                [],
+                [
+                    new(
+                        new("value"),
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ]
+            ),
+            static _ => new AutomationPureNodeResult.Failed("unused")
+        );
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
+            new AutomationPureHandlerRegistry(catalog, [sensitive])
+        );
+        _ = Should.Throw<AutomationCatalogRegistrationException>(() =>
+            new AutomationDefinitionCatalog([new ActionDataOutputModule()])
+        );
+    }
+
+    [Test]
+    public async Task PureOutput_ExecutesOnceAcrossFanOutAndRemainsHostIsolated()
+    {
+        var handler = TextValueHandler("test-counting-text-value", "shared-value");
+        var transformHandler = TextTransformHandler();
+        await using var fixture = await RuntimeFixture.CreateAsync(
+            handlers: [handler, transformHandler]
+        );
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var transform = Node(
+            "test-text-transform",
+            "{}",
+            bindings: Bindings("input", AutomationInputBindingMode.Connected)
+        );
+        var first = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var second = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, transform, first, second],
+            [
+                Edge(source, "flow", first),
+                Edge(source, "flow", second),
+                Edge(value, "value", transform, "input", AutomationEdgeKind.Data),
+                Edge(transform, "value", first, "message", AutomationEdgeKind.Data),
+                Edge(transform, "value", second, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        dispatched.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        handler.Calls.ShouldBe(1);
+        transformHandler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["shared-value-transformed", "shared-value-transformed"]);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoints = await db
+                .AutomationNodeRuns.Where(node =>
+                    node.NodeId == value.Id.Value || node.NodeId == transform.Id.Value
+                )
+                .ToArrayAsync();
+            checkpoints.Length.ShouldBe(2);
+            checkpoints.ShouldAllBe(static checkpoint => checkpoint.OutputJson != null);
+        }
+
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        var diagnostic = summary
+            .Nodes.Single(node => node.NodeId == value.Id)
+            .Outputs.ShouldHaveSingleItem();
+        diagnostic.ValueType.ShouldBe(AutomationPortValueType.Text);
+        diagnostic.Provenance.ShouldBe([AutomationValueProvenance.Generated]);
+        diagnostic.DisplayValue.ShouldBe("shared-value");
+
+        var otherHost = await fixture.SeedHostAsync(
+            "other",
+            HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands
+        );
+        (await fixture.Queries.ListAsync(new(otherHost), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task PureOutput_CheckpointBeforeDelayIsReusedAfterProcessRestart()
+    {
+        var handler = TextValueHandler("test-counting-text-value", "persisted-value");
+        await using var fixture = await RuntimeFixture.CreateAsync(handlers: [handler]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var delay = Node(
+            "test-data-delay",
+            """{"duration-milliseconds":1000}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, delay, action],
+            [
+                Edge(source, "flow", delay),
+                Edge(delay, "complete", action),
+                Edge(value, "value", delay, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        handler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.NodeId == value.Id.Value
+            );
+            checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+            checkpoint.OutputJson.ShouldNotBeNull().ShouldContain("persisted-value");
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture
+            .NewRuntime()
+            .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Completed);
+        handler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["persisted-value"]);
+    }
+
+    [Test]
+    public async Task DisableAfterCheckpoint_InvalidatesWithoutReplayOrReevaluation()
+    {
+        var handler = TextValueHandler("test-counting-text-value", "must-not-replay");
+        await using var fixture = await RuntimeFixture.CreateAsync(handlers: [handler]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var delay = Node(
+            "test-data-delay",
+            """{"duration-milliseconds":1000}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, delay, action],
+            [
+                Edge(source, "flow", delay),
+                Edge(delay, "complete", action),
+                Edge(value, "value", delay, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        handler.Calls.ShouldBe(1);
+
+        await fixture.Features.DisableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
+        await fixture.Features.EnableAsync(
+            fixture.HostId,
+            HostFeatureFlags.Automations,
+            CancellationToken.None
+        );
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        (
+            await fixture
+                .NewRuntime()
+                .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None)
+        ).Status.ShouldBe(AutomationResumeStatus.Invalidated);
+        handler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task InterruptedDataAction_RetainsCheckpointAndDoesNotRetryEffectOrProducer()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var chat = InterruptFirstSend(entered);
+        var handler = TextValueHandler("test-counting-text-value", "single-attempt");
+        await using var fixture = await RuntimeFixture.CreateAsync(chat: chat, handlers: [handler]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, action],
+            [
+                Edge(source, "flow", action),
+                Edge(value, "value", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        using var cancellation = new CancellationTokenSource();
+        var dispatch = fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            cancellation.Token
+        );
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var runId = await SingleRunIdAsync(fixture);
+        cancellation.Cancel();
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => dispatch);
+
+        (
+            await fixture.NewRuntime().ResumeAsync(new(runId), CancellationToken.None)
+        ).Status.ShouldBe(AutomationResumeStatus.Failed);
+        handler.Calls.ShouldBe(1);
+        chat.Messages.ShouldBe(["single-attempt"]);
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+            node.NodeId == value.Id.Value
+        );
+        checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+        _ = checkpoint.OutputJson.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task PureProducerFailure_IsRecordedAndConsumerPolicyControlsFlow()
+    {
+        var stopHandler = FailingTextValueHandler();
+        await using var stop = await RuntimeFixture.CreateAsync(handlers: [stopHandler]);
+        var stopSource = Node("custom-command", """{"custom-command-id":7}""");
+        var stopValue = Node("test-failing-text-value", "{}");
+        var stopConsumer = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await stop.SaveAsync(
+            [stopSource, stopValue, stopConsumer],
+            [
+                Edge(stopSource, "flow", stopConsumer),
+                Edge(stopValue, "value", stopConsumer, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var stopped = await stop.Runtime.DispatchAsync(
+            new(Context(stop.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        (
+            await stop.Runtime.ResumeAsync(
+                stopped.RunIds.ShouldHaveSingleItem(),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(AutomationResumeStatus.Failed);
+        stop.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await stop.Database.CreateDbContextAsync())
+        {
+            var nodes = await db.AutomationNodeRuns.ToArrayAsync();
+            nodes
+                .Single(node => node.NodeId == stopValue.Id.Value)
+                .OutcomeCode.ShouldBe("deterministic-failure");
+            nodes
+                .Single(node => node.NodeId == stopConsumer.Id.Value)
+                .OutcomeCode.ShouldBe("input-resolution-failed");
+        }
+
+        var continueHandler = FailingTextValueHandler();
+        await using var continued = await RuntimeFixture.CreateAsync(handlers: [continueHandler]);
+        var continueSource = Node("custom-command", """{"custom-command-id":7}""");
+        var continueValue = Node("test-failing-text-value", "{}");
+        var continueConsumer = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            AutomationNodeFailurePolicy.Continue,
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var after = Node("send-chat", """{"message":"after"}""");
+        _ = await continued.SaveAsync(
+            [continueSource, continueValue, continueConsumer, after],
+            [
+                Edge(continueSource, "flow", continueConsumer),
+                Edge(continueConsumer, "complete", after),
+                Edge(continueValue, "value", continueConsumer, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var completed = await continued.Runtime.DispatchAsync(
+            new(Context(continued.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        (
+            await continued.Runtime.ResumeAsync(
+                completed.RunIds.ShouldHaveSingleItem(),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(AutomationResumeStatus.Completed);
+        continued.Chat.Messages.ShouldBe(["after"]);
+        var summary = (
+            await continued.Queries.ListAsync(new(continued.HostId), CancellationToken.None)
+        )
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary
+            .Nodes.Single(node => node.NodeId == continueConsumer.Id)
+            .State.ShouldBe(AutomationNodeRunState.ContinuedAfterFailure);
+    }
+
+    [Test]
+    public async Task MalformedCheckpoint_FailsClosedAndNeverExposesItsPayload()
+    {
+        var handler = TextValueHandler("test-counting-text-value", "safe-value");
+        await using var fixture = await RuntimeFixture.CreateAsync(handlers: [handler]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var delay = Node(
+            "test-data-delay",
+            """{"duration-milliseconds":1000}""",
+            bindings: Bindings("value", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, delay, action],
+            [
+                Edge(source, "flow", delay),
+                Edge(delay, "complete", action),
+                Edge(value, "value", delay, "value", AutomationEdgeKind.Data),
+                Edge(value, "value", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.NodeId == value.Id.Value
+            );
+            checkpoint.OutputJson = "{malformed-private-payload";
+            _ = await db.SaveChangesAsync();
+        }
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        var resumed = await fixture
+            .NewRuntime()
+            .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        handler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.NodeId == value.Id.Value
+            );
+            checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Failed);
+            checkpoint.OutcomeCode.ShouldBe("output-invalid");
+            checkpoint.OutputJson.ShouldBeNull();
+        }
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        JsonSerializer.Serialize(summary).ShouldNotContain("malformed-private-payload");
+    }
+
+    [Test]
+    public async Task DisplayNameProjection_IsSafeButStableIdsAndPrivateValuesAreBlocked()
+    {
+        var display = DisplayNameHandler();
+        await using var fixture = await RuntimeFixture.CreateAsync(handlers: [display]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var projector = Node(
+            "test-display-name-transform",
+            "{}",
+            bindings: Bindings("actor", AutomationInputBindingMode.Connected)
+        );
+        var action = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [source, projector, action],
+            [
+                Edge(source, "flow", action),
+                Edge(source, "actor", projector, "actor", AutomationEdgeKind.Data),
+                Edge(projector, "value", action, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        _ = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        display.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBe(["Viewer"]);
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var checkpoint = await db.AutomationNodeRuns.SingleAsync(node =>
+                node.NodeId == projector.Id.Value
+            );
+            var outputJson = checkpoint.OutputJson.ShouldNotBeNull();
+            outputJson.ShouldContain("Viewer");
+            outputJson.ShouldNotContain("viewer-id");
+        }
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary
+            .Nodes.Single(node => node.NodeId == projector.Id)
+            .Outputs.ShouldHaveSingleItem()
+            .Provenance.ShouldBe([AutomationValueProvenance.PublicDisplayName]);
+
+        await using var stableId = await RuntimeFixture.CreateAsync();
+        var idSource = Node("custom-command", """{"custom-command-id":7}""");
+        var idAction = Node("send-chat", """{"message":"${actor.twitch_user_id}"}""");
+        _ = await stableId.SaveAsync([idSource, idAction], [Edge(idSource, "flow", idAction)]);
+        _ = await stableId.Runtime.DispatchAsync(
+            new(Context(stableId.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        stableId.Chat.Messages.ShouldBeEmpty();
+
+        await using var privateValue = await RuntimeFixture.CreateAsync();
+        var privateSource = Node("custom-command", """{"custom-command-id":7}""");
+        var privateAction = Node("send-chat", """{"message":"${private_value}"}""");
+        _ = await privateValue.SaveAsync(
+            [privateSource, privateAction],
+            [Edge(privateSource, "flow", privateAction)]
+        );
+        _ = await privateValue.Runtime.DispatchAsync(
+            new(Context(privateValue.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        privateValue.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task PublicChatArgumentsRemainSafeAndSampleDataResolutionHasNoEffectsOrRows()
+    {
+        await using (var arguments = await RuntimeFixture.CreateAsync())
+        {
+            var source = Node("custom-command", """{"custom-command-id":7}""");
+            var action = Node("send-chat", """{"message":"${arguments[0]}"}""");
+            _ = await arguments.SaveAsync([source, action], [Edge(source, "flow", action)]);
+            _ = await arguments.Runtime.DispatchAsync(
+                new(
+                    Context(arguments.HostId, argument: "public words"),
+                    new CustomCommandSourceConfiguration(new(7))
+                ),
+                CancellationToken.None
+            );
+            arguments.Chat.Messages.ShouldBe(["public words"]);
+        }
+
+        var display = DisplayNameHandler();
+        await using var sample = await RuntimeFixture.CreateAsync(handlers: [display]);
+        var sampleSource = Node("custom-command", """{"custom-command-id":7}""");
+        var projector = Node(
+            "test-display-name-transform",
+            "{}",
+            bindings: Bindings("actor", AutomationInputBindingMode.Connected)
+        );
+        var actionNode = Node(
+            "test-text-consumer",
+            """{"message":"fallback"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var outcome = await sample.Flows.RunSampleAsync(
+            Draft(
+                sample.HostId,
+                [sampleSource, projector, actionNode],
+                [
+                    Edge(sampleSource, "flow", actionNode),
+                    Edge(sampleSource, "actor", projector, "actor", AutomationEdgeKind.Data),
+                    Edge(projector, "value", actionNode, "message", AutomationEdgeKind.Data),
+                ]
+            ),
+            sampleSource.Id,
+            CancellationToken.None
+        );
+
+        var completed = outcome.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        display.Calls.ShouldBe(1);
+        completed
+            .Nodes.Single(node => node.NodeId == actionNode.Id)
+            .ResolvedInputs.ShouldHaveSingleItem()
+            .DisplayValue.ShouldBe("Sample Viewer");
+        sample.Chat.Messages.ShouldBeEmpty();
+        await using var db = await sample.Database.CreateDbContextAsync();
+        (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task MalformedFrozenDefinition_FailsPendingRunWithoutExternalAction()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
@@ -1275,14 +1915,14 @@ public sealed class AutomationRuntimeTests
                 AutomationExpressionSource
             >.Empty.Add(
                 new("message"),
-                new(AutomationExpressionLanguage.CurrentVersion, "arguments[0]")
+                new(AutomationExpressionLanguage.CurrentVersion, "private_value")
             )
         );
         _ = await fixture.SaveAsync([source, action], [Edge(source, "flow", action)]);
 
         var dispatched = await fixture.Runtime.DispatchAsync(
             new(
-                Context(fixture.HostId, "do-not-expose"),
+                Context(fixture.HostId, sensitive: "do-not-expose"),
                 new CustomCommandSourceConfiguration(new(7))
             ),
             CancellationToken.None
@@ -1653,6 +2293,61 @@ public sealed class AutomationRuntimeTests
 
     private sealed record DataContractConfiguration : AutomationConfiguration;
 
+    private sealed class TestPureHandler(
+        AutomationPureHandlerContract contract,
+        Func<AutomationPureNodeInput, AutomationPureNodeResult> execute
+    ) : IAutomationPureNodeHandler
+    {
+        private int _calls;
+
+        public AutomationPureHandlerContract Contract { get; } = contract;
+
+        internal int Calls => Volatile.Read(ref _calls);
+
+        public ValueTask<AutomationPureNodeResult> ExecuteAsync(
+            AutomationPureNodeInput input,
+            CancellationToken cancellationToken
+        )
+        {
+            _ = Interlocked.Increment(ref _calls);
+            return ValueTask.FromResult(execute(input));
+        }
+    }
+
+    private sealed class ActionDataOutputModule : IAutomationCatalogModule
+    {
+        public AutomationModuleId Id => new("tests.action-output");
+
+        public IEnumerable<IAutomationDefinition> Definitions =>
+            [
+                new AutomationDefinition<DataContractConfiguration>(
+                    new(
+                        new("test-action-data-output"),
+                        AutomationNodeKind.Action,
+                        AutomationDefinitionScope.Host,
+                        new(new(1), new(1)),
+                        new("Invalid action", "Declares a Data output.", "Test"),
+                        [],
+                        [
+                            new(
+                                new("value"),
+                                "Value",
+                                "An invalid action result.",
+                                AutomationPortValueType.Text
+                            ),
+                        ],
+                        [],
+                        AutomationActionCapabilities.SendsChat,
+                        AutomationActionRetrySafety.Unsafe
+                    ),
+                    static _ => new AutomationConfigurationParseResult.Parsed(
+                        new DataContractConfiguration()
+                    ),
+                    static _ => AutomationValidationResult.Valid
+                ),
+            ];
+    }
+
     private sealed class DataContractAutomationModule : IAutomationCatalogModule
     {
         private static readonly AutomationSchemaCompatibility _schema = new(new(1), new(1));
@@ -1731,6 +2426,36 @@ public sealed class AutomationRuntimeTests
                 Consumer("test-number-consumer", required: true),
                 Consumer("test-nullable-number-consumer", required: false),
                 Definition(
+                    "test-counting-text-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [DataOutput(AutomationPortValueType.Text)],
+                    []
+                ),
+                Definition(
+                    "test-failing-text-value",
+                    AutomationNodeKind.Value,
+                    [],
+                    [DataOutput(AutomationPortValueType.Text)],
+                    []
+                ),
+                Definition(
+                    "test-text-transform",
+                    AutomationNodeKind.Transform,
+                    [DataInput("input", AutomationPortValueType.Text, required: true)],
+                    [DataOutput(AutomationPortValueType.Text)],
+                    [Field("input", AutomationPortValueType.Text, required: true)]
+                ),
+                Definition(
+                    "test-display-name-transform",
+                    AutomationNodeKind.Transform,
+                    [DataInput("actor", AutomationPortValueType.Actor, required: true)],
+                    [DataOutput(AutomationPortValueType.Text)],
+                    [Field("actor", AutomationPortValueType.Actor, required: true)]
+                ),
+                TextConsumer(),
+                DataDelay(),
+                Definition(
                     "test-data-control",
                     AutomationNodeKind.Control,
                     [_flowInput, DataInput(required: true)],
@@ -1753,6 +2478,90 @@ public sealed class AutomationRuntimeTests
                 [_flowInput, DataInput(required)],
                 [_completeOutput],
                 [Field(required)]
+            );
+
+        private static IAutomationDefinition TextConsumer() =>
+            new AutomationDefinition<SendChatActionConfiguration>(
+                new(
+                    new("test-text-consumer"),
+                    AutomationNodeKind.Action,
+                    AutomationDefinitionScope.Host,
+                    _schema,
+                    new("Text consumer", "Sends the resolved test text.", "Test"),
+                    [
+                        _flowInput,
+                        DataInput("message", AutomationPortValueType.Text, required: true),
+                    ],
+                    [_completeOutput],
+                    [
+                        new(
+                            new("message"),
+                            "Message",
+                            "The resolved message.",
+                            new AutomationConfigurationFieldType.Text(500),
+                            true
+                        ),
+                    ],
+                    AutomationActionCapabilities.SendsChat,
+                    AutomationActionRetrySafety.Unsafe
+                ),
+                static json =>
+                    json.TryGetProperty("message", out var message)
+                    && message.ValueKind == JsonValueKind.String
+                        ? new AutomationConfigurationParseResult.Parsed(
+                            new SendChatActionConfiguration(message.GetString()!)
+                        )
+                        : new AutomationConfigurationParseResult.Invalid([]),
+                static configuration =>
+                    string.IsNullOrWhiteSpace(configuration.Message)
+                        ? AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("message")),
+                            "Enter a fallback message."
+                        )
+                        : AutomationValidationResult.Valid
+            );
+
+        private static IAutomationDefinition DataDelay() =>
+            new AutomationDefinition<DelayControlConfiguration>(
+                new(
+                    new("test-data-delay"),
+                    AutomationNodeKind.Control,
+                    AutomationDefinitionScope.Host,
+                    _schema,
+                    new("Data delay", "Waits after resolving test data.", "Test"),
+                    [_flowInput, DataInput("value", AutomationPortValueType.Text, required: true)],
+                    [_completeOutput],
+                    [
+                        new(
+                            new("duration-milliseconds"),
+                            "Duration",
+                            "The delay duration.",
+                            new AutomationConfigurationFieldType.Duration(
+                                TimeSpan.FromMilliseconds(1),
+                                null
+                            ),
+                            true
+                        ),
+                        Field("value", AutomationPortValueType.Text, required: true),
+                    ],
+                    AutomationActionCapabilities.None,
+                    AutomationActionRetrySafety.NotApplicable
+                ),
+                static json =>
+                    json.TryGetProperty("duration-milliseconds", out var duration)
+                    && duration.TryGetInt64(out var milliseconds)
+                    && milliseconds > 0
+                        ? new AutomationConfigurationParseResult.Parsed(
+                            new DelayControlConfiguration(TimeSpan.FromMilliseconds(milliseconds))
+                        )
+                        : new AutomationConfigurationParseResult.Invalid([]),
+                static configuration =>
+                    configuration.Duration > TimeSpan.Zero
+                        ? AutomationValidationResult.Valid
+                        : AutomationValidationResult.Invalid(
+                            new AutomationValidationTarget.Field(new("duration-milliseconds")),
+                            "Choose a positive delay."
+                        )
             );
 
         private static IAutomationDefinition Definition(
@@ -1784,15 +2593,22 @@ public sealed class AutomationRuntimeTests
             );
 
         private static AutomationPortMetadata DataInput(bool required) =>
+            DataInput("value", AutomationPortValueType.Number, required);
+
+        private static AutomationPortMetadata DataInput(
+            string id,
+            AutomationPortValueType valueType,
+            bool required
+        ) =>
             new(
-                new("value"),
+                new(id),
                 "Value",
-                "Receives the exact Number value.",
-                AutomationPortValueType.Number,
+                "Receives the exact typed value.",
+                valueType,
                 Nullability: required
                     ? AutomationPortNullability.NonNullable
                     : AutomationPortNullability.Nullable,
-                BindingFieldId: new("value")
+                BindingFieldId: new(id)
             );
 
         private static AutomationPortMetadata DataOutput(
@@ -1802,14 +2618,134 @@ public sealed class AutomationRuntimeTests
         ) => new(new("value"), "Value", "Supplies a typed value.", type, sensitivity, nullability);
 
         private static AutomationConfigurationFieldMetadata Field(bool required) =>
+            Field("value", AutomationPortValueType.Number, required);
+
+        private static AutomationConfigurationFieldMetadata Field(
+            string id,
+            AutomationPortValueType valueType,
+            bool required
+        ) =>
             new(
-                new("value"),
+                new(id),
                 "Value",
                 "The retained Fixed value.",
-                new AutomationConfigurationFieldType.Number(0, null),
+                valueType == AutomationPortValueType.Number
+                    ? new AutomationConfigurationFieldType.Number(0, null)
+                    : new AutomationConfigurationFieldType.Data(valueType),
                 required
             );
     }
+
+    private static TestPureHandler TextValueHandler(string definitionId, string value) =>
+        new(
+            new(
+                new(definitionId),
+                AutomationNodeKind.Value,
+                [],
+                [
+                    new(
+                        new("value"),
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ]
+            ),
+            _ => new AutomationPureNodeResult.Succeeded(
+                ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                    new("value"),
+                    new(new AutomationValue.Text(value), [AutomationValueProvenance.Generated])
+                )
+            )
+        );
+
+    private static TestPureHandler FailingTextValueHandler() =>
+        new(
+            new(
+                new("test-failing-text-value"),
+                AutomationNodeKind.Value,
+                [],
+                [
+                    new(
+                        new("value"),
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ]
+            ),
+            static _ => new AutomationPureNodeResult.Failed("deterministic-failure")
+        );
+
+    private static TestPureHandler TextTransformHandler() =>
+        new(
+            new(
+                new("test-text-transform"),
+                AutomationNodeKind.Transform,
+                [
+                    new(
+                        new("input"),
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ],
+                [
+                    new(
+                        new("value"),
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ]
+            ),
+            static input =>
+            {
+                var value = input.Inputs[new("input")].Value.ShouldBeOfType<AutomationValue.Text>();
+                return new AutomationPureNodeResult.Succeeded(
+                    ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                        new("value"),
+                        new(
+                            new AutomationValue.Text($"{value.Value}-transformed"),
+                            input.Inputs[new("input")].Provenance
+                        )
+                    )
+                );
+            }
+        );
+
+    private static TestPureHandler DisplayNameHandler() =>
+        new(
+            new(
+                new("test-display-name-transform"),
+                AutomationNodeKind.Transform,
+                [
+                    new(
+                        new("actor"),
+                        AutomationPortValueType.Actor,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ],
+                [
+                    new(
+                        new("value"),
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable
+                    ),
+                ]
+            ),
+            static input =>
+            {
+                var actor = input
+                    .Inputs[new("actor")]
+                    .Value.ShouldBeOfType<AutomationValue.Actor>();
+                return new AutomationPureNodeResult.Succeeded(
+                    ImmutableDictionary<AutomationPortId, AutomationResolvedValue>.Empty.Add(
+                        new("value"),
+                        new(
+                            new AutomationValue.Text(actor.Value.DisplayName),
+                            [AutomationValueProvenance.PublicDisplayName]
+                        )
+                    )
+                );
+            }
+        );
 
     private sealed class RuntimeFixture : IAsyncDisposable
     {
@@ -1857,7 +2793,8 @@ public sealed class AutomationRuntimeTests
             IOverlayCueAdmissionService? overlays = null,
             HostFeatureFlags hostFeatures =
                 HostFeatureFlags.Automations | HostFeatureFlags.CustomCommands,
-            RecordingChatSender? chat = null
+            RecordingChatSender? chat = null,
+            IEnumerable<IAutomationPureNodeHandler>? handlers = null
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -1872,11 +2809,13 @@ public sealed class AutomationRuntimeTests
                 [],
                 [observer]
             );
+            var expressions = new AutomationExpressionService();
             var catalog = new AutomationCatalogService(
                 new([new CoreAutomationCatalogModule(), new DataContractAutomationModule()]),
-                features
+                features,
+                expressions,
+                handlers ?? []
             );
-            var expressions = new AutomationExpressionService();
             overlays ??= new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);

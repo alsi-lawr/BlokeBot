@@ -665,11 +665,44 @@ public sealed class AutomationRuntimeService(
                 continue;
             }
 
+            var inputs = await catalog.Data.ResolveInputsAsync(
+                new(run.HostId),
+                available.Context,
+                flow,
+                node,
+                new RuntimeCheckpointStore(db, run, leaseId, clock),
+                cancellationToken
+            );
+            if (inputs is not AutomationInputResolution.Available resolvedInputs)
+            {
+                var failedGate = await GateAsync(new(run.HostId), cancellationToken);
+                if (
+                    failedGate is not AutomationRuntimeGate.Enabled failedEnabled
+                    || failedEnabled.Generation != run.AutomationGeneration
+                    || !failedEnabled.Features.Contains(run.RequiredFeatures)
+                )
+                {
+                    return new(
+                        failedGate is AutomationRuntimeGate.Enabled
+                            ? AutomationResumeStatus.Invalidated
+                            : AutomationResumeStatus.FeatureDisabled
+                    );
+                }
+
+                if (await StopsFlowAsync(scope, "input-resolution-failed", cancellationToken))
+                {
+                    return new(AutomationResumeStatus.Failed);
+                }
+
+                continue;
+            }
+
             var result = await ExecuteNodeAsync(
                 new(run.HostId),
                 valid.Configuration,
                 node,
                 available.Context,
+                resolvedInputs.FieldValues,
                 cancellationToken
             );
             var finalGate = await GateAsync(new(run.HostId), cancellationToken);
@@ -1136,13 +1169,21 @@ public sealed class AutomationRuntimeService(
         AutomationConfiguration configuration,
         AutomationRuntimeSerialization.PersistedNode node,
         AutomationContext context,
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         CancellationToken cancellationToken
     ) =>
         configuration switch
         {
             ConditionControlConfiguration condition => EvaluateCondition(condition, context),
             DelayControlConfiguration delay => Delay(delay),
-            _ => await ExecuteActionAsync(hostId, configuration, node, context, cancellationToken),
+            _ => await ExecuteActionAsync(
+                hostId,
+                configuration,
+                node,
+                context,
+                inputs,
+                cancellationToken
+            ),
         };
 
     private AutomationNodeExecution Delay(DelayControlConfiguration configuration)
@@ -1176,6 +1217,7 @@ public sealed class AutomationRuntimeService(
         AutomationConfiguration configuration,
         AutomationRuntimeSerialization.PersistedNode node,
         AutomationContext context,
+        ImmutableDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         CancellationToken cancellationToken
     )
     {
@@ -1187,15 +1229,6 @@ public sealed class AutomationRuntimeService(
             return new AutomationNodeExecution.Failed("binding-invalid");
         }
 
-        if (
-            restored.Bindings.Values.Any(static binding =>
-                binding.Mode == AutomationInputBindingMode.Connected
-            )
-        )
-        {
-            return new AutomationNodeExecution.Failed("input-resolution-unavailable");
-        }
-
         var activeExpressions = restored
             .Bindings.Where(static pair => pair.Value.Mode == AutomationInputBindingMode.Expression)
             .ToImmutableDictionary(static pair => pair.Key, static pair => pair.Value.Expression!);
@@ -1203,6 +1236,7 @@ public sealed class AutomationRuntimeService(
             hostId,
             configuration,
             activeExpressions,
+            inputs,
             context,
             cancellationToken
         );
@@ -1372,6 +1406,108 @@ public sealed class AutomationRuntimeService(
         internal sealed record Owned(Guid LeaseId) : AutomationRunClaim;
 
         internal sealed record Unavailable(AutomationResumeStatus Status) : AutomationRunClaim;
+    }
+
+    private sealed class RuntimeCheckpointStore(
+        BlokeBotDbContext db,
+        AutomationFlowRun run,
+        Guid leaseId,
+        TimeProvider clock
+    ) : IAutomationPureCheckpointStore
+    {
+        public async ValueTask<AutomationPureCheckpoint> ReadOrBeginAsync(
+            AutomationRuntimeSerialization.PersistedNode node,
+            CancellationToken cancellationToken
+        )
+        {
+            var existing = run.NodeRuns.SingleOrDefault(value => value.NodeId == node.Id);
+            if (
+                existing
+                    is { Status: AutomationNodeRunStatus.Succeeded, OutputJson: { } outputJson }
+                && AutomationDataValueSerialization.RestoreOutputs(outputJson)
+                    is AutomationOutputRestoreOutcome.Available restored
+            )
+            {
+                return new AutomationPureCheckpoint.Available(restored.Outputs);
+            }
+
+            if (existing is not null)
+            {
+                if (existing.Status == AutomationNodeRunStatus.Succeeded)
+                {
+                    existing.Status = AutomationNodeRunStatus.Failed;
+                    existing.OutcomeCode = "output-invalid";
+                    existing.OutputJson = null;
+                    existing.CompletedAtUtc = clock.GetUtcNow().UtcDateTime;
+                    _ = await db.SaveChangesAsync(cancellationToken);
+                }
+
+                return new AutomationPureCheckpoint.Failed();
+            }
+
+            var now = clock.GetUtcNow().UtcDateTime;
+            var checkpoint = new AutomationNodeRun
+            {
+                RunId = run.Id,
+                NodeId = node.Id,
+                Sequence = run.NodeRuns.Max(static value => value.Sequence) + 1,
+                Status = AutomationNodeRunStatus.Running,
+                AvailableAtUtc = now,
+                StartedAtUtc = now,
+            };
+            run.NodeRuns.Add(checkpoint);
+            _ = await db.SaveChangesAsync(cancellationToken);
+            return new AutomationPureCheckpoint.Begin();
+        }
+
+        public async ValueTask<bool> CompleteAsync(
+            AutomationRuntimeSerialization.PersistedNode node,
+            ImmutableDictionary<AutomationPortId, AutomationResolvedValue> outputs,
+            CancellationToken cancellationToken
+        )
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            var checkpoint = run.NodeRuns.Single(value => value.NodeId == node.Id);
+            checkpoint.Status = AutomationNodeRunStatus.Succeeded;
+            checkpoint.OutcomeCode = "output-checkpointed";
+            checkpoint.OutputJson = AutomationDataValueSerialization.SerializeOutputs(outputs);
+            checkpoint.CompletedAtUtc = clock.GetUtcNow().UtcDateTime;
+            _ = await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+
+        public async ValueTask FailAsync(
+            AutomationRuntimeSerialization.PersistedNode node,
+            string code,
+            CancellationToken cancellationToken
+        )
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            if (await TouchOwnedRunAsync(db, run.Id, leaseId, cancellationToken) == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
+
+            var checkpoint = run.NodeRuns.Single(value => value.NodeId == node.Id);
+            checkpoint.Status = AutomationNodeRunStatus.Failed;
+            checkpoint.OutcomeCode = code;
+            checkpoint.OutputJson = null;
+            checkpoint.CompletedAtUtc = clock.GetUtcNow().UtcDateTime;
+            _ = await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
     }
 
     private sealed record AutomationNodeExecutionScope(
