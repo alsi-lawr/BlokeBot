@@ -3061,6 +3061,134 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task CelTransform_LaterOutputFailureExposesNoPartialCheckpointAndHonorsScheduledFailurePolicy(
+        bool continueOnFailure
+    )
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("test-dynamic-safe-source", """{"include-display-name":true}""");
+        var transform = Node(
+            "test-cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "amount-input",
+                        "amount",
+                        "Amount",
+                        "amount-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        -1234.5m
+                    ),
+                    new(
+                        "precision-input",
+                        "precision",
+                        "Precision",
+                        "precision-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        7m
+                    ),
+                ],
+                [
+                    new(
+                        "first-output",
+                        "First",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "'must-not-escape'"
+                    ),
+                    new(
+                        "second-output",
+                        "Second",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        "format_number(amount, int(precision))"
+                    ),
+                ]
+            ),
+            bindings: Bindings("amount-binding", AutomationInputBindingMode.Fixed)
+                .Add(
+                    new("precision-binding"),
+                    new(AutomationInputBindingMode.Fixed, Expression: null)
+                )
+        );
+        var consumer = Node(
+            "test-text-consumer",
+            """{"message":"must not send"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        ) with
+        {
+            FailurePolicy = continueOnFailure
+                ? AutomationNodeFailurePolicy.Continue
+                : AutomationNodeFailurePolicy.Stop,
+        };
+        var continued = Node("condition", """{"expression":"arguments[0] == 'yes'"}""");
+        _ = await fixture.SaveAsync(
+            [source, transform, consumer, continued],
+            [
+                Edge(source, "flow", consumer),
+                Edge(consumer, "complete", continued),
+                Edge(transform, "first-output", consumer, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(
+                Context(fixture.HostId, sourceDefinitionId: new("test-dynamic-safe-source")),
+                new DynamicSafeSourceConfiguration(IncludeDisplayName: true)
+            ),
+            CancellationToken.None
+        );
+
+        dispatched.Status.ShouldBe(AutomationDispatchStatus.Accepted);
+        fixture.TransformHandler.Calls.ShouldBe(1);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db
+                .AutomationFlowRuns.AsNoTracking()
+                .Include(static value => value.NodeRuns)
+                .SingleAsync();
+            run.Status.ShouldBe(
+                continueOnFailure
+                    ? AutomationFlowRunStatus.Completed
+                    : AutomationFlowRunStatus.Failed
+            );
+            var checkpoint = run.NodeRuns.Single(node => node.NodeId == transform.Id.Value);
+            checkpoint.Status.ShouldBe(AutomationNodeRunStatus.Failed);
+            checkpoint.OutcomeCode.ShouldBe("output-invalid");
+            checkpoint.OutputJson.ShouldBeNull();
+            run.NodeRuns.ShouldNotContain(static node => node.OutcomeCode == "output-checkpointed");
+            var scheduled = run.NodeRuns.Single(node => node.NodeId == consumer.Id.Value);
+            scheduled.Status.ShouldBe(
+                continueOnFailure
+                    ? AutomationNodeRunStatus.ContinuedAfterFailure
+                    : AutomationNodeRunStatus.Failed
+            );
+            scheduled.OutcomeCode.ShouldBe("input-resolution-failed");
+            if (continueOnFailure)
+            {
+                var continuation = run.NodeRuns.Single(node => node.NodeId == continued.Id.Value);
+                continuation.Status.ShouldBe(AutomationNodeRunStatus.Succeeded);
+                continuation.OutcomeCode.ShouldBe("condition-true");
+            }
+            else
+            {
+                run.NodeRuns.ShouldNotContain(node => node.NodeId == continued.Id.Value);
+            }
+        }
+
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary.Nodes.Single(node => node.NodeId == transform.Id).Outputs.ShouldBeEmpty();
+        JsonSerializer.Serialize(summary).ShouldNotContain("must-not-escape");
+    }
+
+    [Test]
     public async Task MultipleMatchingTriggers_StartIndependentRunsThroughSharedNode()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
