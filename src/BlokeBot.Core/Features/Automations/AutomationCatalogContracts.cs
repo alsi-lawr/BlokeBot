@@ -179,18 +179,6 @@ public sealed record AutomationDefinitionDescriptor(
     AutomationTriggerContextRequirement? TriggerContextRequirement = null
 );
 
-internal sealed record AutomationSafeTriggerFieldContract(
-    AutomationSafeTriggerFieldId Id,
-    string Path,
-    AutomationPortValueType ValueType,
-    AutomationPortNullability Nullability,
-    AutomationValueProvenance Provenance
-);
-
-internal sealed record AutomationSafeTriggerSourceContract(
-    ImmutableArray<AutomationSafeTriggerFieldContract> Fields
-);
-
 public abstract record AutomationValidationTarget
 {
     private AutomationValidationTarget() { }
@@ -454,17 +442,7 @@ public abstract record AutomationConfigurationCheck
     public sealed record Valid(
         AutomationDefinitionDescriptor Definition,
         AutomationConfiguration Configuration
-    ) : AutomationConfigurationCheck
-    {
-        internal Valid(
-            AutomationDefinitionDescriptor definition,
-            AutomationConfiguration configuration,
-            AutomationSafeTriggerSourceContract? safeTriggerSource
-        )
-            : this(definition, configuration) => SafeTriggerSource = safeTriggerSource;
-
-        internal AutomationSafeTriggerSourceContract? SafeTriggerSource { get; }
-    }
+    ) : AutomationConfigurationCheck;
 
     public sealed record Invalid(ImmutableArray<AutomationValidationError> Errors)
         : AutomationConfigurationCheck;

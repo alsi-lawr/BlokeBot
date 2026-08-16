@@ -938,21 +938,12 @@ public sealed class AutomationFlowService(
         ImmutableArray<AutomationGraphError>.Builder errors
     )
     {
-        var flow = SampleFlow(draft);
         var service = new AutomationSafeTriggerExpressionService();
         foreach (var node in draft.Nodes)
         {
             if (
                 !definitions.TryGetValue(node.Id, out var definition)
                 || definition.Kind != AutomationNodeKind.Transform
-                || flow.Nodes.FirstOrDefault(candidate => candidate.Id == node.Id.Value)
-                    is not { } persisted
-                || !AutomationSafeTriggerViewResolver.TryBuild(
-                    catalog,
-                    flow,
-                    persisted,
-                    out var safeView
-                )
             )
             {
                 continue;
@@ -970,15 +961,7 @@ public sealed class AutomationFlowService(
                     continue;
                 }
 
-                if (
-                    !service.Validate(
-                        binding.Expression,
-                        input,
-                        safeView,
-                        out _,
-                        out var invalidSafeField
-                    )
-                )
+                if (!service.Validate(binding.Expression, input, out _, out var invalidSafeField))
                 {
                     errors.Add(
                         new(

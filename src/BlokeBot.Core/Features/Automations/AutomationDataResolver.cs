@@ -132,14 +132,7 @@ internal sealed class AutomationDataResolver(
                 && valid.Configuration is AutomationCelTransformConfiguration
             )
             {
-                resolved = AutomationSafeTriggerViewResolver.TryBuild(
-                    catalog,
-                    flow,
-                    consumer,
-                    out var safeView
-                )
-                    ? _safeExpressions.Evaluate(binding.Expression!, input, safeView, context)
-                    : null;
+                resolved = _safeExpressions.Evaluate(binding.Expression!, input, context);
             }
             else if (binding.Mode == AutomationInputBindingMode.Expression)
             {

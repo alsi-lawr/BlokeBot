@@ -817,12 +817,10 @@ internal static class AutomationCelStaticTypes
         return symbols;
     }
 
-    internal static IReadOnlyDictionary<string, AutomationCelStaticType> ForSafeView(
-        AutomationSafeTriggerViewDescriptor descriptor
-    )
+    internal static IReadOnlyDictionary<string, AutomationCelStaticType> ForSafeView()
     {
         var symbols = new Dictionary<string, AutomationCelStaticType>(StringComparer.Ordinal);
-        foreach (var field in descriptor.AvailableFields)
+        foreach (var field in AutomationSafeTriggerView.Descriptor.Fields)
         {
             AddSymbol(symbols, field.Path, field.ValueType, field.Nullability);
         }

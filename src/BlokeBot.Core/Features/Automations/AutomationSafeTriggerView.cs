@@ -6,14 +6,18 @@ namespace BlokeBot.Core.Features.Automations;
 internal static class AutomationSafeTriggerView
 {
     public const int CurrentVersion = 1;
-}
 
-internal enum AutomationSafeTriggerFieldStatus
-{
-    Available,
-    ReservedName,
-    Collision,
-    Incompatible,
+    internal static AutomationSafeTriggerViewField ArgumentsField { get; } =
+        new(
+            new("arguments"),
+            "arguments",
+            AutomationPortValueType.Arguments,
+            AutomationPortNullability.NonNullable,
+            AutomationValueProvenance.PublicChat
+        );
+
+    internal static AutomationSafeTriggerViewDescriptor Descriptor { get; } =
+        new(CurrentVersion, [ArgumentsField]);
 }
 
 internal sealed record AutomationSafeTriggerViewField(
@@ -21,269 +25,13 @@ internal sealed record AutomationSafeTriggerViewField(
     string Path,
     AutomationPortValueType ValueType,
     AutomationPortNullability Nullability,
-    AutomationValueProvenance Provenance,
-    AutomationSafeTriggerFieldStatus Status
+    AutomationValueProvenance Provenance
 );
 
 internal sealed record AutomationSafeTriggerViewDescriptor(
     int Version,
     ImmutableArray<AutomationSafeTriggerViewField> Fields
-)
-{
-    internal ImmutableArray<AutomationSafeTriggerViewField> AvailableFields =>
-        [
-            .. Fields.Where(static candidate =>
-                candidate.Status == AutomationSafeTriggerFieldStatus.Available
-            ),
-        ];
-}
-
-internal static class AutomationSafeTriggerManifest
-{
-    private static readonly ImmutableDictionary<
-        string,
-        AutomationSafeTriggerFieldContract
-    > _fields = new AutomationSafeTriggerFieldContract[]
-    {
-        new(
-            new("actor-login"),
-            "actor.login",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.Nullable,
-            AutomationValueProvenance.PublicLogin
-        ),
-        new(
-            new("actor-display-name"),
-            "actor.display_name",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.Nullable,
-            AutomationValueProvenance.PublicDisplayName
-        ),
-        new(
-            new("channel-login"),
-            "channel.login",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.NonNullable,
-            AutomationValueProvenance.PublicLogin
-        ),
-        new(
-            new("channel-display-name"),
-            "channel.display_name",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.NonNullable,
-            AutomationValueProvenance.PublicDisplayName
-        ),
-        new(
-            new("stream-title"),
-            "stream.title",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.Nullable,
-            AutomationValueProvenance.Generated
-        ),
-        new(
-            new("stream-game-name"),
-            "stream.game_name",
-            AutomationPortValueType.Text,
-            AutomationPortNullability.Nullable,
-            AutomationValueProvenance.Generated
-        ),
-        new(
-            new("stream-started-at"),
-            "stream.started_at",
-            AutomationPortValueType.Timestamp,
-            AutomationPortNullability.Nullable,
-            AutomationValueProvenance.Generated
-        ),
-        new(
-            new("arguments"),
-            "arguments",
-            AutomationPortValueType.Arguments,
-            AutomationPortNullability.NonNullable,
-            AutomationValueProvenance.PublicChat
-        ),
-    }.ToImmutableDictionary(static field => field.Path, StringComparer.Ordinal);
-
-    internal static bool IsValid(AutomationSafeTriggerFieldContract field)
-    {
-        if (_fields.TryGetValue(field.Path, out var canonical))
-        {
-            return field == canonical;
-        }
-
-        var separator = field.Path.IndexOf('.');
-        var root = separator < 0 ? field.Path : field.Path[..separator];
-        return root is not ("actor" or "channel" or "stream" or "arguments");
-    }
-}
-
-internal static class AutomationSafeTriggerViewResolver
-{
-    private static readonly ImmutableHashSet<string> _reservedRoots = ImmutableHashSet.Create(
-        StringComparer.Ordinal,
-        "event",
-        "timestamps",
-        AutomationCelTransform.FunctionName
-    );
-
-    internal static bool TryBuild(
-        AutomationCatalogService catalog,
-        AutomationRuntimeSerialization.PersistedFlow flow,
-        AutomationRuntimeSerialization.PersistedNode transform,
-        out AutomationSafeTriggerViewDescriptor descriptor
-    )
-    {
-        descriptor = null!;
-        var definitions = new Dictionary<Guid, AutomationConfigurationCheck.Valid>();
-        foreach (var node in flow.Nodes)
-        {
-            if (
-                catalog.ValidatePersistedDefinition(AutomationRuntimeSerialization.Definition(node))
-                is not AutomationConfigurationCheck.Valid valid
-            )
-            {
-                return false;
-            }
-
-            if (!definitions.TryAdd(node.Id, valid))
-            {
-                return false;
-            }
-        }
-
-        if (
-            !definitions.TryGetValue(transform.Id, out var transformDefinition)
-            || transformDefinition.Definition.Kind != AutomationNodeKind.Transform
-        )
-        {
-            return false;
-        }
-
-        var flowAdjacency = definitions.Keys.ToDictionary(
-            static nodeId => nodeId,
-            static _ => new List<Guid>()
-        );
-        var dataAdjacency = definitions.Keys.ToDictionary(
-            static nodeId => nodeId,
-            static _ => new List<Guid>()
-        );
-        foreach (var edge in flow.Edges)
-        {
-            var adjacency = edge.Kind == AutomationEdgeKind.Flow ? flowAdjacency : dataAdjacency;
-            if (
-                !adjacency.TryGetValue(edge.SourceNodeId, out var targets)
-                || !adjacency.ContainsKey(edge.TargetNodeId)
-            )
-            {
-                return false;
-            }
-
-            targets.Add(edge.TargetNodeId);
-        }
-
-        var consumers = Reachable([transform.Id], dataAdjacency)
-            .Where(nodeId =>
-                definitions[nodeId].Definition.Kind
-                    is AutomationNodeKind.Action
-                        or AutomationNodeKind.Control
-            )
-            .ToHashSet();
-        var sources = definitions
-            .Where(static pair => pair.Value.Definition.Kind == AutomationNodeKind.Source)
-            .Where(pair =>
-                consumers.Count == 0 || Reachable([pair.Key], flowAdjacency).Overlaps(consumers)
-            )
-            .Select(static pair => pair.Value.SafeTriggerSource)
-            .ToArray();
-        descriptor = Build(sources);
-        return true;
-    }
-
-    internal static AutomationSafeTriggerViewDescriptor Build(
-        IReadOnlyCollection<AutomationSafeTriggerSourceContract?> sources
-    )
-    {
-        var all = sources
-            .SelectMany(static source => source?.Fields ?? [])
-            .GroupBy(static field => field.Path, StringComparer.Ordinal)
-            .OrderBy(static group => group.Key, StringComparer.Ordinal);
-        var paths = all.Select(static group => group.Key).ToArray();
-        var fields = ImmutableArray.CreateBuilder<AutomationSafeTriggerViewField>();
-        foreach (var group in all)
-        {
-            var contracts = group.ToArray();
-            var root = Root(group.Key);
-            var status =
-                _reservedRoots.Contains(root)
-                || (
-                    !group.Key.Contains('.')
-                    && _rootNames.Contains(group.Key)
-                    && group.Key != "arguments"
-                )
-                    ? AutomationSafeTriggerFieldStatus.ReservedName
-                : contracts.Select(static field => field.Id).Distinct().Count() != 1
-                || paths.Any(path =>
-                    path != group.Key
-                    && (
-                        path.StartsWith($"{group.Key}.", StringComparison.Ordinal)
-                        || group.Key.StartsWith($"{path}.", StringComparison.Ordinal)
-                    )
-                )
-                    ? AutomationSafeTriggerFieldStatus.Collision
-                : contracts
-                    .Select(static field => (field.ValueType, field.Nullability, field.Provenance))
-                    .Distinct()
-                    .Count() != 1
-                    ? AutomationSafeTriggerFieldStatus.Incompatible
-                : contracts.Length != sources.Count ? AutomationSafeTriggerFieldStatus.Incompatible
-                : AutomationSafeTriggerFieldStatus.Available;
-            var first = contracts[0];
-            fields.Add(
-                new(
-                    first.Id,
-                    first.Path,
-                    first.ValueType,
-                    first.Nullability,
-                    first.Provenance,
-                    status
-                )
-            );
-        }
-
-        return new(AutomationSafeTriggerView.CurrentVersion, fields.ToImmutable());
-    }
-
-    private static ImmutableHashSet<string> _rootNames { get; } =
-        ImmutableHashSet.Create(StringComparer.Ordinal, "actor", "channel", "stream", "arguments");
-
-    private static string Root(string path)
-    {
-        var separator = path.IndexOf('.');
-        return separator < 0 ? path : path[..separator];
-    }
-
-    private static HashSet<Guid> Reachable(
-        IEnumerable<Guid> starts,
-        IReadOnlyDictionary<Guid, List<Guid>> adjacency
-    )
-    {
-        var reached = new HashSet<Guid>();
-        var pending = new Stack<Guid>(starts);
-        while (pending.TryPop(out var nodeId) && reached.Add(nodeId))
-        {
-            if (!adjacency.TryGetValue(nodeId, out var targets))
-            {
-                continue;
-            }
-
-            foreach (var target in targets)
-            {
-                pending.Push(target);
-            }
-        }
-
-        return reached;
-    }
-}
+);
 
 internal sealed class AutomationSafeTriggerExpressionService
 {
@@ -293,14 +41,12 @@ internal sealed class AutomationSafeTriggerExpressionService
     internal bool Validate(
         AutomationExpressionSource expression,
         AutomationPortMetadata target,
-        AutomationSafeTriggerViewDescriptor descriptor,
         out ImmutableArray<AutomationSafeTriggerViewField> references
-    ) => Validate(expression, target, descriptor, out references, out _);
+    ) => Validate(expression, target, out references, out _);
 
     internal bool Validate(
         AutomationExpressionSource expression,
         AutomationPortMetadata target,
-        AutomationSafeTriggerViewDescriptor descriptor,
         out ImmutableArray<AutomationSafeTriggerViewField> references,
         out AutomationSafeTriggerFieldId? invalidField
     )
@@ -317,20 +63,17 @@ internal sealed class AutomationSafeTriggerExpressionService
             return false;
         }
 
-        var available = descriptor.AvailableFields.ToDictionary(
+        var available = AutomationSafeTriggerView.Descriptor.Fields.ToDictionary(
             static field => field.Path,
             StringComparer.Ordinal
         );
         var resolved = ImmutableArray.CreateBuilder<AutomationSafeTriggerViewField>();
         foreach (var reference in analysis.References.Order(StringComparer.Ordinal))
         {
-            if (
-                !available.TryGetValue(reference, out var field)
-                && !TryResolveProjectedMember(reference, available, out field)
-            )
+            if (!available.TryGetValue(reference, out var field))
             {
-                invalidField = descriptor
-                    .Fields.FirstOrDefault(candidate => candidate.Path == reference)
+                invalidField = AutomationSafeTriggerView
+                    .Descriptor.Fields.FirstOrDefault(candidate => candidate.Path == reference)
                     ?.Id;
                 return false;
             }
@@ -350,7 +93,7 @@ internal sealed class AutomationSafeTriggerExpressionService
         if (
             !AutomationCelStaticTypes.TryInfer(
                 expression.Source,
-                AutomationCelStaticTypes.ForSafeView(descriptor),
+                AutomationCelStaticTypes.ForSafeView(),
                 out var result
             ) || !result.IsAssignableTo(target.ValueType, target.Nullability)
         )
@@ -362,46 +105,21 @@ internal sealed class AutomationSafeTriggerExpressionService
         return true;
     }
 
-    private static bool TryResolveProjectedMember(
-        string reference,
-        IReadOnlyDictionary<string, AutomationSafeTriggerViewField> available,
-        out AutomationSafeTriggerViewField field
-    )
-    {
-        field = null!;
-        var separator = reference.IndexOf('.');
-        if (
-            separator <= 0
-            || !available.TryGetValue(reference[..separator], out var candidate)
-            || !AutomationCelSyntax.AllowedField(candidate.ValueType, reference[(separator + 1)..])
-        )
-        {
-            return false;
-        }
-
-        field = candidate;
-        return true;
-    }
-
     internal AutomationResolvedValue? Evaluate(
         AutomationExpressionSource expression,
         AutomationPortMetadata port,
-        AutomationSafeTriggerViewDescriptor descriptor,
         AutomationContext context
     )
     {
-        if (!Validate(expression, port, descriptor, out var references))
+        if (!Validate(expression, port, out var references))
         {
             return null;
         }
 
-        Dictionary<string, object?> bindings = new(StringComparer.Ordinal);
-        foreach (var field in references)
+        var bindings = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (references.Any() && !TryBindArguments(bindings, context))
         {
-            if (!TryBind(bindings, field, context))
-            {
-                return null;
-            }
+            return null;
         }
 
         object? evaluated;
@@ -433,75 +151,27 @@ internal sealed class AutomationSafeTriggerExpressionService
             );
     }
 
-    private static bool TryBind(
-        Dictionary<string, object?> bindings,
-        AutomationSafeTriggerViewField field,
+    private static bool TryBindArguments(
+        IDictionary<string, object?> bindings,
         AutomationContext context
     )
     {
-        object? value = field.Path switch
-        {
-            "actor.login" => context.Actor?.Login,
-            "actor.display_name" => context.Actor?.DisplayName,
-            "channel.login" => context.Channel.Login,
-            "channel.display_name" => context.Channel.DisplayName,
-            "stream.title" => context.Stream?.Title,
-            "stream.game_name" => context.Stream?.GameName,
-            "stream.started_at" => context.Stream?.StartedAtUtc,
-            "arguments" => context
-                .Arguments.OrderBy(static argument => argument.Position)
-                .Select(static argument => argument.Value)
-                .ToArray(),
-            _ => ProjectedValue(field, context),
-        };
         if (
-            ReferenceEquals(value, Missing.Value)
-            || (value is null && field.Nullability != AutomationPortNullability.Nullable)
+            context.Arguments.IsDefault
+            || context.Arguments.Any(static argument => argument.Position < 0)
+            || context.Arguments.Select(static argument => argument.Position).Distinct().Count()
+                != context.Arguments.Length
         )
         {
             return false;
         }
 
-        var segments = field.Path.Split('.');
-        if (segments.Length == 1)
-        {
-            bindings[field.Path] = value;
-            return true;
-        }
-
-        IDictionary<string, object?> current = bindings;
-        foreach (var segment in segments[..^1])
-        {
-            if (!current.TryGetValue(segment, out var existing))
-            {
-                existing = new Dictionary<string, object?>(StringComparer.Ordinal);
-                current.Add(segment, existing);
-            }
-
-            if (existing is not IDictionary<string, object?> nested)
-            {
-                return false;
-            }
-
-            current = nested;
-        }
-
-        current[segments[^1]] = value;
+        bindings[AutomationSafeTriggerView.ArgumentsField.Path] = context
+            .Arguments.OrderBy(static argument => argument.Position)
+            .Select(static argument => argument.Value)
+            .ToArray();
         return true;
     }
-
-    private static object? ProjectedValue(
-        AutomationSafeTriggerViewField field,
-        AutomationContext context
-    ) =>
-        !context.Variables.ForExecution().TryGetValue(new(field.Path), out var variable)
-            ? field.Nullability == AutomationPortNullability.Nullable
-                ? null
-                : Missing.Value
-            : variable.Sensitivity == AutomationDataSensitivity.Safe
-            && AutomationPureHandlerRegistry.ValueType(variable.Value) == field.ValueType
-                ? AutomationTransformCelService.ToCelValue(variable.Value)
-                : Missing.Value;
 
     private static bool TryValue(
         object? evaluated,
@@ -541,17 +211,12 @@ internal sealed class AutomationSafeTriggerExpressionService
                             new AutomationValueArgument(
                                 position,
                                 argument,
-                                [AutomationValueProvenance.PublicChat]
+                                [AutomationSafeTriggerView.ArgumentsField.Provenance]
                             )
                     ),
                 ]),
             _ => null!,
         };
         return value is not null;
-    }
-
-    private sealed class Missing
-    {
-        internal static object Value { get; } = new();
     }
 }

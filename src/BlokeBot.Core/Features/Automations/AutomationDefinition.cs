@@ -16,8 +16,6 @@ internal interface IAutomationEffectiveDefinition
     bool UsesEffectiveDescriptor { get; }
 
     AutomationDefinitionDescriptor EffectiveDescriptor(AutomationConfiguration configuration);
-
-    AutomationSafeTriggerSourceContract? SafeTriggerSource(AutomationConfiguration configuration);
 }
 
 public sealed class AutomationDefinition<TConfiguration>
@@ -28,28 +26,25 @@ public sealed class AutomationDefinition<TConfiguration>
     private readonly Func<JsonElement, AutomationConfigurationParseResult> _parse;
     private readonly Func<TConfiguration, AutomationValidationResult> _validate;
     private readonly Func<TConfiguration, AutomationDefinitionDescriptor>? _effectiveDescriptor;
-    private readonly Func<TConfiguration, AutomationSafeTriggerSourceContract?>? _safeTriggerSource;
 
     public AutomationDefinition(
         AutomationDefinitionDescriptor descriptor,
         Func<JsonElement, AutomationConfigurationParseResult> parse,
         Func<TConfiguration, AutomationValidationResult> validate
     )
-        : this(descriptor, parse, validate, null, null) { }
+        : this(descriptor, parse, validate, null) { }
 
     internal AutomationDefinition(
         AutomationDefinitionDescriptor descriptor,
         Func<JsonElement, AutomationConfigurationParseResult> parse,
         Func<TConfiguration, AutomationValidationResult> validate,
-        Func<TConfiguration, AutomationDefinitionDescriptor>? effectiveDescriptor = null,
-        Func<TConfiguration, AutomationSafeTriggerSourceContract?>? safeTriggerSource = null
+        Func<TConfiguration, AutomationDefinitionDescriptor>? effectiveDescriptor = null
     )
     {
         Descriptor = descriptor;
         _parse = parse;
         _validate = validate;
         _effectiveDescriptor = effectiveDescriptor;
-        _safeTriggerSource = safeTriggerSource;
     }
 
     public AutomationDefinitionDescriptor Descriptor { get; }
@@ -73,13 +68,6 @@ public sealed class AutomationDefinition<TConfiguration>
             : Descriptor;
 
     bool IAutomationEffectiveDefinition.UsesEffectiveDescriptor => _effectiveDescriptor is not null;
-
-    AutomationSafeTriggerSourceContract? IAutomationEffectiveDefinition.SafeTriggerSource(
-        AutomationConfiguration configuration
-    ) =>
-        configuration is TConfiguration typed && _safeTriggerSource is not null
-            ? _safeTriggerSource(typed)
-            : null;
 }
 
 public interface IAutomationCatalogModule
