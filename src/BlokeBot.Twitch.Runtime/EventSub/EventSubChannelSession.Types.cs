@@ -4,6 +4,13 @@ internal enum EventSubChannelReconciliationTarget
 {
     Present,
     Absent,
+    Replacing,
+}
+
+internal enum EventSubChannelDeletionLifecycle
+{
+    PreserveRuntime,
+    StopRuntime,
 }
 
 internal sealed class EventSubChannelStatusPublicationException(Exception innerException)

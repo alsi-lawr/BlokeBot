@@ -39,7 +39,9 @@ internal sealed class EventSubSubscriptionReconciliationStore
     private readonly Dictionary<string, EventSubPendingDeletion> _pending = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly HashSet<string> _pendingStops = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pendingLifecycleReconciliations = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
     internal IReadOnlyList<EventSubPendingDeletion> PendingDeletions
     {
@@ -67,7 +69,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
             lock (_gate)
             {
                 return _pending
-                    .Keys.Union(_pendingStops, StringComparer.OrdinalIgnoreCase)
+                    .Keys.Union(_pendingLifecycleReconciliations, StringComparer.OrdinalIgnoreCase)
                     .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
             }
@@ -80,7 +82,7 @@ internal sealed class EventSubSubscriptionReconciliationStore
         {
             lock (_gate)
             {
-                return _pending.Count > 0 || _pendingStops.Count > 0;
+                return _pending.Count > 0 || _pendingLifecycleReconciliations.Count > 0;
             }
         }
     }
@@ -103,10 +105,10 @@ internal sealed class EventSubSubscriptionReconciliationStore
                 return;
             }
 
-            if (_pendingStops.Contains(subscription.Channel))
+            if (_pendingLifecycleReconciliations.Contains(subscription.Channel))
             {
                 throw new UnreachableException(
-                    "An EventSub deletion cannot begin before the prior channel stop is reconciled."
+                    "An EventSub deletion cannot begin before the prior deletion lifecycle is reconciled."
                 );
             }
 
@@ -171,26 +173,26 @@ internal sealed class EventSubSubscriptionReconciliationStore
 
             EnsureSameSubscription(existing.Subscription, subscription);
             _ = _pending.Remove(subscription.Channel);
-            _ = _pendingStops.Add(subscription.Channel);
+            _ = _pendingLifecycleReconciliations.Add(subscription.Channel);
         }
     }
 
-    internal bool HasPendingStop(string channel)
+    internal bool HasPendingLifecycleReconciliation(string channel)
     {
         lock (_gate)
         {
-            return _pendingStops.Contains(channel);
+            return _pendingLifecycleReconciliations.Contains(channel);
         }
     }
 
-    internal void ConfirmStopped(string channel)
+    internal void ConfirmLifecycleReconciled(string channel)
     {
         lock (_gate)
         {
-            if (!_pendingStops.Remove(channel))
+            if (!_pendingLifecycleReconciliations.Remove(channel))
             {
                 throw new UnreachableException(
-                    "A confirmed EventSub channel stop has no pending local evidence."
+                    "A reconciled EventSub deletion lifecycle has no pending local evidence."
                 );
             }
         }

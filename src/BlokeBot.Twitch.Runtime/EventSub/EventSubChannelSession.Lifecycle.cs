@@ -236,24 +236,16 @@ internal sealed partial class EventSubChannelSession(
     {
         var desired = desiredChannels.ToHashSet(StringComparer.OrdinalIgnoreCase);
         await Task.WhenAll(
-            channels.Select(async channel =>
-            {
-                await RunImmediateAsync(
+            channels.Select(channel =>
+                RunImmediateAsync(
                     channel,
-                    EventSubChannelReconciliationTarget.Absent,
+                    desired.Contains(channel)
+                        ? EventSubChannelReconciliationTarget.Replacing
+                        : EventSubChannelReconciliationTarget.Absent,
                     trigger,
                     cancellationToken
-                );
-                if (desired.Contains(channel))
-                {
-                    await RunImmediateAsync(
-                        channel,
-                        EventSubChannelReconciliationTarget.Present,
-                        trigger,
-                        cancellationToken
-                    );
-                }
-            })
+                )
+            )
         );
         await RunReconciliationAsync(desiredChannels, trigger, cancellationToken);
     }

@@ -61,7 +61,9 @@ internal sealed partial class EventSubChannelSession
         if (state is EventSubChannelStatus.Degraded degraded)
         {
             if (
-                target is EventSubChannelReconciliationTarget.Present
+                target
+                    is EventSubChannelReconciliationTarget.Present
+                        or EventSubChannelReconciliationTarget.Replacing
                 && degraded.NextAction is EventSubChannelNextAction.NoFurtherAction
             )
             {

@@ -21,6 +21,7 @@ public sealed class EventSubChannelReconciliationTests : EventSubChannelRecovery
 
         operations.CreateCount("channel").ShouldBe(2);
         operations.DeleteCount("channel").ShouldBe(1);
+        operations.CompleteStopCount("channel").ShouldBe(0);
         _ = harness
             .Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelStatus.Healthy>();

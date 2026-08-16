@@ -74,6 +74,7 @@ internal sealed partial class EventSubChannelSession
         switch (target)
         {
             case EventSubChannelReconciliationTarget.Present:
+            case EventSubChannelReconciliationTarget.Replacing:
                 Publish(
                     new EventSubChannelDiagnosticReport.Healthy
                     {

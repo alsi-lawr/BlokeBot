@@ -36,11 +36,43 @@ internal sealed partial class EventSubChannelSession
             ),
             EventSubChannelReconciliationTarget.Absent => EnsureAbsentAsync(
                 channel,
+                EventSubChannelDeletionLifecycle.StopRuntime,
+                context,
+                cancellationToken
+            ),
+            EventSubChannelReconciliationTarget.Replacing => ReplaceAsync(
+                channel,
                 context,
                 cancellationToken
             ),
             _ => throw new UnreachableException("Unknown EventSub channel reconciliation target."),
         };
+
+    private async ValueTask<EventSubChannelReconciliationOutcome> ReplaceAsync(
+        string channel,
+        EventSubChannelAttemptContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        var removal = await EnsureAbsentAsync(
+            channel,
+            EventSubChannelDeletionLifecycle.PreserveRuntime,
+            context,
+            cancellationToken
+        );
+        return removal switch
+        {
+            EventSubChannelReconciliationOutcome.Completed => await EnsurePresentAsync(
+                channel,
+                context,
+                cancellationToken
+            ),
+            EventSubChannelReconciliationOutcome.UnresolvedDeletion => removal,
+            _ => throw new UnreachableException(
+                "EventSub subscription replacement produced an invalid removal outcome."
+            ),
+        };
+    }
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsurePresentAsync(
         string channel,
@@ -65,7 +97,12 @@ internal sealed partial class EventSubChannelSession
                 );
         }
 
-        await CompletePendingStopAsync(channel, context, cancellationToken);
+        await CompletePendingDeletionLifecycleAsync(
+            channel,
+            EventSubChannelDeletionLifecycle.PreserveRuntime,
+            context,
+            cancellationToken
+        );
         ActiveEventSubSubscription? current;
         lock (_gate)
         {
@@ -113,7 +150,12 @@ internal sealed partial class EventSubChannelSession
                             );
                     }
 
-                    await CompletePendingStopAsync(channel, context, cancellationToken);
+                    await CompletePendingDeletionLifecycleAsync(
+                        channel,
+                        EventSubChannelDeletionLifecycle.PreserveRuntime,
+                        context,
+                        cancellationToken
+                    );
                     active = null;
                 }
 
@@ -412,6 +454,7 @@ internal sealed partial class EventSubChannelSession
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsureAbsentAsync(
         string channel,
+        EventSubChannelDeletionLifecycle lifecycle,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
@@ -433,7 +476,7 @@ internal sealed partial class EventSubChannelSession
                 );
         }
 
-        await CompletePendingStopAsync(channel, context, cancellationToken);
+        await CompletePendingDeletionLifecycleAsync(channel, lifecycle, context, cancellationToken);
         ActiveEventSubSubscription? active;
         lock (_gate)
         {
@@ -459,7 +502,12 @@ internal sealed partial class EventSubChannelSession
                     );
             }
 
-            await CompletePendingStopAsync(channel, context, cancellationToken);
+            await CompletePendingDeletionLifecycleAsync(
+                channel,
+                lifecycle,
+                context,
+                cancellationToken
+            );
         }
 
         lock (_gate)
@@ -803,24 +851,35 @@ internal sealed partial class EventSubChannelSession
         }
     }
 
-    private async ValueTask CompletePendingStopAsync(
+    private async ValueTask CompletePendingDeletionLifecycleAsync(
         string channel,
+        EventSubChannelDeletionLifecycle lifecycle,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
-        if (!pendingDeletions.HasPendingStop(channel))
+        if (!pendingDeletions.HasPendingLifecycleReconciliation(channel))
         {
             return;
         }
 
-        await RunPhaseAsync(
-            context,
-            EventSubChannelPhase.Reconciliation,
-            token => operations.CompleteStopAsync(channel, token),
-            cancellationToken
-        );
-        pendingDeletions.ConfirmStopped(channel);
+        switch (lifecycle)
+        {
+            case EventSubChannelDeletionLifecycle.PreserveRuntime:
+                break;
+            case EventSubChannelDeletionLifecycle.StopRuntime:
+                await RunPhaseAsync(
+                    context,
+                    EventSubChannelPhase.Reconciliation,
+                    token => operations.CompleteStopAsync(channel, token),
+                    cancellationToken
+                );
+                break;
+            default:
+                throw new UnreachableException("Unknown EventSub channel deletion lifecycle.");
+        }
+
+        pendingDeletions.ConfirmLifecycleReconciled(channel);
     }
 
     private static async ValueTask<T> RunPhaseAsync<T>(
