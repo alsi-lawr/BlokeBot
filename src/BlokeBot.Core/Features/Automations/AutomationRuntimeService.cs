@@ -609,7 +609,19 @@ public sealed class AutomationRuntimeService(
             }
 
             var flow = restoredDefinition.Flow;
-            var node = flow.Nodes.Single(value => value.Id == pending.NodeId);
+            var validation = await flowService.ValidateFrozenDefinitionAsync(
+                new(run.HostId),
+                flow,
+                cancellationToken
+            );
+            var node = flow.Nodes.SingleOrDefault(value => value.Id == pending.NodeId);
+            if (validation.Gate is not null || !validation.Errors.IsEmpty || node is null)
+            {
+                FailMalformedRun(run, now);
+                _ = await db.SaveChangesAsync(cancellationToken);
+                return new(AutomationResumeStatus.Failed);
+            }
+
             var scope = new AutomationNodeExecutionScope(db, run, pending, node, flow, leaseId);
             if (node.ExpressionLanguageVersion != AutomationExpressionLanguage.CurrentVersion.Value)
             {

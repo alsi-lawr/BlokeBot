@@ -380,8 +380,24 @@ public sealed class AutomationFlowService(
         }
     }
 
-    internal async Task<AutomationGraphValidation> ValidateAsync(
+    internal Task<AutomationGraphValidation> ValidateAsync(
         AutomationFlowDraft draft,
+        CancellationToken cancellationToken
+    ) => ValidateAsync(draft, AutomationGraphAdmission.Saved, cancellationToken);
+
+    internal Task<AutomationGraphValidation> ValidateFrozenDefinitionAsync(
+        AutomationHostId hostId,
+        AutomationRuntimeSerialization.PersistedFlow flow,
+        CancellationToken cancellationToken
+    ) =>
+        flow.HostId == hostId.Value
+        && RestoreFrozenDraft(flow) is AutomationFlowDraftRestoreOutcome.Available restored
+            ? ValidateAsync(restored.Draft, AutomationGraphAdmission.Frozen, cancellationToken)
+            : Task.FromResult<AutomationGraphValidation>(new(null, [MalformedGraphError()]));
+
+    private async Task<AutomationGraphValidation> ValidateAsync(
+        AutomationFlowDraft draft,
+        AutomationGraphAdmission admission,
         CancellationToken cancellationToken
     )
     {
@@ -446,7 +462,14 @@ public sealed class AutomationFlowService(
                 );
             }
 
-            await ValidateNodeAsync(draft.HostId, node, definitions, errors, cancellationToken);
+            await ValidateNodeAsync(
+                draft.HostId,
+                node,
+                definitions,
+                errors,
+                admission,
+                cancellationToken
+            );
         }
 
         var sources = nodes
@@ -644,6 +667,7 @@ public sealed class AutomationFlowService(
         AutomationFlowDraftNode node,
         IReadOnlyDictionary<AutomationDefinitionId, AutomationDefinitionDescriptor> definitions,
         ImmutableArray<AutomationGraphError>.Builder errors,
+        AutomationGraphAdmission admission,
         CancellationToken cancellationToken
     )
     {
@@ -726,7 +750,10 @@ public sealed class AutomationFlowService(
             );
         }
 
-        if (valid.Configuration is PlayOverlayCueActionConfiguration cue)
+        if (
+            admission == AutomationGraphAdmission.Saved
+            && valid.Configuration is PlayOverlayCueActionConfiguration cue
+        )
         {
             var references = await overlayCues.ResolveReferencesAsync(
                 new(hostId.Value, cue.TargetId.Value, cue.CueId.Value),
@@ -744,7 +771,10 @@ public sealed class AutomationFlowService(
             }
         }
 
-        if (valid.Configuration is RewardRedemptionSourceConfiguration { RewardId: { } rewardId })
+        if (
+            admission == AutomationGraphAdmission.Saved
+            && valid.Configuration is RewardRedemptionSourceConfiguration { RewardId: { } rewardId }
+        )
         {
             // The reward filter is a reference resolved against this channel's known rewards,
             // never free-text. Externally created rewards remain valid read-only triggers.
@@ -767,7 +797,10 @@ public sealed class AutomationFlowService(
             }
         }
 
-        if (valid.Configuration is CustomCommandSourceConfiguration command)
+        if (
+            admission == AutomationGraphAdmission.Saved
+            && valid.Configuration is CustomCommandSourceConfiguration command
+        )
         {
             await using var commandDb = await dbFactory.CreateDbContextAsync(cancellationToken);
             var known = await commandDb
@@ -1249,6 +1282,56 @@ public sealed class AutomationFlowService(
             );
     }
 
+    private static AutomationFlowDraftRestoreOutcome RestoreFrozenDraft(
+        AutomationRuntimeSerialization.PersistedFlow flow
+    )
+    {
+        var nodes = ImmutableArray.CreateBuilder<AutomationFlowDraftNode>();
+        foreach (var node in flow.Nodes)
+        {
+            if (
+                AutomationRuntimeSerialization.RestoreInputBindings(node.InputBindingsJson)
+                is not AutomationInputBindingsRestoreOutcome.Available bindings
+            )
+            {
+                return new AutomationFlowDraftRestoreOutcome.Invalid();
+            }
+
+            nodes.Add(
+                new(
+                    new(node.Id),
+                    AutomationRuntimeSerialization.Definition(node),
+                    new(node.ExpressionLanguageVersion),
+                    node.ContinueOnFailure
+                        ? AutomationNodeFailurePolicy.Continue
+                        : AutomationNodeFailurePolicy.Stop,
+                    bindings.Bindings
+                )
+            );
+        }
+
+        return new AutomationFlowDraftRestoreOutcome.Available(
+            new(
+                new(flow.Id),
+                new(flow.HostId),
+                "Frozen automation",
+                flow.SchemaVersion,
+                true,
+                nodes.ToImmutable(),
+                flow.Edges.Select(static edge => new AutomationFlowDraftEdge(
+                        edge.Id,
+                        edge.Kind,
+                        new(edge.SourceNodeId),
+                        new(edge.SourcePortId),
+                        new(edge.TargetNodeId),
+                        new(edge.TargetPortId)
+                    ))
+                    .ToImmutableArray(),
+                new(AutomationFlowOrientation.Horizontal, AutomationEdgeStyle.Angular)
+            )
+        );
+    }
+
     private static PersistedAutomationEdgeKind Persist(AutomationEdgeKind kind) =>
         kind switch
         {
@@ -1461,6 +1544,12 @@ public sealed class AutomationFlowService(
         string OutcomeCode,
         string? SourcePort
     );
+
+    private enum AutomationGraphAdmission
+    {
+        Saved,
+        Frozen,
+    }
 }
 
 internal sealed record AutomationGraphValidation(

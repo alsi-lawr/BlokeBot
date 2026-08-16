@@ -514,6 +514,125 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
+    public async Task FrozenDefinitionWithUnknownEdgePort_FailsPendingRunWithoutExternalAction()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        var runId = dispatched.RunIds.ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db.AutomationFlowRuns.SingleAsync(candidate =>
+                candidate.Id == runId.Value
+            );
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            var mutated = frozen.Flow with
+            {
+                Edges = frozen
+                    .Flow.Edges.Select(edge =>
+                        edge.TargetNodeId == action.Id.Value
+                            ? edge with
+                            {
+                                SourcePortId = "unknown-output",
+                            }
+                            : edge
+                    )
+                    .ToImmutableArray(),
+            };
+            var mutatedJson = JsonSerializer.Serialize(mutated, JsonSerializerOptions.Web);
+            _ = AutomationRuntimeSerialization
+                .RestoreDefinition(mutatedJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            run.DefinitionJson = mutatedJson;
+            _ = await db.SaveChangesAsync();
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        var failed = await verified
+            .AutomationFlowRuns.Include(static run => run.NodeRuns)
+            .SingleAsync(run => run.Id == runId.Value);
+        failed.Status.ShouldBe(AutomationFlowRunStatus.Failed);
+        failed.NodeRuns.ShouldContain(static node => node.OutcomeCode == "definition-invalid");
+    }
+
+    [Test]
+    public async Task FrozenDefinitionWithUnknownBindingField_FailsPendingRunWithoutExternalAction()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var delay = Node("delay", """{"duration-milliseconds":1000}""");
+        var action = Node("send-chat", """{"message":"must not send"}""");
+        _ = await fixture.SaveAsync(
+            [source, delay, action],
+            [Edge(source, "flow", delay), Edge(delay, "complete", action)]
+        );
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+        var runId = dispatched.RunIds.ShouldHaveSingleItem();
+        await using (var db = await fixture.Database.CreateDbContextAsync())
+        {
+            var run = await db.AutomationFlowRuns.SingleAsync(candidate =>
+                candidate.Id == runId.Value
+            );
+            var frozen = AutomationRuntimeSerialization
+                .RestoreDefinition(run.DefinitionJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            var mutated = frozen.Flow with
+            {
+                Nodes = frozen
+                    .Flow.Nodes.Select(node =>
+                        node.Id == action.Id.Value
+                            ? node with
+                            {
+                                InputBindingsJson =
+                                    AutomationRuntimeSerialization.SerializeInputBindings(
+                                        Bindings("unknown-field", AutomationInputBindingMode.Fixed)
+                                    ),
+                            }
+                            : node
+                    )
+                    .ToImmutableArray(),
+            };
+            var mutatedJson = JsonSerializer.Serialize(mutated, JsonSerializerOptions.Web);
+            _ = AutomationRuntimeSerialization
+                .RestoreDefinition(mutatedJson)
+                .ShouldBeOfType<AutomationDefinitionRestoreOutcome.Available>();
+            run.DefinitionJson = mutatedJson;
+            _ = await db.SaveChangesAsync();
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        var resumed = await fixture.NewRuntime().ResumeAsync(runId, CancellationToken.None);
+
+        resumed.Status.ShouldBe(AutomationResumeStatus.Failed);
+        fixture.Chat.Messages.ShouldBeEmpty();
+        await using var verified = await fixture.Database.CreateDbContextAsync();
+        var failed = await verified
+            .AutomationFlowRuns.Include(static run => run.NodeRuns)
+            .SingleAsync(run => run.Id == runId.Value);
+        failed.Status.ShouldBe(AutomationFlowRunStatus.Failed);
+        failed.NodeRuns.ShouldContain(static node => node.OutcomeCode == "definition-invalid");
+    }
+
+    [Test]
     public async Task MultipleMatchingTriggers_StartIndependentRunsThroughSharedNode()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
