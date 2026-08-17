@@ -15,8 +15,16 @@ public static class AutomationServiceCollectionExtensions
             serviceProvider.GetRequiredService<AutomationDefinitionCatalog>(),
             serviceProvider.GetRequiredService<HostFeatureService>(),
             serviceProvider.GetRequiredService<AutomationExpressionService>(),
-            serviceProvider.GetServices<IAutomationPureNodeHandler>()
+            serviceProvider.GetServices<IAutomationPureNodeHandler>(),
+            serviceProvider.GetRequiredService<IAutomationIntegerEntropy>()
         ));
+        services.TryAddSingleton<IAutomationIntegerEntropy, AutomationProductionIntegerEntropy>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAutomationPureNodeHandler, AutomationRandomNumberHandler>()
+        );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAutomationPureNodeHandler, AutomationCelTransformHandler>()
+        );
         services.TryAddSingleton<AutomationExpressionService>();
         services.TryAddSingleton<AutomationActionExecutor>();
         services.TryAddSingleton<AutomationFlowService>();

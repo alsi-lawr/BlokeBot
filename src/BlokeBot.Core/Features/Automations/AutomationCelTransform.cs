@@ -741,14 +741,18 @@ internal sealed class AutomationTransformCelService
     private sealed record AutomationCelSegment(string? Literal, string? Source);
 }
 
-internal sealed class AutomationCelTransformHandler(AutomationDefinitionId definitionId)
-    : IAutomationPureNodeHandler
+internal sealed class AutomationCelTransformHandler : IAutomationPureNodeHandler
 {
+    public AutomationCelTransformHandler()
+        : this(AutomationDefinitionIds.CelTransform) { }
+
+    internal AutomationCelTransformHandler(AutomationDefinitionId definitionId) =>
+        Contract = AutomationCelTransform.HandlerContract(definitionId);
+
     private readonly AutomationTransformCelService _service = new();
     private int _calls;
 
-    public AutomationPureHandlerContract Contract { get; } =
-        AutomationCelTransform.HandlerContract(definitionId);
+    public AutomationPureHandlerContract Contract { get; }
 
     internal int Calls => Volatile.Read(ref _calls);
 

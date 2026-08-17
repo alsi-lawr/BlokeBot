@@ -15,12 +15,18 @@ public sealed class AutomationCatalogService
         AutomationDefinitionCatalog catalog,
         HostFeatureService features,
         AutomationExpressionService? expressions = null,
-        IEnumerable<IAutomationPureNodeHandler>? handlers = null
+        IEnumerable<IAutomationPureNodeHandler>? handlers = null,
+        IAutomationIntegerEntropy? integerEntropy = null
     )
     {
         _catalog = catalog;
         _features = features;
-        Data = new(this, new(catalog, handlers ?? []), expressions ?? new());
+        Data = new(
+            this,
+            new(catalog, handlers ?? []),
+            expressions ?? new(),
+            integerEntropy ?? new AutomationProductionIntegerEntropy()
+        );
     }
 
     internal AutomationDataResolver Data { get; }

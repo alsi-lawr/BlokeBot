@@ -197,6 +197,13 @@ public sealed class AutomationFlowService(
         AutomationFlowDraft draft,
         AutomationNodeId sourceNodeId,
         CancellationToken cancellationToken
+    ) => await RunSampleAsync(draft, sourceNodeId, 0, cancellationToken);
+
+    internal async Task<AutomationSampleRunOutcome> RunSampleAsync(
+        AutomationFlowDraft draft,
+        AutomationNodeId sourceNodeId,
+        ulong seed,
+        CancellationToken cancellationToken
     )
     {
         var validation = await ValidateAsync(draft, cancellationToken);
@@ -229,6 +236,7 @@ public sealed class AutomationFlowService(
                 host,
                 sourceDefinitionId ?? AutomationDefinitionIds.IncomingRaidSource.Value
             ),
+            seed,
             cancellationToken
         );
     }
@@ -776,38 +784,6 @@ public sealed class AutomationFlowService(
         }
 
         if (
-            valid.Configuration is ConditionControlConfiguration condition
-            && expressions.Validate(
-                new(AutomationExpressionLanguage.CurrentVersion, condition.Expression)
-            ) is AutomationExpressionCheck.Invalid
-        )
-        {
-            errors.Add(
-                new(
-                    node.Id,
-                    "condition-invalid",
-                    "Enter a valid condition expression.",
-                    new("expression")
-                )
-            );
-        }
-
-        if (
-            valid.Configuration is SendChatActionConfiguration sendChat
-            && expressions.ValidateTemplate(sendChat.Message) is AutomationExpressionCheck.Invalid
-        )
-        {
-            errors.Add(
-                new(
-                    node.Id,
-                    "action-expression-invalid",
-                    "Enter a valid chat message expression.",
-                    new("message")
-                )
-            );
-        }
-
-        if (
             admission == AutomationGraphAdmission.Saved
             && valid.Configuration is PlayOverlayCueActionConfiguration cue
         )
@@ -914,10 +890,7 @@ public sealed class AutomationFlowService(
             else if (
                 binding.Expression is { } expression
                 && descriptor.Kind != AutomationNodeKind.Transform
-                && (
-                    expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion
-                    || expressions.Validate(expression) is AutomationExpressionCheck.Invalid
-                )
+                && !ValidOrdinaryBindingExpression(descriptor, fieldId, expression)
             )
             {
                 errors.Add(
@@ -930,6 +903,26 @@ public sealed class AutomationFlowService(
                 );
             }
         }
+    }
+
+    private bool ValidOrdinaryBindingExpression(
+        AutomationDefinitionDescriptor descriptor,
+        AutomationConfigurationFieldId fieldId,
+        AutomationExpressionSource expression
+    )
+    {
+        if (expression.LanguageVersion != AutomationExpressionLanguage.CurrentVersion)
+        {
+            return false;
+        }
+
+        var input = descriptor.Inputs.SingleOrDefault(port => port.BindingFieldId == fieldId);
+        return
+            input is { ValueType: AutomationPortValueType.Text }
+            && expression.Source.Contains("${", StringComparison.Ordinal)
+            ? expressions.ValidateTemplate(expression.Source)
+                is not AutomationExpressionCheck.Invalid
+            : expressions.Validate(expression) is not AutomationExpressionCheck.Invalid;
     }
 
     private void ValidateSafeTriggerExpressions(
@@ -1509,6 +1502,7 @@ public sealed class AutomationFlowService(
         AutomationFlowDraft draft,
         AutomationNodeId sourceNodeId,
         AutomationContext context,
+        ulong seed,
         CancellationToken cancellationToken
     )
     {
@@ -1530,6 +1524,7 @@ public sealed class AutomationFlowService(
         outcomes.Add(new(source.Id, AutomationNodeRunState.Succeeded, "source-received"));
         var persisted = SampleFlow(draft);
         var checkpoints = new AutomationSampleCheckpointStore();
+        var integerEntropy = new AutomationSeededIntegerEntropy(seed);
         var pending = new Queue<AutomationNodeId>(Outgoing(draft.Edges, source.Id, null));
         var visited = new HashSet<AutomationNodeId> { source.Id };
         while (pending.TryDequeue(out var nodeId))
@@ -1548,12 +1543,13 @@ public sealed class AutomationFlowService(
             }
 
             var persistedNode = persisted.Nodes.Single(candidate => candidate.Id == node.Id.Value);
-            var inputs = await catalog.Data.ResolveInputsAsync(
+            var inputs = await catalog.Data.ResolveSampleInputsAsync(
                 draft.HostId,
                 context,
                 persisted,
                 persistedNode,
                 checkpoints,
+                integerEntropy,
                 cancellationToken
             );
             if (inputs is not AutomationInputResolution.Available resolvedInputs)
@@ -1564,7 +1560,7 @@ public sealed class AutomationFlowService(
                 return new AutomationSampleRunOutcome.Failed(outcomes.ToImmutable());
             }
 
-            var evaluated = EvaluateSampleNode(valid.Configuration, context);
+            var evaluated = EvaluateSampleNode(valid.Configuration, resolvedInputs.FieldValues);
             outcomes.Add(
                 new(
                     node.Id,
@@ -1624,42 +1620,41 @@ public sealed class AutomationFlowService(
 
     private SampleNodeEvaluation EvaluateSampleNode(
         AutomationConfiguration configuration,
-        AutomationContext context
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs
     ) =>
         configuration switch
         {
-            ConditionControlConfiguration condition => EvaluateSampleCondition(condition, context),
+            ConditionControlConfiguration => EvaluateSampleCondition(inputs),
             DelayControlConfiguration => new(
                 AutomationNodeRunState.Succeeded,
                 "delay-skipped",
                 "complete"
             ),
-            SendChatActionConfiguration chat
-                when expressions.Interpolate(chat.Message, context)
-                    is AutomationExpressionResult.Invalid => new(
-                AutomationNodeRunState.Failed,
-                "action-expression-invalid",
-                null
-            ),
+            SendChatActionConfiguration => EvaluateSampleSend(inputs),
             _ => new(AutomationNodeRunState.Succeeded, "action-simulated", "complete"),
         };
 
-    private SampleNodeEvaluation EvaluateSampleCondition(
-        ConditionControlConfiguration condition,
-        AutomationContext context
+    private static SampleNodeEvaluation EvaluateSampleCondition(
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs
     ) =>
-        expressions.Evaluate(
-            new(AutomationExpressionLanguage.CurrentVersion, condition.Expression),
-            context
-        ) switch
+        inputs.GetValueOrDefault(new("predicate"))?.Value switch
         {
-            AutomationExpressionResult.Value { Result: bool result } => new(
+            AutomationValue.Boolean { Value: var result } => new(
                 AutomationNodeRunState.Succeeded,
                 result ? "condition-true" : "condition-false",
-                result ? "true" : "false"
+                result ? "yes" : "no"
             ),
             _ => new(AutomationNodeRunState.Failed, "condition-invalid", null),
         };
+
+    private static SampleNodeEvaluation EvaluateSampleSend(
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs
+    ) =>
+        inputs.TryGetValue(new("message"), out var message)
+        && AutomationPublicSinkAdmission.AdmitText(message)
+            is AutomationPublicTextAdmission.Admitted
+            ? new(AutomationNodeRunState.Succeeded, "action-simulated", "complete")
+            : new(AutomationNodeRunState.Failed, "sensitive-output-blocked", null);
 
     private static AutomationContext SampleContext(BotHost host, string sourceDefinitionId)
     {

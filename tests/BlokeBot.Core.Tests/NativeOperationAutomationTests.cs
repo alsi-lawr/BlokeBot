@@ -698,7 +698,21 @@ public sealed class NativeOperationAutomationTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+            type == "send-chat"
+                ? ImmutableDictionary<
+                    AutomationConfigurationFieldId,
+                    AutomationInputBinding
+                >.Empty.Add(
+                    new("message"),
+                    document.RootElement.GetProperty("message").GetString() is { } message
+                    && message.Contains("${", StringComparison.Ordinal)
+                        ? new(
+                            AutomationInputBindingMode.Expression,
+                            new(AutomationExpressionLanguage.CurrentVersion, message)
+                        )
+                        : new(AutomationInputBindingMode.Fixed, Expression: null)
+                )
+                : ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 
@@ -1029,7 +1043,6 @@ public sealed class NativeOperationAutomationTests
                 database,
                 catalog,
                 flows,
-                expressions,
                 executor,
                 clock
             );

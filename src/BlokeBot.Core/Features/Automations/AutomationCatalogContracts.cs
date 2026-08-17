@@ -299,7 +299,7 @@ public sealed record PlayOverlayCueActionConfiguration(
     AutomationOverlayCueId CueId
 ) : AutomationConfiguration;
 
-public sealed record ConditionControlConfiguration(string Expression) : AutomationConfiguration;
+public sealed record ConditionControlConfiguration(bool Predicate) : AutomationConfiguration;
 
 public sealed record DelayControlConfiguration(TimeSpan Duration) : AutomationConfiguration;
 

@@ -11,6 +11,10 @@ public static class AutomationDefinitionIds
 
     public static AutomationDefinitionId PlayOverlayCueAction { get; } = new("play-overlay-cue");
 
+    public static AutomationDefinitionId RandomNumber { get; } = new("random-number");
+
+    public static AutomationDefinitionId CelTransform { get; } = new("cel-transform");
+
     public static AutomationDefinitionId ConditionControl { get; } = new("condition");
 
     public static AutomationDefinitionId DelayControl { get; } = new("delay");
@@ -105,6 +109,15 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
     public IEnumerable<IAutomationDefinition> Definitions { get; } =
     [
         CustomCommandSource(),
+        RandomNumber(),
+        AutomationCelTransform.Definition(
+            AutomationDefinitionIds.CelTransform,
+            new(
+                "CEL Transform",
+                "Evaluates authored CEL expressions over exact typed inputs.",
+                "Data"
+            )
+        ),
         SendChatAction(),
         PlayOverlayCueAction(),
         ConditionControl(),
@@ -191,7 +204,16 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationDefinitionScope.Host,
                 _schema,
                 new("Send chat message", "Sends a message in the host channel.", "Chat"),
-                [_flowInput],
+                [
+                    _flowInput,
+                    new(
+                        new("message"),
+                        "Message",
+                        "Receives the exact Text message to send.",
+                        AutomationPortValueType.Text,
+                        BindingFieldId: new("message")
+                    ),
+                ],
                 [_completeOutput],
                 [
                     new(
@@ -207,6 +229,46 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ),
             ParseSendChat,
             ValidateSendChat
+        );
+
+    private static AutomationDefinition<AutomationRandomNumberConfiguration> RandomNumber() =>
+        new(
+            new(
+                AutomationDefinitionIds.RandomNumber,
+                AutomationNodeKind.Value,
+                AutomationDefinitionScope.Host,
+                _schema,
+                new("Random number", "Generates one inclusive whole number for each run.", "Data"),
+                [],
+                [
+                    new(
+                        new("number"),
+                        "Number",
+                        "Supplies the generated whole number.",
+                        AutomationPortValueType.Number
+                    ),
+                ],
+                [
+                    new(
+                        new("minimum"),
+                        "Minimum",
+                        "The smallest number that can be generated, inclusive.",
+                        new AutomationConfigurationFieldType.Number(long.MinValue, long.MaxValue),
+                        true
+                    ),
+                    new(
+                        new("maximum"),
+                        "Maximum",
+                        "The largest number that can be generated, inclusive.",
+                        new AutomationConfigurationFieldType.Number(long.MinValue, long.MaxValue),
+                        true
+                    ),
+                ],
+                AutomationActionCapabilities.None,
+                AutomationActionRetrySafety.NotApplicable
+            ),
+            ParseRandomNumber,
+            ValidateRandomNumber
         );
 
     private static AutomationDefinition<PlayOverlayCueActionConfiguration> PlayOverlayCueAction() =>
@@ -257,30 +319,38 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 AutomationNodeKind.Control,
                 AutomationDefinitionScope.Host,
                 _schema,
-                new("Condition", "Evaluates an expression and chooses a branch.", "Control"),
-                [_flowInput],
+                new("Condition", "Routes Flow from one exact Boolean predicate.", "Control"),
+                [
+                    _flowInput,
+                    new(
+                        new("predicate"),
+                        "Predicate",
+                        "Receives the exact Boolean value that chooses the branch.",
+                        AutomationPortValueType.Boolean,
+                        BindingFieldId: new("predicate")
+                    ),
+                ],
                 [
                     new(
-                        new("true"),
-                        "Matches",
-                        "Continues when the expression is true.",
+                        new("yes"),
+                        "Yes",
+                        "Continues when the predicate is true.",
                         AutomationPortValueType.Flow
                     ),
                     new(
-                        new("false"),
-                        "Does not match",
-                        "Continues when the expression is false.",
+                        new("no"),
+                        "No",
+                        "Continues when the predicate is false.",
                         AutomationPortValueType.Flow
                     ),
                 ],
                 [
                     new(
-                        new("expression"),
-                        "Expression",
-                        "The expression that decides which branch continues.",
-                        new AutomationConfigurationFieldType.Text(null, true),
-                        true,
-                        AutomationDataSensitivity.Sensitive
+                        new("predicate"),
+                        "Predicate",
+                        "The retained Fixed Boolean value.",
+                        new AutomationConfigurationFieldType.Data(AutomationPortValueType.Boolean),
+                        true
                     ),
                 ],
                 AutomationActionCapabilities.None,
@@ -329,6 +399,30 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             ? Parsed(new SendChatActionConfiguration(message))
             : Invalid("message", "Enter a chat message.");
 
+    private static AutomationConfigurationParseResult ParseRandomNumber(JsonElement json)
+    {
+        if (json.ValueKind != JsonValueKind.Object)
+        {
+            return Invalid("minimum", "Enter an exact whole-number minimum and maximum.");
+        }
+
+        var minimum = 0L;
+        if (
+            json.TryGetProperty("minimum", out var minimumJson)
+            && !TryReadRandomBound(minimumJson, "minimum", out minimum, out var minimumError)
+        )
+        {
+            return minimumError!;
+        }
+
+        var maximum = 100L;
+        return
+            json.TryGetProperty("maximum", out var maximumJson)
+            && !TryReadRandomBound(maximumJson, "maximum", out maximum, out var maximumError)
+            ? maximumError!
+            : Parsed(new AutomationRandomNumberConfiguration(minimum, maximum));
+    }
+
     private static AutomationConfigurationParseResult ParseOverlayCue(JsonElement json) =>
         TryReadString(json, "target-id", out var targetId)
         && Guid.TryParse(targetId, out var parsedTarget)
@@ -338,9 +432,11 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             : Invalid("target-id", "Choose a Cue player and a saved cue.");
 
     private static AutomationConfigurationParseResult ParseCondition(JsonElement json) =>
-        TryReadString(json, "expression", out var expression)
-            ? Parsed(new ConditionControlConfiguration(expression))
-            : Invalid("expression", "Enter a condition expression.");
+        json.ValueKind == JsonValueKind.Object
+        && json.TryGetProperty("predicate", out var predicate)
+        && predicate.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? Parsed(new ConditionControlConfiguration(predicate.GetBoolean()))
+            : Invalid("predicate", "Choose a Boolean predicate.");
 
     private static AutomationConfigurationParseResult ParseDelay(JsonElement json) =>
         TryReadInt64(json, "duration-milliseconds", out var milliseconds)
@@ -379,6 +475,16 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
             _ => AutomationValidationResult.Valid,
         };
 
+    private static AutomationValidationResult ValidateRandomNumber(
+        AutomationRandomNumberConfiguration configuration
+    ) =>
+        configuration.Minimum <= configuration.Maximum
+            ? AutomationValidationResult.Valid
+            : AutomationValidationResult.Invalid(
+                new AutomationValidationTarget.Field(new("maximum")),
+                "Maximum must be greater than or equal to minimum."
+            );
+
     private static AutomationValidationResult ValidateOverlayCue(
         PlayOverlayCueActionConfiguration configuration
     ) =>
@@ -389,17 +495,48 @@ internal sealed class CoreAutomationCatalogModule : IAutomationCatalogModule
                 "Choose a Cue player and a saved cue."
             );
 
-    private static AutomationValidationResult ValidateCondition(
-        ConditionControlConfiguration configuration
-    ) =>
-        configuration.Expression.Trim() switch
+    private static AutomationValidationResult ValidateCondition(ConditionControlConfiguration _) =>
+        AutomationValidationResult.Valid;
+
+    private static bool TryReadRandomBound(
+        JsonElement json,
+        string fieldId,
+        out long value,
+        out AutomationConfigurationParseResult.Invalid? error
+    )
+    {
+        value = 0;
+        error = null;
+        if (json.ValueKind != JsonValueKind.Number || !json.TryGetDecimal(out var number))
         {
-            [] => AutomationValidationResult.Invalid(
-                new AutomationValidationTarget.Field(new("expression")),
-                "Enter a condition expression."
-            ),
-            _ => AutomationValidationResult.Valid,
-        };
+            error = (AutomationConfigurationParseResult.Invalid)Invalid(
+                fieldId,
+                "Enter a whole number from -9223372036854775808 through 9223372036854775807."
+            );
+            return false;
+        }
+
+        if (decimal.Truncate(number) != number)
+        {
+            error = (AutomationConfigurationParseResult.Invalid)Invalid(
+                fieldId,
+                "Enter an exact whole number without a fractional part."
+            );
+            return false;
+        }
+
+        if (number is < long.MinValue or > long.MaxValue)
+        {
+            error = (AutomationConfigurationParseResult.Invalid)Invalid(
+                fieldId,
+                "Enter a whole number from -9223372036854775808 through 9223372036854775807."
+            );
+            return false;
+        }
+
+        value = decimal.ToInt64(number);
+        return true;
+    }
 
     private static AutomationValidationResult ValidateDelay(
         DelayControlConfiguration configuration

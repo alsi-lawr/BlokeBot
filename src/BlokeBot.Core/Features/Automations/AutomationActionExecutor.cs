@@ -48,10 +48,8 @@ public sealed class AutomationActionExecutor(
         {
             return configuration switch
             {
-                SendChatActionConfiguration sendChat => await SendChatAsync(
+                SendChatActionConfiguration => await SendChatAsync(
                     hostId,
-                    sendChat,
-                    fields,
                     inputs,
                     context,
                     cancellationToken
@@ -138,8 +136,6 @@ public sealed class AutomationActionExecutor(
 
     private async Task<AutomationActionOutcome> SendChatAsync(
         AutomationHostId hostId,
-        SendChatActionConfiguration configuration,
-        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationExpressionSource> fields,
         IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs,
         AutomationContext context,
         CancellationToken cancellationToken
@@ -150,25 +146,11 @@ public sealed class AutomationActionExecutor(
             return new AutomationActionOutcome.Failed("feature-disabled");
         }
 
-        AutomationPublicTextAdmission admission;
-        if (inputs.TryGetValue(new("message"), out var input))
-        {
-            admission = AutomationPublicSinkAdmission.AdmitText(input);
-        }
-        else
-        {
-            var message = fields.TryGetValue(new("message"), out var expression)
-                ? expressions.Evaluate(expression, context)
-                : expressions.Interpolate(configuration.Message, context);
-            if (message is not AutomationExpressionResult.Value value)
-            {
-                return new AutomationActionOutcome.Failed("action-expression-invalid");
-            }
-
-            admission = AutomationPublicSinkAdmission.AdmitText(value);
-        }
-
-        if (admission is not AutomationPublicTextAdmission.Admitted admitted)
+        if (
+            !inputs.TryGetValue(new("message"), out var input)
+            || AutomationPublicSinkAdmission.AdmitText(input)
+                is not AutomationPublicTextAdmission.Admitted admitted
+        )
         {
             return new AutomationActionOutcome.Failed("sensitive-output-blocked");
         }

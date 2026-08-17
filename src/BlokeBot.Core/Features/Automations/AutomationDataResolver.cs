@@ -50,7 +50,8 @@ internal interface IAutomationPureCheckpointStore
 internal sealed class AutomationDataResolver(
     AutomationCatalogService catalog,
     AutomationPureHandlerRegistry handlers,
-    AutomationExpressionService expressions
+    AutomationExpressionService expressions,
+    IAutomationIntegerEntropy integerEntropy
 )
 {
     private readonly AutomationSafeTriggerExpressionService _safeExpressions = new();
@@ -70,6 +71,27 @@ internal sealed class AutomationDataResolver(
             consumer,
             checkpoints,
             [],
+            integerEntropy,
+            cancellationToken
+        );
+
+    internal async ValueTask<AutomationInputResolution> ResolveSampleInputsAsync(
+        AutomationHostId hostId,
+        AutomationContext context,
+        AutomationRuntimeSerialization.PersistedFlow flow,
+        AutomationRuntimeSerialization.PersistedNode consumer,
+        IAutomationPureCheckpointStore checkpoints,
+        IAutomationIntegerEntropy sampleIntegerEntropy,
+        CancellationToken cancellationToken
+    ) =>
+        await ResolveInputsAsync(
+            hostId,
+            context,
+            flow,
+            consumer,
+            checkpoints,
+            [],
+            sampleIntegerEntropy,
             cancellationToken
         );
 
@@ -80,6 +102,7 @@ internal sealed class AutomationDataResolver(
         AutomationRuntimeSerialization.PersistedNode consumer,
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
+        IAutomationIntegerEntropy executionIntegerEntropy,
         CancellationToken cancellationToken
     )
     {
@@ -111,7 +134,7 @@ internal sealed class AutomationDataResolver(
         {
             if (!bindings.Bindings.TryGetValue(input.BindingFieldId!.Value, out var binding))
             {
-                continue;
+                return new AutomationInputResolution.Failed("binding-invalid");
             }
 
             AutomationResolvedValue? resolved;
@@ -125,7 +148,7 @@ internal sealed class AutomationDataResolver(
             }
             else if (binding.Mode == AutomationInputBindingMode.Fixed)
             {
-                continue;
+                resolved = ResolveFixed(valid.Configuration, input);
             }
             else if (
                 binding.Mode == AutomationInputBindingMode.Expression
@@ -167,6 +190,7 @@ internal sealed class AutomationDataResolver(
                     new(edge.SourcePortId),
                     checkpoints,
                     resolving,
+                    executionIntegerEntropy,
                     cancellationToken
                 );
             }
@@ -194,6 +218,7 @@ internal sealed class AutomationDataResolver(
         AutomationPortId outputPortId,
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
+        IAutomationIntegerEntropy executionIntegerEntropy,
         CancellationToken cancellationToken
     )
     {
@@ -233,6 +258,7 @@ internal sealed class AutomationDataResolver(
             descriptor,
             checkpoints,
             resolving,
+            executionIntegerEntropy,
             cancellationToken
         );
         return outputs?.GetValueOrDefault(outputPortId);
@@ -249,6 +275,7 @@ internal sealed class AutomationDataResolver(
         AutomationDefinitionDescriptor descriptor,
         IAutomationPureCheckpointStore checkpoints,
         ImmutableHashSet<Guid> resolving,
+        IAutomationIntegerEntropy executionIntegerEntropy,
         CancellationToken cancellationToken
     )
     {
@@ -286,6 +313,7 @@ internal sealed class AutomationDataResolver(
             producer,
             checkpoints,
             nextResolving,
+            executionIntegerEntropy,
             cancellationToken
         );
         if (inputs is not AutomationInputResolution.Available resolvedInputs)
@@ -309,7 +337,7 @@ internal sealed class AutomationDataResolver(
         try
         {
             result = await handler.ExecuteAsync(
-                new(valid.Configuration, resolvedInputs.PortValues),
+                new(valid.Configuration, resolvedInputs.PortValues, executionIntegerEntropy),
                 cancellationToken
             );
         }
@@ -347,6 +375,23 @@ internal sealed class AutomationDataResolver(
             ? outputs
             : null;
     }
+
+    private static AutomationResolvedValue? ResolveFixed(
+        AutomationConfiguration configuration,
+        AutomationPortMetadata input
+    ) =>
+        (configuration, input.Id.Value) switch
+        {
+            (SendChatActionConfiguration sendChat, "message") => new(
+                new AutomationValue.Text(sendChat.Message),
+                [AutomationValueProvenance.Generated]
+            ),
+            (ConditionControlConfiguration condition, "predicate") => new(
+                new AutomationValue.Boolean(condition.Predicate),
+                [AutomationValueProvenance.Generated]
+            ),
+            _ => null,
+        };
 
     private static AutomationResolvedValue? ResolveSource(
         AutomationPortMetadata port,
@@ -398,13 +443,15 @@ internal sealed class AutomationDataResolver(
         AutomationContext context
     )
     {
+        var evaluation =
+            port.ValueType == AutomationPortValueType.Text
+            && expression.Source.Contains("${", StringComparison.Ordinal)
+                ? expressions.Interpolate(expression.Source, context)
+                : expressions.Evaluate(expression, context);
         if (
             port.Sensitivity != AutomationDataSensitivity.Safe
-            || expressions.Evaluate(expression, context)
+            || evaluation
                 is not AutomationExpressionResult.Value { UsesSensitiveValues: false } evaluated
-            || context
-                .Variables.ForExecution()
-                .Keys.Any(variable => ContainsIdentifier(expression.Source, variable.Value))
         )
         {
             return null;

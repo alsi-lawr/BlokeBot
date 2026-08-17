@@ -11,7 +11,6 @@ public sealed class AutomationRuntimeService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     AutomationCatalogService catalog,
     AutomationFlowService flowService,
-    AutomationExpressionService expressions,
     AutomationActionExecutor actions,
     TimeProvider clock,
     IEnumerable<IAutomationRunCompletionObserver>? runCompletionObservers = null
@@ -1174,7 +1173,7 @@ public sealed class AutomationRuntimeService(
     ) =>
         configuration switch
         {
-            ConditionControlConfiguration condition => EvaluateCondition(condition, context),
+            ConditionControlConfiguration => EvaluateCondition(inputs),
             DelayControlConfiguration delay => Delay(delay),
             _ => await ExecuteActionAsync(
                 hostId,
@@ -1195,20 +1194,15 @@ public sealed class AutomationRuntimeService(
     }
 
     private AutomationNodeExecution EvaluateCondition(
-        ConditionControlConfiguration condition,
-        AutomationContext context
+        IReadOnlyDictionary<AutomationConfigurationFieldId, AutomationResolvedValue> inputs
     ) =>
-        expressions.Evaluate(
-            new(AutomationExpressionLanguage.CurrentVersion, condition.Expression),
-            context
-        ) switch
+        inputs.GetValueOrDefault(new("predicate"))?.Value switch
         {
-            AutomationExpressionResult.Value { Result: bool result } =>
-                new AutomationNodeExecution.Succeeded(
-                    result ? "condition-true" : "condition-false",
-                    result ? "true" : "false",
-                    clock.GetUtcNow().UtcDateTime
-                ),
+            AutomationValue.Boolean { Value: var result } => new AutomationNodeExecution.Succeeded(
+                result ? "condition-true" : "condition-false",
+                result ? "yes" : "no",
+                clock.GetUtcNow().UtcDateTime
+            ),
             _ => new AutomationNodeExecution.Failed("condition-invalid"),
         };
 

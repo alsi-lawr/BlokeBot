@@ -131,14 +131,22 @@ public sealed class AutomationRuntimeTests
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
-        var condition = Node("condition", """{"expression":"viewer_count >= 20"}""");
+        var condition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "viewer_count >= 20")
+            )
+        );
         var action = Node("send-chat", """{"message":"Welcome ${actor.display_name}!"}""");
 
         var outcome = await fixture.Flows.RunSampleAsync(
             Draft(
                 fixture.HostId,
                 [source, condition, action],
-                [Edge(source, "flow", condition), Edge(condition, "true", action)]
+                [Edge(source, "flow", condition), Edge(condition, "yes", action)]
             ),
             source.Id,
             CancellationToken.None
@@ -149,6 +157,521 @@ public sealed class AutomationRuntimeTests
             .Nodes.Select(static node => node.OutcomeCode)
             .ShouldBe(["source-received", "condition-true", "action-simulated"]);
         fixture.Chat.Messages.ShouldBeEmpty();
+        await using var db = await fixture.Database.CreateDbContextAsync();
+        (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
+        (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ConnectedCompositeJourney_CheckpointsRandomAndTransformBeforeRestartedSend()
+    {
+        var entropy = new CountingIntegerEntropy(73);
+        RuntimeFixture? fixture = null;
+        var checkpointObservedBeforeEffect = false;
+        var chat = new RecordingChatSender(
+            null,
+            async (_, _, _) =>
+            {
+                await using var db = await fixture!.Database.CreateDbContextAsync();
+                checkpointObservedBeforeEffect =
+                    await db.AutomationNodeRuns.CountAsync(node =>
+                        node.OutcomeCode == "output-checkpointed" && node.OutputJson != null
+                    ) == 2;
+            }
+        );
+        await using (
+            fixture = await RuntimeFixture.CreateAsync(chat: chat, integerEntropy: entropy)
+        )
+        {
+            var source = Node("follow", "{}");
+            var random = Node("random-number", """{"minimum":0,"maximum":100}""");
+            var transform = Node(
+                "cel-transform",
+                TransformJson(
+                    [
+                        new(
+                            "actor",
+                            "actor",
+                            "Actor",
+                            "actor-binding",
+                            AutomationPortValueType.Actor,
+                            AutomationPortNullability.NonNullable,
+                            new Dictionary<string, string>
+                            {
+                                ["login"] = "fixed",
+                                ["display-name"] = "Fixed",
+                            }
+                        ),
+                        new(
+                            "number",
+                            "number",
+                            "Number",
+                            "number-binding",
+                            AutomationPortValueType.Number,
+                            AutomationPortNullability.NonNullable,
+                            0
+                        ),
+                    ],
+                    [
+                        new(
+                            "message",
+                            "Message",
+                            AutomationPortValueType.Text,
+                            AutomationPortNullability.NonNullable,
+                            "${actor.display_name} rolled ${format_number(number)}"
+                        ),
+                        new(
+                            "is-high",
+                            "Is high",
+                            AutomationPortValueType.Boolean,
+                            AutomationPortNullability.NonNullable,
+                            "number >= 50"
+                        ),
+                    ]
+                ),
+                bindings: Bindings("actor-binding", AutomationInputBindingMode.Connected)
+                    .Add(
+                        new("number-binding"),
+                        new(AutomationInputBindingMode.Connected, Expression: null)
+                    )
+            );
+            var condition = Node(
+                "condition",
+                """{"predicate":false}""",
+                bindings: Bindings("predicate", AutomationInputBindingMode.Connected)
+            );
+            var delay = Node("delay", """{"duration-milliseconds":1000}""");
+            var send = Node(
+                "send-chat",
+                """{"message":"inactive fixed"}""",
+                bindings: Bindings(
+                    "message",
+                    AutomationInputBindingMode.Connected,
+                    new(AutomationExpressionLanguage.CurrentVersion, "'inactive expression'")
+                )
+            );
+            _ = await fixture.SaveAsync(
+                [source, random, transform, condition, delay, send],
+                [
+                    Edge(source, "flow", condition),
+                    Edge(condition, "yes", delay),
+                    Edge(delay, "complete", send),
+                    Edge(source, "actor", transform, "actor", AutomationEdgeKind.Data),
+                    Edge(random, "number", transform, "number", AutomationEdgeKind.Data),
+                    Edge(transform, "is-high", condition, "predicate", AutomationEdgeKind.Data),
+                    Edge(transform, "message", send, "message", AutomationEdgeKind.Data),
+                ]
+            );
+
+            var dispatched = await fixture.Runtime.DispatchAsync(
+                new(
+                    Context(
+                        fixture.HostId,
+                        sourceDefinitionId: AutomationDefinitionIds.FollowSource
+                    ),
+                    new FollowSourceConfiguration()
+                ),
+                CancellationToken.None
+            );
+
+            entropy.Calls.ShouldBe(1);
+            entropy.Requests.ShouldBe([(0, 100)]);
+            fixture.ProductTransformHandler.Calls.ShouldBe(1);
+            fixture.Chat.Calls.ShouldBe(0);
+            await using (var db = await fixture.Database.CreateDbContextAsync())
+            {
+                var run = await db
+                    .AutomationFlowRuns.Include(static value => value.NodeRuns)
+                    .SingleAsync();
+                run.Status.ShouldBe(AutomationFlowRunStatus.Waiting);
+                run.DefinitionJson.ShouldNotContain("seed", Case.Insensitive);
+                run.DefinitionJson.ShouldNotContain("random-state", Case.Insensitive);
+                var checkpoints = run
+                    .NodeRuns.Where(node =>
+                        node.NodeId == random.Id.Value || node.NodeId == transform.Id.Value
+                    )
+                    .ToArray();
+                checkpoints.Length.ShouldBe(2);
+                checkpoints.ShouldAllBe(static checkpoint =>
+                    checkpoint.Status == AutomationNodeRunStatus.Succeeded
+                    && checkpoint.OutcomeCode == "output-checkpointed"
+                    && checkpoint.OutputJson != null
+                );
+            }
+
+            fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+            var resumed = await fixture
+                .NewRuntime()
+                .ResumeAsync(dispatched.RunIds.ShouldHaveSingleItem(), CancellationToken.None);
+
+            resumed.Status.ShouldBe(AutomationResumeStatus.Completed);
+            entropy.Calls.ShouldBe(1);
+            fixture.ProductTransformHandler.Calls.ShouldBe(1);
+            fixture.Chat.Messages.ShouldBe(["Viewer rolled 73"]);
+            checkpointObservedBeforeEffect.ShouldBeTrue();
+        }
+    }
+
+    [Test]
+    public async Task RandomNumberNodes_AreIndependentWhileEachNodeFansOutFromOneCheckpoint()
+    {
+        var entropy = new CountingIntegerEntropy(11, 22);
+        await using var fixture = await RuntimeFixture.CreateAsync(integerEntropy: entropy);
+        var source = Node("follow", "{}");
+        var firstRandom = Node("random-number", """{"minimum":0,"maximum":100}""");
+        var secondRandom = Node("random-number", """{"minimum":0,"maximum":100}""");
+        var firstTransform = NumberTextTransform(
+            "first-transform",
+            "First ${format_number(number)}"
+        );
+        var secondTransform = NumberTextTransform(
+            "second-transform",
+            "Second ${format_number(number)}"
+        );
+        var firstSend = Node(
+            "send-chat",
+            """{"message":"first fixed"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var firstFanOut = Node(
+            "send-chat",
+            """{"message":"fan-out fixed"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        var secondSend = Node(
+            "send-chat",
+            """{"message":"second fixed"}""",
+            bindings: Bindings("message", AutomationInputBindingMode.Connected)
+        );
+        _ = await fixture.SaveAsync(
+            [
+                source,
+                firstRandom,
+                secondRandom,
+                firstTransform,
+                secondTransform,
+                firstSend,
+                firstFanOut,
+                secondSend,
+            ],
+            [
+                Edge(source, "flow", firstSend),
+                Edge(source, "flow", firstFanOut),
+                Edge(source, "flow", secondSend),
+                Edge(firstRandom, "number", firstTransform, "number", AutomationEdgeKind.Data),
+                Edge(secondRandom, "number", secondTransform, "number", AutomationEdgeKind.Data),
+                Edge(firstTransform, "message", firstSend, "message", AutomationEdgeKind.Data),
+                Edge(firstTransform, "message", firstFanOut, "message", AutomationEdgeKind.Data),
+                Edge(secondTransform, "message", secondSend, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        _ = await fixture.Runtime.DispatchAsync(
+            new(
+                Context(fixture.HostId, sourceDefinitionId: AutomationDefinitionIds.FollowSource),
+                new FollowSourceConfiguration()
+            ),
+            CancellationToken.None
+        );
+
+        entropy.Calls.ShouldBe(2);
+        fixture.ProductTransformHandler.Calls.ShouldBe(2);
+        var firstMessages = fixture.Chat.Messages.Where(static message =>
+            message.StartsWith("First ", StringComparison.Ordinal)
+        );
+        firstMessages.Count().ShouldBe(2);
+        firstMessages.Distinct().Count().ShouldBe(1);
+        var secondMessage = fixture.Chat.Messages.Single(static message =>
+            message.StartsWith("Second ", StringComparison.Ordinal)
+        );
+        firstMessages
+            .Append(secondMessage)
+            .Select(static message =>
+                long.Parse(message.Split(' ')[1], CultureInfo.InvariantCulture)
+            )
+            .Distinct()
+            .Order()
+            .ShouldBe([11L, 22L]);
+    }
+
+    [Test]
+    public async Task UnifiedSendBinding_AllModesUseOnlyTheActivePayloadAndRoundTripInactiveState()
+    {
+        var connectedValue = TextValueHandler("test-counting-text-value", "connected");
+        await using var fixture = await RuntimeFixture.CreateAsync(handlers: [connectedValue]);
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var value = Node("test-counting-text-value", "{}");
+        var fixedSend = Node(
+            "send-chat",
+            """{"message":"fixed"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Fixed,
+                new(AutomationExpressionLanguage.CurrentVersion, "'inactive fixed expression'")
+            )
+        );
+        var expressionSend = Node(
+            "send-chat",
+            """{"message":"inactive expression fixed"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "'expression'")
+            )
+        );
+        var connectedSend = Node(
+            "send-chat",
+            """{"message":"inactive connected fixed"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Connected,
+                new(AutomationExpressionLanguage.CurrentVersion, "'inactive connected expression'")
+            )
+        );
+        _ = await fixture.SaveAsync(
+            [source, value, fixedSend, expressionSend, connectedSend],
+            [
+                Edge(source, "flow", fixedSend),
+                Edge(source, "flow", expressionSend),
+                Edge(source, "flow", connectedSend),
+                Edge(value, "value", connectedSend, "message", AutomationEdgeKind.Data),
+            ]
+        );
+
+        _ = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        fixture
+            .Chat.Messages.Order()
+            .ShouldBe(new[] { "connected", "expression", "fixed" }.Order());
+        connectedValue.Calls.ShouldBe(1);
+        var roundTrip = (
+            await fixture.Flows.ListAsync(new(fixture.HostId), CancellationToken.None)
+        ).ShouldBeOfType<AutomationFlowQueryOutcome.Available>();
+        var restored = roundTrip.Flows.ShouldHaveSingleItem().Draft.Nodes;
+        restored
+            .Single(node => node.Id == fixedSend.Id)
+            .InputBindings.ShouldBe(fixedSend.InputBindings);
+        restored
+            .Single(node => node.Id == expressionSend.Id)
+            .InputBindings.ShouldBe(expressionSend.InputBindings);
+        restored
+            .Single(node => node.Id == connectedSend.Id)
+            .InputBindings.ShouldBe(connectedSend.InputBindings);
+        restored
+            .Single(node => node.Id == connectedSend.Id)
+            .Definition.Configuration.GetProperty("message")
+            .GetString()
+            .ShouldBe("inactive connected fixed");
+    }
+
+    [Test]
+    public async Task UnifiedConditionBinding_AllModesRouteOnlyExactBooleansToYesOrNo()
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var booleanTransform = Node(
+            "cel-transform",
+            TransformJson(
+                [],
+                [
+                    new(
+                        "predicate",
+                        "Predicate",
+                        AutomationPortValueType.Boolean,
+                        AutomationPortNullability.NonNullable,
+                        "true"
+                    ),
+                ]
+            )
+        );
+        var fixedCondition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Fixed,
+                new(AutomationExpressionLanguage.CurrentVersion, "true")
+            )
+        );
+        var expressionCondition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "true")
+            )
+        );
+        var connectedCondition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Connected,
+                new(AutomationExpressionLanguage.CurrentVersion, "false")
+            )
+        );
+        var fixedNo = Node("send-chat", """{"message":"fixed-no"}""");
+        var expressionYes = Node("send-chat", """{"message":"expression-yes"}""");
+        var connectedYes = Node("send-chat", """{"message":"connected-yes"}""");
+        _ = await fixture.SaveAsync(
+            [
+                source,
+                booleanTransform,
+                fixedCondition,
+                expressionCondition,
+                connectedCondition,
+                fixedNo,
+                expressionYes,
+                connectedYes,
+            ],
+            [
+                Edge(source, "flow", fixedCondition),
+                Edge(source, "flow", expressionCondition),
+                Edge(source, "flow", connectedCondition),
+                Edge(fixedCondition, "no", fixedNo),
+                Edge(expressionCondition, "yes", expressionYes),
+                Edge(connectedCondition, "yes", connectedYes),
+                Edge(
+                    booleanTransform,
+                    "predicate",
+                    connectedCondition,
+                    "predicate",
+                    AutomationEdgeKind.Data
+                ),
+            ]
+        );
+
+        _ = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        fixture
+            .Chat.Messages.Order()
+            .ShouldBe(new[] { "connected-yes", "expression-yes", "fixed-no" }.Order());
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary.Nodes.Count(static node => node.OutcomeCode == "condition-true").ShouldBe(2);
+        summary.Nodes.Count(static node => node.OutcomeCode == "condition-false").ShouldBe(1);
+    }
+
+    [Test]
+    [Arguments(false, "null")]
+    [Arguments(true, "null")]
+    [Arguments(false, "'true'")]
+    [Arguments(true, "'true'")]
+    public async Task UnifiedConditionBinding_NullOrWrongTypeUsesConsumerStopOrContinue(
+        bool continueOnFailure,
+        string expression
+    )
+    {
+        await using var fixture = await RuntimeFixture.CreateAsync();
+        var source = Node("custom-command", """{"custom-command-id":7}""");
+        var condition = Node(
+            "condition",
+            """{"predicate":true}""",
+            continueOnFailure
+                ? AutomationNodeFailurePolicy.Continue
+                : AutomationNodeFailurePolicy.Stop,
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, expression)
+            )
+        );
+        _ = await fixture.SaveAsync([source, condition], [Edge(source, "flow", condition)]);
+
+        var dispatched = await fixture.Runtime.DispatchAsync(
+            new(Context(fixture.HostId), new CustomCommandSourceConfiguration(new(7))),
+            CancellationToken.None
+        );
+
+        var summary = (await fixture.Queries.ListAsync(new(fixture.HostId), CancellationToken.None))
+            .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
+            .Runs.ShouldHaveSingleItem();
+        summary.State.ShouldBe(
+            continueOnFailure ? AutomationFlowRunState.Completed : AutomationFlowRunState.Failed
+        );
+        summary
+            .Nodes.Single(node => node.NodeId == condition.Id)
+            .State.ShouldBe(
+                continueOnFailure
+                    ? AutomationNodeRunState.ContinuedAfterFailure
+                    : AutomationNodeRunState.Failed
+            );
+        summary.Nodes.ShouldNotContain(static node =>
+            node.OutcomeCode == "condition-true" || node.OutcomeCode == "condition-false"
+        );
+        fixture.Chat.Calls.ShouldBe(0);
+        (
+            await fixture.Runtime.ResumeAsync(
+                dispatched.RunIds.ShouldHaveSingleItem(),
+                CancellationToken.None
+            )
+        ).Status.ShouldBe(
+            continueOnFailure ? AutomationResumeStatus.Completed : AutomationResumeStatus.Failed
+        );
+    }
+
+    [Test]
+    public async Task SeededSample_ReusesProductValidationWithoutEntropyEffectsOrDurableWrites()
+    {
+        var productionEntropy = new CountingIntegerEntropy(99);
+        await using var fixture = await RuntimeFixture.CreateAsync(
+            integerEntropy: productionEntropy
+        );
+        var source = Node("follow", "{}");
+        var random = Node("random-number", """{"minimum":0,"maximum":100}""");
+        var transform = NumberBooleanTransform("number >= 50");
+        var condition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings("predicate", AutomationInputBindingMode.Connected)
+        );
+        var draft = Draft(
+            fixture.HostId,
+            [source, random, transform, condition],
+            [
+                Edge(source, "flow", condition),
+                Edge(random, "number", transform, "number", AutomationEdgeKind.Data),
+                Edge(transform, "predicate", condition, "predicate", AutomationEdgeKind.Data),
+            ]
+        );
+
+        var first = await fixture.Flows.RunSampleAsync(
+            draft,
+            source.Id,
+            0x227UL,
+            CancellationToken.None
+        );
+        var second = await fixture.Flows.RunSampleAsync(
+            draft,
+            source.Id,
+            0x227UL,
+            CancellationToken.None
+        );
+
+        JsonSerializer.Serialize(second).ShouldBe(JsonSerializer.Serialize(first));
+        productionEntropy.Calls.ShouldBe(0);
+        fixture.Chat.Calls.ShouldBe(0);
+        var completed = first.ShouldBeOfType<AutomationSampleRunOutcome.Completed>();
+        completed
+            .Nodes.Single(node => node.NodeId == condition.Id)
+            .ResolvedInputs.ShouldHaveSingleItem()
+            .DisplayValue.ShouldBe("available");
+        draft.Nodes.ShouldAllBe(static node =>
+            !node
+                .Definition.Configuration.GetRawText()
+                .Contains("seed", StringComparison.OrdinalIgnoreCase)
+            && !AutomationRuntimeSerialization
+                .SerializeInputBindings(node.InputBindings)
+                .Contains("seed", StringComparison.OrdinalIgnoreCase)
+        );
         await using var db = await fixture.Database.CreateDbContextAsync();
         (await db.AutomationFlowRuns.CountAsync()).ShouldBe(0);
         (await db.AutomationNodeRuns.CountAsync()).ShouldBe(0);
@@ -1037,7 +1560,15 @@ public sealed class AutomationRuntimeTests
 
         await using var stableId = await RuntimeFixture.CreateAsync();
         var idSource = Node("custom-command", """{"custom-command-id":7}""");
-        var idAction = Node("send-chat", """{"message":"${actor.twitch_user_id}"}""");
+        var idAction = Node(
+            "send-chat",
+            """{"message":"fallback"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "actor.twitch_user_id")
+            )
+        );
         _ = await stableId.SaveAsync([idSource, idAction], [Edge(idSource, "flow", idAction)]);
         _ = await stableId.Runtime.DispatchAsync(
             new(Context(stableId.HostId), new CustomCommandSourceConfiguration(new(7))),
@@ -1047,7 +1578,15 @@ public sealed class AutomationRuntimeTests
 
         await using var privateValue = await RuntimeFixture.CreateAsync();
         var privateSource = Node("custom-command", """{"custom-command-id":7}""");
-        var privateAction = Node("send-chat", """{"message":"${private_value}"}""");
+        var privateAction = Node(
+            "send-chat",
+            """{"message":"fallback"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "private_value")
+            )
+        );
         _ = await privateValue.SaveAsync(
             [privateSource, privateAction],
             [Edge(privateSource, "flow", privateAction)]
@@ -1065,7 +1604,15 @@ public sealed class AutomationRuntimeTests
         await using (var arguments = await RuntimeFixture.CreateAsync())
         {
             var source = Node("custom-command", """{"custom-command-id":7}""");
-            var action = Node("send-chat", """{"message":"${arguments[0]}"}""");
+            var action = Node(
+                "send-chat",
+                """{"message":"fallback"}""",
+                bindings: Bindings(
+                    "message",
+                    AutomationInputBindingMode.Expression,
+                    new(AutomationExpressionLanguage.CurrentVersion, "arguments[0]")
+                )
+            );
             _ = await arguments.SaveAsync([source, action], [Edge(source, "flow", action)]);
             _ = await arguments.Runtime.DispatchAsync(
                 new(
@@ -2919,7 +3466,7 @@ public sealed class AutomationRuntimeTests
         {
             FailurePolicy = policy,
         };
-        var continued = Node("condition", """{"expression":"arguments[0] == 'yes'"}""");
+        var continued = Node("condition", """{"predicate":true}""");
         _ = await fixture.SaveAsync(
             [source, transform, consumer, continued],
             [
@@ -3044,7 +3591,7 @@ public sealed class AutomationRuntimeTests
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("test-number-source", "{}");
         var transform = Node(
-            "test-cel-transform",
+            "cel-transform",
             TransformJson(
                 [
                     new(
@@ -3099,7 +3646,7 @@ public sealed class AutomationRuntimeTests
                 ? AutomationNodeFailurePolicy.Continue
                 : AutomationNodeFailurePolicy.Stop,
         };
-        var continued = Node("condition", """{"expression":"arguments[0] == 'yes'"}""");
+        var continued = Node("condition", """{"predicate":true}""");
         _ = await fixture.SaveAsync(
             [source, transform, consumer, continued],
             [
@@ -3118,7 +3665,7 @@ public sealed class AutomationRuntimeTests
         );
 
         dispatched.Status.ShouldBe(AutomationDispatchStatus.Accepted);
-        fixture.TransformHandler.Calls.ShouldBe(1);
+        fixture.ProductTransformHandler.Calls.ShouldBe(1);
         fixture.Chat.Messages.ShouldBeEmpty();
         await using (var db = await fixture.Database.CreateDbContextAsync())
         {
@@ -3200,15 +3747,31 @@ public sealed class AutomationRuntimeTests
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
-        var condition = Node("condition", """{"expression":"arguments[0] == 'yes'"}""");
-        var matched = Node("send-chat", """{"message":"Hello ${actor.display_name}"}""");
+        var condition = Node(
+            "condition",
+            """{"predicate":false}""",
+            bindings: Bindings(
+                "predicate",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "arguments[0] == 'yes'")
+            )
+        );
+        var matched = Node(
+            "send-chat",
+            """{"message":"fallback"}""",
+            bindings: Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, "'Hello ' + actor.display_name")
+            )
+        );
         var unmatched = Node("send-chat", """{"message":"No match"}""");
         var flowId = await fixture.SaveAsync(
             [source, condition, matched, unmatched],
             [
                 Edge(source, "flow", condition),
-                Edge(condition, "true", matched),
-                Edge(condition, "false", unmatched),
+                Edge(condition, "yes", matched),
+                Edge(condition, "no", unmatched),
             ]
         );
         var context = Context(fixture.HostId, "yes", "private-argument");
@@ -3793,7 +4356,7 @@ public sealed class AutomationRuntimeTests
     }
 
     [Test]
-    public async Task SensitiveActionExpression_IsEvaluatedButBlockedBeforePublicOutputAndOutcome()
+    public async Task SensitiveActionExpression_IsBlockedDuringInputResolutionWithoutPublicOutput()
     {
         await using var fixture = await RuntimeFixture.CreateAsync();
         var source = Node("custom-command", """{"custom-command-id":7}""");
@@ -3823,7 +4386,7 @@ public sealed class AutomationRuntimeTests
             .ShouldBeOfType<AutomationRunQueryOutcome.Available>()
             .Runs.ShouldHaveSingleItem();
         summary.State.ShouldBe(AutomationFlowRunState.Failed);
-        summary.Nodes.ShouldContain(static node => node.OutcomeCode == "sensitive-output-blocked");
+        summary.Nodes.ShouldContain(static node => node.OutcomeCode == "input-resolution-failed");
         JsonSerializer.Serialize(summary).ShouldNotContain("do-not-expose");
         (
             await fixture.Runtime.ResumeAsync(
@@ -4100,9 +4663,27 @@ public sealed class AutomationRuntimeTests
                         pair.Value
                     )
                 )
-                ?? ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+                ?? DefaultBindings(type, document.RootElement)
         );
     }
+
+    private static ImmutableDictionary<
+        AutomationConfigurationFieldId,
+        AutomationInputBinding
+    > DefaultBindings(string type, JsonElement configuration) =>
+        type switch
+        {
+            "send-chat"
+                when configuration.GetProperty("message").GetString() is { } message
+                    && message.Contains("${", StringComparison.Ordinal) => Bindings(
+                "message",
+                AutomationInputBindingMode.Expression,
+                new(AutomationExpressionLanguage.CurrentVersion, message)
+            ),
+            "send-chat" => Bindings("message", AutomationInputBindingMode.Fixed),
+            "condition" => Bindings("predicate", AutomationInputBindingMode.Fixed),
+            _ => ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty,
+        };
 
     private static PersistedAutomationNodeDefinition Persisted(string type, string json)
     {
@@ -4175,6 +4756,65 @@ public sealed class AutomationRuntimeTests
                     second
                 ),
             ]
+        );
+
+    private static AutomationFlowDraftNode NumberTextTransform(string alias, string source) =>
+        Node(
+            "cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "number",
+                        "number",
+                        "Number",
+                        "number-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        0
+                    ),
+                ],
+                [
+                    new(
+                        "message",
+                        "Message",
+                        AutomationPortValueType.Text,
+                        AutomationPortNullability.NonNullable,
+                        source
+                    ),
+                ]
+            ),
+            bindings: Bindings("number-binding", AutomationInputBindingMode.Connected)
+        ) with
+        {
+            DisplayAlias = alias,
+        };
+
+    private static AutomationFlowDraftNode NumberBooleanTransform(string source) =>
+        Node(
+            "cel-transform",
+            TransformJson(
+                [
+                    new(
+                        "number",
+                        "number",
+                        "Number",
+                        "number-binding",
+                        AutomationPortValueType.Number,
+                        AutomationPortNullability.NonNullable,
+                        0
+                    ),
+                ],
+                [
+                    new(
+                        "predicate",
+                        "Predicate",
+                        AutomationPortValueType.Boolean,
+                        AutomationPortNullability.NonNullable,
+                        source
+                    ),
+                ]
+            ),
+            bindings: Bindings("number-binding", AutomationInputBindingMode.Connected)
         );
 
     private static AutomationCelTransformConfiguration TransformDynamicPrecisionConfiguration(
@@ -4330,6 +4970,23 @@ public sealed class AutomationRuntimeTests
         {
             _ = Interlocked.Increment(ref _calls);
             return ValueTask.FromResult(execute(input));
+        }
+    }
+
+    private sealed class CountingIntegerEntropy(params long[] values) : IAutomationIntegerEntropy
+    {
+        private readonly Queue<long> _values = new(values);
+        private int _calls;
+
+        internal int Calls => Volatile.Read(ref _calls);
+
+        internal ConcurrentQueue<(long Minimum, long Maximum)> Requests { get; } = [];
+
+        public long NextInt64Inclusive(long minimum, long maximum)
+        {
+            _ = Interlocked.Increment(ref _calls);
+            Requests.Enqueue((minimum, maximum));
+            return _values.Dequeue();
         }
     }
 
@@ -4844,6 +5501,7 @@ public sealed class AutomationRuntimeTests
             HostFeatureService features,
             AutomationCatalogService catalog,
             AutomationCelTransformHandler transformHandler,
+            AutomationCelTransformHandler productTransformHandler,
             AutomationExpressionService expressions,
             AutomationActionExecutor actions,
             AutomationRuntimeService runtime,
@@ -4858,6 +5516,7 @@ public sealed class AutomationRuntimeTests
             Features = features;
             Catalog = catalog;
             TransformHandler = transformHandler;
+            ProductTransformHandler = productTransformHandler;
             Expressions = expressions;
             Actions = actions;
             Runtime = runtime;
@@ -4872,6 +5531,7 @@ public sealed class AutomationRuntimeTests
         internal HostFeatureService Features { get; }
         internal AutomationCatalogService Catalog { get; }
         internal AutomationCelTransformHandler TransformHandler { get; }
+        internal AutomationCelTransformHandler ProductTransformHandler { get; }
         internal AutomationExpressionService Expressions { get; }
         internal AutomationActionExecutor Actions { get; }
         internal AutomationRuntimeService Runtime { get; }
@@ -4887,7 +5547,8 @@ public sealed class AutomationRuntimeTests
             RecordingChatSender? chat = null,
             IEnumerable<IAutomationPureNodeHandler>? handlers = null,
             Func<AutomationCelTransformHandler, IAutomationPureNodeHandler>? transformDecorator =
-                null
+                null,
+            IAutomationIntegerEntropy? integerEntropy = null
         )
         {
             var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -4904,25 +5565,27 @@ public sealed class AutomationRuntimeTests
             );
             var expressions = new AutomationExpressionService();
             var transformHandler = new AutomationCelTransformHandler(new("test-cel-transform"));
+            var productTransformHandler = new AutomationCelTransformHandler();
             var registeredTransformHandler =
                 transformDecorator?.Invoke(transformHandler) ?? transformHandler;
             var catalog = new AutomationCatalogService(
-                new([new CoreAutomationCatalogModule(), new DataContractAutomationModule()]),
+                new([
+                    new CoreAutomationCatalogModule(),
+                    new TwitchEventAutomationCatalogModule(),
+                    new DataContractAutomationModule(),
+                ]),
                 features,
                 expressions,
-                (handlers ?? []).Append(registeredTransformHandler)
+                (handlers ?? [])
+                    .Append(registeredTransformHandler)
+                    .Append(new AutomationRandomNumberHandler())
+                    .Append(productTransformHandler),
+                integerEntropy
             );
             overlays ??= new NoOverlayCues();
             var actions = new AutomationActionExecutor(features, chat, overlays, expressions);
             var flows = new AutomationFlowService(database, catalog, expressions, overlays, clock);
-            var runtime = new AutomationRuntimeService(
-                database,
-                catalog,
-                flows,
-                expressions,
-                actions,
-                clock
-            );
+            var runtime = new AutomationRuntimeService(database, catalog, flows, actions, clock);
             var queries = new AutomationRunQueryService(database, features, catalog);
             var fixture = new RuntimeFixture(
                 database,
@@ -4931,6 +5594,7 @@ public sealed class AutomationRuntimeTests
                 features,
                 catalog,
                 transformHandler,
+                productTransformHandler,
                 expressions,
                 actions,
                 runtime,
@@ -4947,6 +5611,7 @@ public sealed class AutomationRuntimeTests
                 features,
                 catalog,
                 transformHandler,
+                productTransformHandler,
                 expressions,
                 actions,
                 runtime,
@@ -4957,7 +5622,7 @@ public sealed class AutomationRuntimeTests
         }
 
         internal AutomationRuntimeService NewRuntime() =>
-            new(Database, Catalog, Flows, Expressions, Actions, Clock);
+            new(Database, Catalog, Flows, Actions, Clock);
 
         internal async Task<AutomationFlowId> SaveAsync(
             ImmutableArray<AutomationFlowDraftNode> nodes,
@@ -5021,6 +5686,8 @@ public sealed class AutomationRuntimeTests
         private int _calls;
 
         internal ConcurrentQueue<string> Messages { get; } = [];
+
+        internal int Calls => Volatile.Read(ref _calls);
 
         public async ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,

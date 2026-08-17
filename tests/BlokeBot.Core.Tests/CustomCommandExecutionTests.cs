@@ -1351,7 +1351,12 @@ public sealed class CustomCommandExecutionTests
             new(type, 1, document.RootElement.Clone()),
             AutomationExpressionLanguage.CurrentVersion,
             AutomationNodeFailurePolicy.Stop,
-            ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
+            type == "send-chat"
+                ? ImmutableDictionary<
+                    AutomationConfigurationFieldId,
+                    AutomationInputBinding
+                >.Empty.Add(new("message"), new(AutomationInputBindingMode.Fixed, Expression: null))
+                : ImmutableDictionary<AutomationConfigurationFieldId, AutomationInputBinding>.Empty
         );
     }
 

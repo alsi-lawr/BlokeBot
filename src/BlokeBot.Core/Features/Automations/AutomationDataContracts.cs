@@ -41,7 +41,8 @@ internal sealed record AutomationPureHandlerContract(
 
 internal sealed record AutomationPureNodeInput(
     AutomationConfiguration Configuration,
-    ImmutableDictionary<AutomationPortId, AutomationResolvedValue> Inputs
+    ImmutableDictionary<AutomationPortId, AutomationResolvedValue> Inputs,
+    IAutomationIntegerEntropy IntegerEntropy
 );
 
 internal abstract record AutomationPureNodeResult

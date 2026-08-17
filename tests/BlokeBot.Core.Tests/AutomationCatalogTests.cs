@@ -11,6 +11,218 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomationCatalogTests
 {
     [Test]
+    public void ConnectedCompositeProductCatalog_UsesStableTypedRowsWithoutProjectorsOrConversions()
+    {
+        var catalog = new AutomationDefinitionCatalog([
+            new CoreAutomationCatalogModule(),
+            new TwitchEventAutomationCatalogModule(),
+        ]);
+        var definitions = catalog.Descriptors;
+
+        var random = definitions.Single(static definition =>
+            definition.Id == AutomationDefinitionIds.RandomNumber
+        );
+        random.Id.Value.ShouldBe("random-number");
+        random.Kind.ShouldBe(AutomationNodeKind.Value);
+        random.Inputs.ShouldBeEmpty();
+        random
+            .Outputs.ShouldHaveSingleItem()
+            .ShouldBe(
+                new(
+                    new("number"),
+                    "Number",
+                    "Supplies the generated whole number.",
+                    AutomationPortValueType.Number
+                )
+            );
+        random
+            .Configuration.Select(static field => field.Id.Value)
+            .ShouldBe(["minimum", "maximum"]);
+        random.Configuration.ShouldAllBe(static field =>
+            field.FieldType
+            == new AutomationConfigurationFieldType.Number(long.MinValue, long.MaxValue)
+        );
+
+        var transform = definitions.Single(static definition =>
+            definition.Id == AutomationDefinitionIds.CelTransform
+        );
+        transform.Id.Value.ShouldBe("cel-transform");
+        transform.Kind.ShouldBe(AutomationNodeKind.Transform);
+        transform.Inputs.ShouldBeEmpty();
+        transform.Outputs.ShouldBeEmpty();
+        transform.Configuration.ShouldBeEmpty();
+
+        var send = definitions.Single(static definition =>
+            definition.Id == AutomationDefinitionIds.SendChatAction
+        );
+        send.Inputs.Single(static input => input.ValueType != AutomationPortValueType.Flow)
+            .ShouldBe(
+                new(
+                    new("message"),
+                    "Message",
+                    "Receives the exact Text message to send.",
+                    AutomationPortValueType.Text,
+                    BindingFieldId: new("message")
+                )
+            );
+        var condition = definitions.Single(static definition =>
+            definition.Id == AutomationDefinitionIds.ConditionControl
+        );
+        condition
+            .Inputs.Single(static input => input.ValueType != AutomationPortValueType.Flow)
+            .ShouldBe(
+                new(
+                    new("predicate"),
+                    "Predicate",
+                    "Receives the exact Boolean value that chooses the branch.",
+                    AutomationPortValueType.Boolean,
+                    BindingFieldId: new("predicate")
+                )
+            );
+        condition.Outputs.Select(static output => output.Id.Value).ShouldBe(["yes", "no"]);
+
+        var follow = definitions.Single(static definition =>
+            definition.Id == AutomationDefinitionIds.FollowSource
+        );
+        var actor = follow.Outputs.Single(static output => output.Id.Value == "actor");
+        actor.ValueType.ShouldBe(AutomationPortValueType.Actor);
+        actor.Sensitivity.ShouldBe(AutomationDataSensitivity.Safe);
+        actor.Nullability.ShouldBe(AutomationPortNullability.NonNullable);
+
+        definitions
+            .Select(static definition => definition.Id.Value)
+            .ShouldNotContain(static id =>
+                id.Contains("project", StringComparison.Ordinal)
+                || id.Contains("convert", StringComparison.Ordinal)
+                || id.Contains("number-to-text", StringComparison.Ordinal)
+                || id.Contains("generic", StringComparison.Ordinal)
+            );
+    }
+
+    [Test]
+    public async Task RandomNumberConfiguration_DefaultsAndSignedDomainAreExactWithStableFailures()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "random", HostFeatureFlags.Automations);
+        var service = new AutomationCatalogService(Catalog(), FeatureService(dbFactory));
+
+        var defaults = (
+            await service.ValidatePersistedForSaveAsync(
+                new(hostId),
+                Persisted("random-number", 1, "{}"),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        defaults.Configuration.ShouldBe(new AutomationRandomNumberConfiguration(0, 100));
+
+        var domain = (
+            await service.ValidatePersistedForSaveAsync(
+                new(hostId),
+                Persisted(
+                    "random-number",
+                    1,
+                    """{"minimum":-9223372036854775808,"maximum":9223372036854775807}"""
+                ),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Valid>();
+        domain.Configuration.ShouldBe(
+            new AutomationRandomNumberConfiguration(long.MinValue, long.MaxValue)
+        );
+
+        var fractional = (
+            await service.ValidatePersistedForSaveAsync(
+                new(hostId),
+                Persisted("random-number", 1, """{"minimum":0.5,"maximum":1}"""),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+        fractional
+            .Errors.ShouldHaveSingleItem()
+            .ShouldBe(
+                new(
+                    new AutomationValidationTarget.Field(new("minimum")),
+                    "Enter an exact whole number without a fractional part."
+                )
+            );
+
+        var outOfDomain = (
+            await service.ValidatePersistedForSaveAsync(
+                new(hostId),
+                Persisted("random-number", 1, """{"minimum":0,"maximum":9223372036854775808}"""),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+        outOfDomain
+            .Errors.ShouldHaveSingleItem()
+            .ShouldBe(
+                new(
+                    new AutomationValidationTarget.Field(new("maximum")),
+                    "Enter a whole number from -9223372036854775808 through 9223372036854775807."
+                )
+            );
+
+        var reversed = (
+            await service.ValidatePersistedForSaveAsync(
+                new(hostId),
+                Persisted("random-number", 1, """{"minimum":2,"maximum":1}"""),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<AutomationConfigurationCheck.Invalid>();
+        reversed
+            .Errors.ShouldHaveSingleItem()
+            .ShouldBe(
+                new(
+                    new AutomationValidationTarget.Field(new("maximum")),
+                    "Maximum must be greater than or equal to minimum."
+                )
+            );
+    }
+
+    [Test]
+    public void RandomNumberInclusiveMapping_CoversEndpointsSingletonFullDomainAndRejection()
+    {
+        var endpoints = new SequenceUInt64Source(1, ulong.MaxValue);
+        AutomationInclusiveIntegerMapping.NextInt64Inclusive(endpoints, 0, 100).ShouldBe(0);
+        AutomationInclusiveIntegerMapping.NextInt64Inclusive(endpoints, 0, 100).ShouldBe(100);
+
+        var singleton = new SequenceUInt64Source(ulong.MaxValue);
+        AutomationInclusiveIntegerMapping.NextInt64Inclusive(singleton, -42, -42).ShouldBe(-42);
+
+        var fullDomain = new SequenceUInt64Source(0, ulong.MaxValue);
+        AutomationInclusiveIntegerMapping
+            .NextInt64Inclusive(fullDomain, long.MinValue, long.MaxValue)
+            .ShouldBe(long.MinValue);
+        AutomationInclusiveIntegerMapping
+            .NextInt64Inclusive(fullDomain, long.MinValue, long.MaxValue)
+            .ShouldBe(long.MaxValue);
+
+        var rejectedLowProduct = new SequenceUInt64Source(0, 1);
+        AutomationInclusiveIntegerMapping
+            .NextInt64Inclusive(rejectedLowProduct, 0, 100)
+            .ShouldBe(0);
+        rejectedLowProduct.Calls.ShouldBe(2);
+    }
+
+    [Test]
+    public void SeededRandomNumber_UsesTheSameDeterministicInclusiveMapping()
+    {
+        var first = new AutomationSeededIntegerEntropy(0x227UL);
+        var second = new AutomationSeededIntegerEntropy(0x227UL);
+
+        var firstSequence = Enumerable
+            .Range(0, 32)
+            .Select(_ => first.NextInt64Inclusive(long.MinValue, long.MaxValue))
+            .ToArray();
+        var secondSequence = Enumerable
+            .Range(0, 32)
+            .Select(_ => second.NextInt64Inclusive(long.MinValue, long.MaxValue))
+            .ToArray();
+
+        secondSequence.ShouldBe(firstSequence);
+    }
+
+    [Test]
     public async Task HostGate_DiscoveryAndValidation_AreOptInIsolatedAndPauseWithoutReplay()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -33,7 +245,7 @@ public sealed class AutomationCatalogTests
 
         var enabled = await service.DiscoverAsync(new(enabledHost), CancellationToken.None);
         enabled.Availability.ShouldBe(AutomationCatalogAvailability.Enabled);
-        enabled.Definitions.Length.ShouldBe(5);
+        enabled.Definitions.Length.ShouldBe(7);
 
         await features.EnableAsync(
             disabledHost,
@@ -89,10 +301,7 @@ public sealed class AutomationCatalogTests
                 AutomationDefinitionIds.PlayOverlayCueAction,
                 new PlayOverlayCueActionConfiguration(new(Guid.NewGuid()), new(Guid.NewGuid()))
             ),
-            (
-                AutomationDefinitionIds.ConditionControl,
-                new ConditionControlConfiguration("actor.login == 'viewer'")
-            ),
+            (AutomationDefinitionIds.ConditionControl, new ConditionControlConfiguration(true)),
             (
                 AutomationDefinitionIds.DelayControl,
                 new DelayControlConfiguration(TimeSpan.FromDays(30))
@@ -109,7 +318,6 @@ public sealed class AutomationCatalogTests
                 AutomationDefinitionIds.PlayOverlayCueAction,
                 new PlayOverlayCueActionConfiguration(new(Guid.Empty), new(Guid.Empty))
             ),
-            (AutomationDefinitionIds.ConditionControl, new ConditionControlConfiguration(" ")),
             (AutomationDefinitionIds.DelayControl, new DelayControlConfiguration(TimeSpan.Zero)),
         };
 
@@ -185,7 +393,7 @@ public sealed class AutomationCatalogTests
                 1,
                 $$"""{"target-id":"{{Guid.NewGuid()}}","cue-id":"{{Guid.NewGuid()}}"}"""
             ),
-            Persisted("condition", 1, """{"expression":"actor.login == 'viewer'"}"""),
+            Persisted("condition", 1, """{"predicate":true}"""),
             Persisted("delay", 1, """{"duration-milliseconds":2592000000}"""),
         };
 
@@ -238,7 +446,7 @@ public sealed class AutomationCatalogTests
             new CoreAutomationCatalogModule(),
             new AdditionalAutomationModule(),
         ]);
-        extended.Descriptors.Length.ShouldBe(7);
+        extended.Descriptors.Length.ShouldBe(9);
         extended.Descriptors.ShouldContain(static definition =>
             definition.Id == new AutomationDefinitionId("sample-source")
         );
@@ -402,5 +610,18 @@ public sealed class AutomationCatalogTests
 
         public IEnumerable<IAutomationDefinition> Definitions =>
             [TestDefinition(new("future-source"), new(new(2), new(1)))];
+    }
+
+    private sealed class SequenceUInt64Source(params ulong[] values) : IAutomationUInt64Source
+    {
+        private readonly Queue<ulong> _values = new(values);
+
+        internal int Calls { get; private set; }
+
+        public ulong NextUInt64()
+        {
+            Calls++;
+            return _values.Dequeue();
+        }
     }
 }
